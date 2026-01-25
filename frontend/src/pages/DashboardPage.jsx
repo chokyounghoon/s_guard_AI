@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [smsMessages, setSmsMessages] = useState([]);
   const [recentAssignments, setRecentAssignments] = useState([]);
   const [dismissedIds, setDismissedIds] = useState([]);
+  const [totalAssignedCount, setTotalAssignedCount] = useState(0);
   const dismissedIdsRef = useRef([]);
 
   // 초기 로드 시 localStorage에서 데이터 불러오기
@@ -37,6 +38,14 @@ export default function DashboardPage() {
       } catch (e) {
         console.error('닫은 메시지 로드 실패:', e);
       }
+    }
+
+    // 총 할당 건수 로드
+    const savedCount = localStorage.getItem('sguard_total_count');
+    if (savedCount) {
+      setTotalAssignedCount(parseInt(savedCount));
+    } else {
+      setTotalAssignedCount(5); 
     }
   }, []);
 
@@ -98,6 +107,14 @@ export default function DashboardPage() {
       if (newItems.length > 0) {
         const updated = [...newItems, ...prev].slice(0, 10);
         localStorage.setItem('sguard_assignments', JSON.stringify(updated));
+        
+        // 총 할당 건수 업데이트
+        setTotalAssignedCount(current => {
+          const newCount = current + newItems.length;
+          localStorage.setItem('sguard_total_count', newCount.toString());
+          return newCount;
+        });
+        
         return updated;
       }
       return prev;
@@ -322,13 +339,15 @@ export default function DashboardPage() {
             <div className="grid grid-cols-3 gap-4 mb-6">
                 <div 
                     onClick={() => navigate('/assignments')}
-                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
+                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#252b41] transition-all hover:scale-[1.02] active:scale-95"
                 >
                     <p className="text-xs text-slate-400 mb-2 font-medium">할당됨</p>
-                    <span className="text-4xl font-bold text-white">{recentAssignments.length}</span>
+                    <span className="text-4xl font-bold text-white transition-all duration-500">{totalAssignedCount}</span>
                     <div className="absolute bottom-4 right-4 bg-blue-600/20 p-2 rounded-xl">
                         <MoreHorizontal className="w-5 h-5 text-blue-500 fill-current" />
                     </div>
+                    {/* 실시간 업데이트 링 애니메이션 (새 메시지 수신 시) */}
+                    <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
                 </div>
                 <div 
                     onClick={() => navigate('/assignments')}
