@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
-import { Bell, User, Monitor, RefreshCw, CheckCircle, ClipboardList, MessageSquare, Search, MoreHorizontal, Home, Zap, Shield, CheckSquare, BarChart2, Settings, AlertTriangle, Info, AlertCircle, ChevronRight } from 'lucide-react';
+import { Bell, User, Monitor, RefreshCw, CheckCircle, ClipboardList, MessageSquare, Search, MoreHorizontal, Home, Zap, Shield, CheckSquare, BarChart2, Settings, AlertTriangle, Info, AlertCircle, ChevronRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const completionData = [
@@ -10,6 +10,51 @@ const completionData = [
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [smsMessages, setSmsMessages] = useState([]);
+
+  // SMS 메시지 폴링 (5초마다)
+  useEffect(() => {
+    // 초기 로드
+    fetchSMSMessages();
+    
+    // 5초마다 새 메시지 확인
+    const interval = setInterval(fetchSMSMessages, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchSMSMessages = async () => {
+    try {
+      // 프로덕션에서는 실제 API URL 사용
+      const apiUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:8000/sms/recent?limit=3'
+        : 'https://your-backend-api.com/sms/recent?limit=3';
+      
+      const response = await fetch(apiUrl);
+      if (response.ok) {
+        const data = await response.json();
+        setSmsMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error('SMS 메시지 로드 실패:', error);
+      // 에러 시 목 데이터 사용 (데모용)
+      setSmsMessages([
+        {
+          id: 1,
+          sender: '010-1234-5678',
+          message: 'CRITICAL: 서버 장애 발생 - DB 연결 실패',
+          timestamp: new Date().toISOString(),
+          keyword_detected: true,
+          response_message: '긴급 장애가 감지되었습니다. 즉시 War-Room을 통해 확인해주세요.',
+          read: false
+        }
+      ]);
+    }
+  };
+
+  const dismissMessage = (id) => {
+    setSmsMessages(prev => prev.filter(msg => msg.id !== id));
+  };
 
   return (
     <div className="min-h-screen bg-[#0f111a] text-white font-sans pb-24 relative overflow-x-hidden">
@@ -28,13 +73,69 @@ export default function DashboardPage() {
         <div className="flex items-center space-x-4">
             <div className="relative">
                 <Bell className="w-6 h-6 text-slate-400" />
-                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-[#0f111a]"></span>
+                {smsMessages.length > 0 && (
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-[#0f111a]"></span>
+                )}
             </div>
             <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center border border-white/10">
                 <User className="w-5 h-5 text-slate-300" />
             </div>
         </div>
       </header>
+
+      {/* SMS 알림 영역 */}
+      {smsMessages.length > 0 && (
+        <div className="px-5 pt-4 space-y-3">
+          {smsMessages.map((msg) => (
+            <div
+              key={msg.id}
+              className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-4 shadow-xl shadow-blue-900/50 border border-blue-400/30 animate-slide-down"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3 flex-1">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    {msg.keyword_detected ? (
+                      <AlertCircle className="w-6 h-6 text-yellow-300" />
+                    ) : (
+                      <Info className="w-6 h-6 text-white" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <h3 className="font-bold text-white text-sm">SMS 수신</h3>
+                      {msg.keyword_detected && (
+                        <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          키워드 감지
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-blue-100 mb-1">
+                      발신: {msg.sender}
+                    </p>
+                    <p className="text-sm text-white font-medium leading-snug">
+                      {msg.message}
+                    </p>
+                    {msg.response_message && (
+                      <div className="mt-2 bg-white/10 rounded-lg p-2 border border-white/20">
+                        <p className="text-xs text-blue-100 flex items-center space-x-1">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>자동 응답: {msg.response_message}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => dismissMessage(msg.id)}
+                  className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors shrink-0"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <main className="p-5 space-y-5">
         

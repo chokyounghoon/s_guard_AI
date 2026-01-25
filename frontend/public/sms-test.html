@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS 알림 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f1421;
+            color: white;
+        }
+        .container {
+            background: #1a1f2e;
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h1 {
+            color: #3b82f6;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #111827;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        .log {
+            background: #111827;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 8px;
+            background: #1a1f2e;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 S-Guard AI SMS 알림 테스트</h1>
+        
+        <div class="status">
+            <strong>WebSocket 상태:</strong> <span id="ws-status">연결 중...</span>
+        </div>
+
+        <h3>테스트 SMS 전송</h3>
+        <button onclick="sendTestSMS('CRITICAL')">긴급 장애 SMS</button>
+        <button onclick="sendTestSMS('장애')">일반 장애 SMS</button>
+        <button onclick="sendTestSMS('오류')">오류 SMS</button>
+        <button onclick="sendTestSMS('DOWN')">서비스 다운 SMS</button>
+        <button onclick="sendTestSMS('일반')">일반 메시지</button>
+
+        <div class="log">
+            <h3>로그</h3>
+            <div id="log-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const logContainer = document.getElementById('log-container');
+        const wsStatus = document.getElementById('ws-status');
+
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.insertBefore(entry, logContainer.firstChild);
+        }
+
+        // WebSocket 연결
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8000/ws');
+
+            ws.onopen = () => {
+                wsStatus.textContent = '✅ 연결됨';
+                wsStatus.style.color = '#10b981';
+                addLog('WebSocket 연결 성공', 'success');
+                ws.send('ping');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                addLog(`SMS 수신: ${data.sender} - ${data.message}`, 'info');
+                if (data.keyword_detected) {
+                    addLog(`키워드 감지! 자동 응답: ${data.response_message}`, 'success');
+                }
+            };
+
+            ws.onerror = (error) => {
+                wsStatus.textContent = '❌ 오류';
+                wsStatus.style.color = '#ef4444';
+                addLog('WebSocket 오류 발생', 'error');
+            };
+
+            ws.onclose = () => {
+                wsStatus.textContent = '⚠️ 연결 끊김';
+                wsStatus.style.color = '#f59e0b';
+                addLog('WebSocket 연결 종료', 'error');
+                // 재연결 시도
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        // SMS 전송 테스트
+        async function sendTestSMS(keyword) {
+            const message = keyword === '일반' 
+                ? '일반 테스트 메시지입니다.' 
+                : `${keyword}: 서버 장애 발생`;
+
+            try {
+                const response = await fetch('http://localhost:8000/sms/receive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sender: '010-1234-5678',
+                        message: message,
+                        received_at: new Date().toISOString()
+                    })
+                });
+
+                const result = await response.json();
+                addLog(`SMS 전송 성공: ${message}`, 'success');
+                
+                if (result.keyword_detected) {
+                    addLog(`키워드 감지됨! 응답: ${result.response_message}`, 'info');
+                }
+            } catch (error) {
+                addLog(`SMS 전송 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // 페이지 로드 시 WebSocket 연결
+        connectWebSocket();
+    </script>
+</body>
+</html>

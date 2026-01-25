@@ -74,6 +74,9 @@ ALERT_KEYWORDS = {
 # SMS 전송 이력 (실제로는 DB에 저장)
 sms_history: List[dict] = []
 
+# 수신된 SMS 메시지 저장 (최근 10개)
+received_messages: List[dict] = []
+
 def check_keywords(message: str) -> Optional[str]:
     """메시지에서 키워드 감지"""
     for keyword, response in ALERT_KEYWORDS.items():
@@ -127,6 +130,20 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
     # 키워드 체크
     response_message = check_keywords(sms.message)
     
+    # 수신 메시지 저장 (최근 10개만 유지)
+    message_data = {
+        "id": len(received_messages) + 1,
+        "sender": sms.sender,
+        "message": sms.message,
+        "timestamp": datetime.now().isoformat(),
+        "keyword_detected": response_message is not None,
+        "response_message": response_message,
+        "read": False
+    }
+    received_messages.insert(0, message_data)
+    if len(received_messages) > 10:
+        received_messages.pop()
+    
     # WebSocket으로 실시간 알림 전송
     notification = {
         "type": "sms_received",
@@ -159,6 +176,14 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
         "sender": sms.sender,
         "message": sms.message,
         "response_sent": False
+    }
+
+@app.get("/sms/recent")
+async def get_recent_messages(limit: int = 5):
+    """최근 수신된 SMS 메시지 조회"""
+    return {
+        "total": len(received_messages),
+        "messages": received_messages[:limit]
     }
 
 @app.post("/sms/send")
