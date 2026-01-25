@@ -9,6 +9,8 @@ import ReportPublishPage from './pages/ReportPublishPage';
 import ActivityPage from './pages/ActivityPage';
 import ActivityDetailPage from './pages/ActivityDetailPage';
 import AssignmentsPage from './pages/AssignmentsPage';
+import SMSNotification from './components/SMSNotification';
+
 
 
 
@@ -18,6 +20,7 @@ import AssignmentsPage from './pages/AssignmentsPage';
 function App() {
   return (
     <Router>
+      <SMSNotification />
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />

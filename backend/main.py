@@ -1,10 +1,39 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import re
 from datetime import datetime
 import logging
+import json
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# WebSocket 연결 관리자
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"WebSocket 연결됨. 총 연결: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        logger.info(f"WebSocket 연결 해제. 총 연결: {len(self.active_connections)}")
+
+    async def broadcast(self, message: dict):
+        """모든 연결된 클라이언트에게 메시지 브로드캐스트"""
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error(f"메시지 전송 실패: {e}")
+
+manager = ConnectionManager()
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -75,6 +104,18 @@ async def root():
         "version": "1.0.0"
     }
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket 연결 엔드포인트"""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # 클라이언트로부터 메시지 대기 (연결 유지용)
+            data = await websocket.receive_text()
+            logger.info(f"클라이언트 메시지: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
 @app.post("/sms/receive")
 async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
     """
@@ -85,6 +126,17 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
     
     # 키워드 체크
     response_message = check_keywords(sms.message)
+    
+    # WebSocket으로 실시간 알림 전송
+    notification = {
+        "type": "sms_received",
+        "sender": sms.sender,
+        "message": sms.message,
+        "timestamp": datetime.now().isoformat(),
+        "keyword_detected": response_message is not None,
+        "response_message": response_message
+    }
+    await manager.broadcast(notification)
     
     if response_message:
         # 키워드가 감지되면 자동 응답 전송
