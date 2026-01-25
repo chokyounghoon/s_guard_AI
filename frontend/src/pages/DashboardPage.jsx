@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
 import { Bell, User, Monitor, RefreshCw, CheckCircle, ClipboardList, MessageSquare, Search, MoreHorizontal, Home, Zap, Shield, CheckSquare, BarChart2, Settings, AlertTriangle, Info, AlertCircle, ChevronRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -12,71 +12,70 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [smsMessages, setSmsMessages] = useState([]);
   const [recentAssignments, setRecentAssignments] = useState([]);
+  const [dismissedIds, setDismissedIds] = useState([]);
+  const dismissedIdsRef = useRef([]);
 
-  // 초기 로드 시 localStorage에서 할당 내역 불러오기
+  // 초기 로드 시 localStorage에서 데이터 불러오기
   useEffect(() => {
-    const saved = localStorage.getItem('sguard_assignments');
-    if (saved) {
+    // 할당 내역 로드
+    const savedAssignments = localStorage.getItem('sguard_assignments');
+    if (savedAssignments) {
       try {
-        setRecentAssignments(JSON.parse(saved));
+        setRecentAssignments(JSON.parse(savedAssignments));
       } catch (e) {
         console.error('할당 내역 로드 실패:', e);
+      }
+    }
+
+    // 닫은 메시지 ID 로드
+    const savedDismissed = localStorage.getItem('sguard_dismissed_ids');
+    if (savedDismissed) {
+      try {
+        const ids = JSON.parse(savedDismissed);
+        setDismissedIds(ids);
+        dismissedIdsRef.current = ids;
+      } catch (e) {
+        console.error('닫은 메시지 로드 실패:', e);
       }
     }
   }, []);
 
   // SMS 메시지 폴링 (5초마다)
   useEffect(() => {
-    // 초기 로드
     fetchSMSMessages();
-    
-    // 5초마다 새 메시지 확인
     const interval = setInterval(fetchSMSMessages, 5000);
-    
     return () => clearInterval(interval);
   }, []);
 
   const fetchSMSMessages = async () => {
     try {
-      // 프로덕션에서는 실제 API URL 사용
+      // Cloudflare Workers API 사용
       const apiUrl = window.location.hostname === 'localhost' 
         ? 'http://localhost:8000/sms/recent?limit=3'
-        : 'https://your-backend-api.com/sms/recent?limit=3';
+        : 'https://sguard-sms-api.khcho0421.workers.dev/sms/recent?limit=3';
       
       const response = await fetch(apiUrl);
       if (response.ok) {
         const data = await response.json();
         const messages = data.messages || [];
-        setSmsMessages(messages);
         
-        // SMS를 할당 리스트에 추가
+        // 닫지 않은 메시지만 필터링하여 상단 알림에 표시
+        const filteredMessages = messages.filter(msg => !dismissedIdsRef.current.includes(msg.id));
+        setSmsMessages(filteredMessages);
+        
+        // SMS를 할당 리스트에 추가 (할당 리스트는 닫기 여부와 상관없이 누적)
         if (messages.length > 0) {
           addToAssignments(messages);
         }
       }
     } catch (error) {
       console.error('SMS 메시지 로드 실패:', error);
-      // 에러 시 목 데이터 사용 (데모용)
-      const mockMsg = {
-        id: Date.now(),
-        sender: '010-1234-5678',
-        message: 'CRITICAL: 서버 장애 발생 - DB 연결 실패',
-        timestamp: new Date().toISOString(),
-        keyword_detected: true,
-        response_message: '긴급 장애가 감지되었습니다. 즉시 War-Room을 통해 확인해주세요.',
-        read: false
-      };
-      setSmsMessages([mockMsg]);
-      addToAssignments([mockMsg]);
     }
   };
 
   const addToAssignments = (messages) => {
     setRecentAssignments(prev => {
-      // 기존 SMS ID 목록
       const existingIds = new Set(prev.map(a => a.smsId));
-      
-      // 새 메시지만 필터링하여 할당 항목으로 변환
       const newItems = messages
         .filter(msg => !existingIds.has(msg.id))
         .map(msg => ({
@@ -97,7 +96,7 @@ export default function DashboardPage() {
         }));
       
       if (newItems.length > 0) {
-        const updated = [...newItems, ...prev].slice(0, 10); // 최대 10개
+        const updated = [...newItems, ...prev].slice(0, 10);
         localStorage.setItem('sguard_assignments', JSON.stringify(updated));
         return updated;
       }
@@ -107,6 +106,12 @@ export default function DashboardPage() {
 
   const dismissMessage = (id) => {
     setSmsMessages(prev => prev.filter(msg => msg.id !== id));
+    
+    // 닫은 메시지 ID를 저장
+    const updated = [...dismissedIdsRef.current, id];
+    dismissedIdsRef.current = updated;
+    setDismissedIds(updated);
+    localStorage.setItem('sguard_dismissed_ids', JSON.stringify(updated));
   };
 
   return (
@@ -172,7 +177,39 @@ export default function DashboardPage() {
                       <div className="mt-2 bg-white/10 rounded-lg p-2 border border-white/20">
                         <p className="text-xs text-blue-100 flex items-center space-x-1">
                           <CheckCircle className="w-3 h-3" />
-                          <span>자동 응답: {msg.response_message}</span>
+                          {(() => {
+                            if (msg.response_message.includes('AI 분석을 시작합니다.')) {
+                              const parts = msg.response_message.split('AI 분석을 시작합니다.');
+                              return (
+                                <span>
+                                  자동 응답: {parts[0]}
+                                  <span 
+                                    onClick={(e) => { e.stopPropagation(); navigate('/ai-report'); }}
+                                    className="underline decoration-yellow-400/50 underline-offset-4 cursor-pointer font-bold text-yellow-300 hover:text-white transition-colors animate-pulse"
+                                  >
+                                    AI 분석을 시작합니다.
+                                  </span>
+                                  {parts[1]}
+                                </span>
+                              );
+                            } else if (msg.response_message.includes('War-Room')) {
+                              const parts = msg.response_message.split('War-Room');
+                              return (
+                                <span>
+                                  자동 응답: {parts[0]}
+                                  <span 
+                                    onClick={(e) => { e.stopPropagation(); navigate('/chat'); }}
+                                    className="underline decoration-blue-400/50 underline-offset-4 cursor-pointer font-bold text-blue-300 hover:text-white transition-colors animate-pulse"
+                                  >
+                                    War-Room
+                                  </span>
+                                  {parts[1]}
+                                </span>
+                              );
+                            } else {
+                              return <span>자동 응답: {msg.response_message}</span>;
+                            }
+                          })()}
                         </p>
                       </div>
                     )}
@@ -288,7 +325,7 @@ export default function DashboardPage() {
                     className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
                 >
                     <p className="text-xs text-slate-400 mb-2 font-medium">할당됨</p>
-                    <span className="text-4xl font-bold text-white">5</span>
+                    <span className="text-4xl font-bold text-white">{recentAssignments.length}</span>
                     <div className="absolute bottom-4 right-4 bg-blue-600/20 p-2 rounded-xl">
                         <MoreHorizontal className="w-5 h-5 text-blue-500 fill-current" />
                     </div>
