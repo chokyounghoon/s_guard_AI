@@ -49,7 +49,7 @@ export default function LoginPage() {
         {/* Headlines */}
         <div className="text-center mb-10">
             <h1 className="text-3xl font-bold mb-3 text-white tracking-tight">Secure Login</h1>
-            <p className="text-slate-400 text-sm">Access your AI incident management portal</p>
+            <p className="text-slate-400 text-sm">AI Agent 기반 지능형 장애 예방 및 통합 관리 시스템</p>
         </div>
 
         {/* Form */}
@@ -106,5 +106,5 @@ export default function LoginPage() {
         <div className="h-[1px] w-12 bg-slate-500"></div>
       </div>
     </div>
-  );
+  ); 
 }
