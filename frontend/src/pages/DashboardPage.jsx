@@ -11,6 +11,19 @@ const completionData = [
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [smsMessages, setSmsMessages] = useState([]);
+  const [recentAssignments, setRecentAssignments] = useState([]);
+
+  // 초기 로드 시 localStorage에서 할당 내역 불러오기
+  useEffect(() => {
+    const saved = localStorage.getItem('sguard_assignments');
+    if (saved) {
+      try {
+        setRecentAssignments(JSON.parse(saved));
+      } catch (e) {
+        console.error('할당 내역 로드 실패:', e);
+      }
+    }
+  }, []);
 
   // SMS 메시지 폴링 (5초마다)
   useEffect(() => {
@@ -33,23 +46,63 @@ export default function DashboardPage() {
       const response = await fetch(apiUrl);
       if (response.ok) {
         const data = await response.json();
-        setSmsMessages(data.messages || []);
+        const messages = data.messages || [];
+        setSmsMessages(messages);
+        
+        // SMS를 할당 리스트에 추가
+        if (messages.length > 0) {
+          addToAssignments(messages);
+        }
       }
     } catch (error) {
       console.error('SMS 메시지 로드 실패:', error);
       // 에러 시 목 데이터 사용 (데모용)
-      setSmsMessages([
-        {
-          id: 1,
-          sender: '010-1234-5678',
-          message: 'CRITICAL: 서버 장애 발생 - DB 연결 실패',
-          timestamp: new Date().toISOString(),
-          keyword_detected: true,
-          response_message: '긴급 장애가 감지되었습니다. 즉시 War-Room을 통해 확인해주세요.',
-          read: false
-        }
-      ]);
+      const mockMsg = {
+        id: Date.now(),
+        sender: '010-1234-5678',
+        message: 'CRITICAL: 서버 장애 발생 - DB 연결 실패',
+        timestamp: new Date().toISOString(),
+        keyword_detected: true,
+        response_message: '긴급 장애가 감지되었습니다. 즉시 War-Room을 통해 확인해주세요.',
+        read: false
+      };
+      setSmsMessages([mockMsg]);
+      addToAssignments([mockMsg]);
     }
+  };
+
+  const addToAssignments = (messages) => {
+    setRecentAssignments(prev => {
+      // 기존 SMS ID 목록
+      const existingIds = new Set(prev.map(a => a.smsId));
+      
+      // 새 메시지만 필터링하여 할당 항목으로 변환
+      const newItems = messages
+        .filter(msg => !existingIds.has(msg.id))
+        .map(msg => ({
+          smsId: msg.id,
+          id: `sms-${msg.id}-${Date.now()}`,
+          severity: msg.keyword_detected ? 'CRITICAL' : 'MEDIUM',
+          code: `SMS${String(msg.id).padStart(5, '0')}`,
+          time: new Date(msg.timestamp).toLocaleTimeString('ko-KR', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+          }),
+          title: msg.message,
+          sender: msg.sender,
+          timestamp: msg.timestamp,
+          bgColor: msg.keyword_detected ? 'bg-red-900/10' : 'bg-blue-900/10',
+          borderColor: msg.keyword_detected ? 'border-red-500/20' : 'border-blue-500/20'
+        }));
+      
+      if (newItems.length > 0) {
+        const updated = [...newItems, ...prev].slice(0, 10); // 최대 10개
+        localStorage.setItem('sguard_assignments', JSON.stringify(updated));
+        return updated;
+      }
+      return prev;
+    });
   };
 
   const dismissMessage = (id) => {
@@ -264,83 +317,53 @@ export default function DashboardPage() {
 
             {/* Recent List Header */}
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-bold text-white">최근 할당 리스트</h3>
-                <button className="text-[11px] text-blue-500 font-medium hover:text-blue-400 flex items-center">
+                <h3 className="text-sm font-bold text-white">최근 할당 리스트 ({recentAssignments.length})</h3>
+                <button 
+                    onClick={() => navigate('/assignments')}
+                    className="text-[11px] text-blue-500 font-medium hover:text-blue-400 flex items-center"
+                >
                     전체보기 <ChevronRight className="w-3 h-3 ml-0.5" />
                 </button>
             </div>
 
-            {/* List Items */}
+            {/* List Items - Dynamic */}
             <div className="space-y-3">
-                {/* Item 1 - Critical */}
-                <div 
-                    onClick={() => navigate('/assignment-detail')}
-                    className="bg-[#11141d] p-4 rounded-2xl border border-white/5 relative group hover:border-white/10 transition-colors cursor-pointer"
-                >
-                    <div className="flex items-start space-x-3">
-                         <div className="bg-red-500/10 p-2 rounded-full mt-0.5">
-                            <AlertCircle className="w-5 h-5 text-red-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start mb-1">
-                                <h4 className="text-sm font-bold text-white truncate max-w-[80%]">[신한카드] 2026/01/22/21:52:51</h4>
-                                <span className="text-[10px] text-slate-500 font-mono">21:52:51</span>
+                {recentAssignments.length > 0 ? (
+                    recentAssignments.slice(0, 3).map((item) => (
+                        <div 
+                            key={item.id}
+                            onClick={() => navigate('/assignment-detail')}
+                            className={`${item.bgColor} p-4 rounded-2xl border ${item.borderColor} relative group hover:border-white/10 transition-colors cursor-pointer`}
+                        >
+                            <div className="flex items-start space-x-3">
+                                <div className={`${item.severity === 'CRITICAL' ? 'bg-red-500/10' : 'bg-blue-500/10'} p-2 rounded-full mt-0.5`}>
+                                    <AlertCircle className={`w-5 h-5 ${item.severity === 'CRITICAL' ? 'text-red-500' : 'text-blue-500'}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className="text-sm font-bold text-white truncate max-w-[70%]">{item.title}</h4>
+                                        <span className="text-[10px] text-slate-500 font-mono">{item.time}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 leading-snug mb-2">
+                                        발신: {item.sender}
+                                    </p>
+                                    <div className="flex items-center justify-between">
+                                        <span className={`${item.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-blue-500/20 text-blue-500 border-blue-500/30'} text-[10px] font-bold px-2 py-0.5 rounded border`}>
+                                            {item.severity}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500">{item.code}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <p className="text-xs text-slate-300 leading-snug mb-2 line-clamp-2">
-                                SHB02681 은행고객종합정보 비즈니스오류 임계치 초과
-                            </p>
-                            <div className="flex items-center justify-between">
-                                <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded border border-red-500/30">Critical</span>
-                                <span className="text-[10px] text-slate-500">SHB02681</span>
-                            </div>
                         </div>
+                    ))
+                ) : (
+                    <div className="bg-[#11141d] p-8 rounded-2xl border border-white/5 text-center">
+                        <Info className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <p className="text-sm text-slate-400">최근 할당 내역이 없습니다</p>
+                        <p className="text-xs text-slate-500 mt-1">SMS 메시지가 수신되면 자동으로 추가됩니다</p>
                     </div>
-                </div>
-
-                {/* Item 2 - Warning */}
-                <div 
-                    onClick={() => navigate('/assignment-detail')}
-                    className="bg-[#11141d] p-4 rounded-2xl border border-white/5 relative group hover:border-white/10 transition-colors cursor-pointer"
-                >
-                    <div className="flex items-start space-x-3">
-                         <div className="bg-amber-500/10 p-2 rounded-full mt-0.5">
-                            <AlertTriangle className="w-5 h-5 text-amber-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                             <div className="flex justify-between items-center mb-1">
-                                <h4 className="text-sm font-bold text-white">DB 커넥션 풀 임계치 초과</h4>
-                                <span className="bg-amber-500/20 text-amber-500 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-500/30">높음</span>
-                            </div>
-                            <div className="flex justify-between items-center text-[11px] text-slate-500">
-                                <span>Node-DB-01 Warning</span>
-                                <span className="font-mono">09:15 AM</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Item 3 - Info */}
-                <div 
-                    onClick={() => navigate('/assignment-detail')}
-                    className="bg-[#11141d] p-4 rounded-2xl border border-white/5 relative group hover:border-white/10 transition-colors cursor-pointer"
-                >
-                    <div className="flex items-start space-x-3">
-                         <div className="bg-blue-500/10 p-2 rounded-full mt-0.5">
-                            <Info className="w-5 h-5 text-blue-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                             <div className="flex justify-between items-center mb-1">
-                                <h4 className="text-sm font-bold text-white">이미지 서버 동기화 지연</h4>
-                                <span className="bg-blue-500/20 text-blue-500 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-500/30">보통</span>
-                            </div>
-                            <div className="flex justify-between items-center text-[11px] text-slate-500">
-                                <span>CDN-KR-04 Latency</span>
-                                <span className="font-mono">08:30 AM</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
+                )}
             </div>
          </div>
 
