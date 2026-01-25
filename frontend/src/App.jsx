@@ -8,6 +8,8 @@ import ChatPage from './pages/ChatPage';
 import ReportPublishPage from './pages/ReportPublishPage';
 import ActivityPage from './pages/ActivityPage';
 import ActivityDetailPage from './pages/ActivityDetailPage';
+import AssignmentsPage from './pages/AssignmentsPage';
+
 
 
 
@@ -25,6 +27,8 @@ function App() {
         <Route path="/report-publish" element={<ReportPublishPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/activity-detail" element={<ActivityDetailPage />} />
+        <Route path="/assignments" element={<AssignmentsPage />} />
+
 
 
 

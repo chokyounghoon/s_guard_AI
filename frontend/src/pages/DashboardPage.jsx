@@ -128,19 +128,35 @@ export default function DashboardPage() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative">
-                    <p className="text-xs text-slate-400 mb-2 font-medium">할당됨 (Assigned)</p>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+                <div 
+                    onClick={() => navigate('/assignments')}
+                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
+                >
+                    <p className="text-xs text-slate-400 mb-2 font-medium">할당됨</p>
                     <span className="text-4xl font-bold text-white">5</span>
                     <div className="absolute bottom-4 right-4 bg-blue-600/20 p-2 rounded-xl">
                         <MoreHorizontal className="w-5 h-5 text-blue-500 fill-current" />
                     </div>
                 </div>
-                <div className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative">
-                    <p className="text-xs text-slate-400 mb-2 font-medium">처리중 (In Progress)</p>
+                <div 
+                    onClick={() => navigate('/assignments')}
+                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
+                >
+                    <p className="text-xs text-slate-400 mb-2 font-medium">처리중</p>
                     <span className="text-4xl font-bold text-emerald-400">2</span>
                     <div className="absolute bottom-4 right-4 bg-emerald-600/20 p-2 rounded-xl">
                         <RefreshCw className="w-5 h-5 text-emerald-500" />
+                    </div>
+                </div>
+                <div 
+                    onClick={() => navigate('/assignments')}
+                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
+                >
+                    <p className="text-xs text-slate-400 mb-2 font-medium">처리완료</p>
+                    <span className="text-4xl font-bold text-blue-400">3</span>
+                    <div className="absolute bottom-4 right-4 bg-blue-600/20 p-2 rounded-xl">
+                        <CheckCircle className="w-5 h-5 text-blue-500" />
                     </div>
                 </div>
             </div>
