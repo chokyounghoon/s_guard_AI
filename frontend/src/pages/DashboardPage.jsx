@@ -433,7 +433,7 @@ export default function DashboardPage() {
             <div className="bg-blue-600 p-1.5 rounded-lg shadow-lg shadow-blue-900/50">
                 <Shield className="w-4 h-4 text-white fill-current" />
             </div>
-            <span className="font-bold text-lg tracking-wide">S-Guard AI</span>
+            <span className="font-bold text-lg tracking-wide">S-Guard AI <span className="text-red-500 text-xs ml-2">(DEPLOY CHECK)</span></span>
         </div>
         <div className="flex items-center space-x-4">
             <div 
