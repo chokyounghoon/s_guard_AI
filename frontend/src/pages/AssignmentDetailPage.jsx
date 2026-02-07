@@ -2,6 +2,8 @@ import React from 'react';
 import { ArrowLeft, MoreVertical, Server, Clock, AlertCircle, Copy, Sparkles, MessageSquare, FileText, Play, Home, CheckSquare, BarChart2, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import AiResponseGuide from '../components/AiResponseGuide';
+
 export default function AssignmentDetailPage() {
   const navigate = useNavigate();
 
@@ -100,22 +102,7 @@ export default function AssignmentDetailPage() {
         </div>
 
         {/* AI Analysis Result */}
-        <div className="bg-[#1a1f2e] rounded-2xl p-5 border border-blue-500/20 relative overflow-hidden">
-             {/* Gradient Shine */}
-             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-2xl -z-0 rounded-full pointer-events-none" />
-             
-             <div className="flex items-start space-x-4 relative z-10">
-                <div className="bg-blue-600/20 p-2.5 rounded-xl">
-                    <Sparkles className="w-6 h-6 text-blue-400 fill-blue-400/20" />
-                </div>
-                <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-2 text-white">AI 분석 결과</h3>
-                    <p className="text-sm text-slate-300 leading-relaxed">
-                        데이터베이스 <strong className="text-white">연결 풀(Connection Pool)이 초과</strong>되어 응답이 지연되고 있습니다. 현재 활성 세션이 한계치인 500개에 도달했습니다.
-                    </p>
-                </div>
-             </div>
-        </div>
+        <AiResponseGuide />
 
         <div className="flex items-center space-x-3 pt-2">
             <button 

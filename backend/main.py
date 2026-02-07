@@ -223,6 +223,177 @@ def startup_populate_keywords():
     db.commit()
     db.close()
 
-if __name__ == "__main__":
+# --- AI API Endpoints (Phase 2) ---
+
+@app.get("/ai/insight")
+async def get_ai_insight():
+    """
+    대시보드 상단 AI Insight 패널용 데이터
+    실제 구현 시에는 로그 분석 결과나 실시간 지표를 요약해서 반환해야 함.
+    """
+    import random
+    
+    # 시연을 위한 Mock 데이터
+    scenarios = [
+        {
+            "id": "LOG-001",
+            "type": "info", 
+            "category": "report",
+            "severity": "info",
+            "text": "실시간 트래픽 패턴 모니터링 중... (정상 범위)",
+            "detail": "트래픽이 평소와 동일한 패턴을 보이고 있습니다. 특이사항 없음."
+        },
+        {
+            "id": "LOG-002",
+            "type": "info", 
+            "category": "report",
+            "severity": "info",
+            "text": "API 응답 시간 분석: 평균 45ms 유지 중",
+            "detail": "주요 API (Login, Payment) 응답 시간이 SLA 기준(100ms) 이내입니다."
+        },
+        {
+            "id": "SEC-101",
+            "type": "success", 
+            "category": "security",
+            "severity": "low",
+            "text": "보안 스캔 완료: 취약점 발견되지 않음",
+            "detail": "정기 보안 스캔 결과 Critical/High 레벨 취약점이 발견되지 않았습니다."
+        },
+        {
+            "id": "SRV-303",
+            "type": "warning", 
+            "category": "server",
+            "severity": "medium",
+            "text": "트렌드 감지: 지난주 동시간대 대비 접속량 15% 증가",
+            "detail": "이벤트 프로모션 영향으로 접속량이 증가하고 있습니다. 오토스케일링 모니터링 필요."
+        },
+        {
+            "id": "PRED-404",
+            "type": "insight", 
+            "category": "report",
+            "severity": "high",
+            "text": "💡 [Insight] 현재 CPU 패턴이 매주 화요일 배치 작업과 유사합니다.",
+            "detail": "과거 데이터 분석 결과, 화요일 14:00~16:00 사이 배치 작업으로 인한 CPU 상승 패턴과 98% 일치합니다."
+        },
+        {
+            "id": "SEC-999",
+            "type": "insight", 
+            "category": "security",
+            "severity": "critical",
+            "text": "💡 [Insight] 비정상적인 IP 대역(192.168.x.x) 접근 시도가 감지되었습니다.",
+            "detail": "허용되지 않은 VPN 대역에서의 관리자 페이지 접근 시도가 5회 이상 감지되었습니다. 즉시 차단 권고."
+        },
+        {
+            "id": "CRT-500",
+            "type": "error",
+            "category": "critical",
+            "severity": "critical",
+            "text": "🚨 [Critical] 결제 모듈 응답 지연 (Prediction)",
+            "detail": "DB Connection Pool 포화 상태가 예측됩니다. (현재 85% 사용 중, 10분 내 고갈 예상)"
+        },
+        {
+            "id": "SRV-503",
+            "type": "error",
+            "category": "server",
+            "severity": "high",
+            "text": "⚠️ [Server] 이미지 서버 디스크 용량 부족 예측",
+            "detail": "이미지 업로드 속도 저하 감지. 디스크 사용률 90% 도달 예상."
+        }
+    ]
+    
+    return {
+        "status": "active",
+        "learning_data_size": "12.5 TB",
+        "accuracy": "98.2%",
+        "current_log": random.choice(scenarios)
+    }
+
+@app.get("/ai/analysis/{incident_id}")
+async def get_ai_analysis_detail(incident_id: str):
+    """
+    상세 페이지용 AI Root Cause Analysis 및 가이드
+    RAG(Retrieval-Augmented Generation) 엔진 결과를 시뮬레이션
+    """
+    # 데모용: ID에 따라 다른 결과 반환 (홀/짝)
+    # 실제로는 DB에서 해당 incident_id의 로그를 조회하고 LLM에 질의해야 함
+    
+    is_critical = "critical" in incident_id.lower() or "error" in incident_id.lower()
+    
+    if is_critical:
+        return {
+            "incident_id": incident_id,
+            "similarity_score": 95,
+            "similar_case": {
+                "date": "3개월 전",
+                "issue_id": "DB Lock Issue #402",
+                "description": "대량 배치 작업으로 인한 세션 풀 고갈"
+            },
+            "root_cause": "Connection Pool Limit Exceeded (Max: 500)",
+            "impact": "결제 API 응답 지연 (Avg 2.5s)",
+            "recommendation": {
+                "action": "KILL SESSION",
+                "description": "Long Running Query 강제 종료",
+                "type": "script"
+            }
+        }
+    else:
+        return {
+            "incident_id": incident_id,
+            "similarity_score": 88,
+            "similar_case": {
+                "date": "2주 전",
+                "issue_id": "Memory Leak #105",
+                "description": "이미지 처리 서비스 메모리 누수"
+            },
+            "root_cause": "Java Heap Space OutOfMemory",
+            "impact": "이미지 업로드 실패",
+            "recommendation": {
+                "action": "RESTART SERVICE",
+                "description": "이미지 처리 컨테이너 재기동",
+                "type": "command"
+            }
+        }
+
+class ChatRequest(BaseModel):
+    query: str
+
+@app.post("/ai/chat")
+async def chat_with_ai(request: ChatRequest):
+    """
+    AI Agent Chatbot Endpoint
+    Simulates log analysis based on user query keywords.
+    """
+    query = request.query.lower()
+    
+    # Mock Logic for Demo
+    if "결제" in query or "payment" in query:
+        return {
+            "response": "네, 결제 서버 로그를 분석했습니다.\n현재 **에러율 0%**로 매우 안정적인 상태입니다.\n최근 1시간 동안 처리된 결제는 총 1,240건입니다.",
+            "related_logs": [
+                "[INFO] PaymentGateway: Transaction #8823 success (12ms)",
+                "[INFO] PaymentGateway: Transaction #8824 success (11ms)"
+            ]
+        }
+    
+    elif "에러" in query or "error" in query or "장애" in query:
+        return {
+            "response": "⚠️ **최근 1시간 내 3건의 Critical Error**가 발견되었습니다.\n주로 'Connection Timeout' 관련 이슈이며, 현재 담당자에게 알림이 전송되었습니다.",
+            "related_logs": [
+                "[ERROR] ConnectionPool: Timeout waiting for idle object",
+                "[ERROR] API: 503 Service Unavailable"
+            ]
+        }
+        
+    elif "안녕" in query or "hello" in query:
+        return {
+            "response": "안녕하세요! 저는 S-Guard AI 에이전트입니다.\n서버 상태나 로그에 대해 물어보시면 분석해 드립니다.\n예: '지금 결제 서버 괜찮아?'",
+            "related_logs": []
+        }
+        
+    else:
+        return {
+            "response": "죄송합니다. 현재 모니터링 중인 로그에서 해당 내용과 관련된 특이사항을 찾을 수 없습니다.\n다른 질문을 해 주시겠어요?",
+            "related_logs": []
+        }
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

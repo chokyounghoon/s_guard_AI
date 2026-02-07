@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
-import { Bell, User, Monitor, RefreshCw, CheckCircle, ClipboardList, MessageSquare, Search, MoreHorizontal, Home, Zap, Shield, CheckSquare, BarChart2, Settings, AlertTriangle, Info, AlertCircle, ChevronRight, X } from 'lucide-react';
+import { Bell, User, Monitor, RefreshCw, CheckCircle, ClipboardList, MessageSquare, Search, MoreHorizontal, Home, Zap, Shield, CheckSquare, BarChart2, Settings, AlertTriangle, Info, AlertCircle, ChevronRight, X, Sparkles, Server, Brain } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const completionData = [
-  { name: 'Completed', value: 85, color: '#3B82F6' }, // Blue
-  { name: 'Remaining', value: 15, color: '#1a1f2e' }, // Dark background
-];
+import AiInsightPanel from '../components/AiInsightPanel';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -61,7 +57,7 @@ export default function DashboardPage() {
       // Cloudflare Workers API 사용
       const apiUrl = window.location.hostname === 'localhost' 
         ? 'http://localhost:8000/sms/recent?limit=3'
-        : 'https://sguard-sms-api.khcho0421.workers.dev/sms/recent?limit=3';
+        : 'https://api.chokerslab.store/sms/recent?limit=3';
       
       const response = await fetch(apiUrl);
       if (response.ok) {
@@ -131,11 +127,137 @@ export default function DashboardPage() {
     localStorage.setItem('sguard_dismissed_ids', JSON.stringify(updated));
   };
 
+  console.log('DashboardPage Rendering...', { smsMessages, recentAssignments, currentDismissed: dismissedIdsRef.current });
+
+
+  const [predictionLogs, setPredictionLogs] = useState({
+    critical: [],
+    server: [],
+    security: [],
+    report: []
+  });
+
+  const [predictionStats, setPredictionStats] = useState({
+    critical: 0,
+    server: 0,
+    security: 0,
+    report: 0
+  });
+
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  const handleLogReceived = (log) => {
+    if (!log || !log.category) return;
+
+    setPredictionStats(prev => ({
+        ...prev,
+        [log.category]: prev[log.category] + 1
+    }));
+
+    setPredictionLogs(prev => ({
+        ...prev,
+        [log.category]: [log, ...prev[log.category]].slice(0, 50) // Keep last 50
+    }));
+  };
+
+  const statusCards = [
+    { 
+        id: 'critical', 
+        label: 'Critical Error 예측됨', 
+        val: predictionStats.critical, 
+        icon: AlertTriangle, 
+        color: 'bg-red-900/50', 
+        text: 'text-red-400', 
+        bar: 'bg-red-500',
+        borderColor: 'border-red-500/30'
+    },
+    { 
+        id: 'server', 
+        label: '서버오류 예측됨', 
+        val: predictionStats.server, 
+        icon: Server, 
+        color: 'bg-orange-900/50', 
+        text: 'text-orange-400', 
+        bar: 'bg-orange-500',
+        borderColor: 'border-orange-500/30'
+    },
+    { 
+        id: 'security', 
+        label: '보안이슈 감지', 
+        val: predictionStats.security, 
+        icon: Shield, 
+        color: 'bg-blue-900/50', 
+        text: 'text-blue-400', 
+        bar: 'bg-blue-500',
+        borderColor: 'border-blue-500/30'
+    },
+    { 
+        id: 'report', 
+        label: '예측 분석 레포트', 
+        val: predictionStats.report, 
+        icon: ClipboardList, 
+        color: 'bg-purple-900/50', 
+        text: 'text-purple-400', 
+        bar: 'bg-purple-500',
+        borderColor: 'border-purple-500/30'
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0a0e17] text-white font-sans pb-24 relative overflow-x-hidden">
         
        {/* Background Glows */}
        <div className="fixed top-0 left-0 w-full h-96 bg-blue-900/5 blur-[100px] -z-10 pointer-events-none" />
+
+       {/* Detail Modal */}
+       {selectedCategory && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedCategory(null)}>
+            <div className="bg-[#1a1f2e] w-full max-w-2xl rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-scale-up" onClick={e => e.stopPropagation()}>
+                <div className="p-5 border-b border-white/10 flex justify-between items-center bg-[#11141d]">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        {statusCards.find(c => c.id === selectedCategory)?.icon && 
+                            React.createElement(statusCards.find(c => c.id === selectedCategory).icon, { className: `w-5 h-5 ${statusCards.find(c => c.id === selectedCategory).text}` })}
+                        {statusCards.find(c => c.id === selectedCategory)?.label}
+                         - 상세 목록
+                    </h3>
+                    <button onClick={() => setSelectedCategory(null)} className="p-1 rounded-full hover:bg-white/10">
+                        <X className="w-5 h-5 text-slate-400" />
+                    </button>
+                </div>
+                <div className="p-0 max-h-[60vh] overflow-y-auto">
+                    {predictionLogs[selectedCategory].length > 0 ? (
+                        <div className="divide-y divide-white/5">
+                            {predictionLogs[selectedCategory].map((log, idx) => (
+                                <div key={idx} className="p-4 hover:bg-white/5 cursor-pointer transition-colors" onClick={() => navigate('/assignment-detail')}>
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                                                log.severity === 'critical' ? 'bg-red-500/20 text-red-500 border-red-500/30' :
+                                                log.severity === 'high' ? 'bg-orange-500/20 text-orange-500 border-orange-500/30' :
+                                                log.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' :
+                                                'bg-blue-500/20 text-blue-500 border-blue-500/30'
+                                            }`}>
+                                                {log.severity.toUpperCase()}
+                                            </span>
+                                            <span className="text-xs text-slate-500 font-mono">{log.id || 'N/A'}</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-500">Just now</span>
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-200 mb-1">{log.text}</p>
+                                    <p className="text-xs text-slate-400">{log.detail || '상세 내용 없음'}</p>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-10 text-center text-slate-500">
+                            <Info className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                            <p>아직 수집된 로그가 없습니다.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+       )}
 
       {/* Header */}
       <header className="flex justify-between items-center p-5 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-50 border-b border-white/5">
@@ -246,119 +368,214 @@ export default function DashboardPage() {
 
       <main className="p-5 space-y-5">
         
-        {/* Section 1: Integration Status (4 Cards) - Moved to top */}
+        {/* NEW: AI Autopilot Insight Panel */}
+        <React.Suspense fallback={<div className="h-48 bg-gray-900 rounded-3xl animate-pulse"></div>}>
+            <ErrorBoundary>
+                <AiInsightPanel onLogReceived={handleLogReceived} />
+            </ErrorBoundary>
+        </React.Suspense>
+
+        {/* Section 1: Autopilot Prediction Status (Redesigned) - Moved to Top */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-lg">통합 처리 현황</h2>
-                <span className="text-[10px] bg-slate-700/50 px-3 py-1.5 rounded-full text-slate-300 font-medium">전체 기관</span>
+                <h2 className="font-bold text-lg flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-blue-400" />
+                    Autopilot 예측현황
+                </h2>
+                <div className="flex items-center space-x-2">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">REALTIME</span>
+                </div>
             </div>
 
             <div className="grid grid-cols-4 gap-3">
-                {[
-                    { label: '접수', val: 128, icon: Monitor, color: 'bg-slate-700', text: 'text-slate-400', bar: 'bg-slate-500' },
-                    { label: '처리중', val: 39, icon: RefreshCw, color: 'bg-blue-900/50', text: 'text-blue-400', bar: 'bg-blue-500' },
-                    { label: '완료', val: 89, icon: CheckCircle, color: 'bg-emerald-900/50', text: 'text-emerald-400', bar: 'bg-emerald-500' },
-                    { label: '리포트', val: 85, icon: ClipboardList, color: 'bg-purple-900/50', text: 'text-purple-400', bar: 'bg-purple-500' },
-                ].map((stat, idx) => (
-                    <div key={idx} className="bg-[#11141d] rounded-2xl p-3 flex flex-col items-center justify-between h-36 relative overflow-hidden border border-white/5 group hover:border-white/10 transition-colors">
-                        <span className="text-[10px] text-slate-400 mb-2 font-medium">{stat.label}</span>
-                        <div className={`p-2.5 rounded-full ${stat.color} mb-1 group-hover:scale-110 transition-transform`}>
+                {statusCards.map((stat, idx) => (
+                    <div 
+                        key={idx} 
+                        onClick={() => setSelectedCategory(stat.id)}
+                        className={`
+                            bg-[#11141d] rounded-2xl p-3 flex flex-col items-center justify-between h-36 relative overflow-hidden 
+                            border border-white/5 group hover:border-white/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-95
+                        `}
+                    >
+                        <span className="text-[10px] text-slate-400 mb-2 font-medium text-center leading-tight">{stat.label}</span>
+                        <div className={`p-2.5 rounded-full ${stat.color} mb-1 group-hover:scale-110 transition-transform ${stat.borderColor} border`}>
                             <stat.icon className={`w-5 h-5 ${stat.text}`} />
                         </div>
-                        <span className="text-xl font-bold">{stat.val}</span>
+                        <span className={`text-2xl font-bold ${stat.text}`}>{stat.val}</span>
                         <div className={`absolute bottom-0 left-0 w-full h-[3px] ${stat.bar}`} />
+                        
+                        {/* Glow Effect */}
+                        <div className={`absolute -bottom-10 -right-10 w-24 h-24 ${stat.bar} opacity-10 blur-2xl rounded-full`} />
                     </div>
                 ))}
             </div>
         </div>
         
-        {/* Section 2: My Processing Status (Donut) */}
+        {/* Section 2: My AI / SMS Request Status (Bar Charts) */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl relative overflow-hidden">
             <div className="flex justify-between items-center mb-6">
-                <h2 className="font-bold text-lg">나의 처리 현황</h2>
+                <h2 className="font-bold text-lg">나의 AI / SMS 확인요청 현황</h2>
                 <span className="text-[10px] bg-slate-700/50 px-3 py-1.5 rounded-full text-slate-300 font-medium">이번 주</span>
             </div>
             
-            <div className="h-48 relative flex items-center justify-center mb-6">
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={completionData}
-                            innerRadius={65}
-                            outerRadius={85}
-                            startAngle={90}
-                            endAngle={-270}
-                            dataKey="value"
-                            stroke="none"
-                        >
-                            <Cell key="completed" fill="#3B82F6" cornerRadius={10} />
-                            <Cell key="remaining" fill="#11141d" />
-                            <Label 
-                                value="85%" 
-                                position="center" 
-                                className="fill-white text-4xl font-bold"
-                            />
-                             <Label 
-                                value="완료율" 
-                                position="center" 
-                                dy={25}
-                                className="fill-slate-400 text-xs font-medium"
-                            />
-                        </Pie>
-                    </PieChart>
-                </ResponsiveContainer>
-            </div>
+            <div className="grid grid-cols-2 gap-8">
+                {/* AI Request Column */}
+                <div>
+                     <div className="flex items-center space-x-2 mb-4">
+                        <Brain className="w-4 h-4 text-blue-400" />
+                        <h3 className="text-sm font-bold text-slate-300">AI Request</h3>
+                     </div>
+                     <div className="space-y-3">
+                        {/* Critical (0) - Red */}
+                        <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Critical</span>
+                                <span className="text-red-400 font-bold">0</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-red-500 w-0" />
+                            </div>
+                        </div>
+                        {/* Major (1) - Orange */}
+                        <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Major</span>
+                                <span className="text-orange-400 font-bold">1</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-orange-500 w-[10%]" />
+                            </div>
+                        </div>
+                         {/* Minor (5) - Blue/Slate */}
+                         <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Minor</span>
+                                <span className="text-blue-400 font-bold">5</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 w-[30%]" />
+                            </div>
+                        </div>
+                        {/* Warning (20) - Yellow */}
+                        <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Warning</span>
+                                <span className="text-yellow-400 font-bold">20</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-yellow-400 w-[70%]" />
+                            </div>
+                        </div>
+                     </div>
+                </div>
 
-            <div className="grid grid-cols-3 gap-4 border-t border-white/5 pt-4">
-                <div className="text-center">
-                    <p className="text-xs text-slate-400 mb-1">완료</p>
-                    <p className="text-lg font-bold text-white">34건</p>
-                </div>
-                <div className="text-center border-l border-white/5">
-                    <p className="text-xs text-slate-400 mb-1">대기</p>
-                    <p className="text-lg font-bold text-white">6건</p>
-                </div>
-                <div className="text-center border-l border-white/5">
-                    <p className="text-xs text-slate-400 mb-1">평균시간</p>
-                    <p className="text-lg font-bold text-white">25분</p>
+                {/* SMS Request Column */}
+                <div>
+                    <div className="flex items-center space-x-2 mb-4">
+                        <MessageSquare className="w-4 h-4 text-emerald-400" />
+                        <h3 className="text-sm font-bold text-slate-300">SMS Request</h3>
+                     </div>
+                     <div className="space-y-3">
+                        {/* Critical (0) - Red */}
+                        <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Critical</span>
+                                <span className="text-red-400 font-bold">0</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-red-500 w-0" />
+                            </div>
+                        </div>
+                        {/* Major (1) - Orange */}
+                        <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Major</span>
+                                <span className="text-orange-400 font-bold">1</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-orange-500 w-[10%]" />
+                            </div>
+                        </div>
+                         {/* Minor (5) - Blue/Slate */}
+                         <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Minor</span>
+                                <span className="text-blue-400 font-bold">5</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 w-[30%]" />
+                            </div>
+                        </div>
+                        {/* Warning (20) - Yellow */}
+                        <div>
+                            <div className="flex justify-between text-[10px] mb-1">
+                                <span className="text-slate-400">Warning</span>
+                                <span className="text-yellow-400 font-bold">20</span>
+                            </div>
+                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-yellow-400 w-[70%]" />
+                            </div>
+                        </div>
+                     </div>
                 </div>
             </div>
         </div>
 
-         {/* Section 3: My Assignments & Recent List */}
+         {/* Section 3: My Confirmation History & Recent List */}
          <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl">
             <div className="flex justify-between items-center mb-5">
                  <div className="flex items-center space-x-2">
                     <User className="w-5 h-5 text-blue-500" />
-                    <h2 className="font-bold text-lg">나의 할당 내역</h2>
+                    <h2 className="font-bold text-lg">나의 확인 내역</h2>
                  </div>
                 <span className="text-[10px] text-slate-400">실시간 업데이트</span>
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-4 gap-4 mb-6">
+                {/* Total */}
                 <div 
                     onClick={() => navigate('/assignments')}
                     className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#252b41] transition-all hover:scale-[1.02] active:scale-95"
                 >
-                    <p className="text-xs text-slate-400 mb-2 font-medium">할당됨</p>
+                    <p className="text-xs text-slate-400 mb-2 font-medium">총건</p>
                     <span className="text-4xl font-bold text-white transition-all duration-500">{totalAssignedCount}</span>
-                    <div className="absolute bottom-4 right-4 bg-blue-600/20 p-2 rounded-xl">
-                        <MoreHorizontal className="w-5 h-5 text-blue-500 fill-current" />
+                    <div className="absolute bottom-4 right-4 bg-slate-700/20 p-2 rounded-xl">
+                        <MoreHorizontal className="w-5 h-5 text-slate-500 fill-current" />
                     </div>
-                    {/* 실시간 업데이트 링 애니메이션 (새 메시지 수신 시) */}
-                    <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
                 </div>
+
+                {/* Unconfirmed (Red) */}
                 <div 
                     onClick={() => navigate('/assignments')}
-                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
+                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#2e1a1a] transition-all hover:scale-[1.02] active:scale-95"
+                >
+                    <p className="text-xs text-slate-400 mb-2 font-medium">미확인</p>
+                    <span className="text-4xl font-bold text-red-400">0</span>
+                    <div className="absolute bottom-4 right-4 bg-red-600/20 p-2 rounded-xl">
+                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                    </div>
+                    {/* Pulsing Dot for Attention */}
+                    <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                </div>
+
+                {/* Processing (Orange) */}
+                <div 
+                    onClick={() => navigate('/assignments')}
+                    className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#2e231a] transition-colors"
                 >
                     <p className="text-xs text-slate-400 mb-2 font-medium">처리중</p>
-                    <span className="text-4xl font-bold text-emerald-400">2</span>
-                    <div className="absolute bottom-4 right-4 bg-emerald-600/20 p-2 rounded-xl">
-                        <RefreshCw className="w-5 h-5 text-emerald-500" />
+                    <span className="text-4xl font-bold text-orange-400">2</span>
+                    <div className="absolute bottom-4 right-4 bg-orange-600/20 p-2 rounded-xl">
+                        <RefreshCw className="w-5 h-5 text-orange-500" />
                     </div>
                 </div>
+
+                {/* Completed (Blue) */}
                 <div 
                     onClick={() => navigate('/assignments')}
                     className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
@@ -407,6 +624,7 @@ export default function DashboardPage() {
                                         <span className={`${item.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-blue-500/20 text-blue-500 border-blue-500/30'} text-[10px] font-bold px-2 py-0.5 rounded border`}>
                                             {item.severity}
                                         </span>
+                                        <span className="text-4xl font-bold text-white transition-all duration-500">{totalAssignedCount}</span>
                                         <span className="text-[10px] text-slate-500">{item.code}</span>
                                     </div>
                                 </div>

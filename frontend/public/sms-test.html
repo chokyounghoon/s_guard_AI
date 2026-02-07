@@ -33,7 +33,7 @@
             margin-bottom: 20px;
             border: 1px solid rgba(255,255,255,0.05);
         }
-        h3 { margin-top: 0; font-size: 15px; color: #60a5fa; margin-bottom: 15px; display: flex; items-center: gap: 8px; }
+        h3 { margin-top: 0; font-size: 15px; color: #60a5fa; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
         
         .input-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: block; margin-left: 4px; }
         
@@ -157,7 +157,7 @@
     </div>
 
     <script>
-        const API_URL = 'https://sguard-sms-api.khcho0421.workers.dev/sms/receive';
+        const API_URL = 'https://api.chokerslab.store/sms/receive';
         const logBox = document.getElementById('log-container');
 
         function addLog(message, isError = false) {
