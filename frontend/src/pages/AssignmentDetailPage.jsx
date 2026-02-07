@@ -117,7 +117,6 @@ export default function AssignmentDetailPage() {
              </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex items-center space-x-3 pt-2">
             <button 
                 onClick={() => navigate('/chat')}
@@ -131,8 +130,8 @@ export default function AssignmentDetailPage() {
                 onClick={() => navigate('/ai-report')}
                 className="w-32 h-14 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-blue-900/40 transition-all active:scale-[0.98]"
             >
-                <Play className="w-5 h-5 text-white fill-current" />
-                <span className="font-bold text-white text-sm">처리 완료</span>
+                <FileText className="w-5 h-5 text-white" />
+                <span className="font-bold text-white text-sm">보고서</span>
             </button>
         </div>
 

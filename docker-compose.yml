@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: sguard-db
+    restart: always
+    environment:
+      POSTGRES_USER: sguard_user
+      POSTGRES_PASSWORD: sguard_password
+      POSTGRES_DB: sguard_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - sguard_postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: sguard-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://sguard_user:sguard_password@db:5432/sguard_db
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: sguard-frontend
+    ports:
+      - "5174:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    stdin_open: true
+    tty: true
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: sguard-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@sguard.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5051:80"
+    depends_on:
+      - db
+
+volumes:
+  sguard_postgres_data:

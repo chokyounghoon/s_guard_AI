@@ -132,7 +132,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f111a] text-white font-sans pb-24 relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0e17] text-white font-sans pb-24 relative overflow-x-hidden">
         
        {/* Background Glows */}
        <div className="fixed top-0 left-0 w-full h-96 bg-blue-900/5 blur-[100px] -z-10 pointer-events-none" />
@@ -421,7 +421,29 @@ export default function DashboardPage() {
                     </div>
                 )}
             </div>
-         </div>
+          </div>
+
+        {/* Section 4: AI Analysis Report Banner - NEW */}
+        <div 
+          onClick={() => navigate('/ai-report')}
+          className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-3xl p-5 shadow-xl shadow-blue-900/30 border border-blue-400/30 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all active:scale-[0.98]"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full -mr-10 -mt-10" />
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center space-x-4">
+              <div className="bg-white/20 p-2.5 rounded-2xl">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="font-bold text-base text-white">AI 분석 리포트</h2>
+                <p className="text-xs text-blue-100 mt-0.5">비정상적인 IP 대역 접근 탐지 및 대응 권고</p>
+              </div>
+            </div>
+            <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors">
+              확인
+            </button>
+          </div>
+        </div>
 
       </main>
 
