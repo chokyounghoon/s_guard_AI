@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Share2, Sparkles, AlertCircle, Settings, Clock, CheckCircle2, Download, Send, MessageSquare, User, Check, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Share2, Sparkles, AlertCircle, Settings, Clock, CheckCircle2, Download, Send, MessageSquare, User, Check, ChevronRight, X, FileText } from 'lucide-react';
 
 export default function AiReportPage() {
   const navigate = useNavigate();
   const [memo, setMemo] = useState('');
   const [isReporting, setIsReporting] = useState(false);
   const [selectedLines, setSelectedLines] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
 
   const reportingLines = [
     { id: 'leader', role: '팀장', name: '김철수 팀장', desc: '직속 상급자' },
@@ -230,6 +231,88 @@ export default function AiReportPage() {
         )}
       </main>
 
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-5 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-[#0a0d14]/90 backdrop-blur-sm" onClick={() => setShowPreview(false)} />
+          
+          <div className="bg-[#161b2a] w-full max-w-md rounded-3xl border border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-blue-600/5">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                <h3 className="font-bold text-lg">보고서 미리보기</h3>
+              </div>
+              <button 
+                onClick={() => setShowPreview(false)}
+                className="p-1 rounded-full hover:bg-white/5 transition-colors"
+              >
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="space-y-1.5">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">보고서 제목</span>
+                <p className="text-sm font-bold text-slate-200">[신한카드] SHB02681_보안탐지_분석리포트</p>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">AI 분석 요약</span>
+                <div className="bg-[#0a0d14]/50 p-4 rounded-xl border border-white/5">
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    본 장애는 송금 처리 로직의 임계치 설정 오류로 인해 발생하였습니다. 특정 시간대 트래픽 급증 시, 사전에 설정된 안전 임계값을 초과하는 요청들이 거부되면서 대규모 거래 중단 현상이 발생한 것으로 분석됩니다.
+                  </p>
+                </div>
+              </div>
+
+              {memo && (
+                <div className="space-y-2">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">처리자 메모</span>
+                  <div className="bg-blue-600/5 p-4 rounded-xl border border-blue-500/10">
+                    <p className="text-xs text-blue-100 leading-relaxed font-medium">
+                      {memo}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">보고 대상 발송처</span>
+                <div className="flex flex-wrap gap-2">
+                   <div className="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-white/5 flex items-center space-x-2">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span className="text-xs font-medium text-slate-200">S-Guard App (Push)</span>
+                  </div>
+                  <div className="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-white/5 flex items-center space-x-2">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span className="text-xs font-medium text-slate-200">Email</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-white/5 bg-[#0f1421] flex space-x-3">
+              <button 
+                onClick={() => setShowPreview(false)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 h-14 rounded-2xl font-bold text-slate-300 transition-all border border-white/5"
+              >
+                닫기
+              </button>
+              <button 
+                onClick={() => {
+                  setIsReporting(true);
+                  setShowPreview(false);
+                }}
+                className="flex-[1.5] bg-blue-600 hover:bg-blue-500 h-14 rounded-2xl font-bold text-white shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center space-x-2"
+              >
+                <span>확인 및 보고라인 선택</span>
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer Buttons */}
       <footer className="fixed bottom-0 left-0 w-full p-5 bg-gradient-to-t from-[#0a0d14] via-[#0a0d14] to-transparent pt-10 flex space-x-3 pointer-events-auto z-50">
         {!isReporting ? (
@@ -239,7 +322,7 @@ export default function AiReportPage() {
                 <span className="font-bold text-slate-300">리포트 다운로드</span>
             </button>
             <button 
-                onClick={() => setIsReporting(true)}
+                onClick={() => setShowPreview(true)}
                 className="flex-[1.2] bg-blue-600 hover:bg-blue-500 h-14 rounded-xl flex items-center justify-center space-x-2 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 text-white"
             >
                 <Sparkles className="w-5 h-5" />
