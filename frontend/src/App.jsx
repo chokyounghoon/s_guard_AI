@@ -27,6 +27,7 @@ import ReportLineManagementPage from './pages/ReportLineManagementPage';
 
 
 function App() {
+  console.log('App Loaded - Version: Fix-Chat-Crash-v2');
   return (
     <Router>
       <GoogleOAuthProvider clientId="368028308466-placeholder.apps.googleusercontent.com">
