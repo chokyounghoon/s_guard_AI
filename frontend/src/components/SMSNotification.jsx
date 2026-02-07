@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 export default function SMSNotification() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [ws, setWs] = useState(null);
 
@@ -68,7 +70,13 @@ export default function SMSNotification() {
       {notifications.map((notification) => (
         <div
           key={notification.id}
-          className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-4 shadow-2xl shadow-blue-900/50 animate-slide-down pointer-events-auto border border-blue-400/30"
+          className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-4 shadow-2xl shadow-blue-900/50 animate-slide-down pointer-events-auto border border-blue-400/30 cursor-pointer group hover:scale-[1.02] transition-all"
+          onClick={() => {
+            if (notification.responseMessage) {
+              navigate('/assignments');
+              removeNotification(notification.id);
+            }
+          } }
         >
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-3 flex-1">
@@ -95,17 +103,24 @@ export default function SMSNotification() {
                   {notification.message}
                 </p>
                 {notification.responseMessage && (
-                  <div className="mt-2 bg-white/10 rounded-lg p-2 border border-white/20">
+                  <div className="mt-2 bg-white/10 rounded-lg p-2 border border-white/20 group-hover:bg-white/20 transition-colors">
                     <p className="text-xs text-blue-100 flex items-center space-x-1">
                       <CheckCircle className="w-3 h-3" />
-                      <span>자동 응답: {notification.responseMessage}</span>
+                      <span>
+                        자동 응답: {notification.responseMessage.includes('AI 분석을 시작합니다.') 
+                          ? notification.responseMessage.replace('AI 분석을 시작합니다.', '장애등록및 War-Room 생성이 완료 되었습니다.')
+                          : notification.responseMessage}
+                      </span>
                     </p>
                   </div>
                 )}
               </div>
             </div>
             <button
-              onClick={() => removeNotification(notification.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeNotification(notification.id);
+              }}
               className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors shrink-0"
             >
               <X className="w-5 h-5 text-white" />

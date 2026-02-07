@@ -107,9 +107,18 @@ export default function AssignmentsPage() {
     
                   {/* Title & Content */}
                   <div className="space-y-2">
-                    <h3 className="text-[15px] font-bold leading-snug text-white group-hover:text-blue-400 transition-colors">
-                        {assignment.title}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[8px] font-black px-1 py-0.5 rounded border flex-shrink-0 ${
+                        assignment.assignmentType === 'AI' 
+                          ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' 
+                          : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                      }`}>
+                        {assignment.assignmentType || 'AI'}
+                      </span>
+                      <h3 className="text-[15px] font-bold leading-snug text-white group-hover:text-blue-400 transition-colors">
+                          {assignment.title}
+                      </h3>
+                    </div>
                     <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
                         발신: {assignment.sender}
                     </p>

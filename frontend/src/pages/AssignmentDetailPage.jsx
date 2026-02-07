@@ -1,11 +1,15 @@
 import React from 'react';
 import { ArrowLeft, MoreVertical, Server, Clock, AlertCircle, Copy, Sparkles, MessageSquare, FileText, Play, Home, CheckSquare, BarChart2, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import AiResponseGuide from '../components/AiResponseGuide';
 
 export default function AssignmentDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const status = queryParams.get('status') || 'Open';
+  const isCompleted = status === 'Completed' || status === '처리완료' || status === '확인 완료';
 
   const handleCopyLog = () => {
     const logText = `Error: Connection timed out at port 8080.\nCaused by: java.net.ConnectException: Connection refused\nat com.sguard.core.Net.connect(SourceFile:120)\nat com.sguard.service.Auth.login(Auth.java:45)\nat com.sguard.main.Process.run(Process.java:88)\n... 12 more\nTimestamp: 2023-10-25 13:42:05.112 UTC`;
@@ -36,9 +40,17 @@ export default function AssignmentDetailPage() {
                    <span className="text-slate-400 text-xs font-medium">Incident ID</span>
                    <h1 className="text-3xl font-bold mt-1 text-white tracking-tight">INC-8823</h1>
                 </div>
-                <div className="flex items-center space-x-1.5 bg-red-900/30 border border-red-500/30 px-3 py-1 rounded-full">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                    <span className="text-red-500 text-xs font-bold tracking-wide">CRITICAL</span>
+                <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center space-x-1.5 bg-red-900/30 border border-red-500/30 px-3 py-1 rounded-full">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        <span className="text-red-500 text-xs font-bold tracking-wide">CRITICAL</span>
+                    </div>
+                    {isCompleted && (
+                        <div className="bg-blue-500/20 border border-blue-500/30 px-3 py-1 rounded-full flex items-center gap-1.5">
+                            <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+                            <span className="text-blue-400 text-[10px] font-bold">확인 완료</span>
+                        </div>
+                    )}
                 </div>
             </div>
             
@@ -106,19 +118,29 @@ export default function AssignmentDetailPage() {
 
         <div className="flex items-center space-x-3 pt-2">
             <button 
-                onClick={() => navigate('/chat')}
-                className="flex-1 h-14 bg-[#1a1f2e] hover:bg-[#252a3d] border border-white/10 rounded-xl transition-colors flex items-center justify-center space-x-2"
+                onClick={() => !isCompleted && navigate('/chat')}
+                disabled={isCompleted}
+                className={`flex-1 h-14 border rounded-xl transition-all flex items-center justify-center space-x-2 ${
+                    isCompleted 
+                    ? 'bg-slate-800/50 border-white/5 cursor-not-allowed grayscale' 
+                    : 'bg-[#1a1f2e] hover:bg-[#252a3d] border-white/10'
+                }`}
             >
-                <MessageSquare className="w-5 h-5 text-slate-300" />
-                <span className="font-bold text-slate-200">War-Room</span>
+                <MessageSquare className={`w-5 h-5 ${isCompleted ? 'text-slate-600' : 'text-slate-300'}`} />
+                <span className={`font-bold ${isCompleted ? 'text-slate-600' : 'text-slate-200'}`}>War-Room</span>
             </button>
 
             <button 
-                onClick={() => navigate('/ai-report')}
-                className="w-32 h-14 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-blue-900/40 transition-all active:scale-[0.98]"
+                onClick={() => !isCompleted && navigate('/ai-report')}
+                disabled={isCompleted}
+                className={`w-32 h-14 rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-all ${
+                    isCompleted
+                    ? 'bg-slate-800/50 cursor-not-allowed grayscale'
+                    : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/40 active:scale-[0.98]'
+                }`}
             >
-                <FileText className="w-5 h-5 text-white" />
-                <span className="font-bold text-white text-sm">보고서</span>
+                <FileText className={`w-5 h-5 ${isCompleted ? 'text-slate-600' : 'text-white'}`} />
+                <span className={`font-bold text-sm ${isCompleted ? 'text-slate-600' : 'text-white'}`}>보고서</span>
             </button>
         </div>
 

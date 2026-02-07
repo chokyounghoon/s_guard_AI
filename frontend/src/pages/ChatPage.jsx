@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus } from 'lucide-react';
+import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X } from 'lucide-react';
+import AIChatBubble from '../components/AIChatBubble';
+import AIThinkingIndicator from '../components/AIThinkingIndicator';
 
 export default function ChatPage() {
   const navigate = useNavigate();
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [showPhoneList, setShowPhoneList] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [userInput, setUserInput] = useState('');
+  const [isAiThinking, setIsAiThinking] = useState(false);
 
   const participants = [
     { name: '정도현 팀장', role: 'Team Leader', phone: '010-1234-5678' },
@@ -20,6 +26,106 @@ export default function ChatPage() {
   const handleCall = (phoneNumber) => {
     window.location.href = `tel:${phoneNumber}`;
     setShowPhoneList(false);
+  };
+
+  // AI Assistant Logic
+  const quickActions = [
+    { id: 'status', label: '현재 서버 상태 알려줘', icon: BarChart2 },
+    { id: 'error', label: '이 에러 원인 분석해줘', icon: AlertTriangle },
+    { id: 'history', label: '유사 장애 이력 찾아줘', icon: FileText },
+    { id: 'action', label: '조치 방법 추천해줘', icon: Zap }
+  ];
+
+  const detectIntent = (message) => {
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('상태') || lowerMessage.includes('어때') || lowerMessage.includes('괜찮')) return 'status';
+    if (lowerMessage.includes('에러') || lowerMessage.includes('왜') || lowerMessage.includes('원인')) return 'error';
+    if (lowerMessage.includes('전에') || lowerMessage.includes('과거') || lowerMessage.includes('이전') || lowerMessage.includes('이력')) return 'history';
+    if (lowerMessage.includes('어떻게') || lowerMessage.includes('조치') || lowerMessage.includes('해결') || lowerMessage.includes('방법')) return 'action';
+    if (lowerMessage.includes('cpu') || lowerMessage.includes('높')) return 'cpu_analysis';
+    if (lowerMessage.includes('db') || lowerMessage.includes('데이터베이스') || lowerMessage.includes('connection')) return 'db_analysis';
+    return 'general';
+  };
+
+  const getAIResponse = (intent, userMessage) => {
+    const responses = {
+      status: {
+        text: "결제 서버 현재 상태를 확인했습니다.\n\n**✅ 정상 운영 중**\n- CPU: 68% (안정)\n- Memory: 72% (안정)\n- Response Time: 180ms (평균)\n- Error Rate: 0.02%\n\n지난 1시간 동안 특이사항 없습니다.",
+        metrics: { cpu: 68, memory: 72, responseTime: 180 },
+        confidence: 98
+      },
+      error: {
+        text: "Timeout 에러의 원인을 분석했습니다.\n\n**에러 타입**: DB Connection Timeout\n**발생 빈도**: 지난 1시간 동안 47건\n\n**주요 원인**:\n- Connection Pool 고갈 (현재 95% 사용 중)\n- 장기 실행 쿼리 3건 감지 (평균 15초 소요)\n\n**유사 사례**: 3개월 전 [INC-2025-11-15] 사례와 95% 일치",
+        confidence: 95
+      },
+      history: {
+        text: "과거 유사 장애 이력을 검색했습니다.\n\n**🔍 검색 결과: 4건**\n\n**1. DB Connection Pool 고갈** (95% 유사)\n- 발생: 2025-11-15 14:32\n- 조치: Pool Size 200→500 증설\n- 해결 시간: 23분\n\n**2. 배치 프로세스 무한 루프** (88% 유사)\n- 발생: 2025-09-22 09:15\n- 조치: 루프 탈출 조건 추가\n- 해결 시간: 1시간 15분\n\nAI Report 페이지에서 전체 이력을 확인하실 수 있습니다.",
+        confidence: 92
+      },
+      action: {
+        text: "권장 조치 방법을 제시합니다.\n\n**🛠️ 단계별 조치 가이드**\n\n**1️⃣ 즉시 조치 (긴급)**\n```bash\n# Connection Pool 임시 증설\nvim /etc/app/database.conf\nmax_connections=500\nsudo systemctl restart app-server\n```\n\n**2️⃣ 근본 원인 해결**\n```bash\n# 느린 쿼리 확인\nmysql -e \"SHOW FULL PROCESSLIST;\"\n# 장기 실행 세션 종료\nmysql -e \"KILL <session_id>;\"\n```\n\n**3️⃣ 모니터링 강화**\n- Connection Pool 사용률 알림 설정 (>85%)\n- 쿼리 실행 시간 로깅 활성화\n\n**⏱️ 예상 소요 시간**: 15~20분",
+        confidence: 94
+      },
+      cpu_analysis: {
+        text: "CPU 사용률 급증 원인을 다각도로 분석했습니다.\n\n**🔍 분석 결과**:\n**1. 프로세스**: `batch_processor_v2`가 CPU 92% 점유\n**2. 패턴**: 무한 루프 의심 (메모리 증가 + CPU 고정)\n**3. 시작 시간**: 약 15분 전 (14:17경)\n\n**🛠️ 권장 조치 순서**:\n**1️⃣ 프로세스 상태 확인**\n```bash\nps aux | grep batch_processor\ntop -p $(pgrep batch_processor)\n```\n\n**2️⃣ 로그 확인**\n```bash\ntail -f /var/log/batch_errors.log\n```\n\n**3️⃣ 긴급 대응 (심각 시)**\n```bash\nsudo systemctl restart batch_processor_v2\n```\n\n**⏱️ 조치 안하면**: 5~10분 내 서비스 중단 가능성 85%",
+        metrics: { cpu: 92, memory: 78, responseTime: 350 },
+        confidence: 95
+      },
+      db_analysis: {
+        text: "DB 서버 상태를 실시간 분석했습니다.\n\n**⚠️ 주의 필요**\n- Connection Pool: 85% (높음)\n- Active Connections: 170/200\n- Slow Query Count: 23건 (지난 10분)\n- Lock Wait Time: 평균 2.3초\n\n**권장 조치**: Connection Pool 크기 증설을 고려하세요.\n```bash\n# /etc/mysql/my.cnf\nmax_connections=400\nwait_timeout=300\n```\n\n**예상 효과**: 병목 현상 해소, 응답 시간 30% 개선",
+        metrics: { cpu: 45, memory: 52, responseTime: 850 },
+        confidence: 97
+      },
+      general: {
+        text: `"${userMessage}"에 대한 정보를 찾고 있습니다.\n\n현재 War-Room에서 다루고 있는 **INC-8823 (CRITICAL)** 장애와 관련된 정보를 제공해 드릴 수 있습니다.\n\n다음과 같은 질문을 시도해 보세요:\n- "현재 서버 상태 어때?"\n- "이 에러 왜 나는 거야?"\n- "DB 연결 풀 어떻게 늘려?"\n- "CPU가 높은 이유가 뭐야?"`,
+        confidence: 85
+      }
+    };
+
+    return responses[intent] || responses.general;
+  };
+
+  const handleAIMessage = async (message) => {
+    if (!message.trim()) return;
+
+    // Add user message
+    const userMessage = {
+      type: 'user',
+      text: message,
+      timestamp: new Date()
+    };
+    
+    setAiMessages(prev => [...prev, userMessage]);
+    setUserInput('');
+    setIsAiThinking(true);
+
+    // Simulate AI thinking delay
+    setTimeout(() => {
+      const intent = detectIntent(message);
+      const aiResponse = getAIResponse(intent, message);
+      
+      const aiMessage = {
+        type: 'ai',
+        ...aiResponse,
+        timestamp: new Date()
+      };
+
+      setAiMessages(prev => [...prev, aiMessage]);
+      setIsAiThinking(false);
+    }, 1200); // 1.2 seconds thinking time
+  };
+
+  const handleQuickAction = (action) => {
+    handleAIMessage(action.label);
+  };
+
+  const handleCopyMessage = (text) => {
+    navigator.clipboard.writeText(text);
+    alert('메시지가 클립보드에 복사되었습니다.');
+  };
+
+  const handleShareToTeam = (text) => {
+    alert(`팀 채팅에 AI 응답을 공유했습니다:\n\n${text.substring(0, 100)}...`);
   };
 
   return (
@@ -203,6 +309,115 @@ export default function ChatPage() {
         </div>
       </main>
     
+      {/* AI Assistant Panel */}
+      {showAIAssistant && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowAIAssistant(false)}>
+          <div 
+            className="absolute right-0 top-0 h-full w-full max-w-md bg-[#0f1421] border-l border-white/10 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* AI Panel Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10 bg-gradient-to-r from-purple-900/20 to-blue-900/20">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">AI Assistant</h3>
+                  <p className="text-[10px] text-slate-400">S-Autopilot 실시간 분석</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAIAssistant(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Quick Actions */}
+            {aiMessages.length === 0 && (
+              <div className="p-4 space-y-3 border-b border-white/5">
+                <p className="text-xs text-slate-400 mb-2">💡 빠른 질문</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleQuickAction(action)}
+                      className="flex items-center space-x-2 p-3 bg-gradient-to-br from-slate-800/60 to-slate-900/60 hover:from-purple-900/30 hover:to-blue-900/30 border border-white/5 hover:border-purple-500/30 rounded-xl text-left transition-all group"
+                    >
+                      <action.icon className="w-4 h-4 text-purple-400 group-hover:text-purple-300 flex-shrink-0" />
+                      <span className="text-[11px] text-slate-300 leading-tight">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {aiMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600/20 to-blue-600/20 flex items-center justify-center border border-purple-500/20">
+                    <Bot className="w-8 h-8 text-purple-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white mb-1">AI와 대화를 시작하세요</h4>
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
+                      서버 상태, 에러 원인, 조치 방법 등<br/>무엇이든 물어보세요!
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {aiMessages.map((msg, index) => (
+                <div key={index}>
+                  {msg.type === 'user' ? (
+                    <div className="flex flex-col items-end space-y-1">
+                      <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] text-sm leading-relaxed shadow-lg shadow-blue-900/20">
+                        {msg.text}
+                      </div>
+                      <span className="text-[10px] text-slate-500">
+                        {msg.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  ) : (
+                    <AIChatBubble 
+                      message={msg}
+                      onCopy={handleCopyMessage}
+                      onShare={handleShareToTeam}
+                    />
+                  )}
+                </div>
+              ))}
+
+              {isAiThinking && <AIThinkingIndicator />}
+            </div>
+
+            {/* AI Input Area */}
+            <div className="p-3 border-t border-white/10 bg-[#0a0d14]">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAIMessage(userInput)}
+                  placeholder="AI에게 질문하세요..."
+                  className="flex-1 bg-slate-800/60 rounded-full py-2.5 px-4 text-sm border border-white/5 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-slate-500"
+                />
+                <button
+                  onClick={() => handleAIMessage(userInput)}
+                  disabled={!userInput.trim()}
+                  className="p-2.5 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* New Analysis Action Bar */}
       <div className="px-4 pb-2 bg-[#0f1421]">
         <button 
@@ -249,6 +464,23 @@ export default function ChatPage() {
             <BarChart2 className="w-6 h-6" />
             <span className="text-[10px] font-medium">통계</span>
         </div>
+        
+        {/* AI Assistant Nav Button */}
+        <div 
+          className={`flex flex-col items-center space-y-1 transition-colors cursor-pointer ${
+            showAIAssistant ? 'text-purple-400' : 'text-slate-500 hover:text-purple-400'
+          }`}
+          onClick={() => setShowAIAssistant(!showAIAssistant)}
+        >
+            <div className="relative">
+              <Bot className="w-6 h-6" />
+              {!showAIAssistant && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border-2 border-[#0f1421] animate-pulse"></span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium">AI</span>
+        </div>
+        
         <div className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer">
             <Settings className="w-6 h-6" />
             <span className="text-[10px] font-medium">설정</span>

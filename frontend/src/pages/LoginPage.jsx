@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Shield, Eye, AtSign, ArrowRight, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -14,6 +16,26 @@ export default function LoginPage() {
       setLoading(false);
       navigate('/dashboard');
     }, 1000);
+  };
+
+  const handleGoogleSuccess = (credentialResponse) => {
+    const details = jwtDecode(credentialResponse.credential);
+    console.log('Google Login Success:', details);
+    
+    // 유저 정보 저장
+    const userProfile = {
+      name: details.name,
+      email: details.email,
+      picture: details.picture,
+    };
+    
+    localStorage.setItem('sguard_user', JSON.stringify(userProfile));
+    navigate('/dashboard');
+  };
+
+  const handleGoogleError = () => {
+    console.log('Google Login Failed');
+    alert('구글 로그인에 실패했습니다. 다시 시도해 주세요.');
   };
 
   return (
@@ -94,8 +116,42 @@ export default function LoginPage() {
             </button>
         </form>
 
+        <div className="w-full flex items-center my-8">
+            <div className="flex-1 h-[1px] bg-white/5"></div>
+            <span className="px-4 text-[10px] text-slate-500 font-bold uppercase tracking-wider">Or continue with</span>
+            <div className="flex-1 h-[1px] bg-white/5"></div>
+        </div>
+
+        <div className="w-full flex flex-col items-center space-y-3">
+            <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                useOneTap
+                theme="filled_blue"
+                shape="pill"
+                size="large"
+                width="100%"
+            />
+            
+            <button 
+                type="button"
+                onClick={() => {
+                    const guestProfile = {
+                        name: 'Guest User',
+                        email: 'guest@s-guard.ai',
+                        picture: null,
+                    };
+                    localStorage.setItem('sguard_user', JSON.stringify(guestProfile));
+                    navigate('/dashboard');
+                }}
+                className="text-xs text-slate-500 hover:text-blue-400 transition-colors font-medium mt-2"
+            >
+                Guest Login (Demo Mode)
+            </button>
+        </div>
+
         <div className="mt-8 text-center text-sm text-slate-400">
-            Don't have an account? <span className="text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors">Sign Up</span>
+            Don't have an account? <span onClick={() => navigate('/signup')} className="text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors">Sign Up</span>
         </div>
 
       </div>
