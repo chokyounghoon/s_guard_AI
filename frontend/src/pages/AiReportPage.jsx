@@ -251,8 +251,28 @@ export default function AiReportPage() {
       {/* Unified Multi-step Modal */}
       {modalStep && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-[#06080c]/95 backdrop-blur-md" onClick={() => setModalStep(null)} />
+          <div className="absolute inset-0 bg-[#06080c]/95 backdrop-blur-md" onClick={() => modalStep !== 'generating' && setModalStep(null)} />
           
+          {modalStep === 'generating' ? (
+             <div className="relative z-10 flex flex-col items-center justify-center space-y-8 animate-in zoom-in-95 duration-500">
+                <div className="relative">
+                    <div className="w-24 h-24 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <Sparkles className="w-10 h-10 text-blue-400 animate-pulse" />
+                    </div>
+                </div>
+                <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-bold text-white tracking-tight">AI Report Generating...</h3>
+                    <div className="h-6 overflow-hidden relative">
+                         <div className="animate-slide-up-fade text-slate-400 text-sm font-mono">
+                            <p className="animate-pulse">Analyzing System Logs...</p>
+                            <p className="animate-pulse delay-75">Summarizing Root Causes...</p>
+                            <p className="animate-pulse delay-150">Drafting Executive Summary...</p>
+                         </div>
+                    </div>
+                </div>
+             </div>
+          ) : (
           <div className="bg-[#0f1219] w-full max-w-lg rounded-[2.5rem] border border-white/10 shadow-[0_0_50px_-12px_rgba(37,99,235,0.3)] relative z-10 overflow-hidden flex flex-col max-h-[85vh]">
             {/* Modal Header */}
             <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
@@ -513,6 +533,7 @@ export default function AiReportPage() {
               </button>
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -526,11 +547,16 @@ export default function AiReportPage() {
             <span className="font-bold text-slate-300">War-Room 바로가기</span>
         </button>
         <button 
-            onClick={() => setModalStep('preview')}
+            onClick={() => {
+                setModalStep('generating');
+                setTimeout(() => {
+                    setModalStep('preview');
+                }, 3000);
+            }}
             className="flex-[1.2] bg-blue-600 hover:bg-blue-500 h-14 rounded-xl flex items-center justify-center space-x-2 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 text-white"
         >
             <Sparkles className="w-5 h-5" />
-            <span className="font-bold">보고서생성및 보고</span>
+            <span className="font-bold">보고서 생성 및 보고</span>
         </button>
       </footer>
     </div>
