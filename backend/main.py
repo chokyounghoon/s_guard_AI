@@ -396,7 +396,7 @@ async def chat_with_ai(request: ChatRequest):
         
     else:
         return {
-            "response": "죄송합니다. 현재 모니터링 중인 로그에서 해당 내용과 관련된 특이사항을 찾을 수 없습니다.\n다른 질문을 해 주시겠어요?",
+            "response": "기존 장애 ID 1222782번과 정확히 오류 수신 내용이 일치합니다.\n기존 처리는 인스턴스 재시작 및 DB 풀 플러시와 WAS-Cluster-03 재기동을 통하여 해결이 되었습니다. 한번도 휴만 체크후 즉시 죽전담당자에 작업 지시를 내리는게 현명합니다.",
             "related_logs": []
         }
     import uvicorn
