@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const [smsMessages, setSmsMessages] = useState([]);
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
+  const [predictionCounts, setPredictionCounts] = useState({ critical: 0, server: 0, security: 0, report: 0 });
 
   // Initialize data from localStorage
   useEffect(() => {
@@ -286,10 +287,13 @@ export default function DashboardPage() {
     setShowInsightModal(true);
   };
 
-  const handleLogReceived = (log) => {
+  const handleLogReceived = (log, counts) => {
     // Example: Add log to notifications or process it
+    if (counts) {
+      setPredictionCounts(counts);
+    }
     console.log("Log received in Dashboard:", log);
-    setAllNotifications(prev => [{ id: Date.now(), title: log.title, content: log.message, type: 'AI', severity: log.severity, time: new Date().toLocaleTimeString() }, ...prev]);
+    setAllNotifications(prev => [{ id: Date.now(), title: log.title || 'AI Log', content: log.message || log.text, type: 'AI', severity: log.severity, time: new Date().toLocaleTimeString() }, ...prev]);
     // Optionally show a temporary message in the top banner for critical logs
     if (log.severity === 'CRITICAL') {
       setMessages(prev => [...prev, { id: Date.now(), type: 'error', text: log.message }]);
@@ -540,7 +544,7 @@ export default function DashboardPage() {
         </React.Suspense>
 
         {/* AI Autopilot Prediction Panel (Standalone) */}
-        <AiPredictionPanel onShowDetail={handleShowInsight} />
+        <AiPredictionPanel counts={predictionCounts} onShowDetail={handleShowInsight} />
 
         {/* AI Insight Modal */}
         {showInsightModal && (
@@ -553,56 +557,7 @@ export default function DashboardPage() {
         {/* AI/SMS Status Panel */}
         <AiSmsStatusPanel />
 
-        {/* System Vitals Panel */}
-        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mb-6 mt-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue-400" />
-              System Vitals
-            </h3>
-            <div className="flex items-center space-x-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono tracking-wider">LIVE METRICS</span>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard 
-              title="Avg. Response" 
-              value={`${systemStatus === 'critical' ? (1500 + Math.random()*500).toFixed(0) : (120 + Math.random()*20).toFixed(0)}ms`} 
-              trend={systemStatus === 'critical' ? "+450%" : "-12%"} 
-              trendUp={systemStatus !== 'critical'} 
-              icon={Clock} 
-              color={systemStatus === 'critical' ? "red" : "blue"}
-            />
-            <MetricCard 
-              title="Total Requests" 
-              value={metrics.requests.toFixed(0)} 
-              trend="+5.2%" 
-              trendUp={true} 
-              icon={Activity} 
-              color={systemStatus === 'critical' ? "yellow" : "purple"}
-            />
-            <MetricCard 
-              title="Error Rate" 
-              value={`${metrics.errorRate.toFixed(2)}%`} 
-              trend={systemStatus === 'critical' ? "+12.5%" : "-0.1%"} 
-              trendUp={systemStatus !== 'critical'} 
-              icon={AlertTriangle} 
-              color={systemStatus === 'critical' ? "red" : "green"}
-            />
-            <MetricCard 
-              title="Active Servers" 
-              value="4/4" 
-              subValue="All Online" 
-              icon={Server} 
-              color="emerald"
-            />
-          </div>
-        </div>
 
         {/* Main Content Areas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
