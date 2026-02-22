@@ -110,6 +110,37 @@ export default {
         );
       }
 
+      // SMS 삭제 엔드포인트
+      if (path.startsWith('/sms/') && request.method === 'DELETE') {
+        const idStr = path.split('/')[2];
+        if (idStr) {
+          const id = parseInt(idStr);
+          let messages = [];
+          try {
+            const stored = await env.SMS_STORAGE.get('recent_messages', 'json');
+            if (stored) messages = stored;
+          } catch (e) {
+            console.error('KV 읽기 오류:', e);
+          }
+
+          const newMessages = messages.filter(m => m.id !== id);
+          if (messages.length !== newMessages.length) {
+            try {
+              await env.SMS_STORAGE.put('recent_messages', JSON.stringify(newMessages));
+            } catch (e) {
+              console.error('KV 쓰기 오류:', e);
+            }
+            return new Response(JSON.stringify({ status: 'success', message: 'Deleted successfully' }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          return new Response(JSON.stringify({ status: 'error', message: 'Message not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // 키워드 목록 조회
       if (path === '/sms/keywords' && request.method === 'GET') {
         const keywords = {
@@ -126,6 +157,84 @@ export default {
               keyword,
               response,
             })),
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // S-Autopilot AI Insight (KMS 연동 LLM 분석 시뮬레이션)
+      if (path === '/ai/insight' && request.method === 'GET') {
+        let maxLen = 15;
+        let recentMessageText = "";
+        let recentMessageTime = "";
+        let id_val = "SYS-000";
+        try {
+          const stored = await env.SMS_STORAGE.get('recent_messages', 'json');
+          if (stored && stored.length > 0) {
+            recentMessageText = stored[0].message;
+            recentMessageTime = stored[0].timestamp;
+            id_val = `KMS-${stored[0].id}`;
+          }
+        } catch (e) {
+          console.error('KV 읽기 오류:', e);
+        }
+
+        let currentLog;
+        if (recentMessageText) {
+          let severity = "info";
+          let type_str = "insight";
+          let category = "report";
+          let insight_text = "";
+          let shortText = recentMessageText.substring(0, maxLen) + (recentMessageText.length > maxLen ? "..." : "");
+          let lowerText = recentMessageText.toLowerCase();
+
+          if (lowerText.includes("cpu") || lowerText.includes("메모리")) {
+             severity = "high";
+             type_str = "warning";
+             category = "server";
+             insight_text = `💡 [Insight] 수신된 SMS ('${shortText}') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, 과거 배치 작업 중 발생한 서버 과부하 패턴과 98% 일치하며 시스템 강제종료가 예측됩니다.`;
+          } else if (lowerText.includes("db") || lowerText.includes("데이터베이스")) {
+             severity = "critical";
+             type_str = "error";
+             category = "database";
+             insight_text = `🚨 [Critical] 수신된 SMS ('${shortText}') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, DB Connection Pool 고갈 패턴과 94% 일치. 결제 모듈 응답 지연 예측됨.`;
+          } else if (lowerText.includes("네트워크") || lowerText.includes("network")) {
+             severity = "medium";
+             type_str = "insight";
+             category = "network";
+             insight_text = `⚠️ [Insight] 수신된 SMS ('${shortText}') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, L4 스위치 트래픽 포화 상태 예측됨.`;
+          } else {
+             insight_text = `🔍 [Insight] 수신된 SMS ('${shortText}') 기반 분석: 신한DS KMS 연동 LLM이 유사 사례를 분석 중입니다. 현재 트래픽 내 특이 패턴은 발견되지 않았습니다.`;
+          }
+
+          let formattedTime = new Date(recentMessageTime).toLocaleString('ko-KR');
+          currentLog = {
+             id: id_val,
+             type: type_str,
+             category: category,
+             severity: severity,
+             text: insight_text,
+             detail: `수신 시간: ${formattedTime}`
+          };
+        } else {
+          currentLog = {
+             id: "SYS-000",
+             type: "info",
+             category: "report",
+             severity: "info",
+             text: "실시간 데이터 대기 중... 새로운 SMS를 기다리고 있습니다.",
+             detail: "신한DS KMS 연동 LLM 분석 대기 중"
+          };
+        }
+
+        return new Response(
+          JSON.stringify({
+            status: "active",
+            learning_data_size: "15.2 TB (KMS)",
+            accuracy: "98.5%",
+            current_log: currentLog
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

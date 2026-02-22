@@ -25,7 +25,7 @@ export default function AIInsightModal({ insight, onClose }) {
   const CategoryIcon = getCategoryIcon(insight.category);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[#0f111a]/90 backdrop-blur-md" onClick={onClose}></div>
       
       <div className="relative w-full max-w-3xl bg-gradient-to-b from-[#1a1f2e] to-[#0f111a] border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] overflow-y-auto">

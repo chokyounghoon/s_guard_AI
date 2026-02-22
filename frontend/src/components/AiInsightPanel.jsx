@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Sparkles, Activity, Cpu } from 'lucide-react';
+import { Brain, Sparkles, Activity, Cpu, Database, AlertTriangle, Server, Shield, FileText } from 'lucide-react';
 
 // API URL 설정
 const API_BASE_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8000'
   : 'https://api.chokerslab.store';
 
-export default function AiInsightPanel({ onLogReceived }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail }) {
   const [insightData, setInsightData] = useState({
     status: 'active',
     learning_data_size: '12.5 TB',
@@ -126,10 +126,6 @@ export default function AiInsightPanel({ onLogReceived }) {
            </div>
         </div>
       </div>
-      
-      {/* 하단 지표 */}
-
-      
     </div>
   );
 }

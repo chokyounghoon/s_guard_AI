@@ -1,32 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Bell, Search, SlidersHorizontal, Clock, User, ChevronRight, Home, MessageSquare, Activity, MoreHorizontal, AlertCircle } from 'lucide-react';
 
 export default function AssignmentsPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('전체');
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const initialTab = queryParams.get('tab') || '전체';
+
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [assignments, setAssignments] = useState([]);
+
+  // Mock Data Generator
+  const generateMockData = () => {
+    const data = [];
+    let idCounter = 1;
+
+    const addItems = (count, type, severity, status, titlePrefix) => {
+      for (let i = 0; i < count; i++) {
+        data.push({
+          id: idCounter++,
+          code: `INC-${20240000 + idCounter}`,
+          assignmentType: type,
+          severity: severity,
+          status: status,
+          title: `${titlePrefix} - ${type === 'AI' ? 'Anomaly Detected' : 'Service Alert'} #${i + 1}`,
+          sender: type === 'AI' ? 'S-Autopilot' : 'Monitoring System',
+          time: new Date(Date.now() - Math.random() * 86400000 * 3).toLocaleString(),
+          bgColor: severity === 'CRITICAL' ? 'bg-red-900/10' : 'bg-[#1a1f2e]',
+          borderColor: severity === 'CRITICAL' ? 'border-red-500/20' : 'border-white/5'
+        });
+      }
+    };
+
+    // Dashboard Counts Mapping
+    // AI Request
+    addItems(0, 'AI', 'CRITICAL', 'Open', 'Critical System Failure');
+    addItems(1, 'AI', 'MAJOR', 'Open', 'High Latency Detected');
+    addItems(24, 'AI', 'NORMAL', 'Open', 'Routine Check');
+
+    // SMS Request
+    addItems(12, 'SMS', 'NORMAL', 'Open', 'Unconfirmed SMS Alert');
+    addItems(8, 'SMS', 'NORMAL', 'In Progress', 'Processing SMS Issue');
+    addItems(156, 'SMS', 'NORMAL', 'Completed', 'Resolved SMS Incident');
+
+    return data;
+  };
 
   // localStorage에서 할당 내역 불러오기
   useEffect(() => {
     const saved = localStorage.getItem('sguard_assignments');
     if (saved) {
       try {
-        setAssignments(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (parsed.length === 0) {
+            // If empty array, allow regeneration to fix empty state
+             const mock = generateMockData();
+             setAssignments(mock);
+             localStorage.setItem('sguard_assignments', JSON.stringify(mock));
+        } else {
+             setAssignments(parsed);
+        }
       } catch (e) {
         console.error('데이터 로드 실패:', e);
+        const mock = generateMockData();
+        setAssignments(mock);
+        localStorage.setItem('sguard_assignments', JSON.stringify(mock));
       }
+    } else {
+      // No data found, generate mock data
+      const mock = generateMockData();
+      setAssignments(mock);
+      localStorage.setItem('sguard_assignments', JSON.stringify(mock));
     }
   }, []);
 
-  const tabs = ['전체', '중요도: CRITICAL', '상태: 대기', '신규'];
+  // URL 파라미터가 변경될 때 탭 업데이트
+  useEffect(() => {
+    if (queryParams.get('tab')) {
+      setActiveTab(queryParams.get('tab'));
+    }
+  }, [location.search]);
+
+  const tabs = ['전체', '중요도: CRITICAL', '상태: 대기', '상태: 처리중', '상태: 완료', '신규'];
 
   // 필터링 로직 (탭 선택 시)
   const filteredAssignments = assignments.filter(item => {
     if (activeTab === '전체') return true;
     if (activeTab === '중요도: CRITICAL') return item.severity === 'CRITICAL';
-    if (activeTab === '상태: 대기') return true; // 현재는 모두 대기 상태로 가정
-    if (activeTab === '신규') return true;
+    if (activeTab === '상태: 대기') return item.status === 'Open' || (item.assignmentType === 'SMS' && item.title.includes('Unconfirmed'));
+    if (activeTab === '상태: 처리중') return item.status === 'In Progress';
+    if (activeTab === '상태: 완료') return item.status === 'Completed';
+    // Mapping for Dashboard "Major" click (assignments?tab=전체 currently, but if we add specific tab later)
     return true;
   });
 

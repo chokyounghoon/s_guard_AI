@@ -59,6 +59,7 @@ export default function IncidentListPage() {
     }
   ].filter(item => {
     if (category === 'All') return true;
+    if (category === 'Critical' && item.severity === 'Critical') return true;
     if (category === 'Major' && item.severity === 'Major') return true;
     if (category === 'Normal' && item.severity === 'Normal') return true;
     if (category === 'Processing' && item.status === 'In Progress') return true;

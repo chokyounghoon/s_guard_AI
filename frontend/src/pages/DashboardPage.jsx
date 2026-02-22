@@ -1,76 +1,47 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bell, User, Monitor, RefreshCw, CheckCircle, ClipboardList, MessageSquare, Search, MoreHorizontal, Home, Zap, Shield, CheckSquare, BarChart2, Settings, AlertTriangle, Info, AlertCircle, ChevronRight, X, Sparkles, Server, Brain, Calendar, Hash, Users, LogIn } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home } from 'lucide-react';
+import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
+import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
+import AiSmsStatusPanel from '../components/AiSmsStatusPanel';
+import AiPredictionPanel from '../components/AiPredictionPanel';
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const [smsMessages, setSmsMessages] = useState([]);
-  const [recentAssignments, setRecentAssignments] = useState([]);
-  const [dismissedIds, setDismissedIds] = useState([]);
-  const [totalAssignedCount, setTotalAssignedCount] = useState(0);
-  const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState('week'); // 'today', 'week', 'month', 'custom'
-  const [dateRange, setDateRange] = useState({ from: '', to: '' });
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [showAgentPanel, setShowAgentPanel] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [agentMessages, setAgentMessages] = useState([]);
+  const [systemStatus, setSystemStatus] = useState('normal'); // normal, critical, recovering
+  const [messages, setMessages] = useState([]); // For top-banner messages
+  const [allNotifications, setAllNotifications] = useState([]); // For notification drawer
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [aiInsights, setAiInsights] = useState({});
   const [selectedInsight, setSelectedInsight] = useState(null);
-  const [allNotifications, setAllNotifications] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
-  const dismissedIdsRef = useRef([]);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [smsMessages, setSmsMessages] = useState([]);
+  const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
+  const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
 
-  // 초기 로드 시 localStorage에서 데이터 불러오기
+  // Initialize data from localStorage
   useEffect(() => {
-    // 유저 정보 로드
     const savedUser = localStorage.getItem('sguard_user');
     if (savedUser) {
-      try {
-        const profile = JSON.parse(savedUser);
-        setUserProfile(profile);
-        
-        // 소속이나 팀 정보가 없으면 모달 강제 표시 (온보딩)
-        if (!profile.dept || !profile.team) {
-          setShowProfileModal(true);
-        }
-      } catch (e) {
-        console.error('유저 정보 로드 실패:', e);
-      }
+        setUserProfile(JSON.parse(savedUser));
     } else {
-      // 정보가 아예 없으면 기본 모달 표시 (게스트 포함)
-      setShowProfileModal(true);
-    }
-    // 할당 내역 로드
-    const savedAssignments = localStorage.getItem('sguard_assignments');
-    if (savedAssignments) {
-      try {
-        setRecentAssignments(JSON.parse(savedAssignments));
-      } catch (e) {
-        console.error('할당 내역 로드 실패:', e);
-      }
+        setShowProfileModal(true);
     }
 
-    // 닫은 메시지 ID 로드
-    const savedDismissed = localStorage.getItem('sguard_dismissed_ids');
-    if (savedDismissed) {
-      try {
-        const ids = JSON.parse(savedDismissed);
-        setDismissedIds(ids);
-        dismissedIdsRef.current = ids;
-      } catch (e) {
-        console.error('닫은 메시지 로드 실패:', e);
-      }
-    }
-
-    // 총 할당 건수 로드
-    const savedCount = localStorage.getItem('sguard_total_count');
-    if (savedCount) {
-      setTotalAssignedCount(parseInt(savedCount));
-    } else {
-      setTotalAssignedCount(5); 
+    const savedCollapsed = localStorage.getItem('sguard_sms_collapsed');
+    if (savedCollapsed) {
+        setIsSmsPanelCollapsed(JSON.parse(savedCollapsed));
     }
   }, []);
 
@@ -91,266 +62,239 @@ export default function DashboardPage() {
       const response = await fetch(apiUrl);
       if (response.ok) {
         const data = await response.json();
-        const messages = data.messages || [];
-        
-        // 닫지 않은 메시지만 필터링하여 상단 알림에 표시
-        const filteredMessages = messages.filter(msg => !dismissedIdsRef.current.includes(msg.id));
-        setSmsMessages(filteredMessages);
-        
-        // SMS를 할당 리스트에 추가 (할당 리스트는 닫기 여부와 상관없이 누적)
-        if (messages.length > 0) {
-          addToAssignments(messages);
-          
-          // 알림 목록에도 추가 (새로 들어온 것만 중복 체크 후)
-          setAllNotifications(prev => {
-            const existingIds = new Set(prev.filter(n => n.type === 'SMS').map(n => n.id));
-            const newSms = messages
-              .filter(m => !existingIds.has(m.id))
-              .map(m => ({
-                id: m.id,
-                type: 'SMS',
-                title: '새로운 SMS 알림',
-                content: m.message,
-                time: new Date(m.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-                timestamp: m.timestamp,
-                severity: m.keyword_detected ? 'CRITICAL' : 'NORMAL',
-                isRead: false
-              }));
-            
-            if (newSms.length > 0) {
-              setUnreadCount(curr => curr + newSms.length);
-              return [...newSms, ...prev].slice(0, 50);
-            }
-            return prev;
-          });
-        }
+        // 삭제된 항목은 필터링하여 상태 업데이트
+        setSmsMessages((data.messages || []).filter(msg => !deletedSmsIds.has(msg.id)));
       }
     } catch (error) {
       console.error('SMS 메시지 로드 실패:', error);
     }
   };
 
-  const addToAssignments = (messages) => {
-    setRecentAssignments(prev => {
-      const existingIds = new Set(prev.map(a => a.smsId));
-      const newItems = messages
-        .filter(msg => !existingIds.has(msg.id))
-        .map(msg => ({
-          smsId: msg.id,
-          id: `sms-${msg.id}-${Date.now()}`,
-          severity: msg.keyword_detected ? 'CRITICAL' : 'MEDIUM',
-          code: `SMS${String(msg.id).padStart(5, '0')}`,
-          time: new Date(msg.timestamp).toLocaleTimeString('ko-KR', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            second: '2-digit'
-          }),
-          title: msg.message,
-          sender: msg.sender,
-          timestamp: msg.timestamp,
-          assignmentType: 'SMS',
-          bgColor: msg.keyword_detected ? 'bg-red-900/10' : 'bg-blue-900/10',
-          borderColor: msg.keyword_detected ? 'border-red-500/20' : 'border-blue-500/20'
-        }));
+  const toggleSmsPanel = () => {
+    const newState = !isSmsPanelCollapsed;
+    setIsSmsPanelCollapsed(newState);
+    localStorage.setItem('sguard_sms_collapsed', JSON.stringify(newState));
+  };
+
+  const deleteSMSMessage = async (e, id) => {
+    e.stopPropagation();
+    try {
+      const apiUrl = window.location.hostname === 'localhost' 
+        ? `http://localhost:8000/sms/${id}`
+        : `https://api.chokerslab.store/sms/${id}`;
       
-      if (newItems.length > 0) {
-        const updated = [...newItems, ...prev].slice(0, 10);
-        localStorage.setItem('sguard_assignments', JSON.stringify(updated));
-        
-        // 총 할당 건수 업데이트
-        setTotalAssignedCount(current => {
-          const newCount = current + newItems.length;
-          localStorage.setItem('sguard_total_count', newCount.toString());
-          return newCount;
+      const response = await fetch(apiUrl, { method: 'DELETE' });
+      if (response.ok) {
+        // 즉시 화면에서 제거하기 위한 로컬 상태 업데이트
+        setDeletedSmsIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(id);
+          return newSet;
         });
-        
-        return updated;
+        setSmsMessages(prev => prev.filter(msg => msg.id !== id));
       }
-      return prev;
-    });
-  };
-
-  const dismissMessage = (id) => {
-    setSmsMessages(prev => prev.filter(msg => msg.id !== id));
-    
-    // 닫은 메시지 ID를 저장
-    const updated = [...dismissedIdsRef.current, id];
-    dismissedIdsRef.current = updated;
-    setDismissedIds(updated);
-    localStorage.setItem('sguard_dismissed_ids', JSON.stringify(updated));
-  };
-
-  console.log('DashboardPage Rendering...', { smsMessages, recentAssignments, currentDismissed: dismissedIdsRef.current });
-
-
-  const [predictionLogs, setPredictionLogs] = useState({
-    critical: [],
-    server: [],
-    security: [],
-    report: []
-  });
-
-  const [predictionStats, setPredictionStats] = useState({
-    critical: 0,
-    server: 0,
-    security: 0,
-    report: 0
-  });
-
-  const [selectedCategory, setSelectedCategory] = useState(null);
-
-  const handleLogReceived = (log) => {
-    if (!log || !log.category) return;
-
-    setPredictionStats(prev => ({
-        ...prev,
-        [log.category]: prev[log.category] + 1
-    }));
-
-    setPredictionLogs(prev => ({
-        ...prev,
-        [log.category]: [log, ...prev[log.category]].slice(0, 50) // Keep last 50
-    }));
-
-    // 알림 목록에 추가
-    setAllNotifications(prev => {
-      const newNotif = {
-        id: `ai-${Date.now()}`,
-        type: 'AI',
-        title: `AI 예측: ${log.category.toUpperCase()}`,
-        content: log.text,
-        time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-        timestamp: Date.now(),
-        severity: log.severity === 'critical' ? 'CRITICAL' : 'INFO',
-        isRead: false
-      };
-      setUnreadCount(curr => curr + 1);
-      return [newNotif, ...prev].slice(0, 50);
-    });
-  };
-
-  // Mock AI Insights Data for each prediction category
-  const aiInsights = {
-    critical: {
-      predictionId: "PRED-2024-001",
-      category: "장애",
-      severity: "high",
-      aiReasoning: "평소 화요일 오전 08:00~09:00 CPU 사용률은 45% 수준이나, 현재 92%로 급증하였습니다. 배치 프로세스(batch_processor_v2)의 무한 루프가 의심되며, 메모리 누수(Memory Leak) 패턴도 함께 감지되었습니다. 과거 유사 사례 분석 결과, 이러한 패턴은 평균 15분 이내에 서비스 중단으로 이어질 확률이 높습니다.",
-      relatedMetrics: {
-        cpu: 92,
-        memory: 78,
-        diskIO: 65
-      },
-      recommendedActions: [
-        "배치 프로세스 즉시 재시작 (service restart batch_processor_v2)",
-        "로그 파일 확인하여 루프 원인 파악 (/var/log/batch_errors.log)",
-        "메모리 덤프 생성 후 누수 지점 분석",
-        "임시 조치: 프로세스 타임아웃 설정 강화 (timeout 300s → 120s)"
-      ],
-      confidence: 95,
-      similarCases: 37
-    },
-    server: {
-      predictionId: "PRED-2024-002",
-      category: "성능",
-      severity: "medium",
-      aiReasoning: "웹 서버(nginx) 응답 시간이 평소 150ms에서 950ms로 증가했습니다. DB Connection Pool 사용률이 85%에 도달하여 병목 현상이 발생 중입니다. 트래픽 패턴 분석 결과, 특정 API 엔드포인트(/api/v2/analytics)의 요청이 급증하고 있으며, 해당 쿼리의 인덱스 누락이 원인으로 추정됩니다.",
-      relatedMetrics: {
-        cpu: 68,
-        memory: 72,
-        diskIO: 58
-      },
-      recommendedActions: [
-        "DB Connection Pool 크기 임시 증설 (200 → 400)",
-        "문제 API 엔드포인트에 Rate Limiting 적용",
-        "느린 쿼리 로그 확인 및 인덱스 추가 검토",
-        "캐싱 레이어 추가 고려 (Redis)"
-      ],
-      confidence: 88,
-      similarCases: 52
-    },
-    security: {
-      predictionId: "PRED-2024-003",
-      category: "보안",
-      severity: "high",
-      aiReasoning: "최근 1시간 동안 동일 IP 대역(203.142.*.*)에서 로그인 실패 시도가 347건 감지되었습니다. Brute Force Attack 패턴으로 판단되며, 공격 대상 계정은 관리자 권한 계정(admin, root, sysadmin)입니다. 현재 방화벽 룰이 이 패턴을 차단하지 못하고 있어 즉각 조치가 필요합니다.",
-      relatedMetrics: {
-        cpu: 45,
-        memory: 52,
-        diskIO: 38
-      },
-      recommendedActions: [
-        "해당 IP 대역 즉시 차단 (iptables -A INPUT -s 203.142.0.0/16 -j DROP)",
-        "계정 잠금 정책 강화 (5회 실패 시 30분 잠금)",
-        "MFA(Multi-Factor Authentication) 강제 적용 검토",
-        "보안 팀에 긴급 알림 전송"
-      ],
-      confidence: 97,
-      similarCases: 23
-    },
-    report: {
-      predictionId: "PRED-2024-004",
-      category: "성능",
-      severity: "low",
-      aiReasoning: "지난 7일간의 시스템 메트릭을 분석한 결과, 야간 시간대(02:00~04:00) 디스크 I/O가 평소 대비 30% 증가하는 트렌드가 발견되었습니다. 백업 프로세스와 배치 작업이 겹치면서 발생하는 것으로 보이며, 현재는 서비스에 영향이 없으나 트래픽 증가 시 병목 가능성이 있습니다.",
-      relatedMetrics: {
-        cpu: 32,
-        memory: 48,
-        diskIO: 71
-      },
-      recommendedActions: [
-        "백업 스케줄 조정 (02:00 → 01:00)",
-        "배치 작업 우선순위 재조정",
-        "SSD로 스토리지 업그레이드 검토",
-        "모니터링 알림 임계값 설정 (Disk I/O > 80%)"
-      ],
-      confidence: 82,
-      similarCases: 61
+    } catch (error) {
+      console.error('SMS 메시지 삭제 실패:', error);
     }
   };
 
-  const statusCards = [
-    { 
-        id: 'critical', 
-        label: 'Critical Error 예측됨', 
-        val: predictionStats.critical, 
-        icon: AlertTriangle, 
-        color: 'bg-red-900/50', 
-        text: 'text-red-400', 
-        bar: 'bg-red-500',
-        borderColor: 'border-red-500/30'
+
+  // Dummy data for recent assignments
+  const recentAssignments = [
+    {
+      id: 'INC-8823',
+      title: 'Payment Gateway Timeout',
+      sender: 'AI Autopilot',
+      time: '18:45',
+      severity: 'CRITICAL',
+      code: 'PG-001',
+      assignmentType: 'AI',
+      bgColor: 'bg-red-500/5',
+      borderColor: 'border-red-500/10',
     },
-    { 
-        id: 'server', 
-        label: '서버오류 예측됨', 
-        val: predictionStats.server, 
-        icon: Server, 
-        color: 'bg-orange-900/50', 
-        text: 'text-orange-400', 
-        bar: 'bg-orange-500',
-        borderColor: 'border-orange-500/30'
+    {
+      id: 'SMS-1234',
+      title: '서버 CPU 사용량 급증 알림',
+      sender: '김철수',
+      time: '14:30',
+      severity: 'MAJOR',
+      code: 'SRV-002',
+      assignmentType: 'SMS',
+      bgColor: 'bg-orange-500/5',
+      borderColor: 'border-orange-500/10',
     },
-    { 
-        id: 'security', 
-        label: '보안이슈 감지', 
-        val: predictionStats.security, 
-        icon: Shield, 
-        color: 'bg-blue-900/50', 
-        text: 'text-blue-400', 
-        bar: 'bg-blue-500',
-        borderColor: 'border-blue-500/30'
-    },
-    { 
-        id: 'report', 
-        label: '예측 분석 레포트', 
-        val: predictionStats.report, 
-        icon: ClipboardList, 
-        color: 'bg-purple-900/50', 
-        text: 'text-purple-400', 
-        bar: 'bg-purple-500',
-        borderColor: 'border-purple-500/30'
+    {
+      id: 'AI-5678',
+      title: '데이터베이스 연결 오류 감지',
+      sender: 'AI Autopilot',
+      time: '10:00',
+      severity: 'NORMAL',
+      code: 'DB-003',
+      assignmentType: 'AI',
+      bgColor: 'bg-blue-500/5',
+      borderColor: 'border-blue-500/10',
     },
   ];
+
+  const totalAssignedCount = recentAssignments.length;
+
+  // Dummy data for status cards
+  const statusCards = [
+    { id: 'critical', label: 'Critical', val: 0, icon: AlertTriangle, color: 'bg-red-500/20', text: 'text-red-400', bar: 'bg-red-500', borderColor: 'border-red-500/30' },
+    { id: 'major', label: 'Major', val: 1, icon: Shield, color: 'bg-orange-500/20', text: 'text-orange-400', bar: 'bg-orange-500', borderColor: 'border-orange-500/30' },
+    { id: 'normal', label: 'Normal', val: 24, icon: CheckCircle, color: 'bg-emerald-500/20', text: 'text-emerald-400', bar: 'bg-emerald-500', borderColor: 'border-emerald-500/30' },
+    { id: 'info', label: 'Info', val: 156, icon: Info, color: 'bg-blue-500/20', text: 'text-blue-400', bar: 'bg-blue-500', borderColor: 'border-blue-500/30' },
+  ];
+
+  // Real-time metrics simulation
+  const [metrics, setMetrics] = useState({
+    cpu: 45,
+    memory: 52,
+    requests: 240,
+    errorRate: 0.1
+  });
+
+  // Demo Trigger Handler (Secret Key: 'd')
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === 'd' && !showAgentPanel) {
+        startDemoScenario();
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showAgentPanel]);
+
+  // Metric Simulation Loop
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMetrics(prev => {
+        if (systemStatus === 'critical') {
+          return {
+            cpu: Math.min(98, prev.cpu + Math.random() * 5),
+            memory: Math.min(95, prev.memory + Math.random() * 3),
+            requests: Math.min(3000, prev.requests + Math.random() * 100),
+            errorRate: Math.min(15, prev.errorRate + Math.random() * 2)
+          };
+        } else if (systemStatus === 'recovering') {
+          return {
+            cpu: Math.max(45, prev.cpu - 5),
+            memory: Math.max(52, prev.memory - 3),
+            requests: Math.max(240, prev.requests - 50),
+            errorRate: Math.max(0.1, prev.errorRate - 1)
+          };
+        } else {
+          // Normal fluctuation
+          return {
+            cpu: 40 + Math.random() * 20,
+            memory: 50 + Math.random() * 15,
+            requests: 200 + Math.random() * 100,
+            errorRate: Math.random() * 0.5
+          };
+        }
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [systemStatus]);
+
+  const startDemoScenario = () => {
+    setSystemStatus('critical');
+    setShowAgentPanel(true);
+    
+    // Agent Coversation Sequence
+    const sequence = [
+      { role: 'Security', text: '⚠️ 비정상적인 트래픽 급증 감지! IP 평판 조회 중...', delay: 1000 },
+      { role: 'Security', text: '✅ DDoS 분석 결과 음성. 정상 사용자로 확인됨. 보안 공격 아님.', delay: 3000 },
+      { role: 'DB', text: '🚨 DB 커넥션 풀 급격히 포화 중! (사용률 92%)', delay: 5000 },
+      { role: 'DB', text: '🔍 원인 규명 중... `orders` 테이블에서 슬로우 쿼리 발견. 인덱스 누락 의심됨.', delay: 7000 },
+      { role: 'DevOps', text: '🔥 WAS-03 CPU 부하 임계치 초과 (95%). 애플리케이션 응답 지연 발생.', delay: 9000 },
+      { role: 'DevOps', text: '비정상 인스턴스 재시작 및 DB 풀 플러시 승인 요청.', delay: 11000 },
+      { role: 'Leader', text: '상황 분석 중... 보안 이상 무. DB 병목 확인됨. 인프라 상태 위급.', delay: 13000 },
+      { role: 'Leader', text: '💡 결정: 서비스 복구를 위해 WAS-Cluster-03 즉시 재기동 제안.', delay: 15000 },
+    ];
+
+    let currentStep = 0;
+    
+    const runSequence = () => {
+      if (currentStep < sequence.length) {
+        const step = sequence[currentStep];
+        setTimeout(() => {
+          setAgentMessages(prev => [...prev, step]);
+          currentStep++;
+          runSequence();
+        }, step.delay - (currentStep > 0 ? sequence[currentStep-1].delay : 0));
+      } else {
+        setTimeout(() => {
+            setShowEmergencyModal(true);
+        }, 2000);
+      }
+    };
+
+    runSequence();
+  };
+
+  const handleApproveAction = () => {
+    setShowEmergencyModal(false);
+    setSystemStatus('recovering');
+    setAgentMessages(prev => [...prev, { role: 'Leader', text: '✅ 조치 승인됨. 재기동 스크립트 실행 중...', delay: 0 }]);
+    
+    setTimeout(() => {
+       setAgentMessages(prev => [...prev, { role: 'DevOps', text: '🚀 WAS-03 재기동 완료.', delay: 0 }]);
+    }, 2000);
+
+    setTimeout(() => {
+       setAgentMessages(prev => [...prev, { role: 'Leader', text: '🎉 시스템 안정화 확인. 사후 분석(Post-Mortem) 보고서 생성 중...', delay: 0 }]);
+       setSystemStatus('normal');
+       // Auto close panel delay
+       setTimeout(() => setShowAgentPanel(false), 5000);
+    }, 4000);
+  };
+
+  const dismissMessage = (id) => {
+    setMessages(messages.filter(msg => msg.id !== id));
+  };
+
+  // Modal State
+  const [showInsightModal, setShowInsightModal] = useState(false);
+  const [selectedInsightData, setSelectedInsightData] = useState(null);
+
+  // Mock Data for AI Prediction Modal (from screenshot)
+  const demoInsightData = {
+    predictionId: 'PRED-2024-001',
+    severity: 'high',
+    category: '장애',
+    aiReasoning: '평소 화요일 오전 08:00~09:00 CPU 사용률은 45% 수준이나, 현재 92%로 급증하였습니다. 배치 프로세스 (batch_processor_v2)의 무한 루프가 의심되며, 메모리 누수(Memory Leak) 패턴도 함께 감지되었습니다. 과거 유사 사례 분석 결과, 이러한 패턴은 평균 15분 이내에 서비스 중단으로 이어질 확률이 높습니다.',
+    relatedMetrics: {
+      cpu: 92,
+      memory: 78,
+      diskIO: 65
+    },
+    recommendedActions: [
+      '배치 프로세스 즉시 재시작 (service restart batch_processor_v2)',
+      '로그 파일 확인하여 루프 원인 파악 (/var/log/batch_errors.log)',
+      '메모리 덤프 생성 후 누수 지점 분석',
+      '임시 조치: 프로세스 타임아웃 설정 강화 (timeout 300s -> 120s)'
+    ],
+    confidence: 95,
+    similarCases: 37
+  };
+
+  const handleShowInsight = (type) => {
+    // In a real app, we would fetch data based on type using the API
+    // For now, we use the demo data matching the screenshot
+    setSelectedInsightData(demoInsightData);
+    setShowInsightModal(true);
+  };
+
+  const handleLogReceived = (log) => {
+    // Example: Add log to notifications or process it
+    console.log("Log received in Dashboard:", log);
+    setAllNotifications(prev => [{ id: Date.now(), title: log.title, content: log.message, type: 'AI', severity: log.severity, time: new Date().toLocaleTimeString() }, ...prev]);
+    // Optionally show a temporary message in the top banner for critical logs
+    if (log.severity === 'CRITICAL') {
+      setMessages(prev => [...prev, { id: Date.now(), type: 'error', text: log.message }]);
+    }
+  };
 
   const renderProfileModal = () => {
     if (!showProfileModal) return null;
@@ -372,186 +316,63 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] text-white font-sans pb-24 relative overflow-x-hidden">
-        
-       {/* Background Glows */}
-       <div className="fixed top-0 left-0 w-full h-96 bg-blue-900/5 blur-[100px] -z-10 pointer-events-none" />
-
-       {/* Detail Modal */}
-       {selectedCategory && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedCategory(null)}>
-            <div className="bg-[#1a1f2e] w-full max-w-2xl rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-scale-up" onClick={e => e.stopPropagation()}>
-                <div className="p-5 border-b border-white/10 flex justify-between items-center bg-[#11141d]">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                        {statusCards.find(c => c.id === selectedCategory)?.icon && 
-                            React.createElement(statusCards.find(c => c.id === selectedCategory).icon, { className: `w-5 h-5 ${statusCards.find(c => c.id === selectedCategory).text}` })}
-                        {statusCards.find(c => c.id === selectedCategory)?.label}
-                         - 상세 목록
-                    </h3>
-                    <button onClick={() => setSelectedCategory(null)} className="p-1 rounded-full hover:bg-white/10">
-                        <X className="w-5 h-5 text-slate-400" />
-                    </button>
-                </div>
-                <div className="p-0 max-h-[60vh] overflow-y-auto">
-                    {predictionLogs[selectedCategory].length > 0 ? (
-                        <div className="divide-y divide-white/5">
-                            {predictionLogs[selectedCategory].map((log, idx) => (
-                                <div key={idx} className="p-4 hover:bg-white/5 cursor-pointer transition-colors" onClick={() => navigate('/assignment-detail')}>
-                                    <div className="flex justify-between items-start mb-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                                                log.severity === 'critical' ? 'bg-red-500/20 text-red-500 border-red-500/30' :
-                                                log.severity === 'high' ? 'bg-orange-500/20 text-orange-500 border-orange-500/30' :
-                                                log.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' :
-                                                'bg-blue-500/20 text-blue-500 border-blue-500/30'
-                                            }`}>
-                                                {log.severity.toUpperCase()}
-                                            </span>
-                                            <span className="text-xs text-slate-500 font-mono">{log.id || 'N/A'}</span>
-                                        </div>
-                                        <span className="text-[10px] text-slate-500">Just now</span>
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-200 mb-1">{log.text}</p>
-                                    <p className="text-xs text-slate-400">{log.detail || '상세 내용 없음'}</p>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="p-10 text-center text-slate-500">
-                            <Info className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                            <p>아직 수집된 로그가 없습니다.</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-       )}
-
-      {/* Header */}
-      <header className="flex justify-between items-center p-5 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-50 border-b border-white/5">
-        <div className="flex items-center space-x-2">
-            <div className="bg-blue-600 p-1.5 rounded-lg shadow-lg shadow-blue-900/50">
-                <Shield className="w-4 h-4 text-white fill-current" />
-            </div>
-            <span className="font-bold text-lg tracking-wide">S-Guard AI <span className="text-red-500 text-xs ml-2">(DEPLOY CHECK)</span></span>
+    <div className="min-h-screen bg-[#0f1421] text-white font-sans overflow-x-hidden relative">
+      {/* Top Navigation */}
+      <nav className="flex justify-between items-center p-4 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-900/50">S</div>
+          <span className="text-lg font-bold tracking-tight">S-Guard <span className="text-blue-500">AI</span></span>
         </div>
         <div className="flex items-center space-x-4">
-            <div 
-              className="relative p-1 hover:bg-white/10 rounded-full cursor-pointer transition-colors"
-              onClick={() => {
-                setShowNotifications(!showNotifications);
-                setUnreadCount(0);
-                setAllNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-              }}
-            >
-                <Bell className={`w-6 h-6 ${unreadCount > 0 ? 'text-blue-400 animate-bounce-subtle' : 'text-slate-400'}`} />
-                {unreadCount > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-[#0f111a] text-white">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
+          <div className="relative group">
+            <Search className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors cursor-pointer" />
+          </div>
+          <div className="relative group">
+            <Bell 
+              className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors cursor-pointer" 
+              onClick={() => setShowNotifications(true)}
+            />
+            {allNotifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            )}
+          </div>
+          <div 
+            className="flex items-center space-x-3 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
+            onClick={() => setShowProfileModal(true)}
+          >
+            {userProfile && (
+            <span className="text-xs font-bold text-slate-300 hidden sm:inline-block group-hover:text-blue-400">
+                {userProfile.name}
+            </span>
+            )}
+            <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all">
+                {userProfile?.picture ? (
+                <img src={userProfile.picture} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                <User className="w-5 h-5 text-slate-300 group-hover:text-blue-400" />
                 )}
             </div>
-            <div 
-              className="flex items-center space-x-3 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
-              onClick={() => setShowProfileModal(true)}
-            >
-              {userProfile && (
-                <span className="text-xs font-bold text-slate-300 hidden sm:inline-block group-hover:text-blue-400">
-                  {userProfile.name}
-                </span>
-              )}
-              <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all">
-                  {userProfile?.picture ? (
-                    <img src={userProfile.picture} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-5 h-5 text-slate-300 group-hover:text-blue-400" />
-                  )}
-              </div>
-            </div>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      {/* SMS 알림 영역 */}
-      {smsMessages.length > 0 && (
-        <div className="px-5 pt-4 space-y-3">
-          {smsMessages.map((msg) => (
-            <div
-              key={msg.id}
-              className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-4 shadow-xl shadow-blue-900/50 border border-blue-400/30 animate-slide-down"
+      {/* Top Banner Messages */}
+      {messages.length > 0 && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md p-4 space-y-2">
+          {messages.map(msg => (
+            <div 
+              key={msg.id} 
+              className={`flex items-center justify-between p-3 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300
+                ${msg.type === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}
+              `}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-3 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    {msg.keyword_detected ? (
-                      <AlertCircle className="w-6 h-6 text-yellow-300" />
-                    ) : (
-                      <Info className="w-6 h-6 text-white" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="font-bold text-white text-sm">SMS 수신</h3>
-                      {msg.keyword_detected && (
-                        <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          키워드 감지
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-blue-100 mb-1">
-                      발신: {msg.sender}
-                    </p>
-                    <p className="text-sm text-white font-medium leading-snug">
-                      {msg.message}
-                    </p>
-                    {msg.response_message && (
-                      <div className="mt-2 bg-white/10 rounded-lg p-2 border border-white/20">
-                        <p className="text-xs text-blue-100 flex items-center space-x-1">
-                          <CheckCircle className="w-3 h-3" />
-                          {(() => {
-                            if (msg.response_message.includes('AI 분석을 시작합니다.')) {
-                              const parts = msg.response_message.split('AI 분석을 시작합니다.');
-                              return (
-                                <span>
-                                  자동 응답: {parts[0]}
-                                  <span 
-                                    onClick={(e) => { e.stopPropagation(); navigate('/assignments'); }}
-                                    className="underline decoration-blue-400/50 underline-offset-4 cursor-pointer font-bold text-blue-300 hover:text-white transition-colors animate-pulse"
-                                  >
-                                    장애등록및 War-Room 생성이 완료 되었습니다.
-                                  </span>
-                                  {parts[1]}
-                                </span>
-                              );
-                            } else if (msg.response_message.includes('War-Room')) {
-                              const parts = msg.response_message.split('War-Room');
-                              return (
-                                <span>
-                                  자동 응답: {parts[0]}
-                                  <span 
-                                    onClick={(e) => { e.stopPropagation(); navigate('/chat'); }}
-                                    className="underline decoration-blue-400/50 underline-offset-4 cursor-pointer font-bold text-blue-300 hover:text-white transition-colors animate-pulse"
-                                  >
-                                    War-Room
-                                  </span>
-                                  {parts[1]}
-                                </span>
-                              );
-                            } else {
-                              return <span>자동 응답: {msg.response_message}</span>;
-                            }
-                          })()}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => dismissMessage(msg.id)}
-                  className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors shrink-0"
-                >
-                  <X className="w-5 h-5 text-white" />
-                </button>
-              </div>
+              <p className="text-sm font-medium">{msg.text}</p>
+              <button
+                onClick={() => dismissMessage(msg.id)}
+                className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors shrink-0"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
             </div>
           ))}
         </div>
@@ -634,223 +455,255 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <main className="p-5 space-y-5">
-        
-        {/* NEW: AI Autopilot Insight Panel */}
+      <div className="p-6 max-w-7xl mx-auto pb-24">
+        {/* Header Section */}
+        <div>
+        </div>
+
+        {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
+        {smsMessages.length > 0 && (
+          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl mb-6 overflow-hidden transition-all duration-300">
+            <div 
+              onClick={toggleSmsPanel}
+              className="p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-600/20 p-2 rounded-xl">
+                  <MessageSquare className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">실시간 SMS 수신 내역</h3>
+                  <p className="text-[10px] text-slate-500 font-mono uppercase">REAL-TIME SMS MONITORING</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono tracking-wider">LIVE</span>
+                </div>
+                <div className={`transition-transform duration-300 ${isSmsPanelCollapsed ? '' : 'rotate-180'}`}>
+                  <ChevronRight className="w-5 h-5 text-slate-400 rotate-90" />
+                </div>
+              </div>
+            </div>
+
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSmsPanelCollapsed ? 'max-h-0' : 'max-h-[1000px] border-t border-white/5'}`}>
+              <div className="p-6 space-y-4">
+                {smsMessages.filter(msg => !deletedSmsIds.has(msg.id)).map((msg) => (
+                  <div key={msg.id} className="bg-[#11141d] rounded-2xl p-4 border border-white/5 flex items-start justify-between group hover:border-blue-500/30 transition-all">
+                    <div className="flex items-start space-x-3 flex-1">
+                      <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center shrink-0">
+                        {msg.keyword_detected ? (
+                          <AlertCircle className="w-6 h-6 text-yellow-300" />
+                        ) : (
+                          <Info className="w-6 h-6 text-blue-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-bold text-white text-sm">SMS 수신</h4>
+                            {msg.keyword_detected && (
+                              <span className="bg-yellow-400/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-400/30">
+                                키워드 감지
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 mb-1">발신: {msg.sender}</p>
+                        <p className="text-sm text-slate-200 leading-snug">{msg.message}</p>
+                      </div>
+                      <button 
+                        onClick={(e) => deleteSMSMessage(e, msg.id)}
+                        className="ml-2 p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                        title="삭제"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AI Autopilot Insight Panel */}
         <React.Suspense fallback={<div className="h-48 bg-gray-900 rounded-3xl animate-pulse"></div>}>
             <ErrorBoundary>
-                <AiInsightPanel onLogReceived={handleLogReceived} />
+                <AiInsightPanel onLogReceived={handleLogReceived} onShowDetail={handleShowInsight} />
             </ErrorBoundary>
         </React.Suspense>
 
-        {/* Section 1: Autopilot Prediction Status (Redesigned) - Moved to Top */}
-        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-lg flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-blue-400" />
-                    Autopilot 예측현황
-                </h2>
-                <div className="flex items-center space-x-2">
-                    <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">REALTIME</span>
-                </div>
-            </div>
+        {/* AI Autopilot Prediction Panel (Standalone) */}
+        <AiPredictionPanel onShowDetail={handleShowInsight} />
 
-            <div className="grid grid-cols-4 gap-3">
-                {statusCards.map((stat, idx) => (
-                    <div 
-                        key={idx} 
-                        onClick={() => setSelectedInsight(aiInsights[stat.id])}
-                        className={`
-                            bg-[#11141d] rounded-2xl p-3 flex flex-col items-center justify-between h-36 relative overflow-hidden 
-                            border border-white/5 group hover:border-blue-500/40 transition-all cursor-pointer hover:scale-[1.02] active:scale-95
-                        `}
-                    >
-                        <span className="text-[10px] text-slate-400 mb-2 font-medium text-center leading-tight">{stat.label}</span>
-                        <div className={`p-2.5 rounded-full ${stat.color} mb-1 group-hover:scale-110 transition-transform ${stat.borderColor} border`}>
-                            <stat.icon className={`w-5 h-5 ${stat.text}`} />
-                        </div>
-                        <span className={`text-2xl font-bold ${stat.text}`}>{stat.val}</span>
-                        <div className={`absolute bottom-0 left-0 w-full h-[3px] ${stat.bar}`} />
-                        
-                        {/* Glow Effect */}
-                        <div className={`absolute -bottom-10 -right-10 w-24 h-24 ${stat.bar} opacity-10 blur-2xl rounded-full`} />
-                    </div>
-                ))}
+        {/* AI Insight Modal */}
+        {showInsightModal && (
+            <AIInsightModal 
+                insight={selectedInsightData} 
+                onClose={() => setShowInsightModal(false)} 
+            />
+        )}
+
+        {/* AI/SMS Status Panel */}
+        <AiSmsStatusPanel />
+
+        {/* System Vitals Panel */}
+        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mb-6 mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-blue-400" />
+              System Vitals
+            </h3>
+            <div className="flex items-center space-x-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono tracking-wider">LIVE METRICS</span>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard 
+              title="Avg. Response" 
+              value={`${systemStatus === 'critical' ? (1500 + Math.random()*500).toFixed(0) : (120 + Math.random()*20).toFixed(0)}ms`} 
+              trend={systemStatus === 'critical' ? "+450%" : "-12%"} 
+              trendUp={systemStatus !== 'critical'} 
+              icon={Clock} 
+              color={systemStatus === 'critical' ? "red" : "blue"}
+            />
+            <MetricCard 
+              title="Total Requests" 
+              value={metrics.requests.toFixed(0)} 
+              trend="+5.2%" 
+              trendUp={true} 
+              icon={Activity} 
+              color={systemStatus === 'critical' ? "yellow" : "purple"}
+            />
+            <MetricCard 
+              title="Error Rate" 
+              value={`${metrics.errorRate.toFixed(2)}%`} 
+              trend={systemStatus === 'critical' ? "+12.5%" : "-0.1%"} 
+              trendUp={systemStatus !== 'critical'} 
+              icon={AlertTriangle} 
+              color={systemStatus === 'critical' ? "red" : "green"}
+            />
+            <MetricCard 
+              title="Active Servers" 
+              value="4/4" 
+              subValue="All Online" 
+              icon={Server} 
+              color="emerald"
+            />
+          </div>
         </div>
-        
-        {/* Section 2: My AI / SMS Request Status (Bar Charts) */}
-        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <h2 className="font-bold text-lg">나의 AI / SMS 확인요청 현황</h2>
-                
-                <div className="flex flex-col items-end space-y-3">
-                  {/* Period Selection (Radio-style buttons) */}
-                  <div className="flex bg-[#11141d] p-1 rounded-xl border border-white/5 overflow-hidden">
-                      {[
-                          { id: 'today', label: '오늘' },
-                          { id: 'week', label: '이번주' },
-                          { id: 'month', label: '이번달' },
-                          { id: 'custom', label: '일자지정' },
-                      ].map((period) => (
-                          <button
-                              key={period.id}
-                              onClick={() => setSelectedPeriod(period.id)}
-                              className={`
-                                  px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all
-                                  ${selectedPeriod === period.id 
-                                      ? 'bg-blue-600 text-white shadow-lg' 
-                                      : 'text-slate-500 hover:text-slate-300'}
-                              `}
-                          >
-                              {period.label}
-                          </button>
-                      ))}
+
+        {/* Main Content Areas */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Alerts List */}
+          <div className="lg:col-span-1 bg-[#1a1f2e] rounded-2xl p-6 border border-white/5">
+            <h3 className="font-bold mb-4 flex items-center">
+              <Activity className="w-4 h-4 mr-2 text-blue-400" />
+              Live Incident Stream
+            </h3>
+            <div className="space-y-4">
+              {systemStatus === 'critical' && (
+                  <div onClick={startDemoScenario} className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99]">
+                    <AlertItem 
+                        title="High Latency detected on WAS-03" 
+                        time="Now" 
+                        severity="critical"
+                        desc="Response time exceeded threshold (2000ms > 500ms)"
+                    />
                   </div>
-
-                  {/* Custom Date Inputs (Visible only if 'custom' is selected) */}
-                  {selectedPeriod === 'custom' && (
-                      <div className="flex items-center space-x-2 animate-in fade-in slide-in-from-right-2 duration-300">
-                          <div className="relative">
-                            <input 
-                                type="date" 
-                                value={dateRange.from}
-                                onChange={(e) => setDateRange({...dateRange, from: e.target.value})}
-                                className="bg-[#11141d] border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
-                            />
-                          </div>
-                          <span className="text-slate-500 text-[10px]">~</span>
-                          <div className="relative">
-                            <input 
-                                type="date" 
-                                value={dateRange.to}
-                                onChange={(e) => setDateRange({...dateRange, to: e.target.value})}
-                                className="bg-[#11141d] border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
-                            />
-                          </div>
-                      </div>
-                  )}
-                </div>
+              )}
+              <div onClick={startDemoScenario} className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99]">
+                <AlertItem 
+                    title="API Gateway Latency Spike" 
+                    time="2m ago" 
+                    severity="warning"
+                    desc="Intermittent latency observed in region ap-northeast-2"
+                />
+              </div>
+              <AlertItem 
+                title="Database Backup Completed" 
+                time="1h ago" 
+                severity="info"
+                desc="Daily incremental backup finished successfully (12.4GB)"
+              />
+              <AlertItem 
+                title="New Deployment: Frontend v2.4" 
+                time="3h ago" 
+                severity="success"
+                desc="Successfully deployed by CI/CD pipeline #8821"
+              />
             </div>
-            
-            <div className="grid grid-cols-2 gap-8">
-                {/* AI Request Column */}
-                <div>
-                     <div className="flex items-center space-x-2 mb-4">
-                        <Brain className="w-4 h-4 text-blue-400" />
-                        <h3 className="text-sm font-bold text-slate-300">AI Request</h3>
-                     </div>
-                     <div className="space-y-3">
-                        {/* Critical (0) - Red */}
-                        <div>
-                            <div className="flex justify-between text-[10px] mb-1">
-                                <span className="text-slate-400">Critical</span>
-                                <span className="text-red-400 font-bold">0</span>
-                            </div>
-                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                                <div className="h-full bg-red-500 w-0" />
-                            </div>
-                        </div>
-                        {/* Major (1) - Orange */}
-                        <div>
-                            <div className="flex justify-between text-[10px] mb-1">
-                                <span className="text-slate-400">Major</span>
-                                <span 
-                                  onClick={() => navigate('/incident-list?type=AI&category=Major')}
-                                  className="text-orange-400 font-bold underline cursor-pointer hover:text-orange-300 transition-colors"
-                                >
-                                  1
-                                </span>
-                            </div>
-                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                                <div className="h-full bg-orange-500 w-[15%]" />
-                            </div>
-                        </div>
-                        {/* Normal (24) - Emerald */}
-                        <div>
-                            <div className="flex justify-between text-[10px] mb-1">
-                                <span className="text-slate-400">Normal</span>
-                                <span 
-                                  onClick={() => navigate('/incident-list?type=AI&category=Normal')}
-                                  className="text-emerald-400 font-bold underline cursor-pointer hover:text-emerald-300 transition-colors"
-                                >
-                                  24
-                                </span>
-                            </div>
-                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 w-[60%]" />
-                            </div>
-                        </div>
-                     </div>
-                </div>
+          </div>
 
-                {/* SMS Request Column */}
-                <div>
-                    <div className="flex items-center space-x-2 mb-4">
-                        <MessageSquare className="w-4 h-4 text-purple-400" />
-                        <h3 className="text-sm font-bold text-slate-300">SMS Request</h3>
-                     </div>
-                     <div className="space-y-3">
-                        {/* Unconfirmed (12) - Red */}
-                        <div>
-                            <div className="flex justify-between text-[10px] mb-1">
-                                <span className="text-slate-400">미확인</span>
-                                <span 
-                                  onClick={() => navigate('/incident-list?type=SMS&category=Unconfirmed')}
-                                  className="text-red-400 font-bold underline cursor-pointer hover:text-red-300 transition-colors"
-                                >
-                                  12
+          {/* Quick Actions / Assignment / Agent Panel */}
+          <div className="lg:col-span-2 space-y-6">
+            {showAgentPanel ? (
+                 <AgentDiscussionPanel 
+                    messages={agentMessages} 
+                    isVisible={true}
+                    embedded={true}
+                    onClose={() => setShowAgentPanel(false)} 
+                />
+            ) : (
+                <div className="bg-[#1a1f2e] rounded-2xl p-6 border border-white/5 h-full">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold flex items-center">
+                            <Shield className="w-4 h-4 mr-2 text-purple-400" />
+                            AI War-Room Situation Log
+                        </h3>
+                        <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-0.5 rounded">승인 대기: 1건</span>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        {/* Demo Trigger Item */}
+                        <div onClick={startDemoScenario} className="bg-[#11141d] p-4 rounded-xl border border-red-500/20 cursor-pointer hover:bg-[#1a1f2e] hover:border-red-500/50 transition-all group relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">CRITICAL</span>
+                                <span className="text-[10px] text-slate-500">Just now</span>
+                            </div>
+                            <h4 className="font-bold text-sm text-slate-200 mb-1 group-hover:text-red-400 transition-colors">WAS-03 Response Latency</h4>
+                            <p className="text-xs text-slate-500 mb-2 line-clamp-1">CPU load &gt; 95%, DB Conn saturation.</p>
+                            <div className="flex justify-end">
+                                <span className="text-[10px] text-blue-400 font-bold flex items-center group-hover:underline">
+                                    승인 필요 <ChevronRight className="w-3 h-3 ml-0.5" />
                                 </span>
                             </div>
-                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                                <div className="h-full bg-red-500 w-[45%]" />
-                            </div>
                         </div>
-                        {/* Processing (8) - Orange */}
-                        <div>
-                            <div className="flex justify-between text-[10px] mb-1">
-                                <span className="text-slate-400">처리중</span>
-                                <span 
-                                  onClick={() => navigate('/incident-list?type=SMS&category=Processing')}
-                                  className="text-orange-400 font-bold underline cursor-pointer hover:text-orange-300 transition-colors"
-                                >
-                                  8
-                                </span>
+
+                        {/* Static Item */}
+                        <div className="bg-[#11141d] p-4 rounded-xl border border-white/5 opacity-60 hover:opacity-100 transition-opacity">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">MAJOR</span>
+                                <span className="text-[10px] text-slate-500">2h ago</span>
                             </div>
-                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                                <div className="h-full bg-orange-500 w-[20%]" />
-                            </div>
+                            <h4 className="font-bold text-sm text-slate-300 mb-1">API Gateway Latency</h4>
+                            <p className="text-xs text-slate-500 line-clamp-1">Intermittent packet loss in region ap-ne-2.</p>
                         </div>
-                        {/* Completed (156) - Blue */}
-                        <div>
-                            <div className="flex justify-between text-[10px] mb-1">
-                                <span className="text-slate-400">확인 완료</span>
-                                <span 
-                                  onClick={() => navigate('/incident-list?type=SMS&category=Completed')}
-                                  className="text-blue-400 font-bold underline cursor-pointer hover:text-blue-300 transition-colors"
-                                >
-                                  156
-                                </span>
-                            </div>
-                            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 w-full" />
-                            </div>
-                        </div>
-                     </div>
+                    </div>
                 </div>
-            </div>
+            )}
+          </div>
         </div>
 
-         {/* Section 3: My Confirmation History & Recent List */}
-         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl">
+        {/* Section 3: My Confirmation History & Recent List */}
+         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
             <div className="flex justify-between items-center mb-5">
                  <div className="flex items-center space-x-2">
                     <User className="w-5 h-5 text-blue-500" />
-                    <h2 className="font-bold text-lg">나의 확인 내역</h2>
+                    <h2 className="font-bold text-lg">나의 Autopilot 확인요청 현황</h2>
                  </div>
                 <span className="text-[10px] text-slate-400">실시간 업데이트</span>
             </div>
@@ -859,7 +712,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-4 gap-4 mb-6">
                 {/* Total */}
                 <div 
-                    onClick={() => navigate('/assignments')}
+                    onClick={() => navigate('/assignments?tab=전체')}
                     className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#252b41] transition-all hover:scale-[1.02] active:scale-95"
                 >
                     <p className="text-xs text-slate-400 mb-2 font-medium">총건</p>
@@ -871,7 +724,7 @@ export default function DashboardPage() {
 
                 {/* Unconfirmed (Red) */}
                 <div 
-                    onClick={() => navigate('/assignments')}
+                    onClick={() => navigate('/assignments?tab=상태: 대기')}
                     className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#2e1a1a] transition-all hover:scale-[1.02] active:scale-95"
                 >
                     <p className="text-xs text-slate-400 mb-2 font-medium">미확인</p>
@@ -885,7 +738,7 @@ export default function DashboardPage() {
 
                 {/* Processing (Orange) */}
                 <div 
-                    onClick={() => navigate('/assignments')}
+                    onClick={() => navigate('/assignments?tab=상태: 처리중')}
                     className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#2e231a] transition-colors"
                 >
                     <p className="text-xs text-slate-400 mb-2 font-medium">처리중</p>
@@ -897,7 +750,7 @@ export default function DashboardPage() {
 
                 {/* Completed (Blue) */}
                 <div 
-                    onClick={() => navigate('/assignments')}
+                    onClick={() => navigate('/assignments?tab=상태: 완료')}
                     className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
                 >
                     <p className="text-xs text-slate-400 mb-2 font-medium">처리완료</p>
@@ -968,135 +821,121 @@ export default function DashboardPage() {
                 )}
             </div>
           </div>
+      </div>
 
-        {/* Section 4: Overall Status Banner */}
-        <div 
-          onClick={() => navigate('/overall-status')}
-          className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-3xl p-5 shadow-xl shadow-blue-900/30 border border-blue-400/30 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all active:scale-[0.98]"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full -mr-10 -mt-10" />
-          <div className="flex items-center justify-between relative z-10">
-            <div className="flex items-center space-x-4">
-              <div className="bg-white/20 p-2.5 rounded-2xl">
-                <BarChart2 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="font-bold text-base text-white">전체 시스템 현황</h2>
-                <p className="text-xs text-blue-100 mt-0.5">주요 시스템의 트랜잭션 및 장애 처리 상태를 실시간으로 모니터링합니다.</p>
-              </div>
-            </div>
-            <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors">
-              확인
-            </button>
-          </div>
-        </div>
+       {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
+       <EmergencyActionModal 
+         isOpen={showEmergencyModal}
+         onClose={() => setShowEmergencyModal(false)}
+         onApprove={handleApproveAction}
+       />
+       
+       {renderProfileModal()}
+       <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} />
 
-      </main>
-
-
-      {/* War Room Chat List Popup */}
-      {showWarRoomPopup && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
-          
-          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-in slide-in-from-bottom-full duration-500">
-            {/* Header */}
-            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
-                  <MessageSquare className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>
-                  <p className="text-[10px] text-slate-500 font-mono">ACTIVE CHANNELS (2)</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowWarRoomPopup(false)}
-                className="p-2 rounded-full hover:bg-white/5 transition-colors group"
-              >
-                <X className="w-5 h-5 text-slate-500 group-hover:text-white" />
-              </button>
-            </div>
-
-            {/* Chat Room List */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
-              {[
-                { 
-                  id: 1, 
-                  title: '[신한카드] SHB02681 은행고객종합...', 
-                  lastMsg: 'AI 분석 결과 트래픽 임계치 설정 오류가 확인되었습니다.', 
-                  time: '18:45', 
-                  participants: 5,
-                  severity: 'CRITICAL',
-                  unread: true
-                },
-                { 
-                  id: 2, 
-                  title: 'INC-8823 서버 타임아웃 대응', 
-                  lastMsg: 'DB Connection Pool 증설 작업이 완료되었습니다.', 
-                  time: '14:30', 
-                  participants: 3,
-                  severity: 'MAJOR',
-                  unread: false
-                }
-              ].map((room) => (
-                <div 
-                  key={room.id}
-                  onClick={() => {
-                    setShowWarRoomPopup(false);
-                    navigate('/chat');
-                  }}
-                  className="bg-[#11141d] p-4 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98]"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
-                        room.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-orange-500/20 text-orange-500 border-orange-500/30'
-                      }`}>
-                        {room.severity}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-mono">ROOM #{room.id}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500">{room.time}</span>
-                  </div>
-                  
-                  <h4 className="font-bold text-slate-200 mb-1 group-hover:text-blue-400 transition-colors truncate">
-                    {room.title}
-                  </h4>
-                  <p className="text-xs text-slate-400 truncate mb-3">{room.lastMsg}</p>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex -space-x-2">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="w-6 h-6 rounded-full bg-slate-800 border-2 border-[#11141d] flex items-center justify-center">
-                          <User className="w-3 h-3 text-slate-400" />
-                        </div>
-                      ))}
-                      <div className="w-6 h-6 rounded-full bg-blue-600/20 border-2 border-[#11141d] flex items-center justify-center">
-                        <span className="text-[8px] font-bold text-blue-400">+{room.participants - 3}</span>
-                      </div>
-                    </div>
-                    {room.unread && (
-                      <div className="bg-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">NEW</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Bottom Safe Area */}
-            <div className="pb-8 px-6 pt-2">
-              <button 
-                onClick={() => navigate('/assignments')}
-                className="w-full py-4 rounded-2xl bg-slate-800 text-slate-400 font-bold text-sm hover:bg-slate-700 transition-colors"
-              >
-                전체 히스토리 보기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+       {/* War Room Chat List Popup */}
+       {showWarRoomPopup && (
+         <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
+           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
+           
+           <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-in slide-in-from-bottom-full duration-500">
+             {/* Header */}
+             <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+               <div className="flex items-center space-x-3">
+                 <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
+                   <MessageSquare className="w-5 h-5 text-blue-400" />
+                 </div>
+                 <div>
+                   <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>
+                   <p className="text-[10px] text-slate-500 font-mono">ACTIVE CHANNELS (2)</p>
+                 </div>
+               </div>
+               <button 
+                 onClick={() => setShowWarRoomPopup(false)}
+                 className="p-2 rounded-full hover:bg-white/5 transition-colors group"
+               >
+                 <X className="w-5 h-5 text-slate-500 group-hover:text-white" />
+               </button>
+             </div>
+ 
+             {/* Chat Room List */}
+             <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
+               {[
+                 { 
+                   id: 1, 
+                   title: '[신한카드] SHB02681 은행고객종합...', 
+                   lastMsg: 'AI 분석 결과 트래픽 임계치 설정 오류가 확인되었습니다.', 
+                   time: '18:45', 
+                   participants: 5,
+                   severity: 'CRITICAL',
+                   unread: true
+                 },
+                 { 
+                   id: 2, 
+                   title: 'INC-8823 서버 타임아웃 대응', 
+                   lastMsg: 'DB Connection Pool 증설 작업이 완료되었습니다.', 
+                   time: '14:30', 
+                   participants: 3,
+                   severity: 'MAJOR',
+                   unread: false
+                 }
+               ].map((room) => (
+                 <div 
+                   key={room.id}
+                   onClick={() => {
+                     setShowWarRoomPopup(false);
+                     navigate('/chat');
+                   }}
+                   className="bg-[#11141d] p-4 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98]"
+                 >
+                   <div className="flex items-start justify-between mb-2">
+                     <div className="flex items-center gap-2">
+                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                         room.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-orange-500/20 text-orange-500 border-orange-500/30'
+                       }`}>
+                         {room.severity}
+                       </span>
+                       <span className="text-[10px] text-slate-500 font-mono">ROOM #{room.id}</span>
+                     </div>
+                     <span className="text-[10px] text-slate-500">{room.time}</span>
+                   </div>
+                   
+                   <h4 className="font-bold text-slate-200 mb-1 group-hover:text-blue-400 transition-colors truncate">
+                     {room.title}
+                   </h4>
+                   <p className="text-xs text-slate-400 truncate mb-3">{room.lastMsg}</p>
+                   
+                   <div className="flex items-center justify-between">
+                     <div className="flex -space-x-2">
+                       {[1, 2, 3].map(i => (
+                         <div key={i} className="w-6 h-6 rounded-full bg-slate-800 border-2 border-[#11141d] flex items-center justify-center">
+                           <User className="w-3 h-3 text-slate-400" />
+                         </div>
+                       ))}
+                       <div className="w-6 h-6 rounded-full bg-blue-600/20 border-2 border-[#11141d] flex items-center justify-center">
+                         <span className="text-[8px] font-bold text-blue-400">+{room.participants - 3}</span>
+                       </div>
+                     </div>
+                     {room.unread && (
+                       <div className="bg-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">NEW</div>
+                     )}
+                   </div>
+                 </div>
+               ))}
+             </div>
+ 
+             {/* Bottom Safe Area */}
+             <div className="pb-8 px-6 pt-2">
+               <button 
+                 onClick={() => navigate('/assignments')}
+                 className="w-full py-4 rounded-2xl bg-slate-800 text-slate-400 font-bold text-sm hover:bg-slate-700 transition-colors"
+               >
+                 전체 히스토리 보기
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 w-full bg-[#0f111a] border-t border-white/10 px-6 py-3 flex justify-between items-center z-50 pb-safe">
@@ -1128,8 +967,8 @@ export default function DashboardPage() {
         </div>
       </nav>
 
-      {/* More Menu Popup */}
-      {showMoreMenu && (
+       {/* More Menu Popup */}
+       {showMoreMenu && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowMoreMenu(false)} />
           <div className="w-full bg-[#1a1f2e] rounded-t-[40px] border-t border-white/10 shadow-2xl relative z-10 animate-in slide-in-from-bottom duration-500 overflow-hidden">
@@ -1185,8 +1024,61 @@ export default function DashboardPage() {
          </div>
        )}
 
-       {renderProfileModal()}
-       <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} />
+    </div>
+  );
+}
+
+function MetricCard({ title, value, subValue, trend, trendUp, icon: Icon, color }) {
+  const colorClasses = {
+    blue: "text-blue-400 bg-blue-500/10",
+    purple: "text-purple-400 bg-purple-500/10",
+    green: "text-emerald-400 bg-emerald-500/10",
+    emerald: "text-emerald-400 bg-emerald-500/10",
+    red: "text-red-400 bg-red-500/10",
+    yellow: "text-yellow-400 bg-yellow-500/10",
+  };
+
+  return (
+    <div className="bg-[#1a1f2e] p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+      <div className="flex justify-between items-start mb-2">
+        <div className={`p-2 rounded-lg ${colorClasses[color]} mb-2`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        {trend && (
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${trendUp ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'}`}>
+            {trend}
+          </span>
+        )}
+      </div>
+      <div>
+        <h4 className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">{title}</h4>
+        <div className="flex items-baseline space-x-2">
+           <span className="text-xl font-bold text-white">{value}</span>
+           {subValue && <span className="text-xs text-slate-500">{subValue}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlertItem({ title, time, severity, desc }) {
+  const sevColor = {
+    critical: "bg-red-500",
+    warning: "bg-yellow-500",
+    info: "bg-blue-500",
+    success: "bg-green-500"
+  };
+
+  return (
+    <div className="flex items-start space-x-4 p-4 rounded-xl bg-slate-900/30 border border-white/5 hover:bg-slate-800/50 transition-colors group cursor-pointer">
+      <div className={`w-1.5 h-1.5 mt-2 rounded-full ${sevColor[severity]} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
+      <div className="flex-1">
+        <div className="flex justify-between items-start mb-1">
+          <h4 className="font-bold text-sm text-slate-200 group-hover:text-white transition-colors">{title}</h4>
+          <span className="text-xs text-slate-500 whitespace-nowrap ml-2">{time}</span>
+        </div>
+         <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+      </div>
     </div>
   );
 }

@@ -189,6 +189,15 @@ async def get_recent_messages(limit: int = 10, db: Session = Depends(get_db)):
     messages = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).limit(limit).all()
     return {"total": len(messages), "messages": messages}
 
+@app.delete("/sms/{message_id}")
+async def delete_sms(message_id: int, db: Session = Depends(get_db)):
+    msg = db.query(SMSMessageDB).filter(SMSMessageDB.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    db.delete(msg)
+    db.commit()
+    return {"status": "success", "message": "Deleted successfully"}
+
 @app.get("/sms/history")
 async def get_sms_history(db: Session = Depends(get_db)):
     history = db.query(SMSHistoryDB).all()
@@ -226,86 +235,62 @@ def startup_populate_keywords():
 # --- AI API Endpoints (Phase 2) ---
 
 @app.get("/ai/insight")
-async def get_ai_insight():
+async def get_ai_insight(db: Session = Depends(get_db)):
     """
     대시보드 상단 AI Insight 패널용 데이터
-    실제 구현 시에는 로그 분석 결과나 실시간 지표를 요약해서 반환해야 함.
+    수신된 SMS 내용을 보고 신한DS내 축적된 KMS를 연동 LLM을 활용하여 장애를 예측 (구현 예정/시뮬레이션)
     """
-    import random
+    # 가장 최근 SMS 1건 조회
+    recent_sms = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).first()
     
-    # 시연을 위한 Mock 데이터
-    scenarios = [
-        {
-            "id": "LOG-001",
-            "type": "info", 
-            "category": "report",
-            "severity": "info",
-            "text": "실시간 트래픽 패턴 모니터링 중... (정상 범위)",
-            "detail": "트래픽이 평소와 동일한 패턴을 보이고 있습니다. 특이사항 없음."
-        },
-        {
-            "id": "LOG-002",
-            "type": "info", 
-            "category": "report",
-            "severity": "info",
-            "text": "API 응답 시간 분석: 평균 45ms 유지 중",
-            "detail": "주요 API (Login, Payment) 응답 시간이 SLA 기준(100ms) 이내입니다."
-        },
-        {
-            "id": "SEC-101",
-            "type": "success", 
-            "category": "security",
-            "severity": "low",
-            "text": "보안 스캔 완료: 취약점 발견되지 않음",
-            "detail": "정기 보안 스캔 결과 Critical/High 레벨 취약점이 발견되지 않았습니다."
-        },
-        {
-            "id": "SRV-303",
-            "type": "warning", 
-            "category": "server",
-            "severity": "medium",
-            "text": "트렌드 감지: 지난주 동시간대 대비 접속량 15% 증가",
-            "detail": "이벤트 프로모션 영향으로 접속량이 증가하고 있습니다. 오토스케일링 모니터링 필요."
-        },
-        {
-            "id": "PRED-404",
-            "type": "insight", 
-            "category": "report",
-            "severity": "high",
-            "text": "💡 [Insight] 현재 CPU 패턴이 매주 화요일 배치 작업과 유사합니다.",
-            "detail": "과거 데이터 분석 결과, 화요일 14:00~16:00 사이 배치 작업으로 인한 CPU 상승 패턴과 98% 일치합니다."
-        },
-        {
-            "id": "SEC-999",
-            "type": "insight", 
-            "category": "security",
-            "severity": "critical",
-            "text": "💡 [Insight] 비정상적인 IP 대역(192.168.x.x) 접근 시도가 감지되었습니다.",
-            "detail": "허용되지 않은 VPN 대역에서의 관리자 페이지 접근 시도가 5회 이상 감지되었습니다. 즉시 차단 권고."
-        },
-        {
-            "id": "CRT-500",
-            "type": "error",
-            "category": "critical",
-            "severity": "critical",
-            "text": "🚨 [Critical] 결제 모듈 응답 지연 (Prediction)",
-            "detail": "DB Connection Pool 포화 상태가 예측됩니다. (현재 85% 사용 중, 10분 내 고갈 예상)"
-        },
-        {
-            "id": "SRV-503",
-            "type": "error",
-            "category": "server",
-            "severity": "high",
-            "text": "⚠️ [Server] 이미지 서버 디스크 용량 부족 예측",
-            "detail": "이미지 업로드 속도 저하 감지. 디스크 사용률 90% 도달 예상."
+    if recent_sms:
+        text = recent_sms.message
+        category = "report"
+        severity = "info"
+        type_str = "insight"
+        
+        # 키워드 기반 KMS 연동 LLM 분석 시뮬레이션
+        if "cpu" in text.lower() or "메모리" in text:
+            severity = "high"
+            type_str = "warning"
+            category = "server"
+            insight_text = f"💡 [Insight] 수신된 SMS ('{text[:15]}...') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, 과거 배치 작업 중 발생한 서버 과부하 패턴과 98% 일치하며 시스템 강제종료가 예측됩니다."
+        elif "db" in text.lower() or "데이터베이스" in text:
+            severity = "critical"
+            type_str = "error"
+            category = "database"
+            insight_text = f"🚨 [Critical] 수신된 SMS ('{text[:15]}...') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, DB Connection Pool 고갈 패턴과 94% 일치. 결제 모듈 응답 지연 예측됨."
+        elif "네트워크" in text or "network" in text.lower():
+            severity = "medium"
+            type_str = "insight"
+            category = "network"
+            insight_text = f"⚠️ [Insight] 수신된 SMS ('{text[:15]}...') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, L4 스위치 트래픽 포화 상태 예측됨."
+        else:
+            insight_text = f"🔍 [Insight] 수신된 SMS ('{text[:15]}...') 기반 분석: 신한DS KMS 연동 LLM이 유사 사례를 분석 중입니다. 현재 트래픽 내 특이 패턴은 발견되지 않았습니다."
+
+        current_log = {
+            "id": f"KMS-{recent_sms.id}",
+            "type": type_str,
+            "category": category,
+            "severity": severity,
+            "text": insight_text,
+            "detail": f"수신 시간: {recent_sms.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
         }
-    ]
-    
+    else:
+        current_log = {
+            "id": "SYS-000",
+            "type": "info",
+            "category": "report",
+            "severity": "info",
+            "text": "실시간 데이터 대기 중... 새로운 SMS를 기다리고 있습니다.",
+            "detail": "신한DS KMS 연동 LLM 분석 대기 중"
+        }
+
     return {
         "status": "active",
-        "learning_data_size": "12.5 TB",
-        "accuracy": "98.2%",
-        "current_log": random.choice(scenarios)
+        "learning_data_size": "15.2 TB (KMS)",
+        "accuracy": "98.5%",
+        "current_log": current_log
     }
 
 @app.get("/ai/analysis/{incident_id}")

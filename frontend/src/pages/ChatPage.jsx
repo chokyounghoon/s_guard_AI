@@ -24,6 +24,53 @@ export default function ChatPage() {
     { name: '박영희 대리', role: 'Assistant', phone: '010-7777-8888' },
   ];
 
+  // Main Chat State
+  const [mainMessages, setMainMessages] = useState([
+    {
+      id: 1,
+      type: 'other',
+      sender: '정도현 팀장',
+      role: 'Team Leader',
+      initials: 'JD',
+      color: 'bg-slate-700',
+      text: '현재 Server-02에서 포트 8080 타임아웃 오류가 발생했습니다. 확인 가능하신 분 있나요?',
+      time: '13:42'
+    },
+    {
+      id: 2,
+      type: 'other',
+      sender: '시스템 어드민',
+      role: 'Admin',
+      initials: 'SA',
+      color: 'bg-blue-900/40 border border-blue-500/20 text-blue-400',
+      text: '네, 로그 확인 결과 아래와 같은 오류가 발생하고 있습니다.',
+      time: '13:45'
+    },
+    {
+      id: 3,
+      type: 'other',
+      sender: '시스템 어드민',
+      role: 'Admin',
+      initials: 'SA',
+      color: 'bg-blue-900/40 border border-blue-500/20 text-blue-400',
+      text: '상단 로그 배너를 참고해주세요. DB Connection Pool 이슈로 보입니다.',
+      time: '13:45'
+    },
+    {
+      id: 4,
+      type: 'me',
+      text: '제가 지금 유휴 세션 초기화 작업 진행하겠습니다. 작업 완료 후 보고 드리겠습니다.',
+      time: '13:46'
+    },
+    {
+      id: 5,
+      type: 'system',
+      text: '사용자가 <span class="text-blue-400 font-semibold underline underline-offset-4 decoration-blue-500/40">임시 복구 작업</span>을 시작했습니다.',
+      icon: Info
+    }
+  ]);
+  const [mainInput, setMainInput] = useState('');
+
   const handleCall = (phoneNumber) => {
     window.location.href = `tel:${phoneNumber}`;
     setShowPhoneList(false);
@@ -126,7 +173,26 @@ export default function ChatPage() {
   };
 
   const handleShareToTeam = (text) => {
-    alert(`팀 채팅에 AI 응답을 공유했습니다:\n\n${text.substring(0, 100)}...`);
+    const newMessage = {
+      id: Date.now(),
+      type: 'me',
+      text: `[AI Analysis Shared]\n\n${text}`,
+      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setMainMessages(prev => [...prev, newMessage]);
+    setShowAIAssistant(false);
+  };
+
+  const handleMainSendMessage = () => {
+    if (!mainInput.trim()) return;
+    const newMessage = {
+      id: Date.now(),
+      type: 'me',
+      text: mainInput,
+      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setMainMessages(prev => [...prev, newMessage]);
+    setMainInput('');
   };
 
   return (
@@ -249,65 +315,48 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Message: Team Leader */}
-        <div className="flex items-start space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
-            JD
-          </div>
-          <div className="flex flex-col space-y-1">
-            <span className="text-xs text-slate-400 font-medium">정도현 팀장</span>
-            <div className="flex items-end space-x-2">
-              <div className="bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[280px] text-[15px] leading-relaxed">
-                현재 Server-02에서 포트 8080 타임아웃 오류가 발생했습니다. 확인 가능하신 분 있나요?
-              </div>
-              <span className="text-[10px] text-slate-500 pb-1">13:42</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Message: Admin (With Log Snippet) */}
-        <div className="flex items-start space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-900/40 flex items-center justify-center font-bold text-sm text-blue-400 shrink-0 border border-blue-500/20">
-            SA
-          </div>
-          <div className="flex flex-col space-y-1">
-            <span className="text-xs text-slate-400 font-medium">시스템 어드민</span>
-            <div className="flex flex-col space-y-2">
-              <div className="bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-3 max-w-[280px] text-[15px] leading-relaxed">
-                네, 로그 확인 결과 아래와 같은 오류가 발생하고 있습니다.
-              </div>
-              {/* Note: In-chat log block removed/simplified since it's now in the header, keeping it simple here as reference to header */}
-              <div className="flex items-end space-x-2">
-                <div className="bg-slate-800/80 rounded-2xl px-4 py-2.5 max-w-[280px] text-[15px] leading-relaxed">
-                    상단 로그 배너를 참고해주세요. DB Connection Pool 이슈로 보입니다.
+        {mainMessages.map((msg) => (
+          <div key={msg.id}>
+            {msg.type === 'other' && (
+              <div className="flex items-start space-x-3 mb-4">
+                <div className={`w-10 h-10 rounded-xl ${msg.color} flex items-center justify-center font-bold text-sm shrink-0`}>
+                  {msg.initials}
                 </div>
-                <span className="text-[10px] text-slate-500 pb-1">13:45</span>
+                <div className="flex flex-col space-y-1">
+                  <span className="text-xs text-slate-400 font-medium">{msg.sender}</span>
+                  <div className="flex items-end space-x-2">
+                    <div className="bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[280px] text-[15px] leading-relaxed whitespace-pre-wrap">
+                      {msg.text}
+                    </div>
+                    <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            )}
 
-        {/* Message: My Message */}
-        <div className="flex flex-col items-end space-y-1">
-          <div className="flex items-end space-x-2">
-            <span className="text-[10px] text-slate-500 pb-1">13:46</span>
-            <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[280px] text-[15px] leading-relaxed shadow-lg shadow-blue-900/20">
-              제가 지금 유휴 세션 초기화 작업 진행하겠습니다. 작업 완료 후 보고 드리겠습니다.
-            </div>
-          </div>
-        </div>
+            {msg.type === 'me' && (
+              <div className="flex flex-col items-end space-y-1 mb-4">
+                <div className="flex items-end space-x-2">
+                  <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
+                  <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[280px] text-[15px] leading-relaxed shadow-lg shadow-blue-900/20 whitespace-pre-wrap">
+                    {msg.text}
+                  </div>
+                </div>
+              </div>
+            )}
 
-        {/* System Message */}
-        <div className="flex justify-center mt-8">
-          <div className="bg-slate-800/30 border border-white/5 rounded-xl px-4 py-2.5 flex items-center space-x-3 max-w-[320px]">
-            <div className="p-1.5 bg-blue-500/20 rounded-full">
-               <Info className="w-4 h-4 text-blue-400" />
-            </div>
-            <p className="text-[13px] text-slate-300">
-               사용자가 <span className="text-blue-400 font-semibold underline underline-offset-4 decoration-blue-500/40">임시 복구 작업</span>을 시작했습니다.
-            </p>
+            {msg.type === 'system' && (
+              <div className="flex justify-center mt-8 mb-8">
+                <div className="bg-slate-800/30 border border-white/5 rounded-xl px-4 py-2.5 flex items-center space-x-3 max-w-[320px]">
+                  <div className="p-1.5 bg-blue-500/20 rounded-full">
+                     <msg.icon className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <p className="text-[13px] text-slate-300" dangerouslySetInnerHTML={{ __html: msg.text }} />
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        ))}
       </main>
     
       {/* AI Assistant Panel */}
@@ -445,10 +494,17 @@ export default function ChatPage() {
         <div className="flex-1 relative">
            <input 
              type="text" 
+             value={mainInput}
+             onChange={(e) => setMainInput(e.target.value)}
+             onKeyPress={(e) => e.key === 'Enter' && handleMainSendMessage()}
              placeholder="메시지를 입력하세요..." 
              className="w-full bg-slate-800/60 rounded-full py-2.5 px-5 text-[15px] border border-white/5 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500"
            />
-           <button className="absolute right-1 top-1 p-1.5 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-900/40">
+           <button 
+             onClick={handleMainSendMessage}
+             disabled={!mainInput.trim()}
+             className="absolute right-1 top-1 p-1.5 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
+           >
               <Send className="w-5 h-5 fill-current" />
            </button>
         </div>
