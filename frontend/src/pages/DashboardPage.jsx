@@ -207,7 +207,7 @@ export default function DashboardPage() {
       { role: 'Security', text: '⚠️ 비정상적인 트래픽 급증 감지! IP 평판 조회 중...', delay: 1000 },
       { role: 'Security', text: '✅ 보안이슈로 발생한 장애 수신은 아님, 보안 이슈 없음', delay: 3000 },
       { role: 'DB', text: '🚨 DB 커넥션 풀 급격히 포화 중! (사용률 92%(문자))', delay: 5000 },
-      { role: 'DB', text: '🔍 원인 규명 중... `orders` 테이블에서 슬로우 쿼리 발견. 인덱스 누락 의심됨.', delay: 7000 },
+      { role: 'DB', text: '🔍 원인 규명 중... KMS 내 동일 오류및 처리 히스토리 확인 `orders` 테이블에서 슬로우 쿼리로 발견. 인덱스 누락 의심되어 처리된 이력 존재', delay: 7000 },
       { role: 'DevOps', text: '🔥 WAS-03 CPU 부하 임계치 초과 (95%). 애플리케이션 응답 지연 발생.', delay: 9000 },
       { role: 'DevOps', text: '비정상 인스턴스 재시작 및 DB 풀 플러시 승인 요청.', delay: 11000 },
       { role: 'Leader', text: '상황 분석 중... 보안 이상 무. DB 병목 확인됨. 인프라 상태 위급.', delay: 13000 },
