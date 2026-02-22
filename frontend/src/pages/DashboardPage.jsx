@@ -205,7 +205,7 @@ export default function DashboardPage() {
     // Agent Coversation Sequence
     const sequence = [
       { role: 'Security', text: '⚠️ 비정상적인 트래픽 급증 감지! IP 평판 조회 중...', delay: 1000 },
-      { role: 'Security', text: '✅ DDoS 분석 결과 음성. 정상 사용자로 확인됨. 보안 공격 아님.', delay: 3000 },
+      { role: 'Security', text: '✅ 보안이슈로 발생한 장애 수신은 아님, 보안 이슈 없음', delay: 3000 },
       { role: 'DB', text: '🚨 DB 커넥션 풀 급격히 포화 중! (사용률 92%)', delay: 5000 },
       { role: 'DB', text: '🔍 원인 규명 중... `orders` 테이블에서 슬로우 쿼리 발견. 인덱스 누락 의심됨.', delay: 7000 },
       { role: 'DevOps', text: '🔥 WAS-03 CPU 부하 임계치 초과 (95%). 애플리케이션 응답 지연 발생.', delay: 9000 },
