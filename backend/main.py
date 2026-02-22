@@ -243,6 +243,24 @@ async def get_ai_insight(db: Session = Depends(get_db)):
     # 가장 최근 SMS 1건 조회
     recent_sms = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).first()
     
+    # 전체 최근 메시지 목록 (최대 100건)을 조회하여 예측 카운트를 집계
+    recent_messages = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).limit(100).all()
+    prediction_counts = {
+        "critical": 0,
+        "server": 0,
+        "security": 0,
+        "report": 0
+    }
+    
+    for msg in recent_messages:
+        msg_text_lower = msg.message.lower()
+        if "db" in msg_text_lower or "데이터베이스" in msg_text_lower:
+            prediction_counts["critical"] += 1
+        elif "cpu" in msg_text_lower or "메모리" in msg_text_lower:
+            prediction_counts["server"] += 1
+        else:
+            prediction_counts["report"] += 1
+
     if recent_sms:
         text = recent_sms.message
         category = "report"
@@ -266,7 +284,7 @@ async def get_ai_insight(db: Session = Depends(get_db)):
             category = "network"
             insight_text = f"⚠️ [Insight] 수신된 SMS ('{text[:15]}...') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, L4 스위치 트래픽 포화 상태 예측됨."
         else:
-            insight_text = f"🔍 [Insight] 수신된 SMS ('{text[:15]}...') 기반 분석: 신한DS KMS 연동 LLM이 유사 사례를 분석 중입니다. 현재 트래픽 내 특이 패턴은 발견되지 않았습니다."
+            insight_text = f"🔍 [Insight] 수신된 SMS ('{text[:15]}...') 기반 분석: 신한DS KMS 연동 LLM이 유사 사례를 분석 중입니다. 분석결과 일시적 발생 오류로 판단됩니다."
 
         current_log = {
             "id": f"KMS-{recent_sms.id}",
@@ -290,6 +308,7 @@ async def get_ai_insight(db: Session = Depends(get_db)):
         "status": "active",
         "learning_data_size": "15.2 TB (KMS)",
         "accuracy": "98.5%",
+        "prediction_counts": prediction_counts,
         "current_log": current_log
     }
 

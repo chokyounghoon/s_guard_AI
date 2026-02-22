@@ -170,12 +170,31 @@ export default {
         let recentMessageText = "";
         let recentMessageTime = "";
         let id_val = "SYS-000";
+        let prediction_counts = {
+          critical: 0,
+          server: 0,
+          security: 0,
+          report: 0
+        };
+
         try {
           const stored = await env.SMS_STORAGE.get('recent_messages', 'json');
           if (stored && stored.length > 0) {
             recentMessageText = stored[0].message;
             recentMessageTime = stored[0].timestamp;
             id_val = `KMS-${stored[0].id}`;
+
+            // 모든 최근 메시지에 대해 카운팅 루프 (최대 100건 가량)
+            for (let i = 0; i < stored.length; i++) {
+              let msg_text_lower = stored[i].message.toLowerCase();
+              if (msg_text_lower.includes("db") || msg_text_lower.includes("데이터베이스")) {
+                prediction_counts.critical += 1;
+              } else if (msg_text_lower.includes("cpu") || msg_text_lower.includes("메모리")) {
+                prediction_counts.server += 1;
+              } else {
+                prediction_counts.report += 1;
+              }
+            }
           }
         } catch (e) {
           console.error('KV 읽기 오류:', e);
@@ -206,7 +225,7 @@ export default {
              category = "network";
              insight_text = `⚠️ [Insight] 수신된 SMS ('${shortText}') 기반 분석: 신한DS KMS 연동 LLM 분석 결과, L4 스위치 트래픽 포화 상태 예측됨.`;
           } else {
-             insight_text = `🔍 [Insight] 수신된 SMS ('${shortText}') 기반 분석: 신한DS KMS 연동 LLM이 유사 사례를 분석 중입니다. 현재 트래픽 내 특이 패턴은 발견되지 않았습니다.`;
+             insight_text = `🔍 [Insight] 수신된 SMS ('${shortText}') 기반 분석: 신한DS KMS 연동 LLM이 유사 사례를 분석 중입니다. 분석결과 일시적 발생 오류로 판단됩니다.`;
           }
 
           let formattedTime = new Date(recentMessageTime).toLocaleString('ko-KR');
@@ -234,6 +253,7 @@ export default {
             status: "active",
             learning_data_size: "15.2 TB (KMS)",
             accuracy: "98.5%",
+            prediction_counts: prediction_counts,
             current_log: currentLog
           }),
           {
