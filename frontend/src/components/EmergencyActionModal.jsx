@@ -19,7 +19,7 @@ export default function EmergencyActionModal({ isOpen, onClose, onApprove, actio
             </div>
             
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-white mb-1">긴급 조치 승인 요청</h2>
+              <h2 className="text-xl font-bold text-white mb-1">긴급 조치 확인 요청</h2>
               <p className="text-sm text-slate-400 mb-4">
                 S-Autopilot AI 리더가 시스템 안정화를 위해 다음과 같은 긴급 조치를 제안했습니다.
               </p>
@@ -74,7 +74,7 @@ export default function EmergencyActionModal({ isOpen, onClose, onApprove, actio
                   onClick={onApprove}
                   className="flex-[2] py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white rounded-xl font-bold shadow-lg shadow-red-900/40 transition-all flex items-center justify-center group"
                 >
-                  <span>승인 및 즉시 실행</span>
+                  <span>WAR-ROOM 소집</span>
                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
