@@ -1,3 +1,10 @@
 scripts/venv/
 scripts/post-mortems/
 workers/sms-api/node_modules/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
