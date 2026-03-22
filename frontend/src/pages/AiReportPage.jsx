@@ -111,7 +111,9 @@ export default function AiReportPage() {
               if (d === '[DONE]') { setIsGenerating(false); return; }
               try {
                 const obj = JSON.parse(d);
-                if (obj.answer) {
+                if (obj.error) {
+                  setAiGenText(prev => prev + `\n\n⚠️ 서버 내부 오류 (스트림): ${obj.error}`);
+                } else if (obj.answer) {
                   setAiGenText(prev => prev + obj.answer);
                 }
               } catch (e) {
