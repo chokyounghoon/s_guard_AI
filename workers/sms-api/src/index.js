@@ -473,20 +473,23 @@ app.post('/ai/generate-report', async (c) => {
   const db = c.env.DB
 
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
+  
+  // Frontend mostly passes "INC-12345678", but DB stores raw numbers.
+  const rawId = incident_id.startsWith('INC-') ? incident_id.slice(4) : incident_id;
 
   // ────────────────────────────────────────────────────
   // 1. 모든 테이블 JOIN 조회
   // ────────────────────────────────────────────────────
   const [wr, sms, insight] = await Promise.all([
-    db.prepare("SELECT * FROM warroom_list WHERE inc_id = ?").bind(incident_id).first(),
-    db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(incident_id).first(),
-    db.prepare("SELECT content, severity, category FROM autopilot_insight WHERE inc_id = ?").bind(incident_id).first(),
+    db.prepare("SELECT * FROM warroom_list WHERE inc_id = ?").bind(rawId).first(),
+    db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(rawId).first(),
+    db.prepare("SELECT content, severity, category FROM autopilot_insight WHERE inc_id = ?").bind(rawId).first(),
   ])
 
   const [{ results: agentLogs }, { results: chatLogs }, { results: attachments }] = await Promise.all([
-    db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(incident_id).all(),
-    db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(incident_id).all(),
-    db.prepare("SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC").bind(incident_id).all(),
+    db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(rawId).all(),
+    db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(rawId).all(),
+    db.prepare("SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC").bind(rawId).all(),
   ])
 
   // ────────────────────────────────────────────────────
@@ -620,9 +623,12 @@ ${insightTxt.includes('재발')
 
   ;(async () => {
     try {
-      const chunkSize = 40
-      for (let i = 0; i < report.length; i += chunkSize) {
-        await writer.write(encode(`data: ${JSON.stringify({ answer: report.slice(i, i + chunkSize) })}\n\n`))
+      // Use Array.from to correctly slice surrogate pairs (Emojis, Korean characters) without splitting them.
+      const chars = Array.from(report);
+      const chunkSize = 40;
+      for (let i = 0; i < chars.length; i += chunkSize) {
+        const chunk = chars.slice(i, i + chunkSize).join('');
+        await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
       }
       await writer.write(encode('data: [DONE]\n\n'))
     } catch (e) {
@@ -811,8 +817,10 @@ app.post('/ai/report/save', async (c) => {
 // Aggregated Report Data for a given inc_id
 // ==========================================
 app.get('/warroom/report/:id', async (c) => {
-  const id = c.req.param('id')
+  const idParam = c.req.param('id')
   const db = c.env.DB
+
+  const id = idParam.startsWith('INC-') ? idParam.slice(4) : idParam;
 
   // 1. War-Room base info
   const wr = await db.prepare("SELECT * FROM warroom_list WHERE inc_id = ?").bind(id).first()
