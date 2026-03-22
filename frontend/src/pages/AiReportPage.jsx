@@ -95,20 +95,29 @@ export default function AiReportPage() {
         const { value, done } = await reader.read();
         if (done) break;
         buf += decoder.decode(value, { stream: true });
-        const evts = buf.split('\n\n');
-        buf = evts.pop() || '';
-        for (const evt of evts) {
-          for (const line of evt.split('\n')) {
-            if (!line.startsWith('data:')) continue;
-            const d = line.slice(5).trim();
-            if (d === '[DONE]') { setIsGenerating(false); return; }
-            try { 
-              const obj = JSON.parse(d); 
-              if (obj.answer) {
-                // 직접 즉시 추가 (타자 효과 큐 제거하여 버그 방지)
-                setAiGenText(prev => prev + obj.answer);
+        
+        // Extract all complete 'data: ...\n\n' blocks
+        let newlineIdx;
+        while ((newlineIdx = buf.indexOf('\n\n')) >= 0) {
+          const block = buf.slice(0, newlineIdx).trim();
+          buf = buf.slice(newlineIdx + 2);
+          
+          if (!block) continue;
+          
+          const lines = block.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const d = line.slice(5).trim();
+              if (d === '[DONE]') { setIsGenerating(false); return; }
+              try {
+                const obj = JSON.parse(d);
+                if (obj.answer) {
+                  setAiGenText(prev => prev + obj.answer);
+                }
+              } catch (e) {
+                console.error("Parse error on chunk:", d, e);
               }
-            } catch {}
+            }
           }
         }
       }
