@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   ArrowLeft, Share2, Sparkles, AlertCircle, MessageSquare,
   FileText, Paperclip, Clock, Users, CheckCircle2, Send, User, Check, ChevronRight, X,
@@ -8,19 +10,33 @@ import {
 
 const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
+const mdComponents = {
+  h1: ({children}) => <h1 className="text-lg font-black text-white mt-4 mb-2 border-b border-white/10 pb-1">{children}</h1>,
+  h2: ({children}) => <h2 className="text-sm font-bold text-blue-300 mt-4 mb-2 uppercase tracking-wide">{children}</h2>,
+  h3: ({children}) => <h3 className="text-sm font-bold text-slate-200 mt-3 mb-1">{children}</h3>,
+  p:  ({children}) => <p className="text-[13px] text-slate-300 leading-relaxed mb-2">{children}</p>,
+  strong: ({children}) => <strong className="text-white font-bold">{children}</strong>,
+  em: ({children}) => <em className="text-slate-400 italic">{children}</em>,
+  blockquote: ({children}) => <blockquote className="border-l-2 border-blue-500/50 pl-3 my-2 text-slate-400 italic text-[12px]">{children}</blockquote>,
+  code: ({inline, children}) => inline
+    ? <code className="bg-slate-800 text-emerald-400 text-[11px] px-1.5 py-0.5 rounded font-mono">{children}</code>
+    : <pre className="bg-slate-900 border border-white/5 rounded-xl p-3 my-2 overflow-x-auto text-[11px] text-emerald-300 font-mono whitespace-pre-wrap">{children}</pre>,
+  ul: ({children}) => <ul className="list-disc list-inside space-y-1 my-2 text-[13px] text-slate-300">{children}</ul>,
+  ol: ({children}) => <ol className="list-decimal list-inside space-y-1 my-2 text-[13px] text-slate-300">{children}</ol>,
+  li: ({children}) => <li className="leading-relaxed">{children}</li>,
+  hr: () => <hr className="border-white/10 my-3" />,
+  table: ({children}) => <div className="overflow-x-auto my-3"><table className="w-full text-[12px] border-collapse">{children}</table></div>,
+  thead: ({children}) => <thead>{children}</thead>,
+  th: ({children}) => <th className="border border-white/10 bg-slate-800 px-3 py-1.5 text-left font-bold text-slate-200">{children}</th>,
+  td: ({children}) => <td className="border border-white/10 px-3 py-1.5 text-slate-300">{children}</td>,
+  tr: ({children}) => <tr className="even:bg-slate-900/30">{children}</tr>,
+};
+
 function MarkdownBlock({ text }) {
   if (!text) return <span className="text-slate-500">-</span>;
   return (
-    <div className="text-[13px] text-slate-300 leading-relaxed whitespace-pre-wrap break-words">
-      {text.split('\n').map((line, i) => {
-        // Bold: **text**
-        const parts = line.split(/\*\*(.*?)\*\*/g);
-        return (
-          <p key={i} className="mb-1">
-            {parts.map((p, j) => j % 2 === 1 ? <strong key={j} className="text-white">{p}</strong> : p)}
-          </p>
-        );
-      })}
+    <div className="text-[13px]">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{text}</ReactMarkdown>
     </div>
   );
 }
