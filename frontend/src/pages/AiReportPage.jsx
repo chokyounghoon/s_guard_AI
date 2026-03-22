@@ -1,493 +1,566 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Share2, Sparkles, AlertCircle, Settings, Clock, CheckCircle2, Download, Send, MessageSquare, User, Check, ChevronRight, X, FileText, Search, TrendingUp } from 'lucide-react';
-import SimilarIncidentCard from '../components/SimilarIncidentCard';
+import {
+  ArrowLeft, Share2, Sparkles, AlertCircle, MessageSquare,
+  FileText, Paperclip, Clock, Users, CheckCircle2, Send, User, Check, ChevronRight, X,
+  Database, Shield, Server, Bot, Activity, RefreshCw, Loader
+} from 'lucide-react';
 
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'https://sguardai.khcho0421.workers.dev'
-  : 'https://sguardai.khcho0421.workers.dev';
+const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
+
+function MarkdownBlock({ text }) {
+  if (!text) return <span className="text-slate-500">-</span>;
+  return (
+    <div className="text-[13px] text-slate-300 leading-relaxed whitespace-pre-wrap break-words">
+      {text.split('\n').map((line, i) => {
+        // Bold: **text**
+        const parts = line.split(/\*\*(.*?)\*\*/g);
+        return (
+          <p key={i} className="mb-1">
+            {parts.map((p, j) => j % 2 === 1 ? <strong key={j} className="text-white">{p}</strong> : p)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+const severityColors = {
+  CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/40',
+  HIGH:     'bg-orange-500/20 text-orange-400 border-orange-500/40',
+  NORMAL:   'bg-blue-500/20 text-blue-400 border-blue-500/40',
+  INFO:     'bg-slate-500/20 text-slate-400 border-slate-500/40',
+};
+
+const agentColors = {
+  Security: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', icon: Shield },
+  DB:       { bg: 'bg-purple-500/15', border: 'border-purple-500/30', text: 'text-purple-400', icon: Database },
+  DevOps:   { bg: 'bg-green-500/15', border: 'border-green-500/30', text: 'text-green-400', icon: Server },
+  Leader:   { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-400', icon: Bot },
+};
 
 export default function AiReportPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const incidentId = location.state?.incidentId || 'INC-8823';
+  const incidentId = location.state?.incidentId;
 
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [memo, setMemo] = useState('');
-  const [modalStep, setModalStep] = useState(null); // 'generating', 'preview', 'selection', or null
+  const [modalStep, setModalStep] = useState(null);
   const [selectedLines, setSelectedLines] = useState([]);
-  const [showSimilarIncidents, setShowSimilarIncidents] = useState(false);
-  
-  const [reportData, setReportData] = useState({
-    who: '',
-    when: '',
-    where: '',
-    what: '',
-    why: '',
-    how: '',
-    report_text: ''
-  });
+  const [activeTab, setActiveTab] = useState('summary');
+  // Dify AI report generation
+  const [aiGenText, setAiGenText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const genAbortRef = useRef(null);
+  const genQueueRef = useRef('');
+  const genTimerRef = useRef(null);
 
-  const [isLoading, setIsLoading] = useState(false);
-
-  // SSE typewriter state (streaming chunks -> char-by-char render)
-  const reportQueueRef = useRef('');
-  const reportTypingTimerRef = useRef(null);
-  const reportAbortRef = useRef(null);
-
-  const stopReportTypewriter = () => {
-    if (reportTypingTimerRef.current) {
-      clearInterval(reportTypingTimerRef.current);
-      reportTypingTimerRef.current = null;
-    }
-    reportQueueRef.current = '';
+  const stopGenTypewriter = () => {
+    if (genTimerRef.current) { clearInterval(genTimerRef.current); genTimerRef.current = null; }
+    genQueueRef.current = '';
   };
 
-  const enqueueReportText = (text) => {
+  const enqueueGen = (text) => {
     if (!text) return;
-    reportQueueRef.current += text;
-    if (reportTypingTimerRef.current) return;
-
-    reportTypingTimerRef.current = setInterval(() => {
-      if (!reportQueueRef.current.length) {
-        clearInterval(reportTypingTimerRef.current);
-        reportTypingTimerRef.current = null;
-        return;
-      }
-      const nextChar = reportQueueRef.current[0];
-      reportQueueRef.current = reportQueueRef.current.slice(1);
-      setReportData(prev => ({ ...prev, report_text: (prev.report_text || '') + nextChar }));
-    }, 18);
+    genQueueRef.current += text;
+    if (genTimerRef.current) return;
+    genTimerRef.current = setInterval(() => {
+      if (!genQueueRef.current.length) { clearInterval(genTimerRef.current); genTimerRef.current = null; return; }
+      // 8글자씩 단위로 표시 (빠른 타자 효과)
+      const chunk = genQueueRef.current.slice(0, 8);
+      genQueueRef.current = genQueueRef.current.slice(8);
+      setAiGenText(prev => prev + chunk);
+    }, 8);
   };
 
-  // Mock Similar Incidents Data
-  const similarIncidents = [
-    {
-      incidentId: "INC-2025-11-15",
-      timestamp: "2025-11-15 14:32:00",
-      title: "DB Connection Pool 고갈로 인한 서비스 지연",
-      description: "대량 트래픽으로 DB Connection이 Max(200)에 도달하여 신규 요청 처리 불가 상태 발생. 응답 시간 150ms → 3500ms로 급증.",
-      similarity: 95,
-      resolution: "Connection Pool Size를 200→500으로 증설 및 Timeout 설정 최적화 (30s → 10s). 쿼리 최적화로 평균 응답 시간 180ms 달성.",
-      resolutionTime: "23분",
-      tags: ["DB", "Connection Pool", "Performance", "Timeout"]
-    },
-    {
-      incidentId: "INC-2025-09-22",
-      timestamp: "2025-09-22 09:15:00",
-      title: "배치 프로세스 무한 루프로 CPU 100% 도달",
-      description: "야간 배치 작업(batch_processor_v2) 실행 중 특정 데이터 처리 로직에서 무한 루프 발생. CPU 사용률 92% 이상 유지.",
-      similarity: 88,
-      resolution: "문제 코드 라인 식별 후 루프 탈출 조건 추가. 배치 작업 타임아웃 설정 강화 (무제한 → 120s). 모니터링 알림 규칙 추가.",
-      resolutionTime: "1시간 15분",
-      tags: ["Batch", "CPU", "Infinite Loop", "Memory Leak"]
-    },
-    {
-      incidentId: "INC-2025-08-10",
-      timestamp: "2025-08-10 16:45:00",
-      title: "API Gateway Rate Limiting 미설정으로 DDoS 공격 영향",
-      description: "특정 API 엔드포인트(/api/v2/search)에 대한 비정상 트래픽 급증 (초당 15,000 요청). Rate Limiting이 설정되지 않아 전체 서비스 영향.",
-      similarity: 72,
-      resolution: "API Gateway에 Rate Limiting 적용 (초당 100 요청). IP 기반 블랙리스트 추가. WAF 규칙 강화.",
-      resolutionTime: "45분",
-      tags: ["API", "Security", "DDoS", "Rate Limiting"]
-    },
-    {
-      incidentId: "INC-2025-07-05",
-      timestamp: "2025-07-05 11:20:00",
-      title: "Redis 메모리 부족으로 캐싱 실패",
-      description: "Redis 인스턴스의 메모리 사용률이 95%를 초과하여 캐싱 기능 중단. 데이터베이스 부하 급증으로 응답 시간 지연.",
-      similarity: 68,
-      resolution: "Redis 메모리 증설 (8GB → 16GB). TTL 정책 최적화 및 불필요한 캐시 데이터 정리. Eviction Policy 재설정.",
-      resolutionTime: "2시간 10분",
-      tags: ["Redis", "Cache", "Memory", "Performance"]
+  const flushQueue = () => {
+    if (genQueueRef.current) {
+      setAiGenText(prev => prev + genQueueRef.current);
+      genQueueRef.current = '';
     }
-  ];
+    stopGenTypewriter();
+  };
 
-  const reportingLines = [
-    { id: 'leader', role: '팀장', name: '김철수 팀장', desc: '직속 상급자' },
-    { id: 'director', role: '본부장', name: '이영희 본부장', desc: '부서 책임자' },
-    { id: 'exec', role: '상무', name: '박지성 상무', desc: '사업부 임원' },
-  ];
-
-  const fetchAiReport = async () => {
-    setModalStep('generating');
+  const generateAiReport = async () => {
+    if (!incidentId) return;
+    if (genAbortRef.current) genAbortRef.current.abort();
+    const controller = new AbortController();
+    genAbortRef.current = controller;
+    stopGenTypewriter();
+    setAiGenText('');
+    setIsGenerating(true);
+    setActiveTab('ai_report');
     try {
-      // cancel previous stream if any
-      if (reportAbortRef.current) reportAbortRef.current.abort();
-      const controller = new AbortController();
-      reportAbortRef.current = controller;
-
-      stopReportTypewriter();
-      setReportData(prev => ({ ...prev, report_text: '' }));
-
       const res = await fetch(`${API_BASE_URL}/ai/generate-report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ incident_id: incidentId }),
         signal: controller.signal,
       });
-
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = '';
-
+      let buf = '';
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSE events split by blank line
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const evt of events) {
-          const lines = evt.split('\n');
-          for (const line of lines) {
+        buf += decoder.decode(value, { stream: true });
+        const evts = buf.split('\n\n');
+        buf = evts.pop() || '';
+        for (const evt of evts) {
+          for (const line of evt.split('\n')) {
             if (!line.startsWith('data:')) continue;
-            const dataStr = line.slice(5).trim();
-            if (!dataStr) continue;
-            if (dataStr === '[DONE]') {
-              setModalStep('preview');
-              stopReportTypewriter();
-              return;
-            }
-
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.error) {
-                setReportData(prev => ({ ...prev, report_text: 'AI 분석이 지연되고 있습니다' }));
-                setModalStep('preview');
-                stopReportTypewriter();
-                return;
-              }
-              if (data.answer) enqueueReportText(data.answer);
-              if (data.final_report) {
-                setReportData(prev => ({ ...prev, ...data.final_report, report_text: prev.report_text || '' }));
-              }
-            } catch (e) {
-              // ignore non-JSON chunks
-            }
+            const d = line.slice(5).trim();
+            if (d === '[DONE]') { flushQueue(); setIsGenerating(false); return; }
+            try { const obj = JSON.parse(d); if (obj.answer) enqueueGen(obj.answer); } catch {}
           }
         }
+        // stream ended naturally (reader.done) - flush any remaining
       }
-
-      setModalStep('preview');
-    } catch (err) {
-      console.error('Fetch report failed', err);
-      setReportData(prev => ({ ...prev, report_text: 'AI 분석이 지연되고 있습니다' }));
-      setModalStep('preview');
+    } catch (e) {
+      if (e.name !== 'AbortError') setAiGenText(prev => prev + '\n\n⚠️ 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
+  useEffect(() => () => { stopGenTypewriter(); if (genAbortRef.current) genAbortRef.current.abort(); }, []);
+
+  const reportingLines = [
+    { id: 'leader',   role: '팀장',  name: '직속 팀장', desc: '직속 상급자' },
+    { id: 'director', role: '본부장', name: '부서 본부장', desc: '부서 책임자' },
+    { id: 'exec',     role: '상무',  name: '사업부 상무', desc: '사업부 임원' },
+  ];
+
   useEffect(() => {
-    return () => {
-      try { if (reportAbortRef.current) reportAbortRef.current.abort(); } catch {}
-      stopReportTypewriter();
+    if (!incidentId) {
+      setError('장애 ID가 없습니다. 채팅방에서 다시 접근해주세요.');
+      setLoading(false);
+      return;
+    }
+    const fetchReport = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/warroom/report/${incidentId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setReport(data);
+      } catch (e) {
+        setError(`데이터 로드 실패: ${e.message}`);
+      } finally {
+        setLoading(false);
+      }
     };
-  }, []);
+    fetchReport();
+  }, [incidentId]);
+
+  const toggleLine = (id) => {
+    setSelectedLines(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   const handleFinalSubmit = async () => {
     try {
-      // Mapping reportData to ReportBroadcastRequest schema
-      const broadcastPayload = {
-        incident_id: incidentId,
-        report_content: `
-          [6W1H 분석 결과]
-          Who: ${reportData.who}
-          When: ${reportData.when}
-          Where: ${reportData.where}
-          What: ${reportData.what}
-          Why: ${reportData.why}
-          How: ${reportData.how}
-          
-          [상세 내용]
-          ${reportData.report_text}
-          
-          [처리자 메모]
-          ${memo}
-        `,
-        recipient_emails: selectedLines.map(lineId => {
-          const line = reportingLines.find(l => l.id === lineId);
-          // Mocking email addresses for the selected reporting lines
-          return `${lineId}@sguard-internal.com`;
-        })
-      };
-
-      const res = await fetch(`${API_BASE_URL}/ai/report/broadcast`, {
+      await fetch(`${API_BASE_URL}/ai/report/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(broadcastPayload),
+        body: JSON.stringify({
+          title: report?.title || incidentId,
+          content: `[6W1H]\nWho: ${report?.who}\nWhen: ${report?.when}\nWhere: ${report?.where}\nWhat: ${report?.what}\nWhy: ${report?.why}\nHow: ${report?.how}\n\n[메모]\n${memo}`,
+        }),
       });
-
-      if (res.ok) {
-        alert(`${selectedLines.length}명의 상급자에게 보고서가 전파되었으며 지식베이스(RAG) 학습이 완료되었습니다.`);
-        navigate('/dashboard');
-      } else {
-        alert('보고서 전파 중 오류가 발생했습니다.');
-      }
-    } catch (err) {
-      console.error('Final submit failed', err);
-      alert('서버와의 통신에 실패했습니다.');
+      alert(`보고서가 전파되었으며 지식DB 학습이 시작되었습니다.`);
+      navigate('/dashboard');
+    } catch {
+      alert('전송에 실패했습니다.');
     }
   };
 
-  const toggleLine = (id) => {
-    setSelectedLines(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
+  const tabs = [
+    { id: 'summary',   label: 'AI 분석 요약' },
+    { id: '6w1h',      label: '6W1H 분석' },
+    { id: 'agents',    label: 'Agent 로그' },
+    { id: 'chat',      label: '채팅 기록' },
+    { id: 'files',     label: '첨부파일' },
+    { id: 'ai_report', label: '✨ AI 종합보고서' },
+  ];
+
+  const sev = report?.severity || 'NORMAL';
+  const sevClass = severityColors[sev] || severityColors.NORMAL;
 
   return (
-    <div className="min-h-screen bg-[#0a0d14] text-white font-sans flex flex-col pb-24">
+    <div className="min-h-screen bg-[#0a0d14] text-white font-sans flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between p-5 sticky top-0 bg-[#0a0d14]/80 backdrop-blur-lg z-50 border-b border-white/5">
+      <header className="flex items-center justify-between px-4 py-3 sticky top-0 bg-[#0a0d14]/90 backdrop-blur-lg z-50 border-b border-white/5">
         <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
-          <ArrowLeft className="w-6 h-6 text-slate-400" />
+          <ArrowLeft className="w-5 h-5 text-slate-400" />
         </button>
-        <div className="flex flex-col items-center">
-            <div className="flex items-center space-x-2 mb-0.5">
-                <span className="bg-red-500/20 text-red-500 text-[10px] font-black px-1.5 py-0.5 rounded border border-red-500/30 uppercase tracking-tighter">Critical</span>
-                <span className="text-[11px] text-slate-500 font-mono tracking-tighter">SHB02681</span>
-            </div>
-            <h1 className="font-bold text-base tracking-tight text-slate-200 truncate max-w-[200px]">
-                [신한카드] SHB02681 은행고객종합정...
-            </h1>
+        <div className="flex flex-col items-center flex-1 mx-3">
+          {report ? (
+            <>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter ${sevClass}`}>
+                  {sev}
+                </span>
+                <span className="text-[11px] text-slate-500 font-mono">{incidentId?.slice(-10)}</span>
+              </div>
+              <h1 className="font-bold text-sm text-slate-200 truncate max-w-[220px] text-center">
+                {report.title}
+              </h1>
+            </>
+          ) : (
+            <span className="text-sm text-slate-400">장애 보고서</span>
+          )}
         </div>
         <button className="p-2 rounded-full hover:bg-white/5 transition-colors">
-          <Share2 className="w-6 h-6 text-slate-400" />
+          <Share2 className="w-5 h-5 text-slate-400" />
         </button>
       </header>
 
-      <main className="flex-1 px-5 py-2 space-y-8 overflow-y-auto">
-        {/* AI 분석 요약 */}
-        <section className="space-y-4">
-            <div className="flex items-center space-x-2 text-blue-400">
-                <Sparkles className="w-5 h-5 fill-blue-400/20" />
-                <h2 className="text-lg font-bold">AI 분석 요약</h2>
-            </div>
-            <div className="bg-[#161b2a] rounded-2xl p-6 border border-white/5 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl -z-0" />
-                <p className="text-[15px] leading-relaxed text-slate-300 relative z-10 whitespace-pre-wrap">
-                    {reportData.report_text || "보고서가 생성되지 않았습니다."}
-                </p>
-            </div>
-        </section>
-
-        {/* 6W1H 상세 분석 (Post-Mortem) */}
-        <section className="space-y-4">
-            <div className="flex items-center space-x-2 text-blue-400">
-                <AlertCircle className="w-5 h-5" />
-                <h2 className="text-lg font-bold">6W1H 상세 분석</h2>
-            </div>
-            <div className="bg-[#161b2a] rounded-2xl p-6 border border-white/5 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Who (대상/담당)</span>
-                    <p className="text-sm text-slate-200">{reportData.who || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">When (일시)</span>
-                    <p className="text-sm text-slate-200">{reportData.when || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Where (위치/시스템)</span>
-                    <p className="text-sm text-slate-200">{reportData.where || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">What (현상)</span>
-                    <p className="text-sm text-slate-200">{reportData.what || "-"}</p>
-                  </div>
-                </div>
-                <div className="space-y-1 pt-2 border-t border-white/5">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase">Why (원인)</span>
-                  <p className="text-sm text-slate-200">{reportData.why || "-"}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase">How (조치)</span>
-                  <p className="text-sm text-slate-200">{reportData.how || "-"}</p>
-                </div>
-            </div>
-        </section>
-
-        {/* 처리자 메모 영역 */}
-        <section className="space-y-4 pb-20">
-            <div className="flex items-center space-x-2 text-blue-400">
-                <MessageSquare className="w-5 h-5" />
-                <h2 className="text-lg font-bold">처리자 메모 (Dify 학습 데이터 추가)</h2>
-            </div>
-            <div className="bg-[#161b2a] rounded-2xl p-4 border border-white/5 shadow-inner">
-                <textarea 
-                  value={memo}
-                  onChange={(e) => setMemo(e.target.value)}
-                  placeholder="장애 처리 과정에 대한 추가 코멘트를 입력하세요 (이 내용은 지식베이스 학습에 포함됩니다)..."
-                  className="w-full h-32 bg-transparent text-slate-300 text-sm outline-none resize-none placeholder:text-slate-600 leading-relaxed"
-                />
-            </div>
-        </section>
-      </main>
-
-      {/* Unified Multi-step Modal */}
-      {modalStep && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-[#06080c]/95 backdrop-blur-md" onClick={() => modalStep !== 'generating' && setModalStep(null)} />
-          
-          {modalStep === 'generating' ? (
-             <div className="relative z-10 flex flex-col items-center justify-center space-y-8 animate-in zoom-in-95 duration-500">
-                <div className="relative">
-                    <div className="w-24 h-24 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <Sparkles className="w-10 h-10 text-blue-400 animate-pulse" />
-                    </div>
-                </div>
-                <div className="text-center space-y-2">
-                    <h3 className="text-2xl font-bold text-white tracking-tight">AI Report Generating...</h3>
-                    <p className="text-slate-400 animate-pulse">Dify Cloud 엔진이 분석 중입니다...</p>
-                </div>
-             </div>
-          ) : (
-          <div className="bg-[#0f1219] w-full max-w-lg rounded-[2.5rem] border border-white/10 shadow-[0_0_50px_-12px_rgba(37,99,235,0.3)] relative z-10 overflow-hidden flex flex-col max-h-[85vh]">
-            {/* Modal Header */}
-            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-600/20 p-2 rounded-xl border border-blue-500/30">
-                  <FileText className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg text-white">
-                    {modalStep === 'preview' ? '보고 내용 최종 확인' : '보고 대상 선정'}
-                  </h3>
-                  <p className="text-[10px] text-slate-500 font-mono">
-                    {modalStep === 'preview' ? 'STEP 1: 리포트 검토' : 'STEP 2: 수신자 확인'}
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setModalStep(null)}
-                className="p-2 rounded-full hover:bg-white/5 transition-colors group"
-              >
-                <X className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-              {modalStep === 'preview' ? (
-                /* Step 1: Detailed Preview Content */
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
-                  <div className="bg-[#161b24] p-6 rounded-3xl border border-white/5 space-y-4">
-                    <div className="pb-4 border-b border-white/5">
-                      <h4 className="text-lg font-bold text-blue-400 flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5" /> 6W1H 요약
-                      </h4>
-                    </div>
-                    <div className="space-y-3">
-                      <div><span className="text-[10px] text-slate-500 block uppercase">Who</span> <p className="text-sm text-slate-300">{reportData.who}</p></div>
-                      <div><span className="text-[10px] text-slate-500 block uppercase">When</span> <p className="text-sm text-slate-300">{reportData.when}</p></div>
-                      <div><span className="text-[10px] text-slate-500 block uppercase">Where</span> <p className="text-sm text-slate-300">{reportData.where}</p></div>
-                      <div><span className="text-[10px] text-slate-500 block uppercase">What</span> <p className="text-sm text-slate-300">{reportData.what}</p></div>
-                      <div><span className="text-[10px] text-slate-500 block uppercase">Why</span> <p className="text-sm text-slate-300">{reportData.why}</p></div>
-                      <div><span className="text-[10px] text-slate-500 block uppercase">How</span> <p className="text-sm text-slate-300">{reportData.how}</p></div>
-                    </div>
-                  </div>
-                  {memo && (
-                    <div className="bg-blue-600/10 p-4 rounded-2xl border border-blue-500/20 italic text-sm text-blue-200">
-                      "{memo}"
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Step 2: Recipient Selection Content */
-                <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-                  <div className="text-center space-y-2">
-                    <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-2 border border-blue-500/30">
-                      <Send className="w-7 h-7 text-blue-400" />
-                    </div>
-                    <p className="text-sm text-slate-400">보고서를 전송할 상급자를 선택해주세요.</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {reportingLines.map((line) => (
-                      <div 
-                        key={line.id}
-                        onClick={() => toggleLine(line.id)}
-                        className={`flex items-center justify-between p-5 rounded-3xl border transition-all cursor-pointer ${
-                          selectedLines.includes(line.id) 
-                            ? 'bg-blue-600/10 border-blue-500 shadow-xl shadow-blue-900/20' 
-                            : 'bg-[#161b2a]/50 border-white/5 hover:border-white/10'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                             selectedLines.includes(line.id) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
-                          }`}>
-                            <User className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-200 text-sm">{line.role} {line.name}</p>
-                            <p className="text-[11px] text-slate-500 italic">{line.desc}</p>
-                          </div>
-                        </div>
-                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
-                          selectedLines.includes(line.id) ? 'bg-blue-600 border-blue-400 scale-110' : 'border-slate-700'
-                        }`}>
-                          {selectedLines.includes(line.id) && <Check className="w-4 h-4 text-white" />}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-8 border-t border-white/5 bg-[#0a0d14] flex space-x-4">
-              <button 
-                onClick={() => modalStep === 'preview' ? setModalStep(null) : setModalStep('preview')}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 h-16 rounded-[1.25rem] font-bold text-slate-300 transition-all border border-white/10 active:scale-95 text-sm"
-              >
-                {modalStep === 'preview' ? '닫기' : '이전으로'}
-              </button>
-              <button 
-                onClick={() => {
-                  if (modalStep === 'preview') {
-                    setModalStep('selection');
-                  } else if (selectedLines.length > 0) {
-                    handleFinalSubmit();
-                  }
-                }}
-                disabled={modalStep === 'selection' && selectedLines.length === 0}
-                className={`flex-[1.8] h-16 rounded-[1.25rem] font-bold text-white transition-all flex items-center justify-center space-x-3 active:scale-95 text-sm shadow-lg ${
-                  modalStep === 'selection' && selectedLines.length === 0
-                    ? 'bg-slate-800 opacity-50 cursor-not-allowed text-slate-500' 
-                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-blue-600/20'
-                }`}
-              >
-                <span>{modalStep === 'preview' ? '확인 및 보고라인 선택' : `보고서 최종 전송 (${selectedLines.length}명)`}</span>
-                {modalStep === 'preview' ? <ChevronRight className="w-5 h-5" /> : <Send className="w-5 h-5" />}
-              </button>
-            </div>
+      {/* Stats Bar */}
+      {report && (
+        <div className="flex items-center justify-around px-4 py-2 bg-[#0f1421] border-b border-white/5 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-blue-400" />
+            <span>{report.created_at?.slice(0, 16) || '-'}</span>
           </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+            <span>채팅 {report.message_count}건</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Paperclip className="w-3.5 h-3.5 text-purple-400" />
+            <span>첨부 {report.attachment_count}건</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Activity className="w-3.5 h-3.5 text-amber-400" />
+            <span>{report.duration_min}분 소요</span>
+          </div>
         </div>
       )}
 
-      {/* Footer Buttons */}
-      <footer className="fixed bottom-0 left-0 w-full p-5 bg-gradient-to-t from-[#0a0d14] via-[#0a0d14] to-transparent pt-10 flex space-x-3 pointer-events-auto z-50">
-        <button 
+      {/* Tabs */}
+      <div className="flex overflow-x-auto border-b border-white/5 bg-[#0a0d14] sticky top-[57px] z-40">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`px-4 py-2.5 text-xs font-bold whitespace-nowrap transition-all border-b-2 ${
+              activeTab === t.id
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <main className="flex-1 px-4 py-4 mb-28 overflow-y-auto">
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
+            <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            <span className="text-sm">데이터 로드 중...</span>
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">{error}</div>
+        )}
+        {report && !loading && (
+          <>
+            {/* ── AI 분석 요약 ── */}
+            {activeTab === 'summary' && (
+              <div className="space-y-4 animate-in fade-in duration-300">
+                {/* S-Autopilot Insight */}
+                {report.autopilot_insight && (
+                  <section className="bg-[#0f1421] rounded-2xl border border-blue-500/10 overflow-hidden">
+                    <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5 bg-blue-500/5">
+                      <Sparkles className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs font-bold text-blue-400">S-Autopilot Insight</span>
+                    </div>
+                    <div className="p-4">
+                      <MarkdownBlock text={report.autopilot_insight} />
+                    </div>
+                  </section>
+                )}
+                {/* Leader Summary */}
+                {report.leader_summary && (
+                  <section className="bg-[#0f1421] rounded-2xl border border-amber-500/10 overflow-hidden">
+                    <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5 bg-amber-500/5">
+                      <Bot className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-bold text-amber-400">Leader Agent 종합 요약</span>
+                    </div>
+                    <div className="p-4">
+                      <MarkdownBlock text={report.leader_summary} />
+                    </div>
+                  </section>
+                )}
+                {!report.autopilot_insight && !report.leader_summary && (
+                  <div className="text-center py-10 text-slate-500 text-sm">분석 데이터가 없습니다.</div>
+                )}
+
+                {/* Memo */}
+                <section className="bg-[#0f1421] rounded-2xl border border-white/5 overflow-hidden">
+                  <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5">
+                    <MessageSquare className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-400">처리자 메모 (지식DB 학습 데이터)</span>
+                  </div>
+                  <div className="p-4">
+                    <textarea
+                      value={memo}
+                      onChange={e => setMemo(e.target.value)}
+                      placeholder="장애 처리 과정에 대한 추가 코멘트를 입력하세요..."
+                      className="w-full h-28 bg-transparent text-slate-300 text-sm outline-none resize-none placeholder:text-slate-600 leading-relaxed"
+                    />
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* ── 6W1H ── */}
+            {activeTab === '6w1h' && (
+              <div className="space-y-3 animate-in fade-in duration-300">
+                {[
+                  { label: 'WHO (담당자)', value: report.who, color: 'text-blue-400' },
+                  { label: 'WHEN (발생 일시)', value: report.when, color: 'text-purple-400' },
+                  { label: 'WHERE (대상 시스템)', value: report.where, color: 'text-teal-400' },
+                  { label: 'WHAT (장애 현상)', value: report.what, color: 'text-yellow-400' },
+                  { label: 'WHY (원인 분석)', value: report.why, color: 'text-red-400', wide: true },
+                  { label: 'HOW (조치 방법)', value: report.how, color: 'text-emerald-400', wide: true },
+                ].map(item => (
+                  <div key={item.label} className="bg-[#0f1421] rounded-xl p-4 border border-white/5">
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${item.color}`}>{item.label}</span>
+                    <div className="mt-1.5">
+                      <MarkdownBlock text={item.value} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Agent 로그 ── */}
+            {activeTab === 'agents' && (
+              <div className="space-y-3 animate-in fade-in duration-300">
+                {(report.agent_logs || []).length === 0 && (
+                  <div className="text-center py-10 text-slate-500 text-sm">에이전트 로그가 없습니다.</div>
+                )}
+                {(report.agent_logs || []).map((log, i) => {
+                  const cfg = agentColors[log.agent_role] || agentColors.Leader;
+                  const Icon = cfg.icon;
+                  return (
+                    <div key={i} className={`rounded-xl border p-4 ${cfg.bg} ${cfg.border}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Icon className={`w-4 h-4 ${cfg.text}`} />
+                        <span className={`text-xs font-bold ${cfg.text}`}>{log.agent_role} Agent</span>
+                        <span className="ml-auto text-[10px] text-slate-500">{log.reg_dt?.slice(0, 16)}</span>
+                      </div>
+                      <MarkdownBlock text={log.content} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── 채팅 기록 ── */}
+            {activeTab === 'chat' && (
+              <div className="space-y-2 animate-in fade-in duration-300">
+                {(report.chat_logs || []).length === 0 && (
+                  <div className="text-center py-10 text-slate-500 text-sm">채팅 기록이 없습니다.</div>
+                )}
+                {(report.chat_logs || []).map((msg, i) => (
+                  <div key={i} className={`flex gap-2.5 ${msg.type === 'me' ? 'flex-row-reverse' : ''}`}>
+                    <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                      {(msg.sender || '?').slice(0, 2)}
+                    </div>
+                    <div className={`max-w-[75%] ${msg.type === 'me' ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <span className="text-[10px] text-slate-500 mb-0.5">{msg.sender} · {msg.timestamp?.slice(11, 16)}</span>
+                      <div className={`px-3 py-2 rounded-xl text-xs leading-relaxed ${
+                        msg.type === 'system' ? 'bg-slate-800/50 text-slate-400 italic' :
+                        msg.type === 'me' ? 'bg-blue-600 text-white' : 'bg-[#1a2035] text-slate-200'
+                      }`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── 첨부파일 ── */}
+            {activeTab === 'files' && (
+              <div className="space-y-2 animate-in fade-in duration-300">
+                {(report.attachments || []).length === 0 && (
+                  <div className="text-center py-10 text-slate-500 text-sm">첨부파일이 없습니다.</div>
+                )}
+                {(report.attachments || []).map((att, i) => (
+                  <a
+                    key={i}
+                    href={`${API_BASE_URL}${att.url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-[#0f1421] rounded-xl p-4 border border-white/5 hover:border-blue-500/30 transition-colors"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center shrink-0">
+                      <Paperclip className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-200 truncate">{att.original_name}</p>
+                      <p className="text-[10px] text-slate-500">{att.uploaded_by} · {att.timestamp?.slice(0, 16)}</p>
+                    </div>
+                    <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 shrink-0">다운로드</span>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* ── AI 종합보고서 ── */}
+            {activeTab === 'ai_report' && (
+              <div className="space-y-4 animate-in fade-in duration-300">
+                {!aiGenText && !isGenerating && (
+                  <div className="flex flex-col items-center justify-center py-16 gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center">
+                      <Sparkles className="w-8 h-8 text-blue-400" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-slate-300 font-semibold">AI 종합 보고서 생성</p>
+                      <p className="text-slate-500 text-sm mt-1">채팅 기록, 에이전트 분석, AI Insight를<br/>모두 참조하여 보고서를 생성합니다.</p>
+                    </div>
+                    <button
+                      onClick={generateAiReport}
+                      disabled={!report}
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-sm font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-900/30 active:scale-95"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      보고서 생성 시작
+                    </button>
+                  </div>
+                )}
+                {isGenerating && !aiGenText && (
+                  <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-400">
+                    <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                    <p className="text-sm">Dify AI가 분석 및 보고서 작성 중...</p>
+                  </div>
+                )}
+                {aiGenText && (
+                  <section className="bg-[#0f1421] rounded-2xl border border-blue-500/10 overflow-hidden">
+                    <div className="px-4 py-2.5 flex items-center justify-between border-b border-white/5 bg-blue-500/5">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-blue-400" />
+                        <span className="text-xs font-bold text-blue-400">AI 종합 장애 보고서 (Dify 생성)</span>
+                        {isGenerating && <Loader className="w-3 h-3 text-blue-400 animate-spin ml-1" />}
+                      </div>
+                      <button
+                        onClick={generateAiReport}
+                        disabled={isGenerating}
+                        className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors disabled:opacity-40"
+                      >
+                        <RefreshCw className="w-3 h-3" /> 재생성
+                      </button>
+                    </div>
+                    <div className="p-4">
+                      <MarkdownBlock text={aiGenText} />
+                      {isGenerating && <span className="inline-block w-1.5 h-4 bg-blue-400 animate-pulse align-middle ml-0.5" />}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Modal */}
+      {modalStep && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => modalStep !== 'generating' && setModalStep(null)} />
+          <div className="relative z-10 w-full max-w-lg bg-[#0f1219] rounded-t-3xl border border-white/10 overflow-hidden max-h-[80vh] flex flex-col">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between">
+              <h3 className="font-bold text-white">
+                {modalStep === 'preview' ? '📋 보고서 최종 확인' : '📤 보고 대상 선정'}
+              </h3>
+              <button onClick={() => setModalStep(null)} className="p-1.5 rounded-full hover:bg-white/10">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {modalStep === 'preview' ? (
+                <div className="space-y-3 text-sm">
+                  {[
+                    { k: 'WHO', v: report?.who }, { k: 'WHEN', v: report?.when },
+                    { k: 'WHERE', v: report?.where }, { k: 'WHAT', v: report?.what },
+                    { k: 'WHY', v: report?.why }, { k: 'HOW', v: report?.how },
+                  ].map(({ k, v }) => (
+                    <div key={k} className="bg-[#161b24] rounded-xl p-3 border border-white/5">
+                      <span className="text-[10px] text-slate-500 uppercase font-bold">{k}</span>
+                      <p className="text-slate-300 mt-0.5 text-xs truncate">{v || '-'}</p>
+                    </div>
+                  ))}
+                  {memo && <div className="bg-blue-500/10 rounded-xl p-3 border border-blue-500/20 text-blue-200 text-xs italic">"{memo}"</div>}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reportingLines.map(line => (
+                    <div
+                      key={line.id}
+                      onClick={() => toggleLine(line.id)}
+                      className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
+                        selectedLines.includes(line.id) ? 'bg-blue-600/10 border-blue-500' : 'bg-[#161b2a]/50 border-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${selectedLines.includes(line.id) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                          <User className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-slate-200">{line.role} {line.name}</p>
+                          <p className="text-[10px] text-slate-500">{line.desc}</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedLines.includes(line.id) ? 'bg-blue-600 border-blue-400' : 'border-slate-600'}`}>
+                        {selectedLines.includes(line.id) && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-white/5 flex gap-3">
+              <button
+                onClick={() => modalStep === 'preview' ? setModalStep(null) : setModalStep('preview')}
+                className="flex-1 h-12 rounded-2xl bg-slate-800 text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all border border-white/5"
+              >
+                {modalStep === 'preview' ? '닫기' : '이전'}
+              </button>
+              <button
+                onClick={() => modalStep === 'preview' ? setModalStep('selection') : (selectedLines.length > 0 && handleFinalSubmit())}
+                disabled={modalStep === 'selection' && selectedLines.length === 0}
+                className="flex-[1.5] h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-bold flex items-center justify-center gap-2 hover:from-blue-500 hover:to-blue-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {modalStep === 'preview' ? (<><span>보고라인 선택</span><ChevronRight className="w-4 h-4" /></>) : (<><span>최종 전송 ({selectedLines.length}명)</span><Send className="w-4 h-4" /></>)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0a0d14] to-transparent pt-8 flex gap-3 z-50">
+        <button
           onClick={() => navigate(`/chat/${incidentId}`)}
-          className="flex-1 bg-slate-800 hover:bg-slate-700 h-14 rounded-xl flex items-center justify-center space-x-2 transition-all active:scale-[0.98] border border-white/5"
+          className="flex-1 h-13 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center gap-2 transition-all border border-white/5 py-3"
         >
-            <MessageSquare className="w-5 h-5 text-slate-300" />
-            <span className="font-bold text-slate-300">War-Room 바로가기</span>
+          <MessageSquare className="w-4 h-4 text-slate-300" />
+          <span className="font-bold text-slate-300 text-sm">War-Room 바로가기</span>
         </button>
-        <button 
-            onClick={fetchAiReport}
-            className="flex-[1.2] bg-blue-600 hover:bg-blue-500 h-14 rounded-xl flex items-center justify-center space-x-2 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 text-white"
+        <button
+          onClick={() => report && setModalStep('preview')}
+          disabled={!report}
+          className="flex-[1.2] h-13 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/20 text-white disabled:opacity-40 py-3"
         >
-            <Sparkles className="w-5 h-5" />
-            <span className="font-bold">보고서 생성 및 보고</span>
+          <Send className="w-4 h-4" />
+          <span className="font-bold text-sm">보고서 전송 및 지식DB 저장</span>
         </button>
       </footer>
     </div>

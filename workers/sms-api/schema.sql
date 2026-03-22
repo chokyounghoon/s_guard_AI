@@ -153,8 +153,8 @@ CREATE TABLE IF NOT EXISTS alert_keywords (
 );
 
 CREATE TABLE IF NOT EXISTS warroom_chats (
-    inc_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    incident_id INTEGER,
+    inc_id TEXT,
+    seq INTEGER,
     sender TEXT,
     role TEXT,
     type TEXT DEFAULT 'user',
@@ -163,12 +163,13 @@ CREATE TABLE IF NOT EXISTS warroom_chats (
     reg_id TEXT DEFAULT 'SYSTEM',
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
-    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (inc_id, seq)
 );
 
 CREATE TABLE IF NOT EXISTS warroom_attachments (
-    inc_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    incident_id INTEGER,
+    inc_id TEXT,
+    seq INTEGER,
     filename TEXT,
     original_name TEXT,
     file_type TEXT,
@@ -178,7 +179,8 @@ CREATE TABLE IF NOT EXISTS warroom_attachments (
     reg_id TEXT DEFAULT 'SYSTEM',
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
-    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (inc_id, seq)
 );
 
 CREATE TABLE IF NOT EXISTS reset_verifications (
@@ -251,8 +253,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
 
 -- War-Room Tracking List
 CREATE TABLE IF NOT EXISTS warroom_list (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    inc_id TEXT NOT NULL,
+    inc_id TEXT PRIMARY KEY,
     title TEXT,
     creator_id TEXT,
     status TEXT DEFAULT 'OPEN',

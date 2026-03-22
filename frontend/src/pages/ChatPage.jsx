@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon } from 'lucide-react';
+import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon, Shield, Server, User, Terminal, CheckCircle } from 'lucide-react';
 import AIChatBubble from '../components/AIChatBubble';
 import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
@@ -21,6 +21,9 @@ export default function ChatPage() {
   const [roomStatus, setRoomStatus] = useState('Open');
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]); // Array of { name, url, type, file }
+  const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
+  const [warRooms, setWarRooms] = useState([]);
+  const [showWipToast, setShowWipToast] = useState(false);
   const fileInputRef = useRef(null);
 
   const participants = [
@@ -76,6 +79,24 @@ export default function ChatPage() {
     return `${apiBase}${endpoint}`;
   };
 
+  // Fetch active War-Rooms for the popup list
+  const fetchWarRooms = async () => {
+    try {
+      const res = await fetch(getApiUrl('/warroom/rooms'));
+      if (res.ok) {
+        const data = await res.json();
+        setWarRooms(data.rooms || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch war rooms', e);
+    }
+  };
+
+  const handleWarRoomNavClick = () => {
+    fetchWarRooms();
+    setShowWarRoomPopup(prev => !prev);
+  };
+
   // Load chat history on mount or when incidentId changes
   useEffect(() => {
     const fetchChatHistory = async () => {
@@ -101,9 +122,14 @@ export default function ChatPage() {
           }));
           setMainMessages(loadedMessages);
           
-          // AI 분석 메시지 추출하여 상태 저장
-          const analysis = loadedMessages.find(m => m.type === 'ai_analysis');
-          if (analysis) setAiAnalysisMessage(analysis);
+          // Leader Agent 내용을 AI ANALYSIS SUMMARY 배너에 표시
+          if (data.leader_summary) {
+            setAiAnalysisMessage({ type: 'ai_analysis', text: data.leader_summary });
+          } else {
+            // Fallback: any ai_analysis message in history
+            const analysis = loadedMessages.find(m => m.type === 'ai_analysis');
+            if (analysis) setAiAnalysisMessage(analysis);
+          }
         }
       } catch (err) {
         console.error("Failed to load chat history", err);
@@ -332,13 +358,39 @@ export default function ChatPage() {
       if (hasFiles) {
         const userStr = localStorage.getItem('sguard_user');
         const user = userStr ? JSON.parse(userStr) : { name: '익명' };
-        
+        const uploadedFiles = [];
+
         for (const fileObj of selectedFiles) {
           const formData = new FormData();
           formData.append('file', fileObj.file);
           formData.append('incident_id', incidentId);
           formData.append('uploaded_by', user.name || '익명');
-          await fetch(`${apiBase}/warroom/upload`, { method: 'POST', body: formData });
+          const uploadRes = await fetch(`${apiBase}/warroom/upload`, { method: 'POST', body: formData });
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            uploadedFiles.push({ ...fileObj, url: uploadData.url, seq: uploadData.seq });
+          }
+        }
+
+        // Optimistically add file messages to chat
+        if (uploadedFiles.length > 0) {
+          const now = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+          const fileMsgs = uploadedFiles.map((f, idx) => ({
+            id: `file_${Date.now()}_${idx}`,
+            type: 'me',
+            sender: user.name || '익명',
+            initials: (user.name || '익명').substring(0, 2),
+            color: 'bg-slate-700',
+            text: null,
+            fileAttachment: {
+              name: f.name || f.file?.name,
+              url: `https://sguardai.khcho0421.workers.dev${f.url}`,
+              type: f.file?.type || 'application/octet-stream'
+            },
+            time: now,
+            icon: null
+          }));
+          setMainMessages(prev => [...prev, ...fileMsgs]);
         }
         setSelectedFiles([]);
       }
@@ -372,7 +424,28 @@ export default function ChatPage() {
           time: new Date(msg.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
           icon: msg.type === 'system' ? Info : (msg.type === 'ai_analysis' ? Sparkles : null)
         }));
-        setMainMessages(loadedMessages);
+
+        // Merge with attachments from DB
+        const attRes = await fetch(`${apiBase}/warroom/attachments/${incidentId}`);
+        const attData = attRes.ok ? await attRes.json() : { attachments: [] };
+        const attMsgs = (attData.attachments || []).map(att => ({
+          id: `att_${att.seq}`,
+          type: currentUser.name === att.uploaded_by ? 'me' : 'other',
+          sender: att.uploaded_by,
+          initials: att.uploaded_by ? att.uploaded_by.substring(0, 2) : '??',
+          color: 'bg-slate-700',
+          text: null,
+          fileAttachment: {
+            name: att.original_name,
+            url: `https://sguardai.khcho0421.workers.dev${att.url}`,
+            type: att.file_type
+          },
+          time: att.timestamp ? new Date(att.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '',
+          icon: null
+        }));
+
+        const combined = [...loadedMessages, ...attMsgs].sort((a, b) => a.id < b.id ? -1 : 1);
+        setMainMessages(combined);
         const analysis = loadedMessages.find(m => m.type === 'ai_analysis');
         if (analysis) setAiAnalysisMessage(analysis);
       }
@@ -386,7 +459,6 @@ export default function ChatPage() {
   const [resolveSuccess, setResolveSuccess] = useState(false);
 
   const handleResolveIncident = () => {
-    if (!confirm('이 장애 상황에 대한 AI 정밀 분석 보고서를 생성하시겠습니까?')) return;
     navigate('/ai-report', { state: { incidentId } });
   };
 
@@ -400,7 +472,9 @@ export default function ChatPage() {
           </button>
           <div className="flex flex-col">
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-lg">{roomTitle || incidentId}</span>
+              <span className="font-bold text-lg">
+                {roomTitle || (incidentId?.startsWith('INC-') ? incidentId : `INC-${incidentId}`)}
+              </span>
               <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded border border-red-500/30 uppercase tracking-tighter">
                 CRITICAL
               </span>
@@ -513,9 +587,24 @@ export default function ChatPage() {
                       </>
                     )}
                 </div>
-                <button className="p-1 rounded-full group-hover:bg-white/10 transition-colors">
-                    {isLogExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
+                <div className="flex items-center gap-1">
+                  {aiAnalysisMessage && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMainInput(prev => prev ? prev + '\n\n' + aiAnalysisMessage.text : aiAnalysisMessage.text);
+                      }}
+                      title="채팅창에 붙여넣기"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold hover:bg-purple-500/30 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      채팅에 붙여넣기
+                    </button>
+                  )}
+                  <button className="p-1 rounded-full group-hover:bg-white/10 transition-colors">
+                      {isLogExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                  </button>
+                </div>
             </div>
             
             {isLogExpanded && (
@@ -533,7 +622,7 @@ export default function ChatPage() {
                         </div>
                       ) : (
                         <div className="text-slate-300 italic">
-                          {roomDescription || '장애 세부 정보를 불러오는 중입니다...'}
+                          {roomDescription || '장애 내용을 포함한 SMS 원문 또는 AI 분석 내용을 기다리고 있습니다...'}
                         </div>
                       )}
                     </div>
@@ -558,12 +647,6 @@ export default function ChatPage() {
 
       {/* Chat Area */}
       <main className="flex-1 p-4 space-y-6 overflow-y-auto pb-40">
-        {/* Date Divider */}
-        <div className="flex justify-center my-4">
-          <div className="bg-slate-800/40 text-slate-400 text-[11px] px-4 py-1 rounded-full">
-            2023년 10월 25일 수요일
-          </div>
-        </div>
 
         {mainMessages.filter(msg => msg.type !== 'ai_analysis').map((msg) => (
           <div key={msg.inc_id || msg.id}>
@@ -576,7 +659,13 @@ export default function ChatPage() {
                   <span className="text-xs text-slate-400 font-medium">{msg.sender}</span>
                   <div className="flex items-end space-x-2">
                     <div className="bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[280px] text-[15px] leading-relaxed whitespace-pre-wrap">
-                      {renderMessageContent(msg.text, false)}
+                      {msg.fileAttachment ? (
+                        <a href={msg.fileAttachment.url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 underline text-xs">
+                          <Paperclip className="w-3 h-3 shrink-0" />
+                          {msg.fileAttachment.name}
+                        </a>
+                      ) : renderMessageContent(msg.text, false)}
                     </div>
                     <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
                   </div>
@@ -589,7 +678,13 @@ export default function ChatPage() {
                 <div className="flex items-end space-x-2">
                   <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
                   <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[280px] text-[15px] leading-relaxed shadow-lg shadow-blue-900/20 whitespace-pre-wrap">
-                    {renderMessageContent(msg.text, true)}
+                    {msg.fileAttachment ? (
+                      <a href={msg.fileAttachment.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-100 hover:text-white underline text-xs">
+                        <Paperclip className="w-3 h-3 shrink-0" />
+                        {msg.fileAttachment.name}
+                      </a>
+                    ) : renderMessageContent(msg.text, true)}
                   </div>
                 </div>
               </div>
@@ -606,24 +701,64 @@ export default function ChatPage() {
               </div>
             )}
 
-            {msg.type === 'ai_analysis' && (
-              <div className="flex flex-col items-start space-y-2 mb-8 mt-4">
-                <div className="flex items-center space-x-2 text-purple-400 ml-1">
-                  <div className="bg-purple-500/20 p-1 rounded-lg">
-                    <Sparkles className="w-4 h-4" />
+            {msg.type === 'ai_analysis' && (() => {
+              const isLeader = msg.role === 'Leader';
+              const roleColors = {
+                'Security': 'bg-red-500/20 text-red-400 border-red-500/30',
+                'DB': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                'DevOps': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                'Leader': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+                'default': 'bg-slate-700 text-slate-300 border-white/10'
+              };
+              const roleColorClass = roleColors[msg.role] || roleColors['default'];
+              const roleTextClass = msg.role === 'Security' ? 'text-red-400' :
+                                    msg.role === 'DB' ? 'text-yellow-400' :
+                                    msg.role === 'DevOps' ? 'text-blue-400' :
+                                    msg.role === 'Leader' ? 'text-purple-400' : 'text-slate-400';
+              
+              const Icon = msg.role === 'Security' ? Shield :
+                           msg.role === 'DB' ? Database :
+                           msg.role === 'DevOps' ? Server :
+                           msg.role === 'Leader' ? User : Terminal;
+
+              return (
+                <div className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 mt-6 mb-6 ${isLeader ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex max-w-[90%] ${isLeader ? 'flex-row-reverse' : 'flex-row'} items-start gap-2.5`}>
+                    
+                    {/* Avatar */}
+                    <div className="shrink-0 mt-1 shadow-md">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${roleColorClass}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                    </div>
+                    
+                    {/* Message Content */}
+                    <div className={`flex flex-col ${isLeader ? 'items-end' : 'items-start'}`}>
+                      {/* Name */}
+                      <span className={`text-[11px] mb-1.5 px-1 font-bold tracking-wide ${roleTextClass}`}>
+                        {msg.role} Agent
+                      </span>
+                      
+                      {/* Bubble and Time */}
+                      <div className={`flex items-end gap-2 ${isLeader ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {/* Bubble */}
+                        <div className={`p-3.5 text-[13px] leading-relaxed shadow-lg whitespace-pre-wrap break-words ${
+                          isLeader 
+                            ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tr-sm border border-purple-500/30' 
+                            : 'bg-slate-800 text-slate-200 rounded-2xl rounded-tl-sm border border-white/5 shadow-black/20'
+                        }`}>
+                          {msg.text}
+                        </div>
+                        {/* Time */}
+                        <span className="text-[10px] text-slate-500 shrink-0 mb-1 font-mono tracking-tighter">
+                          {msg.time}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold uppercase tracking-widest">AI분석 리포트</span>
                 </div>
-                <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border border-purple-500/20 rounded-3xl px-6 py-5 w-full text-[14px] leading-relaxed whitespace-pre-wrap shadow-xl shadow-purple-900/10 backdrop-blur-sm relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Bot className="w-12 h-12" />
-                  </div>
-                  <div className="relative z-10 text-slate-200">
-                    {msg.text}
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         ))}
       </main>
@@ -745,18 +880,40 @@ export default function ChatPage() {
       )}
 
       <div className="px-4 pb-2 bg-[#0f1421]">
-        <button 
-            onClick={handleResolveIncident}
-            disabled={roomStatus === 'Completed'}
-            className={`w-full font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all ${
-              roomStatus === 'Completed'
-                ? 'bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
-                : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-900/30 active:scale-[0.98]'
-            }`}
-        >
-            <Settings className={`w-5 h-5 ${roomStatus !== 'Completed' ? 'animate-spin-slow' : ''}`} />
-            <span>{roomStatus === 'Completed' ? '이미 해결된 장애입니다' : '장애 해결(Resolve) 및 AI에 학습시키기'}</span>
-        </button>
+        {roomStatus === 'Completed' ? (
+          <div className="w-full py-3.5 rounded-xl bg-slate-700 text-slate-500 text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed">
+            <CheckCircle className="w-4 h-4" />
+            이미 해결된 장애입니다
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            {/* Button 1: Simple close (WIP) */}
+            <button
+              onClick={() => {
+                setShowWipToast(true);
+                setTimeout(() => setShowWipToast(false), 2500);
+              }}
+              className="flex-1 py-3 rounded-xl bg-slate-700/80 border border-white/10 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-600/80 transition-all active:scale-[0.97]"
+            >
+              <CheckCircle className="w-4 h-4 text-slate-400" />
+              장애완료만 처리<br/>(보고불필요)
+            </button>
+            {/* Button 2: Full report flow */}
+            <button
+              onClick={handleResolveIncident}
+              className="flex-1 py-3 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/30 hover:from-emerald-500 hover:to-teal-600 transition-all active:scale-[0.97]"
+            >
+              <FileText className="w-4 h-4" />
+              완료 및 REPORT·<br/>지식DB생성 진행
+            </button>
+          </div>
+        )}
+        {/* 구현중 toast */}
+        {showWipToast && (
+          <div className="mt-2 w-full text-center text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg py-2 animate-in fade-in duration-300">
+            ⚙️ 해당 기능은 현재 구현 중입니다.
+          </div>
+        )}
       </div>
 
       {/* Input Area */}
@@ -843,16 +1000,60 @@ export default function ChatPage() {
     )}
   </div>
 
+      {/* War-Room List Popup */}
+      {showWarRoomPopup && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
+          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
+                  <MessageSquare className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>
+                  <p className="text-[10px] text-slate-500 font-mono">ACTIVE CHANNELS ({warRooms.length})</p>
+                </div>
+              </div>
+              <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {warRooms.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">진행 중인 War-Room이 없습니다.</div>
+              ) : warRooms.map((room) => {
+                const roomId = room.inc_id || room.id;
+                return (
+                  <div
+                    key={roomId}
+                    onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
+                    className={`bg-[#11141d] p-4 rounded-2xl border transition-all cursor-pointer group ${roomId === incidentId ? 'border-blue-500/40 bg-blue-900/10' : 'border-white/5 hover:border-blue-500/30'}`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30">CRITICAL</span>
+                      {roomId === incidentId && <span className="text-[9px] text-blue-400 font-bold">● 현재 채팅방</span>}
+                    </div>
+                    <p className="text-sm font-semibold text-white truncate">{room.title || roomId}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="fixed bottom-0 left-0 w-full bg-[#0f1421] border-t border-white/5 px-6 py-3 flex justify-between items-center z-50 pb-safe">
         <div className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => navigate('/dashboard')}>
             <Home className="w-6 h-6" />
             <span className="text-[10px] font-medium">홈</span>
         </div>
-        <div className="flex flex-col items-center space-y-1 text-blue-500 relative cursor-pointer" onClick={() => navigate('/chat')}>
+        <div className="flex flex-col items-center space-y-1 text-blue-500 relative cursor-pointer" onClick={handleWarRoomNavClick}>
             <div className="relative">
                 <MessageSquare className="w-6 h-6" />
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0f1421]"></span>
+                {warRooms.length > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0f1421]"></span>}
             </div>
             <span className="text-[10px] font-medium">War-Room</span>
         </div>

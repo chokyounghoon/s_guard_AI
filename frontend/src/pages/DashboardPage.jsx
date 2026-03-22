@@ -115,12 +115,42 @@ export default function DashboardPage() {
     const currentSms = smsMessage || selectedSmsRef.current;
     if (!currentSms) return;
 
-    const incidentId = currentSms.inc_id || `INC-${Date.now()}`;
+    // The raw received SMS ID (e.g. 20231026154512345) MUST be the primary key DB identifier
+    // to match aichat_history, but we prefix it with INC- for the UI title.
+    const incidentId = String(currentSms.inc_id || currentSms.id || `INC-${Date.now()}`);
+    
+    const baseSmsMessage = currentSms.message.length > 30 ? currentSms.message.substring(0, 30) + '...' : currentSms.message;
+    const formattedUiId = incidentId.startsWith('INC-') ? incidentId : `INC-${incidentId}`;
+    const smsTitle = `${formattedUiId} | ${baseSmsMessage}`;
+    
+    // Check if War-Room already exists
+    const existingRoom = warRooms.find(r => r.id === incidentId);
+    if (existingRoom) {
+      navigate(`/chat/${incidentId}`);
+      return;
+    }
+    
+    let diagnosisText = '';
+    let leaderSummary = '';
+    if (analysisText) {
+      // Extract [전문가별 심층 진단] section for incidents description
+      const diagnosisMatch = analysisText.match(/\[전문가별 심층 진단\]([\s\S]*?)(\[|$)/);
+      if (diagnosisMatch) {
+        diagnosisText = diagnosisMatch[1].replace(/(\*\*.+?\*\*|###.+?\n|---)/g, '').trim();
+      }
+      // Extract [Leader]: section specifically for the AI ANALYSIS SUMMARY banner
+      const leaderMatch = analysisText.match(/\[Leader\][\s\S]*?[:：]\s*([\s\S]*?)(?=\[|$)/);
+      if (leaderMatch) {
+        leaderSummary = leaderMatch[1].replace(/(\*\*.+?\*\*|###.+?\n|---)/g, '').trim();
+      }
+      // Fallback: if full text is short or unmatched, use entire text
+      if (!leaderSummary && analysisText.length < 2000) leaderSummary = analysisText.trim();
+    }
 
     // 1. Add to local state
     const newRoom = {
       id: incidentId,
-      title: currentSms.message,
+      title: smsTitle,
       lastMsg: analysisText ? 'AI분석 완료' : '',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       participants: 1,
@@ -134,25 +164,29 @@ export default function DashboardPage() {
       const apiBase = 'https://sguardai.khcho0421.workers.dev';
       
       // Save to warroom_list
-      await fetch(`${apiBase}/ai/warroom/open`, {
+      const res = await fetch(`${apiBase}/ai/warroom/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inc_id: incidentId,
-          title: currentSms.message,
+          title: smsTitle,
           creator_id: userProfile?.name || 'SYSTEM',
-          severity: 'CRITICAL'
+          severity: 'CRITICAL',
+          leader_summary: leaderSummary
         })
       });
 
-      // Legacy incidents metadata
+      const openData = await res.json();
+      // Even if status === 'exists', we proceed to UPDATE legacy incidents and insert AI analysis if provided.
+      
+      // Legacy incidents metadata (using UPSERT logic on backend to update description safely)
       await fetch(`${apiBase}/incidents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: incidentId,
-          title: currentSms.message,
-          description: currentSms.message,
+          title: smsTitle,
+          description: diagnosisText || currentSms.message,
           severity: 'CRITICAL',
           incident_type: 'SMS',
           source_sms_id: currentSms.inc_id
@@ -174,30 +208,32 @@ export default function DashboardPage() {
         });
       }
 
-      // System messages
-      await fetch(`${apiBase}/warroom/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          incident_id: incidentId,
-          sender: '시스템',
-          role: 'System',
-          type: 'system',
-          text: `[장애발생] ${currentSms.sender}로부터 SMS 수신: ${currentSms.message}`
-        })
-      });
-      
-      await fetch(`${apiBase}/warroom/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          incident_id: incidentId,
-          sender: '시스템',
-          role: 'System',
-          type: 'system',
-          text: 'War-Room 채팅방이 생성되었습니다. 모든 대화 내용은 장애 해결 시 AI 학습에 사용됩니다.'
-        })
-      });
+      // ONLY insert system intro messages if the room was NEWLY created
+      if (openData.status !== 'exists') {
+        await fetch(`${apiBase}/warroom/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            incident_id: incidentId,
+            sender: '시스템',
+            role: 'System',
+            type: 'system',
+            text: `[장애발생] ${currentSms.sender}로부터 SMS 수신: ${currentSms.message}`
+          })
+        });
+        
+        await fetch(`${apiBase}/warroom/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            incident_id: incidentId,
+            sender: '시스템',
+            role: 'System',
+            type: 'system',
+            text: 'War-Room 채팅방이 생성되었습니다. 모든 대화 내용은 장애 해결 시 AI 학습에 사용됩니다.'
+          })
+        });
+      }
 
       await fetchWarRooms();
       setShowEmergencyModal(false);
@@ -286,11 +322,11 @@ export default function DashboardPage() {
         const data = await res.json();
         const mapped = (data.rooms || []).map(room => ({
           id: room.inc_id,
-          title: room.title,
-          lastMsg: room.last_message || '대화가 시작되지 않았습니다.',
-          time: room.last_message_time 
-            ? new Date(room.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-            : new Date(room.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          title: room.title || `ROOM ${room.inc_id}`,
+          lastMsg: room.status === 'Completed' ? '종료된 채널' : '대화가 시작되지 않았습니다.',
+          time: room.reg_dt 
+            ? new Date(room.reg_dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+            : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           participants: room.participants || Math.floor(Math.random() * 5) + 2,
           severity: room.severity || 'NORMAL',
           unread: false

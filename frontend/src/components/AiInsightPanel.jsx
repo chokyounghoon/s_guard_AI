@@ -72,11 +72,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
     const analyze = async () => {
       try {
-        if (abortRef.current) abortRef.current.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
-
-        // Check if insight already exists in DB
+        // ① Check DB cache FIRST (before aborting anything, no signal needed)
         try {
           const checkRes = await fetch(`${API_BASE_URL}/ai/insight/${selectedSms.inc_id}`);
           if (checkRes.ok) {
@@ -86,6 +82,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               const critical = data.severity === 'CRITICAL';
               setIsCritical(critical);
               setAnalysisComplete(true);
+              setIsAnalyzingSms(false); // DB 캐시 로드 시 LIVE 애니메이션 비활성화
               if (onLogReceived) {
                 onLogReceived({
                   title: `SMS 장애 분석: ${selectedSms.sender}`,
@@ -101,6 +98,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         } catch (e) {
           console.error("Check insight err:", e);
         }
+
+        // ② No cached data → abort previous Dify stream and start a new one
+        if (abortRef.current) abortRef.current.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
 
         const res = await fetch(`${API_BASE_URL}/ai/analyze-sms`, {
           method: 'POST',
@@ -277,6 +279,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   // 기본 폴링 루프 (SMS 미선택 시)
   useEffect(() => {
     if (isAnalyzingSms) return;
+    if (selectedSms) return; // SMS 선택 중엔 폴링 안함 (DB 캐시 로드 후 덮어쓰기 방지)
 
     let isCancelled = false;
     const startStreaming = async () => {
@@ -349,7 +352,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
     startStreaming();
     return () => { isCancelled = true; };
-  }, [isAnalyzingSms]);
+  }, [isAnalyzingSms, selectedSms]);
 
   const [showReportModal, setShowReportModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -420,9 +423,28 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               </span>
             </div>
           )}
-          <div className="bg-[#0f111a] px-3 py-1.5 rounded-lg border border-white/5 flex items-center space-x-2">
-            <Activity className="w-3 h-3 text-emerald-500" />
-            <span className="text-xs text-slate-300 font-mono">LIVE</span>
+          <div
+            className={`px-3 py-1.5 rounded-lg flex items-center space-x-2 border transition-all duration-500 ${
+              isAnalyzingSms
+                ? 'bg-red-500/20 border-red-400/50 shadow-[0_0_14px_rgba(239,68,68,0.45)]'
+                : 'bg-[#0f111a] border-white/5'
+            }`}
+          >
+            <span
+              className={`relative flex items-center justify-center w-2 h-2 ${isAnalyzingSms ? '' : 'opacity-40'}`}
+            >
+              {isAnalyzingSms && (
+                <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
+              )}
+              <Activity className={`relative w-3 h-3 ${isAnalyzingSms ? 'text-red-400 animate-pulse' : 'text-emerald-500'}`} />
+            </span>
+            <span
+              className={`text-xs font-mono font-black tracking-widest ${
+                isAnalyzingSms ? 'text-red-300 animate-pulse' : 'text-slate-500'
+              }`}
+            >
+              LIVE
+            </span>
           </div>
         </div>
       </div>

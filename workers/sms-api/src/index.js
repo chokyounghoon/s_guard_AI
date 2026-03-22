@@ -277,8 +277,35 @@ app.get('/activity-logs', async (c) => {
 
 app.get('/warroom/rooms', async (c) => {
   const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM warroom_chats GROUP BY incident_id ORDER BY timestamp DESC LIMIT 20").all()
-  return c.json({ rooms: results })
+  const q = c.req.query('q') || ''
+  const statusFilter = c.req.query('status') || ''
+
+  let sql = `
+    SELECT
+      w.inc_id                          AS code,
+      w.inc_id,
+      w.title,
+      w.severity,
+      w.status,
+      w.creator_id,
+      w.leader_summary,
+      w.reg_dt                          AS created_at,
+      (SELECT COUNT(*) FROM warroom_chats wc WHERE wc.inc_id = w.inc_id)       AS message_count,
+      (SELECT COUNT(*) FROM warroom_attachments wa WHERE wa.inc_id = w.inc_id) AS attachment_count,
+      (SELECT wc2.text FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)     AS last_message,
+      (SELECT wc2.sender FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
+      (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
+    FROM warroom_list w
+    WHERE 1=1
+  `
+  const params = []
+  if (q) { sql += ` AND (w.title LIKE ? OR w.inc_id LIKE ?)`; params.push(`%${q}%`, `%${q}%`) }
+  if (statusFilter) { sql += ` AND UPPER(w.status) = UPPER(?)`; params.push(statusFilter) }
+  sql += ` ORDER BY w.reg_dt DESC LIMIT 50`
+
+  const stmt = db.prepare(sql)
+  const { results } = await stmt.bind(...params).all()
+  return c.json({ rooms: results || [] })
 })
 
 // ==========================================
@@ -329,11 +356,11 @@ app.post('/ai/insight/save', async (c) => {
 
 app.post('/ai/chat', async (c) => {
   const { query } = await c.req.json()
-  const api_key = c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!api_key) {
-    return c.json({ response: "DIFY_API_KEY가 설정되지 않았습니다." })
+    return c.json({ response: "DIFY_API_KEY_AGENT가 설정되지 않았습니다." })
   }
 
   const payload = {
@@ -359,10 +386,10 @@ app.post('/ai/chat', async (c) => {
 
 app.post('/ai/analyze-sms', async (c) => {
   const { sender, message, sms_id } = await c.req.json()
-  const api_key = c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
-  if (!api_key) return c.json({ error: "DIFY_API_KEY가 설정되지 않았습니다." }, 500)
+  if (!api_key) return c.json({ error: "DIFY_API_KEY_AGENT가 설정되지 않았습니다." }, 500)
 
   const prompt = `다음 SMS 장애 메시지를 지능형 관제 시스템의 입장에서 분석하고, [Security], [DB], [DevOps], [Leader] 관점의 대응 방안을 포함한 종합 리포트를 작성해줘:\n\n발신자: ${sender}\n메시지: ${message}`
 
@@ -437,11 +464,189 @@ app.post('/ai/analyze-sms', async (c) => {
   })
 })
 
+// Comprehensive AI Report Generation (SSE) - uses all incident data as Dify context
+// ==========================================
+// DB-Only Report Generation (No Dify)
+// ==========================================
+app.post('/ai/generate-report', async (c) => {
+  const { incident_id } = await c.req.json()
+  const db = c.env.DB
+
+  if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
+
+  // ────────────────────────────────────────────────────
+  // 1. 모든 테이블 JOIN 조회
+  // ────────────────────────────────────────────────────
+  const [wr, sms, insight] = await Promise.all([
+    db.prepare("SELECT * FROM warroom_list WHERE inc_id = ?").bind(incident_id).first(),
+    db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(incident_id).first(),
+    db.prepare("SELECT content, severity, category FROM autopilot_insight WHERE inc_id = ?").bind(incident_id).first(),
+  ])
+
+  const [{ results: agentLogs }, { results: chatLogs }, { results: attachments }] = await Promise.all([
+    db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(incident_id).all(),
+    db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(incident_id).all(),
+    db.prepare("SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC").bind(incident_id).all(),
+  ])
+
+  // ────────────────────────────────────────────────────
+  // 2. 데이터 추출
+  // ────────────────────────────────────────────────────
+  const title     = wr?.title || incident_id
+  const severity  = wr?.severity || 'NORMAL'
+  const status    = wr?.status || '-'
+  const creator   = wr?.creator_id || '-'
+  const createdAt = wr?.reg_dt || '-'
+  const smsMsg    = sms ? `발신자: ${sms.sender}\n메시지: ${sms.message}` : '(SMS 정보 없음)'
+  const insightTxt = insight?.content || ''
+
+  const userChats = (chatLogs || []).filter(m => m.type !== 'system')
+  const systemChats = (chatLogs || []).filter(m => m.type === 'system')
+  const firstEvent = systemChats[0]?.timestamp || chatLogs[0]?.timestamp || createdAt
+  const lastEvent  = chatLogs[chatLogs.length - 1]?.timestamp || createdAt
+  const durationMin = firstEvent && lastEvent
+    ? Math.max(0, Math.round((new Date(lastEvent) - new Date(firstEvent)) / 60000))
+    : 0
+
+  // 에이전트별 분석
+  const agentMap = {}
+  for (const log of (agentLogs || [])) {
+    if (!agentMap[log.agent_role]) agentMap[log.agent_role] = []
+    agentMap[log.agent_role].push(log.content)
+  }
+  const agentSection = Object.entries(agentMap).map(([role, contents]) =>
+    `### 🤖 ${role} Agent\n${contents.join('\n').slice(0, 600)}`
+  ).join('\n\n')
+
+  // 채팅 타임라인
+  const chatTimeline = userChats.slice(0, 30).map(m =>
+    `- \`[${(m.timestamp || '').slice(11, 16)}]\` **${m.sender}**: ${m.text?.slice(0, 120) || ''}`
+  ).join('\n')
+
+  // 첨부파일
+  const attachSection = (attachments || []).length > 0
+    ? (attachments || []).map(a => `- 📎 ${a.original_name} (${a.file_type || '-'}) — ${a.uploaded_by || '-'}`).join('\n')
+    : '(첨부파일 없음)'
+
+  // Insight 요약 (처음 500자)
+  const insightSummary = insightTxt
+    ? insightTxt.slice(0, 500) + (insightTxt.length > 500 ? '...' : '')
+    : '(S-Autopilot 분석 없음)'
+
+  // 리더 요약
+  const leaderTxt = (agentMap['Leader'] || []).join('\n').slice(0, 400)
+
+  // ────────────────────────────────────────────────────
+  // 3. 마크다운 보고서 생성
+  // ────────────────────────────────────────────────────
+  const severityEmoji = { CRITICAL: '🔴', HIGH: '🟠', NORMAL: '🟡', INFO: '🟢' }[severity] || '⚪'
+  const report = `# 🚨 S-GUARD 장애 조치 결과 보고서
+
+> **장애 ID:** ${incident_id}  
+> **생성 일시:** ${getKst()}  
+> **상태:** ${status}
+
+---
+
+## 1. 장애 개요 (Incident Overview)
+
+| 항목 | 내용 |
+|------|------|
+| **심각도** | ${severityEmoji} ${severity} |
+| **발생 일시** | ${createdAt} |
+| **담당자** | ${creator} |
+| **대상 시스템** | ${title.split('|').slice(-1)[0]?.trim() || title} |
+| **총 대응 시간** | 약 ${durationMin}분 |
+| **채팅 메시지** | ${userChats.length}건 |
+| **첨부파일** | ${(attachments || []).length}건 |
+
+### 📱 최초 수신 SMS
+\`\`\`
+${smsMsg}
+\`\`\`
+
+---
+
+## 2. S-Autopilot AI 분석 요약
+
+${insightSummary}
+
+---
+
+## 3. AI 에이전트별 심층 분석
+
+${agentSection || '(에이전트 분석 없음)'}
+
+---
+
+## 4. War-Room 대응 타임라인
+
+${chatTimeline || '(대화 기록 없음)'}
+
+---
+
+## 5. 종합 조치 결과 (Leader Agent 요약)
+
+${leaderTxt || '(요약 없음)'}
+
+---
+
+## 6. 첨부 자료
+
+${attachSection}
+
+---
+
+## 7. 재발 방지 권고사항
+
+${insightTxt ? `S-Autopilot 분석 기반 재발 방지 포인트:
+
+${insightTxt.includes('재발') 
+  ? insightTxt.split('\n').filter(l => l.includes('재발') || l.includes('방지') || l.includes('모니터') || l.includes('개선')).slice(0, 5).join('\n') || '- 상세 내용은 에이전트 로그를 참조하세요.'
+  : '- 장애 원인 분석을 기반으로 재발 방지 대책을 수립하세요.\n- 주기적인 모니터링 강화 및 알림 임계값 검토를 권장합니다.'}` 
+: '- 장애 데이터 부족으로 자동 권고 생략. 담당자 메모를 참조하세요.'}
+
+---
+
+*본 보고서는 S-GUARD 시스템이 sguard_db의 데이터를 자동 집계하여 생성하였습니다.*
+`
+
+  // ────────────────────────────────────────────────────
+  // 4. SSE 스트리밍 (타자 효과)
+  // ────────────────────────────────────────────────────
+  const { readable, writable } = new TransformStream()
+  const writer = writable.getWriter()
+  const encode = (s) => new TextEncoder().encode(s)
+
+  ;(async () => {
+    try {
+      const chunkSize = 40
+      for (let i = 0; i < report.length; i += chunkSize) {
+        await writer.write(encode(`data: ${JSON.stringify({ answer: report.slice(i, i + chunkSize) })}\n\n`))
+      }
+      await writer.write(encode('data: [DONE]\n\n'))
+    } catch (e) {
+      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
+    } finally {
+      await writer.close()
+    }
+  })()
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
+    }
+  })
+})
+
+
 // AI Agent Discussion (SSE) - called when user clicks an SMS
 app.get('/ai/agent-discussion/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
-  const api_key = c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
@@ -568,14 +773,26 @@ app.get('/ai/warroom/list', async (c) => {
 })
 
 app.post('/ai/warroom/open', async (c) => {
-  const { inc_id, title, creator_id, severity } = await c.req.json()
+  const { inc_id, title, creator_id, severity, leader_summary } = await c.req.json()
   const db = c.env.DB
+  
+  // Prevent duplicate creation
+  const existing = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ?").bind(inc_id).first()
+  if (existing) {
+    // Update leader_summary if a new value was provided
+    if (leader_summary) {
+      await db.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
+        .bind(leader_summary, getKst(), inc_id).run()
+    }
+    return c.json({ status: 'exists', inc_id })
+  }
+
   const now = getKst()
   
   await db.prepare(`
-    INSERT INTO warroom_list (inc_id, title, creator_id, severity, reg_dt)
-    VALUES (?, ?, ?, ?, ?)
-  `).bind(inc_id, title, creator_id, severity, now)
+    INSERT INTO warroom_list (inc_id, title, creator_id, severity, leader_summary, reg_dt)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(inc_id, title, creator_id, severity, leader_summary || '', now)
   .run()
   
   return c.json({ status: 'opened', inc_id })
@@ -588,6 +805,85 @@ app.post('/ai/report/save', async (c) => {
     .bind(title, content, getKst())
     .run()
   return c.json({ status: 'saved' })
+})
+
+// ==========================================
+// Aggregated Report Data for a given inc_id
+// ==========================================
+app.get('/warroom/report/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+
+  // 1. War-Room base info
+  const wr = await db.prepare("SELECT * FROM warroom_list WHERE inc_id = ?").bind(id).first()
+  if (!wr) return c.json({ error: 'War-Room not found' }, 404)
+
+  // 2. S-Autopilot Insight (full AI analysis)
+  const insight = await db.prepare("SELECT content, severity, category FROM autopilot_insight WHERE inc_id = ?").bind(id).first()
+
+  // 3. AI Agent Discussion log (aichat_history)
+  const { results: agentLogs } = await db.prepare(
+    "SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC"
+  ).bind(id).all()
+
+  // 4. War-Room chat history
+  const { results: chatLogs } = await db.prepare(
+    "SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC"
+  ).bind(id).all()
+
+  // 5. Attachments
+  const { results: attachments } = await db.prepare(
+    "SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC"
+  ).bind(id).all()
+
+  // 6. Find leader summary (from warroom_list first, fallback to aichat_history)
+  const leaderRow = (agentLogs || []).find(r => r.agent_role === 'Leader')
+  const leaderSummary = (wr.leader_summary && wr.leader_summary.trim()) 
+    ? wr.leader_summary 
+    : (leaderRow ? leaderRow.content : '')
+
+  // 7. Derive 6W1H fields from available data
+  const insightText = insight ? insight.content : ''
+  const agentText = (agentLogs || []).map(r => `[${r.agent_role}]\n${r.content}`).join('\n\n')
+  const combinedAnalysis = (leaderSummary || insightText || agentText || '').slice(0, 4000)
+
+  // Extract metadata
+  const firstChat = (chatLogs || [])[0]
+  const lastChat = (chatLogs || []).slice(-1)[0]
+
+  return c.json({
+    inc_id: id,
+    title: wr.title || id,
+    severity: wr.severity || 'NORMAL',
+    status: wr.status || 'OPEN',
+    creator_id: wr.creator_id || '',
+    created_at: wr.reg_dt || '',
+
+    // Summary fields
+    leader_summary: leaderSummary,
+    autopilot_insight: insightText,
+    ai_analysis: combinedAnalysis,
+
+    // 6W1H - derived from available data
+    who: wr.creator_id || '-',
+    when: wr.reg_dt || '-',
+    where: (wr.title || '').split('|').slice(-1)[0]?.trim() || '-',
+    what: wr.title || '-',
+    why: insightText ? insightText.slice(0, 300) : '-',
+    how: leaderSummary ? leaderSummary.slice(0, 500) : '-',
+
+    // Related records
+    agent_logs: agentLogs || [],
+    chat_logs: chatLogs || [],
+    attachments: attachments || [],
+    
+    // Stats
+    message_count: (chatLogs || []).length,
+    attachment_count: (attachments || []).length,
+    duration_min: firstChat && lastChat
+      ? Math.round((new Date(lastChat.timestamp) - new Date(firstChat.timestamp)) / 60000) 
+      : 0,
+  })
 })
 
 // Knowledge Base CRUD
@@ -659,16 +955,154 @@ app.post('/incidents', async (c) => {
   return c.json({ status: 'created', code })
 })
 
+// Warroom chat list
+app.get('/warroom/chat/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+
+  // Always pull title and leader_summary from warroom_list (authoritative source)
+  const wr = await db.prepare("SELECT title, status, leader_summary FROM warroom_list WHERE inc_id = ?").bind(id).first()
+  let title = (wr && wr.title) ? wr.title : id
+  let status = (wr && wr.status) ? wr.status : 'OPEN'
+  const leader_summary_db = (wr && wr.leader_summary) ? wr.leader_summary : ''
+  let description = leader_summary_db
+
+  // Supplement description from incidents if warroom_list has none
+  const inc = await db.prepare("SELECT description, status FROM incidents WHERE code = ?").bind(id).first()
+  if (inc) {
+    if (!description && inc.description) description = inc.description
+    if (inc.status && inc.status !== 'OPEN') status = inc.status
+  }
+
+  // Get messages
+  const { results: aiResults } = await db.prepare("SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all()
+  const { results: wrResults } = await db.prepare("SELECT * FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(id).all()
+
+  // Format AI messages
+  const aiMessages = (aiResults || []).map(r => ({
+    inc_id: r.id,
+    type: 'ai_analysis',
+    sender: r.agent_role + ' Agent',
+    role: r.agent_role,
+    text: r.content,
+    timestamp: r.reg_dt
+  }));
+
+  // Format Warroom chats
+  const chatMessages = (wrResults || []).map(r => ({
+    inc_id: r.seq ? `${r.inc_id}_${r.seq}` : r.timestamp,
+    type: r.type || 'user',
+    sender: r.sender,
+    role: r.role,
+    text: r.text,
+    timestamp: r.timestamp
+  }));
+
+  // Extract Leader Agent summary: prefer warroom_list.leader_summary, fallback to aichat_history Leader row
+  const wrForSummary = await db.prepare("SELECT leader_summary FROM warroom_list WHERE inc_id = ?").bind(id).first()
+  const leaderRow = (aiResults || []).find(r => r.agent_role === 'Leader')
+  const leader_summary = (wrForSummary && wrForSummary.leader_summary) || (leaderRow ? leaderRow.content : '')
+
+  // Combine and sort
+  const allMessages = [...aiMessages, ...chatMessages].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+  return c.json({ title, description, status, leader_summary, messages: allMessages })
+})
+
 // Warroom chat post
 app.post('/warroom/chat', async (c) => {
   const { incident_id, sender, role, type, text } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
   const senderId = sender || 'anonymous'
+  
+  const lastRow = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(incident_id).first()
+  const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1
+
   await db.prepare(
-    "INSERT INTO warroom_chats (incident_id, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(incident_id, senderId, role || senderId, type || 'user', text, now, senderId, now, senderId, now).run()
+    "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(incident_id, seq, senderId, role || senderId, type || 'user', text, now, senderId, now, senderId, now).run()
+  
   return c.json({ status: 'saved' })
+})
+
+// ==========================================
+// File Upload → warroom_attachments
+// ==========================================
+app.post('/warroom/upload', async (c) => {
+  const db = c.env.DB
+  const kv = c.env.SMS_STORAGE
+  const now = getKst()
+
+  let formData
+  try {
+    formData = await c.req.formData()
+  } catch (e) {
+    return c.json({ error: 'Invalid form data' }, 400)
+  }
+
+  const file = formData.get('file')
+  const incident_id = formData.get('incident_id')
+  const uploaded_by = formData.get('uploaded_by') || 'Unknown'
+
+  if (!file || !incident_id) {
+    return c.json({ error: 'file and incident_id are required' }, 400)
+  }
+
+  // Calculate next seq for this inc_id
+  const lastRow = await db.prepare(
+    "SELECT MAX(seq) as max_seq FROM warroom_attachments WHERE inc_id = ?"
+  ).bind(incident_id).first()
+  const seq = (lastRow && lastRow.max_seq != null) ? lastRow.max_seq + 1 : 1
+
+  // Store file binary in KV with a unique key
+  const fileName = file.name || `file_${Date.now()}`
+  const fileKey = `attachment:${incident_id}:${seq}:${fileName}`
+  const fileBuffer = await file.arrayBuffer()
+  await kv.put(fileKey, fileBuffer, { metadata: { contentType: file.type || 'application/octet-stream' } })
+
+  // Construct a public URL (via GET /warroom/file/:key endpoint)
+  const fileUrl = `/warroom/file/${encodeURIComponent(fileKey)}`
+
+  // Save metadata to warroom_attachments
+  await db.prepare(`
+    INSERT INTO warroom_attachments (inc_id, seq, filename, original_name, file_type, url, uploaded_by, timestamp, reg_id, reg_dt, mod_id, mod_dt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    incident_id, seq,
+    fileKey, fileName,
+    file.type || 'application/octet-stream',
+    fileUrl, uploaded_by,
+    now, uploaded_by, now, uploaded_by, now
+  ).run()
+
+  return c.json({ status: 'uploaded', seq, url: fileUrl, filename: fileName })
+})
+
+// Serve attachment file from KV
+app.get('/warroom/file/:key', async (c) => {
+  const kv = c.env.SMS_STORAGE
+  const key = decodeURIComponent(c.req.param('key'))
+  const { value, metadata } = await kv.getWithMetadata(key, 'arrayBuffer')
+  if (!value) return c.json({ error: 'File not found' }, 404)
+  const contentType = (metadata && metadata.contentType) ? metadata.contentType : 'application/octet-stream'
+  return new Response(value, {
+    headers: {
+      'Content-Type': contentType,
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, max-age=86400'
+    }
+  })
+})
+
+// List attachments for a War-Room
+app.get('/warroom/attachments/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const { results } = await db.prepare(
+    "SELECT seq, original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC"
+  ).bind(id).all()
+  return c.json({ attachments: results || [] })
 })
 
 export default app
