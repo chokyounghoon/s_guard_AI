@@ -79,8 +79,8 @@ export default function AiReportPage() {
     setIsGenerating(true);
     setActiveTab('ai_report');
     try {
-      // Allow frontend to optionally strip INC- before sending
-      const reqId = incidentId.startsWith('INC-') ? incidentId.slice(4) : incidentId;
+      const safeId = String(incidentId);
+      const reqId = safeId.startsWith('INC-') ? safeId.slice(4) : safeId;
       const res = await fetch(`${API_BASE_URL}/ai/generate-report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,7 +96,6 @@ export default function AiReportPage() {
         if (done) break;
         buf += decoder.decode(value, { stream: true });
         
-        // Extract all complete 'data: ...\n\n' blocks
         let newlineIdx;
         while ((newlineIdx = buf.indexOf('\n\n')) >= 0) {
           const block = buf.slice(0, newlineIdx).trim();
@@ -118,14 +117,15 @@ export default function AiReportPage() {
                 }
               } catch (e) {
                 setAiGenText(prev => prev + `\n\n[PARSE ERROR ON CHUNK]: ${d}\n[ERROR]: ${e.message}\n\n`);
-                console.error("Parse error on chunk:", d, e);
               }
             }
           }
         }
       }
     } catch (e) {
-      if (e.name !== 'AbortError') setAiGenText(prev => prev + '\n\n⚠️ 생성 중 오류가 발생했습니다.');
+      if (e.name !== 'AbortError') {
+        setAiGenText(prev => prev + `\n\n⚠️ 생성 중 오류가 발생했습니다. (${e.message})`);
+      }
     } finally {
       setIsGenerating(false);
     }
