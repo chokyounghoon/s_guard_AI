@@ -115,6 +115,7 @@ export default function AiReportPage() {
                   setAiGenText(prev => prev + obj.answer);
                 }
               } catch (e) {
+                setAiGenText(prev => prev + `\n\n[PARSE ERROR ON CHUNK]: ${d}\n[ERROR]: ${e.message}\n\n`);
                 console.error("Parse error on chunk:", d, e);
               }
             }
