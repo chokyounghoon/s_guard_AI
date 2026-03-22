@@ -70,50 +70,21 @@ export default function AiReportPage() {
   // Dify AI report generation
   const [aiGenText, setAiGenText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const genAbortRef = useRef(null);
-  const genQueueRef = useRef('');
-  const genTimerRef = useRef(null);
-
-  const stopGenTypewriter = () => {
-    if (genTimerRef.current) { clearInterval(genTimerRef.current); genTimerRef.current = null; }
-    genQueueRef.current = '';
-  };
-
-  const enqueueGen = (text) => {
-    if (!text) return;
-    genQueueRef.current += text;
-    if (genTimerRef.current) return;
-    genTimerRef.current = setInterval(() => {
-      if (!genQueueRef.current.length) { clearInterval(genTimerRef.current); genTimerRef.current = null; return; }
-      // 8글자씩 단위로 표시 (빠른 타자 효과)
-      const chunk = genQueueRef.current.slice(0, 8);
-      genQueueRef.current = genQueueRef.current.slice(8);
-      setAiGenText(prev => prev + chunk);
-    }, 8);
-  };
-
-  const flushQueue = () => {
-    if (genQueueRef.current) {
-      setAiGenText(prev => prev + genQueueRef.current);
-      genQueueRef.current = '';
-    }
-    stopGenTypewriter();
-  };
-
   const generateAiReport = async () => {
     if (!incidentId) return;
     if (genAbortRef.current) genAbortRef.current.abort();
     const controller = new AbortController();
     genAbortRef.current = controller;
-    stopGenTypewriter();
     setAiGenText('');
     setIsGenerating(true);
     setActiveTab('ai_report');
     try {
+      // Allow frontend to optionally strip INC- before sending
+      const reqId = incidentId.startsWith('INC-') ? incidentId.slice(4) : incidentId;
       const res = await fetch(`${API_BASE_URL}/ai/generate-report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ incident_id: incidentId }),
+        body: JSON.stringify({ incident_id: reqId }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -130,11 +101,16 @@ export default function AiReportPage() {
           for (const line of evt.split('\n')) {
             if (!line.startsWith('data:')) continue;
             const d = line.slice(5).trim();
-            if (d === '[DONE]') { flushQueue(); setIsGenerating(false); return; }
-            try { const obj = JSON.parse(d); if (obj.answer) enqueueGen(obj.answer); } catch {}
+            if (d === '[DONE]') { setIsGenerating(false); return; }
+            try { 
+              const obj = JSON.parse(d); 
+              if (obj.answer) {
+                // 직접 즉시 추가 (타자 효과 큐 제거하여 버그 방지)
+                setAiGenText(prev => prev + obj.answer);
+              }
+            } catch {}
           }
         }
-        // stream ended naturally (reader.done) - flush any remaining
       }
     } catch (e) {
       if (e.name !== 'AbortError') setAiGenText(prev => prev + '\n\n⚠️ 생성 중 오류가 발생했습니다.');
@@ -143,7 +119,7 @@ export default function AiReportPage() {
     }
   };
 
-  useEffect(() => () => { stopGenTypewriter(); if (genAbortRef.current) genAbortRef.current.abort(); }, []);
+  useEffect(() => () => { if (genAbortRef.current) genAbortRef.current.abort(); }, []);
 
   const reportingLines = [
     { id: 'leader',   role: '팀장',  name: '직속 팀장', desc: '직속 상급자' },
