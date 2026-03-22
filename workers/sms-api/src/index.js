@@ -1,346 +1,674 @@
-// SMS 수신 및 관리 API - Cloudflare Workers
-// BACKEND_URL env가 설정된 경우 로컬 백엔드로 프록시. 없으면 KV 기반 Mock 분석 사용.
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 
-export default {
-  async fetch(request, env) {
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
+const app = new Hono()
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
+app.use('*', cors())
 
-    const url = new URL(request.url);
-    const path = url.pathname;
+// Utility for KST Timestamp
+const getKst = () => {
+  const now = new Date()
+  const kstOffset = 9 * 60 * 60 * 1000
+  return new Date(now.getTime() + kstOffset).toISOString().replace('T', ' ').substring(0, 19)
+}
 
+// Utility for Password Hashing (Compatible with Python's salt:sha256_hash)
+const hashPassword = async (password) => {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(saltHex + password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return `${saltHex}:${hashHex}`;
+}
+
+const verifyPassword = async (password, storedHash) => {
+  if (!storedHash || !storedHash.includes(':')) return false;
+  try {
+    const [saltHex, originalHash] = storedHash.split(':');
+    const encoder = new TextEncoder();
+    const data = encoder.encode(saltHex + password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex === originalHash;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ==========================================
+// 1. Auth & Users
+// ==========================================
+app.post('/auth/login', async (c) => {
+  const { email, password } = await c.req.json()
+  const db = c.env.DB
+  
+  // Find user by email or employee_id
+  const user = await db.prepare("SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND is_active = 1")
+    .bind(email, email)
+    .first()
+
+  if (!user || !user.password_hash || !(await verifyPassword(password, user.password_hash))) {
+    return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다." }, 401)
+  }
+
+  // Token is just email for mock auth as per earlier JWT replacements
+  const token = `sguard-token-${user.id}`
+  const now = getKst()
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || 'unknown'
+  const ua = c.req.header('user-agent') || 'unknown'
+
+  await db.prepare("UPDATE users SET token = ?, mod_dt = ?, mod_id = ? WHERE id = ?")
+    .bind(token, now, 'SYSTEM', user.id)
+    .run()
+
+  await db.prepare(`
+    INSERT INTO login_history (
+      user_id, email, ip_address, user_agent, status, login_time, reg_id, reg_dt, mod_id, mod_dt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(user.id, user.email, ip, ua, 'SUCCESS', now, 'SYSTEM', now, 'SYSTEM', now)
+    .run()
+
+  return c.json({
+    id: user.id, email: user.email, name: user.name, role: user.role,
+    company: user.company, honbu: user.honbu, team: user.team,
+    token: token
+  })
+})
+
+app.post('/auth/signup', async (c) => {
+  const { email, password, name, company, honbu, team } = await c.req.json()
+  const db = c.env.DB
+
+  const existing = await db.prepare("SELECT id FROM users WHERE email = ?").bind(email).first()
+  if (existing) {
+    return c.json({ detail: "이미 등록된 이메일입니다." }, 400)
+  }
+
+  const hashedPassword = await hashPassword(password)
+  const regDt = getKst()
+  const employeeId = `EMP-${Math.floor(100000 + Math.random() * 900000)}`
+  
+  const res = await db.prepare(
+    `INSERT INTO users (
+      email, password_hash, name, company, honbu, team, 
+      employee_id, role, is_active, reg_id, reg_dt, mod_id, mod_dt, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    email, hashedPassword, name, company, honbu, team, 
+    employeeId, 'user', 1, 'SYSTEM', regDt, 'SYSTEM', regDt, regDt
+  ).run()
+
+  return c.json({ status: "success", id: res.meta.last_row_id, employee_id: employeeId })
+})
+
+app.post('/auth/request-reset-code', async (c) => {
+  const { email, employee_id } = await c.req.json()
+  const db = c.env.DB
+  
+  const user = await db.prepare("SELECT * FROM users WHERE email = ? AND employee_id = ?").bind(email, employee_id).first()
+  if (!user) {
+    return c.json({ detail: "가입 정보가 없거나 사번이 일치하지 않습니다." }, 404)
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString()
+  await db.prepare("INSERT INTO reset_verifications (email, code, created_at, is_verified) VALUES (?, ?, ?, 0)")
+    .bind(user.email, code, getKst())
+    .run()
+
+  // TODO: Send email
+  return c.json({ status: "success", message: `인증코드가 발송되었습니다. (DEMO: ${code})` })
+})
+
+app.post('/auth/verify-reset-code', async (c) => {
+  const { email, employee_id, code } = await c.req.json()
+  const db = c.env.DB
+
+  const record = await db.prepare("SELECT * FROM reset_verifications WHERE email = ? AND code = ? AND is_verified = 0 ORDER BY inc_id DESC LIMIT 1")
+    .bind(email, code)
+    .first()
+
+  if (!record) {
+    return c.json({ detail: "인증 코드가 올바르지 않거나 만료되었습니다." }, 400)
+  }
+  
+  await db.prepare("UPDATE reset_verifications SET is_verified = 1 WHERE inc_id = ?").bind(record.inc_id).run()
+
+  const temp_password = "T" + Math.floor(100000 + Math.random() * 900000).toString() + "!"
+  const hashedTempPassword = await hashPassword(temp_password)
+  const modDt = getKst()
+  
+  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE email = ?")
+    .bind(hashedTempPassword, modDt, 'SYSTEM', email)
+    .run()
+
+  const user = await db.prepare("SELECT name, email FROM users WHERE email = ?").bind(email).first()
+  return c.json({ temp_password, name: user.name, email: user.email })
+})
+
+app.get('/users', async (c) => {
+  const db = c.env.DB
+  const users = await db.prepare("SELECT id, email, name, role, company, honbu, team, is_active FROM users").all()
+  return c.json(users.results)
+})
+
+app.get('/users/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const user = await db.prepare("SELECT id, email, name, role, company, honbu, team, part, subpart, phone, is_active FROM users WHERE id = ?").bind(id).first()
+  if (!user) return c.json({ detail: "User not found" }, 404)
+  return c.json(user)
+})
+
+app.patch('/auth/profile', async (c) => {
+  const db = c.env.DB
+  const { user_id, name, phone, company, honbu, team, part, subpart } = await c.req.json()
+  const modDt = getKst()
+  await db.prepare(
+    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, mod_dt = ?, mod_id = ? WHERE id = ?"
+  ).bind(name, phone || null, company || null, honbu || null, team || null, part || null, subpart || null, modDt, 'USER', user_id).run()
+  const updated = await db.prepare("SELECT id, email, name, role, company, honbu, team, part, subpart, phone FROM users WHERE id = ?").bind(user_id).first()
+  return c.json({ status: "success", user: updated })
+})
+
+app.post('/auth/change-password', async (c) => {
+  const db = c.env.DB
+  const { user_id, old_password, new_password } = await c.req.json()
+  const user = await db.prepare("SELECT * FROM users WHERE id = ?").bind(user_id).first()
+  
+  if (!user || !(await verifyPassword(old_password, user.password_hash))) {
+    return c.json({ detail: "현재 비밀번호가 올바르지 않습니다." }, 401)
+  }
+  
+  const hashedNewPassword = await hashPassword(new_password)
+  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ? WHERE id = ?")
+    .bind(hashedNewPassword, getKst(), user_id)
+    .run()
+  return c.json({ status: "success" })
+})
+
+// ==========================================
+// 2. Organization Tree
+// ==========================================
+function buildTree(nodes, parentId = null) {
+  return nodes
+    .filter(n => n.parent_id === parentId)
+    .map(n => ({
+      ...n,
+      children: buildTree(nodes, n.id)
+    }))
+}
+
+app.get('/org/tree', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM organizations ORDER BY sort_order ASC").all()
+  return c.json(buildTree(results))
+})
+
+// ==========================================
+// 3. SMS Interactions
+// ==========================================
+app.post('/sms/receive', async (c) => {
+  const { sender, message } = await c.req.json()
+  const db = c.env.DB
+  const now = new Date()
+  const kstOffset = 9 * 60 * 60 * 1000
+  const kstNow = new Date(now.getTime() + kstOffset)
+  const timestamp = kstNow.toISOString().replace('T', ' ').substring(0, 19)
+  
+  // Create a timestamp-based ID (YYYYMMDDHHMMSSmmm) - same as local PG logic
+  const inc_id = parseInt(kstNow.toISOString().replace(/[-:T.Z]/g, '').substring(0, 17))
+
+  // Keyword mock
+  const keywords = ['장애', 'CRITICAL', '오류', 'DOWN', '비정상', 'error', 'timeout', 'db', 'cpu']
+  const detected = keywords.some(k => message.toLowerCase().includes(k))
+  
+  let response_msg = null
+  if (detected) response_msg = "장애가 감지되었습니다. 담당자에게 전달됩니다."
+
+  await db.prepare(
+    "INSERT INTO received_messages (inc_id, sender, message, timestamp, keyword_detected, response_message, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(inc_id, sender, message, timestamp, detected ? 1 : 0, response_msg, 'SYSTEM', timestamp, 'SYSTEM', timestamp).run()
+
+  return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id })
+})
+
+app.get('/sms/recent', async (c) => {
+  const limit = c.req.query('limit') || 10
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM received_messages ORDER BY inc_id DESC LIMIT ?").bind(limit).all()
+  return c.json({ total: results.length, messages: results.map(r => ({ inc_id: r.inc_id, id: r.inc_id, sender: r.sender, message: r.message, timestamp: r.timestamp, keyword_detected: r.keyword_detected })) })
+})
+
+app.get('/sms/stats', async (c) => {
+  const db = c.env.DB
+  const total = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first('c')
+  const unread = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE read = 0").first('c')
+  return c.json({ total, unread })
+})
+
+// ==========================================
+// 4. Incident & Dashboard Summary
+// ==========================================
+app.get('/dashboard/summary', async (c) => {
+  const db = c.env.DB
+  const incidents = await db.prepare("SELECT * FROM incidents ORDER BY created_at DESC LIMIT 5").all()
+  
+  return c.json({
+    systemStatus: { overall: 'Warning', activeAlarms: incidents.results.length },
+    autopilotStats: { autoResolved: 15, learningRate: '98%', predictionAccuracy: '95%' }
+  })
+})
+
+app.get('/incidents', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM incidents ORDER BY created_at DESC").all()
+  return c.json(results)
+})
+
+app.get('/activity-logs', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 20").all()
+  return c.json({ logs: results })
+})
+
+app.get('/warroom/rooms', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM warroom_chats GROUP BY incident_id ORDER BY timestamp DESC LIMIT 20").all()
+  return c.json({ rooms: results })
+})
+
+// ==========================================
+// 5. AI Dify Integration
+// ==========================================
+app.get('/ai/insight', async (c) => {
+  const db = c.env.DB
+  const msg = await db.prepare("SELECT * FROM received_messages ORDER BY id DESC LIMIT 1").first()
+  
+  if (!msg) {
+    return c.json({ status: 'active', current_log: { id: 'SYS-000', text: '대기 중...', type: 'info' }, prediction_counts: { critical:0, server:0 }})
+  }
+
+  // Optionally check if we have an insight for this latest SMS
+  const insight = await db.prepare("SELECT * FROM autopilot_insight WHERE inc_id = ?").bind(msg.inc_id).first()
+  
+  let insight_text = insight ? insight.content : `🔍 [Insight] SMS 분석 완료: '${msg.message.substring(0,25)}...'`
+  
+  return c.json({
+    status: 'active',
+    current_log: { id: `KMS-${msg.inc_id}`, type: 'warning', category: 'server', severity: 'high', text: insight_text, detail: `시간: ${msg.timestamp}` },
+    prediction_counts: { critical: 1, server: 2, safety: 0, report: 5 }
+  })
+})
+
+app.get('/ai/insight/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const insight = await db.prepare("SELECT * FROM autopilot_insight WHERE inc_id = ?").bind(id).first()
+  if (!insight) return c.json({ error: "Insight not found" }, 404)
+  return c.json({ 
+    content: insight.content, 
+    severity: insight.severity, 
+    category: insight.category 
+  })
+})
+
+app.post('/ai/insight/save', async (c) => {
+  const { incident_id, content, severity, category, user_id } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  await db.prepare(`
+    INSERT OR REPLACE INTO autopilot_insight (inc_id, content, severity, category, reg_id, reg_dt, mod_id, mod_dt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(incident_id, content, severity, category, user_id || 'SYSTEM', now, user_id || 'SYSTEM', now).run()
+  return c.json({ status: 'saved' })
+})
+
+app.post('/ai/chat', async (c) => {
+  const { query } = await c.req.json()
+  const api_key = c.env.DIFY_API_KEY
+  const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
+
+  if (!api_key) {
+    return c.json({ response: "DIFY_API_KEY가 설정되지 않았습니다." })
+  }
+
+  const payload = {
+    inputs: {},
+    query: query,
+    response_mode: "blocking",
+    conversation_id: "",
+    user: "sguard-worker"
+  }
+
+  try {
+    const difyRes = await fetch(`${api_base}/chat-messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${api_key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    const data = await difyRes.json()
+    return c.json({ response: data.answer || "응답이 없습니다." })
+  } catch (e) {
+    return c.json({ response: `Dify API 오류: ${e.message}` })
+  }
+})
+
+app.post('/ai/analyze-sms', async (c) => {
+  const { sender, message, sms_id } = await c.req.json()
+  const api_key = c.env.DIFY_API_KEY
+  const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
+
+  if (!api_key) return c.json({ error: "DIFY_API_KEY가 설정되지 않았습니다." }, 500)
+
+  const prompt = `다음 SMS 장애 메시지를 지능형 관제 시스템의 입장에서 분석하고, [Security], [DB], [DevOps], [Leader] 관점의 대응 방안을 포함한 종합 리포트를 작성해줘:\n\n발신자: ${sender}\n메시지: ${message}`
+
+  const { readable, writable } = new TransformStream()
+  const writer = writable.getWriter()
+  const encode = (s) => new TextEncoder().encode(s)
+
+  ;(async () => {
     try {
-      // ── SMS 수신 ─────────────────────────────────────────────────────────────
-      if (path === '/sms/receive' && request.method === 'POST') {
-        const bodyText = await request.text();
-        const data = JSON.parse(bodyText);
-        const { sender, message, received_at } = data;
+      const difyRes = await fetch(`${api_base}/chat-messages`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${api_key}`, 
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({ 
+          inputs: {}, 
+          query: prompt, 
+          response_mode: 'streaming', 
+          user: 'sguard-worker' 
+        })
+      })
 
-        // 1. 로컬 백엔드 프록시 (BACKEND_URL 설정된 경우)
-        if (env.BACKEND_URL) {
+      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
+      
+      const reader = difyRes.body.getReader()
+      const decoder = new TextDecoder()
+      let lineBuffer = ""
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        lineBuffer += decoder.decode(value, { stream: true })
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop()
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim()
+          if (!trimmedLine.startsWith('data: ')) continue
+          
+          const dataStr = trimmedLine.substring(6)
+          if (dataStr === '[DONE]') continue
+          
           try {
-            const backendRes = await fetch(`${env.BACKEND_URL}/sms/receive`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: bodyText
-            });
-            if (backendRes.ok) {
-              const backendData = await backendRes.json();
-              // 백엔드 성공 시 해당 응답 반환 (incident_id 포함됨)
-              return new Response(JSON.stringify(backendData), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              });
+            const data = JSON.parse(dataStr)
+            if (data.event === 'message' || data.event === 'agent_message') {
+              // Send ONLY THE DELTA (data.answer)
+              await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
             }
           } catch (e) {
-            console.error('[Proxy] SMS Receive proxy failed, falling back to KV:', e);
+            continue
           }
         }
-
-        // 2. Mock/KV fallback (기존 로직)
-        const keywords = {
-          '장애': '장애 알림이 감지되었습니다.',
-          'CRITICAL': '긴급 장애가 감지되었습니다.',
-          '오류': '시스템 오류가 감지되었습니다.',
-          'DOWN': '서비스 다운이 감지되었습니다.',
-          '비정상': '비정상 상태가 감지되었습니다.',
-          'error': '에러가 감지되었습니다.',
-          'timeout': '타임아웃 장애가 감지되었습니다.',
-          'db': 'DB 관련 장애가 감지되었습니다.',
-          'cpu': 'CPU 과부하 장애가 감지되었습니다.',
-        };
-
-        let responseMessage = null;
-        for (const [keyword, response] of Object.entries(keywords)) {
-          if (message.toLowerCase().includes(keyword.toLowerCase())) {
-            responseMessage = response;
-            break;
-          }
-        }
-
-        const smsId = Date.now();
-        const smsData = {
-          id: smsId,
-          sender,
-          message,
-          timestamp: received_at || new Date().toISOString(),
-          keyword_detected: responseMessage !== null,
-          response_message: responseMessage,
-          read: false,
-        };
-
-        let messages = [];
-        try {
-          const stored = await env.SMS_STORAGE.get('recent_messages', 'json');
-          if (stored) messages = stored;
-        } catch (e) { console.error('KV 읽기 오류:', e); }
-
-        messages.unshift(smsData);
-        if (messages.length > 50) messages = messages.slice(0, 50);
-
-        try {
-          await env.SMS_STORAGE.put('recent_messages', JSON.stringify(messages));
-        } catch (e) { console.error('KV 쓰기 오류:', e); }
-
-        return new Response(
-          JSON.stringify({
-            status: responseMessage ? 'keyword_detected' : 'received',
-            sender,
-            detected_message: message,
-            response_sent: responseMessage !== null,
-            response_message: responseMessage,
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
-
-      // ── 최근 SMS 조회 ─────────────────────────────────────────────────────────
-      if (path === '/sms/recent' && request.method === 'GET') {
-        const limit = parseInt(url.searchParams.get('limit') || '10');
-        let messages = [];
-        try {
-          const stored = await env.SMS_STORAGE.get('recent_messages', 'json');
-          if (stored) messages = stored;
-        } catch (e) { console.error('KV 읽기 오류:', e); }
-
-        return new Response(
-          JSON.stringify({ total: messages.length, messages: messages.slice(0, limit) }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // ── SMS 삭제 ─────────────────────────────────────────────────────────────
-      if (path.startsWith('/sms/') && request.method === 'DELETE') {
-        const idStr = path.split('/')[2];
-        if (idStr) {
-          const id = parseInt(idStr);
-          let messages = [];
-          try {
-            const stored = await env.SMS_STORAGE.get('recent_messages', 'json');
-            if (stored) messages = stored;
-          } catch (e) { console.error('KV 읽기 오류:', e); }
-
-          const newMessages = messages.filter(m => m.id !== id);
-          if (messages.length !== newMessages.length) {
-            await env.SMS_STORAGE.put('recent_messages', JSON.stringify(newMessages));
-            return new Response(JSON.stringify({ status: 'success' }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-          }
-          return new Response(JSON.stringify({ status: 'error', message: 'Not found' }), {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-      }
-
-      // ── 키워드 목록 ───────────────────────────────────────────────────────────
-      if (path === '/sms/keywords' && request.method === 'GET') {
-        return new Response(
-          JSON.stringify({ keywords: ['장애', 'CRITICAL', '오류', 'DOWN', '비정상', 'error', 'timeout', 'db', 'cpu'] }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // ── S-Autopilot AI Insight ────────────────────────────────────────────────
-      if (path === '/ai/insight' && request.method === 'GET') {
-        // 1. 로컬 백엔드 프록시 (BACKEND_URL 설정된 경우)
-        if (env.BACKEND_URL) {
-          try {
-            const backendRes = await fetch(`${env.BACKEND_URL}/ai/insight`);
-            if (backendRes.ok) {
-              const data = await backendRes.json();
-              return new Response(JSON.stringify(data), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              });
-            }
-          } catch (e) {
-            console.error('[Proxy] Backend call failed, falling back to mock:', e);
-          }
-        }
-
-        // 2. Mock fallback (KV 기반 분석)
-        let recentMessageText = '';
-        let recentMessageTime = '';
-        let id_val = 'SYS-000';
-        let prediction_counts = { critical: 0, server: 0, security: 0, report: 0 };
-
-        try {
-          const stored = await env.SMS_STORAGE.get('recent_messages', 'json');
-          if (stored && stored.length > 0) {
-            recentMessageText = stored[0].message;
-            recentMessageTime = stored[0].timestamp;
-            id_val = `KMS-${stored[0].id}`;
-            for (let i = 0; i < stored.length; i++) {
-              const t = stored[i].message.toLowerCase();
-              if (t.includes('db') || t.includes('데이터베이스')) prediction_counts.critical++;
-              else if (t.includes('cpu') || t.includes('메모리')) prediction_counts.server++;
-              else prediction_counts.report++;
-            }
-          }
-        } catch (e) { console.error('KV 읽기 오류:', e); }
-
-        let currentLog;
-        if (recentMessageText) {
-          let severity = 'info', type_str = 'insight', category = 'report', insight_text = '';
-          const shortText = recentMessageText.substring(0, 25) + (recentMessageText.length > 25 ? '...' : '');
-          const lowerText = recentMessageText.toLowerCase();
-
-          if (lowerText.includes('cpu') || lowerText.includes('메모리')) {
-            severity = 'high'; type_str = 'warning'; category = 'server';
-            insight_text = `💡 [Insight] SMS('${shortText}') 분석: 배치 서버 CPU 과부하 패턴 감지. 강제종료 위험.`;
-          } else if (lowerText.includes('db') || lowerText.includes('database') || lowerText.includes('데이터베이스')) {
-            severity = 'critical'; type_str = 'error'; category = 'database';
-            insight_text = `🚨 [Critical] SMS('${shortText}') 분석: DB Connection Pool 고갈 진단. 결제 모듈 지연 예측.`;
-          } else if (lowerText.includes('timeout') || lowerText.includes('network')) {
-            severity = 'medium'; type_str = 'insight'; category = 'network';
-            insight_text = `⚠️ [Insight] SMS('${shortText}') 분석: 네트워크 타임아웃 패턴 감지. L4 스위치 확인 권고.`;
-          } else {
-            insight_text = `🔍 [Insight] SMS('${shortText}') 분석 완료. KMS 유사 사례 검색 및 원인 추론 중...`;
-          }
-          const formattedTime = new Date(recentMessageTime).toLocaleString('ko-KR');
-          currentLog = { id: id_val, type: type_str, category, severity, text: insight_text, detail: `수신 시간: ${formattedTime}` };
-        } else {
-          currentLog = { id: 'SYS-000', type: 'info', category: 'report', severity: 'info', text: '실시간 데이터 대기 중... 새로운 SMS를 기다리고 있습니다.', detail: 'KMS LLM 분석 대기' };
-        }
-        return new Response(
-          JSON.stringify({ status: 'active', learning_data_size: '15.2 TB (KMS)', accuracy: '98.5%', prediction_counts, current_log: currentLog }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // ── AI Agent Discussion ───────────────────────────────────────────────────
-      if (path.startsWith('/ai/agent-discussion/') && request.method === 'GET') {
-        const smsId = path.split('/')[3];
-
-        // 1. 로컬 백엔드 프록시 (BACKEND_URL 설정된 경우)
-        if (env.BACKEND_URL) {
-          try {
-            const backendRes = await fetch(`${env.BACKEND_URL}/ai/agent-discussion/${smsId}`);
-            if (backendRes.ok) {
-              const data = await backendRes.json();
-              return new Response(JSON.stringify(data), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              });
-            }
-          } catch (e) {
-            console.error('[Proxy] Agent Discussion proxy failed:', e);
-          }
-        }
-
-        // 2. Mock fallback (실제 SMS 내용 참조)
-        const stored = await env.SMS_STORAGE.get('recent_messages', 'json').catch(() => []);
-        const sms = (stored || []).find(m => String(m.id) === String(smsId));
-        const msgText = sms ? sms.message : 'Unknown issue';
-        const shortMsg = msgText.substring(0, 40);
-
-        const discussionLog = [
-          { role: 'L1 Support Agent', content: `수신 SMS 확인: "${shortMsg}". 시스템 로그 분석 결과를 요청합니다.` },
-          { role: 'DB Expert Agent', content: 'KMS 연동 분석: DB Connection Pool 고갈 패턴 확인. 트랜잭션 지연 예상.' },
-          { role: 'System Admin Agent', content: 'Runbook 기반 max_connections 증설 조치 후 Escalation 진행합니다.' }
-        ];
-        return new Response(JSON.stringify(discussionLog), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      // ── AI Chat (S-Autopilot Agent) ──────────────────────────────────────────
-      if (path === '/ai/chat' && request.method === 'POST') {
-        const body = await request.json();
-        const { query } = body;
-
-        // 1. 로컬 백엔드 프록시 (BACKEND_URL 설정된 경우)
-        if (env.BACKEND_URL) {
-          try {
-            const backendRes = await fetch(`${env.BACKEND_URL}/ai/chat`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ query })
-            });
-            if (backendRes.ok) {
-              const data = await backendRes.json();
-              return new Response(JSON.stringify(data), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              });
-            }
-          } catch (e) {
-            console.error('[Proxy] Chat proxy failed:', e);
-          }
-        }
-
-        // 2. Mock fallback
-        const lowerQuery = (query || '').toLowerCase();
-        let response = '';
-        if (lowerQuery.includes('db') || lowerQuery.includes('database') || lowerQuery.includes('데이터베이스')) {
-          response = '데이터베이스 관련 문제를 분석합니다. DB Connection Pool 고갈이 의심됩니다. 우선 `SHOW PROCESSLIST` 명령으로 현재 접속 수를 확인하고, max_connections 설정을 검토하세요.';
-        } else if (lowerQuery.includes('cpu') || lowerQuery.includes('메모리') || lowerQuery.includes('memory')) {
-          response = 'CPU/메모리 과부하 상황입니다. `top` 또는 `htop` 명령으로 프로세스를 확인하고, 비정상적으로 높은 사용률을 보이는 프로세스를 재시작하세요.';
-        } else if (lowerQuery.includes('timeout') || lowerQuery.includes('타임아웃')) {
-          response = '네트워크 타임아웃이 감지되었습니다. 게이트웨이 설정과 L4 스위치 상태를 점검하고, 서비스 간 응답 시간을 모니터링하세요.';
-        } else {
-          response = `"${query}"에 대한 질의를 수신했습니다. 현재 AI 백엔드 연결 중입니다. S-Guard Cloud 서비스를 통해 RAG 기반 정밀 분석을 제공해 드립니다.`;
-        }
-
-        return new Response(
-          JSON.stringify({ response, related_logs: [] }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // ── KMS Report Save ───────────────────────────────────────────────────────
-      if (path === '/ai/report/save' && request.method === 'POST') {
-        // 로컬 백엔드 프록시 (BACKEND_URL 설정된 경우)
-        if (env.BACKEND_URL) {
-          try {
-            const body = await request.json();
-            const backendRes = await fetch(`${env.BACKEND_URL}/ai/report/save`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body)
-            });
-            if (backendRes.ok) {
-              const data = await backendRes.json();
-              return new Response(JSON.stringify(data), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              });
-            }
-          } catch (e) {
-            console.error('[Proxy] Report save proxy failed:', e);
-          }
-        }
-
-        // Mock fallback
-        return new Response(
-          JSON.stringify({ status: 'success', message: '보고서가 KMS에 저장(임베딩)되었습니다.', doc_id: `report_${Date.now()}` }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // ── 루트 경로 ─────────────────────────────────────────────────────────────
-      if (path === '/' && request.method === 'GET') {
-        return new Response(
-          JSON.stringify({
-            service: 'S-Guard AI SMS Service',
-            status: 'running',
-            backend_connected: !!env.BACKEND_URL,
-            version: '2.0.0',
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response('Not Found', { status: 404, headers: corsHeaders });
-    } catch (error) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      await writer.write(encode('data: [DONE]\n\n'))
+    } catch (e) {
+      console.error('Analyze-SMS error:', e)
+      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
+    } finally {
+      await writer.close()
     }
-  },
-};
+  })()
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
+    }
+  })
+})
+
+// AI Agent Discussion (SSE) - called when user clicks an SMS
+app.get('/ai/agent-discussion/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const api_key = c.env.DIFY_API_KEY
+  const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
+
+  const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
+  if (!sms) {
+    return c.json({ error: "SMS not found" }, 404)
+  }
+
+  const prompt = `다음 SMS 장애 메시지를 분석하여 담당 에이전트별로 대응 방안을 알려주세요:\n\n발신자: ${sms.sender}\n메시지: ${sms.message}\n\n[Security]: 보안 관점 분석\n[DB]: 데이터베이스 관점 분석\n[DevOps]: 서버/인프라 관점 분석\n[Leader]: 종합 의견 및 조치사항`
+
+  const { readable, writable } = new TransformStream()
+  const writer = writable.getWriter()
+  const encode = (s) => new TextEncoder().encode(s)
+
+  // Start Dify call in background
+  ;(async () => {
+    try {
+      const difyRes = await fetch(`${api_base}/chat-messages`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${api_key}`, 
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({ 
+          inputs: {}, 
+          query: prompt, 
+          response_mode: 'streaming', 
+          conversation_id: '', 
+          user: 'sguard-agent' 
+        })
+      })
+
+      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
+      
+      const reader = difyRes.body.getReader()
+      const decoder = new TextDecoder()
+      let lineBuffer = ""
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        lineBuffer += decoder.decode(value, { stream: true })
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop()
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim()
+          if (!trimmedLine.startsWith('data: ')) continue
+          
+          const dataStr = trimmedLine.substring(6)
+          if (dataStr === '[DONE]') continue
+          
+          try {
+            const data = JSON.parse(dataStr)
+            if (data.event === 'message' || data.event === 'agent_message') {
+              // Send ONLY THE DELTA
+              await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+            }
+          } catch (e) {
+            continue
+          }
+        }
+      }
+      await writer.write(encode('data: [DONE]\n\n'))
+    } catch (e) {
+      console.error('Dify Stream Error:', e)
+      const fallback = `[Security]: SMS 장애 분석 중입니다. 상세 분석 결과가 곧 업데이트됩니다.\n[DB]: 데이터베이스 연결 상태 및 쿼리 성능 점검 중입니다.\n[DevOps]: 서버 로그 및 인프라 매트릭(CPU/MEM)을 실시간 분석 중입니다.\n[Leader]: 전체 상황 파악 후 즉시 조치 가이드를 공유하겠습니다.`
+      await writer.write(encode(`data: ${JSON.stringify({ answer: fallback })}\n\n`))
+      await writer.write(encode('data: [DONE]\n\n'))
+    } finally {
+      await writer.close()
+    }
+  })()
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
+    }
+  })
+})
+
+// Chat history (autopilot insight save/load)
+// Chat history (AI Agent Discussion)
+app.get('/ai/chat-history/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  // Try aichat_history first
+  const { results: aiResults } = await db.prepare("SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all()
+  if (aiResults && aiResults.length > 0) {
+    return c.json({ messages: aiResults.map(r => ({ role: r.agent_role, text: r.content })) })
+  }
+  
+  // Fallback to warroom_chats (legacy)
+  const { results: wrResults } = await db.prepare("SELECT * FROM warroom_chats WHERE incident_id = ? ORDER BY timestamp ASC").bind(id).all()
+  const messages = wrResults.map(r => ({ role: r.role || r.sender, text: r.text }))
+  return c.json({ messages })
+})
+
+app.post('/ai/chat-history/save', async (c) => {
+  const { incident_id, messages } = await c.req.json()
+  console.log(`Saving chat history for incident: ${incident_id}, count: ${messages?.length}`);
+  const db = c.env.DB
+  const now = getKst()
+  
+  for (const msg of messages) {
+    // Insert into aichat_history
+    await db.prepare(`
+      INSERT INTO aichat_history (inc_id, agent_role, content, reg_id, reg_dt, mod_id, mod_dt)
+      VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
+    `).bind(incident_id, msg.role, msg.text, now, now)
+    .run()
+  }
+  return c.json({ status: 'saved', count: messages.length })
+})
+
+// War-Room Tracking
+app.get('/ai/warroom/list', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM warroom_list ORDER BY reg_dt DESC").all()
+  return c.json({ results })
+})
+
+app.post('/ai/warroom/open', async (c) => {
+  const { inc_id, title, creator_id, severity } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  
+  await db.prepare(`
+    INSERT INTO warroom_list (inc_id, title, creator_id, severity, reg_dt)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(inc_id, title, creator_id, severity, now)
+  .run()
+  
+  return c.json({ status: 'opened', inc_id })
+})
+
+app.post('/ai/report/save', async (c) => {
+  const { title, content } = await c.req.json()
+  const db = c.env.DB
+  await db.prepare("INSERT INTO activity_logs (action, detail, report_type, created_at) VALUES (?, ?, 'AI 리포트', ?)")
+    .bind(title, content, getKst())
+    .run()
+  return c.json({ status: 'saved' })
+})
+
+// Knowledge Base CRUD
+app.get('/ai/knowledge', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM knowledge_base ORDER BY reg_dt DESC").all()
+  return c.json({ results })
+})
+
+app.get('/ai/knowledge/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const result = await db.prepare("SELECT * FROM knowledge_base WHERE id = ?").bind(id).first()
+  if (!result) return c.json({ error: "Not found" }, 404)
+  return c.json(result)
+})
+
+app.post('/ai/knowledge/save', async (c) => {
+  const body = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  const user_id = body.user_id || 'SYSTEM'
+
+  if (body.id) {
+    // Update
+    await db.prepare(`
+      UPDATE knowledge_base 
+      SET inc_id = ?, title = ?, content = ?, category = ?, file_url = ?, file_type = ?, tags = ?, mod_id = ?, mod_dt = ?
+      WHERE id = ?
+    `).bind(
+      body.inc_id, body.title, body.content, body.category, body.file_url, body.file_type, body.tags, user_id, now, body.id
+    ).run()
+    return c.json({ status: 'updated', id: body.id })
+  } else {
+    // Create
+    const result = await db.prepare(`
+      INSERT INTO knowledge_base (inc_id, title, content, category, file_url, file_type, tags, reg_id, reg_dt, mod_id, mod_dt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.inc_id, body.title, body.content, body.category, body.file_url, body.file_type, body.tags, user_id, now, user_id, now
+    ).run()
+    return c.json({ status: 'created', id: result.meta.last_row_id })
+  }
+})
+
+app.delete('/ai/knowledge/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  await db.prepare("DELETE FROM knowledge_base WHERE id = ?").bind(id).run()
+  return c.json({ status: 'deleted' })
+})
+
+// Incidents create
+app.post('/incidents', async (c) => {
+  const { code, title, description, severity, incident_type, source_sms_id } = await c.req.json()
+  const db = c.env.DB
+  const existing = await db.prepare("SELECT inc_id FROM incidents WHERE code = ?").bind(code).first()
+  if (existing) return c.json({ status: 'exists', code })
+  const now = getKst()
+  await db.prepare(
+    `INSERT INTO incidents (
+      code, title, description, severity, status, incident_type, source_sms_id, 
+      reg_id, reg_dt, mod_id, mod_dt, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    code, title, description, severity, 'OPEN', incident_type, source_sms_id || null, 
+    'SYSTEM', now, 'SYSTEM', now, now
+  ).run()
+  return c.json({ status: 'created', code })
+})
+
+// Warroom chat post
+app.post('/warroom/chat', async (c) => {
+  const { incident_id, sender, role, type, text } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  const senderId = sender || 'anonymous'
+  await db.prepare(
+    "INSERT INTO warroom_chats (incident_id, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(incident_id, senderId, role || senderId, type || 'user', text, now, senderId, now, senderId, now).run()
+  return c.json({ status: 'saved' })
+})
+
+export default app

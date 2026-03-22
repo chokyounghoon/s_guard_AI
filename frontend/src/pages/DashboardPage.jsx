@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
@@ -20,7 +20,7 @@ const SHINHAN_COMPANIES = [
   '신한자산신탁', '신한펀드파트너스', '신한금융플러스', '신한큐브리스크컨설팅',
 ];
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 // ── 셀렉트 + 기타 입력 컴포넌트 ───────────────────
 function SelectWithOther({ label, icon: Icon, options, value, onChange, required, disabled }) {
@@ -107,18 +107,20 @@ export default function DashboardPage() {
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
   const [predictionCounts, setPredictionCounts] = useState({ critical: 0, server: 0, security: 0, report: 0 });
   const [selectedSms, setSelectedSms] = useState(null);
+  const selectedSmsRef = useRef(null);
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
 
   const handleOpenWarRoomFromInsight = async (smsMessage, analysisText) => {
-    if (!smsMessage) return;
+    const currentSms = smsMessage || selectedSmsRef.current;
+    if (!currentSms) return;
 
-    const incidentId = `INC-${Date.now()}`;
+    const incidentId = currentSms.inc_id || `INC-${Date.now()}`;
 
-    // 1. Add to War-Room list
+    // 1. Add to local state
     const newRoom = {
       id: incidentId,
-      title: smsMessage.message, // Use full message as title
+      title: currentSms.message,
       lastMsg: analysisText ? 'AI분석 완료' : '',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       participants: 1,
@@ -127,34 +129,37 @@ export default function DashboardPage() {
     };
     setWarRooms(prev => [newRoom, ...prev]);
 
-    // 2. Persist incident metadata and system messages
+    // 2. Persist to DB
     try {
-      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://sguardai.khcho0421.workers.dev';
+      const apiBase = 'https://sguardai.khcho0421.workers.dev';
       
-      // Save Incident Metadata
-      const incRes = await fetch(`${apiBase}/incidents`, {
+      // Save to warroom_list
+      await fetch(`${apiBase}/ai/warroom/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inc_id: incidentId,
+          title: currentSms.message,
+          creator_id: userProfile?.name || 'SYSTEM',
+          severity: 'CRITICAL'
+        })
+      });
+
+      // Legacy incidents metadata
+      await fetch(`${apiBase}/incidents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: incidentId,
-          title: smsMessage.message, // Use full message as title
-          description: smsMessage.message,
+          title: currentSms.message,
+          description: currentSms.message,
           severity: 'CRITICAL',
           incident_type: 'SMS',
-          source_sms_id: smsMessage.inc_id
+          source_sms_id: currentSms.inc_id
         })
       });
 
-      if (incRes.ok) {
-        const incData = await incRes.json();
-        if (incData.status === 'exists') {
-          // If room already exists, just navigate there
-          navigate(`/chat/${incData.code}`);
-          return;
-        }
-      }
-
-      // 3. Persist AI Analysis Pinned Message
+      // AI Analysis Pinned Message
       if (analysisText) {
         await fetch(`${apiBase}/warroom/chat`, {
           method: 'POST',
@@ -169,7 +174,7 @@ export default function DashboardPage() {
         });
       }
 
-      // Persist to backend as a system message
+      // System messages
       await fetch(`${apiBase}/warroom/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -178,11 +183,10 @@ export default function DashboardPage() {
           sender: '시스템',
           role: 'System',
           type: 'system',
-          text: `[장애발생] ${smsMessage.sender}로부터 SMS 수신: ${smsMessage.message}`
+          text: `[장애발생] ${currentSms.sender}로부터 SMS 수신: ${currentSms.message}`
         })
       });
       
-      // Also seed a welcome message
       await fetch(`${apiBase}/warroom/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -194,27 +198,58 @@ export default function DashboardPage() {
           text: 'War-Room 채팅방이 생성되었습니다. 모든 대화 내용은 장애 해결 시 AI 학습에 사용됩니다.'
         })
       });
-    } catch (err) {
-      console.error("Failed to persist war room message:", err);
-    }
 
-    // 3. Show War-Room List Popup (User will enter from there)
-    await fetchWarRooms();
-    setShowWarRoomPopup(true);
+      await fetchWarRooms();
+      setShowEmergencyModal(false);
+      navigate(`/chat/${incidentId}`);
+    } catch (err) {
+      console.error("Failed to open War-Room:", err);
+    }
   };
 
-  // Initialize data from localStorage
+  // Initialize data from localStorage (or fetch from API if missing)
   useEffect(() => {
-    const savedUser = localStorage.getItem('sguard_user');
-    if (savedUser) {
-      setUserProfile(JSON.parse(savedUser));
-    } else {
-      setShowProfileModal(true);
-    }
+    const initUser = async () => {
+      try {
+        const savedUser = localStorage.getItem('sguard_user');
+        if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
+          setUserProfile(JSON.parse(savedUser));
+          return;
+        }
+      } catch {
+        localStorage.removeItem('sguard_user');
+      }
 
-    const savedCollapsed = localStorage.getItem('sguard_sms_collapsed');
-    if (savedCollapsed) {
-      setIsSmsPanelCollapsed(JSON.parse(savedCollapsed));
+      // Try to restore from token
+      const token = localStorage.getItem('sguard_token');
+      if (token) {
+        try {
+          const userId = token.replace('sguard-token-', '');
+          const res = await fetch(`${API_BASE}/users/${userId}`);
+          if (res.ok) {
+            const user = await res.json();
+            localStorage.setItem('sguard_user', JSON.stringify(user));
+            setUserProfile(user);
+            return;
+          }
+        } catch {
+          // ignore, fall through to modal
+        }
+      }
+
+      // No valid session found: redirect to login
+      navigate('/');
+    };
+
+    initUser();
+
+    try {
+      const savedCollapsed = localStorage.getItem('sguard_sms_collapsed');
+      if (savedCollapsed) {
+        setIsSmsPanelCollapsed(JSON.parse(savedCollapsed));
+      }
+    } catch {
+      localStorage.removeItem('sguard_sms_collapsed');
     }
   }, []);
 
@@ -245,7 +280,7 @@ export default function DashboardPage() {
 
   const fetchWarRooms = async () => {
     try {
-      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://sguardai.khcho0421.workers.dev';
+      const apiBase = 'https://sguardai.khcho0421.workers.dev';
       const res = await fetch(`${apiBase}/warroom/rooms?status=Open`);
       if (res.ok) {
         const data = await res.json();
@@ -269,7 +304,8 @@ export default function DashboardPage() {
 
   const fetchActivityLogs = async () => {
     try {
-      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://sguardai.khcho0421.workers.dev';
+      const apiBase = 'https://sguardai.khcho0421.workers.dev';
+      const res = await fetch(`${apiBase}/activity-logs`);
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(data.logs || []);
@@ -282,9 +318,7 @@ export default function DashboardPage() {
   const fetchSMSMessages = async () => {
     try {
       // Cloudflare Workers API 사용
-      const apiUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:8000/sms/recent?limit=3'
-        : 'https://api.chokerslab.store/sms/recent?limit=3';
+      const apiUrl = 'https://sguardai.khcho0421.workers.dev/sms/recent?limit=3';
 
       const response = await fetch(apiUrl);
       if (response.ok) {
@@ -307,8 +341,8 @@ export default function DashboardPage() {
     e.stopPropagation();
     try {
       const apiUrl = window.location.hostname === 'localhost'
-        ? `http://localhost:8000/sms/${id}`
-        : `https://api.chokerslab.store/sms/${id}`;
+        ? `https://sguardai.khcho0421.workers.dev/sms/${id}`
+        : `https://sguardai.khcho0421.workers.dev/sms/${id}`;
 
       const response = await fetch(apiUrl, { method: 'DELETE' });
       if (response.ok) {
@@ -425,14 +459,115 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [systemStatus]);
 
+  // Re-parse transcript (utility for handleAgentContent)
+  const parseTranscript = (transcript) => {
+    if (!transcript) return [];
+
+    // 1. Initial cleanup of common headers/noise
+    let text = transcript
+      .replace(/--- ?\s*#* ?\[전문가별 심층 진단\]/gi, '')
+      .replace(/#* ?\[리더의 최종 조치 가이드\]/gi, '\n[Leader]\n')
+      .replace(/Agent:?\s*\*\*/gi, '')
+      .replace(/^[ \t\n\r\W]+/gm, ''); // Remove leading non-word chars from overall transcript start
+
+    // 2. Normalize Agent declarations to a uniform [Role] format
+    // Includes Korean synonyms for missing roles coverage
+    const declarations = [
+      { name: 'Security', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Security|보안)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'DB', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:DB|데이터베이스)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'DevOps', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:DevOps|데브옵스)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'Infra', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Infra|인프라)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'App', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:App|애플리케이션)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'Leader', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Leader|리더|최종 조치)(?:\s*Agent| Agent|분석|진단|가이드)?\s*(?:\]|:|\*\*)?/gim }
+    ];
+
+    declarations.forEach(dec => {
+      text = text.replace(dec.regex, `\n[${dec.name}]\n`);
+    });
+
+    // 3. Split by normalized markers
+    // Prepend a newline to ensure the first marker matches the \n[...] multiline pattern
+    const rolePattern = /\n\[(Security|DB|DevOps|Infra|App|Leader)\]\n/gi;
+    const parts = ('\n' + text).split(rolePattern);
+    const msgs = [];
+    
+    // Safety: ignore text before the first detected role
+    let currentRole = null; 
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i].trim();
+        if (!part) continue;
+
+        // The split with capturing group puts the role name in the array
+        if (['Security', 'DB', 'DevOps', 'Infra', 'App', 'Leader'].includes(part)) {
+            currentRole = part;
+        } else if (currentRole) {
+            // Clean the content block
+            const cleanText = part
+                .replace(/^[ \t\-\*\#\d\.,\:]+/gm, (match) => {
+                  // Only remove leading symbols, but preserve numbers if they are part of guidance
+                  // unless it's just "1. " or "2. " exactly? 
+                  // Let's be conservative: only remove non-digits at the VERY start of a block
+                  return match.replace(/^[ \t\-\*\#\.,\:]+/, '');
+                })
+                .replace(/\*\*/g, '')           // Remove bolding clatter
+                .replace(/^Agent\s*:\s*/i, '')  // Extra "Agent:" check
+                .trim();
+            
+            if (cleanText) {
+                const lastMsg = msgs[msgs.length - 1];
+                if (lastMsg && lastMsg.role === currentRole) {
+                    lastMsg.text += "\n" + cleanText;
+                } else {
+                    msgs.push({ role: currentRole, text: cleanText, delay: 0 });
+                }
+            }
+        }
+    }
+    return msgs;
+  };
+
+  // Callback called from AiInsightPanel
+  const handleAgentContent = (fullTranscript, isDone) => {
+    const currentMsgs = parseTranscript(fullTranscript);
+    if (currentMsgs.length > 0) {
+      setAgentMessages(currentMsgs);
+    }
+
+    const currentIncId = selectedSmsRef.current?.inc_id;
+
+    if (isDone && currentIncId) {
+      console.log(`AI Analysis Done for ${currentIncId}. Saving to DB...`);
+      // Save to DB
+      const baseUrl = 'https://sguardai.khcho0421.workers.dev';
+      fetch(`${baseUrl}/ai/chat-history/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incident_id: String(currentIncId),
+          messages: currentMsgs
+        })
+      })
+      .then(res => res.json())
+      .then(data => console.log("Save complete:", data))
+      .catch(console.error);
+      
+      setTimeout(() => setShowEmergencyModal(true), 1500);
+    }
+  };
+
   const startLiveScenario = async (smsMessage) => {
     if (!smsMessage) return;
     setSystemStatus('critical');
     setShowAgentPanel(true);
     setAgentMessages([{ role: 'Security', text: '🔍 새로운 장애 로그 감지. AI 에이전트 분석을 시작합니다...', delay: 0 }]);
 
+    // Update both state and ref
+    setSelectedSms(smsMessage);
+    selectedSmsRef.current = smsMessage;
+
     try {
-      const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://api.chokerslab.store';
+      const baseUrl = 'https://sguardai.khcho0421.workers.dev';
       const checkRes = await fetch(`${baseUrl}/ai/chat-history/${smsMessage.inc_id}`);
       if (checkRes.ok) {
          const data = await checkRes.json();
@@ -444,110 +579,6 @@ export default function DashboardPage() {
       }
     } catch(e) {
       console.error("Check chat history err:", e);
-    }
-
-    try {
-      const apiUrl = window.location.hostname === 'localhost'
-        ? `http://localhost:8000/ai/agent-discussion/${smsMessage.inc_id}`
-        : `https://api.chokerslab.store/ai/agent-discussion/${smsMessage.inc_id}`;
-
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error('Failed to fetch discussion');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullTranscript = "";
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-        
-        const lines = buffer.split("\n");
-        buffer = lines.pop(); 
-        
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const dataStr = line.replace("data: ", "").trim();
-            if (dataStr === "[DONE]") {
-              // Save AI Chat History to DB
-              try {
-                const userData = JSON.parse(localStorage.getItem('sguard_user') || '{}');
-                const blocks = fullTranscript.split(/(\[(?:Security|DB|DevOps|Leader)\]:)/g);
-                const finalMessages = [];
-                let currentRole = null;
-                for (let i = 0; i < blocks.length; i++) {
-                  const item = blocks[i].trim();
-                  if (!item) continue;
-                  if (item.match(/^\[(Security|DB|DevOps|Leader)\]:$/)) {
-                    currentRole = item.replace(/[\[\]:]/g, '');
-                  } else if (currentRole) {
-                    finalMessages.push({ role: currentRole, text: item.replace(/^\s*-\s*/, '').trim() });
-                  }
-                }
-                if (finalMessages.length > 0) {
-                  const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://api.chokerslab.store';
-                  fetch(`${baseUrl}/ai/chat-history/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      incident_id: String(smsMessage.inc_id),
-                      messages: finalMessages,
-                      user_id: String(userData.id || 'SYSTEM')
-                    })
-                  }).catch(console.error);
-                }
-              } catch (e) {
-                console.error("Save chat history err:", e);
-              }
-
-              setTimeout(() => setShowEmergencyModal(true), 1500);
-              continue;
-            }
-            
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.answer) {
-                fullTranscript += data.answer;
-                
-                // Parse the transcript to identify agent blocks: [Role]: Message
-                // We split by patterns like [Security]: [DB]: [DevOps]: [Leader]:
-                const blocks = fullTranscript.split(/(\[(?:Security|DB|DevOps|Leader)\]:)/g);
-                const parsedMessages = [];
-                let currentRole = null;
-                
-                for (let i = 0; i < blocks.length; i++) {
-                  const item = blocks[i].trim();
-                  if (!item) continue;
-                  
-                  if (item.match(/^\[(Security|DB|DevOps|Leader)\]:$/)) {
-                    currentRole = item.replace(/[\[\]:]/g, '');
-                  } else if (currentRole) {
-                    parsedMessages.push({
-                      role: currentRole,
-                      text: item.replace(/^\s*-\s*/, '').trim(), // Clean up leading bullet if any
-                      delay: 0
-                    });
-                  }
-                }
-                
-                if (parsedMessages.length > 0) {
-                  setAgentMessages(parsedMessages);
-                }
-              }
-            } catch (e) {
-              // Ignore partial JSON errors
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Discussion load error:", err);
-      setAgentMessages(prev => [...prev, { role: 'Leader', text: '오류 분석 서버 응답 지연. 수동 조치 프로토콜을 가동하십시오.', delay: 0 }]);
-      setTimeout(() => setShowEmergencyModal(true), 2000);
     }
   };
 
@@ -568,9 +599,7 @@ export default function DashboardPage() {
         const reportTitle = "Agent Discussion Report " + new Date().toISOString().split('T')[0];
         const reportContent = agentMessages.map(m => `[${m.role}] ${m.text}`).join('\n');
 
-        const apiUrl = window.location.hostname === 'localhost'
-          ? 'http://localhost:8000/ai/report/save'
-          : 'https://api.chokerslab.store/ai/report/save';
+        const apiUrl = 'https://sguardai.khcho0421.workers.dev/ai/report/save';
 
         const res = await fetch(apiUrl, {
           method: 'POST',
@@ -670,7 +699,6 @@ export default function DashboardPage() {
         onClose={() => setShowProfileModal(false)}
         onSave={async (updated) => {
           try {
-            const API_BASE = 'http://localhost:8000';
             const res = await fetch(`${API_BASE}/auth/profile`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
@@ -972,6 +1000,7 @@ export default function DashboardPage() {
                    onShowDetail={handleShowInsight} 
                    selectedSms={selectedSms} 
                    onOpenWarRoom={handleOpenWarRoomFromInsight} 
+                   onAgentContent={handleAgentContent}
                 />
               </ErrorBoundary>
             </React.Suspense>

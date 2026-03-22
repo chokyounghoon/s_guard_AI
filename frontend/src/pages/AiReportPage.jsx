@@ -4,8 +4,8 @@ import { ArrowLeft, Share2, Sparkles, AlertCircle, Settings, Clock, CheckCircle2
 import SimilarIncidentCard from '../components/SimilarIncidentCard';
 
 const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000'
-  : 'https://api.chokerslab.store';
+  ? 'https://sguardai.khcho0421.workers.dev'
+  : 'https://sguardai.khcho0421.workers.dev';
 
 export default function AiReportPage() {
   const navigate = useNavigate();

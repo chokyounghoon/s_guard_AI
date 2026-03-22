@@ -9,8 +9,8 @@ export default function AiResponseGuide() {
 
   // API URL 설정
   const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000'
-    : 'https://api.chokerslab.store';
+    ? 'https://sguardai.khcho0421.workers.dev'
+    : 'https://sguardai.khcho0421.workers.dev';
 
   React.useEffect(() => {
     const fetchAnalysis = async () => {

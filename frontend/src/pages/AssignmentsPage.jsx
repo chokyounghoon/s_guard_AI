@@ -12,7 +12,7 @@ export default function AssignmentsPage() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [assignments, setAssignments] = useState([]);
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   // Fetch real incidents from backend
   useEffect(() => {

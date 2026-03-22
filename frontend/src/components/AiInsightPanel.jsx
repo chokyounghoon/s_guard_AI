@@ -3,10 +3,10 @@ import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText } f
 import MarkdownViewer from './MarkdownViewer';
 
 const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000'
-  : 'https://api.chokerslab.store';
+  ? 'https://sguardai.khcho0421.workers.dev'
+  : 'https://sguardai.khcho0421.workers.dev';
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent }) {
   const [insightData, setInsightData] = useState({
     status: 'active',
     current_log: { type: 'info', text: 'AI 엔진 연결 중...' }
@@ -191,6 +191,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     category: getCategoryFromAnalysis(finalText, selectedSms.message)
                   });
                 }
+                if (onAgentContent) {
+                  onAgentContent(finalText, true);
+                }
                 return;
               }
               try {
@@ -213,6 +216,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   try { clearTimeout(hardAbortId); } catch {}
                   finalText += data.answer;
                   enqueueText(data.answer);
+                  
+                  // Push to parent for War-Room Log
+                  if (onAgentContent) {
+                    onAgentContent(finalText, false);
+                  }
                 }
               } catch (e) {}
             }

@@ -9,8 +9,8 @@ import {
 
 const getApiUrl = (path) => {
   const base = window.location.hostname === 'localhost'
-    ? 'http://localhost:8000'
-    : 'https://api.chokerslab.store';
+    ? 'https://sguardai.khcho0421.workers.dev'
+    : 'https://sguardai.khcho0421.workers.dev';
   return `${base}${path}`;
 };
 

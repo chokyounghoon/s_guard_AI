@@ -15,7 +15,7 @@ const SHINHAN_COMPANIES = [
 ];
 
 // 백엔드 API로부터 동적으로 로드받는 상수(하드코딩 제거)
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 // ── 약관 텍스트 ────────────────────────────────────
 const TERMS_OF_SERVICE = `

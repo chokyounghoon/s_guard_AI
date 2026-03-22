@@ -7,7 +7,7 @@ export default function Layer1LogPanel() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
     fetchLogs();

@@ -1,211 +1,363 @@
 import React, { useState, useEffect } from 'react';
+import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, ArrowLeft, Database, FileText, Clock, RefreshCw, Search, ChevronDown, ChevronUp, Zap, Book, Server } from 'lucide-react';
 
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000'
-  : 'https://api.chokerslab.store';
-
-const SOURCE_LABEL = {
-  war_room_chat: { label: 'War-Room 대화 학습', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30', icon: '💬' },
-  auto_generated_report: { label: 'AI 자동 보고서', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30', icon: '🤖' },
-  kaggle_itsm: { label: 'Kaggle ITSM 데이터', color: 'bg-green-500/20 text-green-300 border-green-500/30', icon: '📊' },
-  synthetic_data: { label: '합성 학습 데이터', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30', icon: '🔬' },
-};
-
-function SourceBadge({ source }) {
-  const cfg = SOURCE_LABEL[source] || { label: source || '기타', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30', icon: '📁' };
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${cfg.color}`}>
-      <span>{cfg.icon}</span>{cfg.label}
-    </span>
-  );
-}
-
-function EntryCard({ entry }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className="bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/20 transition-all">
-      <div
-        className="p-4 flex items-start justify-between cursor-pointer"
-        onClick={() => setExpanded(v => !v)}
-      >
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className="bg-blue-600/10 p-2 rounded-xl shrink-0 mt-0.5">
-            <FileText className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <SourceBadge source={entry.source} />
-              {entry.incident_id && (
-                <span className="text-[10px] font-mono text-slate-500">#{entry.incident_id}</span>
-              )}
-            </div>
-            <p className="text-sm text-slate-200 font-medium leading-snug line-clamp-2">{entry.title}</p>
-            {entry.ingested_at && (
-              <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {entry.ingested_at}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="shrink-0 ml-3 mt-1">
-          {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
-        </div>
-      </div>
-      {expanded && (
-        <div className="px-4 pb-4 border-t border-white/5 pt-3">
-          <pre className="text-xs text-slate-300 bg-[#0a0c10] rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre-wrap font-mono border border-white/5">
-            {entry.preview}
-          </pre>
-          <p className="text-[9px] text-slate-600 mt-2 font-mono">ID: {entry.inc_id}</p>
-        </div>
-      )}
-    </div>
-  );
-}
+const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function KnowledgeBasePage() {
   const navigate = useNavigate();
-  const [entries, setEntries] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [knowledge, setKnowledge] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
-  const [filterSource, setFilterSource] = useState('all');
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`${API_BASE_URL}/knowledge/list?limit=100`);
-        if (!res.ok) throw new Error(`API Error ${res.status}`);
-        const data = await res.json();
-        setEntries(data.entries || []);
-        setTotal(data.total || 0);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [refreshKey]);
-
-  const sources = ['all', ...new Set(entries.map(e => e.source).filter(Boolean))];
-
-  const filtered = entries.filter(e => {
-    const matchSearch = !search || e.title?.toLowerCase().includes(search.toLowerCase()) || e.preview?.toLowerCase().includes(search.toLowerCase());
-    const matchSource = filterSource === 'all' || e.source === filterSource;
-    return matchSearch && matchSource;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    category: 'GENERAL',
+    inc_id: '',
+    file_url: '',
+    file_type: 'text',
+    tags: ''
   });
 
-  const stats = {
-    total,
-    warRoom: entries.filter(e => e.source === 'war_room_chat').length,
-    reports: entries.filter(e => e.source === 'auto_generated_report').length,
-    other: entries.filter(e => !['war_room_chat', 'auto_generated_report'].includes(e.source)).length,
+  const categories = ['all', 'SECURITY', 'DB', 'DEVOPS', 'INFRA', 'GENERAL'];
+
+  useEffect(() => {
+    fetchKnowledge();
+  }, []);
+
+  const fetchKnowledge = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/ai/knowledge`);
+      if (res.ok) {
+        const data = await res.json();
+        setKnowledge(data.results || []);
+      }
+    } catch (err) {
+      console.error("Fetch knowledge error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const handleSave = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/ai/knowledge/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingEntry ? { ...formData, id: editingEntry.id } : formData)
+      });
+      if (res.ok) {
+        setShowAddModal(false);
+        setEditingEntry(null);
+        setFormData({ title: '', content: '', category: 'GENERAL', inc_id: '', file_url: '', file_type: 'text', tags: '' });
+        fetchKnowledge();
+      }
+    } catch (err) {
+      console.error("Save knowledge error:", err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/ai/knowledge/${id}`, { method: 'DELETE' });
+      if (res.ok) fetchKnowledge();
+    } catch (err) {
+      console.error("Delete knowledge error:", err);
+    }
+  };
+
+  const filteredKnowledge = knowledge.filter(k => {
+    const matchesSearch = (k.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (k.content || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (k.tags || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || k.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans">
-      {/* 헤더 */}
-      <nav className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 bg-[#0f1421]/90 backdrop-blur-md z-10">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-xl hover:bg-white/5 transition-colors"
+    <div className="min-h-screen bg-[#0f1219] text-white p-6 pb-24">
+      {/* Header Area */}
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="p-2 rounded-full hover:bg-white/5 text-slate-400 transition-all active:scale-90"
           >
-            <ArrowLeft className="w-5 h-5 text-slate-400" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="bg-blue-600/20 p-2 rounded-xl border border-blue-500/30">
-            <Brain className="w-5 h-5 text-blue-400" />
-          </div>
           <div>
-            <h1 className="font-bold text-white">RAG Knowledge Base</h1>
-            <p className="text-[10px] text-slate-500 font-mono uppercase">AI 학습 내역 조회</p>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <BookOpen className="w-6 h-6 text-blue-500" />
+              Universal Knowledge Base
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">지능형 관제 시스템 통합 지식 창고</p>
           </div>
         </div>
-        <button
-          onClick={() => setRefreshKey(k => k + 1)}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-xs font-medium text-slate-300 disabled:opacity-50"
+        
+        <button 
+          onClick={() => {
+            setEditingEntry(null);
+            setFormData({ title: '', content: '', category: 'GENERAL', inc_id: '', file_url: '', file_type: 'text', tags: '' });
+            setShowAddModal(true);
+          }}
+          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          새로고침
+          <Plus className="w-5 h-5" />
+          신규 지식 등록
         </button>
-      </nav>
+      </div>
 
-      <div className="max-w-3xl mx-auto p-4 pb-24 space-y-5">
-
-        {/* 통계 카드 */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: '총 학습 건', value: stats.total, icon: Database, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-            { label: 'War-Room', value: stats.warRoom, icon: Zap, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-            { label: 'AI 보고서', value: stats.reports, icon: Book, color: 'text-green-400', bg: 'bg-green-500/10' },
-            { label: '기타 데이터', value: stats.other, icon: Server, color: 'text-orange-400', bg: 'bg-orange-500/10' },
-          ].map(({ label, value, icon: Icon, color, bg }) => (
-            <div key={label} className="bg-[#1a1f2e] rounded-2xl p-4 border border-white/5">
-              <div className={`${bg} p-2 rounded-xl w-fit mb-2`}>
-                <Icon className={`w-4 h-4 ${color}`} />
-              </div>
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">{label}</p>
-            </div>
+      {/* Search & Filter Bar */}
+      <div className="max-w-7xl mx-auto bg-[#1a1f2e] border border-white/5 rounded-2xl p-4 mb-8 flex flex-col md:flex-row gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input 
+            type="text" 
+            placeholder="지식 제안, 태그, 본문 내용 검색..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-all"
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+          <Filter className="w-4 h-4 text-slate-500 shrink-0 mr-1" />
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                selectedCategory === cat ? 'bg-blue-500 text-white' : 'bg-[#0f1219] text-slate-400 border border-white/5 hover:border-white/20'
+              }`}
+            >
+              {cat.toUpperCase()}
+            </button>
           ))}
         </div>
+      </div>
 
-        {/* 검색 + 필터 */}
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="제목 또는 내용으로 검색..."
-              className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
-            />
-          </div>
-          <select
-            value={filterSource}
-            onChange={e => setFilterSource(e.target.value)}
-            className="bg-[#1a1f2e] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500/50"
-          >
-            {sources.map(s => (
-              <option key={s} value={s}>{s === 'all' ? '전체 소스' : (SOURCE_LABEL[s]?.label || s)}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* 결과 */}
+      {/* Knowledge List Grid */}
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-20 bg-[#1a1f2e] rounded-2xl animate-pulse" />
-            ))}
-          </div>
-        ) : error ? (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-center">
-            <p className="text-red-400 font-bold mb-1">API 연결 오류</p>
-            <p className="text-red-300/60 text-sm">{error}</p>
-            <p className="text-slate-500 text-xs mt-2">백엔드 서버가 실행 중인지 확인해주세요.</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-[#1a1f2e] rounded-2xl p-10 text-center border border-white/5">
-            <Brain className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400 font-bold">학습된 데이터가 없습니다</p>
-            <p className="text-slate-500 text-sm mt-1">War-Room에서 장애를 해결(Resolve)하면 이곳에 기록됩니다.</p>
-          </div>
+          Array(6).fill(0).map((_, i) => (
+            <div key={i} className="h-64 bg-[#1a1f2e] rounded-2xl animate-pulse border border-white/5" />
+          ))
+        ) : filteredKnowledge.length > 0 ? (
+          filteredKnowledge.map(item => (
+            <div key={item.id} className="group bg-[#1a1f2e] border border-white/5 rounded-2xl overflow-hidden hover:border-blue-500/30 transition-all flex flex-col h-full shadow-lg">
+              {/* Card Meta Header */}
+              <div className="p-4 flex items-center justify-between border-b border-white/5">
+                <span className="bg-blue-500/20 text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                  {item.category}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setEditingEntry(item);
+                      setFormData({ ...item });
+                      setShowAddModal(true);
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-blue-400 transition-all"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(item.id)}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-red-400 transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Card Body */}
+              <div className="p-5 flex-1 cursor-pointer">
+                <h3 className="text-lg font-bold mb-3 group-hover:text-blue-400 transition-colors leading-tight">
+                  {item.title}
+                </h3>
+                <p className="text-slate-400 text-sm line-clamp-3 leading-relaxed mb-4">
+                  {item.content}
+                </p>
+
+                {/* Multimodal Preview Placeholder */}
+                {item.file_url ? (
+                  <div className="bg-[#0f1219] rounded-xl p-3 flex items-center gap-3 border border-white/5 mb-4 group-hover:border-blue-500/20 transition-all">
+                    {item.file_type?.includes('image') ? <ImageIcon className="w-5 h-5 text-emerald-400" /> : <FileText className="w-5 h-5 text-orange-400" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-slate-500 uppercase font-black">Attached {item.file_type}</p>
+                      <a href={item.file_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 truncate block hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {item.file_url.split('/').pop()}
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Tags */}
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5 mt-4">
+                  {(item.tags || '').split(',').filter(t => t.trim()).map(tag => (
+                    <span key={tag} className="text-[9px] text-slate-500 bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
+                      <Tag className="w-2 h-2" />
+                      {tag.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card Footer Footer Info */}
+              <div className="px-5 py-3 bg-[#11141d] flex items-center justify-between text-[10px] text-slate-500">
+                <div className="flex items-center gap-2">
+                  <User className="w-3 h-3" />
+                  <span>{item.reg_id}</span>
+                </div>
+                <div className="flex items-center gap-2 font-mono">
+                  <Calendar className="w-3 h-3" />
+                  <span>{new Date(item.reg_dt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          ))
         ) : (
-          <div className="space-y-3">
-            <p className="text-xs text-slate-500 font-mono">{filtered.length}개 항목 표시</p>
-            {filtered.map(entry => <EntryCard key={entry.inc_id} entry={entry} />)}
+          <div className="col-span-full py-20 flex flex-col items-center justify-center opacity-40">
+            <Search className="w-16 h-16 mb-4 text-slate-600" />
+            <p className="text-lg font-bold">지식 데이터가 없습니다.</p>
+            <p className="text-sm">신규 지식을 등록하여 팀과 공유해보세요.</p>
           </div>
         )}
       </div>
+
+      {/* Add/Edit Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full max-w-2xl bg-[#1a1f2e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Plus className="w-5 h-5 text-blue-500" />
+                {editingEntry ? '지식 정보 수정' : '신규 지식 등록'}
+              </h2>
+              <button 
+                onClick={() => setShowAddModal(false)}
+                className="p-2 rounded-full hover:bg-white/10 text-slate-400 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 ml-1">지식 제목</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={formData.title}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    placeholder="지식 제목을 입력하세요"
+                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 ml-1">카테고리</label>
+                  <select 
+                    value={formData.category}
+                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white appearance-none"
+                  >
+                    {categories.filter(c => c !== 'all').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-400 ml-1">상세 내용</label>
+                <textarea 
+                  required
+                  rows={4}
+                  value={formData.content}
+                  onChange={(e) => setFormData({...formData, content: e.target.value})}
+                  placeholder="지식의 상세 내용을 설명해주세요..."
+                  className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 ml-1">파일 URL (Optional)</label>
+                  <input 
+                    type="text" 
+                    value={formData.file_url}
+                    onChange={(e) => setFormData({...formData, file_url: e.target.value})}
+                    placeholder="https://..."
+                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 ml-1">파일 형식</label>
+                  <select 
+                    value={formData.file_type}
+                    onChange={(e) => setFormData({...formData, file_type: e.target.value})}
+                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white appearance-none"
+                  >
+                    <option value="text">TEXT</option>
+                    <option value="image">IMAGE</option>
+                    <option value="pdf">PDF</option>
+                    <option value="pptx">PPTX/DOC</option>
+                    <option value="link">LINK</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 ml-1">관련 인시던트 ID</label>
+                  <input 
+                    type="text" 
+                    value={formData.inc_id}
+                    onChange={(e) => setFormData({...formData, inc_id: e.target.value})}
+                    placeholder="INC-..."
+                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 ml-1">태그 (콤마 구분)</label>
+                  <input 
+                    type="text" 
+                    value={formData.tags}
+                    onChange={(e) => setFormData({...formData, tags: e.target.value})}
+                    placeholder="db, manual, critical"
+                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-xl transition-all"
+                >
+                  취소
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                >
+                  {editingEntry ? '수정 완료' : '등록 완료'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -145,7 +145,7 @@ const SmsTestPage = () => {
         const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
         
         if (isLocal) {
-            return `http://localhost:8000${path}`;
+            return `https://sguardai.khcho0421.workers.dev${path}`;
         }
         
         // HTTPS인 경우 Tunnel 도메인(api.chokerslab.store) 사용

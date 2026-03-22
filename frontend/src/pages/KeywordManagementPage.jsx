@@ -14,7 +14,7 @@ export default function KeywordManagementPage() {
   const [keywords, setKeywords] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
     fetch(`${API_BASE}/sms/keywords`)

@@ -14,7 +14,7 @@ export default function UserManagementPage() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   const fetchUsers = () => {
     setLoading(true);

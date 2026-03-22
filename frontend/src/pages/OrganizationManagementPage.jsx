@@ -20,7 +20,7 @@ export default function OrganizationManagementPage() {
   const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit'
   const [modalData, setModalData] = useState({ id: null, name: '', code: '', parentId: null, depth: 1 });
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   const fetchTree = () => {
     setLoading(true);

@@ -8,7 +8,7 @@ export default function ActivityPage() {
   const navigate = useNavigate();
 
   const [activities, setActivities] = useState([]);
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
     fetch(`${API_BASE}/activity-logs?limit=50`)

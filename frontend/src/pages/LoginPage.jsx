@@ -66,6 +66,7 @@ export default function LoginPage() {
             });
             const data = await res.json();
             if (!res.ok) { setResetError(data.detail || '실패했습니다.'); return; }
+            alert(data.message); // DEMO 용: 코드를 화면에 보여줌
             setResetStep('VERIFY');
         } catch {
             setResetError('서버에 연결할 수 없습니다.');
@@ -124,7 +125,7 @@ export default function LoginPage() {
         }
     }, []);
 
-    const API_BASE = 'http://localhost:8000';
+    const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
     // ── real-time validation on blur ──
     const handleEmailBlur = () => {
@@ -180,7 +181,7 @@ export default function LoginPage() {
             }
 
             localStorage.setItem('sguard_token', data.token);
-            localStorage.setItem('sguard_user', JSON.stringify(data.user));
+            localStorage.setItem('sguard_user', JSON.stringify(data));
             navigate('/dashboard');
         } catch {
             setServerError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');

@@ -14,6 +14,7 @@ import ActivityDetailPage from './pages/ActivityDetailPage';
 import AssignmentsPage from './pages/AssignmentsPage';
 import SMSNotification from './components/SMSNotification';
 import AiChatWidget from './components/AiChatWidget';
+import ErrorBoundary from './components/ErrorBoundary';
 import OverallStatusPage from './pages/OverallStatusPage';
 import SearchPage from './pages/SearchPage';
 import IncidentListPage from './pages/IncidentListPage';
@@ -37,7 +38,7 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
         <Route path="/ai-report" element={<AiReportPage />} />
         <Route path="/assignment-detail" element={<AssignmentDetailPage />} />
         <Route path="/chat/:incidentId?" element={<ChatPage />} />

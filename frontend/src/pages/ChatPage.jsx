@@ -71,8 +71,8 @@ export default function ChatPage() {
 
   const getApiUrl = (endpoint) => {
     const apiBase = window.location.hostname === 'localhost' 
-      ? 'http://localhost:8000' 
-      : 'https://api.chokerslab.store';
+      ? 'https://sguardai.khcho0421.workers.dev' 
+      : 'https://sguardai.khcho0421.workers.dev';
     return `${apiBase}${endpoint}`;
   };
 
@@ -275,7 +275,7 @@ export default function ChatPage() {
       
       if (parts.length >= 3) {
         const [filename, url, type] = parts;
-        const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://api.chokerslab.store';
+        const apiBase = 'https://sguardai.khcho0421.workers.dev';
         const fullUrl = url.startsWith('http') ? url : `${apiBase}${url}`;
         
         if (type.startsWith('image/')) {
@@ -325,7 +325,7 @@ export default function ChatPage() {
     if (uploadingFile) return;
 
     setUploadingFile(true);
-    const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://api.chokerslab.store';
+    const apiBase = 'https://sguardai.khcho0421.workers.dev';
     
     try {
       // 1. Upload files first if any

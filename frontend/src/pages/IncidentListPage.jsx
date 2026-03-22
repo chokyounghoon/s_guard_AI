@@ -21,7 +21,7 @@ export default function IncidentListPage() {
 
   const [incidents, setIncidents] = useState([]);
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
     const params = new URLSearchParams();

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Sparkles, Server, Activity } from 'lucide-react';
 
 const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000'
+  ? 'https://sguardai.khcho0421.workers.dev'
   : 'https://sguard-sms-api.khcho0421.workers.dev';
 
 export default function AiChatWidget() {
