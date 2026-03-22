@@ -70,6 +70,8 @@ export default function AiReportPage() {
   // Dify AI report generation
   const [aiGenText, setAiGenText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const genAbortRef = useRef(null);
+  
   const generateAiReport = async () => {
     if (!incidentId) return;
     if (genAbortRef.current) genAbortRef.current.abort();
