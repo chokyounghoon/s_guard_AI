@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Hash, Users, User, Network, Shield } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Hash, Users, User, Network, Shield, FileText } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick }) {
   const navigate = useNavigate();
@@ -37,6 +37,14 @@ export default function BottomMenu({ currentPath, onWarRoomClick }) {
         >
           <Activity className={`w-6 h-6 ${currentPath === '/activity' ? 'fill-current' : ''}`} />
           <span className="text-[10px] font-medium">활동</span>
+        </div>
+        
+        <div
+          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/search' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
+          onClick={() => navigate('/search')}
+        >
+          <Search className={`w-6 h-6 ${currentPath === '/search' ? 'fill-current' : ''}`} />
+          <span className="text-[10px] font-medium">검색</span>
         </div>
         
         <div
@@ -134,6 +142,36 @@ export default function BottomMenu({ currentPath, onWarRoomClick }) {
                   <div>
                     <span className="block font-bold text-slate-200 text-sm sm:text-base">부서/조직도 관리</span>
                     <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Org Hierarchy Tree Admin</span>
+                  </div>
+                </div>
+                <div
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    navigate('/knowledge-base');
+                  }}
+                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
+                >
+                  <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
+                    <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+                  </div>
+                  <div>
+                    <span className="block font-bold text-slate-200 text-sm sm:text-base">지식 관리</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">RAG Knowledge Management</span>
+                  </div>
+                </div>
+                <div
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    navigate('/overall-status');
+                  }}
+                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-orange-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
+                >
+                  <div className="bg-orange-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
+                    <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-orange-400" />
+                  </div>
+                  <div>
+                    <span className="block font-bold text-slate-200 text-sm sm:text-base">전체 장애 통계</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Global Error Statistics</span>
                   </div>
                 </div>
                 <div

@@ -12,14 +12,7 @@ services:
     volumes:
       - sguard_postgres_data:/var/lib/postgresql/data
 
-  chroma:
-    image: chromadb/chroma
-    container_name: sguard-chroma
-    restart: always
-    ports:
-      - "8001:8000"
-    volumes:
-      - sguard_chroma_data:/chroma/chroma
+
 
   tomcat:
     image: tomcat:10-jdk17
@@ -32,14 +25,6 @@ services:
     environment:
       - JAVA_OPTS=-Dfile.encoding=UTF-8
 
-  ollama:
-    image: ollama/ollama
-    container_name: sguard-ollama
-    restart: always
-    ports:
-      - "11434:11434"
-    volumes:
-      - sguard_ollama_data:/root/.ollama
 
   backend:
     build: ./backend
@@ -49,16 +34,15 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://sguard_user:sguard_password@db:5432/sguard_db
-      OLLAMA_BASE_URL: http://ollama:11434
-      CHROMA_BASE_URL: http://chroma:8000
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-your-email@gmail.com}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-your-app-password}
+      DIFY_API_KEY: app-TSlqmp329iKOzpXUP90iC6Kw
+      DIFY_API_BASE: ${DIFY_API_BASE:-https://api.dify.ai/v1}
+      DIFY_DATASET_ID: ${DIFY_DATASET_ID:-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
     depends_on:
       - db
-      - ollama
-      - chroma
     volumes:
       - ./backend:/app
 
@@ -99,5 +83,3 @@ services:
 
 volumes:
   sguard_postgres_data:
-  sguard_ollama_data:
-  sguard_chroma_data:

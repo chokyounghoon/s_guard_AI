@@ -141,7 +141,7 @@ export default function DashboardPage() {
           description: smsMessage.message,
           severity: 'CRITICAL',
           incident_type: 'SMS',
-          source_sms_id: smsMessage.id
+          source_sms_id: smsMessage.inc_id
         })
       });
 
@@ -250,7 +250,7 @@ export default function DashboardPage() {
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.rooms || []).map(room => ({
-          id: room.code,
+          id: room.inc_id,
           title: room.title,
           lastMsg: room.last_message || '대화가 시작되지 않았습니다.',
           time: room.last_message_time 
@@ -270,7 +270,6 @@ export default function DashboardPage() {
   const fetchActivityLogs = async () => {
     try {
       const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://sguardai.khcho0421.workers.dev';
-      const res = await fetch(`${apiBase}/activity-logs?limit=10`);
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(data.logs || []);
@@ -291,7 +290,7 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         // 삭제된 항목은 필터링하여 상태 업데이트
-        setSmsMessages((data.messages || []).filter(msg => !deletedSmsIds.has(msg.id)));
+        setSmsMessages((data.messages || []).filter(msg => !deletedSmsIds.has(msg.inc_id)));
       }
     } catch (error) {
       console.error('SMS 메시지 로드 실패:', error);
@@ -319,7 +318,7 @@ export default function DashboardPage() {
           newSet.add(id);
           return newSet;
         });
-        setSmsMessages(prev => prev.filter(msg => msg.id !== id));
+        setSmsMessages(prev => prev.filter(msg => msg.inc_id !== id));
       }
     } catch (error) {
       console.error('SMS 메시지 삭제 실패:', error);
@@ -430,58 +429,124 @@ export default function DashboardPage() {
     if (!smsMessage) return;
     setSystemStatus('critical');
     setShowAgentPanel(true);
-    setAgentMessages([]); // 초기화
+    setAgentMessages([{ role: 'Security', text: '🔍 새로운 장애 로그 감지. AI 에이전트 분석을 시작합니다...', delay: 0 }]);
 
     try {
-      // 1. Loading Text 표시
-      setAgentMessages([
-        { role: 'Security', text: '🔍 새로운 장애 로그 수신. 과거 사례 (RAG) 검색 및 분석을 시작합니다...', delay: 0 }
-      ]);
+      const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://api.chokerslab.store';
+      const checkRes = await fetch(`${baseUrl}/ai/chat-history/${smsMessage.inc_id}`);
+      if (checkRes.ok) {
+         const data = await checkRes.json();
+         if (data.messages && data.messages.length > 0) {
+            setAgentMessages(data.messages);
+            setTimeout(() => setShowEmergencyModal(true), 1500);
+            return; // Skip Dify streaming
+         }
+      }
+    } catch(e) {
+      console.error("Check chat history err:", e);
+    }
 
+    try {
       const apiUrl = window.location.hostname === 'localhost'
-        ? `http://localhost:8000/ai/agent-discussion/${smsMessage.id}`
-        : `https://api.chokerslab.store/ai/agent-discussion/${smsMessage.id}`;
+        ? `http://localhost:8000/ai/agent-discussion/${smsMessage.inc_id}`
+        : `https://api.chokerslab.store/ai/agent-discussion/${smsMessage.inc_id}`;
 
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error('Failed to fetch discussion');
 
-      const data = await response.json();
-      const discussion = data.discussion || [];
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullTranscript = "";
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        
+        const lines = buffer.split("\n");
+        buffer = lines.pop(); 
+        
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const dataStr = line.replace("data: ", "").trim();
+            if (dataStr === "[DONE]") {
+              // Save AI Chat History to DB
+              try {
+                const userData = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+                const blocks = fullTranscript.split(/(\[(?:Security|DB|DevOps|Leader)\]:)/g);
+                const finalMessages = [];
+                let currentRole = null;
+                for (let i = 0; i < blocks.length; i++) {
+                  const item = blocks[i].trim();
+                  if (!item) continue;
+                  if (item.match(/^\[(Security|DB|DevOps|Leader)\]:$/)) {
+                    currentRole = item.replace(/[\[\]:]/g, '');
+                  } else if (currentRole) {
+                    finalMessages.push({ role: currentRole, text: item.replace(/^\s*-\s*/, '').trim() });
+                  }
+                }
+                if (finalMessages.length > 0) {
+                  const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://api.chokerslab.store';
+                  fetch(`${baseUrl}/ai/chat-history/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      incident_id: String(smsMessage.inc_id),
+                      messages: finalMessages,
+                      user_id: String(userData.id || 'SYSTEM')
+                    })
+                  }).catch(console.error);
+                }
+              } catch (e) {
+                console.error("Save chat history err:", e);
+              }
 
-      // 2. 받아온 대본을 순차적으로 렌더링
-      let currentStep = 0;
-      const runSequence = () => {
-        if (currentStep < discussion.length) {
-          const step = discussion[currentStep];
-          setTimeout(() => {
-            setAgentMessages(prev => [...prev, {
-              role: step.role,
-              text: step.text,
-              delay: 0
-            }]);
-            currentStep++;
-            runSequence();
-          }, 1500); // 1.5초 간격으로 말풍선 생성
-        } else {
-          // 토론이 끝나면 조치 모달 트리거
-          setTimeout(() => {
-            setShowEmergencyModal(true);
-          }, 2000);
+              setTimeout(() => setShowEmergencyModal(true), 1500);
+              continue;
+            }
+            
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.answer) {
+                fullTranscript += data.answer;
+                
+                // Parse the transcript to identify agent blocks: [Role]: Message
+                // We split by patterns like [Security]: [DB]: [DevOps]: [Leader]:
+                const blocks = fullTranscript.split(/(\[(?:Security|DB|DevOps|Leader)\]:)/g);
+                const parsedMessages = [];
+                let currentRole = null;
+                
+                for (let i = 0; i < blocks.length; i++) {
+                  const item = blocks[i].trim();
+                  if (!item) continue;
+                  
+                  if (item.match(/^\[(Security|DB|DevOps|Leader)\]:$/)) {
+                    currentRole = item.replace(/[\[\]:]/g, '');
+                  } else if (currentRole) {
+                    parsedMessages.push({
+                      role: currentRole,
+                      text: item.replace(/^\s*-\s*/, '').trim(), // Clean up leading bullet if any
+                      delay: 0
+                    });
+                  }
+                }
+                
+                if (parsedMessages.length > 0) {
+                  setAgentMessages(parsedMessages);
+                }
+              }
+            } catch (e) {
+              // Ignore partial JSON errors
+            }
+          }
         }
-      };
-
-      // 첫 로딩 말풍선 지우고 시작하려면 setTimeout을 살짝 주고 덮어씌워도 되나, 자연스럽게 이어가기 위해 그냥 실행
-      setTimeout(() => {
-        // (선택) 로딩 메시지를 제거하고 싶다면 여기서 필터링 가능
-        runSequence();
-      }, 1000);
-
+      }
     } catch (err) {
       console.error("Discussion load error:", err);
-      // Fallback
-      setAgentMessages([
-        { role: 'Leader', text: '오류 분석 서버 응답 지연. 수동 조치 프로토콜을 가동하십시오.', delay: 0 }
-      ]);
+      setAgentMessages(prev => [...prev, { role: 'Leader', text: '오류 분석 서버 응답 지연. 수동 조치 프로토콜을 가동하십시오.', delay: 0 }]);
       setTimeout(() => setShowEmergencyModal(true), 2000);
     }
   };
@@ -560,8 +625,9 @@ export default function DashboardPage() {
   const handleShowInsight = (type) => {
     // In a real app, we would fetch data based on type using the API
     // For now, we use the demo data matching the screenshot
-    setSelectedInsightData(demoInsightData);
-    setShowInsightModal(true);
+    // setSelectedInsightData(demoInsightData);
+    // setShowInsightModal(true);
+    console.log("AI Insight Modal disabled by user request");
   };
 
   const handleLogReceived = (log, counts) => {
@@ -588,7 +654,8 @@ export default function DashboardPage() {
     }, ...prev]);
     // Optionally show a temporary message in the top banner for critical logs
     if (log.severity === 'CRITICAL') {
-      setMessages(prev => [...prev, { id: `msg-${Date.now()}-${Math.random()}`, type: 'error', text: log.message }]);
+      // 사용자 요청으로 긴급 분석 결과 전체 텍스트 팝업(상단 빨간 배너) 비활성화
+      // setMessages(prev => [...prev, { id: `msg-${Date.now()}-${Math.random()}`, type: 'error', text: log.message }]);
     }
   };
 
@@ -789,124 +856,142 @@ export default function DashboardPage() {
         <div>
         </div>
 
-        {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
-        {smsMessages.length > 0 && (
-          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl mb-6 overflow-hidden transition-all duration-300">
-            <div
-              onClick={toggleSmsPanel}
-              className="p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-600/20 p-2 rounded-xl">
-                  <MessageSquare className="w-5 h-5 text-blue-400" />
+        <div className="flex flex-col gap-6 mb-6">
+          {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
+          {smsMessages.length > 0 && (
+            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl overflow-hidden w-full">
+              <div
+                onClick={toggleSmsPanel}
+                className="p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-600/20 p-2 rounded-xl">
+                    <MessageSquare className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-lg">실시간 SMS 수신 내역</h3>
+                    <p className="text-[10px] text-slate-500 font-mono uppercase">REAL-TIME SMS MONITORING</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-white text-lg">실시간 SMS 수신 내역</h3>
-                  <p className="text-[10px] text-slate-500 font-mono uppercase">REAL-TIME SMS MONITORING · 클릭하여 AI 분석</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                {selectedSms && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setSelectedSms(null); }}
-                    className="text-[10px] bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-2 py-1 rounded-full hover:bg-yellow-500/20 transition-colors"
-                  >
-                    분석 취소 ✕
-                  </button>
-                )}
-                <div className="flex items-center space-x-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono tracking-wider">LIVE</span>
-                </div>
-                <div className={`transition-transform duration-300 ${isSmsPanelCollapsed ? '' : 'rotate-180'}`}>
-                  <ChevronRight className="w-5 h-5 text-slate-400 rotate-90" />
-                </div>
-              </div>
-            </div>
-
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSmsPanelCollapsed ? 'max-h-0' : 'max-h-[1000px] border-t border-white/5'}`}>
-              <div className="p-6 space-y-4">
-                {smsMessages.filter(msg => !deletedSmsIds.has(msg.id)).map((msg) => {
-                  const isSelected = selectedSms?.id === msg.id;
-                  return (
-                    <div
-                      key={msg.id}
-                      onClick={() => setSelectedSms(isSelected ? null : msg)}
-                      className={`rounded-2xl p-4 border flex items-start justify-between group transition-all cursor-pointer
-                        ${isSelected
-                          ? 'bg-yellow-500/5 border-yellow-500/40 ring-1 ring-yellow-500/30 shadow-lg shadow-yellow-500/10'
-                          : 'bg-[#11141d] border-white/5 hover:border-blue-500/30'}`}
+                <div className="flex items-center gap-4">
+                  {selectedSms && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedSms(null); }}
+                      className="text-[10px] bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-2 py-1 rounded-full hover:bg-yellow-500/20 transition-colors"
                     >
-                      <div className="flex items-start space-x-3 flex-1">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
-                          {msg.keyword_detected ? (
-                            <AlertCircle className={`w-6 h-6 ${isSelected ? 'text-yellow-300' : 'text-yellow-300'}`} />
-                          ) : (
-                            <Info className={`w-6 h-6 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center space-x-2">
-                              <h4 className={`font-bold text-sm ${isSelected ? 'text-yellow-300' : 'text-white'}`}>SMS 수신</h4>
-                              {msg.keyword_detected && (
-                                <span className="bg-yellow-400/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-400/30">
-                                  키워드 감지
-                                </span>
-                              )}
-                              {isSelected && (
-                                <span className="bg-yellow-500/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-500/30 animate-pulse">
-                                  ⚡ 분석 중
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-mono bg-white/5 px-2 py-0.5 rounded ml-auto whitespace-nowrap">
-                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-                            </span>
+                      분석 취소 ✕
+                    </button>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono tracking-wider">LIVE</span>
+                  </div>
+                  <div className={`transition-transform duration-300 ${isSmsPanelCollapsed ? '' : 'rotate-180'}`}>
+                    <ChevronRight className="w-5 h-5 text-slate-400 rotate-90" />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSmsPanelCollapsed ? 'max-h-0' : 'max-h-[1000px] border-t border-white/5'}`}>
+                <div className="p-6 space-y-4">
+                  {smsMessages.filter(msg => !deletedSmsIds.has(msg.inc_id)).map((msg) => {
+                    const isSelected = selectedSms?.inc_id === msg.inc_id;
+                    return (
+                      <div
+                        key={msg.inc_id}
+                        onClick={() => {
+                          const isSelected = selectedSms?.inc_id === msg.inc_id;
+                          setSelectedSms(isSelected ? null : msg);
+                          if (!isSelected) {
+                            startLiveScenario(msg);
+                          } else {
+                            setShowAgentPanel(false);
+                            setAgentMessages([]);
+                          }
+                        }}
+                        className={`rounded-2xl p-4 border flex items-start justify-between group transition-all cursor-pointer
+                          ${isSelected
+                            ? 'bg-yellow-500/5 border-yellow-500/40 ring-1 ring-yellow-500/30 shadow-lg shadow-yellow-500/10'
+                            : 'bg-[#11141d] border-white/5 hover:border-blue-500/30'}`}
+                      >
+                        <div className="flex items-start space-x-3 flex-1">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
+                            {msg.keyword_detected ? (
+                              <AlertCircle className={`w-6 h-6 ${isSelected ? 'text-yellow-300' : 'text-yellow-300'}`} />
+                            ) : (
+                              <Info className={`w-6 h-6 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
+                            )}
                           </div>
-                          <p className="text-xs text-slate-400 mb-1">발신: {msg.sender}</p>
-                          <p className={`text-sm leading-snug ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center space-x-2">
+                                <h4 className={`font-bold text-sm ${isSelected ? 'text-yellow-300' : 'text-white'}`}>SMS 수신</h4>
+                                {msg.keyword_detected && (
+                                  <span className="bg-yellow-400/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-400/30">
+                                    키워드 감지
+                                  </span>
+                                )}
+                                {isSelected && (
+                                  <span className="bg-yellow-500/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-500/30 animate-pulse">
+                                    ⚡ 분석 중
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-mono bg-white/5 px-2 py-0.5 rounded ml-auto whitespace-nowrap">
+                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mb-1">발신: {msg.sender}</p>
+                            <p className={`text-sm leading-snug ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
+                          </div>
+                          <button
+                            onClick={(e) => deleteSMSMessage(e, msg.inc_id)}
+                            className="ml-2 p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                            title="삭제"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button
-                          onClick={(e) => deleteSMSMessage(e, msg.id)}
-                          className="ml-2 p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                          title="삭제"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
+          )}
+
+          {/* AI Autopilot Insight Panel */}
+          <div className="w-full">
+            <React.Suspense fallback={<div className="h-48 bg-gray-900 rounded-3xl animate-pulse"></div>}>
+              <ErrorBoundary>
+                <AiInsightPanel 
+                   onLogReceived={handleLogReceived} 
+                   onShowDetail={handleShowInsight} 
+                   selectedSms={selectedSms} 
+                   onOpenWarRoom={handleOpenWarRoomFromInsight} 
+                />
+              </ErrorBoundary>
+            </React.Suspense>
           </div>
-        )}
+        </div>
 
+        {/* (Region 3) Handling Progress Area (Previously Region 4) */}
+        <AiSmsStatusPanel />
 
-        {/* AI Autopilot Insight Panel */}
-        <React.Suspense fallback={<div className="h-48 bg-gray-900 rounded-3xl animate-pulse"></div>}>
-          <ErrorBoundary>
-            <AiInsightPanel onLogReceived={handleLogReceived} onShowDetail={handleShowInsight} selectedSms={selectedSms} onOpenWarRoom={handleOpenWarRoomFromInsight} />
-          </ErrorBoundary>
-        </React.Suspense>
-
-        {/* AI Autopilot Prediction Panel (Standalone) */}
-        <AiPredictionPanel counts={predictionCounts} onShowDetail={handleShowInsight} />
-
-        {/* AI Insight Modal */}
+        {/* AI Insight Modal fully disabled by user request
         {showInsightModal && (
           <AIInsightModal
             insight={selectedInsightData}
             onClose={() => setShowInsightModal(false)}
           />
         )}
+        */}
 
-        {/* AI/SMS Status Panel */}
-        <AiSmsStatusPanel />
+        {/* (Region 4) My Tasks Area (Previously Region 3) */}
+        <AiPredictionPanel counts={predictionCounts} onShowDetail={handleShowInsight} />
 
 
 
@@ -937,9 +1022,9 @@ export default function DashboardPage() {
 
                 return (
                   <div
-                    key={msg.id}
+                    key={msg.inc_id}
                     onClick={() => { 
-                      const isSame = selectedSms?.id === msg.id;
+                      const isSame = selectedSms?.inc_id === msg.inc_id;
                       setSelectedSms(isSame ? null : msg); 
                       // 좌측 인시던트 스트림 클릭 시에만 에이전트 토론 시작
                       if (!isSame) {
@@ -952,14 +1037,14 @@ export default function DashboardPage() {
                     className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99] relative"
                   >
                     {/* 반짝이는 표시기 */}
-                    {isRecent && <div className={`absolute top-2 right-2 w-2 h-2 rounded-full animate-ping z-10 ${selectedSms?.id === msg.id ? 'bg-yellow-400' : 'bg-blue-500'}`} />}
+                    {isRecent && <div className={`absolute top-2 right-2 w-2 h-2 rounded-full animate-ping z-10 ${selectedSms?.inc_id === msg.inc_id ? 'bg-yellow-400' : 'bg-blue-500'}`} />}
 
                     <AlertItem
                       title={title}
                       time={new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       severity={severity}
                       desc={msg.message}
-                      isSelected={selectedSms?.id === msg.id}
+                      isSelected={selectedSms?.inc_id === msg.inc_id}
                     />
                   </div>
                 );
@@ -1006,7 +1091,7 @@ export default function DashboardPage() {
                     <p className="text-[10px] text-slate-500 mb-2 font-bold uppercase tracking-wider">최근 시스템 활동</p>
                     <div className="space-y-2">
                       {activityLogs.slice(0, 2).map(log => (
-                        <div key={log.id} className="text-[10px] flex justify-between text-slate-400">
+                        <div key={log.inc_id} className="text-[10px] flex justify-between text-slate-400">
                           <span className="truncate mr-2">{log.action}</span>
                           <span className="shrink-0">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
@@ -1098,7 +1183,7 @@ export default function DashboardPage() {
             {recentAssignments.length > 0 ? (
               recentAssignments.slice(0, 3).map((item) => (
                 <div
-                  key={item.id}
+                  key={item.inc_id}
                   onClick={() => navigate('/assignment-detail?status=Open')}
                   className={`${item.bgColor} p-4 rounded-2xl border ${item.borderColor} relative group hover:border-white/10 transition-colors cursor-pointer`}
                 >
@@ -1144,14 +1229,16 @@ export default function DashboardPage() {
       </div>
 
       {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
+      {/* AI Agent Demo Components - Emergency Modal disabled by user request
       <EmergencyActionModal
         isOpen={showEmergencyModal}
         onClose={() => setShowEmergencyModal(false)}
         onApprove={handleApproveAction}
       />
+      */}
 
       {renderProfileModal()}
-      <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} />
+      {/* <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} /> */}
 
       {/* War Room Chat List Popup */}
       {showWarRoomPopup && (
@@ -1344,7 +1431,7 @@ function ProfileModalContent({ profile, onClose, onSave, navigate }) {
   }, []);
 
   const [formData, setFormData] = useState({
-    id: profile.id,
+    id: profile.inc_id,
     name: profile.name || '',
     phone: profile.phone || '',
     company: profile.company || '',
@@ -1392,7 +1479,7 @@ function ProfileModalContent({ profile, onClose, onSave, navigate }) {
       const res = await fetch(`${API_BASE}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.id, new_password: newPassword }),
+        body: JSON.stringify({ user_id: profile.inc_id, new_password: newPassword }),
       });
       const data = await res.json();
       if (res.ok) {

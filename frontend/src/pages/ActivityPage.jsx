@@ -25,7 +25,7 @@ export default function ActivityPage() {
           else if (dateObj.toDateString() === yesterday.toDateString()) dateLabel = '어제 - ' + dateLabel;
           if (!grouped[dateLabel]) grouped[dateLabel] = [];
           grouped[dateLabel].push({
-            id: log.id,
+            id: log.inc_id,
             time: dateObj.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료',
             title: log.incident_title || log.action,
             status: log.action,

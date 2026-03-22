@@ -1,11 +1,15 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends, File, UploadFile, Form, Query
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends, File, UploadFile, Form, Query, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 import re
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+def get_kst():
+    return datetime.now(ZoneInfo('Asia/Seoul')).replace(tzinfo=None)
 import random
 import string
 import logging
@@ -19,116 +23,338 @@ from email.mime.multipart import MIMEMultipart
 import asyncio
 import base64
 import httpx
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, or_
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, or_, BigInteger, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship, backref
-import chromadb
-from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
 
-# LangChain & RAG 관련 임포트
-from langchain_community.llms import Ollama
-from langchain_ollama import OllamaEmbeddings
-from langchain_chroma import Chroma
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+# .env 파일 로드
+load_dotenv()
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# FastAPI 앱 초기화
+app = FastAPI(title="S-Guard AI Backend")
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # 데이터베이스 설정
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://sguard_user:sguard_password@localhost:5433/sguard_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://sguard_user:sguard_password@db:5432/sguard_db")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# RAG 환경설정 (Ollama & ChromaDB 연결)
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-CHROMA_BASE_URL = os.getenv("CHROMA_BASE_URL", "http://localhost:8001")
+class AuditingMixin:
+    reg_id = Column(String(50), default="SYSTEM")
+    reg_dt = Column(DateTime, default=get_kst)
+    mod_id = Column(String(50), default="SYSTEM")
+    mod_dt = Column(DateTime, default=get_kst, onupdate=get_kst)
 
-# 1. 임베딩 모델 (nomic-embed-text)
-embeddings = OllamaEmbeddings(
-    model="nomic-embed-text",
-    base_url=OLLAMA_BASE_URL
-)
+def generate_inc_id(db: Session, model: Any) -> int:
+    """PostgreSQL의 generate_inc_id() 함수를 호출하여 고유 키 생성"""
+    return db.execute(text("SELECT generate_inc_id()")).scalar()
 
-# 2. Vector DB (Chroma) 연결
-import chromadb
-# chromadb 컨테이너에 HttpClient로 접속. 포트가 URL 형태라면 분리 필요
-chroma_host = CHROMA_BASE_URL.replace("http://", "").split(":")[0]
-chroma_port = CHROMA_BASE_URL.split(":")[-1]
+# Dify API Configuration
+DIFY_API_KEY = os.getenv("DIFY_API_KEY", "app-XXXXXXXX")
+DIFY_API_BASE = os.getenv("DIFY_API_BASE", "https://api.dify.ai/v1")
+DIFY_DATASET_ID = os.getenv("DIFY_DATASET_ID", "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
 
-chroma_client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+class DifyClient:
+    @staticmethod
+    async def chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = []):
+        """
+        Dify chat-messages를 streaming 모드로 호출한 뒤,
+        answer만 누적해 최종 JSON 형태로 반환한다.
+        (긴 응답에서도 연결 유지를 위해 streaming을 기본으로 사용)
+        """
+        try:
+            gen = await DifyClient.stream_chat_message(query=query, user=user, inputs=inputs, files=files)
+            answer_parts: list[str] = []
+            async for chunk in gen:
+                # chunk format: "data: {...}\n\n" or "data: [DONE]\n\n"
+                if not chunk.startswith("data:"):
+                    continue
+                data_str = chunk[5:].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_str)
+                except Exception:
+                    continue
+                if data.get("error"):
+                    return {"answer": f"AI 분석 중 오류가 발생했습니다: {data.get('error')}"}
+                if data.get("answer"):
+                    answer_parts.append(data["answer"])
+            return {"answer": "".join(answer_parts)}
+        except Exception as e:
+            logger.error(f"Dify API error: {e}")
+            return {"answer": "AI 분석이 지연되고 있습니다"}
 
-vector_store = Chroma(
-    client=chroma_client,
-    collection_name="s_guard_knowledge",
-    embedding_function=embeddings
-)
+    @staticmethod
+    async def stream_chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = []):
+        url = f"{DIFY_API_BASE}/chat-messages"
+        headers = {
+            "Authorization": f"Bearer {DIFY_API_KEY}",
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        payload = {
+            "inputs": inputs,
+            "query": query,
+            "response_mode": "streaming",
+            "user": user,
+            "files": files
+        }
+        
+        async def event_generator():
+            # Dify가 첫 토큰을 늦게 보내는 경우가 있어 read timeout은 넉넉히 둔다.
+            timeout = httpx.Timeout(120.0, connect=20.0, read=300.0, write=20.0, pool=20.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                try:
+                    async with client.stream("POST", url, json=payload, headers=headers) as response:
+                        response.raise_for_status()
+                        # heartbeat: SSE 연결이 열렸음을 즉시 알림 (클라이언트 무응답 체감 완화)
+                        yield f"data: {json.dumps({'status': 'connected'}, ensure_ascii=False)}\n\n"
+                        workflow_run_id: Optional[str] = None
+                        emitted_any_answer = False
+                        # NOTE: Dify SSE는 data JSON이 여러 줄로 분할될 수 있어,
+                        # line-based 파싱 대신 blank-line(\n\n) 기반으로 이벤트를 조립한다.
+                        buf = b""
+                        aiter = response.aiter_raw()
+                        while True:
+                            # keep-alive: Dify가 한동안 바이트를 안 보내도 연결 유지
+                            try:
+                                chunk = await asyncio.wait_for(aiter.__anext__(), timeout=5.0)
+                            except asyncio.TimeoutError:
+                                yield f"data: {json.dumps({'status': 'working'}, ensure_ascii=False)}\n\n"
+                                continue
+                            except StopAsyncIteration:
+                                break
 
-# 3. LLM 엔진 (Llama 3)
-llm = Ollama(
-    model="llama3",
-    base_url=OLLAMA_BASE_URL,
-    temperature=0.1 # 정확한 답변을 위해 낮은 temperature 설정
-)
+                            if not chunk:
+                                continue
 
-# 4. Retrieval QA Chain 셋업 
-# 실제 RAG 연동시 이 chain을 통해 LLM에 질의를 던짐
-qa_prompt_template = PromptTemplate(
-    template="[S-Guard 시스템 컨텍스트]\n{context}\n\n질문: {question}\n\n위 컨텍스트를 기반으로 간결하고 정확하게 시스템 운영 관점에서 답변해줘.",
-    input_variables=["context", "question"]
-)
+                            buf += chunk
+                            while b"\n\n" in buf:
+                                raw_evt, buf = buf.split(b"\n\n", 1)
+                                raw_evt = raw_evt.strip()
+                                if not raw_evt:
+                                    continue
 
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=vector_store.as_retriever(search_kwargs={"k": 3}),
-    chain_type_kwargs={"prompt": qa_prompt_template}
-)
+                                lines = raw_evt.split(b"\n")
+                                # ignore ping/other event-only frames
+                                data_lines = [ln for ln in lines if ln.startswith(b"data:")]
+                                if not data_lines:
+                                    continue
 
-# DB 모델 정의
-# RAG 설정 (ChromaDB + Ollama)
-try:
-    chroma_client = chromadb.HttpClient(host="sguard-chroma", port=8000)
-    chroma_collection = chroma_client.get_collection(name="sguard_postmortems")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-    logger.info("ChromaDB & Embedding Model initialized successfully.")
-except Exception as e:
-    logger.error(f"Failed to initialize ChromaDB or Embedding Model: {e}")
-    chroma_collection = None
-    embedding_model = None
+                                data_str = b"\n".join([ln[5:].lstrip() for ln in data_lines]).decode("utf-8", "ignore").strip()
+                                if not data_str:
+                                    continue
 
-OLLAMA_URL = "http://sguard-ollama:11434/api/generate"
+                                try:
+                                    data = json.loads(data_str)
+                                except Exception:
+                                    continue
 
-class SMSMessageDB(Base):
+                                event = data.get("event")
+                                if not workflow_run_id and isinstance(data.get("workflow_run_id"), str):
+                                    workflow_run_id = data.get("workflow_run_id")
+                                    logger.info(f"Dify stream captured workflow_run_id={workflow_run_id}")
+
+                                # Standard chat streaming
+                                if event in ("message", "agent_message"):
+                                    answer = data.get("answer", "")
+                                    if answer:
+                                        emitted_any_answer = True
+                                        yield f"data: {json.dumps({'answer': answer}, ensure_ascii=False)}\n\n"
+                                    continue
+
+                                # Workflow streaming: final answer is often in outputs.answer
+                                if event == "workflow_finished":
+                                    outputs = (data.get("data") or {}).get("outputs") or {}
+                                    answer = outputs.get("answer") if isinstance(outputs, dict) else None
+                                    if isinstance(answer, str) and answer:
+                                        emitted_any_answer = True
+                                        yield f"data: {json.dumps({'answer': answer}, ensure_ascii=False)}\n\n"
+                                        yield "data: [DONE]\n\n"
+                                    break
+
+                                if event in ("message_end",):
+                                    if emitted_any_answer:
+                                        yield "data: [DONE]\n\n"
+                                    break
+
+                                if event == "error":
+                                    yield f"data: {json.dumps({'error': data.get('message', 'Unknown error')}, ensure_ascii=False)}\n\n"
+                                    yield "data: [DONE]\n\n"
+                                    emitted_any_answer = True
+                                    break
+
+                        # If upstream streaming ended before workflow_finished,
+                        # try to fetch workflow run detail and emit outputs.answer.
+                        if (not emitted_any_answer) and workflow_run_id:
+                            try:
+                                detail_url = f"{DIFY_API_BASE}/workflows/run/{workflow_run_id}"
+                                logger.info(f"Dify stream polling workflow detail {detail_url}")
+                                poll_timeout_s = 180
+                                poll_started = asyncio.get_event_loop().time()
+                                while True:
+                                    # keep client connection alive during polling
+                                    yield f"data: {json.dumps({'status': 'working'}, ensure_ascii=False)}\n\n"
+                                    r = await client.get(detail_url, headers={"Authorization": f"Bearer {DIFY_API_KEY}"})
+                                    logger.info(f"Dify workflow detail status_code={r.status_code}")
+                                    if r.status_code >= 400:
+                                        try:
+                                            logger.warning(f"Dify workflow detail error_body={r.text[:300]}")
+                                        except Exception:
+                                            pass
+                                        break
+                                    detail = r.json() if r.content else {}
+                                    status = (detail.get("status") or "").lower()
+                                    outputs = detail.get("outputs") or {}
+                                    logger.info(f"Dify workflow detail status={status} outputs_keys={(list(outputs.keys())[:10] if isinstance(outputs, dict) else type(outputs).__name__)}")
+                                    if status in ("succeeded", "success", "completed", "partial-succeeded") and isinstance(outputs, dict):
+                                        # Try 'answer' first, then 'text', then 'result'
+                                        answer = outputs.get("answer") or outputs.get("text") or outputs.get("result")
+                                        
+                                        logger.info(f"Dify raw result extracted: type={type(answer).__name__} val={repr(answer)[:100]}")
+                                        
+                                        if isinstance(answer, str) and answer.strip():
+                                            logger.info(f"Dify workflow polling found result in outputs (status={status})")
+                                            yield f"data: {json.dumps({'answer': answer}, ensure_ascii=False)}\n\n"
+                                            yield "data: [DONE]\n\n"
+                                            return
+                                        else:
+                                            logger.warning(f"Dify workflow finished ({status}) but result is empty or not string. Full outputs: {outputs}")
+                                            # If it finished but truly empty, we can provide a better message
+                                            if not emitted_any_answer:
+                                                yield f"data: {json.dumps({'answer': '[분석 완료] 워크플로우가 종료되었으나 텍스트 결과가 비어있습니다.'}, ensure_ascii=False)}\n\n"
+                                                yield "data: [DONE]\n\n"
+                                                emitted_any_answer = True
+                                        break
+                                    if status in ("failed", "error", "stopped", "canceled", "cancelled"):
+                                        logger.error(f"Dify workflow failed/stopped: {detail}")
+                                        break
+                                    if asyncio.get_event_loop().time() - poll_started > poll_timeout_s:
+                                        logger.warning(f"Dify workflow poll timeout ({poll_timeout_s}s)")
+                                        break
+                                    await asyncio.sleep(2.0)
+                            except Exception as e:
+                                logger.error(f"Dify stream polling exception: {e}")
+                                pass
+
+                        if not emitted_any_answer:
+                            yield f"data: {json.dumps({'error': 'AI 분석 결과를 추출하지 못했습니다'}, ensure_ascii=False)}\n\n"
+                            yield "data: [DONE]\n\n"
+
+                except Exception as e:
+                    logger.error(f"Dify Stream error: {e}")
+                    yield f"data: {json.dumps({'error': 'AI 분석이 지연되고 있습니다'}, ensure_ascii=False)}\n\n"
+                    yield "data: [DONE]\n\n"
+
+        return event_generator()
+
+    @staticmethod
+    async def ingest_to_dataset(content: str, metadata: dict = {}):
+        url = f"{DIFY_API_BASE}/datasets/{DIFY_DATASET_ID}/document/create_by_text"
+        headers = {
+            "Authorization": f"Bearer {DIFY_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "text": content,
+            "indexing_technique": "high_quality",
+            "process_rule": {"mode": "automatic"}
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logger.error(f"Dify Dataset Ingestion error: {e}")
+                return {"error": str(e)}
+
+@app.post("/sms/convert-multimodal")
+async def convert_multimodal(file: UploadFile = File(...)):
+    content_type = file.content_type
+    content = await file.read()
+    if "image" in content_type:
+        base64_image = base64.b64encode(content).decode('utf-8')
+        try:
+            dify_res = await DifyClient.chat_message(
+                query="이 이미지에 포함된 텍스트를 모두 추출해서 한국어로 보여줘.",
+                user="sguard-multimodal-user",
+                files=[{"type": "image", "transfer_method": "remote_url", "url": f"data:{content_type};base64,{base64_image}"}]
+            )
+            result_text = dify_res.get("answer", "이미지 분석 실패")
+        except Exception as e:
+            result_text = f"Error: {str(e)}"
+    else:
+        result_text = "지원하지 않는 형식입니다."
+    return {"status": "success", "converted_text": result_text}
+
+
+
+
+class IncidentHistoryDB(Base, AuditingMixin):
+    __tablename__ = "incident_history"
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
+    sms_id = Column(BigInteger, ForeignKey("received_messages.inc_id"))
+    target_system = Column(String(100))
+    error_code = Column(String(50))
+    problem_description = Column(Text)
+    severity = Column(String(20))
+    created_at = Column(DateTime, default=get_kst)
+
+class ActionResultDB(Base, AuditingMixin):
+    __tablename__ = "action_results"
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
+    incident_id = Column(BigInteger, ForeignKey("incidents.inc_id"))
+    resolution_text = Column(Text)
+    commandsUsed = Column(Text)
+    feedback = Column(Text) # "Correct/Fixed" etc.
+    created_at = Column(DateTime, default=get_kst)
+
+class SMSMessageDB(Base, AuditingMixin):
     __tablename__ = "received_messages"
-    id = Column(Integer, primary_key=True, index=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
     sender = Column(String(20), index=True)
     message = Column(Text)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=get_kst)
     keyword_detected = Column(Boolean, default=False)
     response_message = Column(Text, nullable=True)
     read = Column(Boolean, default=False)
+    received_count = Column(Integer, default=1) # 중복 수신 횟수
 
-class SMSHistoryDB(Base):
+class SMSHistoryDB(Base, AuditingMixin):
     __tablename__ = "sms_history"
-    id = Column(Integer, primary_key=True, index=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
     recipient = Column(String(20))
     message = Column(Text)
-    sent_at = Column(DateTime, default=datetime.utcnow)
+    sent_at = Column(DateTime, default=get_kst)
     status = Column(String(20))
 
-class KeywordDB(Base):
+class KeywordDB(Base, AuditingMixin):
     __tablename__ = "alert_keywords"
-    keyword = Column(String(50), primary_key=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
+    keyword = Column(String(50), unique=True, index=True)
     response = Column(Text)
     severity = Column(String(20), default="NORMAL")
     hit_count = Column(Integer, default=0)
 
-class UserDB(Base):
+class UserDB(Base, AuditingMixin):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     email = Column(String(100), unique=True, index=True, nullable=False)
     name = Column(String(100), nullable=False)
     password_hash = Column(String(256), nullable=True)  # nullable for Google OAuth users
@@ -140,13 +366,14 @@ class UserDB(Base):
     honbu = Column(String(100), nullable=True)        # 본부
     team = Column(String(100), nullable=True)         # 팀
     part = Column(String(100), nullable=True)         # 파트
+    subpart = Column(String(100), nullable=True)      # 파트2
     token = Column(String(256), nullable=True)        # 세션 토큰
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_kst)
     is_active = Column(Boolean, default=True)
 
-class OrganizationDB(Base):
+class OrganizationDB(Base, AuditingMixin):
     __tablename__ = "organizations"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     code = Column(String(50), unique=True, index=True, nullable=True)
     parent_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
@@ -155,9 +382,9 @@ class OrganizationDB(Base):
 
     children = relationship("OrganizationDB", backref=backref('parent', remote_side=[id]), cascade="all, delete-orphan")
 
-class IncidentDB(Base):
+class IncidentDB(Base, AuditingMixin):
     __tablename__ = "incidents"
-    id = Column(Integer, primary_key=True, index=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
     code = Column(String(30), unique=True, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -165,13 +392,14 @@ class IncidentDB(Base):
     status = Column(String(30), default="Open")  # Open, In Progress, Completed
     incident_type = Column(String(20), default="AI")  # AI, SMS
     assigned_to = Column(String(100), nullable=True)
-    source_sms_id = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    source_sms_id = Column(BigInteger, nullable=True)
+    ai_insight = Column(Text, nullable=True)  # S-Autopilot Insight 분석 결과 저장
+    created_at = Column(DateTime, default=get_kst)
+    updated_at = Column(DateTime, default=get_kst, onupdate=get_kst)
 
-class ActivityLogDB(Base):
+class ActivityLogDB(Base, AuditingMixin):
     __tablename__ = "activity_logs"
-    id = Column(Integer, primary_key=True, index=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
     user_id = Column(Integer, nullable=True)
     user_name = Column(String(100), default="System")
     incident_code = Column(String(30), nullable=True)
@@ -180,36 +408,60 @@ class ActivityLogDB(Base):
     detail = Column(Text, nullable=True)
     team = Column(String(100), nullable=True)
     report_type = Column(String(50), default="AI 리포트")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_kst)
 
-class WarRoomChatDB(Base):
+class WarRoomChatDB(Base, AuditingMixin):
     __tablename__ = "warroom_chats"
-    id = Column(Integer, primary_key=True, index=True)
-    incident_id = Column(String(50), index=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
+    incident_id = Column(BigInteger, index=True)
     sender = Column(String(50))
     role = Column(String(50), nullable=True)
     type = Column(String(20), default='user') # 'user', 'ai', 'system'
     text = Column(Text)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=get_kst)
 
-class WarRoomAttachmentDB(Base):
+class WarRoomAttachmentDB(Base, AuditingMixin):
     __tablename__ = "warroom_attachments"
-    id = Column(Integer, primary_key=True, index=True)
-    incident_id = Column(String(50), index=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
+    incident_id = Column(BigInteger, index=True)
     filename = Column(String(255))          # stored filename
     original_name = Column(String(255))     # user-facing name
     file_type = Column(String(50))          # image/jpeg, application/pdf, etc.
     url = Column(String(500))               # /static/uploads/{filename}
     uploaded_by = Column(String(100), default="Unknown")
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=get_kst)
 
-class ResetVerificationDB(Base):
+class ResetVerificationDB(Base, AuditingMixin):
     __tablename__ = "reset_verifications"
-    id = Column(Integer, primary_key=True, index=True)
+    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
     email = Column(String(100), index=True)
     code = Column(String(10))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_kst)
     is_verified = Column(Boolean, default=False)
+
+class LoginHistoryDB(Base, AuditingMixin):
+    __tablename__ = "login_history"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    email = Column(String(100), index=True)
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(String(255), nullable=True)
+    status = Column(String(20)) # SUCCESS, FAIL
+    login_time = Column(DateTime, default=get_kst)
+
+class AutopilotInsightDB(Base, AuditingMixin):
+    __tablename__ = "autopilot_insight"
+    inc_id = Column(String(50), primary_key=True)
+    content = Column(Text, nullable=False)
+    severity = Column(String(20))
+    category = Column(String(50))
+
+class AIChatHistoryDB(Base, AuditingMixin):
+    __tablename__ = "aichat_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    inc_id = Column(String(50), index=True, nullable=False)
+    agent_role = Column(String(50))
+    content = Column(Text, nullable=False)
 
 # 테이블 생성 및 연결 대기
 import time
@@ -283,7 +535,7 @@ class IncidentCreate(BaseModel):
     description: Optional[str] = None
     severity: str = "NORMAL"
     incident_type: str = "AI"
-    source_sms_id: Optional[int] = None
+    source_sms_id: Optional[str] = None
 
 def check_keywords(db: Session, message: str) -> Optional[str]:
     keywords = db.query(KeywordDB).all()
@@ -293,12 +545,25 @@ def check_keywords(db: Session, message: str) -> Optional[str]:
             return kw.response
     return None
 
+def mask_sensitive_data(text: str) -> str:
+    """전화번호, 계좌번호 등 개인정보 마스킹"""
+    # 전화번호 마스킹 (010-1234-5678 -> 010-****-5678)
+    text = re.sub(r'(\d{3})-\d{3,4}-(\d{4})', r'\1-****-\2', text)
+    # 계좌번호 마스킹 (간단 예시: 10자 이상의 숫자 연속)
+    text = re.sub(r'\d{10,}', '**********', text)
+    return text
+
+def generate_incident_id(db: Session) -> str:
+    """사용자 요청에 따른 YYYYMMDDHHmmss + sequence 고유 키 생성 (Legacy wrapper)"""
+    return generate_inc_id(db, IncidentDB)
+
 async def send_sms(db: Session, recipient: str, message: str):
     logger.info(f"SMS 전송: {recipient} - {message}")
     sms_data = SMSHistoryDB(
+        inc_id=generate_inc_id(db, SMSHistoryDB),
         recipient=recipient,
         message=message,
-        sent_at=datetime.utcnow(),
+        sent_at=get_kst(),
         status="sent"
     )
     db.add(sms_data)
@@ -321,20 +586,46 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.post("/sms/receive")
 async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     logger.info(f"SMS 수신: {sms.sender} - {sms.message}")
-    response_message = check_keywords(db, sms.message)
     
-    # Use internal timestamp if provided, else fallback to server time
-    ts = datetime.utcnow()
+    # 1. 보안 마스킹 처리
+    masked_message = mask_sensitive_data(sms.message)
+    
+    # 2. 중복 통제 (De-duplication)
+    existing_msg = db.query(SMSMessageDB).filter(
+        SMSMessageDB.sender == sms.sender,
+        SMSMessageDB.message == masked_message
+    ).order_by(SMSMessageDB.timestamp.desc()).first()
+    
+    if existing_msg:
+        # 5초 이내 동일 메시지면 count만 업데이트 (시뮬레이터 테스트를 위해 1시간에서 축소)
+        if get_kst() - existing_msg.timestamp < timedelta(seconds=5):
+            existing_msg.received_count += 1
+            existing_msg.timestamp = get_kst() # 최신 수신 시간으로 업데이트
+            db.commit()
+            db.refresh(existing_msg)
+            
+            # WebSocket 브로드캐스트 (중복 수신 알림)
+            await manager.broadcast({
+                "type": "sms_duplicate",
+                "inc_id": existing_msg.inc_id,
+                "count": existing_msg.received_count,
+                "message": masked_message
+            })
+            return {"status": "updated", "inc_id": existing_msg.inc_id, "count": existing_msg.received_count}
+
+    response_message = check_keywords(db, masked_message)
+    
+    ts = get_kst()
     if sms.received_at:
         try:
-            # Handle ISO format like "2024-03-21T15:30:00" or simple "2024-03-21 15:30:00"
             ts = datetime.fromisoformat(sms.received_at.replace("Z", "+00:00"))
         except (ValueError, TypeError):
             logger.warning(f"Invalid timestamp format: {sms.received_at}. Falling back to server time.")
     
     msg_db = SMSMessageDB(
+        inc_id=generate_inc_id(db, SMSMessageDB),
         sender=sms.sender,
-        message=sms.message,
+        message=masked_message,
         timestamp=ts,
         keyword_detected=response_message is not None,
         response_message=response_message
@@ -343,10 +634,72 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Se
     db.commit()
     db.refresh(msg_db)
     
+    # ── [핵심 1] Dify 멀티 에이전트 기반 구조화 데이터 추출 ──────────────────────
+    prompt = f"""
+    당신은 S-GUARD의 데이터 분류 에이전트입니다. 다음 SMS 내용을 분석하여 JSON 형식으로 응답하세요.
+    내용: {masked_message}
+    추출 필드:
+    - target_system: 장애가 발생한 시스템 (예: Core Banking, Redis, L4 등)
+    - error_code: 메시지에 포함된 에러 코드 (없으면 null)
+    - problem_description: 기술적인 장애 현상 요약 (한국어)
+    - severity: CRITICAL, MAJOR, NORMAL 중 하나 선택
+    """
+    try:
+        extraction_res = await DifyClient.chat_message(query=prompt, user="sguard-extractor")
+        raw_json = extraction_res.get("answer", "{}")
+        import json
+        m = re.search(r"\{.*\}", raw_json, re.DOTALL)
+        if m:
+            extracted = json.loads(m.group())
+            
+            # 새로운 인시던트 ID 생성
+            incident_code = generate_incident_id(db)
+            
+            # 인시던트 자동 생성 및 [접수중] 상태 설정
+            new_incident = IncidentDB(
+                inc_id=incident_code, 
+                code=incident_code,
+                title=f"[{extracted.get('target_system', 'Unknown')}] {extracted.get('problem_description', masked_message[:30])}",
+                description=masked_message,
+                severity=extracted.get("severity", "NORMAL"),
+                status="접수중", # 상태 전이: 접수중
+                incident_type="SMS",
+                source_sms_id=msg_db.inc_id,
+                assigned_to="자동할당(AI)"
+            )
+            db.add(new_incident)
+            
+            hist = IncidentHistoryDB(
+                inc_id=generate_inc_id(db, IncidentHistoryDB),
+                sms_id=msg_db.inc_id,
+                target_system=extracted.get("target_system", "Unknown"),
+                error_code=extracted.get("error_code"),
+                problem_description=extracted.get("problem_description", masked_message),
+                severity=extracted.get("severity", "NORMAL")
+            )
+            db.add(hist)
+            db.commit()
+            
+            # 활동 로그 추가
+            log = ActivityLogDB(
+                user_name="System",
+                incident_code=incident_code,
+                incident_title=new_incident.title,
+                action="장애 접수 (자동)",
+                detail=f"SMS 수신에 따른 장애 자동 접수 및 담당자 할당 완료. 상태: [접수중]",
+                report_type="시스템"
+            )
+            db.add(log)
+            db.commit()
+            
+    except Exception as e:
+        logger.error(f"Structured extraction failed: {e}")
+
     notification = {
         "type": "sms_received",
+        "inc_id": str(msg_db.inc_id),
         "sender": sms.sender,
-        "message": sms.message,
+        "message": masked_message,
         "timestamp": msg_db.timestamp.isoformat(),
         "keyword_detected": msg_db.keyword_detected,
         "response_message": response_message
@@ -354,27 +707,38 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Se
     await manager.broadcast(notification)
     
     if response_message:
-        # 백업 태스크에서도 새 세션을 사용하거나 세션 관리에 주의해야 합니다. 
-        # 간단하게 구현하기 위해 동기 함수로 직접 호출하거나 별도 로직 권장
         await send_sms(db, sms.sender, response_message)
-        
-        return {
-            "status": "keyword_detected",
-            "sender": sms.sender,
-            "response_sent": True,
-            "response_message": response_message
-        }
+        return {"status": "keyword_detected", "inc_id": str(msg_db.inc_id), "response_message": response_message}
     
-    return {"status": "received", "sender": sms.sender, "response_sent": False}
+    # 인시던트가 생성되었다면 incident_id도 함께 반환
+    res_data = {"status": "received", "inc_id": str(msg_db.inc_id)}
+    try:
+        inc = db.query(IncidentDB).filter(IncidentDB.source_sms_id == msg_db.inc_id).first()
+        if inc:
+            res_data["incident_id"] = inc.inc_id
+    except:
+        pass
+        
+    return res_data
 
 @app.get("/sms/recent")
 async def get_recent_messages(limit: int = 10, db: Session = Depends(get_db)):
     messages = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).limit(limit).all()
-    return {"total": len(messages), "messages": messages}
+    # BigInt precision issue fix for JS: cast inc_id to string
+    result = []
+    for msg in messages:
+        m = {c.name: getattr(msg, c.name) for c in msg.__table__.columns}
+        m["inc_id"] = str(msg.inc_id)
+        result.append(m)
+    return {"total": len(messages), "messages": result}
 
 @app.delete("/sms/{message_id}")
-async def delete_sms(message_id: int, db: Session = Depends(get_db)):
-    msg = db.query(SMSMessageDB).filter(SMSMessageDB.id == message_id).first()
+async def delete_sms(message_id: str, db: Session = Depends(get_db)):
+    msg_id_int = int(message_id)
+    # Remove references in incidents first to avoid ForeignKeyViolation
+    db.query(IncidentDB).filter(IncidentDB.source_sms_id == msg_id_int).update({IncidentDB.source_sms_id: None})
+    
+    msg = db.query(SMSMessageDB).filter(SMSMessageDB.inc_id == msg_id_int).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
     db.delete(msg)
@@ -411,7 +775,7 @@ def startup_populate_keywords():
     }
     for k, v in default_keywords.items():
         if not db.query(KeywordDB).filter_by(keyword=k).first():
-            db.add(KeywordDB(keyword=k, response=v))
+            db.add(KeywordDB(inc_id=generate_inc_id(db, KeywordDB), keyword=k, response=v))
     db.commit()
     db.close()
 
@@ -424,249 +788,151 @@ cached_insight_response = None
 @app.get("/ai/insight")
 async def get_ai_insight(db: Session = Depends(get_db)):
     """
-    대시보드 상단 AI Insight (Autopilot) 패널용 데이터
-    수신된 가장 최근 SMS 내용을 바탕으로 ChromaDB에서 과거 장애 패턴을 찾고, Ollama LLM을 통해 실시간 분석 및 대응 가이드 제공.
+    대시보드 상단 AI Insight (Autopilot) 패널용 데이터 (Streaming SSE)
     """
-    global last_analyzed_sms_id, cached_insight_response
-    
     # 1. 최근 SMS 내역 조회
     recent_sms = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).first()
     
-    # 대시보드 UI 요약 지표용 데이터 (최근 100건)
+    # 지표 계산 로직은 동일
     recent_messages = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).limit(100).all()
-    prediction_counts = {
-        "critical": 0,
-        "server": 0,
-        "security": 0,
-        "report": 0
-    }
-    
+    prediction_counts = {"critical": 0, "server": 0, "security": 0, "report": 0}
     for msg in recent_messages:
         msg_text_lower = msg.message.lower()
-        if "db" in msg_text_lower or "데이터베이스" in msg_text_lower:
-            prediction_counts["critical"] += 1
-        elif "cpu" in msg_text_lower or "메모리" in msg_text_lower:
-            prediction_counts["server"] += 1
-        else:
-            prediction_counts["report"] += 1
+        if "db" in msg_text_lower or "데이터베이스" in msg_text_lower: prediction_counts["critical"] += 1
+        elif "cpu" in msg_text_lower or "메모리" in msg_text_lower: prediction_counts["server"] += 1
+        else: prediction_counts["report"] += 1
 
-    # 수신된 메시지가 아예 없을 경우 예외 처리
     if not recent_sms:
-        return {
-            "status": "active",
-            "learning_data_size": "15.2 TB (KMS)",
-            "accuracy": "98.5%",
-            "prediction_counts": prediction_counts,
-            "current_log": {
-                "id": "SYS-000",
-                "type": "info",
-                "category": "report",
-                "severity": "info",
-                "text": "실시간 데이터 대기 중... 새로운 장애 SMS를 기다리고 있습니다.",
-                "detail": "신한DS KMS 연동 RAG 분석 대기 중"
-            }
-        }
+        async def empty_gen():
+            yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'answer': '새로운 장애 SMS를 기다리고 있습니다.'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(empty_gen(), media_type="text/event-stream")
 
-    # 2. 성능 최적화: 이전에 캐싱된 SMS 결과인지 체크
-    if last_analyzed_sms_id == recent_sms.id and cached_insight_response:
-        # prediction_counts 값만 최신화해서 캐시 응답
-        cached_insight_response["prediction_counts"] = prediction_counts
-        return cached_insight_response
-
-    # 3. 새로운 SMS가 수신되었다면 RAG 기반 AI 모델 구동
-    text = recent_sms.message
+    # [핵심] Dify 스트리밍 호출
+    prompt = f"다음 SMS 장애 내용을 분석하고 1~2문장으로 대응 가이드를 한글로 제시해줘: {recent_sms.message}"
     
-    # 3-1. Retrieval (ChromaDB 참조 데이터 수집)
-    rag_context = ""
-    if chroma_collection and embedding_model:
+    async def insight_stream():
+        # 먼저 지표 데이터 전송
+        yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'sms_id': str(recent_sms.inc_id)}, ensure_ascii=False)}\n\n"
+        
+        # Dify 스트림 전송
+        gen = await DifyClient.stream_chat_message(query=prompt, user="sguard-autopilot")
+        async for chunk in gen:
+            yield chunk
+
+    return StreamingResponse(insight_stream(), media_type="text/event-stream")
+
+class GenerateReportRequest(BaseModel):
+    incident_id: str
+
+
+@app.post("/ai/generate-report")
+async def generate_ai_report(req: GenerateReportRequest):
+    """
+    AI Report 생성 (Dify Streaming SSE)
+    - 프론트에서 SSE로 받아 Typewriter로 렌더링할 수 있도록 answer 스트림을 그대로 전달한다.
+    - 스트림 종료 시, 파싱 가능한 경우 6W1H 구조화 데이터도 함께 보낸다.
+    """
+    incident_id = (req.incident_id or "").strip()
+    if not incident_id:
+        async def err_gen():
+            yield f"data: {json.dumps({'error': 'incident_id가 필요합니다.'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(err_gen(), media_type="text/event-stream")
+
+    prompt = f"""
+다음 incident_id에 대한 장애 보고서를 한국어로 작성해줘: {incident_id}
+
+요구사항:
+- 먼저 보고서 본문(요약)을 자연어로 작성
+- 이어서 6W1H를 JSON으로 출력 (키: who, when, where, what, why, how, report_text)
+- JSON은 코드블록 없이 순수 JSON 텍스트로만 출력
+"""
+
+    async def report_stream():
+        accumulated: list[str] = []
         try:
-            query_embedding = embedding_model.encode([text])
-            results = chroma_collection.query(
-                query_embeddings=query_embedding.tolist(),
-                n_results=2 # 핵심 참조 문헌 2건만
-            )
-            if results['documents'] and len(results['documents'][0]) > 0:
-                rag_context = "과거 발생한 유사 사후보고서 단서:\\n"
-                for doc in results['documents'][0]:
-                    rag_context += f"- {doc[:200]}...\\n"
+            gen = await DifyClient.stream_chat_message(query=prompt, user="sguard-report")
+            async for chunk in gen:
+                if chunk.startswith("data:"):
+                    data_str = chunk[5:].strip()
+                    if data_str == "[DONE]":
+                        full_text = "".join(accumulated)
+                        # best-effort: JSON block extraction
+                        try:
+                            json_match = re.search(r'\{[\s\S]*\}$', full_text.strip())
+                            if json_match:
+                                report_obj = json.loads(json_match.group())
+                                yield f"data: {json.dumps({'final_report': report_obj}, ensure_ascii=False)}\n\n"
+                        except Exception:
+                            pass
+                        yield "data: [DONE]\n\n"
+                        break
+                    try:
+                        data = json.loads(data_str)
+                    except Exception:
+                        continue
+                    if data.get("answer"):
+                        accumulated.append(data["answer"])
+                    yield chunk
+                else:
+                    yield chunk
         except Exception as e:
-            logger.error(f"ChromaDB search failed in Autopilot: {e}")
+            logger.error(f"Generate report stream error: {e}")
+            yield f"data: {json.dumps({'error': 'AI 분석이 지연되고 있습니다'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
 
-    # 3-2. Generation (Ollama LLM)
-    system_prompt = (
-        "당신은 S-Guard 시스템 자동 분석 오토파일럿(S-Autopilot)입니다. "
-        "사용자가 수신한 에러/장애 SMS 텍스트와, 이와 유사했던 과거 장애 사례 문헌을 분석하여 "
-        "현재 발생한 장애의 추정 원인 및 즉각적인 조치 가이드라인을 '1~2문장'으로 매우 짧고 명확하게 한국어로 제시하세요. "
-        "결과는 반드시 '💡 [Insight] ' 또는 '🚨 [Critical] ' 등의 아이콘 접두어로 시작해야 합니다. 불필요한 인사말은 생략하세요."
-    )
-    
-    combined_prompt = f"수신된 SMS 에러: {text}\\n\\n과거 관련 사례 문헌:\\n{rag_context}\\n\\n위의 정보를 참고하여 원인과 결론을 요약해주세요."
-    
-    insight_text = "AI 엔진 분석 중..."
-    severity = "info"
-    type_str = "insight"
-    category = "report"
-
-    try:
-        logger.info(f"Autopilot LLM 처리 중... SMS ID: {recent_sms.id}")
-        payload = {
-            "model": "llama3",
-            "prompt": combined_prompt,
-            "system": system_prompt,
-            "stream": False
-        }
-        # 분석이 느려질 수 있으므로 timeout 여유있게 부여 (대시보드는 한 번만 기다리면 됨)
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(OLLAMA_URL, json=payload)
-            response.raise_for_status()
-            llm_result = response.json()
-            insight_text = llm_result.get("response", "LLM 응답 불가")
-            
-            # 텍스트 결과에서 심각도 간단 추정
-            if "Critical" in insight_text or "🚨" in insight_text:
-                severity = "critical"
-                type_str = "error"
-                category = "database"
-            elif "Warning" in insight_text or "⚠️" in insight_text:
-                severity = "high"
-                type_str = "warning"
-                category = "server"
-                
-    except Exception as e:
-        logger.error(f"Ollama failed in Autopilot insight: {e}")
-        insight_text = f"💡 [Insight] RAG 모델 연동 중 LLM 추론 타임아웃 발생 (수신 SMS: {text[:20]}...). 서버 재기동을 고려하세요."
-
-    current_log = {
-        "id": f"RAG-AUTO-{recent_sms.id}",
-        "type": type_str,
-        "category": category,
-        "severity": severity,
-        "text": insight_text,
-        "detail": f"수신 시간: {recent_sms.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
-    }
-
-    final_response = {
-        "status": "active",
-        "learning_data_size": "15.2 TB (KMS) + Local RAG",
-        "accuracy": "99.1%",
-        "prediction_counts": prediction_counts,
-        "current_log": current_log
-    }
-
-    # 4. 분석 결과 메모리 캐싱 (중복 추론 방지)
-    last_analyzed_sms_id = recent_sms.id
-    cached_insight_response = final_response
-
-    return final_response
+    return StreamingResponse(report_stream(), media_type="text/event-stream")
 
 @app.get("/ai/agent-discussion/{sms_id}")
-async def get_agent_discussion(sms_id: int, db: Session = Depends(get_db)):
+@app.get("/ai/discussion/{sms_id}")
+async def get_agent_discussion_stream(sms_id: str, db: Session = Depends(get_db)):
     """
-    특정 SMS ID 기반 다중 에이전트 논의 대본 생성 API (Live Incident Stream 연동용)
-    RAG(ChromaDB)를 통해 과거 사례를 찾고, Ollama LLM을 이용해 4명의 전문가 캐릭터들이 회의하는 JSON 대본을 생성.
+    특정 장애 SMS에 대해 4인의 에이전트(Security, DB, DevOps, Leader)가 협업하여 분석하는 실시간 상황 로그 (Streaming)
     """
-    sms = db.query(SMSMessageDB).filter(SMSMessageDB.id == sms_id).first()
+    sms = db.query(SMSMessageDB).filter(SMSMessageDB.inc_id == sms_id).first()
     if not sms:
-        raise HTTPException(status_code=404, detail="해당 SMS를 찾을 수 없습니다.")
+        async def err_gen():
+            yield f"data: {json.dumps({'error': 'SMS not found'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(err_gen(), media_type="text/event-stream")
 
-    text = sms.message
+    query = f"""
+    다음 장애 SMS 내용에 대해 보안 전문가(Security), DB 전문가(DB), 인프라 전문가(DevOps), 실시간 대응팀장(Leader)이 
+    서로 대화하며 원인을 분석하고 해결 방안을 도출하는 'AI War-Room 상황 로그' 대본을 작성해라.
     
-    # 1. Retrieval (ChromaDB 참조 데이터 수집)
-    rag_context = ""
-    if chroma_collection and embedding_model:
-        try:
-            query_embedding = embedding_model.encode([text])
-            results = chroma_collection.query(
-                query_embeddings=query_embedding.tolist(),
-                n_results=2 # 핵심 참조 문헌 2건만
-            )
-            if results['documents'] and len(results['documents'][0]) > 0:
-                rag_context = "과거 발생한 유사 장애 및 해결 사례 (사후보고서):\\n"
-                for doc in results['documents'][0]:
-                    rag_context += f"- {doc[:200]}...\\n"
-        except Exception as e:
-            logger.error(f"ChromaDB search failed in Discussion API: {e}")
-
-    # 2. 시스템 프롬프트 및 JSON 강제 생성 규칙 작성
-    system_prompt = """
-당신은 IT 장애 대응팀의 4명의 에이전트(Security, DB, DevOps, Leader)의 회의 대본을 작성하는 AI 봇입니다.
-사용자가 제공하는 [현재 수신된 통신 장애 로그]와 [과거 유사 장애 및 해결 사례]를 바탕으로, 각자의 역할에 맞춘 짧은 대사(1~2문장)를 생성하세요.
-반드시 아래 JSON Array 형식만 응답해야 하며, 다른 인삿말이나 부연 설명은 일절 포함하지 마세요.
-
-역할(role) 정보:
-- "Security": 침입이나 보안 위협 관점 점검
-- "DB": 데이터베이스 상태 및 트랜잭션, 커넥션 풀 등의 관점 점검
-- "DevOps": 서버 리소스, 인프라, 네트워크 지연 관점 제안
-- "Leader": 상황을 종합하고 조치 방안(Actions) 결론 도출 (반드시 마지막에 발언)
-
-응답 예시 포맷:
-[
-  {"role": "DevOps", "text": "현재 시스템의 ... 로그가 감지되었습니다. 이전 사례를 비추어볼 때 트래픽 폭주가 예상됩니다."},
-  {"role": "DB", "text": "... 정보를 확인했습니다. DB 커넥션이 포화 상태입니다."},
-  {"role": "Security", "text": "외부의 악성 접근은 발견되지 않았습니다."},
-  {"role": "Leader", "text": "과거 사례를 참고하여 즉각적인 캐시 스케일 아웃 및 DB 재기동을 승인합니다."}
-]
-"""
+    내용: {sms.message}
     
-    combined_prompt = f"현재 수신된 통신 장애 로그:\n{text}\n\n과거 유사 장애 및 해결 사례:\n{rag_context}\n\n역할별로 나누어 JSON 대본을 작성해주세요."
-    
-    try:
-        logger.info(f"Agent-Discussion LLM 처리 중... SMS ID: {sms_id}")
-        payload = {
-            "model": "llama3",
-            "prompt": combined_prompt,
-            "system": system_prompt,
-            "stream": False,
-            "format": "json" # JSON 응답 강제 (지원되는 모델의 경우)
-        }
+    [규칙]
+    1. 각 대사는 반드시 '[에이전트명]: 내용' 형식을 지켜라.
+    2. 에이전트명은 반드시 [Security, DB, DevOps, Leader] 중 하나여야 한다.
+    3. 각 에이전트별로 최소 1회 이상 발언해라.
+    4. 기술적인 전문 내용을 포함하되, 긴박한 상황실 분위기를 연출해라.
+    5. 마지막은 반드시 Leader가 최종 조치를 지시하며 마무리해라.
+    """
+
+    async def stream():
+        req_id = secrets.token_hex(4)
+        logger.info(f"[discussion-stream:{req_id}] start sms_id={sms_id}")
         
-        async with httpx.AsyncClient(timeout=180.0) as client:
-            response = await client.post(OLLAMA_URL, json=payload)
-            response.raise_for_status()
-            llm_result = response.json()
-            raw_text = llm_result.get("response", "[]")
-            
-            # JSON 파싱 시도
-            import json
-            try:
-                # 가끔 모델이 markdown 블록으로 감싸는 경우 처리
-                if raw_text.startswith("```json"):
-                    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-                elif raw_text.startswith("```"):
-                    raw_text = raw_text.split("```")[1].split("```")[0].strip()
-                    
-                discussion_data = json.loads(raw_text)
-                
-                # 모델이 {"response": [...]} 또는 {"discussion": [...]} 형태로 응답하는 경우 처리
-                if isinstance(discussion_data, dict):
-                    if "response" in discussion_data and isinstance(discussion_data["response"], list):
-                        discussion_data = discussion_data["response"]
-                    elif "discussion" in discussion_data and isinstance(discussion_data["discussion"], list):
-                        discussion_data = discussion_data["discussion"]
-                        
-                if not isinstance(discussion_data, list):
-                    raise ValueError("Parsed JSON is not a list")
-                    
-                return {"status": "success", "discussion": discussion_data}
-            except Exception as e:
-                logger.warning(f"Failed to parse LLM JSON output: {e}. Raw text: {raw_text}")
-                # 파싱 실패시 폴백 데이터 생성
-                fallback_data = [
-                    {"role": "DevOps", "text": f"수신된 로그 '{text[:20]}...' 분석 중입니다. 인프라 지표를 점검하겠습니다."},
-                    {"role": "DB", "text": "데이터베이스 부하는 정상 범위로 보이나 과거 사례 기반으로 재확인 중입니다."},
-                    {"role": "Security", "text": "관련 IP 대역에 대한 차단 룰을 임시로 활성화 하길 권장합니다."},
-                    {"role": "Leader", "text": "우선 모니터링을 지속하며, 관련자 승인을 대기합니다."}
-                ]
-                return {"status": "fallback", "discussion": fallback_data}
+        # 1. 연결 성공 알림
+        yield f"data: {json.dumps({'status': 'connected'}, ensure_ascii=False)}\n\n"
 
-    except Exception as e:
-        logger.error(f"Ollama failed in Agent Discussion API: {e}")
-        # LLM 자체 에러시 에러 메시 대사로 구성
-        error_data = [
-            {"role": "DevOps", "text": "LLM 추론 엔진과의 통신 시간 초과 (Timeout)가 발생했습니다."},
-            {"role": "Leader", "text": "일단 과거 발생한 사례를 기반으로 기존 프로토콜 매뉴얼에 따라 수동 조치를 진행해 주시기 바랍니다."}
-        ]
-        return {"status": "error", "discussion": error_data}
+        try:
+            # Dify 스트리밍 호출
+            gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user")
+            async for chunk in gen:
+                # Dify chunk를 그대로 전달하되, 프론트에서 파싱하기 쉽게 [Agent]: 포맷 유지
+                yield chunk
+        except Exception as e:
+            logger.error(f"[discussion-stream:{req_id}] error: {e}")
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+            logger.info(f"[discussion-stream:{req_id}] end")
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
 
 @app.get("/ai/analysis/{incident_id}")
 async def get_ai_analysis_detail(incident_id: str):
@@ -720,158 +986,239 @@ class ChatRequest(BaseModel):
 @app.post("/ai/chat")
 async def chat_with_ai(request: ChatRequest):
     """
-    AI Agent Chatbot Endpoint (Fully Integrated with RAG)
+    AI Agent Chatbot Endpoint (Dify Streaming SSE)
     """
     query = request.query
-    
-    # 기본 더미 체크 (이전 Mock 호환 명목)
     if not query.strip():
-        return {"response": "질문을 입력해주세요.", "related_logs": []}
-
-    related_logs = []
-    rag_context = ""
-
-    # 1. Retrieval (ChromaDB 검색)
-    if chroma_collection and embedding_model:
-        try:
-            logger.info(f"Querying ChromaDB for: {query}")
-            query_embedding = embedding_model.encode([query])
-            results = chroma_collection.query(
-                query_embeddings=query_embedding.tolist(),
-                n_results=3
-            )
-            
-            if results['documents'] and len(results['documents'][0]) > 0:
-                rag_context = "다음은 S-Guard에 등록된 과거 장애 처리 내역(Post-Mortem)입니다:\\n"
-                for i, doc in enumerate(results['documents'][0]):
-                    source = results['metadatas'][0][i].get('source', 'Unknown')
-                    excerpt = doc[:400] + "..." if len(doc) > 400 else doc
-                    rag_context += f"- [출처: {source}] {excerpt}\\n"
-                    related_logs.append(f"[RAG] 매칭 출처: {source} (유사도: {results['distances'][0][i]:.4f})")
-        except Exception as e:
-            logger.error(f"ChromaDB search failed: {e}")
-            related_logs.append(f"[System Error] Vector DB 연동 중 오류 발생: {e}")
-
-    # 2. Generation (Ollama LLM 활용)
-    # 프롬프트 구성
-    system_prompt = (
-        "당신은 S-Guard IT 시스템 장애 분석 전문가 및 챗봇입니다. "
-        "사용자가 시스템 오류나 장애에 대해 질문하면, 가용한 정보와 과거 유사 장애 사례를 바탕으로 원인을 분석하고 해결책을 친절하게 제시하세요. "
-        "응답은 반드시 한국어로 작성해야 합니다."
-    )
-    
-    combined_prompt = f"질문: {query}\\n\\n"
-    if rag_context:
-        combined_prompt += f"과거 관련 장애 사례:\\n{rag_context}\\n\\n위의 과거 사례를 참고하여 질문에 상세히 답변해주세요."
-    else:
-        combined_prompt += "질문에 답변해주세요."
-
-    payload = {
-        "model": "llama3", # 사용 중인 모델명 (만약 phi3 사용시 변경)
-        "prompt": combined_prompt,
-        "system": system_prompt,
-        "stream": False
-    }
+        async def err_gen():
+            yield f"data: {json.dumps({'answer': '질문을 입력해주세요.'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(err_gen(), media_type="text/event-stream")
 
     try:
-        logger.info("Sending prompt to Ollama LLM...")
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(OLLAMA_URL, json=payload)
-            response.raise_for_status()
-            llm_result = response.json()
-            answer = llm_result.get("response", "LLM 응답을 해석할 수 없습니다.")
+        logger.info(f"S-GUARD Chat Dify 스트리밍 연동 중: {query}")
+        gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user")
+        return StreamingResponse(gen, media_type="text/event-stream")
     except Exception as e:
-        logger.error(f"OLLAMA HTTP Request Failed: {e}")
-        answer = (
-            "⚠️ LLM(Ollama) 서버와 통신할 수 없습니다. "
-            "현재 모델(llama3)이 컨테이너에 탑재되어 실행 중인지, 메모리가 충분한지 확인해주세요.\\n"
-            f"Error details: {e}"
-        )
-        if rag_context:
-            answer += f"\\n\\n(참고로 AI 생성은 실패했으나, 다음 과거 유사 장애 문서를 찾았습니다.)\\n{rag_context[:500]}..."
+        logger.error(f"Chat Dify error: {e}")
+        async def fail_gen():
+            yield f"data: {json.dumps({'error': f'AI 통신 중 오류가 발생했습니다: {str(e)}'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(fail_gen(), media_type="text/event-stream")
 
-    return {
-        "response": answer,
-        "related_logs": related_logs
-    }
 
-class ReportSaveRequest(BaseModel):
-    title: str
-    content: str
+@app.get("/ai/analyze-sms/{sms_id}")
+async def analyze_sms_multi_agent(sms_id: str, db: Session = Depends(get_db)):
+    """Perform multi-agent collaborative analysis using Dify"""
+    sms = db.query(SMSMessageDB).filter(SMSMessageDB.inc_id == sms_id).first()
+    hist = db.query(IncidentHistoryDB).filter(IncidentHistoryDB.sms_id == sms_id).first()
+    
+    if not sms:
+        raise HTTPException(status_code=404, detail="SMS not found")
+
+    # [핵심] 4개 에이전트 페르소나를 활용한 분석 프롬프트
+    query = f"""
+    [장애 수신 내역]
+    발신자: {sms.sender}
+    메시지 원본: {sms.message}
+    추출 정보: {hist.target_system if hist else 'Unknown'} / {hist.error_code if hist else 'N/A'}
+    
+    다음 4명의 전문가 에이전트가 협업하여 이 장애를 분석하고 리더가 최종 결과를 한국어로 보고하세요:
+    1. Infra Agent: L4, 네트워크, VM 등 인프라 영향도 분석
+    2. DB Agent: DB 서버 상태, 쿼리 지연, 데드락 가능성 및 과거 조치 이력 분석
+    3. DevOps Agent: 소스 코드 배포 이력, API 연동, 어플리케이션 에러 로그 관점 분석
+    4. S-Guard Leader: 위 전문가들의 의견을 종합하여 장애 원인을 특정하고 구체적인 '조치 가이드'를 제시
+    
+    응답 형식: '현상 분석', '담당자 자동 할당', 'AI War-Room Situation Log', '리더의 최종 조치 가이드' 섹션으로 구성할 것.
+    - '담당자 자동 할당' 섹션은 반드시 "-> 담당자 대응 : 할당리스트에 해당하는 할당자 목록을 표시해줘" 라는 문구로 시작할 것.
+    """
+    
+    try:
+        res = await DifyClient.chat_message(query=query, user="sguard-multi-agent")
+        analysis = res.get("answer", "AI 분석 결과를 생성할 수 없습니다.")
+        return {"status": "success", "analysis": analysis}
+    except Exception as e:
+        logger.error(f"Multi-agent analysis failed: {e}")
+        return {"status": "error", "analysis": "분석 서비스 일시 중단"}
+
+
+class AnalyzeSmsRequest(BaseModel):
+    sender: Optional[str] = None
+    message: str
     sms_id: Optional[str] = None
 
-class SmsAnalysisRequest(BaseModel):
-    sender: str
-    message: str
 
 @app.post("/ai/analyze-sms")
-async def analyze_sms(req: SmsAnalysisRequest):
-    """Perform real-time RAG analysis on an incoming SMS"""
-    query = f"다음 SMS 메시지를 분석하고 장애 유형과 대응 방안을 제시해줘: '{req.message}' (발신자: {req.sender})"
-    try:
-        # Use the existing RAG chain to find similar cases and analyze
-        result = qa_chain.invoke(query)
-        analysis_text = result.get('result', '')
+async def analyze_sms_stream(req: AnalyzeSmsRequest):
+    """
+    SMS 텍스트 분석 (Dify Streaming SSE)
+    - 프론트에서 실시간 타이핑 렌더링을 위해 SSE로 응답
+    """
+    message = (req.message or "").strip()
+    sender = (req.sender or "Unknown").strip()
+
+    if not message:
+        async def err_gen():
+            yield f"data: {json.dumps({'error': 'message가 필요합니다.'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(err_gen(), media_type="text/event-stream")
+
+    query = (
+        f"다음 SMS 장애 내용을 분석하고 조치 가이드를 한국어로 제시해줘.\n"
+        f"발신자: {sender}\n"
+        f"메시지: {message}\n\n"
+        "[응답 형식 가이드]\n"
+        "1. **상황 요약**: 현재 발생한 장애의 핵심 내용을 요약한다.\n"
+        "2. **담당자 자동 할당**: 어떤 파트가 담당해야 하는지 명시한다. (내용 시작 시 반드시 '-> 담당자 대응 : 할당리스트에 해당하는 할당자 목록을 표시해줘' 문구를 포함할 것)\n"
+        "3. **AI War-Room Situation Log**: 이곳은 실제 전문가 에이전트들이 대화를 나누며 진단하는 '대화형 로그' 형식으로 작성한다.\n"
+        "   예: \n"
+        "   - [Infra Agent]: \"CPU 부하 확인 결과... 특정 프로세스 점유율이 비정상적입니다.\"\n"
+        "   - [DB Agent]: \"해당 시간대 DB Lock 상황 점검... 인덱스 누널이 원인으로 보입니다.\"\n"
+        "   - [S-Guard Leader]: \"상황 파악 완료. 즉시 조치 가이드를 생성하겠습니다.\"\n"
+        "4. **리더의 최종 조치 가이드**: 구체적인 명령어 및 해결 단계를 제시한다."
+    )
+
+    async def stream():
+        req_id = secrets.token_hex(4)
+        logger.info(f"[analyze-sms:{req_id}] start sender={sender} msg_len={len(message)}")
         
-        # If the result is too short or empty, provide a default but still structured response
-        if not analysis_text or len(analysis_text) < 10:
-            analysis_text = f"수신 메시지 '{req.message}'를 분석한 결과, 특이 장애 패턴이 발견되지 않았습니다. 지속적으로 모니터링이 필요합니다."
-            
-        return {"status": "success", "analysis": analysis_text}
-    except Exception as e:
-        logger.error(f"RAG 분석 중 오류 발생: {e}")
-        # Fallback to a simpler prompt if the chain fails
+        # 0. 클라이언트 타임아웃 방지 시그널 즉시 발송
+        yield f"data: {json.dumps({'status': 'connected'}, ensure_ascii=False)}\n\n"
+
+        # 1. 기 분석된 결과가 있는지 DB 조회 (캐시 히트)
+        if req.sms_id:
+            try:
+                with SessionLocal() as db_session:
+                    inc = db_session.query(IncidentDB).filter(IncidentDB.source_sms_id == req.sms_id).first()
+                    if inc and inc.ai_insight:
+                        logger.info(f"[analyze-sms:{req_id}] Cache Hit for SMS_ID: {req.sms_id}")
+                        # 저장된 내용을 즉시 반환
+                        yield f"data: {json.dumps({'answer': inc.ai_insight}, ensure_ascii=False)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+            except Exception as e:
+                logger.error(f"[analyze-sms:{req_id}] Cache check failed: {e}")
+
+        # 2. 신규 분석 진행
+        yield f"data: {json.dumps({'status': 'working'}, ensure_ascii=False)}\n\n"
+        
         try:
-            response = await httpx.AsyncClient(timeout=30.0).post(
-                f"{OLLAMA_BASE_URL}/api/generate",
-                json={
-                    "model": "llama3",
-                    "prompt": f"장애 관제 시스템 전문가로서 다음 SMS를 분석하고 대응 방안을 한국어로 한 문장으로 말해줘: {req.message}",
-                    "stream": False
-                }
-            )
-            if response.status_code == 200:
-                data = response.json()
-                return {"status": "success", "analysis": data.get('response', '')}
-        except:
-            pass
-        return {"status": "error", "analysis": "AI 서비스를 일시적으로 사용할 수 없어 로컬 규칙으로 분석합니다."}
+            gen = await DifyClient.stream_chat_message(query=query, user="sguard-sms-analyze")
+            answer_chars = 0
+            answer_parts = []
+            done_sent = False
+            async for chunk in gen:
+                # chunk is already SSE-formatted ("data: ...\n\n")
+                if chunk.startswith("data:"):
+                    data_str = chunk[5:].strip()
+                    if data_str == "[DONE]":
+                        logger.info(f"[analyze-sms:{req_id}] done answer_chars={answer_chars}")
+                        done_sent = True
+                    else:
+                        try:
+                            data = json.loads(data_str)
+                            if data.get("error"):
+                                logger.warning(f"[analyze-sms:{req_id}] error={data.get('error')}")
+                            if data.get("status") in ("connected", "working"):
+                                logger.info(f"[analyze-sms:{req_id}] status={data.get('status')}")
+                            if data.get("answer"):
+                                part = data["answer"]
+                                answer_parts.append(part)
+                                answer_chars += len(part)
+                                if answer_chars < 80:
+                                    logger.info(f"[analyze-sms:{req_id}] answer_chunk sample={part[:60]!r}")
+                        except Exception:
+                            pass
+                yield chunk
 
-@app.post("/ai/report/save")
-async def save_ai_report(req: ReportSaveRequest, db: Session = Depends(get_db)):
-    logger.info(f"KMS 보고서 저장 요청: {req.title}")
+            # If upstream ended without any answer, fail gracefully for the client UI.
+            if answer_chars == 0 and not done_sent:
+                logger.warning(f"[analyze-sms:{req_id}] upstream_ended_without_answer")
+                yield f"data: {json.dumps({'error': 'AI 분석이 지연되고 있습니다'}, ensure_ascii=False)}\n\n"
+                yield "data: [DONE]\n\n"
+        except asyncio.CancelledError:
+            # Client disconnected / request cancelled
+            logger.warning(f"[analyze-sms:{req_id}] cancelled_by_client answer_chars={answer_chars if 'answer_chars' in locals() else 0}")
+            raise
+        except Exception as e:
+            logger.error(f"[analyze-sms:{req_id}] exception: {e}")
+            yield f"data: {json.dumps({'error': 'AI 분석이 지연되고 있습니다'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        finally:
+            # 스트리밍 종료 시 최종 답변을 DB에 자동 저장 (사용자 요청 사항)
+            if (req.sms_id or sender) and answer_chars > 0:
+                try:
+                    # Sync DB session inside generator if needed, but better to use a new session
+                    with SessionLocal() as db_session:
+                        # sms_id가 있으면 우선순위로 검색, 없으면 sender/message로 검색
+                        target_inc = None
+                        if req.sms_id:
+                            target_inc = db_session.query(IncidentDB).filter(IncidentDB.source_sms_id == req.sms_id).first()
+                        
+                        if not target_inc:
+                            # fallback: 최근 1시간 내 동일 발신자/메시지 인시던트 찾기
+                            target_inc = db_session.query(IncidentDB).filter(
+                                IncidentDB.description == message,
+                                IncidentDB.created_at >= get_kst() - timedelta(hours=1)
+                            ).order_by(IncidentDB.created_at.desc()).first()
+                        
+                        if target_inc:
+                            target_inc.ai_insight = "".join(answer_parts)
+                            db_session.commit()
+                            logger.info(f"[analyze-sms:{req_id}] AI Insight saved to Incident ID: {target_inc.inc_id}")
+                except Exception as db_err:
+                    logger.error(f"[analyze-sms:{req_id}] Failed to save AI Insight: {db_err}")
+            
+            logger.info(f"[analyze-sms:{req_id}] end")
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+# ── [지식 선순환 루프] 조치 결과 피드백 및 RAG 재학습 ──────────────────────────
+class FeedbackRequest(BaseModel):
+    incident_id: str
+    resolution: str
+    commands_used: Optional[str] = None
+    feedback_rating: str
+
+@app.post("/ai/feedback/save")
+async def save_resolution_feedback(req: FeedbackRequest, db: Session = Depends(get_db)):
+    """피드백 저장 및 Dify 지식 베이스(RAG) 동기화"""
+    # 1. DB 적재
+    action = ActionResultDB(
+        inc_id=generate_inc_id(db, ActionResultDB),
+        incident_id=req.incident_id,
+        resolution_text=req.resolution,
+        commandsUsed=req.commands_used,
+        feedback=req.feedback_rating
+    )
+    db.add(action)
+    db.commit()
+
+    # 2. Dify 지식 베이스(RAG)에 실시간 '성공 사례'로 인입
+    inc = db.query(IncidentDB).filter(IncidentDB.inc_id == req.incident_id).first()
+    knowledge_text = f"""
+    [검증된 장애 해결 사례]
+    시스템: {inc.title if inc else 'Unknown'}
+    현상: {inc.description if inc else 'N/A'}
+    해결방안: {req.resolution}
+    실행 명령어: {req.commands_used if req.commands_used else 'N/A'}
+    피드백 결과: {req.feedback_rating}
+    등록일: {get_kst().strftime('%Y-%m-%d %H:%M:%S')}
+    """
+    
     try:
-        doc_id = f"report_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        document_text = f"Title: {req.title}\nContent: {req.content}"
-        
-        vector_store.add_texts(
-            texts=[document_text],
-            metadatas=[{
-                "source": "auto_generated_report",
-                "title": req.title,
-                "timestamp": datetime.utcnow().isoformat(),
-                "sms_id": req.sms_id or "unknown"
-            }],
-            ids=[doc_id]
+        await DifyClient.ingest_to_dataset(
+            content=knowledge_text, 
+            metadata={
+                "incident_id": req.incident_id,
+                "type": "verified_resolution",
+                "source": "sguard_virtuous_cycle"
+            }
         )
-        
-        # [활동로그] AI 리포트 저장 로그 추가
-        log = ActivityLogDB(
-            user_name="AI Autopilot",
-            incident_code=req.sms_id, # Linking to SMS ID if provided
-            incident_title=req.title,
-            action="AI 리포트 보고 완료",
-            detail=f"KMS 지식 베이스에 AI 분석 보고서({req.title})가 저장되었습니다.",
-            report_type="AI 리포트"
-        )
-        db.add(log)
-        db.commit()
-
-        logger.info(f"ChromaDB [s_guard_knowledge] 컬렉션에 새 보고서 적재 성공. ID: {doc_id}")
-        return {"status": "success", "message": "보고서가 성공적으로 KMS에 저장(임베딩)되었습니다.", "doc_id": doc_id}
+        return {"status": "success", "message": "해결 사례가 지식 베이스에 반영되었습니다. 시스템이 학습을 완료했습니다."}
     except Exception as e:
-        logger.error(f"KMS 저장 중 오류 발생: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Feedback ingestion failed: {e}")
+        return {"status": "partial_success", "message": "피드백은 DB에 저장되었으나 AI 학습 연동에 실패했습니다."}
 
 # --- War-Room Chat Endpoints ---
 
@@ -886,17 +1233,18 @@ class WarRoomMessage(BaseModel):
 async def save_warroom_chat(msg: WarRoomMessage, db: Session = Depends(get_db)):
     """Save a single message from the War-Room"""
     chat_db = WarRoomChatDB(
+        inc_id=generate_inc_id(db, WarRoomChatDB),
         incident_id=msg.incident_id,
         sender=msg.sender,
         role=msg.role,
         type=msg.type,
         text=msg.text,
-        timestamp=datetime.utcnow()
+        timestamp=get_kst()
     )
     db.add(chat_db)
     db.commit()
     db.refresh(chat_db)
-    return {"status": "success", "id": chat_db.id}
+    return {"status": "success", "inc_id": chat_db.inc_id}
 
 @app.get("/warroom/chat/{incident_id}")
 async def get_warroom_chat(incident_id: str, db: Session = Depends(get_db)):
@@ -905,6 +1253,22 @@ async def get_warroom_chat(incident_id: str, db: Session = Depends(get_db)):
     
     # Also fetch incident metadata for the title and description
     incident = db.query(IncidentDB).filter(IncidentDB.code == incident_id).first()
+
+    if incident and incident.status == "접수중":
+        incident.status = "처리중"
+        db.commit()
+        # Log this state transition
+        activity = ActivityLogDB(
+            user_name="System Agent",
+            incident_code=incident_id,
+            incident_title=incident.title if incident else "",
+            action="Status Transition",
+            detail="워룸 개설로 인해 상태가 '접수중'에서 '처리중'으로 변경되었습니다.",
+            report_type="System"
+        )
+        db.add(activity)
+        db.commit()
+
     title = incident.title if incident else f"Room {incident_id}"
     description = incident.description if incident else ""
     severity = incident.severity if incident else "NORMAL"
@@ -926,7 +1290,7 @@ async def create_incident(inc: IncidentCreate, db: Session = Depends(get_db)):
         if existing_sms_inc:
             return {
                 "status": "exists", 
-                "id": existing_sms_inc.id, 
+                "inc_id": existing_sms_inc.inc_id, 
                 "code": existing_sms_inc.code,
                 "title": existing_sms_inc.title
             }
@@ -939,9 +1303,10 @@ async def create_incident(inc: IncidentCreate, db: Session = Depends(get_db)):
         existing.severity = inc.severity
         db.commit()
         db.refresh(existing)
-        return {"status": "updated", "id": existing.id, "code": existing.code}
+        return {"status": "updated", "inc_id": existing.inc_id, "code": existing.code}
     
     new_inc = IncidentDB(
+        inc_id=inc.code, # code와 inc_id를 동일하게 가져간다
         code=inc.code,
         title=inc.title,
         description=inc.description,
@@ -953,6 +1318,7 @@ async def create_incident(inc: IncidentCreate, db: Session = Depends(get_db)):
     
     # [활동로그] 새로운 워룸 개설 로그 추가
     log = ActivityLogDB(
+        inc_id=generate_inc_id(db, ActivityLogDB),
         user_name="System",
         incident_code=new_inc.code,
         incident_title=new_inc.title,
@@ -964,7 +1330,7 @@ async def create_incident(inc: IncidentCreate, db: Session = Depends(get_db)):
     
     db.commit()
     db.refresh(new_inc)
-    return {"status": "created", "id": new_inc.id, "code": new_inc.code}
+    return {"status": "created", "inc_id": new_inc.inc_id, "code": new_inc.code}
 
 # ─── War-Room Management Endpoints ──────────────────────────────────────────
 
@@ -1136,7 +1502,7 @@ async def join_warroom(
         role="System",
         type="system",
         text=f"👤 {user_name}님이 War-Room에 참여하였습니다.",
-        timestamp=datetime.utcnow()
+        timestamp=get_kst()
     )
     db.add(join_msg)
     
@@ -1178,24 +1544,26 @@ async def upload_warroom_file(
     file_url = f"/warroom/uploads/{unique_name}"
     
     attachment = WarRoomAttachmentDB(
+        inc_id=generate_inc_id(db, WarRoomAttachmentDB),
         incident_id=incident_id,
         filename=unique_name,
         original_name=file.filename,
         file_type=file.content_type,
         url=file_url,
         uploaded_by=uploaded_by,
-        timestamp=datetime.utcnow()
+        timestamp=get_kst()
     )
     db.add(attachment)
     
     # Also save to chat log as a message
     chat_msg = WarRoomChatDB(
+        inc_id=generate_inc_id(db, WarRoomChatDB),
         incident_id=incident_id,
         sender=uploaded_by,
         role="User",
         type="file",
         text=f"[첨부파일] {file.filename}|{file_url}|{file.content_type}",
-        timestamp=datetime.utcnow()
+        timestamp=get_kst()
     )
     db.add(chat_msg)
     db.commit()
@@ -1203,7 +1571,7 @@ async def upload_warroom_file(
     
     return {
         "status": "success",
-        "id": attachment.id,
+        "inc_id": attachment.inc_id,
         "url": file_url,
         "filename": file.filename,
         "file_type": file.content_type
@@ -1226,7 +1594,7 @@ async def get_warroom_attachments(incident_id: str, db: Session = Depends(get_db
         .filter(WarRoomAttachmentDB.incident_id == incident_id)\
         .order_by(WarRoomAttachmentDB.timestamp.asc()).all()
     return {"attachments": [{
-        "id": a.id,
+        "inc_id": a.inc_id,
         "filename": a.filename,
         "original_name": a.original_name,
         "file_type": a.file_type,
@@ -1241,7 +1609,7 @@ async def get_warroom_attachments(incident_id: str, db: Session = Depends(get_db
 async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get_db)):
     """
     Gather all chat logs for the incident, compile them into a troubleshooting report,
-    and ingest them into ChromaDB for future RAG learning.
+    and ingest them into Dify Knowledge base for future RAG learning.
     """
     try:
         # Retrieve all messages for this incident
@@ -1254,7 +1622,7 @@ async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get
         report_lines = [
             f"[Troubleshooting Report - War-Room Chat History]",
             f"Incident ID: {incident_id}",
-            f"Resolved At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Resolved At: {get_kst().strftime('%Y-%m-%d %H:%M:%S')}",
             f"\n--- Incident Log ---"
         ]
         
@@ -1273,21 +1641,17 @@ async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get
             "type": "incident_report",
             "category": "human_interaction",
             "incident_id": incident_id,
-            "ingested_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            "ingested_at": get_kst().strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        # Ingest into ChromaDB
-        vector_store.add_texts(
-            texts=[full_report_text],
-            metadatas=[metadata],
-            ids=[f"warroom_{incident_id}_{int(datetime.now().timestamp())}"]
-        )
+        # Ingest into Dify Knowledge Base
+        await DifyClient.ingest_to_dataset(content=full_report_text, metadata=metadata)
         
         # 1. Update Incident Status in DB
         inc = db.query(IncidentDB).filter(IncidentDB.code == incident_id).first()
         if inc:
             inc.status = "Completed"
-            inc.updated_at = datetime.utcnow()
+            inc.updated_at = get_kst()
         
         # 2. Add Final System Message
         closure_msg = WarRoomChatDB(
@@ -1296,7 +1660,7 @@ async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get
             role="System",
             type="system",
             text="✅ 대응이 완료되어 War-Room이 종료되었습니다. (읽기 전용 모드)",
-            timestamp=datetime.utcnow()
+            timestamp=get_kst()
         )
         db.add(closure_msg)
         db.commit()
@@ -1314,41 +1678,11 @@ async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get
 @app.get("/knowledge/list")
 async def list_knowledge_entries(limit: int = 50):
     """
-    Return documents from the s_guard_knowledge ChromaDB collection
+    Return documents from the S-GUARD Knowledge base (via Dify)
     so users can review what has been learned by the AI.
     """
-    try:
-        # Get the raw ChromaDB client collection
-        raw_collection = chroma_client.get_or_create_collection(
-            name="s_guard_knowledge",
-            metadata={"hnsw:space": "cosine"}
-        )
-        result = raw_collection.get(
-            limit=limit,
-            include=["documents", "metadatas"]
-        )
-        entries = []
-        ids = result.get("ids", [])
-        docs = result.get("documents", [])
-        metas = result.get("metadatas", [])
-        for i, doc_id in enumerate(ids):
-            meta = metas[i] if i < len(metas) else {}
-            doc = docs[i] if i < len(docs) else ""
-            entries.append({
-                "id": doc_id,
-                "source": meta.get("source", "unknown"),
-                "type": meta.get("type", "document"),
-                "incident_id": meta.get("incident_id", ""),
-                "title": meta.get("title", doc[:80] + "..." if len(doc) > 80 else doc),
-                "ingested_at": meta.get("ingested_at", meta.get("timestamp", "")),
-                "preview": doc[:300] + "..." if len(doc) > 300 else doc,
-            })
-        # Sort by ingested_at descending
-        entries.sort(key=lambda x: x.get("ingested_at", ""), reverse=True)
-        return {"total": len(entries), "entries": entries}
-    except Exception as e:
-        logger.error(f"Failed to list knowledge entries: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # [Note] ChromaDB removed. Dify Knowledge base is managed via Dify Console.
+    return {"total": 0, "entries": []}
 
 
 # ===========================================================
@@ -1367,11 +1701,11 @@ def verify_password(password: str, stored_hash: str) -> bool:
     except Exception:
         return False
 
-def generate_token(user_id: int, email: str) -> str:
+def generate_token(user_id: str, email: str) -> str:
     raw = f"{user_id}:{email}:{secrets.token_hex(16)}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
-async def send_email_async(to_email: str, subject: str, body: str):
+async def send_email_async(to_email: str, subject: str, body: str, is_html: bool = False):
     """
     SMTP 서버(기본: Gmail)를 통해 이메일을 비동기로 발송합니다.
     """
@@ -1388,7 +1722,11 @@ async def send_email_async(to_email: str, subject: str, body: str):
     msg['From'] = sender_email
     msg['To'] = to_email
     msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
+    
+    if is_html:
+        msg.attach(MIMEText(body, 'html'))
+    else:
+        msg.attach(MIMEText(body, 'plain'))
 
     try:
         # SMTP 연결
@@ -1453,7 +1791,7 @@ async def verify_reset_code(req: VerifyResetCode, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="인증 코드가 올바르지 않습니다.")
     
     # 코드 유효 시간 체크 (예: 5분)
-    if datetime.utcnow() - verif.created_at > timedelta(minutes=5):
+    if get_kst() - verif.created_at > timedelta(minutes=5):
         raise HTTPException(status_code=400, detail="인증 코드가 만료되었습니다.")
     
     user = db.query(UserDB).filter(UserDB.email == req.email, UserDB.employee_id == req.employee_id).first()
@@ -1476,13 +1814,14 @@ async def verify_reset_code(req: VerifyResetCode, db: Session = Depends(get_db))
     }
 
 class ProfileUpdateRequest(BaseModel):
-    user_id: int
+    user_id: str
     name: Optional[str] = None
     phone: Optional[str] = None
     company: Optional[str] = None
     honbu: Optional[str] = None
     team: Optional[str] = None
     part: Optional[str] = None
+    subpart: Optional[str] = None
 
 class SignupRequest(BaseModel):
     email: str
@@ -1494,6 +1833,7 @@ class SignupRequest(BaseModel):
     honbu: Optional[str] = None
     team: Optional[str] = None
     part: Optional[str] = None
+    subpart: Optional[str] = None
 
 class LoginRequest(BaseModel):
     email: str
@@ -1508,7 +1848,7 @@ class UserUpdateRoleRequest(BaseModel):
 class OrgNodeCreate(BaseModel):
     name: str
     code: Optional[str] = None
-    parent_id: Optional[int] = None
+    parent_id: Optional[str] = None
     depth: int
     sort_order: Optional[int] = 0
 
@@ -1533,6 +1873,7 @@ async def signup(req: SignupRequest, db: Session = Depends(get_db)):
         honbu=req.honbu,
         team=req.team,
         part=req.part,
+        subpart=req.subpart,
     )
     db.add(user)
     db.commit()
@@ -1541,30 +1882,65 @@ async def signup(req: SignupRequest, db: Session = Depends(get_db)):
     user.token = token
     db.commit()
     db.refresh(user)
-    return {"status": "success", "token": token, "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role, "company": user.company, "honbu": user.honbu, "team": user.team, "part": user.part, "phone": user.phone}}
+    return {"status": "success", "token": token, "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role, "company": user.company, "honbu": user.honbu, "team": user.team, "part": user.part, "subpart": user.subpart, "phone": user.phone}}
 
 @app.post("/auth/login")
-async def login(req: LoginRequest, db: Session = Depends(get_db)):
+async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     # 이메일 또는 사번으로 사용자 조회
     user = db.query(UserDB).filter(
         or_(UserDB.email == req.email, UserDB.employee_id == req.email),
         UserDB.is_active == True
     ).first()
     
+    ip = request.client.host if request.client else "unknown"
+    agent = request.headers.get("user-agent", "unknown")
+    
     if not user or not user.password_hash or not verify_password(req.password, user.password_hash):
+        # 실패 히스토리 기록
+        fail_history = LoginHistoryDB(
+            email=req.email,
+            ip_address=ip,
+            user_agent=agent,
+            status="FAIL"
+        )
+        db.add(fail_history)
+        db.commit()
         raise HTTPException(status_code=401, detail="이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다.")
     
     token = generate_token(user.id, user.email)
     user.token = token
+    
+    # 성공 히스토리 기록
+    success_history = LoginHistoryDB(
+        user_id=user.id,
+        email=user.email,
+        ip_address=ip,
+        user_agent=agent,
+        status="SUCCESS"
+    )
+    db.add(success_history)
     db.commit()
     
     return {"status": "success", "token": token, "user": {
         "id": user.id, "name": user.name, "email": user.email, "role": user.role,
-        "company": user.company, "honbu": user.honbu, "team": user.team, "part": user.part, "phone": user.phone
+        "company": user.company, "honbu": user.honbu, "team": user.team, "part": user.part,
+        "subpart": user.subpart, "phone": user.phone
     }}
 
+@app.get("/auth/login-history")
+async def get_login_history(limit: int = 50, db: Session = Depends(get_db)):
+    history = db.query(LoginHistoryDB).order_by(LoginHistoryDB.login_time.desc()).limit(limit).all()
+    result = []
+    for h in history:
+        item = {c.name: getattr(h, c.name) for c in h.__table__.columns}
+        item["id"] = str(h.id)
+        if h.user_id:
+            item["user_id"] = str(h.user_id)
+        result.append(item)
+    return {"total": len(result), "history": result}
+
 class ChangePasswordRequest(BaseModel):
-    user_id: int
+    user_id: str
     new_password: str
 
 @app.post("/auth/change-password")
@@ -1589,6 +1965,7 @@ async def update_profile(req: ProfileUpdateRequest, db: Session = Depends(get_db
     if req.honbu is not None: user.honbu = req.honbu
     if req.team is not None: user.team = req.team
     if req.part is not None: user.part = req.part
+    if req.subpart is not None: user.subpart = req.subpart
     
     db.commit()
     db.refresh(user)
@@ -1669,7 +2046,7 @@ async def list_users(db: Session = Depends(get_db)):
     ]
 
 @app.post("/users/{user_id}/reset-password")
-async def reset_user_password(user_id: int, req: UserResetPasswordRequest, db: Session = Depends(get_db)):
+async def reset_user_password(user_id: str, req: UserResetPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -1678,7 +2055,7 @@ async def reset_user_password(user_id: int, req: UserResetPasswordRequest, db: S
     return {"status": "success", "message": "비밀번호가 초기화되었습니다."}
 
 @app.patch("/users/{user_id}/status")
-async def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
+async def toggle_user_status(user_id: str, db: Session = Depends(get_db)):
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -1688,7 +2065,7 @@ async def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
 
 @app.patch("/users/{user_id}/role")
 async def update_user_role(user_id: int, req: UserUpdateRoleRequest, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    user = db.query(UserDB).filter(UserDB.inc_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     user.role = req.role
@@ -1704,13 +2081,13 @@ async def get_org_tree(db: Session = Depends(get_db)):
         tree = []
         for node in nodes:
             tree.append({
-                "id": node.id,
+                "inc_id": node.inc_id,
                 "name": node.name,
                 "code": node.code,
                 "parent_id": node.parent_id,
                 "depth": node.depth,
                 "sort_order": node.sort_order,
-                "children": build_tree(node.id)
+                "children": build_tree(node.inc_id)
             })
         return tree
     
@@ -1742,8 +2119,8 @@ async def update_org_node(node_id: int, req: OrgNodeUpdate, db: Session = Depend
     return node
 
 @app.delete("/org/nodes/{node_id}")
-async def delete_org_node(node_id: int, db: Session = Depends(get_db)):
-    node = db.query(OrganizationDB).filter(OrganizationDB.id == node_id).first()
+async def delete_org_node(node_id: str, db: Session = Depends(get_db)):
+    node = db.query(OrganizationDB).filter(OrganizationDB.inc_id == node_id).first()
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
     db.delete(node)
@@ -1792,7 +2169,7 @@ async def get_incidents(
     result = []
     for inc in incidents:
         result.append({
-            "id": inc.id,
+            "inc_id": inc.inc_id,
             "code": inc.code,
             "title": inc.title,
             "description": inc.description,
@@ -1821,11 +2198,12 @@ async def create_incident(req: IncidentCreateRequest, db: Session = Depends(get_
     db.add(inc)
     db.commit()
     db.refresh(inc)
-    return {"status": "success", "code": inc.code, "id": inc.id}
+    return {"status": "success", "code": inc.code, "inc_id": inc.inc_id}
+
 
 @app.patch("/incidents/{incident_id}")
-async def update_incident(incident_id: int, req: IncidentUpdateRequest, db: Session = Depends(get_db)):
-    inc = db.query(IncidentDB).filter(IncidentDB.id == incident_id).first()
+async def update_incident(incident_id: str, req: IncidentUpdateRequest, db: Session = Depends(get_db)):
+    inc = db.query(IncidentDB).filter(IncidentDB.inc_id == incident_id).first()
     if not inc:
         raise HTTPException(status_code=404, detail="인시던트를 찾을 수 없습니다.")
     if req.status is not None:
@@ -1836,10 +2214,10 @@ async def update_incident(incident_id: int, req: IncidentUpdateRequest, db: Sess
         inc.assigned_to = req.assigned_to
     if req.description is not None:
         inc.description = req.description
-    inc.updated_at = datetime.utcnow()
+    inc.updated_at = get_kst()
     db.commit()
     db.refresh(inc)
-    return {"status": "success", "id": inc.id, "code": inc.code}
+    return {"status": "success", "inc_id": inc.inc_id, "code": inc.code}
 
 # ===========================================================
 # ACTIVITY LOGS Endpoints
@@ -1860,7 +2238,7 @@ async def get_activity_logs(limit: int = 50, db: Session = Depends(get_db)):
     result = []
     for log in logs:
         result.append({
-            "id": log.id,
+            "inc_id": log.inc_id,
             "user_name": log.user_name,
             "incident_code": log.incident_code,
             "incident_title": log.incident_title,
@@ -1886,7 +2264,7 @@ async def create_activity_log(req: ActivityLogCreateRequest, db: Session = Depen
     db.add(log)
     db.commit()
     db.refresh(log)
-    return {"status": "success", "id": log.id}
+    return {"status": "success", "inc_id": log.inc_id}
 
 # ===========================================================
 # KEYWORD DELETE Endpoint
@@ -1958,6 +2336,148 @@ async def convert_multimodal(file: UploadFile = File(...)):
         "filename": file.filename,
         "content_type": content_type
     }
+
+
+class ReportBroadcastRequest(BaseModel):
+    incident_id: str
+    report_content: str
+    recipients: List[str]
+    channels: List[str] = ["email", "app"]
+
+@app.post("/ai/report/broadcast")
+async def broadcast_report(req: ReportBroadcastRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """인시던트 보고서 공식 전파 (DB 저장, 이메일 발송, 앱 알림)"""
+    inc = db.query(IncidentDB).filter(IncidentDB.code == req.incident_id).first()
+    if not inc:
+        raise HTTPException(status_code=404, detail="인시던트를 찾을 수 없습니다.")
+
+    # 1. 지식 베이스(Dify) 저장
+    metadata = {
+        "incident_id": req.incident_id,
+        "type": "official_report",
+        "sender": "S-GUARD AI",
+        "timestamp": get_kst().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    background_tasks.add_task(DifyClient.ingest_to_dataset, content=req.report_content, metadata=metadata)
+
+    # 2. 이메일 발송 (HTML)
+    if "email" in req.channels:
+        email_subject = f"[S-GUARD] 장애 보고서: {inc.title}"
+        report_html = req.report_content.replace('\n', '<br>')
+        email_body = f"""
+        <html>
+        <body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
+                <h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px;">장애 종결 보고서</h2>
+                <p><strong>인시던트 ID:</strong> {req.incident_id}</p>
+                <p><strong>제목:</strong> {inc.title}</p>
+                <p><strong>발생 일시:</strong> {inc.created_at.strftime('%Y-%m-%d %H:%M:%S') if inc.created_at else 'N/A'}</p>
+                <hr style="border: 0; border-top: 1px solid #eee;">
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
+                    {report_html}
+                </div>
+                <p style="font-size: 12px; color: #888; margin-top: 20px;">본 메일은 S-GUARD AIOps 시스템에서 자동으로 발송되었습니다.</p>
+            </div>
+        </body>
+        </html>
+        """
+        for email in req.recipients:
+            if "@" in email:
+                background_tasks.add_task(send_email_async, email, email_subject, email_body, is_html=True)
+
+    # 3. 앱 알림 (WebSocket 브로드캐스트)
+    if "app" in req.channels:
+        await manager.broadcast({
+            "type": "report_broadcast",
+            "incident_id": req.incident_id,
+            "title": inc.title,
+            "summary": "장애가 최종 처리되어 보고서가 발송되었습니다."
+        })
+
+    # 상태 업데이트
+    inc.status = "처리완료"
+    db.commit()
+
+    return {"status": "success", "message": f"{len(req.recipients)}명의 수신자에게 보고서 전파를 시작했습니다."}
+
+class InsightSaveRequest(BaseModel):
+    incident_id: str
+    content: str
+    severity: str
+    category: str
+    user_id: str = "SYSTEM"
+
+class AgentMessage(BaseModel):
+    role: str
+    text: str
+
+class ChatHistorySaveRequest(BaseModel):
+    incident_id: str
+    messages: List[AgentMessage]
+    user_id: str = "SYSTEM"
+
+@app.post("/ai/insight/save")
+async def save_insight(req: InsightSaveRequest, db: Session = Depends(get_db)):
+    try:
+        existing = db.query(AutopilotInsightDB).filter(AutopilotInsightDB.inc_id == req.incident_id).first()
+        if existing:
+            existing.content = req.content
+            existing.severity = req.severity
+            existing.category = req.category
+            existing.mod_id = req.user_id
+            existing.mod_dt = get_kst()
+        else:
+            new_insight = AutopilotInsightDB(
+                inc_id=req.incident_id,
+                content=req.content,
+                severity=req.severity,
+                category=req.category,
+                reg_id=req.user_id,
+                mod_id=req.user_id
+            )
+            db.add(new_insight)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ai/chat-history/save")
+async def save_chat_history(req: ChatHistorySaveRequest, db: Session = Depends(get_db)):
+    try:
+        db.query(AIChatHistoryDB).filter(AIChatHistoryDB.inc_id == req.incident_id).delete()
+        for msg in req.messages:
+            db.add(AIChatHistoryDB(
+                inc_id=req.incident_id,
+                agent_role=msg.role,
+                content=msg.text,
+                reg_id=req.user_id,
+                mod_id=req.user_id
+            ))
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai/insight/{incident_id}")
+async def get_insight(incident_id: str, db: Session = Depends(get_db)):
+    insight = db.query(AutopilotInsightDB).filter(AutopilotInsightDB.inc_id == incident_id).first()
+    if insight:
+        return {
+            "content": insight.content,
+            "severity": insight.severity,
+            "category": insight.category
+        }
+    raise HTTPException(status_code=404, detail="Insight not found")
+
+@app.get("/ai/chat-history/{incident_id}")
+async def get_chat_history(incident_id: str, db: Session = Depends(get_db)):
+    history = db.query(AIChatHistoryDB).filter(AIChatHistoryDB.inc_id == incident_id).order_by(AIChatHistoryDB.id).all()
+    if history:
+        messages = [{"role": msg.agent_role, "text": msg.content} for msg in history]
+        return {"messages": messages}
+    raise HTTPException(status_code=404, detail="Chat history not found")
 
 if __name__ == "__main__":
     import uvicorn

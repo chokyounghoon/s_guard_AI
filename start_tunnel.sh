@@ -66,7 +66,7 @@ if [ -n "$CF_TOKEN" ]; then
   echo "🚀 재배포 중..."
   CLOUDFLARE_API_TOKEN="$CF_TOKEN" npx wrangler deploy
   echo ""
-  echo "🎉 완료! 이제 S-Guard 대시보드에서 실제 Ollama LLM 분석이 동작합니다."
+  echo "🎉 완료! 이제 S-Guard 대시보드에서 Dify AI 분석이 동작합니다."
 else
   echo ""
   echo "⚠️  CLOUDFLARE_API_TOKEN 환경변수가 없어서 Worker 자동 업데이트를 건너뜁니다."

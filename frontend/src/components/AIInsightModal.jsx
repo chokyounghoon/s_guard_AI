@@ -1,7 +1,11 @@
 import React from 'react';
-import { X, Brain, TrendingUp, AlertTriangle, CheckCircle, Zap, Activity } from 'lucide-react';
+import { X, Brain, TrendingUp, AlertTriangle, CheckCircle, Zap, Activity, Info } from 'lucide-react';
+import MarkdownViewer from './MarkdownViewer';
 
 export default function AIInsightModal({ insight, onClose }) {
+  // AI Insight Modal disabled by user request
+  return null;
+
   if (!insight) return null;
 
   const getSeverityColor = (severity) => {
@@ -26,44 +30,65 @@ export default function AIInsightModal({ insight, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#0f111a]/90 backdrop-blur-md" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-[#0f111a]/95 backdrop-blur-xl" onClick={onClose}></div>
       
-      <div className="relative w-full max-w-3xl bg-gradient-to-b from-[#1a1f2e] to-[#0f111a] border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] overflow-y-auto">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-purple-500 to-cyan-400"></div>
+      <div className="relative w-full max-w-3xl bg-gradient-to-b from-[#1a1f2e] to-[#0d0f16] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-purple-500 to-cyan-400"></div>
         
         {/* Header */}
-        <div className="sticky top-0 bg-[#1a1f2e]/95 backdrop-blur-sm border-b border-white/10 p-6 z-10">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-br from-blue-600 to-purple-600 p-3 rounded-2xl shadow-lg">
-                <Brain className="w-6 h-6 text-white" />
+        <div className="p-8 border-b border-white/5 bg-white/5 backdrop-blur-md">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="bg-gradient-to-br from-blue-600 to-purple-600 p-4 rounded-3xl shadow-xl shadow-blue-500/20">
+                <Brain className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-                  <span>AI 예측 분석 상세</span>
-                  <span className={`text-xs px-3 py-1 rounded-full border ${getSeverityColor(insight.severity)}`}>
-                    {insight.severity === 'high' ? '높음' : insight.severity === 'medium' ? '보통' : '낮음'}
+                <h2 className="text-2xl font-black text-white flex items-center gap-3">
+                  S-Autopilot <span className="text-blue-400">Insight</span>
+                  <span className={`text-[10px] font-black px-3 py-1 rounded-full border tracking-widest uppercase ${getSeverityColor(insight.severity)}`}>
+                    {insight.severity === 'high' ? 'Critical' : insight.severity === 'medium' ? 'Warning' : 'Info'}
                   </span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">Prediction ID: {insight.predictionId}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 rounded-md border border-white/5">
+                    <span className="text-[10px] text-slate-500 font-mono">ID:</span>
+                    <span className="text-[10px] text-blue-400 font-mono font-bold">{insight.predictionId || 'N/A'}</span>
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="text-[10px] text-slate-500 uppercase tracking-tighter">AI-Driven Diagnostic Engine</span>
+                </div>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-              <X className="w-5 h-5 text-slate-400" />
+            <button 
+              onClick={onClose} 
+              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/5 active:scale-95 group"
+            >
+              <X className="w-6 h-6 text-slate-500 group-hover:text-white" />
             </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
           {/* AI Reasoning Section */}
-          <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/20 rounded-2xl p-6">
-            <div className="flex items-center space-x-2 mb-4">
-              <CategoryIcon className="w-5 h-5 text-blue-400" />
-              <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider">AI 분석 결과</h3>
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+            <div className="relative bg-[#1a1f2e] border border-white/10 rounded-3xl p-6 shadow-inner">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-blue-600/20 p-2 rounded-xl">
+                    <CategoryIcon className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest italic">Diagnostic Result</h3>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                  <Activity className="w-3 h-3 text-emerald-400" />
+                  <span className="text-[10px] text-emerald-400 font-bold">LIVE ANALYSIS</span>
+                </div>
+              </div>
+              <div className="text-slate-200 leading-relaxed text-sm">
+                <MarkdownViewer text={insight.aiReasoning} />
+              </div>
             </div>
-            <p className="text-white leading-relaxed text-sm">
-              {insight.aiReasoning}
-            </p>
           </div>
 
           {/* Metrics Visualization */}

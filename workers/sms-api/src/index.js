@@ -1,5 +1,5 @@
 // SMS 수신 및 관리 API - Cloudflare Workers
-// BACKEND_URL env가 설정된 경우 로컬 Ollama LLM 백엔드로 프록시. 없으면 KV 기반 Mock 분석 사용.
+// BACKEND_URL env가 설정된 경우 로컬 백엔드로 프록시. 없으면 KV 기반 Mock 분석 사용.
 
 export default {
   async fetch(request, env) {
@@ -284,7 +284,7 @@ export default {
         } else if (lowerQuery.includes('timeout') || lowerQuery.includes('타임아웃')) {
           response = '네트워크 타임아웃이 감지되었습니다. 게이트웨이 설정과 L4 스위치 상태를 점검하고, 서비스 간 응답 시간을 모니터링하세요.';
         } else {
-          response = `"${query}"에 대한 질의를 수신했습니다. 현재 로컬 LLM 백엔드 연결 중입니다. 로컬 Docker를 시작하시면 RAG 기반 정밀 분석을 제공해 드립니다.`;
+          response = `"${query}"에 대한 질의를 수신했습니다. 현재 AI 백엔드 연결 중입니다. S-Guard Cloud 서비스를 통해 RAG 기반 정밀 분석을 제공해 드립니다.`;
         }
 
         return new Response(

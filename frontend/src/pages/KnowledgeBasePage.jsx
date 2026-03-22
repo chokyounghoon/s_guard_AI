@@ -58,7 +58,7 @@ function EntryCard({ entry }) {
           <pre className="text-xs text-slate-300 bg-[#0a0c10] rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre-wrap font-mono border border-white/5">
             {entry.preview}
           </pre>
-          <p className="text-[9px] text-slate-600 mt-2 font-mono">ID: {entry.id}</p>
+          <p className="text-[9px] text-slate-600 mt-2 font-mono">ID: {entry.inc_id}</p>
         </div>
       )}
     </div>
@@ -202,7 +202,7 @@ export default function KnowledgeBasePage() {
         ) : (
           <div className="space-y-3">
             <p className="text-xs text-slate-500 font-mono">{filtered.length}개 항목 표시</p>
-            {filtered.map(entry => <EntryCard key={entry.id} entry={entry} />)}
+            {filtered.map(entry => <EntryCard key={entry.inc_id} entry={entry} />)}
           </div>
         )}
       </div>

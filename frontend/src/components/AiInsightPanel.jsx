@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle } from 'lucide-react';
+import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText } from 'lucide-react';
+import MarkdownViewer from './MarkdownViewer';
 
 const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
@@ -16,20 +17,40 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [isCritical, setIsCritical] = useState(false);
   const [smsAnalysisTitle, setSmsAnalysisTitle] = useState('');
 
-  // 타이핑 애니메이션 함수
-  const typeText = (text, onDone) => {
-    setDisplayedText('');
-    let charIndex = 0;
-    const interval = setInterval(() => {
-      if (charIndex <= text.length) {
-        setDisplayedText(text.slice(0, charIndex));
-        charIndex++;
-      } else {
-        clearInterval(interval);
+  // Streaming typewriter (SSE chunk -> queue -> char-by-char)
+  const typingQueueRef = useRef('');
+  const typingTimerRef = useRef(null);
+  const abortRef = useRef(null);
+  const delayShownRef = useRef(false);
+
+  const stopTypewriter = () => {
+    if (typingTimerRef.current) {
+      clearInterval(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+    typingQueueRef.current = '';
+  };
+
+  const enqueueText = (text, { reset = false, onDone } = {}) => {
+    if (reset) {
+      stopTypewriter();
+      setDisplayedText('');
+    }
+    if (!text) return;
+    typingQueueRef.current += text;
+    if (typingTimerRef.current) return;
+
+    typingTimerRef.current = setInterval(() => {
+      if (!typingQueueRef.current.length) {
+        clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
         if (onDone) onDone();
+        return;
       }
-    }, 30);
-    return interval;
+      const nextChar = typingQueueRef.current[0];
+      typingQueueRef.current = typingQueueRef.current.slice(1);
+      setDisplayedText(prev => prev + nextChar);
+    }, 18);
   };
 
   // SMS 선택 시 분석 모드로 전환
@@ -38,60 +59,184 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setIsAnalyzingSms(false);
       setAnalysisComplete(false);
       setIsCritical(false);
+      delayShownRef.current = false;
       return;
     }
 
     setIsAnalyzingSms(true);
     setAnalysisComplete(false);
     setIsCritical(false);
+    delayShownRef.current = false;
     setSmsAnalysisTitle(`분석 중: "${selectedSms.sender}" 발신 SMS`);
     setDisplayedText('');
 
     const analyze = async () => {
-      typeText(`📡 SMS 수신 분석 시작... 발신: ${selectedSms.sender}`);
-      await new Promise(r => setTimeout(r, 1500));
-
-      setDisplayedText('🔍 RAG 지식베이스에서 유사 장애 사례 검색 중...');
       try {
+        if (abortRef.current) abortRef.current.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        // Check if insight already exists in DB
+        try {
+          const checkRes = await fetch(`${API_BASE_URL}/ai/insight/${selectedSms.inc_id}`);
+          if (checkRes.ok) {
+            const data = await checkRes.json();
+            if (data.content) {
+              setDisplayedText(data.content);
+              const critical = data.severity === 'CRITICAL';
+              setIsCritical(critical);
+              setAnalysisComplete(true);
+              if (onLogReceived) {
+                onLogReceived({
+                  title: `SMS 장애 분석: ${selectedSms.sender}`,
+                  text: data.content,
+                  message: data.content,
+                  severity: data.severity,
+                  category: data.category
+                });
+              }
+              return; // Skip Dify streaming
+            }
+          }
+        } catch (e) {
+          console.error("Check insight err:", e);
+        }
+
         const res = await fetch(`${API_BASE_URL}/ai/analyze-sms`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sender: selectedSms.sender, message: selectedSms.message }),
+          body: JSON.stringify({ 
+            sender: selectedSms.sender, 
+            message: selectedSms.message,
+            sms_id: selectedSms.inc_id 
+          }),
+          signal: controller.signal,
         });
 
-        let analysisText;
-        if (res.ok) {
-          const data = await res.json();
-          analysisText = data.analysis || data.answer || data.text || '분석 완료.';
-        } else {
-          analysisText = buildLocalAnalysis(selectedSms.message);
+        if (!res.ok || !res.body) throw new Error('Network response was not ok');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalText = '';
+        let showedWorkingHint = false;
+        const startedAt = Date.now();
+
+        const showDelayOnce = () => {
+          if (delayShownRef.current) return;
+          delayShownRef.current = true;
+          stopTypewriter();
+          setDisplayedText(prev => {
+            const base = (prev || '').trimEnd();
+            return (base ? base + '\n' : '') + 'AI 분석이 지연되고 있습니다\n';
+          });
+        };
+
+        // Soft delay notice (do NOT abort; allow late answers to arrive)
+        const delayNoticeId = setTimeout(() => {
+          if (finalText) return;
+          showDelayOnce();
+        }, 20000);
+
+        // Hard cap: eventually abort to avoid infinite hanging connections
+        const hardAbortId = setTimeout(() => {
+          if (finalText) return;
+          showDelayOnce();
+          try { controller.abort(); } catch {}
+        }, 180000); // 3 minutes
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+
+          for (const evt of events) {
+            const lines = evt.split('\n');
+            for (const line of lines) {
+              if (!line.startsWith('data:')) continue;
+              const dataStr = line.slice(5).trim();
+              if (!dataStr) continue;
+              if (dataStr === '[DONE]') {
+                const critical = isCriticalAnalysis(finalText, selectedSms.message);
+                setIsCritical(critical);
+                setAnalysisComplete(true);
+                
+                // Save insight to DB
+                try {
+                  const category = getCategoryFromAnalysis(finalText, selectedSms.message);
+                  const userData = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+                  fetch(`${API_BASE_URL}/ai/insight/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      incident_id: String(selectedSms.inc_id),
+                      content: finalText,
+                      severity: critical ? 'CRITICAL' : 'INFO',
+                      category: category,
+                      user_id: String(userData.inc_id || 'SYSTEM')
+                    })
+                  }).catch(console.error);
+                } catch (e) {
+                  console.error("Save insight err:", e);
+                }
+
+                if (onLogReceived) {
+                  onLogReceived({
+                    title: `SMS 장애 분석: ${selectedSms.sender}`,
+                    text: finalText,
+                    message: finalText,
+                    severity: critical ? 'CRITICAL' : 'INFO',
+                    category: getCategoryFromAnalysis(finalText, selectedSms.message)
+                  });
+                }
+                return;
+              }
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.error) {
+                  showDelayOnce();
+                  return;
+                }
+                // keep-alive/status from backend while waiting Dify
+                if ((data.status === 'connected' || data.status === 'working') && !finalText) {
+                  const elapsedMs = Date.now() - startedAt;
+                  if (!showedWorkingHint && elapsedMs > 2500) {
+                    showedWorkingHint = true;
+                    enqueueText('\n⏳ AI 분석 진행 중...\n');
+                  }
+                }
+                if (data.answer) {
+                  // if we got real content, cancel delay timers
+                  try { clearTimeout(delayNoticeId); } catch {}
+                  try { clearTimeout(hardAbortId); } catch {}
+                  finalText += data.answer;
+                  enqueueText(data.answer);
+                }
+              } catch (e) {}
+            }
+          }
         }
 
-        await new Promise(r => setTimeout(r, 500));
+        clearTimeout(delayNoticeId);
+        clearTimeout(hardAbortId);
 
-        const critical = isCriticalAnalysis(analysisText, selectedSms.message);
-        setIsCritical(critical);
-
-        typeText(`✅ ${analysisText}`, () => {
-          setAnalysisComplete(true);
-        });
-
-        if (onLogReceived) {
-          onLogReceived({
-            title: `SMS 장애 분석: ${selectedSms.sender}`,
-            text: analysisText,
-            message: analysisText,
-            severity: critical ? 'CRITICAL' : 'INFO',
-            category: getCategoryFromAnalysis(analysisText, selectedSms.message)
-          });
+        // Stream ended but no answer ever arrived → show graceful delay message.
+        if (!finalText) {
+          showDelayOnce();
         }
       } catch {
-        const localAnalysis = buildLocalAnalysis(selectedSms.message);
-        const critical = isCriticalAnalysis(localAnalysis, selectedSms.message);
-        setIsCritical(critical);
-        typeText(`⚡ ${localAnalysis}`, () => {
+        setIsCritical(false);
+        if (!delayShownRef.current) {
+          delayShownRef.current = true;
+          stopTypewriter();
+          setDisplayedText(prev => {
+            const base = (prev || '').trimEnd();
+            return (base ? base + '\n' : '') + 'AI 분석이 지연되고 있습니다\n';
+          });
           setAnalysisComplete(true);
-        });
+        }
       }
     };
 
@@ -121,56 +266,85 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     return 'report';
   };
 
-  const buildLocalAnalysis = (message) => {
-    const msg = (message || '').toLowerCase();
-    if (msg.includes('critical') || msg.includes('db') || msg.includes('데이터베이스')) {
-      return 'CRITICAL 등급 감지. 데이터베이스 관련 장애 패턴과 일치합니다. 즉시 DBA 팀 에스컬레이션 및 War-Room 개설을 권장합니다.';
-    } else if (msg.includes('cpu') || msg.includes('메모리') || msg.includes('memory')) {
-      return '리소스 과부하 패턴 감지. 해당 서버의 프로세스 목록 및 배치 잡 스케줄을 즉시 확인하세요. War-Room 개설을 권장합니다.';
-    } else if (msg.includes('down') || msg.includes('접속') || msg.includes('서버')) {
-      return '서버 다운 패턴 감지. 헬스체크 엔드포인트 및 로드밸런서 상태 확인을 권장합니다. War-Room 개설을 권장합니다.';
-    } else if (msg.includes('복구') || msg.includes('정상')) {
-      return '복구 완료 신호 수신. 서비스 정상화 여부를 모니터링하고 사후 Post-Mortem을 준비하세요.';
-    }
-    return '수신 메시지 분석 완료. 특이 키워드가 감지되지 않았습니다. 상황을 계속 모니터링합니다.';
-  };
-
   // 기본 폴링 루프 (SMS 미선택 시)
   useEffect(() => {
     if (isAnalyzingSms) return;
 
     let isCancelled = false;
-    const startTypingCycle = async () => {
+    const startStreaming = async () => {
+      if (isCancelled) return;
+      stopTypewriter();
       setDisplayedText('');
+      
       try {
-        const res = await fetch(`${API_BASE_URL}/ai/insight`);
-        let logText = '분석 데이터 대기 중...';
-        if (res.ok) {
-          const data = await res.json();
-          setInsightData(data);
-          if (onLogReceived && data.current_log) onLogReceived(data.current_log, data.prediction_counts);
-          logText = data.current_log?.text || logText;
-        }
-        if (isCancelled) return;
-        let charIndex = 0;
-        const interval = setInterval(() => {
-          if (isCancelled) { clearInterval(interval); return; }
-          if (charIndex <= logText.length) {
-            setDisplayedText(logText.slice(0, charIndex));
-            charIndex++;
-          } else {
-            clearInterval(interval);
-            if (!isCancelled) setTimeout(startTypingCycle, 5000);
+        const response = await fetch(`${API_BASE_URL}/ai/insight`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let cumulativeText = '';
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done || isCancelled) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+
+          for (const evt of events) {
+            const lines = evt.split('\n');
+            for (const line of lines) {
+              if (!line.startsWith('data:')) continue;
+              const dataStr = line.slice(5).trim();
+              if (dataStr === '[DONE]') {
+                setAnalysisComplete(true);
+                // After completion, wait 10 seconds before starting a new stream to avoid hammer
+                if (!isCancelled) setTimeout(startStreaming, 10000);
+                return;
+              }
+              
+              try {
+                const data = JSON.parse(dataStr);
+                
+                // Metadata update (prediction counts, etc.)
+                if (data.prediction_counts) {
+                  setInsightData(prev => ({ ...prev, prediction_counts: data.prediction_counts }));
+                  if (onLogReceived) onLogReceived({ type: 'info' }, data.prediction_counts);
+                }
+                
+                // Streaming text update
+                if (data.answer) {
+                  cumulativeText += data.answer;
+                  enqueueText(data.answer);
+                }
+
+                // Error handling
+                if (data.error) {
+                  enqueueText(`\n⚠️ ${data.error}\n`);
+                  if (!isCancelled) setTimeout(startStreaming, 10000);
+                  return;
+                }
+              } catch (e) {
+                console.error("Error parsing stream chunk:", e);
+              }
+            }
           }
-        }, 50);
-      } catch {
-        if (!isCancelled) setTimeout(startTypingCycle, 7000);
+        }
+      } catch (err) {
+        console.error("Streaming error:", err);
+        enqueueText("AI 분석이 지연되고 있습니다", { reset: true });
+        if (!isCancelled) setTimeout(startStreaming, 7000);
       }
     };
 
-    startTypingCycle();
+    startStreaming();
     return () => { isCancelled = true; };
   }, [isAnalyzingSms]);
+
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const handleOpenWarRoom = () => {
     if (onOpenWarRoom && selectedSms) {
@@ -178,12 +352,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     }
   };
 
-  const currentLog = insightData.current_log || { type: 'info' };
   const textColor = isAnalyzingSms
     ? (isCritical ? 'text-red-300' : 'text-yellow-300')
-    : currentLog.type === 'insight' ? 'text-yellow-300 font-bold'
-    : currentLog.type === 'warning' ? 'text-orange-400'
-    : currentLog.type === 'success' ? 'text-emerald-400'
+    : insightData.current_log?.type === 'insight' ? 'text-yellow-300 font-bold'
+    : insightData.current_log?.type === 'warning' ? 'text-orange-400'
+    : insightData.current_log?.type === 'success' ? 'text-emerald-400'
     : 'text-blue-200';
 
   return (
@@ -217,6 +390,20 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
 
         <div className="flex items-center space-x-2">
+          <button 
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-[10px] font-bold"
+            onClick={() => setShowReportModal(true)}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>관련 보고서</span>
+          </button>
+          <button 
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 transition-all text-[10px] font-bold"
+            onClick={() => setShowHistoryModal(true)}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>관련 워룸 히스토리</span>
+          </button>
           {isAnalyzingSms && (
             <div className={`px-3 py-1.5 rounded-lg flex items-center space-x-2 border ${isCritical ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
               <Zap className={`w-3 h-3 animate-pulse ${isCritical ? 'text-red-400' : 'text-yellow-400'}`} />
@@ -233,16 +420,20 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       </div>
 
       {/* 터미널 뷰 */}
-      <div className={`rounded-xl p-4 border font-mono text-sm flex items-start relative shadow-inner transition-all duration-300
-        ${isAnalyzingSms && isCritical ? 'bg-[#100505] border-red-500/20 min-h-[7rem]' : isAnalyzingSms ? 'bg-[#0f0a00] border-yellow-500/20 min-h-[7rem]' : 'bg-[#0a0c10] border-white/5 h-28'}`}>
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/5 to-transparent h-full w-full pointer-events-none animate-scanline" />
-        <div className="w-full">
-          <div className="flex items-start space-x-2">
-            <span className={`mt-0.5 shrink-0 ${isAnalyzingSms && isCritical ? 'text-red-500' : isAnalyzingSms ? 'text-yellow-500' : 'text-blue-500'}`}>❯</span>
-            <p className={`leading-relaxed ${textColor}`}>
-              {displayedText}
-              <span className={`animate-blink inline-block w-2 h-4 align-middle ml-1 ${isAnalyzingSms && isCritical ? 'bg-red-500/50' : isAnalyzingSms ? 'bg-yellow-500/50' : 'bg-blue-500/50'}`}></span>
-            </p>
+      <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 overflow-hidden
+        ${isAnalyzingSms && isCritical ? 'bg-[#150a0a] border-red-500/30' : isAnalyzingSms ? 'bg-[#11110a] border-yellow-500/30' : 'bg-[#0a0c12] border-blue-500/10'}`}>
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-500/5 h-full w-full pointer-events-none" />
+        <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
+          <Brain className="w-12 h-12" />
+        </div>
+
+        <div className="w-full relative z-10">
+          <div className="flex items-start space-x-3 text-slate-400">
+            <span className={`mt-0.5 shrink-0 font-black ${isAnalyzingSms && isCritical ? 'text-red-500' : isAnalyzingSms ? 'text-yellow-500' : 'text-blue-500'}`}>❯</span>
+            <div className={`leading-relaxed w-full ${textColor}`}>
+              <MarkdownViewer text={displayedText} />
+              <span className={`animate-pulse inline-block w-1.5 h-4 align-middle ml-1 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
+            </div>
           </div>
         </div>
       </div>
@@ -266,6 +457,56 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             <Users className="w-4 h-4" />
             War-Room 개설
           </button>
+        </div>
+      )}
+
+      {/* 관련 보고서 모달 리스트 (Mock) */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
+          <div className="bg-[#1a1f2e] w-full max-w-md rounded-3xl border border-white/10 p-6 relative z-10 shadow-2xl animate-in fade-in zoom-in-95">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-blue-400">
+              <FileText className="w-5 h-5" /> 과거 관련 보고서 리스트
+            </h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="p-4 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] text-slate-500 font-mono">2026.03.{10-i} 14:00</span>
+                    <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">완료</span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-200 group-hover:text-blue-400 transition-colors">유사 장애 사례 #{i}: DB 커넥션 유실 건</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Dify RAG 분석 결과 관련성 92%</p>
+                </div>
+              ))}
+            </div>
+            <button className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all" onClick={() => setShowReportModal(false)}>닫기</button>
+          </div>
+        </div>
+      )}
+
+      {/* 관련 워룸 히스토리 모달 (Mock) */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowHistoryModal(false)} />
+          <div className="bg-[#1a1f2e] w-full max-w-md rounded-3xl border border-white/10 p-6 relative z-10 shadow-2xl animate-in fade-in zoom-in-95">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-purple-400">
+              <MessageSquare className="w-5 h-5" /> 과거 워룸 대화 히스토리
+            </h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {[1, 2].map(i => (
+                <div key={i} className="p-4 bg-[#11141d] rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer group">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] text-slate-500 font-mono">2026.02.{15+i} 10:30</span>
+                    <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded border border-purple-500/20">Closed</span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-200 group-hover:text-purple-400 transition-colors">War-Room: 시스템 연동 오류 대응 회의</p>
+                  <p className="text-[11px] text-slate-500 mt-1">참여자: 김철수, 이영희 외 4명</p>
+                </div>
+              ))}
+            </div>
+            <button className="w-full mt-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all" onClick={() => setShowHistoryModal(false)}>닫기</button>
+          </div>
         </div>
       )}
     </div>

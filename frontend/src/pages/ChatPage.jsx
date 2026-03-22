@@ -41,6 +41,19 @@ export default function ChatPage() {
   const [currentUser, setCurrentUser] = useState({ name: '이수민 매니저', role: 'Manager' });
   const [aiAnalysisMessage, setAiAnalysisMessage] = useState(null);
 
+  // AI Assistant SSE streaming + typewriter
+  const aiAbortRef = useRef(null);
+  const aiTypingTimerRef = useRef(null);
+  const aiQueueRef = useRef('');
+
+  const stopAiTypewriter = () => {
+    if (aiTypingTimerRef.current) {
+      clearInterval(aiTypingTimerRef.current);
+      aiTypingTimerRef.current = null;
+    }
+    aiQueueRef.current = '';
+  };
+
   useEffect(() => {
     const userStr = localStorage.getItem('sguard_user');
     if (userStr) {
@@ -74,7 +87,7 @@ export default function ChatPage() {
             setRoomDescription(data.description || '');
             setRoomStatus(data.status || 'Open');
             const loadedMessages = data.messages.map(msg => ({
-            id: msg.id,
+            id: msg.inc_id,
             type: msg.type === 'me' || msg.sender === currentUser.name ? 'me' : 
                  (msg.type === 'system' ? 'system' : 
                  (msg.type === 'ai_analysis' ? 'ai_analysis' : 'other')),
@@ -109,7 +122,7 @@ export default function ChatPage() {
       if (res.ok) {
         const saved = await res.json();
         const newMessage = {
-          id: saved.id || Date.now(),
+          id: saved.inc_id || Date.now(),
           type: messageData.type === 'me' ? 'me' : (messageData.type === 'system' ? 'system' : 'other'),
           sender: messageData.sender,
           role: messageData.role,
@@ -154,36 +167,79 @@ export default function ChatPage() {
     setIsAiThinking(true);
 
     try {
+      // cancel previous AI request
+      if (aiAbortRef.current) aiAbortRef.current.abort();
+      const controller = new AbortController();
+      aiAbortRef.current = controller;
+
+      stopAiTypewriter();
+
+      // create placeholder AI message to stream into
+      const aiMsgId = Date.now() + Math.random();
+      setAiMessages(prev => [...prev, { id: aiMsgId, type: 'ai', text: '', timestamp: new Date() }]);
+
       const apiResponse = await fetch(getApiUrl('/ai/chat'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: message })
+        body: JSON.stringify({ query: message }),
+        signal: controller.signal,
       });
       
-      if (!apiResponse.ok) {
-        throw new Error(`API Error: ${apiResponse.status}`);
-      }
-      
-      const data = await apiResponse.json();
-      
-      const aiMessage = {
-        type: 'ai',
-        text: data.response,
-        logs: data.related_logs || [],
-        timestamp: new Date()
+      if (!apiResponse.ok || !apiResponse.body) throw new Error(`API Error: ${apiResponse.status}`);
+
+      const reader = apiResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      const enqueue = (text) => {
+        if (!text) return;
+        aiQueueRef.current += text;
+        if (aiTypingTimerRef.current) return;
+        aiTypingTimerRef.current = setInterval(() => {
+          if (!aiQueueRef.current.length) {
+            clearInterval(aiTypingTimerRef.current);
+            aiTypingTimerRef.current = null;
+            return;
+          }
+          const ch = aiQueueRef.current[0];
+          aiQueueRef.current = aiQueueRef.current.slice(1);
+          setAiMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: (m.text || '') + ch } : m));
+        }, 18);
       };
 
-      setAiMessages(prev => [...prev, aiMessage]);
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const evt of events) {
+          const lines = evt.split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const dataStr = line.slice(5).trim();
+            if (!dataStr) continue;
+            if (dataStr === '[DONE]') {
+              return;
+            }
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.error) {
+                setAiMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: 'AI 분석이 지연되고 있습니다' } : m));
+                stopAiTypewriter();
+                return;
+              }
+              if (data.answer) enqueue(data.answer);
+            } catch (e) {}
+          }
+        }
+      }
     } catch (error) {
       console.error("Failed to connect to AI backend:", error);
-      const errorMessage = {
-        type: 'ai',
-        text: "현재 AI 에이전트 서비스 응답이 지연되고 있거나 연결할 수 없습니다. 서버 상태를 확인해주세요.",
-        timestamp: new Date()
-      };
-      setAiMessages(prev => [...prev, errorMessage]);
+      setAiMessages(prev => [...prev, { type: 'ai', text: "AI 분석이 지연되고 있습니다", timestamp: new Date() }]);
     } finally {
       setIsAiThinking(false);
     }
@@ -304,7 +360,7 @@ export default function ChatPage() {
       if (res.ok) {
         const data = await res.json();
         const loadedMessages = data.messages.map(msg => ({
-          id: msg.id,
+          id: msg.inc_id,
           type: msg.type === 'me' || msg.sender === currentUser.name ? 'me' : 
               (msg.type === 'system' ? 'system' : 
               (msg.type === 'ai_analysis' ? 'ai_analysis' : 'other')),
@@ -329,29 +385,9 @@ export default function ChatPage() {
 
   const [resolveSuccess, setResolveSuccess] = useState(false);
 
-  const handleResolveIncident = async () => {
-    if (!confirm('이 장애 상황을 해결(Resolve) 처리하고 해당 대화 내용을 AI RAG Knowledge Base에 학습시키겠습니까?')) return;
-    
-    try {
-      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://api.chokerslab.store';
-      const res = await fetch(`${apiBase}/warroom/resolve/${incidentId}`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setResolveSuccess(true);
-        saveChatToDb({
-          incident_id: incidentId,
-          sender: '시스템',
-          role: 'System',
-          type: 'system',
-          text: `✅ 장애 처리 완료! ${data.message_count_processed}개의 대화가 RAG AI Knowledge Base에 성공적으로 학습되었습니다.`
-        });
-      } else {
-        alert('학습 중 오류가 발생했습니다.');
-      }
-    } catch (err) {
-      console.error('Resolve failed', err);
-      alert('서버와의 통신에 실패했습니다.');
-    }
+  const handleResolveIncident = () => {
+    if (!confirm('이 장애 상황에 대한 AI 정밀 분석 보고서를 생성하시겠습니까?')) return;
+    navigate('/ai-report', { state: { incidentId } });
   };
 
   return (
@@ -530,7 +566,7 @@ export default function ChatPage() {
         </div>
 
         {mainMessages.filter(msg => msg.type !== 'ai_analysis').map((msg) => (
-          <div key={msg.id}>
+          <div key={msg.inc_id || msg.id}>
             {msg.type === 'other' && (
               <div className="flex items-start space-x-3 mb-4">
                 <div className={`px-2 py-1 h-10 min-w-[40px] rounded-xl ${msg.color} flex items-center justify-center font-bold text-xs shrink-0 whitespace-nowrap`}>
