@@ -1123,6 +1123,7 @@ export default function DashboardPage() {
                selectedSms={insightSms} 
                onOpenWarRoom={handleOpenWarRoomFromInsight} 
                onAgentContent={handleAgentContent}
+               warRooms={warRooms}
             />
           </div>
 
