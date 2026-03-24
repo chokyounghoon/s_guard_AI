@@ -1116,7 +1116,7 @@ export default function DashboardPage() {
           )}
 
           {/* AI Autopilot Insight Panel (항상 최신 SMS만 분석하도록 insightSms 적용) */}
-          <div className="w-full min-h-[220px]">
+          <div className="w-full min-h-[300px]">
             <AiInsightPanel 
                onLogReceived={handleLogReceived} 
                onShowDetail={handleShowInsight} 
