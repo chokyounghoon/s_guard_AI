@@ -375,7 +375,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     : insightData.current_log?.type === 'success' ? 'text-emerald-400'
     : 'text-blue-200';
 
-  const warRoomExists = warRooms && selectedSms && warRooms.some(r => String(r.id) === String(selectedSms.inc_id));
+  // 현재 SMS incident에 이미 생성된 War-Room이 있는지 확인 (status 무관)
+  const warRoomExists = warRooms && selectedSms && warRooms.some(r => 
+    String(r.source_sms_id) === String(selectedSms.inc_id)
+  );
+
 
   // War-Room 개설 버튼 (분석 완료 시 표시, 단 이미 개설된 경우는 제외)
   const showWarRoomButton = analysisComplete && !warRoomExists;

@@ -652,12 +652,11 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Se
         if m:
             extracted = json.loads(m.group())
             
-            # 새로운 인시던트 ID 생성
-            incident_code = generate_incident_id(db)
+            # 새로운 인시던트 코드 생성 (문자열)
+            incident_code = generate_incident_code(db)
             
             # 인시던트 자동 생성 및 [접수중] 상태 설정
             new_incident = IncidentDB(
-                inc_id=incident_code, 
                 code=incident_code,
                 title=f"[{extracted.get('target_system', 'Unknown')}] {extracted.get('problem_description', masked_message[:30])}",
                 description=masked_message,
@@ -667,6 +666,7 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Se
                 source_sms_id=msg_db.inc_id,
                 assigned_to="자동할당(AI)"
             )
+
             db.add(new_incident)
             
             hist = IncidentHistoryDB(
@@ -1306,7 +1306,6 @@ async def create_incident(inc: IncidentCreate, db: Session = Depends(get_db)):
         return {"status": "updated", "inc_id": existing.inc_id, "code": existing.code}
     
     new_inc = IncidentDB(
-        inc_id=inc.code, # code와 inc_id를 동일하게 가져간다
         code=inc.code,
         title=inc.title,
         description=inc.description,
@@ -1314,6 +1313,7 @@ async def create_incident(inc: IncidentCreate, db: Session = Depends(get_db)):
         incident_type=inc.incident_type,
         source_sms_id=inc.source_sms_id
     )
+
     db.add(new_inc)
     
     # [활동로그] 새로운 워룸 개설 로그 추가
@@ -1397,7 +1397,9 @@ async def list_warrooms(
             .count()
 
         result.append({
+            "inc_id": inc.inc_id,
             "code": inc.code,
+            "source_sms_id": inc.source_sms_id,
             "title": inc.title,
             "description": inc.description,
             "severity": inc.severity,

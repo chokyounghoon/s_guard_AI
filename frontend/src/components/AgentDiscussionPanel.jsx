@@ -22,25 +22,27 @@ const AgentAvatar = ({ role }) => {
   );
 };
 
-const TypewriterText = ({ text, delay = 15 }) => {
+const TypewriterText = ({ text, chunkSize = 5, delay = 20 }) => {
   const [displayedText, setDisplayedText] = React.useState('');
-  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const indexRef = React.useRef(0);
+  const timerRef = React.useRef(null);
 
   React.useEffect(() => {
-    // Reset if text changes
     setDisplayedText('');
-    setCurrentIndex(0);
-  }, [text]);
+    indexRef.current = 0;
 
-  React.useEffect(() => {
-    if (currentIndex < text.length) {
-      const timeout = setTimeout(() => {
-        setDisplayedText(prev => prev + text[currentIndex]);
-        setCurrentIndex(prev => prev + 1);
-      }, delay);
-      return () => clearTimeout(timeout);
-    }
-  }, [currentIndex, text, delay]);
+    const tick = () => {
+      if (indexRef.current < text.length) {
+        const next = text.slice(0, indexRef.current + chunkSize);
+        setDisplayedText(next);
+        indexRef.current = Math.min(indexRef.current + chunkSize, text.length);
+        timerRef.current = setTimeout(tick, delay);
+      }
+    };
+
+    timerRef.current = setTimeout(tick, delay);
+    return () => clearTimeout(timerRef.current);
+  }, [text, chunkSize, delay]);
 
   return <>{displayedText}</>;
 };

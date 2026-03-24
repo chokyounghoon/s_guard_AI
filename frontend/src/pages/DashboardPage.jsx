@@ -317,13 +317,16 @@ export default function DashboardPage() {
   const fetchWarRooms = async () => {
     try {
       const apiBase = 'https://sguardai.khcho0421.workers.dev';
-      const res = await fetch(`${apiBase}/warroom/rooms?status=Open`);
+      // Fetch ALL rooms (any status) so we can hide the button for any existing room
+      const res = await fetch(`${apiBase}/warroom/rooms`);
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.rooms || []).map(room => ({
-          id: room.inc_id,
+          id: room.code,
+          inc_id: room.inc_id,
+          source_sms_id: room.source_sms_id,
           title: room.title || `ROOM ${room.inc_id}`,
-          lastMsg: room.status === 'Completed' ? '종료된 채널' : '대화가 시작되지 않았습니다.',
+          lastMsg: room.status === 'Completed' ? '종료된 체널' : '대화가 시작되지 않았습니다.',
           time: room.reg_dt 
             ? new Date(room.reg_dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
             : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -600,17 +603,11 @@ export default function DashboardPage() {
     setShowAgentPanel(true);
     setAgentMessages([{ role: 'Security', text: '🔍 새로운 장애 로그 감지. AI 에이전트 분석을 시작합니다...', delay: 0 }]);
 
-    // Anchor view to the Situation Log
-    setTimeout(() => {
-      if (agentPanelRef.current) {
-        agentPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-
 
     // Update both state and ref
     setSelectedSms(smsMessage);
     selectedSmsRef.current = smsMessage;
+
 
     try {
       const baseUrl = 'https://sguardai.khcho0421.workers.dev';
@@ -1326,7 +1323,8 @@ export default function DashboardPage() {
 
             {/* Chat Room List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
-              {warRooms.map((room) => (
+              {warRooms.filter(r => r.status === 'Open').map((room) => (
+
                 <div
                   key={room.id}
                   onClick={() => {
