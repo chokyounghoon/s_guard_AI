@@ -380,8 +380,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     String(r.inc_id) === String(selectedSms.inc_id)
   );
 
-  // War-Room 개설 버튼 (분석 완료 시 표시, 단 이미 개설된 경우는 제외)
-  const showWarRoomButton = analysisComplete && !warRoomExists;
+  // War-Room 개설 버튼 (분석 완료 시 표시, 이미 개설된 경우 텍스트를 변경해서 표시)
+  const showWarRoomButton = analysisComplete;
 
 
   return (
@@ -487,19 +487,23 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         <div className={`mt-4 flex items-center gap-3 p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-500
           ${isCritical ? 'bg-red-500/5 border-red-500/20' : 'bg-yellow-500/5 border-yellow-500/20'}`}>
           <div className={`flex-1 text-xs ${isCritical ? 'text-red-300' : 'text-yellow-300'}`}>
-            {isCritical
-              ? '⚠️ CRITICAL 장애가 감지되었습니다. 즉시 팀 전체가 참여하는 War-Room을 개설하세요.'
-              : '💡 분석이 완료되었습니다. 필요 시 War-Room을 개설하여 팀과 상황을 공유하세요.'}
+            {warRoomExists 
+              ? '💡 해당 장애 건에 대해 이미 War-Room이 개설되어 진행 중입니다.'
+              : isCritical
+                ? '⚠️ CRITICAL 장애가 감지되었습니다. 즉시 팀 전체가 참여하는 War-Room을 개설하세요.'
+                : '💡 분석이 완료되었습니다. 필요 시 War-Room을 개설하여 팀과 상황을 공유하세요.'}
           </div>
           <button
             onClick={handleOpenWarRoom}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all active:scale-95 shadow-lg
-              ${isCritical
+              ${isCritical && !warRoomExists
                 ? 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/30'
+                : warRoomExists
+                ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/30'
                 : 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-yellow-500/30'}`}
           >
             <Users className="w-4 h-4" />
-            War-Room 개설
+            {warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}
           </button>
         </div>
       )}
