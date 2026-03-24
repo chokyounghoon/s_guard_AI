@@ -54,16 +54,6 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
     }
   }, [messages]);
 
-  // Also scroll when the typewriter adds text
-  const lastMessageText = messages.length > 0 ? messages[messages.length - 1].text : '';
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [lastMessageText]);
 
   if (!isVisible) return null;
 

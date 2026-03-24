@@ -6,7 +6,8 @@ const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'https://sguardai.khcho0421.workers.dev'
   : 'https://sguardai.khcho0421.workers.dev';
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms }) {
+
   const [insightData, setInsightData] = useState({
     status: 'active',
     current_log: { type: 'info', text: 'AI 엔진 연결 중...' }
@@ -374,6 +375,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     : insightData.current_log?.type === 'success' ? 'text-emerald-400'
     : 'text-blue-200';
 
+  const warRoomExists = warRooms && selectedSms && warRooms.some(r => String(r.id) === String(selectedSms.inc_id));
+
+  // War-Room 개설 버튼 (분석 완료 시 표시, 단 이미 개설된 경우는 제외)
+  const showWarRoomButton = analysisComplete && !warRoomExists;
+
+
   return (
     <div className={`bg-gradient-to-br from-[#1a1f2e] to-[#11141d] rounded-3xl p-6 border shadow-xl relative overflow-hidden group transition-all duration-500
       ${isAnalyzingSms && isCritical ? 'border-red-500/30' : isAnalyzingSms ? 'border-yellow-500/20' : 'border-blue-500/20'}`}>
@@ -472,8 +479,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       </div>
 
-      {/* War-Room 개설 버튼 (분석 완료 + Critical 등급일 때 표시) */}
-      {analysisComplete && isAnalyzingSms && (
+      {/* War-Room 개설 버튼 */}
+      {showWarRoomButton && (
         <div className={`mt-4 flex items-center gap-3 p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-500
           ${isCritical ? 'bg-red-500/5 border-red-500/20' : 'bg-yellow-500/5 border-yellow-500/20'}`}>
           <div className={`flex-1 text-xs ${isCritical ? 'text-red-300' : 'text-yellow-300'}`}>
@@ -493,6 +500,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </button>
         </div>
       )}
+
 
       {/* 관련 보고서 모달 리스트 (Mock) */}
       {showReportModal && (
