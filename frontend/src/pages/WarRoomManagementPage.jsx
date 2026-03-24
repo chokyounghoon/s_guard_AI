@@ -460,7 +460,7 @@ export default function WarRoomManagementPage() {
               {joinSuccess === room.code && (
                 <div className="absolute inset-0 z-10 bg-emerald-500/20 rounded-3xl border border-emerald-500/40 flex items-center justify-center backdrop-blur-sm">
                   <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                    <CheckCircle2 className="w-5 h-5" />
+                    {/* {Icon && <Icon className="w-4 h-4" />} */}
                     입장 중...
                   </div>
                 </div>

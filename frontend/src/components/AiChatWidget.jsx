@@ -163,8 +163,8 @@ export default function AiChatWidget() {
               onChange={(e) => setInputText(e.target.value)}
               placeholder="서버 상태나 로그에 대해 물어보세요..."
               className="flex-1 bg-[#1a1f2e] text-white text-sm rounded-xl py-3 px-4 focus:outline-none focus:ring-1 focus:ring-blue-500/50 border border-white/5 placeholder:text-slate-500"
-              autoFocus
             />
+
             <button
               type="submit"
               disabled={!inputText.trim() || isLoading}

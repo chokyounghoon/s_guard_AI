@@ -78,8 +78,8 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
           value={otherText}
           onChange={handleOther}
           placeholder={`${label} 직접 입력`}
-          autoFocus
           className={`${inputClass} mt-2 pl-4`}
+
         />
       )}
     </div>
@@ -1075,7 +1075,9 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={msg.inc_id}
-                    onClick={() => { 
+                    onClick={(e) => { 
+                      e.preventDefault();
+                      e.stopPropagation();
                       const isSame = selectedSms?.inc_id === msg.inc_id;
                       setSelectedSms(isSame ? null : msg); 
                       // 좌측 인시던트 스트림 클릭 시에만 에이전트 토론 시작
@@ -1088,6 +1090,7 @@ export default function DashboardPage() {
                     }}
                     className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99] relative"
                   >
+
                     {/* 반짝이는 표시기 */}
                     {isRecent && <div className={`absolute top-2 right-2 w-2 h-2 rounded-full animate-ping z-10 ${selectedSms?.inc_id === msg.inc_id ? 'bg-yellow-400' : 'bg-blue-500'}`} />}
 
