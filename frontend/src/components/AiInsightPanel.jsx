@@ -130,7 +130,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           stopTypewriter();
           setDisplayedText(prev => {
             const base = (prev || '').trimEnd();
-            return (base ? base + '\n' : '') + 'AI 분석이 지연되고 있습니다\n';
+            return (base ? base + '\n' : '') + '선택된 SMS수신 내역이 없습니다. 내역을 선택해주세요.\n';
+
           });
         };
 
@@ -243,7 +244,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           stopTypewriter();
           setDisplayedText(prev => {
             const base = (prev || '').trimEnd();
-            return (base ? base + '\n' : '') + 'AI 분석이 지연되고 있습니다\n';
+            return (base ? base + '\n' : '') + '선택된 SMS수신 내역이 없습니다. 내역을 선택해주세요.\n';
+
           });
           setAnalysisComplete(true);
         }
@@ -345,7 +347,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         }
       } catch (err) {
         console.error("Streaming error:", err);
-        enqueueText("AI 분석이 지연되고 있습니다", { reset: true });
+        enqueueText("선택된 SMS수신 내역이 없습니다. 내역을 선택해주세요.", { reset: true });
+
+
         if (!isCancelled) setTimeout(startStreaming, 7000);
       }
     };

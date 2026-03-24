@@ -1020,19 +1020,16 @@ export default function DashboardPage() {
           )}
 
           {/* AI Autopilot Insight Panel */}
-          <div className="w-full">
-            <React.Suspense fallback={<div className="h-48 bg-gray-900 rounded-3xl animate-pulse"></div>}>
-              <ErrorBoundary>
-                <AiInsightPanel 
-                   onLogReceived={handleLogReceived} 
-                   onShowDetail={handleShowInsight} 
-                   selectedSms={selectedSms} 
-                   onOpenWarRoom={handleOpenWarRoomFromInsight} 
-                   onAgentContent={handleAgentContent}
-                />
-              </ErrorBoundary>
-            </React.Suspense>
+          <div className="w-full min-h-[220px]">
+            <AiInsightPanel 
+               onLogReceived={handleLogReceived} 
+               onShowDetail={handleShowInsight} 
+               selectedSms={selectedSms} 
+               onOpenWarRoom={handleOpenWarRoomFromInsight} 
+               onAgentContent={handleAgentContent}
+            />
           </div>
+
         </div>
 
 

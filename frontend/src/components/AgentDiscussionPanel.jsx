@@ -22,6 +22,29 @@ const AgentAvatar = ({ role }) => {
   );
 };
 
+const TypewriterText = ({ text, delay = 15 }) => {
+  const [displayedText, setDisplayedText] = React.useState('');
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    // Reset if text changes
+    setDisplayedText('');
+    setCurrentIndex(0);
+  }, [text]);
+
+  React.useEffect(() => {
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, delay);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentIndex, text, delay]);
+
+  return <>{displayedText}</>;
+};
+
 export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false }) {
   const scrollRef = useRef(null);
 
@@ -30,6 +53,17 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Also scroll when the typewriter adds text
+  const lastMessageText = messages.length > 0 ? messages[messages.length - 1].text : '';
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [lastMessageText]);
 
   if (!isVisible) return null;
 
@@ -75,6 +109,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         
         {messages.map((msg, idx) => {
           const isLeader = msg.role === 'Leader';
+          const isLast = idx === messages.length - 1;
           
           return (
             <div key={idx} className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ${isLeader ? 'justify-end' : 'justify-start'}`}>
@@ -104,7 +139,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                         ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tr-sm border border-purple-500/30' 
                         : 'bg-slate-800 text-slate-200 rounded-2xl rounded-tl-sm border border-white/5 shadow-black/20'
                     }`}>
-                      {msg.text}
+                      {isLast ? <TypewriterText text={msg.text} /> : msg.text}
                     </div>
                     {/* Time */}
                     <span className="text-[10px] text-slate-500 shrink-0 mb-1 font-mono tracking-tighter">
