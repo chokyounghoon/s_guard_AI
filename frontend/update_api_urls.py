@@ -3,7 +3,10 @@ import glob
 import re
 
 def main():
-    files = glob.glob('/Users/khcho/work_antigravity/s_guard_AI/frontend/src/**/*.jsx', recursive=True)
+    # Use relative path to work in any environment
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    files = glob.glob(os.path.join(script_dir, 'src/**/*.jsx'), recursive=True)
+
     count = 0
     for f in files:
         with open(f, 'r', encoding='utf-8') as file:
