@@ -1526,10 +1526,10 @@ function AlertItem({ title, time, severity, desc, isSelected }) {
   return (
     <div className={`flex items-start space-x-4 p-4 rounded-xl transition-all group cursor-pointer ${
       isSelected 
-        ? "bg-yellow-500/10 border border-yellow-500/30 scale-[1.02] shadow-lg shadow-yellow-500/5" 
+        ? "bg-yellow-500/10 border border-yellow-500/30 shadow-lg shadow-yellow-500/5" 
         : "bg-slate-900/30 border border-white/5 hover:bg-slate-800/50"
     }`}>
-      <div className={`w-1.5 h-1.5 mt-2 rounded-full ${sevColor[severity]} ${isSelected ? 'animate-pulse scale-150' : ''} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
+      <div className={`w-1.5 h-1.5 mt-2 rounded-full ${sevColor[severity]} ${isSelected ? 'animate-pulse' : ''} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1">
           <h4 className={`font-bold text-sm transition-colors ${isSelected ? 'text-yellow-400' : 'text-slate-200 group-hover:text-white'}`}>{title}</h4>
