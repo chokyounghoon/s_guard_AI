@@ -5,7 +5,7 @@ import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
 import AiSmsStatusPanel from '../components/AiSmsStatusPanel';
-import AiPredictionPanel from '../components/AiPredictionPanel';
+
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
@@ -105,7 +105,7 @@ export default function DashboardPage() {
   const [smsMessages, setSmsMessages] = useState([]);
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
-  const [predictionCounts, setPredictionCounts] = useState({ critical: 0, server: 0, security: 0, report: 0 });
+
   const [selectedSms, setSelectedSms] = useState(null);
   const selectedSmsRef = useRef(null);
   const [warRooms, setWarRooms] = useState([]);
@@ -696,17 +696,9 @@ export default function DashboardPage() {
   };
 
   const handleLogReceived = (log, counts) => {
-    if (counts) {
-      setPredictionCounts(counts);
-    }
+
     
-    // SMS 분석 결과에 따른 카운트 업데이트
-    if (log.category) {
-      setPredictionCounts(prev => ({
-        ...prev,
-        [log.category]: (prev[log.category] || 0) + 1
-      }));
-    }
+
     console.log("Log received in Dashboard:", log);
     const uniqueId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setAllNotifications(prev => [{
@@ -1043,20 +1035,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* (Region 3) Handling Progress Area (Previously Region 4) */}
-        <AiSmsStatusPanel />
 
-        {/* AI Insight Modal fully disabled by user request
-        {showInsightModal && (
-          <AIInsightModal
-            insight={selectedInsightData}
-            onClose={() => setShowInsightModal(false)}
-          />
-        )}
-        */}
 
-        {/* (Region 4) My Tasks Area (Previously Region 3) */}
-        <AiPredictionPanel counts={predictionCounts} onShowDetail={handleShowInsight} />
 
 
 
@@ -1168,6 +1148,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Handling Progress Area */}
+        <AiSmsStatusPanel />
 
         {/* Section 3: My Confirmation History & Recent List */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
