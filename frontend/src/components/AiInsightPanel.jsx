@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText } from 'lucide-react';
+import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 
 const API_BASE_URL = window.location.hostname === 'localhost'
@@ -17,6 +17,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [isCritical, setIsCritical] = useState(false);
   const [smsAnalysisTitle, setSmsAnalysisTitle] = useState('');
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Streaming typewriter (SSE chunk -> queue -> char-by-char)
   const typingQueueRef = useRef('');
@@ -56,6 +57,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
   // SMS 선택 시 분석 모드로 전환
   useEffect(() => {
+    if (selectedSms) {
+      setIsCollapsed(false); // SMS 선택 시 패널 펼침
+    }
+
     if (!selectedSms) {
       setIsAnalyzingSms(false);
       setAnalysisComplete(false);
@@ -460,10 +465,17 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               LIVE
             </span>
           </div>
+          <button 
+             onClick={() => setIsCollapsed(!isCollapsed)}
+             className="px-2 py-1.5 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors text-slate-400"
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
+          </button>
         </div>
       </div>
 
-      {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
+      <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isCollapsed ? 'max-h-0 min-h-0 opacity-0' : 'max-h-[1500px] min-h-[300px] opacity-100'} -mx-2 px-2`}>
+        {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
       <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px]
         ${isAnalyzingSms && isCritical ? 'bg-[#150a0a] border-red-500/30' : isAnalyzingSms ? 'bg-[#11110a] border-yellow-500/30' : 'bg-[#0a0c12] border-blue-500/10'}`}>
         <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-500/5 h-full w-full pointer-events-none" />
@@ -507,7 +519,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </button>
         </div>
       )}
-
+      </div>
 
       {/* 관련 보고서 모달 리스트 (Mock) */}
       {showReportModal && (
