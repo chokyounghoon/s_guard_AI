@@ -405,13 +405,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           <div>
             <h2 className="font-bold text-lg text-white flex items-center gap-2">
               S-Autopilot Insight
-              <span className="flex h-2 w-2 relative">
+              <span className="flex h-2 w-2 relative ml-2">
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isAnalyzingSms && isCritical ? 'bg-red-400' : isAnalyzingSms ? 'bg-yellow-400' : 'bg-blue-400'}`}></span>
                 <span className={`relative inline-flex rounded-full h-2 w-2 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
               </span>
             </h2>
             <p className="text-xs text-slate-400">
-              {isAnalyzingSms ? smsAnalysisTitle : '실시간 인공지능 분석 스트림'}
+              {selectedSms?.message 
+                ? (selectedSms.message.length > 30 ? selectedSms.message.substring(0, 30) + '...' : selectedSms.message)
+                : '실시간 인공지능 분석 스트림'}
             </p>
           </div>
         </div>
