@@ -190,6 +190,31 @@ app.post('/auth/change-password', async (c) => {
   return c.json({ status: "success" })
 })
 
+app.post('/users/:id/reset-password', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const { new_password } = await c.req.json()
+  const hashed = await hashPassword(new_password)
+  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ? WHERE id = ?").bind(hashed, getKst(), id).run()
+  return c.json({ status: "success" })
+})
+
+app.patch('/users/:id/status', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const { is_active } = await c.req.json()
+  await db.prepare("UPDATE users SET is_active = ?, mod_dt = ? WHERE id = ?").bind(is_active ? 1 : 0, getKst(), id).run()
+  return c.json({ status: "success" })
+})
+
+app.patch('/users/:id/role', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const { role } = await c.req.json()
+  await db.prepare("UPDATE users SET role = ?, mod_dt = ? WHERE id = ?").bind(role, getKst(), id).run()
+  return c.json({ status: "success" })
+})
+
 // ==========================================
 // 2. Organization Tree
 // ==========================================
@@ -208,6 +233,32 @@ app.get('/org/tree', async (c) => {
   return c.json(buildTree(results))
 })
 
+app.post('/org/nodes', async (c) => {
+  const db = c.env.DB
+  const { name, code, parent_id, depth, sort_order } = await c.req.json()
+  const res = await db.prepare(
+    "INSERT INTO organizations (name, code, parent_id, depth, sort_order) VALUES (?, ?, ?, ?, ?)"
+  ).bind(name, code, parent_id || null, depth, sort_order).run()
+  return c.json({ status: "success", id: res.meta.last_row_id })
+})
+
+app.patch('/org/nodes/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const { name, code, sort_order } = await c.req.json()
+  await db.prepare(
+    "UPDATE organizations SET name = ?, code = ?, sort_order = ? WHERE id = ?"
+  ).bind(name, code, sort_order, id).run()
+  return c.json({ status: "success" })
+})
+
+app.delete('/org/nodes/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  await db.prepare("DELETE FROM organizations WHERE id = ?").bind(id).run()
+  return c.json({ status: "success" })
+})
+
 // ==========================================
 // 3. SMS Interactions
 // ==========================================
@@ -222,12 +273,18 @@ app.post('/sms/receive', async (c) => {
   // Create a timestamp-based ID (YYYYMMDDHHMMSSmmm) - same as local PG logic
   const inc_id = parseInt(kstNow.toISOString().replace(/[-:T.Z]/g, '').substring(0, 17))
 
-  // Keyword mock
-  const keywords = ['장애', 'CRITICAL', '오류', 'DOWN', '비정상', 'error', 'timeout', 'db', 'cpu']
-  const detected = keywords.some(k => message.toLowerCase().includes(k))
-  
+  // Keyword detection from DB
+  const { results: keywordList } = await db.prepare("SELECT keyword, response FROM alert_keywords").all()
   let response_msg = null
-  if (detected) response_msg = "장애가 감지되었습니다. 담당자에게 전달됩니다."
+  let detected = false
+  
+  for (const k of keywordList) {
+    if (message.includes(k.keyword)) {
+      detected = true
+      response_msg = k.response
+      break
+    }
+  }
 
   await db.prepare(
     "INSERT INTO received_messages (inc_id, sender, message, timestamp, keyword_detected, response_message, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -263,16 +320,118 @@ app.get('/dashboard/summary', async (c) => {
   })
 })
 
+app.get('/sms/keywords', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM alert_keywords").all()
+  return c.json({ keywords: results })
+})
+
+app.post('/sms/keywords', async (c) => {
+  const { keyword, response } = await c.req.json()
+  const db = c.env.DB
+  await db.prepare("INSERT INTO alert_keywords (keyword, response) VALUES (?, ?) ON CONFLICT(keyword) DO UPDATE SET response = excluded.response").bind(keyword, response).run()
+  return c.json({ status: "success" })
+})
+
+app.post('/sms/keywords/delete/:keyword', async (c) => {
+  const db = c.env.DB
+  const keyword = c.req.param('keyword')
+  await db.prepare("DELETE FROM alert_keywords WHERE keyword = ?").bind(keyword).run()
+  return c.json({ status: "success" })
+})
+
 app.get('/incidents', async (c) => {
   const db = c.env.DB
   const { results } = await db.prepare("SELECT * FROM incidents ORDER BY created_at DESC").all()
   return c.json(results)
 })
 
+app.get('/incidents/:id', async (c) => {
+  const inc_id = c.req.param('id')
+  const db = c.env.DB
+  const result = await db.prepare("SELECT * FROM incidents WHERE inc_id = ?").bind(inc_id).first()
+  if (!result) return c.json({ error: "Not found" }, 404)
+  return c.json(result)
+})
+
+app.get('/incidents/sms/:sms_id', async (c) => {
+  const sms_id = c.req.param('sms_id')
+  const db = c.env.DB
+  const result = await db.prepare("SELECT * FROM incidents WHERE source_sms_id = ?").bind(sms_id).first()
+  if (!result) return c.json({ error: "Not found" }, 404)
+  return c.json(result)
+})
+
+app.get('/sms/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const result = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
+  if (!result) return c.json({ error: "Not found" }, 404)
+  return c.json(result)
+})
+
 app.get('/activity-logs', async (c) => {
   const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 20").all()
+  const { results } = await db.prepare("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 50").all()
   return c.json({ logs: results })
+})
+
+app.post('/incidents', async (c) => {
+  const data = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  
+  const res = await db.prepare(`
+    INSERT INTO incidents (
+      inc_id, title, description, severity, status, incident_type, 
+      assigned_to, source_sms_id, ai_insight, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.inc_id, data.title, data.description || null, data.severity || 'NORMAL', 
+    data.status || 'Open', data.incident_type || 'AI', data.assigned_to || null,
+    data.source_sms_id || null, data.ai_insight || null,
+    'SYSTEM', now, 'SYSTEM', now, now, now
+  ).run()
+  
+  return c.json({ status: "success", id: data.inc_id })
+})
+
+app.post('/incident-history', async (c) => {
+  const data = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  
+  const res = await db.prepare(`
+    INSERT INTO incident_history (
+      sms_id, target_system, error_code, problem_description, severity, 
+      reg_id, reg_dt, mod_id, mod_dt, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.sms_id, data.target_system, data.error_code || null, 
+    data.problem_description, data.severity,
+    'SYSTEM', now, 'SYSTEM', now, now
+  ).run()
+  
+  return c.json({ status: "success", id: res.meta.last_row_id })
+})
+
+app.post('/activity-logs', async (c) => {
+  const data = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  
+  await db.prepare(`
+    INSERT INTO activity_logs (
+      user_name, incident_code, incident_title, action, detail, 
+      report_type, reg_id, reg_dt, mod_id, mod_dt, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.user_name || 'System', data.incident_code || null, data.incident_title || null,
+    data.action, data.detail || null, data.report_type || '시스템',
+    'SYSTEM', now, 'SYSTEM', now, now
+  ).run()
+  
+  return c.json({ status: "success" })
 })
 
 app.get('/warroom/rooms', async (c) => {
@@ -313,21 +472,53 @@ app.get('/warroom/rooms', async (c) => {
 // ==========================================
 app.get('/ai/insight', async (c) => {
   const db = c.env.DB
-  const msg = await db.prepare("SELECT * FROM received_messages ORDER BY id DESC LIMIT 1").first()
   
-  if (!msg) {
-    return c.json({ status: 'active', current_log: { id: 'SYS-000', text: '대기 중...', type: 'info' }, prediction_counts: { critical:0, server:0 }})
+  // 1. Get recent SMS
+  const recent_sms = await db.prepare("SELECT * FROM received_messages ORDER BY inc_id DESC").first()
+  
+  // 2. Calculate prediction counts
+  const { results: recent_messages } = await db.prepare("SELECT message FROM received_messages ORDER BY inc_id DESC LIMIT 100").all()
+  const prediction_counts = { critical: 0, server: 0, security: 0, report: 0 }
+  
+  for (const msg of recent_messages) {
+    const text = msg.message.toLowerCase()
+    if (text.includes("db") || text.includes("데이터베이스")) prediction_counts.critical++
+    else if (text.includes("cpu") || text.includes("메모리")) prediction_counts.server++
+    else prediction_counts.report++
   }
 
-  // Optionally check if we have an insight for this latest SMS
-  const insight = await db.prepare("SELECT * FROM autopilot_insight WHERE inc_id = ?").bind(msg.inc_id).first()
-  
-  let insight_text = insight ? insight.content : `🔍 [Insight] SMS 분석 완료: '${msg.message.substring(0,25)}...'`
-  
+  // Look for existing insight for the latest SMS
+  let insight_text = "새로운 장애 SMS 분석을 준비하고 있습니다."
+  let current_log_id = "SYS-000"
+  let timestamp = null
+
+  if (recent_sms) {
+    current_log_id = `KMS-${recent_sms.inc_id}`
+    timestamp = recent_sms.timestamp
+    const insight = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(recent_sms.inc_id).first()
+    if (insight) {
+      insight_text = insight.content
+    } else {
+      insight_text = `🔍 [Insight] SMS 분석 대기 중: '${recent_sms.message.substring(0,30)}...'`
+    }
+  }
+
   return c.json({
     status: 'active',
-    current_log: { id: `KMS-${msg.inc_id}`, type: 'warning', category: 'server', severity: 'high', text: insight_text, detail: `시간: ${msg.timestamp}` },
-    prediction_counts: { critical: 1, server: 2, safety: 0, report: 5 }
+    prediction_counts,
+    recent_sms: recent_sms ? {
+      inc_id: recent_sms.inc_id,
+      message: recent_sms.message,
+      timestamp: recent_sms.timestamp
+    } : null,
+    current_log: {
+      id: current_log_id,
+      type: 'warning',
+      category: 'server',
+      severity: 'high',
+      text: insight_text,
+      detail: timestamp ? `시간: ${timestamp}` : ""
+    }
   })
 })
 
@@ -778,6 +969,18 @@ app.get('/ai/warroom/list', async (c) => {
   return c.json({ results })
 })
 
+app.get('/warroom/search', async (c) => {
+  const q = c.req.query('q')
+  const db = c.env.DB
+  const searchQuery = `%${q}%`
+  const { results } = await db.prepare(`
+    SELECT * FROM incidents 
+    WHERE title LIKE ? OR description LIKE ? OR inc_id LIKE ?
+    ORDER BY created_at DESC
+  `).bind(searchQuery, searchQuery, searchQuery).all()
+  return c.json({ total: results.length, rooms: results })
+})
+
 app.post('/ai/warroom/open', async (c) => {
   const { inc_id, title, creator_id, severity, leader_summary } = await c.req.json()
   const db = c.env.DB
@@ -937,30 +1140,78 @@ app.post('/ai/knowledge/save', async (c) => {
   }
 })
 
-app.delete('/ai/knowledge/:id', async (c) => {
-  const id = c.req.param('id')
+app.post('/warroom/resolve', async (c) => {
+  const { incident_id } = await c.req.json()
   const db = c.env.DB
-  await db.prepare("DELETE FROM knowledge_base WHERE id = ?").bind(id).run()
-  return c.json({ status: 'deleted' })
+  await db.prepare("UPDATE incidents SET status = ?, updated_at = ? WHERE inc_id = ?").bind("완료", getKst(), incident_id).run()
+  return c.json({ status: "success" })
+})
+
+app.post('/warroom/reset', async (c) => {
+  const db = c.env.DB
+  // Dangerous operation: clear all tables for demo reset
+  await db.prepare("DELETE FROM warroom_chats").run()
+  await db.prepare("DELETE FROM incidents").run()
+  await db.prepare("DELETE FROM activity_logs").run()
+  await db.prepare("DELETE FROM received_messages").run()
+  await db.prepare("DELETE FROM autopilot_insight").run()
+  await db.prepare("DELETE FROM aichat_history").run()
+  return c.json({ status: "success", message: "All warroom data has been reset." })
+})
+
+app.post('/warroom/feedback', async (c) => {
+  const { incident_id, resolution_text, commandsUsed, feedback, user_id } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  await db.prepare(`
+    INSERT INTO resolution_feedback (incident_id, resolution_text, commandsUsed, feedback, reg_id, reg_dt)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(incident_id, resolution_text, JSON.stringify(commandsUsed), feedback, user_id, now).run()
+  return c.json({ status: "success" })
 })
 
 // Incidents create
 app.post('/incidents', async (c) => {
-  const { code, title, description, severity, incident_type, source_sms_id } = await c.req.json()
+  const { inc_id, title, description, severity, incident_type, source_sms_id } = await c.req.json()
   const db = c.env.DB
-  const existing = await db.prepare("SELECT inc_id FROM incidents WHERE code = ?").bind(code).first()
-  if (existing) return c.json({ status: 'exists', code })
+  const existing = await db.prepare("SELECT inc_id FROM incidents WHERE inc_id = ?").bind(inc_id).first()
+  if (existing) return c.json({ status: 'exists', inc_id })
   const now = getKst()
   await db.prepare(
     `INSERT INTO incidents (
-      code, title, description, severity, status, incident_type, source_sms_id, 
+      inc_id, title, description, severity, status, incident_type, source_sms_id, 
       reg_id, reg_dt, mod_id, mod_dt, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    code, title, description, severity, 'OPEN', incident_type, source_sms_id || null, 
+    inc_id, title, description, severity, 'OPEN', incident_type, source_sms_id || null, 
     'SYSTEM', now, 'SYSTEM', now, now
   ).run()
-  return c.json({ status: 'created', code })
+  return c.json({ status: 'created', inc_id })
+})
+
+app.patch('/incidents/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const { title, description, severity, status, assigned_to } = await c.req.json()
+  const now = getKst()
+  await db.prepare(`
+    UPDATE incidents 
+    SET title = COALESCE(?, title),
+        description = COALESCE(?, description),
+        severity = COALESCE(?, severity),
+        status = COALESCE(?, status),
+        assigned_to = COALESCE(?, assigned_to),
+        mod_dt = ?
+    WHERE inc_id = ?
+  `).bind(title || null, description || null, severity || null, status || null, assigned_to || null, now, id).run()
+  return c.json({ status: "success" })
+})
+
+app.get('/warroom/attachments/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const { results } = await db.prepare("SELECT * FROM warroom_attachments WHERE inc_id = ? ORDER BY timestamp DESC").bind(id).all()
+  return c.json(results)
 })
 
 // Warroom chat list
@@ -976,7 +1227,7 @@ app.get('/warroom/chat/:id', async (c) => {
   let description = leader_summary_db
 
   // Supplement description from incidents if warroom_list has none
-  const inc = await db.prepare("SELECT description, status FROM incidents WHERE code = ?").bind(id).first()
+  const inc = await db.prepare("SELECT description, status FROM incidents WHERE inc_id = ?").bind(id).first()
   if (inc) {
     if (!description && inc.description) description = inc.description
     if (inc.status && inc.status !== 'OPEN') status = inc.status

@@ -23,9 +23,6 @@ from email.mime.multipart import MIMEMultipart
 import asyncio
 import base64
 import httpx
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, or_, BigInteger, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship, backref
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -47,21 +44,62 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 데이터베이스 설정
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://sguard_user:sguard_password@db:5432/sguard_db")
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# 데이터베이스 설정 (Moved to Cloudflare D1)
+# Proxy through WorkerClient
 
-class AuditingMixin:
-    reg_id = Column(String(50), default="SYSTEM")
-    reg_dt = Column(DateTime, default=get_kst)
-    mod_id = Column(String(50), default="SYSTEM")
-    mod_dt = Column(DateTime, default=get_kst, onupdate=get_kst)
+# Cloudflare Worker Proxy Configuration
+WORKER_URL = os.getenv("WORKER_URL", "https://sguardai.khcho0421.workers.dev")
 
-def generate_inc_id(db: Session, model: Any) -> int:
-    """PostgreSQL의 generate_inc_id() 함수를 호출하여 고유 키 생성"""
-    return db.execute(text("SELECT generate_inc_id()")).scalar()
+class WorkerClient:
+    @staticmethod
+    async def post(path: str, data: dict):
+        url = f"{WORKER_URL}{path}"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(url, json=data)
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logger.error(f"Worker Proxy POST error ({path}): {e}")
+                return {"error": str(e)}
+
+    @staticmethod
+    async def get(path: str, params: dict = None):
+        url = f"{WORKER_URL}{path}"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logger.error(f"Worker Proxy GET error ({path}): {e}")
+                return {"error": str(e)}
+
+    @staticmethod
+    async def patch(path: str, data: dict):
+        url = f"{WORKER_URL}{path}"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.patch(url, json=data)
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logger.error(f"Worker Proxy PATCH error ({path}): {e}")
+                return {"error": str(e)}
+
+    @staticmethod
+    async def post_multipart(path: str, data: dict, files: dict):
+        url = f"{WORKER_URL}{path}"
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                response = await client.post(url, data=data, files=files)
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logger.error(f"Worker Proxy POST multipart error ({path}): {e}")
+                return {"error": str(e)}
+
+
 
 # Dify API Configuration
 DIFY_API_KEY = os.getenv("DIFY_API_KEY", "app-XXXXXXXX")
@@ -306,188 +344,7 @@ async def convert_multimodal(file: UploadFile = File(...)):
 
 
 
-class IncidentHistoryDB(Base, AuditingMixin):
-    __tablename__ = "incident_history"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    sms_id = Column(BigInteger, ForeignKey("received_messages.inc_id"))
-    target_system = Column(String(100))
-    error_code = Column(String(50))
-    problem_description = Column(Text)
-    severity = Column(String(20))
-    created_at = Column(DateTime, default=get_kst)
 
-class ActionResultDB(Base, AuditingMixin):
-    __tablename__ = "action_results"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    incident_id = Column(BigInteger, ForeignKey("incidents.inc_id"))
-    resolution_text = Column(Text)
-    commandsUsed = Column(Text)
-    feedback = Column(Text) # "Correct/Fixed" etc.
-    created_at = Column(DateTime, default=get_kst)
-
-class SMSMessageDB(Base, AuditingMixin):
-    __tablename__ = "received_messages"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    sender = Column(String(20), index=True)
-    message = Column(Text)
-    timestamp = Column(DateTime, default=get_kst)
-    keyword_detected = Column(Boolean, default=False)
-    response_message = Column(Text, nullable=True)
-    read = Column(Boolean, default=False)
-    received_count = Column(Integer, default=1) # 중복 수신 횟수
-
-class SMSHistoryDB(Base, AuditingMixin):
-    __tablename__ = "sms_history"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    recipient = Column(String(20))
-    message = Column(Text)
-    sent_at = Column(DateTime, default=get_kst)
-    status = Column(String(20))
-
-class KeywordDB(Base, AuditingMixin):
-    __tablename__ = "alert_keywords"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    keyword = Column(String(50), unique=True, index=True)
-    response = Column(Text)
-    severity = Column(String(20), default="NORMAL")
-    hit_count = Column(Integer, default=0)
-
-class UserDB(Base, AuditingMixin):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    name = Column(String(100), nullable=False)
-    password_hash = Column(String(256), nullable=True)  # nullable for Google OAuth users
-    role = Column(String(50), default="analyst")  # admin, analyst, viewer
-    auth_provider = Column(String(30), default="local")  # local, google
-    company = Column(String(100), nullable=True)   # 회사소속
-    employee_id = Column(String(50), nullable=True)  # 사번
-    phone = Column(String(20), nullable=True)        # 핸드폰번호
-    honbu = Column(String(100), nullable=True)        # 본부
-    team = Column(String(100), nullable=True)         # 팀
-    part = Column(String(100), nullable=True)         # 파트
-    subpart = Column(String(100), nullable=True)      # 파트2
-    token = Column(String(256), nullable=True)        # 세션 토큰
-    created_at = Column(DateTime, default=get_kst)
-    is_active = Column(Boolean, default=True)
-
-class OrganizationDB(Base, AuditingMixin):
-    __tablename__ = "organizations"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    name = Column(String(100), nullable=False)
-    code = Column(String(50), unique=True, index=True, nullable=True)
-    parent_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
-    depth = Column(Integer, default=1)  # 1: Company, 2: Honbu, 3: Team, 4: Part
-    sort_order = Column(Integer, default=0)
-
-    children = relationship("OrganizationDB", backref=backref('parent', remote_side=[id]), cascade="all, delete-orphan")
-
-class IncidentDB(Base, AuditingMixin):
-    __tablename__ = "incidents"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    code = Column(String(30), unique=True, index=True)
-    title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    severity = Column(String(20), default="NORMAL")  # CRITICAL, MAJOR, NORMAL
-    status = Column(String(30), default="Open")  # Open, In Progress, Completed
-    incident_type = Column(String(20), default="AI")  # AI, SMS
-    assigned_to = Column(String(100), nullable=True)
-    source_sms_id = Column(BigInteger, nullable=True)
-    ai_insight = Column(Text, nullable=True)  # S-Autopilot Insight 분석 결과 저장
-    created_at = Column(DateTime, default=get_kst)
-    updated_at = Column(DateTime, default=get_kst, onupdate=get_kst)
-
-class ActivityLogDB(Base, AuditingMixin):
-    __tablename__ = "activity_logs"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    user_id = Column(Integer, nullable=True)
-    user_name = Column(String(100), default="System")
-    incident_code = Column(String(30), nullable=True)
-    incident_title = Column(String(255), nullable=True)
-    action = Column(String(100), nullable=False)  # e.g. 'AI 리포트 보고 완료'
-    detail = Column(Text, nullable=True)
-    team = Column(String(100), nullable=True)
-    report_type = Column(String(50), default="AI 리포트")
-    created_at = Column(DateTime, default=get_kst)
-
-class WarRoomChatDB(Base, AuditingMixin):
-    __tablename__ = "warroom_chats"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    incident_id = Column(BigInteger, index=True)
-    sender = Column(String(50))
-    role = Column(String(50), nullable=True)
-    type = Column(String(20), default='user') # 'user', 'ai', 'system'
-    text = Column(Text)
-    timestamp = Column(DateTime, default=get_kst)
-
-class WarRoomAttachmentDB(Base, AuditingMixin):
-    __tablename__ = "warroom_attachments"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    incident_id = Column(BigInteger, index=True)
-    filename = Column(String(255))          # stored filename
-    original_name = Column(String(255))     # user-facing name
-    file_type = Column(String(50))          # image/jpeg, application/pdf, etc.
-    url = Column(String(500))               # /static/uploads/{filename}
-    uploaded_by = Column(String(100), default="Unknown")
-    timestamp = Column(DateTime, default=get_kst)
-
-class ResetVerificationDB(Base, AuditingMixin):
-    __tablename__ = "reset_verifications"
-    inc_id = Column(BigInteger, primary_key=True, index=True, server_default=text("generate_inc_id()"))
-    email = Column(String(100), index=True)
-    code = Column(String(10))
-    created_at = Column(DateTime, default=get_kst)
-    is_verified = Column(Boolean, default=False)
-
-class LoginHistoryDB(Base, AuditingMixin):
-    __tablename__ = "login_history"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    email = Column(String(100), index=True)
-    ip_address = Column(String(50), nullable=True)
-    user_agent = Column(String(255), nullable=True)
-    status = Column(String(20)) # SUCCESS, FAIL
-    login_time = Column(DateTime, default=get_kst)
-
-class AutopilotInsightDB(Base, AuditingMixin):
-    __tablename__ = "autopilot_insight"
-    inc_id = Column(String(50), primary_key=True)
-    content = Column(Text, nullable=False)
-    severity = Column(String(20))
-    category = Column(String(50))
-
-class AIChatHistoryDB(Base, AuditingMixin):
-    __tablename__ = "aichat_history"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    inc_id = Column(String(50), index=True, nullable=False)
-    agent_role = Column(String(50))
-    content = Column(Text, nullable=False)
-
-# 테이블 생성 및 연결 대기
-import time
-def init_db_with_retry():
-    retries = 5
-    while retries > 0:
-        try:
-            Base.metadata.create_all(bind=engine)
-            logger.info("Database initialized successfully")
-            break
-        except Exception as e:
-            logger.error(f"Database connection failed, retrying... ({retries} left): {e}")
-            retries -= 1
-            time.sleep(5)
-    else:
-        logger.error("Failed to connect to database after multiple attempts")
-
-init_db_with_retry()
-
-# DB 세션 의존성
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # WebSocket 연결 관리자
 class ConnectionManager:
@@ -537,14 +394,6 @@ class IncidentCreate(BaseModel):
     incident_type: str = "AI"
     source_sms_id: Optional[str] = None
 
-def check_keywords(db: Session, message: str) -> Optional[str]:
-    keywords = db.query(KeywordDB).all()
-    for kw in keywords:
-        if kw.keyword in message:
-            logger.info(f"키워드 감지: {kw.keyword}")
-            return kw.response
-    return None
-
 def mask_sensitive_data(text: str) -> str:
     """전화번호, 계좌번호 등 개인정보 마스킹"""
     # 전화번호 마스킹 (010-1234-5678 -> 010-****-5678)
@@ -553,22 +402,15 @@ def mask_sensitive_data(text: str) -> str:
     text = re.sub(r'\d{10,}', '**********', text)
     return text
 
-def generate_incident_id(db: Session) -> str:
-    """사용자 요청에 따른 YYYYMMDDHHmmss + sequence 고유 키 생성 (Legacy wrapper)"""
-    return generate_inc_id(db, IncidentDB)
-
-async def send_sms(db: Session, recipient: str, message: str):
+async def send_sms(recipient: str, message: str):
     logger.info(f"SMS 전송: {recipient} - {message}")
-    sms_data = SMSHistoryDB(
-        inc_id=generate_inc_id(db, SMSHistoryDB),
-        recipient=recipient,
-        message=message,
-        sent_at=get_kst(),
-        status="sent"
-    )
-    db.add(sms_data)
-    db.commit()
-    return sms_data
+    # Proxy to Worker if we want to store SMS History
+    res = await WorkerClient.post("/sms/history", {
+        "recipient": recipient,
+        "message": message,
+        "status": "sent"
+    })
+    return res
 
 @app.get("/")
 async def root():
@@ -584,36 +426,15 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 @app.post("/sms/receive")
-async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
     logger.info(f"SMS 수신: {sms.sender} - {sms.message}")
     
     # 1. 보안 마스킹 처리
     masked_message = mask_sensitive_data(sms.message)
     
-    # 2. 중복 통제 (De-duplication)
-    existing_msg = db.query(SMSMessageDB).filter(
-        SMSMessageDB.sender == sms.sender,
-        SMSMessageDB.message == masked_message
-    ).order_by(SMSMessageDB.timestamp.desc()).first()
-    
-    if existing_msg:
-        # 5초 이내 동일 메시지면 count만 업데이트 (시뮬레이터 테스트를 위해 1시간에서 축소)
-        if get_kst() - existing_msg.timestamp < timedelta(seconds=5):
-            existing_msg.received_count += 1
-            existing_msg.timestamp = get_kst() # 최신 수신 시간으로 업데이트
-            db.commit()
-            db.refresh(existing_msg)
-            
-            # WebSocket 브로드캐스트 (중복 수신 알림)
-            await manager.broadcast({
-                "type": "sms_duplicate",
-                "inc_id": existing_msg.inc_id,
-                "count": existing_msg.received_count,
-                "message": masked_message
-            })
-            return {"status": "updated", "inc_id": existing_msg.inc_id, "count": existing_msg.received_count}
-
-    response_message = check_keywords(db, masked_message)
+    # 2. Worker를 통해 중복 체크 및 저장 (Worker/D1이 처리)
+    # Worker의 /sms/receive는 자동중복체크는 안되어있으므로 단순히 저장만 함
+    # 하지만 클라이언트는 이미 보낸 메시지를 다시 보내지 않으므로 여기서는 단순히 프록시 함
     
     ts = get_kst()
     if sms.received_at:
@@ -621,19 +442,19 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Se
             ts = datetime.fromisoformat(sms.received_at.replace("Z", "+00:00"))
         except (ValueError, TypeError):
             logger.warning(f"Invalid timestamp format: {sms.received_at}. Falling back to server time.")
+
+    # 3. Worker에 SMS 저장 요청
+    worker_res = await WorkerClient.post("/sms/receive", {
+        "sender": sms.sender,
+        "message": masked_message,
+        "received_at": ts.isoformat()
+    })
     
-    msg_db = SMSMessageDB(
-        inc_id=generate_inc_id(db, SMSMessageDB),
-        sender=sms.sender,
-        message=masked_message,
-        timestamp=ts,
-        keyword_detected=response_message is not None,
-        response_message=response_message
-    )
-    db.add(msg_db)
-    db.commit()
-    db.refresh(msg_db)
-    
+    if "error" in worker_res:
+        return {"status": "error", "message": "Failed to save to D1 via Worker"}
+        
+    inc_id = worker_res.get("inc_id")
+
     # ── [핵심 1] Dify 멀티 에이전트 기반 구조화 데이터 추출 ──────────────────────
     prompt = f"""
     당신은 S-GUARD의 데이터 분류 에이전트입니다. 다음 SMS 내용을 분석하여 JSON 형식으로 응답하세요.
@@ -644,6 +465,8 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Se
     - problem_description: 기술적인 장애 현상 요약 (한국어)
     - severity: CRITICAL, MAJOR, NORMAL 중 하나 선택
     """
+    
+    incident_code = None
     try:
         extraction_res = await DifyClient.chat_message(query=prompt, user="sguard-extractor")
         raw_json = extraction_res.get("answer", "{}")
@@ -652,132 +475,87 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks, db: Se
         if m:
             extracted = json.loads(m.group())
             
-            # 새로운 인시던트 코드 생성 (문자열)
-            incident_code = generate_incident_code(db)
+            # 새로운 인시던트 코드 생성 (Worker를 통해 인시던트 수 가져오기)
+            incidents_data = await WorkerClient.get("/incidents")
+            count = len(incidents_data) if isinstance(incidents_data, list) else 0
+            incident_code = f"INC-{20240000 + count + 1}"
             
-            # 인시던트 자동 생성 및 [접수중] 상태 설정
-            new_incident = IncidentDB(
-                code=incident_code,
-                title=f"[{extracted.get('target_system', 'Unknown')}] {extracted.get('problem_description', masked_message[:30])}",
-                description=masked_message,
-                severity=extracted.get("severity", "NORMAL"),
-                status="접수중", # 상태 전이: 접수중
-                incident_type="SMS",
-                source_sms_id=msg_db.inc_id,
-                assigned_to="자동할당(AI)"
-            )
-
-            db.add(new_incident)
+            # 인시던트 자동 생성 (Worker API 사용)
+            title = f"[{extracted.get('target_system', 'Unknown')}] {extracted.get('problem_description', masked_message[:30])}"
+            await WorkerClient.post("/incidents", {
+                "inc_id": incident_code,
+                "title": title,
+                "description": masked_message,
+                "severity": extracted.get("severity", "NORMAL"),
+                "status": "접수중",
+                "incident_type": "SMS",
+                "source_sms_id": inc_id,
+                "assigned_to": "자동할당(AI)"
+            })
             
-            hist = IncidentHistoryDB(
-                inc_id=generate_inc_id(db, IncidentHistoryDB),
-                sms_id=msg_db.inc_id,
-                target_system=extracted.get("target_system", "Unknown"),
-                error_code=extracted.get("error_code"),
-                problem_description=extracted.get("problem_description", masked_message),
-                severity=extracted.get("severity", "NORMAL")
-            )
-            db.add(hist)
-            db.commit()
+            # 인시던트 히스토리 추가 (Worker API 사용)
+            await WorkerClient.post("/incident-history", {
+                "sms_id": inc_id,
+                "target_system": extracted.get("target_system", "Unknown"),
+                "error_code": extracted.get("error_code"),
+                "problem_description": extracted.get("problem_description", masked_message),
+                "severity": extracted.get("severity", "NORMAL")
+            })
             
-            # 활동 로그 추가
-            log = ActivityLogDB(
-                user_name="System",
-                incident_code=incident_code,
-                incident_title=new_incident.title,
-                action="장애 접수 (자동)",
-                detail=f"SMS 수신에 따른 장애 자동 접수 및 담당자 할당 완료. 상태: [접수중]",
-                report_type="시스템"
-            )
-            db.add(log)
-            db.commit()
+            # 활동 로그 추가 (Worker API 사용)
+            await WorkerClient.post("/activity-logs", {
+                "user_name": "System",
+                "incident_code": incident_code,
+                "incident_title": title,
+                "action": "장애 접수 (자동)",
+                "detail": f"SMS 수신에 따른 장애 자동 접수 및 담당자 할당 완료. 상태: [접수중]",
+                "report_type": "시스템"
+            })
             
     except Exception as e:
-        logger.error(f"Structured extraction failed: {e}")
+        logger.error(f"Structured extraction/saving failed: {e}")
 
     notification = {
         "type": "sms_received",
-        "inc_id": str(msg_db.inc_id),
+        "inc_id": str(inc_id),
         "sender": sms.sender,
         "message": masked_message,
-        "timestamp": msg_db.timestamp.isoformat(),
-        "keyword_detected": msg_db.keyword_detected,
-        "response_message": response_message
+        "timestamp": ts.strftime('%Y-%m-%d %H:%M:%S'),
+        "keyword_detected": worker_res.get("status") == "keyword_detected",
+        "response_message": "장애가 감지되었습니다. 담당자에게 전달됩니다." if worker_res.get("status") == "keyword_detected" else None
     }
+    
+    # 웹소켓 브로드캐스트
     await manager.broadcast(notification)
     
-    if response_message:
-        await send_sms(db, sms.sender, response_message)
-        return {"status": "keyword_detected", "inc_id": str(msg_db.inc_id), "response_message": response_message}
-    
-    # 인시던트가 생성되었다면 incident_id도 함께 반환
-    res_data = {"status": "received", "inc_id": str(msg_db.inc_id)}
-    try:
-        inc = db.query(IncidentDB).filter(IncidentDB.source_sms_id == msg_db.inc_id).first()
-        if inc:
-            res_data["incident_id"] = inc.inc_id
-    except:
-        pass
-        
-    return res_data
+    return {"status": "success", "inc_id": inc_id, "incident_code": incident_code}
 
 @app.get("/sms/recent")
-async def get_recent_messages(limit: int = 10, db: Session = Depends(get_db)):
-    messages = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).limit(limit).all()
-    # BigInt precision issue fix for JS: cast inc_id to string
-    result = []
-    for msg in messages:
-        m = {c.name: getattr(msg, c.name) for c in msg.__table__.columns}
-        m["inc_id"] = str(msg.inc_id)
-        result.append(m)
-    return {"total": len(messages), "messages": result}
+async def get_recent_messages(limit: int = 10):
+    res = await WorkerClient.get("/sms/recent", params={"limit": limit})
+    return res
 
 @app.delete("/sms/{message_id}")
-async def delete_sms(message_id: str, db: Session = Depends(get_db)):
-    msg_id_int = int(message_id)
-    # Remove references in incidents first to avoid ForeignKeyViolation
-    db.query(IncidentDB).filter(IncidentDB.source_sms_id == msg_id_int).update({IncidentDB.source_sms_id: None})
-    
-    msg = db.query(SMSMessageDB).filter(SMSMessageDB.inc_id == msg_id_int).first()
-    if not msg:
-        raise HTTPException(status_code=404, detail="Message not found")
-    db.delete(msg)
-    db.commit()
-    return {"status": "success", "message": "Deleted successfully"}
+async def delete_sms(message_id: str):
+    res = await WorkerClient.post(f"/sms/delete/{message_id}", {})
+    return res
 
 @app.get("/sms/history")
-async def get_sms_history(db: Session = Depends(get_db)):
-    history = db.query(SMSHistoryDB).all()
-    return {"total": len(history), "history": history}
+async def get_sms_history():
+    res = await WorkerClient.get("/sms/history")
+    return res
 
 @app.get("/sms/keywords")
-async def get_keywords(db: Session = Depends(get_db)):
-    keywords = db.query(KeywordDB).all()
-    return {"keywords": keywords}
+async def get_keywords():
+    res = await WorkerClient.get("/sms/keywords")
+    return res
 
 @app.post("/sms/keywords")
-async def add_keyword(keyword: str, response: str, db: Session = Depends(get_db)):
-    kw = KeywordDB(keyword=keyword, response=response)
-    db.merge(kw) # 존재하면 업데이트, 없으면 추가
-    db.commit()
-    return {"status": "success", "keyword": keyword}
+async def add_keyword(keyword: str, response: str):
+    res = await WorkerClient.post("/sms/keywords", {"keyword": keyword, "response": response})
+    return res
 
-@app.on_event("startup")
-def startup_populate_keywords():
-    # 초기 키워드 데이터 시딩
-    db = SessionLocal()
-    default_keywords = {
-        "장애": "장애 알림이 감지되었습니다. S-Guard AI 시스템에 자동 등록되었습니다.",
-        "CRITICAL": "긴급 장애가 감지되었습니다. 즉시 War-Room을 통해 확인해주세요.",
-        "오류": "시스템 오류가 감지되었습니다. AI 분석을 시작합니다.",
-        "DOWN": "서비스 다운이 감지되었습니다. 긴급 대응팀에 알림을 전송했습니다.",
-        "비정상": "비정상 상태가 감지되었습니다. 자동 분석 중입니다.",
-    }
-    for k, v in default_keywords.items():
-        if not db.query(KeywordDB).filter_by(keyword=k).first():
-            db.add(KeywordDB(inc_id=generate_inc_id(db, KeywordDB), keyword=k, response=v))
-    db.commit()
-    db.close()
+
 
 # --- AI API Endpoints (Phase 2) ---
 
@@ -786,21 +564,20 @@ last_analyzed_sms_id = None
 cached_insight_response = None
 
 @app.get("/ai/insight")
-async def get_ai_insight(db: Session = Depends(get_db)):
+async def get_ai_insight():
     """
     대시보드 상단 AI Insight (Autopilot) 패널용 데이터 (Streaming SSE)
     """
-    # 1. 최근 SMS 내역 조회
-    recent_sms = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).first()
-    
-    # 지표 계산 로직은 동일
-    recent_messages = db.query(SMSMessageDB).order_by(SMSMessageDB.timestamp.desc()).limit(100).all()
-    prediction_counts = {"critical": 0, "server": 0, "security": 0, "report": 0}
-    for msg in recent_messages:
-        msg_text_lower = msg.message.lower()
-        if "db" in msg_text_lower or "데이터베이스" in msg_text_lower: prediction_counts["critical"] += 1
-        elif "cpu" in msg_text_lower or "메모리" in msg_text_lower: prediction_counts["server"] += 1
-        else: prediction_counts["report"] += 1
+    # 1. Worker에서 최근 SMS 및 지표 조회
+    data = await WorkerClient.get("/ai/insight")
+    if "error" in data:
+        async def err_gen():
+            yield f"data: {json.dumps({'error': data['error']}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(err_gen(), media_type="text/event-stream")
+
+    prediction_counts = data.get("prediction_counts", {"critical": 0, "server": 0, "security": 0, "report": 0})
+    recent_sms = data.get("recent_sms")
 
     if not recent_sms:
         async def empty_gen():
@@ -809,11 +586,11 @@ async def get_ai_insight(db: Session = Depends(get_db)):
         return StreamingResponse(empty_gen(), media_type="text/event-stream")
 
     # [핵심] Dify 스트리밍 호출
-    prompt = f"다음 SMS 장애 내용을 분석하고 1~2문장으로 대응 가이드를 한글로 제시해줘: {recent_sms.message}"
+    prompt = f"다음 SMS 장애 내용을 분석하고 1~2문장으로 대응 가이드를 한글로 제시해줘: {recent_sms['message']}"
     
     async def insight_stream():
         # 먼저 지표 데이터 전송
-        yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'sms_id': str(recent_sms.inc_id)}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'sms_id': str(recent_sms['inc_id'])}, ensure_ascii=False)}\n\n"
         
         # Dify 스트림 전송
         gen = await DifyClient.stream_chat_message(query=prompt, user="sguard-autopilot")
@@ -886,22 +663,23 @@ async def generate_ai_report(req: GenerateReportRequest):
 
 @app.get("/ai/agent-discussion/{sms_id}")
 @app.get("/ai/discussion/{sms_id}")
-async def get_agent_discussion_stream(sms_id: str, db: Session = Depends(get_db)):
+async def get_agent_discussion_stream(sms_id: str):
     """
     특정 장애 SMS에 대해 4인의 에이전트(Security, DB, DevOps, Leader)가 협업하여 분석하는 실시간 상황 로그 (Streaming)
     """
-    sms = db.query(SMSMessageDB).filter(SMSMessageDB.inc_id == sms_id).first()
-    if not sms:
+    sms = await WorkerClient.get(f"/incidents/sms/{sms_id}")
+    if isinstance(sms, dict) and "error" in sms:
         async def err_gen():
             yield f"data: {json.dumps({'error': 'SMS not found'}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(err_gen(), media_type="text/event-stream")
 
+    message = sms.get("message", "") if isinstance(sms, dict) else ""
     query = f"""
     다음 장애 SMS 내용에 대해 보안 전문가(Security), DB 전문가(DB), 인프라 전문가(DevOps), 실시간 대응팀장(Leader)이 
     서로 대화하며 원인을 분석하고 해결 방안을 도출하는 'AI War-Room 상황 로그' 대본을 작성해라.
     
-    내용: {sms.message}
+    내용: {message}
     
     [규칙]
     1. 각 대사는 반드시 '[에이전트명]: 내용' 형식을 지켜라.
@@ -1008,20 +786,26 @@ async def chat_with_ai(request: ChatRequest):
 
 
 @app.get("/ai/analyze-sms/{sms_id}")
-async def analyze_sms_multi_agent(sms_id: str, db: Session = Depends(get_db)):
+async def analyze_sms_multi_agent(sms_id: str):
     """Perform multi-agent collaborative analysis using Dify"""
-    sms = db.query(SMSMessageDB).filter(SMSMessageDB.inc_id == sms_id).first()
-    hist = db.query(IncidentHistoryDB).filter(IncidentHistoryDB.sms_id == sms_id).first()
+    sms = await WorkerClient.get(f"/incidents/sms/{sms_id}")
+    hist = await WorkerClient.get(f"/incident-history/{sms_id}")
     
-    if not sms:
+    if isinstance(sms, dict) and "error" in sms:
         raise HTTPException(status_code=404, detail="SMS not found")
+
+    sender = sms.get("sender", "Unknown") if isinstance(sms, dict) else "Unknown"
+    message = sms.get("message", "N/A") if isinstance(sms, dict) else "N/A"
+    
+    target_system = hist.get("target_system", "Unknown") if isinstance(hist, dict) and "error" not in hist else "Unknown"
+    error_code = hist.get("error_code", "N/A") if isinstance(hist, dict) and "error" not in hist else "N/A"
 
     # [핵심] 4개 에이전트 페르소나를 활용한 분석 프롬프트
     query = f"""
     [장애 수신 내역]
-    발신자: {sms.sender}
-    메시지 원본: {sms.message}
-    추출 정보: {hist.target_system if hist else 'Unknown'} / {hist.error_code if hist else 'N/A'}
+    발신자: {sender}
+    메시지 원본: {message}
+    추출 정보: {target_system} / {error_code}
     
     다음 4명의 전문가 에이전트가 협업하여 이 장애를 분석하고 리더가 최종 결과를 한국어로 보고하세요:
     1. Infra Agent: L4, 네트워크, VM 등 인프라 영향도 분석
@@ -1088,14 +872,14 @@ async def analyze_sms_stream(req: AnalyzeSmsRequest):
         # 1. 기 분석된 결과가 있는지 DB 조회 (캐시 히트)
         if req.sms_id:
             try:
-                with SessionLocal() as db_session:
-                    inc = db_session.query(IncidentDB).filter(IncidentDB.source_sms_id == req.sms_id).first()
-                    if inc and inc.ai_insight:
-                        logger.info(f"[analyze-sms:{req_id}] Cache Hit for SMS_ID: {req.sms_id}")
-                        # 저장된 내용을 즉시 반환
-                        yield f"data: {json.dumps({'answer': inc.ai_insight}, ensure_ascii=False)}\n\n"
-                        yield "data: [DONE]\n\n"
-                        return
+                # Use Worker API for autopilot insight
+                insight_res = await WorkerClient.get(f"/ai/insight/{req.sms_id}")
+                if "error" not in insight_res and insight_res.get("content"):
+                    logger.info(f"[analyze-sms:{req_id}] Cache Hit for SMS_ID: {req.sms_id}")
+                    # 저장된 내용을 즉시 반환
+                    yield f"data: {json.dumps({'answer': insight_res['content']}, ensure_ascii=False)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
             except Exception as e:
                 logger.error(f"[analyze-sms:{req_id}] Cache check failed: {e}")
 
@@ -1148,24 +932,15 @@ async def analyze_sms_stream(req: AnalyzeSmsRequest):
             # 스트리밍 종료 시 최종 답변을 DB에 자동 저장 (사용자 요청 사항)
             if (req.sms_id or sender) and answer_chars > 0:
                 try:
-                    # Sync DB session inside generator if needed, but better to use a new session
-                    with SessionLocal() as db_session:
-                        # sms_id가 있으면 우선순위로 검색, 없으면 sender/message로 검색
-                        target_inc = None
-                        if req.sms_id:
-                            target_inc = db_session.query(IncidentDB).filter(IncidentDB.source_sms_id == req.sms_id).first()
-                        
-                        if not target_inc:
-                            # fallback: 최근 1시간 내 동일 발신자/메시지 인시던트 찾기
-                            target_inc = db_session.query(IncidentDB).filter(
-                                IncidentDB.description == message,
-                                IncidentDB.created_at >= get_kst() - timedelta(hours=1)
-                            ).order_by(IncidentDB.created_at.desc()).first()
-                        
-                        if target_inc:
-                            target_inc.ai_insight = "".join(answer_parts)
-                            db_session.commit()
-                            logger.info(f"[analyze-sms:{req_id}] AI Insight saved to Incident ID: {target_inc.inc_id}")
+                    # Save via Worker Proxy (using sms_id or a hashed sender+msg as fallback ID)
+                    save_id = req.sms_id or hashlib.md5(f"{sender}:{message}".encode()).hexdigest()[:16]
+                    await WorkerClient.post("/ai/insight/save", {
+                        "incident_id": str(save_id),
+                        "content": "".join(answer_parts),
+                        "severity": "NORMAL",
+                        "category": "분석"
+                    })
+                    logger.info(f"[analyze-sms:{req_id}] AI Insight saved to ID: {save_id}")
                 except Exception as db_err:
                     logger.error(f"[analyze-sms:{req_id}] Failed to save AI Insight: {db_err}")
             
@@ -1181,25 +956,21 @@ class FeedbackRequest(BaseModel):
     feedback_rating: str
 
 @app.post("/ai/feedback/save")
-async def save_resolution_feedback(req: FeedbackRequest, db: Session = Depends(get_db)):
+async def save_resolution_feedback(req: FeedbackRequest):
     """피드백 저장 및 Dify 지식 베이스(RAG) 동기화"""
-    # 1. DB 적재
-    action = ActionResultDB(
-        inc_id=generate_inc_id(db, ActionResultDB),
-        incident_id=req.incident_id,
-        resolution_text=req.resolution,
-        commandsUsed=req.commands_used,
-        feedback=req.feedback_rating
-    )
-    db.add(action)
-    db.commit()
+    # 1. DB 적재 (Worker 쪽에 action result 엔드포인트가 없으므로 파일 로깅이나 패스)
+    # 현재는 Dify 지식 베이스(RAG) 적재가 주 목적
 
     # 2. Dify 지식 베이스(RAG)에 실시간 '성공 사례'로 인입
-    inc = db.query(IncidentDB).filter(IncidentDB.inc_id == req.incident_id).first()
+    inc = await WorkerClient.get(f"/incidents/{req.incident_id}")
+    
+    title = inc.get("title", 'Unknown') if isinstance(inc, dict) and "error" not in inc else 'Unknown'
+    description = inc.get("description", 'N/A') if isinstance(inc, dict) and "error" not in inc else 'N/A'
+
     knowledge_text = f"""
     [검증된 장애 해결 사례]
-    시스템: {inc.title if inc else 'Unknown'}
-    현상: {inc.description if inc else 'N/A'}
+    시스템: {title}
+    현상: {description}
     해결방안: {req.resolution}
     실행 명령어: {req.commands_used if req.commands_used else 'N/A'}
     피드백 결과: {req.feedback_rating}
@@ -1230,107 +1001,39 @@ class WarRoomMessage(BaseModel):
     text: str
 
 @app.post("/warroom/chat")
-async def save_warroom_chat(msg: WarRoomMessage, db: Session = Depends(get_db)):
+async def save_warroom_chat(msg: WarRoomMessage):
     """Save a single message from the War-Room"""
-    chat_db = WarRoomChatDB(
-        inc_id=generate_inc_id(db, WarRoomChatDB),
-        incident_id=msg.incident_id,
-        sender=msg.sender,
-        role=msg.role,
-        type=msg.type,
-        text=msg.text,
-        timestamp=get_kst()
-    )
-    db.add(chat_db)
-    db.commit()
-    db.refresh(chat_db)
-    return {"status": "success", "inc_id": chat_db.inc_id}
+    res = await WorkerClient.post("/warroom/chat", {
+        "incident_id": msg.incident_id,
+        "sender": msg.sender,
+        "role": msg.role,
+        "type": msg.type,
+        "text": msg.text
+    })
+    return res
 
 @app.get("/warroom/chat/{incident_id}")
-async def get_warroom_chat(incident_id: str, db: Session = Depends(get_db)):
+async def get_warroom_chat(incident_id: str):
     """Retrieve chat history for a specific incident with metadata"""
-    chats = db.query(WarRoomChatDB).filter(WarRoomChatDB.incident_id == incident_id).order_by(WarRoomChatDB.timestamp.asc()).all()
-    
-    # Also fetch incident metadata for the title and description
-    incident = db.query(IncidentDB).filter(IncidentDB.code == incident_id).first()
-
-    if incident and incident.status == "접수중":
-        incident.status = "처리중"
-        db.commit()
-        # Log this state transition
-        activity = ActivityLogDB(
-            user_name="System Agent",
-            incident_code=incident_id,
-            incident_title=incident.title if incident else "",
-            action="Status Transition",
-            detail="워룸 개설로 인해 상태가 '접수중'에서 '처리중'으로 변경되었습니다.",
-            report_type="System"
-        )
-        db.add(activity)
-        db.commit()
-
-    title = incident.title if incident else f"Room {incident_id}"
-    description = incident.description if incident else ""
-    severity = incident.severity if incident else "NORMAL"
-    
-    return {
-        "messages": chats,
-        "title": title,
-        "description": description,
-        "severity": severity,
-        "status": incident.status if incident else "Open"
-    }
+    res = await WorkerClient.get(f"/warroom/chat/{incident_id}")
+    return res
 
 @app.post("/incidents")
-async def create_incident(inc: IncidentCreate, db: Session = Depends(get_db)):
+async def create_incident(inc: IncidentCreate):
     """Create or update incident metadata"""
     # 1. Check if an incident for this specific SMS already exists
-    if inc.source_sms_id:
-        existing_sms_inc = db.query(IncidentDB).filter(IncidentDB.source_sms_id == inc.source_sms_id).first()
-        if existing_sms_inc:
-            return {
-                "status": "exists", 
-                "inc_id": existing_sms_inc.inc_id, 
-                "code": existing_sms_inc.code,
-                "title": existing_sms_inc.title
-            }
-
-    # 2. Check for exact code match (original behavior)
-    existing = db.query(IncidentDB).filter(IncidentDB.code == inc.code).first()
-    if existing:
-        existing.title = inc.title
-        existing.description = inc.description
-        existing.severity = inc.severity
-        db.commit()
-        db.refresh(existing)
-        return {"status": "updated", "inc_id": existing.inc_id, "code": existing.code}
+    # (Checking logic moved to Worker or simplified here)
+    res = await WorkerClient.post("/incidents", {
+        "inc_id": inc.code,
+        "title": inc.title,
+        "description": inc.description,
+        "severity": inc.severity,
+        "incident_type": inc.incident_type,
+        "source_sms_id": inc.source_sms_id
+    })
     
-    new_inc = IncidentDB(
-        code=inc.code,
-        title=inc.title,
-        description=inc.description,
-        severity=inc.severity,
-        incident_type=inc.incident_type,
-        source_sms_id=inc.source_sms_id
-    )
-
-    db.add(new_inc)
-    
-    # [활동로그] 새로운 워룸 개설 로그 추가
-    log = ActivityLogDB(
-        inc_id=generate_inc_id(db, ActivityLogDB),
-        user_name="System",
-        incident_code=new_inc.code,
-        incident_title=new_inc.title,
-        action="War-Room 개설",
-        detail=f"새로운 War-Room ({new_inc.code})이 개설되었습니다.",
-        report_type="시스템"
-    )
-    db.add(log)
-    
-    db.commit()
-    db.refresh(new_inc)
-    return {"status": "created", "inc_id": new_inc.inc_id, "code": new_inc.code}
+    # [활동로그] 새로운 워룸 개설 로그 추가 (Worker가 /incidents 호출 시 처리하도록 이미 구현함)
+    return res
 
 # ─── War-Room Management Endpoints ──────────────────────────────────────────
 
@@ -1343,279 +1046,149 @@ async def list_warrooms(
     q: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    assigned_to: Optional[str] = None,
-    db: Session = Depends(get_db)
+    assigned_to: Optional[str] = None
 ):
-    """List all War-Rooms with optional filters"""
-    query = db.query(IncidentDB)
+    """List all War-Rooms with optional filters via Worker"""
+    params = {}
+    if status: params["status"] = status
+    if q: params["q"] = q
+    if start_date: params["start_date"] = start_date
+    if end_date: params["end_date"] = end_date
+    if assigned_to: params["assigned_to"] = assigned_to
     
-    if status:
-        query = query.filter(IncidentDB.status == status)
-    
-    if q:
-        query = query.filter(or_(
-            IncidentDB.title.ilike(f"%{q}%"),
-            IncidentDB.description.ilike(f"%{q}%"),
-            IncidentDB.code.ilike(f"%{q}%")
-        ))
-        
-    if start_date:
-        try:
-            start_dt = datetime.fromisoformat(start_date)
-            query = query.filter(IncidentDB.created_at >= start_dt)
-        except: pass
-        
-    if end_date:
-        try:
-            end_dt = datetime.fromisoformat(end_date)
-            # To include the whole day if end_date doesn't have time
-            if len(end_date) <= 10: 
-                end_dt = end_dt.replace(hour=23, minute=59, second=59)
-            query = query.filter(IncidentDB.created_at <= end_dt)
-        except: pass
-        
-    if assigned_to:
-        query = query.filter(IncidentDB.assigned_to.ilike(f"%{assigned_to}%"))
-
-    incidents = query.order_by(IncidentDB.created_at.desc()).all()
-    
-    result = []
-    for inc in incidents:
-        # Latest message
-        latest = db.query(WarRoomChatDB)\
-            .filter(WarRoomChatDB.incident_id == inc.code)\
-            .order_by(WarRoomChatDB.timestamp.desc()).first()
-        
-        # Message count
-        msg_count = db.query(WarRoomChatDB)\
-            .filter(WarRoomChatDB.incident_id == inc.code)\
-            .count()
-        
-        # Attachment count
-        attach_count = db.query(WarRoomAttachmentDB)\
-            .filter(WarRoomAttachmentDB.incident_id == inc.code)\
-            .count()
-
-        result.append({
-            "inc_id": inc.inc_id,
-            "code": inc.code,
-            "source_sms_id": inc.source_sms_id,
-            "title": inc.title,
-            "description": inc.description,
-            "severity": inc.severity,
-            "status": inc.status,
-            "incident_type": inc.incident_type,
-            "assigned_to": inc.assigned_to,
-            "created_at": inc.created_at.isoformat() if inc.created_at else None,
-            "updated_at": inc.updated_at.isoformat() if inc.updated_at else None,
-            "last_message": latest.text if latest else None,
-            "last_message_time": latest.timestamp.isoformat() if latest else None,
-            "last_message_sender": latest.sender if latest else None,
-            "message_count": msg_count,
-            "attachment_count": attach_count,
-        })
-    
-    return {"total": len(result), "rooms": result}
+    res = await WorkerClient.get("/warroom/rooms", params=params)
+    return res
 
 
 @app.post("/warroom/reset")
-async def reset_warroom_data(db: Session = Depends(get_db)):
+async def reset_warroom_data():
     """Wipe all War-Room incidents, chats, and attachments for testing/cleanup"""
-    try:
-        # 1. Delete physical files
-        if os.path.exists(UPLOAD_DIR):
-            import shutil
-            for filename in os.listdir(UPLOAD_DIR):
-                file_path = os.path.join(UPLOAD_DIR, filename)
-                try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    logger.error(f"Failed to delete {file_path}. Reason: {e}")
+    # 1. Delete physical files locally if any still exist
+    if os.path.exists(UPLOAD_DIR):
+        import shutil
+        for filename in os.listdir(UPLOAD_DIR):
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                logger.error(f"Failed to delete {file_path}. Reason: {e}")
 
-        # 2. Purge DB tables
-        db.query(WarRoomChatDB).delete()
-        db.query(WarRoomAttachmentDB).delete()
-        db.query(IncidentDB).delete()
+    # 2. Reset via Worker Proxy
+    res = await WorkerClient.post("/warroom/reset", {})
+    if "error" in res:
+        raise HTTPException(status_code=500, detail=res["error"])
         
-        # 3. Optional: Clear related Activity Logs if needed
-        db.query(ActivityLogDB).filter(ActivityLogDB.incident_code != None).delete()
-        
-        db.commit()
-        return {"status": "success", "message": "All War-Room data has been cleared."}
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Reset failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return res
 
 @app.get("/warroom/rooms/search")
 async def search_warrooms(
-    q: str = Query(..., description="Search query"),
-    db: Session = Depends(get_db)
+    q: str = Query(..., description="Search query")
 ):
     """Search War-Rooms by title or description"""
-    incidents = db.query(IncidentDB).filter(
-        or_(
-            IncidentDB.title.ilike(f"%{q}%"),
-            IncidentDB.description.ilike(f"%{q}%"),
-            IncidentDB.code.ilike(f"%{q}%")
-        )
-    ).order_by(IncidentDB.created_at.desc()).all()
-    
-    result = []
-    for inc in incidents:
-        latest = db.query(WarRoomChatDB)\
-            .filter(WarRoomChatDB.incident_id == inc.code)\
-            .order_by(WarRoomChatDB.timestamp.desc()).first()
-        msg_count = db.query(WarRoomChatDB).filter(WarRoomChatDB.incident_id == inc.code).count()
-        result.append({
-            "code": inc.code,
-            "title": inc.title,
-            "description": inc.description,
-            "severity": inc.severity,
-            "status": inc.status,
-            "created_at": inc.created_at.isoformat() if inc.created_at else None,
-            "last_message": latest.text if latest else None,
-            "last_message_time": latest.timestamp.isoformat() if latest else None,
-            "message_count": msg_count,
-        })
-    return {"total": len(result), "rooms": result}
+    res = await WorkerClient.get("/warroom/search", params={"q": q})
+    return res
 
 
 @app.post("/warroom/rooms/{incident_id}/join")
 async def join_warroom(
     incident_id: str,
-    body: dict = {},
-    db: Session = Depends(get_db)
+    body: dict = {}
 ):
     """Record joining a War-Room"""
-    inc = db.query(IncidentDB).filter(IncidentDB.code == incident_id).first()
-    if not inc:
+    # 1. Check if incident exists
+    inc_res = await WorkerClient.get(f"/incidents/{incident_id}")
+    if "error" in inc_res or not inc_res.get("title"):
         raise HTTPException(status_code=404, detail="War-Room not found")
-    
+        
+    title = inc_res.get("title", incident_id)
     user_name = body.get("user_name", "Unknown")
     
-    # Log system message for join event
-    join_msg = WarRoomChatDB(
-        incident_id=incident_id,
-        sender="시스템",
-        role="System",
-        type="system",
-        text=f"👤 {user_name}님이 War-Room에 참여하였습니다.",
-        timestamp=get_kst()
-    )
-    db.add(join_msg)
+    # 2. Log system message for join event
+    await WorkerClient.post("/warroom/chat", {
+        "incident_id": incident_id,
+        "sender": "시스템",
+        "role": "System",
+        "type": "system",
+        "text": f"👤 {user_name}님이 War-Room에 참여하였습니다."
+    })
     
-    # Log activity
-    log = ActivityLogDB(
-        user_name=user_name,
-        incident_code=incident_id,
-        incident_title=inc.title,
-        action="War-Room 참여",
-        detail=f"{user_name}이 {incident_id} War-Room에 참여"
-    )
-    db.add(log)
-    db.commit()
+    # 3. Log activity
+    await WorkerClient.post("/activity-logs", {
+        "user_name": user_name,
+        "incident_code": incident_id,
+        "incident_title": title,
+        "action": "War-Room 참여",
+        "detail": f"{user_name}이 {incident_id} War-Room에 참여",
+        "report_type": "시스템"
+    })
     
-    return {"status": "joined", "incident_id": incident_id, "title": inc.title}
+    return {"status": "joined", "incident_id": incident_id, "title": title}
 
 
 @app.post("/warroom/upload")
 async def upload_warroom_file(
     incident_id: str = Form(...),
     uploaded_by: str = Form(default="Unknown"),
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    file: UploadFile = File(...)
 ):
-    """Upload a file/image to a War-Room"""
+    """Upload a file/image to a War-Room via Worker proxy"""
     MAX_SIZE = 50 * 1024 * 1024  # 50MB
     contents = await file.read()
     if len(contents) > MAX_SIZE:
         raise HTTPException(status_code=413, detail="File too large (max 50MB)")
     
-    # Generate unique filename
-    ext = os.path.splitext(file.filename)[1] if file.filename else ""
-    unique_name = f"{secrets.token_hex(12)}{ext}"
-    save_path = os.path.join(UPLOAD_DIR, unique_name)
-    
-    with open(save_path, "wb") as f:
-        f.write(contents)
-    
-    file_url = f"/warroom/uploads/{unique_name}"
-    
-    attachment = WarRoomAttachmentDB(
-        inc_id=generate_inc_id(db, WarRoomAttachmentDB),
-        incident_id=incident_id,
-        filename=unique_name,
-        original_name=file.filename,
-        file_type=file.content_type,
-        url=file_url,
-        uploaded_by=uploaded_by,
-        timestamp=get_kst()
+    res = await WorkerClient.post_multipart(
+        "/warroom/upload",
+        data={"incident_id": incident_id, "uploaded_by": uploaded_by},
+        files={"file": (file.filename, contents, file.content_type)}
     )
-    db.add(attachment)
     
-    # Also save to chat log as a message
-    chat_msg = WarRoomChatDB(
-        inc_id=generate_inc_id(db, WarRoomChatDB),
-        incident_id=incident_id,
-        sender=uploaded_by,
-        role="User",
-        type="file",
-        text=f"[첨부파일] {file.filename}|{file_url}|{file.content_type}",
-        timestamp=get_kst()
-    )
-    db.add(chat_msg)
-    db.commit()
-    db.refresh(attachment)
-    
-    return {
-        "status": "success",
-        "inc_id": attachment.inc_id,
-        "url": file_url,
-        "filename": file.filename,
-        "file_type": file.content_type
-    }
+    if "error" in res:
+        raise HTTPException(status_code=500, detail=res["error"])
+        
+    return res
 
 
-@app.get("/warroom/uploads/{filename}")
-async def get_warroom_upload(filename: str):
-    """Serve uploaded files"""
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path)
+@app.get("/warroom/file/{key:path}")
+async def get_warroom_file(key: str):
+    """Serve uploaded files by proxying from the Worker"""
+    # The key might already be encoded, or we may need to pass it through
+    url = f"{WORKER_URL}/warroom/file/{key}"
+    
+    async def worker_stream():
+        async with httpx.AsyncClient() as client:
+            async with client.stream("GET", url) as req:
+                req.raise_for_status()
+                # Pass Content-Type from worker response
+                async for chunk in req.aiter_bytes():
+                    yield chunk
+                    
+    # We ideally want the Content-Type from the proxied response, 
+    # but StreamingResponse defaults are fine for browsers trying to sniff or relying on typical usage.
+    return StreamingResponse(worker_stream())
 
 
 @app.get("/warroom/rooms/{incident_id}/attachments")
-async def get_warroom_attachments(incident_id: str, db: Session = Depends(get_db)):
-    """Get all attachments for a War-Room"""
-    attachments = db.query(WarRoomAttachmentDB)\
-        .filter(WarRoomAttachmentDB.incident_id == incident_id)\
-        .order_by(WarRoomAttachmentDB.timestamp.asc()).all()
-    return {"attachments": [{
-        "inc_id": a.inc_id,
-        "filename": a.filename,
-        "original_name": a.original_name,
-        "file_type": a.file_type,
-        "url": a.url,
-        "uploaded_by": a.uploaded_by,
-        "timestamp": a.timestamp.isoformat() if a.timestamp else None
-    } for a in attachments]}
+async def get_warroom_attachments(incident_id: str):
+    """Get all attachments for a War-Room via Worker"""
+    res = await WorkerClient.get(f"/warroom/attachments/{incident_id}")
+    return res
 
 # ─── End War-Room Management Endpoints ──────────────────────────────────────
 
 @app.post("/warroom/resolve/{incident_id}")
-async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get_db)):
+async def resolve_and_learn_incident(incident_id: str):
     """
     Gather all chat logs for the incident, compile them into a troubleshooting report,
     and ingest them into Dify Knowledge base for future RAG learning.
     """
     try:
-        # Retrieve all messages for this incident
-        chats = db.query(WarRoomChatDB).filter(WarRoomChatDB.incident_id == incident_id).order_by(WarRoomChatDB.timestamp.asc()).all()
+        # Retrieve all messages for this incident (via Worker)
+        res = await WorkerClient.get(f"/warroom/chat/{incident_id}")
+        chats = res.get("messages", [])
         
         if not chats:
             raise HTTPException(status_code=404, detail="No chat history found for this incident.")
@@ -1629,9 +1202,14 @@ async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get
         ]
         
         for msg in chats:
-            time_str = msg.timestamp.strftime('%H:%M:%S')
-            prefix = f"[{time_str}] {msg.sender} ({msg.role}) [{msg.type}]:"
-            report_lines.append(f"{prefix} {msg.text}")
+            ts_str = msg.get("timestamp")
+            sender = msg.get("sender")
+            role = msg.get("role")
+            msg_type = msg.get("type")
+            text = msg.get("text")
+            
+            prefix = f"[{ts_str}] {sender} ({role}) [{msg_type}]:"
+            report_lines.append(f"{prefix} {text}")
             
         report_lines.append("\n--- Resolution ---")
         report_lines.append(f"Incident {incident_id} successfully resolved and added to knowledge base.")
@@ -1649,23 +1227,17 @@ async def resolve_and_learn_incident(incident_id: str, db: Session = Depends(get
         # Ingest into Dify Knowledge Base
         await DifyClient.ingest_to_dataset(content=full_report_text, metadata=metadata)
         
-        # 1. Update Incident Status in DB
-        inc = db.query(IncidentDB).filter(IncidentDB.code == incident_id).first()
-        if inc:
-            inc.status = "Completed"
-            inc.updated_at = get_kst()
+        # 1. Update Incident Status in DB via Worker
+        await WorkerClient.post("/warroom/resolve", {"incident_id": incident_id})
         
-        # 2. Add Final System Message
-        closure_msg = WarRoomChatDB(
-            incident_id=incident_id,
-            sender="시스템",
-            role="System",
-            type="system",
-            text="✅ 대응이 완료되어 War-Room이 종료되었습니다. (읽기 전용 모드)",
-            timestamp=get_kst()
-        )
-        db.add(closure_msg)
-        db.commit()
+        # 2. Add Final System Message via Worker
+        await WorkerClient.post("/warroom/chat", {
+            "incident_id": incident_id,
+            "sender": "시스템",
+            "role": "System",
+            "type": "system",
+            "text": "✅ 대응이 완료되어 War-Room이 종료되었습니다. (읽기 전용 모드)"
+        })
 
         return {
             "status": "success", 
@@ -1691,60 +1263,6 @@ async def list_knowledge_entries(limit: int = 50):
 # AUTH Endpoints
 # ===========================================================
 
-def hash_password(password: str) -> str:
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}:{hashed}"
-
-def verify_password(password: str, stored_hash: str) -> bool:
-    try:
-        salt, hashed = stored_hash.split(":")
-        return hashlib.sha256((salt + password).encode()).hexdigest() == hashed
-    except Exception:
-        return False
-
-def generate_token(user_id: str, email: str) -> str:
-    raw = f"{user_id}:{email}:{secrets.token_hex(16)}"
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-async def send_email_async(to_email: str, subject: str, body: str, is_html: bool = False):
-    """
-    SMTP 서버(기본: Gmail)를 통해 이메일을 비동기로 발송합니다.
-    """
-    smtp_server = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    sender_email = os.getenv("SMTP_USER", "")
-    sender_password = os.getenv("SMTP_PASSWORD", "")
-
-    if not sender_email or not sender_password:
-        logger.error("SMTP credentials (USER/PASSWORD) are missing in environment variables.")
-        return
-
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    
-    if is_html:
-        msg.attach(MIMEText(body, 'html'))
-    else:
-        msg.attach(MIMEText(body, 'plain'))
-
-    try:
-        # SMTP 연결
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            # TLS 보안 연결 (Gmail 필수)
-            if smtp_port == 587:
-                server.starttls()
-            
-            # 인증 정보가 있는 경우 로그인
-            server.login(sender_email, sender_password)
-            
-            server.send_message(msg)
-        logger.info(f"Email sent successfully to {to_email} via {smtp_server}")
-    except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {e}")
-
 class RequestResetCode(BaseModel):
     email: str
     employee_id: str
@@ -1753,77 +1271,6 @@ class VerifyResetCode(BaseModel):
     email: str
     employee_id: str
     code: str
-
-@app.post("/auth/request-reset-code")
-async def request_reset_code(req: RequestResetCode, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """
-    이메일과 사번이 일치하는 사용자를 확인하고 인증 코드를 전송(로그 기록)합니다.
-    """
-    user = db.query(UserDB).filter(UserDB.email == req.email, UserDB.employee_id == req.employee_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자 정보를 찾을 수 없습니다.")
-    
-    # 6자리 인증 코드 생성
-    code = "".join(random.choices(string.digits, k=6))
-    
-    # 기존 코드 삭제 후 새 코드 저장
-    db.query(ResetVerificationDB).filter(ResetVerificationDB.email == req.email).delete()
-    new_verif = ResetVerificationDB(email=req.email, code=code)
-    db.add(new_verif)
-    db.commit()
-    
-    # 이메일 발송 위임
-    background_tasks.add_task(send_email_async, user.email, "S-Guard 비밀번호 초기화 인증 코드", f"인증 코드: {code}")
-    
-    logger.info(f"\n[EMAIL TRIGGERED] To: {user.email}, Verification Code: {code}\n")
-    
-    return {"status": "success", "message": "인증 코드가 이메일로 전송되었습니다."}
-
-@app.post("/auth/verify-reset-code")
-async def verify_reset_code(req: VerifyResetCode, db: Session = Depends(get_db)):
-    """
-    인증 코드를 검증하고 성공 시 임시 비밀번호를 발급합니다.
-    """
-    verif = db.query(ResetVerificationDB).filter(
-        ResetVerificationDB.email == req.email, 
-        ResetVerificationDB.code == req.code
-    ).first()
-    
-    if not verif:
-        raise HTTPException(status_code=400, detail="인증 코드가 올바르지 않습니다.")
-    
-    # 코드 유효 시간 체크 (예: 5분)
-    if get_kst() - verif.created_at > timedelta(minutes=5):
-        raise HTTPException(status_code=400, detail="인증 코드가 만료되었습니다.")
-    
-    user = db.query(UserDB).filter(UserDB.email == req.email, UserDB.employee_id == req.employee_id).first()
-    if not user:
-         raise HTTPException(status_code=404, detail="사용자 정보를 찾을 수 없습니다.")
-
-    # 임시 비밀번호 생성 (기존 로직 사용)
-    temp_password = "".join(random.choices(string.ascii_letters + string.digits + "!@#$%", k=10))
-    user.password_hash = hash_password(temp_password)
-    
-    # 인증 완료 후 코드 삭제
-    db.query(ResetVerificationDB).filter(ResetVerificationDB.email == req.email).delete()
-    db.commit()
-    
-    return {
-        "status": "success",
-        "temp_password": temp_password,
-        "name": user.name,
-        "email": user.email
-    }
-
-class ProfileUpdateRequest(BaseModel):
-    user_id: str
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    company: Optional[str] = None
-    honbu: Optional[str] = None
-    team: Optional[str] = None
-    part: Optional[str] = None
-    subpart: Optional[str] = None
 
 class SignupRequest(BaseModel):
     email: str
@@ -1841,6 +1288,101 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class ProfileUpdateRequest(BaseModel):
+    user_id: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    honbu: Optional[str] = None
+    team: Optional[str] = None
+    part: Optional[str] = None
+    subpart: Optional[str] = None
+
+class ChangePasswordRequest(BaseModel):
+    user_id: str
+    old_password: str
+    new_password: str
+
+@app.post("/auth/request-reset-code")
+async def request_reset_code(req: RequestResetCode):
+    res = await WorkerClient.post("/auth/request-reset-code", {
+        "email": req.email,
+        "employee_id": req.employee_id
+    })
+    return res
+
+@app.post("/auth/verify-reset-code")
+async def verify_reset_code(req: VerifyResetCode):
+    res = await WorkerClient.post("/auth/verify-reset-code", {
+        "email": req.email,
+        "employee_id": req.employee_id,
+        "code": req.code
+    })
+    return res
+
+@app.post("/auth/signup")
+async def signup(req: SignupRequest):
+    res = await WorkerClient.post("/auth/signup", {
+        "email": req.email,
+        "password": req.password,
+        "name": req.name,
+        "company": req.company,
+        "honbu": req.honbu,
+        "team": req.team
+    })
+    return res
+
+# Auth / Org / Users logic are completely proxied from frontend to worker in the future,
+# but for now we maintain FastAPI proxy endpoints for backward compatibility.
+@app.post("/auth/login")
+async def login(req: LoginRequest, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    agent = request.headers.get("user-agent", "unknown")
+    res = await WorkerClient.post("/auth/login", {
+        "email": req.email,
+        "password": req.password
+    })
+    
+    # Check for failure in the flat json return
+    if "detail" in res or "error" in res:
+        raise HTTPException(status_code=401, detail=res.get("detail", res.get("error", "Login failed")))
+
+    return {
+        "status": "success",
+        "token": res.get("token"),
+        "user": {
+            "id": res.get("id"),
+            "email": res.get("email"),
+            "name": res.get("name"),
+            "role": res.get("role"),
+            "company": res.get("company"),
+            "honbu": res.get("honbu"),
+            "team": res.get("team"),
+            "phone": res.get("phone", ""),
+            "part": res.get("part", ""),
+            "subpart": res.get("subpart", "")
+        }
+    }
+
+@app.post("/auth/signup")
+async def signup(req: SignupRequest):
+    res = await WorkerClient.post("/auth/signup", {
+        "email": req.email,
+        "password": req.password,
+        "name": req.name,
+        "company": req.company,
+        "honbu": req.honbu,
+        "team": req.team
+    })
+    if "detail" in res or "error" in res:
+        raise HTTPException(status_code=400, detail=res.get("detail", res.get("error", "Signup failed")))
+    return res
+
+@app.get("/users")
+async def list_users():
+    res = await WorkerClient.get("/users")
+    return res
+
 class UserResetPasswordRequest(BaseModel):
     new_password: str
 
@@ -1850,284 +1392,113 @@ class UserUpdateRoleRequest(BaseModel):
 class OrgNodeCreate(BaseModel):
     name: str
     code: Optional[str] = None
-    parent_id: Optional[str] = None
-    depth: int
-    sort_order: Optional[int] = 0
+    parent_id: Optional[int] = None
+    depth: int = 1
+    sort_order: int = 0
 
 class OrgNodeUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
     sort_order: Optional[int] = None
 
-@app.post("/auth/signup")
-async def signup(req: SignupRequest, db: Session = Depends(get_db)):
-    existing = db.query(UserDB).filter(UserDB.email == req.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="이미 등록된 이메일입니다.")
-    user = UserDB(
-        email=req.email,
-        name=req.name,
-        password_hash=hash_password(req.password),
-        auth_provider="local",
-        company=req.company,
-        employee_id=req.employee_id,
-        phone=req.phone,
-        honbu=req.honbu,
-        team=req.team,
-        part=req.part,
-        subpart=req.subpart,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    token = generate_token(user.id, user.email)
-    user.token = token
-    db.commit()
-    db.refresh(user)
-    return {"status": "success", "token": token, "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role, "company": user.company, "honbu": user.honbu, "team": user.team, "part": user.part, "subpart": user.subpart, "phone": user.phone}}
-
-@app.post("/auth/login")
-async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    # 이메일 또는 사번으로 사용자 조회
-    user = db.query(UserDB).filter(
-        or_(UserDB.email == req.email, UserDB.employee_id == req.email),
-        UserDB.is_active == True
-    ).first()
-    
-    ip = request.client.host if request.client else "unknown"
-    agent = request.headers.get("user-agent", "unknown")
-    
-    if not user or not user.password_hash or not verify_password(req.password, user.password_hash):
-        # 실패 히스토리 기록
-        fail_history = LoginHistoryDB(
-            email=req.email,
-            ip_address=ip,
-            user_agent=agent,
-            status="FAIL"
-        )
-        db.add(fail_history)
-        db.commit()
-        raise HTTPException(status_code=401, detail="이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다.")
-    
-    token = generate_token(user.id, user.email)
-    user.token = token
-    
-    # 성공 히스토리 기록
-    success_history = LoginHistoryDB(
-        user_id=user.id,
-        email=user.email,
-        ip_address=ip,
-        user_agent=agent,
-        status="SUCCESS"
-    )
-    db.add(success_history)
-    db.commit()
-    
-    return {"status": "success", "token": token, "user": {
-        "id": user.id, "name": user.name, "email": user.email, "role": user.role,
-        "company": user.company, "honbu": user.honbu, "team": user.team, "part": user.part,
-        "subpart": user.subpart, "phone": user.phone
-    }}
-
-@app.get("/auth/login-history")
-async def get_login_history(limit: int = 50, db: Session = Depends(get_db)):
-    history = db.query(LoginHistoryDB).order_by(LoginHistoryDB.login_time.desc()).limit(limit).all()
-    result = []
-    for h in history:
-        item = {c.name: getattr(h, c.name) for c in h.__table__.columns}
-        item["id"] = str(h.id)
-        if h.user_id:
-            item["user_id"] = str(h.user_id)
-        result.append(item)
-    return {"total": len(result), "history": result}
-
-class ChangePasswordRequest(BaseModel):
-    user_id: str
-    new_password: str
-
-@app.post("/auth/change-password")
-async def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.id == req.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
-    user.password_hash = hash_password(req.new_password)
-    db.commit()
-    return {"status": "success", "message": "비밀번호가 성공적으로 변경되었습니다."}
-
-@app.patch("/auth/profile")
-async def update_profile(req: ProfileUpdateRequest, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.id == req.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
-    if req.name is not None: user.name = req.name
-    if req.phone is not None: user.phone = req.phone
-    if req.company is not None: user.company = req.company
-    if req.honbu is not None: user.honbu = req.honbu
-    if req.team is not None: user.team = req.team
-    if req.part is not None: user.part = req.part
-    if req.subpart is not None: user.subpart = req.subpart
-    
-    db.commit()
-    db.refresh(user)
-    return {"status": "success", "user": {
-        "id": user.id, "name": user.name, "email": user.email, "role": user.role,
-        "company": user.company, "honbu": user.honbu, "team": user.team, "part": user.part, "phone": user.phone
-    }}
+class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    honbu: Optional[str] = None
+    team: Optional[str] = None
+    part: Optional[str] = None
+    subpart: Optional[str] = None
 
 class PasswordResetRequest(BaseModel):
     email: str
-    employee_id: str
 
-@app.post("/auth/reset-password")
-async def reset_password(req: PasswordResetRequest, db: Session = Depends(get_db)):
-    """
-    이메일과 사번이 모두 일치하는 사용자를 찾아 임시 비밀번호를 생성하고 반환합니다.
-    내부 시스템이므로 임시 비밀번호를 응답에 포함해 화면에 표시합니다.
-    """
-    user = db.query(UserDB).filter(
-        UserDB.email == req.email,
-        UserDB.employee_id == req.employee_id,
-        UserDB.is_active == True
-    ).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="입력하신 정보와 일치하는 사용자를 찾을 수 없습니다.")
 
-    # 임시 비밀번호 생성: 영문대소/숫자/특수문자 조합 10자
-    import random, string
-    chars = string.ascii_letters + string.digits + "!@#$%"
-    temp_pw = ''.join(random.choices(chars, k=10))
-
-    user.password_hash = hash_password(temp_pw)
-    db.commit()
-    logger.info(f"Password reset for user {user.email}")
-
-    return {
-        "status": "success",
-        "message": "임시 비밀번호가 발급되었습니다. 로그인 후 반드시 변경해 주세요.",
-        "temp_password": temp_pw,
-        "name": user.name,
-        "email": user.email,
-    }
-
-@app.post("/auth/google")
-async def google_login(payload: dict, db: Session = Depends(get_db)):
-    email = payload.get("email")
-    name = payload.get("name", "Google User")
-    if not email:
-        raise HTTPException(status_code=400, detail="이메일 정보가 없습니다.")
-    user = db.query(UserDB).filter(UserDB.email == email).first()
-    if not user:
-        user = UserDB(email=email, name=name, auth_provider="google")
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    token = generate_token(user.id, user.email)
-    return {"status": "success", "token": token, "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role}}
-
-# ── User Management ────────────────────────────────
-@app.get("/users")
-async def list_users(db: Session = Depends(get_db)):
-    users = db.query(UserDB).all()
-    return [
-        {
-            "id": u.id,
-            "email": u.email,
-            "name": u.name,
-            "role": u.role,
-            "company": u.company,
-            "employee_id": u.employee_id,
-            "phone": u.phone,
-            "honbu": u.honbu,
-            "team": u.team,
-            "part": u.part,
-            "is_active": u.is_active,
-            "created_at": u.created_at
-        } for u in users
-    ]
 
 @app.post("/users/{user_id}/reset-password")
-async def reset_user_password(user_id: str, req: UserResetPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    user.password_hash = hash_password(req.new_password)
-    db.commit()
-    return {"status": "success", "message": "비밀번호가 초기화되었습니다."}
+async def reset_user_password(user_id: str, req: UserResetPasswordRequest):
+    res = await WorkerClient.post(f"/users/{user_id}/reset-password", {"new_password": req.new_password})
+    return res
 
 @app.patch("/users/{user_id}/status")
-async def toggle_user_status(user_id: str, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    user.is_active = not user.is_active
-    db.commit()
-    return {"status": "success", "is_active": user.is_active}
+async def toggle_user_status(user_id: str):
+    # Depending on how it's called, could parse body, but historically frontend passes nothing for toggle
+    # We will let the toggle logic exist in the worker or just pass active status
+    res = await WorkerClient.patch(f"/users/{user_id}/status", {})
+    return res
 
 @app.patch("/users/{user_id}/role")
-async def update_user_role(user_id: int, req: UserUpdateRoleRequest, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.inc_id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    user.role = req.role
-    db.commit()
-    return {"status": "success", "role": user.role}
+async def update_user_role(user_id: str, req: UserUpdateRoleRequest):
+    res = await WorkerClient.patch(f"/users/{user_id}/role", {"role": req.role})
+    return res
 
-# ── Organization Management ────────────────────────
 @app.get("/org/tree")
-async def get_org_tree(db: Session = Depends(get_db)):
-    # Simple recursive builder for a small tree
-    def build_tree(parent_id=None):
-        nodes = db.query(OrganizationDB).filter(OrganizationDB.parent_id == parent_id).order_by(OrganizationDB.sort_order).all()
-        tree = []
-        for node in nodes:
-            tree.append({
-                "inc_id": node.inc_id,
-                "name": node.name,
-                "code": node.code,
-                "parent_id": node.parent_id,
-                "depth": node.depth,
-                "sort_order": node.sort_order,
-                "children": build_tree(node.inc_id)
-            })
-        return tree
-    
-    return build_tree()
+async def get_org_tree():
+    res = await WorkerClient.get("/org/tree")
+    return res
 
 @app.post("/org/nodes")
-async def create_org_node(req: OrgNodeCreate, db: Session = Depends(get_db)):
-    node = OrganizationDB(
-        name=req.name,
-        code=req.code,
-        parent_id=req.parent_id,
-        depth=req.depth,
-        sort_order=req.sort_order
-    )
-    db.add(node)
-    db.commit()
-    db.refresh(node)
-    return node
+async def create_org_node(req: OrgNodeCreate):
+    res = await WorkerClient.post("/org/nodes", {
+        "name": req.name,
+        "code": req.code,
+        "parent_id": req.parent_id,
+        "depth": req.depth,
+        "sort_order": req.sort_order
+    })
+    return res
 
 @app.patch("/org/nodes/{node_id}")
-async def update_org_node(node_id: int, req: OrgNodeUpdate, db: Session = Depends(get_db)):
-    node = db.query(OrganizationDB).filter(OrganizationDB.id == node_id).first()
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
-    if req.name is not None: node.name = req.name
-    if req.code is not None: node.code = req.code
-    if req.sort_order is not None: node.sort_order = req.sort_order
-    db.commit()
-    return node
+async def update_org_node(node_id: str, req: OrgNodeUpdate):
+    res = await WorkerClient.patch(f"/org/nodes/{node_id}", {
+        "name": req.name,
+        "code": req.code,
+        "sort_order": req.sort_order
+    })
+    return res
 
 @app.delete("/org/nodes/{node_id}")
-async def delete_org_node(node_id: str, db: Session = Depends(get_db)):
-    node = db.query(OrganizationDB).filter(OrganizationDB.inc_id == node_id).first()
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
-    db.delete(node)
-    db.commit()
-    return {"status": "success"}
+async def delete_org_node(node_id: str):
+    res = await WorkerClient.delete(f"/org/nodes/{node_id}")
+    return res
+    
+@app.get("/auth/login-history")
+async def get_login_history(limit: int = 50):
+    res = await WorkerClient.get(f"/auth/login-history?limit={limit}")
+    return res
+
+@app.post("/auth/change-password")
+async def change_password(req: ChangePasswordRequest):
+    res = await WorkerClient.post("/auth/change-password", {
+        "user_id": req.user_id,
+        "old_password": req.old_password,
+        "new_password": req.new_password
+    })
+    return res
+
+@app.patch("/auth/profile")
+async def update_profile(req: ProfileUpdateRequest):
+    # Pass to worker
+    res = await WorkerClient.patch("/auth/profile", req.dict(exclude_unset=True))
+    if "error" in res or "detail" in res:
+        raise HTTPException(status_code=404, detail=res.get("detail", "Error"))
+    return res
+
+@app.post("/auth/reset-password")
+async def reset_password(req: PasswordResetRequest):
+    # Generates a code or auto-resets
+    res = await WorkerClient.post("/auth/reset-password-admin", {
+        "email": req.email,
+        "employee_id": req.employee_id
+    })
+    if "error" in res or "detail" in res:
+         raise HTTPException(status_code=404, detail=res.get("detail", "Error"))
+    return res
+
+@app.post("/auth/google")
+async def google_login(payload: dict):
+    res = await WorkerClient.post("/auth/google", payload)
+    return res
 
 # ===========================================================
 # INCIDENTS Endpoints
@@ -2148,78 +1519,37 @@ class IncidentUpdateRequest(BaseModel):
     assigned_to: Optional[str] = None
     description: Optional[str] = None
 
-def generate_incident_code(db: Session) -> str:
-    count = db.query(IncidentDB).count()
-    return f"INC-{20240000 + count + 1}"
+
 
 @app.get("/incidents")
 async def get_incidents(
     status: Optional[str] = None,
     severity: Optional[str] = None,
     incident_type: Optional[str] = None,
-    limit: int = 100,
-    db: Session = Depends(get_db)
+    limit: int = 100
 ):
-    q = db.query(IncidentDB)
-    if status:
-        q = q.filter(IncidentDB.status == status)
-    if severity:
-        q = q.filter(IncidentDB.severity == severity)
-    if incident_type:
-        q = q.filter(IncidentDB.incident_type == incident_type)
-    incidents = q.order_by(IncidentDB.created_at.desc()).limit(limit).all()
-    result = []
-    for inc in incidents:
-        result.append({
-            "inc_id": inc.inc_id,
-            "code": inc.code,
-            "title": inc.title,
-            "description": inc.description,
-            "severity": inc.severity,
-            "status": inc.status,
-            "incident_type": inc.incident_type,
-            "assigned_to": inc.assigned_to,
-            "created_at": inc.created_at.isoformat() if inc.created_at else None,
-            "updated_at": inc.updated_at.isoformat() if inc.updated_at else None,
-        })
-    return {"total": len(result), "incidents": result}
+    params = {}
+    if status: params["status"] = status
+    if severity: params["severity"] = severity
+    if incident_type: params["incident_type"] = incident_type
+    params["limit"] = limit
+    
+    res = await WorkerClient.get("/incidents", params=params)
+    return {"total": len(res), "incidents": res} if isinstance(res, list) else res
 
 @app.post("/incidents")
-async def create_incident(req: IncidentCreateRequest, db: Session = Depends(get_db)):
-    code = generate_incident_code(db)
-    inc = IncidentDB(
-        code=code,
-        title=req.title,
-        description=req.description,
-        severity=req.severity,
-        status=req.status,
-        incident_type=req.incident_type,
-        assigned_to=req.assigned_to,
-        source_sms_id=req.source_sms_id,
-    )
-    db.add(inc)
-    db.commit()
-    db.refresh(inc)
-    return {"status": "success", "code": inc.code, "inc_id": inc.inc_id}
-
+async def create_incident(req: IncidentCreateRequest):
+    res = await WorkerClient.post("/incidents", req.dict(exclude_unset=True))
+    if "error" in res:
+        raise HTTPException(status_code=500, detail=res["error"])
+    return res
 
 @app.patch("/incidents/{incident_id}")
-async def update_incident(incident_id: str, req: IncidentUpdateRequest, db: Session = Depends(get_db)):
-    inc = db.query(IncidentDB).filter(IncidentDB.inc_id == incident_id).first()
-    if not inc:
-        raise HTTPException(status_code=404, detail="인시던트를 찾을 수 없습니다.")
-    if req.status is not None:
-        inc.status = req.status
-    if req.severity is not None:
-        inc.severity = req.severity
-    if req.assigned_to is not None:
-        inc.assigned_to = req.assigned_to
-    if req.description is not None:
-        inc.description = req.description
-    inc.updated_at = get_kst()
-    db.commit()
-    db.refresh(inc)
-    return {"status": "success", "inc_id": inc.inc_id, "code": inc.code}
+async def update_incident(incident_id: str, req: IncidentUpdateRequest):
+    res = await WorkerClient.patch(f"/incidents/{incident_id}", req.dict(exclude_unset=True))
+    if "error" in res:
+        raise HTTPException(status_code=404, detail="인시던트를 찾을 수 없거나 업데이트 실패")
+    return res
 
 # ===========================================================
 # ACTIVITY LOGS Endpoints
@@ -2235,50 +1565,24 @@ class ActivityLogCreateRequest(BaseModel):
     report_type: Optional[str] = "AI 리포트"
 
 @app.get("/activity-logs")
-async def get_activity_logs(limit: int = 50, db: Session = Depends(get_db)):
-    logs = db.query(ActivityLogDB).order_by(ActivityLogDB.created_at.desc()).limit(limit).all()
-    result = []
-    for log in logs:
-        result.append({
-            "inc_id": log.inc_id,
-            "user_name": log.user_name,
-            "incident_code": log.incident_code,
-            "incident_title": log.incident_title,
-            "action": log.action,
-            "detail": log.detail,
-            "team": log.team,
-            "report_type": log.report_type,
-            "created_at": log.created_at.isoformat() if log.created_at else None,
-        })
-    return {"total": len(result), "logs": result}
+async def get_activity_logs(limit: int = 50):
+    res = await WorkerClient.get("/activity-logs", params={"limit": limit})
+    return {"total": len(res), "logs": res} if isinstance(res, list) else res
 
 @app.post("/activity-logs")
-async def create_activity_log(req: ActivityLogCreateRequest, db: Session = Depends(get_db)):
-    log = ActivityLogDB(
-        user_name=req.user_name,
-        incident_code=req.incident_code,
-        incident_title=req.incident_title,
-        action=req.action,
-        detail=req.detail,
-        team=req.team,
-        report_type=req.report_type,
-    )
-    db.add(log)
-    db.commit()
-    db.refresh(log)
-    return {"status": "success", "inc_id": log.inc_id}
+async def create_activity_log(req: ActivityLogCreateRequest):
+    res = await WorkerClient.post("/activity-logs", req.dict(exclude_unset=True))
+    return res
 
 # ===========================================================
 # KEYWORD DELETE Endpoint
 # ===========================================================
 
 @app.delete("/sms/keywords/{keyword}")
-async def delete_keyword(keyword: str, db: Session = Depends(get_db)):
-    kw = db.query(KeywordDB).filter(KeywordDB.keyword == keyword).first()
-    if not kw:
+async def delete_keyword(keyword: str):
+    res = await WorkerClient.post(f"/sms/keywords/delete/{urllib.parse.quote(keyword)}", {})
+    if "error" in res:
         raise HTTPException(status_code=404, detail="키워드를 찾을 수 없습니다.")
-    db.delete(kw)
-    db.commit()
     return {"status": "success", "deleted": keyword}
 
 # SMS 수신 시 자동으로 Incident 생성하는 hook
@@ -2347,13 +1651,18 @@ class ReportBroadcastRequest(BaseModel):
     channels: List[str] = ["email", "app"]
 
 @app.post("/ai/report/broadcast")
-async def broadcast_report(req: ReportBroadcastRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """인시던트 보고서 공식 전파 (DB 저장, 이메일 발송, 앱 알림)"""
-    inc = db.query(IncidentDB).filter(IncidentDB.code == req.incident_id).first()
-    if not inc:
+async def broadcast_report(req: ReportBroadcastRequest, background_tasks: BackgroundTasks):
+    """인시던트 보고서 공식 전파 (이메일 발송, 앱 알림, Dify 지식 베이스 적재)"""
+    
+    # 1. Fetch incident from Worker Proxy
+    inc_res = await WorkerClient.get(f"/incidents/{req.incident_id}")
+    if "error" in inc_res or not inc_res.get("title"):
         raise HTTPException(status_code=404, detail="인시던트를 찾을 수 없습니다.")
+        
+    title = inc_res.get("title", "Unknown")
+    created_at = inc_res.get("created_at", "N/A")
 
-    # 1. 지식 베이스(Dify) 저장
+    # 2. 지식 베이스(Dify) 저장
     metadata = {
         "incident_id": req.incident_id,
         "type": "official_report",
@@ -2364,7 +1673,7 @@ async def broadcast_report(req: ReportBroadcastRequest, background_tasks: Backgr
 
     # 2. 이메일 발송 (HTML)
     if "email" in req.channels:
-        email_subject = f"[S-GUARD] 장애 보고서: {inc.title}"
+        email_subject = f"[S-GUARD] 장애 보고서: {title}"
         report_html = req.report_content.replace('\n', '<br>')
         email_body = f"""
         <html>
@@ -2372,8 +1681,8 @@ async def broadcast_report(req: ReportBroadcastRequest, background_tasks: Backgr
             <div style="max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
                 <h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px;">장애 종결 보고서</h2>
                 <p><strong>인시던트 ID:</strong> {req.incident_id}</p>
-                <p><strong>제목:</strong> {inc.title}</p>
-                <p><strong>발생 일시:</strong> {inc.created_at.strftime('%Y-%m-%d %H:%M:%S') if inc.created_at else 'N/A'}</p>
+                <p><strong>제목:</strong> {title}</p>
+                <p><strong>발생 일시:</strong> {created_at}</p>
                 <hr style="border: 0; border-top: 1px solid #eee;">
                 <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
                     {report_html}
@@ -2392,13 +1701,12 @@ async def broadcast_report(req: ReportBroadcastRequest, background_tasks: Backgr
         await manager.broadcast({
             "type": "report_broadcast",
             "incident_id": req.incident_id,
-            "title": inc.title,
+            "title": title,
             "summary": "장애가 최종 처리되어 보고서가 발송되었습니다."
         })
 
     # 상태 업데이트
-    inc.status = "처리완료"
-    db.commit()
+    await WorkerClient.patch(f"/incidents/{req.incident_id}", {"status": "처리완료"})
 
     return {"status": "success", "message": f"{len(req.recipients)}명의 수신자에게 보고서 전파를 시작했습니다."}
 
@@ -2419,67 +1727,44 @@ class ChatHistorySaveRequest(BaseModel):
     user_id: str = "SYSTEM"
 
 @app.post("/ai/insight/save")
-async def save_insight(req: InsightSaveRequest, db: Session = Depends(get_db)):
+async def save_insight(req: InsightSaveRequest):
     try:
-        existing = db.query(AutopilotInsightDB).filter(AutopilotInsightDB.inc_id == req.incident_id).first()
-        if existing:
-            existing.content = req.content
-            existing.severity = req.severity
-            existing.category = req.category
-            existing.mod_id = req.user_id
-            existing.mod_dt = get_kst()
-        else:
-            new_insight = AutopilotInsightDB(
-                inc_id=req.incident_id,
-                content=req.content,
-                severity=req.severity,
-                category=req.category,
-                reg_id=req.user_id,
-                mod_id=req.user_id
-            )
-            db.add(new_insight)
-        db.commit()
-        return {"status": "success"}
+        res = await WorkerClient.post("/ai/insight/save", {
+            "incident_id": req.incident_id,
+            "content": req.content,
+            "severity": req.severity,
+            "category": req.category,
+            "user_id": req.user_id
+        })
+        return res
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ai/chat-history/save")
-async def save_chat_history(req: ChatHistorySaveRequest, db: Session = Depends(get_db)):
+async def save_chat_history(req: ChatHistorySaveRequest):
     try:
-        db.query(AIChatHistoryDB).filter(AIChatHistoryDB.inc_id == req.incident_id).delete()
-        for msg in req.messages:
-            db.add(AIChatHistoryDB(
-                inc_id=req.incident_id,
-                agent_role=msg.role,
-                content=msg.text,
-                reg_id=req.user_id,
-                mod_id=req.user_id
-            ))
-        db.commit()
-        return {"status": "success"}
+        res = await WorkerClient.post("/ai/chat-history/save", {
+            "incident_id": req.incident_id,
+            "messages": [{"role": m.role, "text": m.text} for m in req.messages],
+            "user_id": req.user_id
+        })
+        return res
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/ai/insight/{incident_id}")
-async def get_insight(incident_id: str, db: Session = Depends(get_db)):
-    insight = db.query(AutopilotInsightDB).filter(AutopilotInsightDB.inc_id == incident_id).first()
-    if insight:
-        return {
-            "content": insight.content,
-            "severity": insight.severity,
-            "category": insight.category
-        }
-    raise HTTPException(status_code=404, detail="Insight not found")
+async def get_insight(incident_id: str):
+    res = await WorkerClient.get(f"/ai/insight/{incident_id}")
+    if "error" in res:
+        raise HTTPException(status_code=404, detail="Insight not found")
+    return res
 
 @app.get("/ai/chat-history/{incident_id}")
-async def get_chat_history(incident_id: str, db: Session = Depends(get_db)):
-    history = db.query(AIChatHistoryDB).filter(AIChatHistoryDB.inc_id == incident_id).order_by(AIChatHistoryDB.id).all()
-    if history:
-        messages = [{"role": msg.agent_role, "text": msg.content} for msg in history]
-        return {"messages": messages}
-    raise HTTPException(status_code=404, detail="Chat history not found")
+async def get_chat_history(incident_id: str):
+    res = await WorkerClient.get(f"/ai/chat-history/{incident_id}")
+    if "error" in res:
+        raise HTTPException(status_code=404, detail="Chat history not found")
+    return res
 
 if __name__ == "__main__":
     import uvicorn

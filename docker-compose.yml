@@ -1,19 +1,4 @@
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: sguard-db
-    restart: always
-    environment:
-      POSTGRES_USER: sguard_user
-      POSTGRES_PASSWORD: sguard_password
-      POSTGRES_DB: sguard_db
-    ports:
-      - "5433:5432"
-    volumes:
-      - sguard_postgres_data:/var/lib/postgresql/data
-
-
-
   tomcat:
     image: tomcat:10-jdk17
     container_name: sguard-tomcat
@@ -25,7 +10,6 @@ services:
     environment:
       - JAVA_OPTS=-Dfile.encoding=UTF-8
 
-
   backend:
     build: ./backend
     container_name: sguard-backend
@@ -33,16 +17,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://sguard_user:sguard_password@db:5432/sguard_db
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-your-email@gmail.com}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-your-app-password}
+      SMTP_USER: ${SMTP_USER:khcho0421@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:!QweAsd1020}
       DIFY_API_KEY: app-TSlqmp329iKOzpXUP90iC6Kw
       DIFY_API_BASE: ${DIFY_API_BASE:-https://api.dify.ai/v1}
       DIFY_DATASET_ID: ${DIFY_DATASET_ID:-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
-    depends_on:
-      - db
+
     volumes:
       - ./backend:/app
 
@@ -68,18 +50,3 @@ services:
       - /app/node_modules
     stdin_open: true
     tty: true
-
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: sguard-pgadmin
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@sguard.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5051:80"
-    depends_on:
-      - db
-
-volumes:
-  sguard_postgres_data:

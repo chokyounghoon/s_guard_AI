@@ -141,6 +141,12 @@ const SmsTestPage = () => {
     };
     const getApiUrl = (path) => {
         const hostname = window.location.hostname;
+        
+        // '/sms/receive' and '/sms/convert-multimodal' must hit the Python Backend for AI processing
+        if (path.startsWith('/sms/')) {
+            return `http://${hostname}:8000${path}`;
+        }
+
         const protocol = window.location.protocol;
         const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
         
@@ -148,12 +154,10 @@ const SmsTestPage = () => {
             return `https://sguardai.khcho0421.workers.dev${path}`;
         }
         
-        // HTTPS인 경우 Tunnel 도메인(api.chokerslab.store) 사용
         if (protocol === 'https:') {
             return `https://sguardai.khcho0421.workers.dev${path}`;
         }
         
-        // 그 외(IP 접속 등) 현재 호스트의 8000 포트 시도
         return `http://${hostname}:8000${path}`;
     };
 

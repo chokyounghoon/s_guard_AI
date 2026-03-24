@@ -107,6 +107,7 @@ export default function DashboardPage() {
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
 
   const [selectedSms, setSelectedSms] = useState(null);
+  const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
@@ -289,6 +290,21 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // 상단 S-Autopilot Insight 패널은 항상 최신 SMS만 분석하도록 고정
+  // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
+  useEffect(() => {
+    if (selectedSms) {
+      setInsightSms(selectedSms);
+    } else if (smsMessages.length > 0) {
+      setInsightSms(prev => {
+        if (!prev || prev.inc_id !== smsMessages[0].inc_id) {
+          return smsMessages[0];
+        }
+        return prev;
+      });
+    }
+  }, [selectedSms, smsMessages]);
+
   // Fetch War-Rooms & SMS periodically
   useEffect(() => {
     fetchSMSMessages();
@@ -326,6 +342,7 @@ export default function DashboardPage() {
           inc_id: room.inc_id,
           source_sms_id: room.source_sms_id,
           title: room.title || `ROOM ${room.inc_id}`,
+          status: room.status || 'OPEN',
           lastMsg: room.status === 'Completed' ? '종료된 체널' : '대화가 시작되지 않았습니다.',
           time: room.reg_dt 
             ? new Date(room.reg_dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
@@ -357,7 +374,7 @@ export default function DashboardPage() {
   const fetchSMSMessages = async () => {
     try {
       // Cloudflare Workers API 사용
-      const apiUrl = 'https://sguardai.khcho0421.workers.dev/sms/recent?limit=3';
+      const apiUrl = 'https://sguardai.khcho0421.workers.dev/sms/recent?limit=20';
 
       const response = await fetch(apiUrl);
       if (response.ok) {
@@ -568,30 +585,34 @@ export default function DashboardPage() {
 
   // Callback called from AiInsightPanel
   const handleAgentContent = (fullTranscript, isDone) => {
-    const currentMsgs = parseTranscript(fullTranscript);
-    if (currentMsgs.length > 0) {
-      setAgentMessages(currentMsgs);
-    }
+    // 진행 중인 스트리밍 찌꺼기(랜더링 전 텍스트)를 화면에 보이지 않게 하고, 완료 시에만 파싱 결과를 업데이트
+    if (isDone) {
+      const currentMsgs = parseTranscript(fullTranscript);
+      if (currentMsgs.length > 0) {
+        const completedMsgs = currentMsgs.map(m => ({ ...m, isCompleted: true }));
+        setAgentMessages(completedMsgs);
+      }
 
-    const currentIncId = selectedSmsRef.current?.inc_id;
+      const currentIncId = selectedSmsRef.current?.inc_id;
 
-    if (isDone && currentIncId) {
-      console.log(`AI Analysis Done for ${currentIncId}. Saving to DB...`);
-      // Save to DB
-      const baseUrl = 'https://sguardai.khcho0421.workers.dev';
-      fetch(`${baseUrl}/ai/chat-history/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          incident_id: String(currentIncId),
-          messages: currentMsgs
+      if (currentIncId) {
+        console.log(`AI Analysis Done for ${currentIncId}. Saving to DB...`);
+        // Save to DB
+        const baseUrl = 'https://sguardai.khcho0421.workers.dev';
+        fetch(`${baseUrl}/ai/chat-history/save`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            incident_id: String(currentIncId),
+            messages: currentMsgs
+          })
         })
-      })
-      .then(res => res.json())
-      .then(data => console.log("Save complete:", data))
-      .catch(console.error);
-      
-      setTimeout(() => setShowEmergencyModal(true), 1500);
+        .then(res => res.json())
+        .then(data => console.log("Save complete:", data))
+        .catch(console.error);
+        
+        setTimeout(() => setShowEmergencyModal(true), 1500);
+      }
     }
   };
 
@@ -615,13 +636,81 @@ export default function DashboardPage() {
       if (checkRes.ok) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
-            setAgentMessages(data.messages);
+            const completedMsgs = data.messages.map(m => ({ ...m, isCompleted: true }));
+            setAgentMessages(completedMsgs);
             setTimeout(() => setShowEmergencyModal(true), 1500);
             return; // Skip Dify streaming
          }
       }
+
+      // -------------------------------------------------------------
+      // IF CACHE IS EMPTY OR FETCH FAILS: STREAM MANUALLY FOR BOTTOM PANEL ONLY
+      // This ensures the Agent panel still streams data even if AiInsightPanel is decoupled!
+      // -------------------------------------------------------------
+      const streamRes = await fetch(`${baseUrl}/ai/analyze-sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sender: smsMessage.sender, 
+          message: smsMessage.message, 
+          sms_id: smsMessage.inc_id 
+        })
+      });
+      if (!streamRes.ok) throw new Error('Stream failed');
+
+      const reader = streamRes.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalText = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const evt of events) {
+          const lines = evt.split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const dataStr = line.slice(5).trim();
+            if (!dataStr) continue;
+            if (dataStr === '[DONE]') {
+               // Finished streaming
+               console.log(`Standalone stream done for ${smsMessage.inc_id}`);
+               const finalMsgs = parseTranscript(finalText);
+               
+               // Save to DB
+               fetch(`${baseUrl}/ai/chat-history/save`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    incident_id: String(smsMessage.inc_id),
+                    messages: finalMsgs
+                  })
+               }).catch(console.error);
+
+               setTimeout(() => setShowEmergencyModal(true), 1500);
+               return;
+            }
+            try {
+               const data = JSON.parse(dataStr);
+               if (data.answer) {
+                  finalText += data.answer;
+                  const currentMsgs = parseTranscript(finalText);
+                  if (currentMsgs.length > 0) {
+                    setAgentMessages(currentMsgs);
+                  }
+               }
+            } catch(e) {}
+          }
+        }
+      }
+
     } catch(e) {
-      console.error("Check chat history err:", e);
+      console.error("Agent panel stream err:", e);
+      setAgentMessages([{ role: 'System', text: '데이터 조회에 실패했습니다. 캐시 데이터나 네트워크 상태를 확인해주세요.', delay: 0, isCompleted: true }]);
     }
   };
 
@@ -1026,12 +1115,12 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* AI Autopilot Insight Panel */}
+          {/* AI Autopilot Insight Panel (항상 최신 SMS만 분석하도록 insightSms 적용) */}
           <div className="w-full min-h-[220px]">
             <AiInsightPanel 
                onLogReceived={handleLogReceived} 
                onShowDetail={handleShowInsight} 
-               selectedSms={selectedSms} 
+               selectedSms={insightSms} 
                onOpenWarRoom={handleOpenWarRoomFromInsight} 
                onAgentContent={handleAgentContent}
             />
@@ -1047,13 +1136,13 @@ export default function DashboardPage() {
         {/* Main Content Areas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Alerts List */}
-          <div className="lg:col-span-1 bg-[#1a1f2e] rounded-2xl p-6 border border-white/5">
-            <h3 className="font-bold mb-4 flex items-center">
+          <div className="lg:col-span-1 bg-[#1a1f2e] rounded-2xl p-6 border border-white/5 h-[650px] flex flex-col overflow-hidden shadow-xl">
+            <h3 className="font-bold mb-4 flex items-center shrink-0">
               <Activity className="w-4 h-4 mr-2 text-blue-400" />
               Live Incident Stream
             </h3>
-            <div className="space-y-4">
-              {smsMessages.slice(0, 5).map((msg) => {
+            <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide space-y-4">
+              {smsMessages.slice(0, 10).map((msg) => {
                 let severity = 'info';
                 let title = 'System Report';
                 const lowerText = (msg.message || '').toLowerCase();
@@ -1111,8 +1200,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Actions / Assignment / Agent Panel */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-[#1a1f2e] rounded-2xl border border-white/5 h-full overflow-hidden flex flex-col">
+          <div className="lg:col-span-2 h-[650px]">
+            <div className="bg-[#1a1f2e] rounded-2xl border border-white/5 h-full overflow-hidden flex flex-col shadow-xl">
               {showAgentPanel || selectedSms ? (
                 <AgentDiscussionPanel
                   messages={agentMessages}
@@ -1323,7 +1412,7 @@ export default function DashboardPage() {
 
             {/* Chat Room List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
-              {warRooms.filter(r => r.status === 'Open').map((room) => (
+              {warRooms.filter(r => String(r.status).toUpperCase() === 'OPEN').map((room) => (
 
                 <div
                   key={room.id}
@@ -1426,7 +1515,7 @@ function MetricCard({ title, value, subValue, trend, trendUp, icon: Icon, color 
   );
 }
 
-function AlertItem({ title, time, severity, desc }) {
+function AlertItem({ title, time, severity, desc, isSelected }) {
   const sevColor = {
     critical: "bg-red-500",
     warning: "bg-yellow-500",
@@ -1435,14 +1524,18 @@ function AlertItem({ title, time, severity, desc }) {
   };
 
   return (
-    <div className="flex items-start space-x-4 p-4 rounded-xl bg-slate-900/30 border border-white/5 hover:bg-slate-800/50 transition-colors group cursor-pointer">
-      <div className={`w-1.5 h-1.5 mt-2 rounded-full ${sevColor[severity]} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
+    <div className={`flex items-start space-x-4 p-4 rounded-xl transition-all group cursor-pointer ${
+      isSelected 
+        ? "bg-yellow-500/10 border border-yellow-500/30 scale-[1.02] shadow-lg shadow-yellow-500/5" 
+        : "bg-slate-900/30 border border-white/5 hover:bg-slate-800/50"
+    }`}>
+      <div className={`w-1.5 h-1.5 mt-2 rounded-full ${sevColor[severity]} ${isSelected ? 'animate-pulse scale-150' : ''} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1">
-          <h4 className="font-bold text-sm text-slate-200 group-hover:text-white transition-colors">{title}</h4>
+          <h4 className={`font-bold text-sm transition-colors ${isSelected ? 'text-yellow-400' : 'text-slate-200 group-hover:text-white'}`}>{title}</h4>
           <span className="text-xs text-slate-500 whitespace-nowrap ml-2">{time}</span>
         </div>
-        <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+        <p className={`text-xs leading-relaxed ${isSelected ? 'text-yellow-100/80' : 'text-slate-400'}`}>{desc}</p>
       </div>
     </div>
   );

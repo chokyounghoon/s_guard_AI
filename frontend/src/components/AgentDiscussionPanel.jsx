@@ -131,7 +131,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                         ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tl-sm border border-purple-500/30' 
                         : 'bg-slate-800 text-slate-200 rounded-2xl rounded-tl-sm border border-white/5 shadow-black/20'
                     }`}>
-                      {isLast ? <TypewriterText text={msg.text} /> : msg.text}
+                      {msg.text}
                     </div>
                     {/* Time */}
                     <span className="text-[10px] text-slate-500 shrink-0 mb-1 font-mono tracking-tighter">

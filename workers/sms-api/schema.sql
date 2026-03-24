@@ -68,8 +68,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 );
 
 CREATE TABLE IF NOT EXISTS incidents (
-    inc_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    code TEXT UNIQUE,
+    inc_id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT,
     severity TEXT DEFAULT 'NORMAL',

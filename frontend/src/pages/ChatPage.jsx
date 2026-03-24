@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart2, Set
 import AIChatBubble from '../components/AIChatBubble';
 import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
+import MarkdownViewer from '../components/MarkdownViewer';
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -617,8 +618,8 @@ export default function ChatPage() {
                     </div>
                     <div className="p-3 text-[12px] leading-relaxed">
                       {aiAnalysisMessage ? (
-                        <div className={`text-slate-200 whitespace-pre-wrap transition-all duration-300 ${!showFullAnalysis ? 'line-clamp-3' : ''}`}>
-                          {aiAnalysisMessage.text}
+                        <div className={`text-slate-200 transition-all duration-300 ${!showFullAnalysis ? 'max-h-24 overflow-hidden mask-bottom' : ''}`}>
+                          <MarkdownViewer text={aiAnalysisMessage.text} />
                         </div>
                       ) : (
                         <div className="text-slate-300 italic">

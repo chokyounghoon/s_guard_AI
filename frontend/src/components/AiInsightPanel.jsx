@@ -69,7 +69,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     setIsCritical(false);
     delayShownRef.current = false;
     setSmsAnalysisTitle(`분석 중: "${selectedSms.sender}" 발신 SMS`);
-    setDisplayedText('');
 
     const analyze = async () => {
       try {
@@ -100,7 +99,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           console.error("Check insight err:", e);
         }
 
-        // ② No cached data → abort previous Dify stream and start a new one
+        // ② No cached data → clear old text, abort previous stream, and start new one
+        setDisplayedText('');
         if (abortRef.current) abortRef.current.abort();
         const controller = new AbortController();
         abortRef.current = controller;
@@ -377,9 +377,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
   // 현재 SMS incident에 이미 생성된 War-Room이 있는지 확인 (status 무관)
   const warRoomExists = warRooms && selectedSms && warRooms.some(r => 
-    String(r.source_sms_id) === String(selectedSms.inc_id)
+    String(r.inc_id) === String(selectedSms.inc_id)
   );
-
 
   // War-Room 개설 버튼 (분석 완료 시 표시, 단 이미 개설된 경우는 제외)
   const showWarRoomButton = analysisComplete && !warRoomExists;
@@ -464,8 +463,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       </div>
 
-      {/* 터미널 뷰 */}
-      <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 overflow-hidden
+      {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
+      <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px] overflow-hidden
         ${isAnalyzingSms && isCritical ? 'bg-[#150a0a] border-red-500/30' : isAnalyzingSms ? 'bg-[#11110a] border-yellow-500/30' : 'bg-[#0a0c12] border-blue-500/10'}`}>
         <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-500/5 h-full w-full pointer-events-none" />
         <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
@@ -473,7 +472,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
 
         <div className="w-full relative z-10">
-          <div className="flex items-start space-x-3 text-slate-400">
+          <div className="flex items-start space-x-3 text-slate-400 min-h-full">
             <span className={`mt-0.5 shrink-0 font-black ${isAnalyzingSms && isCritical ? 'text-red-500' : isAnalyzingSms ? 'text-yellow-500' : 'text-blue-500'}`}>❯</span>
             <div className={`leading-relaxed w-full ${textColor}`}>
               <MarkdownViewer text={displayedText} />
