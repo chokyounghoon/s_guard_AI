@@ -1149,8 +1149,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Handling Progress Area */}
-        <AiSmsStatusPanel />
 
         {/* Section 3: My Confirmation History & Recent List */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
@@ -1274,6 +1272,9 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Handling Progress Area */}
+        <AiSmsStatusPanel />
       </div>
 
       {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
