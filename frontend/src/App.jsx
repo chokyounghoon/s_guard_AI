@@ -63,7 +63,7 @@ function AppContent() {
 }
 
 function App() {
-  console.log('App Loaded - Version: Fix-Chat-Crash-v2');
+  console.log('App Loaded - Version: Dashboard-Rearrange-v1');
   return (
     <Router>
       <GoogleOAuthProvider clientId="368028308466-placeholder.apps.googleusercontent.com">
