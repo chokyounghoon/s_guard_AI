@@ -592,11 +592,21 @@ export default function DashboardPage() {
     }
   };
 
+  const agentPanelRef = useRef(null);
+
   const startLiveScenario = async (smsMessage) => {
     if (!smsMessage) return;
     setSystemStatus('critical');
     setShowAgentPanel(true);
     setAgentMessages([{ role: 'Security', text: '🔍 새로운 장애 로그 감지. AI 에이전트 분석을 시작합니다...', delay: 0 }]);
+
+    // Anchor view to the Situation Log
+    setTimeout(() => {
+      if (agentPanelRef.current) {
+        agentPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
 
     // Update both state and ref
     setSelectedSms(smsMessage);

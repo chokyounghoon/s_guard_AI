@@ -102,8 +102,8 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
           const isLast = idx === messages.length - 1;
           
           return (
-            <div key={idx} className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ${isLeader ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex max-w-[90%] ${isLeader ? 'flex-row-reverse' : 'flex-row'} items-start gap-2.5`}>
+            <div key={idx} className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 justify-start`}>
+              <div className={`flex max-w-[90%] flex-row items-start gap-2.5`}>
                 
                 {/* Avatar */}
                 <div className="shrink-0 mt-1 shadow-md">
@@ -111,7 +111,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                 </div>
                 
                 {/* Message Content */}
-                <div className={`flex flex-col ${isLeader ? 'items-end' : 'items-start'}`}>
+                <div className={`flex flex-col items-start`}>
                   {/* Name */}
                   <span className={`text-[11px] mb-1.5 px-1 font-bold tracking-wide ${
                     msg.role === 'Security' ? 'text-red-400' :
@@ -122,11 +122,11 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                   }`}>{msg.role} Agent</span>
                   
                   {/* Bubble and Time */}
-                  <div className={`flex items-end gap-2 ${isLeader ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`flex items-end gap-2 flex-row`}>
                     {/* Bubble */}
                     <div className={`p-3.5 text-[13px] leading-relaxed shadow-lg whitespace-pre-wrap break-words ${
                       isLeader 
-                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tr-sm border border-purple-500/30' 
+                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tl-sm border border-purple-500/30' 
                         : 'bg-slate-800 text-slate-200 rounded-2xl rounded-tl-sm border border-white/5 shadow-black/20'
                     }`}>
                       {isLast ? <TypewriterText text={msg.text} /> : msg.text}
@@ -141,6 +141,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
             </div>
           );
         })}
+
       </div>
       
       {/* Footer Status */}
