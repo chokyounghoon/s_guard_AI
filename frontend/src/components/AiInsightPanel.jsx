@@ -57,9 +57,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
   // SMS 선택 시 분석 모드로 전환
   useEffect(() => {
-    if (selectedSms) {
-      setIsCollapsed(false); // SMS 선택 시 패널 펼침
-    }
 
     if (!selectedSms) {
       setIsAnalyzingSms(false);
