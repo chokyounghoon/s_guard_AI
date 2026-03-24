@@ -463,8 +463,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       </div>
 
-      {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
-      <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px] overflow-hidden
+      {/* 터미널 뷰 (고정 높이 및 내부 스크롤 적용하여 화면 점프 방지) */}
+      <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 h-[220px] overflow-y-auto custom-scrollbar
         ${isAnalyzingSms && isCritical ? 'bg-[#150a0a] border-red-500/30' : isAnalyzingSms ? 'bg-[#11110a] border-yellow-500/30' : 'bg-[#0a0c12] border-blue-500/10'}`}>
         <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-500/5 h-full w-full pointer-events-none" />
         <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
