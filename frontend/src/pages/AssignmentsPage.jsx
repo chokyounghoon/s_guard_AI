@@ -11,30 +11,49 @@ export default function AssignmentsPage() {
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [assignments, setAssignments] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
 
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
-  // Fetch real incidents from backend
   useEffect(() => {
-    fetch(`${API_BASE}/incidents?limit=200`)
+    const savedUser = localStorage.getItem('sguard_user');
+    if (savedUser) {
+      setUserProfile(JSON.parse(savedUser));
+    }
+  }, []);
+
+  // Fetch real incidents from backend specifically for the user
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    
+    // Default 1 month window for the assignment list page
+    const toDate = new Date().toISOString().split('T')[0];
+    const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${fromDate}&to=${toDate}`)
       .then(r => r.json())
       .then(data => {
-        const mapped = (data.incidents || []).map(inc => ({
-          id: inc.id,
-          code: inc.code,
-          assignmentType: inc.incident_type,
-          severity: inc.severity,
-          status: inc.status,
-          title: inc.title,
-          sender: inc.incident_type === 'AI' ? 'S-Autopilot' : 'SMS 수신',
-          time: inc.created_at ? new Date(inc.created_at).toLocaleString('ko-KR') : '',
-          bgColor: inc.severity === 'CRITICAL' ? 'bg-red-900/10' : 'bg-[#1a1f2e]',
-          borderColor: inc.severity === 'CRITICAL' ? 'border-red-500/20' : 'border-white/5',
+        const mapped = (data.assignments || []).map(inc => ({
+          id: inc.inc_id,
+          code: inc.inc_id.startsWith('INC-') ? inc.inc_id : `INC-${inc.inc_id}`,
+          assignmentType: 'SMS',
+          severity: inc.severity || 'NORMAL',
+          status: inc.status || '미확인',
+          title: inc.message || '상공 발생',
+          sender: inc.sender,
+          time: inc.assigned_at ? new Date(inc.assigned_at).toLocaleString('ko-KR') : '',
+          received_count: inc.received_count || 1,
+          assignees: inc.assignees || '담당자 미지정',
+          inc_id: inc.inc_id,
+          bgColor: inc.status === '미확인' ? 'bg-red-900/10' : 
+                   inc.status === '처리중' ? 'bg-orange-900/10' : 'bg-emerald-900/10',
+          borderColor: inc.status === '미확인' ? 'border-red-500/20' : 
+                       inc.status === '처리중' ? 'border-orange-500/20' : 'border-emerald-500/20',
         }));
         setAssignments(mapped);
       })
       .catch(console.error);
-  }, []);
+  }, [userProfile]);
 
   // URL 파라미터가 변경될 때 탭 업데이트
   useEffect(() => {
@@ -43,17 +62,13 @@ export default function AssignmentsPage() {
     }
   }, [location.search]);
 
-  const tabs = ['전체', '중요도: CRITICAL', '상태: 대기', '상태: 처리중', '상태: 완료', '신규'];
+  const tabs = ['전체', '미확인', '처리중', '처리완료'];
 
   // 필터링 로직 (탭 선택 시)
   const filteredAssignments = assignments.filter(item => {
-    if (activeTab === '전체') return true;
-    if (activeTab === '중요도: CRITICAL') return item.severity === 'CRITICAL';
-    if (activeTab === '상태: 대기') return item.status === 'Open' || (item.assignmentType === 'SMS' && item.title.includes('Unconfirmed'));
-    if (activeTab === '상태: 처리중') return item.status === 'In Progress';
-    if (activeTab === '상태: 완료') return item.status === 'Completed';
-    // Mapping for Dashboard "Major" click (assignments?tab=전체 currently, but if we add specific tab later)
-    return true;
+    const cleanTab = activeTab.replace('상태: ', '');
+    if (cleanTab === '전체') return true;
+    return item.status === cleanTab;
   });
 
   return (
@@ -109,8 +124,7 @@ export default function AssignmentsPage() {
             filteredAssignments.map((assignment) => (
               <div
                 key={assignment.id}
-                onClick={() => navigate('/assignment-detail')}
-                className={`${assignment.bgColor || 'bg-[#1a1f2e]'} border ${assignment.borderColor || 'border-white/5'} rounded-2xl p-5 space-y-4 hover:border-white/20 transition-all cursor-pointer group shadow-lg`}
+                className={`p-6 rounded-3xl border ${assignment.borderColor} ${assignment.bgColor} relative overflow-hidden group transition-all duration-500 shadow-lg`}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between">
@@ -142,8 +156,13 @@ export default function AssignmentsPage() {
                       {assignment.title}
                     </h3>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
-                    발신: {assignment.sender}
+                  <p className="text-xs text-slate-400 leading-relaxed flex items-center justify-between">
+                    <span>발신: {assignment.sender}</span>
+                    {assignment.received_count > 1 && (
+                      <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0.5 rounded-full border border-blue-500/20 font-bold">
+                        +{assignment.received_count - 1} 중복
+                      </span>
+                    )}
                   </p>
                 </div>
 
@@ -151,14 +170,30 @@ export default function AssignmentsPage() {
                 <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-2">
                   <div className="flex items-center space-x-2">
                     <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center">
-                      <User className="w-4 h-4 text-slate-500" />
+                    <User className="w-4 h-4 text-slate-500" />
                     </div>
-                    <span className="text-[11px] text-slate-400">나진수 책임 (배정됨)</span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-slate-500 uppercase font-black spacing-tighter opacity-70">Assignees</span>
+                      <span className="text-[11px] text-slate-200 font-bold">{assignment.assignees}</span>
+                    </div>
                   </div>
-                  <button className="text-xs font-bold text-blue-500 flex items-center space-x-1 hover:text-white transition-colors">
-                    <span>분석 리포트</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
+                  {assignment.status === '처리완료' ? (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); navigate('/ai-report'); }}
+                      className="text-xs font-bold text-emerald-500 flex items-center space-x-1 hover:text-white transition-colors bg-emerald-500/5 px-3 py-1.5 rounded-lg border border-emerald-500/20"
+                    >
+                      <span>분석 리포트</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${assignment.inc_id}`); }}
+                      className="text-xs font-bold text-blue-500 flex items-center space-x-1 hover:text-white transition-colors bg-blue-500/5 px-3 py-1.5 rounded-lg border border-blue-500/20"
+                    >
+                      <span>인시던트 처리 흐름</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))

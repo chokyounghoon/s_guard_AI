@@ -1,0 +1,23 @@
+name = "sguardai"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+ENVIRONMENT = "production"
+DIFY_API_BASE = "https://api.dify.ai/v1"
+
+[ai]
+binding = "AI"
+
+# KV Namespace for storing SMS messages
+[[kv_namespaces]]
+binding = "SMS_STORAGE"
+id = "2b426805a38f4403ac1e4f8a03c22d00"
+
+# Local Backend URL (set via `wrangler secret put BACKEND_URL`)
+# Leave empty to use built-in mock responses
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sguard-db"
+database_id = "cec6c7cc-5bce-4fdf-a500-e1976b1fb66f"

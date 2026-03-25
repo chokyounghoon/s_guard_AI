@@ -25,6 +25,7 @@ export default function ChatPage() {
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [warRooms, setWarRooms] = useState([]);
   const [showWipToast, setShowWipToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef(null);
 
   const participants = [
@@ -101,6 +102,7 @@ export default function ChatPage() {
   // Load chat history on mount or when incidentId changes
   useEffect(() => {
     const fetchChatHistory = async () => {
+      setIsLoading(true);
       try {
         const res = await fetch(getApiUrl(`/warroom/chat/${incidentId}`));
           if (res.ok) {
@@ -118,22 +120,32 @@ export default function ChatPage() {
             initials: msg.sender ? msg.sender : 'SY',
             color: msg.type === 'ai_analysis' ? 'bg-purple-600' : 'bg-slate-700',
             text: msg.text,
-            time: new Date(msg.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            time: (() => {
+               const d = new Date(msg.timestamp);
+               const yy = String(d.getFullYear()).slice(2);
+               const mm = String(d.getMonth() + 1).padStart(2, '0');
+               const dd = String(d.getDate()).padStart(2, '0');
+               const hh = String(d.getHours()).padStart(2, '0');
+               const min = String(d.getMinutes()).padStart(2, '0');
+               const ss = String(d.getSeconds()).padStart(2, '0');
+               return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
+            })(),
             icon: msg.type === 'system' ? Info : (msg.type === 'ai_analysis' ? Sparkles : null)
           }));
           setMainMessages(loadedMessages);
           
-          // Leader Agent 내용을 AI ANALYSIS SUMMARY 배너에 표시
           if (data.leader_summary) {
             setAiAnalysisMessage({ type: 'ai_analysis', text: data.leader_summary });
           } else {
-            // Fallback: any ai_analysis message in history
             const analysis = loadedMessages.find(m => m.type === 'ai_analysis');
             if (analysis) setAiAnalysisMessage(analysis);
           }
         }
       } catch (err) {
         console.error("Failed to load chat history", err);
+      } finally {
+        // Delay slightly for smoother transition feeling
+        setTimeout(() => setIsLoading(false), 300);
       }
     };
     fetchChatHistory();
@@ -156,7 +168,16 @@ export default function ChatPage() {
           initials: messageData.sender,
           color: messageData.type === 'system' ? 'bg-indigo-600' : 'bg-slate-700',
           text: messageData.text,
-          time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+          time: (() => {
+             const d = new Date();
+             const yy = String(d.getFullYear()).slice(2);
+             const mm = String(d.getMonth() + 1).padStart(2, '0');
+             const dd = String(d.getDate()).padStart(2, '0');
+             const hh = String(d.getHours()).padStart(2, '0');
+             const min = String(d.getMinutes()).padStart(2, '0');
+             const ss = String(d.getSeconds()).padStart(2, '0');
+             return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
+          })()
         };
         setMainMessages(prev => [...prev, newMessage]);
         if (newMessage.type === 'ai_analysis') setAiAnalysisMessage(newMessage);
@@ -462,6 +483,24 @@ export default function ChatPage() {
   const handleResolveIncident = () => {
     navigate('/ai-report', { state: { incidentId } });
   };
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-[#0f1421] flex flex-col items-center justify-center space-y-6">
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+          <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-blue-400 animate-pulse" />
+        </div>
+        <div className="flex flex-col items-center space-y-2">
+          <h2 className="text-xl font-black text-white tracking-widest uppercase">Initializing War-Room</h2>
+          <div className="flex items-center space-x-2 text-slate-500 font-mono text-xs">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+            <span>데이터를 안전하게 불러오는 중... 조회를 잠시만 기다려주세요</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-20 relative">

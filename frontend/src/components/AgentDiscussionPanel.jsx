@@ -47,7 +47,7 @@ const TypewriterText = ({ text, chunkSize = 5, delay = 20 }) => {
   return <>{displayedText}</>;
 };
 
-export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false }) {
+export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false, incidentMessage = '' }) {
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -75,9 +75,13 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
             </span>
           </div>
           <h3 className="font-bold text-white text-sm">AI War-Room Situation Log</h3>
+          {incidentMessage && (
+            <span className="text-[10px] text-slate-300 font-bold ml-4 truncate max-w-[500px]">
+              {incidentMessage.length > 40 ? incidentMessage.substring(0, 40) + '...' : incidentMessage}
+            </span>
+          )}
         </div>
         <div className="flex items-center space-x-3">
-            <span className="text-[10px] text-slate-500 font-mono">LIVE</span>
             <button 
                 onClick={onClose}
                 className="text-slate-500 hover:text-white transition-colors"
@@ -133,10 +137,6 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                     }`}>
                       {msg.text}
                     </div>
-                    {/* Time */}
-                    <span className="text-[10px] text-slate-500 shrink-0 mb-1 font-mono tracking-tighter">
-                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
                   </div>
                 </div>
               </div>

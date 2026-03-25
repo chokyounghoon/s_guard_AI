@@ -1,0 +1,2233 @@
+/Users/khcho/work_antigravity/s_guard_AI/backend/main.py:1589: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [16580]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:__main__:SMS 수신: 1544-7000 - 장애 테스트 메시지
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/sms/receive "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b10cb292-0353-49f3-8e96-9d35883ddaff
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/b10cb292-0353-49f3-8e96-9d35883ddaff
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/b10cb292-0353-49f3-8e96-9d35883ddaff "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/b10cb292-0353-49f3-8e96-9d35883ddaff "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='### [S-Autopilot Insight]\n수신된 메시지를 분석한 결과, 실제 장애가 아닌 **시스템 점검용 테스트 메시지**로 파악되었습니다. 워룸을 생성하고 담당자들에게
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/incidents "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/incidents "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/incident-history "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/activity-logs "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51591 - "POST /sms/receive HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52080 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52166 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52166 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=2cb99568-a15c-49c2-9fda-961cf3453ac5
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52491 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52491 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=4922e934-5049-4bf8-b830-8ed1162da1b8
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52656 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6b32b6e3-0dfc-45c6-a86f-f4c4f84a9fdf
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52700 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=65163ea4-797a-41b7-b18a-103d4bd60ac3
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52973 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=936abece-febc-4c71-bbd5-0b7dd6de2ba1
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53194 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53194 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fb522eec-f0fe-461c-9392-507a28ebcbf5
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53260 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53294 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a75ad76f-10b5-46bb-9d30-e81af8ef4efa
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/a75ad76f-10b5-46bb-9d30-e81af8ef4efa
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a75ad76f-10b5-46bb-9d30-e81af8ef4efa "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a75ad76f-10b5-46bb-9d30-e81af8ef4efa "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n결제 API 타임아웃 및 DB 커넥션 풀 고갈 장애가 감지되었습니다. 서비스 결제 불가 상태로 판단되어 최고 우선순위로 전문가 그
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53381 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53385 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=85089472-994a-4adf-99be-9e5e3ab9ab4b
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53448 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53450 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53467 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=87694aa3-3ade-449a-92db-bdee22862e4b
+INFO:     127.0.0.1:53481 - "OPTIONS /sms/receive HTTP/1.1" 200 OK
+INFO:__main__:SMS 수신: 1544-7001 - payment API timeout 및 database connection pool error 발생
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/sms/receive "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=483e7b3c-8be7-4c71-a0d6-e76ebb34d162
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53497 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53496 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53493 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/483e7b3c-8be7-4c71-a0d6-e76ebb34d162
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/483e7b3c-8be7-4c71-a0d6-e76ebb34d162 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/483e7b3c-8be7-4c71-a0d6-e76ebb34d162 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/483e7b3c-8be7-4c71-a0d6-e76ebb34d162 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='```json\n{\n  "target_system": "Payment API",\n  "error_code": null,\n  "problem_description": "결제 
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/incidents "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/incidents "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/incident-history "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/activity-logs "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53481 - "POST /sms/receive HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53481 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=15991cee-b2ad-4979-a6fc-0cf4802acda4
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53560 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53562 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53660 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=56b3de92-e1a6-4bad-8a4c-02cb2e2f888c
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53791 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f43cd21d-34cd-4a00-8ee7-fe30bdf65c6a
+WARNING:  Invalid HTTP request received.
+INFO:     94.231.206.156:50885 - "GET / HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53931 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53931 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f63e5604-e202-40e3-a697-7334eafeb2e2
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53976 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a6246d90-2d04-436d-96f0-892f78cfb3ea
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54051 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=30e34fde-2611-4b59-9ab1-fe447712cdf5
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54095 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54099 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54099 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a3bbe394-5baf-4858-b987-0e9d60c3ebec
+INFO:     94.231.206.206:38779 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54181 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a8ff8ba3-a85e-494f-9d7f-0be13cefc9c8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54233 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=45bacc23-a6e8-4230-b40c-14a40ff217cf
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54626 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=be55bea9-b833-4026-938d-369e90905da8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54626 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55576 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55576 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fe6b63b9-f208-4d66-9a6c-765094ef5f41
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55651 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=07559fa4-4810-4076-8cf2-b75181783f2c
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55701 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=74751244-8dbf-4c51-8a63-dff18b154ef5
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55712 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56840 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56840 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=480d41d5-1bb4-4abd-932b-9bd545dd02f3
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56949 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6f0a0ba8-60fa-4e69-9478-8736f4c9a345
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/6f0a0ba8-60fa-4e69-9478-8736f4c9a345
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/6f0a0ba8-60fa-4e69-9478-8736f4c9a345 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/6f0a0ba8-60fa-4e69-9478-8736f4c9a345 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/6f0a0ba8-60fa-4e69-9478-8736f4c9a345 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[대응 가이드]**\nDB 커넥션 풀 고갈로 인한 결제 API 타임아웃이 발생했으므로, 즉시 DB 연결 설정을 확장하고 지연 쿼리(Slow Query)를 점검하여 프로세스를 
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57011 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57078 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57142 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57144 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57153 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57155 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57222 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57227 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a1cc73bb-4891-41f7-938c-dd51518e4fe8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57281 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=56039da9-2699-4d16-bbd3-a12708c827d8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57363 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=1fd74e1f-f514-4606-88b9-6cc12a2c7df9
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57417 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57497 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57499 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57541 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=2dd64213-aada-4f00-bc60-5ebb8c88827d
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57644 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57644 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fcb309ac-4f61-4624-a3e6-dc5b190d4fda
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57925 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=144dc3ef-b6cb-4a73-8bf7-761bbfeeb0c8
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/144dc3ef-b6cb-4a73-8bf7-761bbfeeb0c8
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/144dc3ef-b6cb-4a73-8bf7-761bbfeeb0c8 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/144dc3ef-b6cb-4a73-8bf7-761bbfeeb0c8 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n결제 API 타임아웃 및 DB 커넥션 풀 고갈 장애가 감지되었습니다. DB 병목이 애플리케이션 계층으로 전이된 상황으로 판단하며, 플랫폼
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57925 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58099 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=07254c78-4abd-490b-a131-1340e90feb3d
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58163 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58165 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58330 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58330 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=88b906a2-da18-4541-a799-e6f2c8e7d68f
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58392 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=354f7609-79fc-45cf-a2c4-6664b33feb2d
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58445 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=66f0de2c-8edf-45b3-b1cc-2cb5b4641c75
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58445 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58490 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=bc26b856-924d-402d-8cea-bc2ce6391cfa
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58592 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58594 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58660 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58660 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=86937521-63e8-4310-8fe0-8408ca64b92b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58754 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58754 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=71fb1db7-7f60-4347-88ed-88f91dcc2caf
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/71fb1db7-7f60-4347-88ed-88f91dcc2caf
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/71fb1db7-7f60-4347-88ed-88f91dcc2caf "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/71fb1db7-7f60-4347-88ed-88f91dcc2caf "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n*   **장애 요약:** 결제 API 타임아웃 및 DB Connection Pool 고갈 발생 (심각도: 긴급)\n*   **업무 배분
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58819 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58822 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58853 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=528ec360-fc18-443f-875d-0a3268b9f972
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58998 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=eb252926-a233-4c62-a11c-612130f76710
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59164 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59164 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59201 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:__main__:Dify stream captured workflow_run_id=a1e7c492-d0b1-4c6d-bd76-4d3eab62ccd7
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59277 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59277 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=7310c5dd-2677-4d5f-b93c-4c2637252a95
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59390 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=35a89498-b18a-4054-a830-4bc554fe7a03
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59430 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59432 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59523 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=0195e37e-19b0-4039-b66f-f175382d339d
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59599 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59599 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b81e2e44-ddf6-447d-bbbb-f967b53a355d
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59690 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59692 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59695 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=9450cdbd-4adb-448a-a2da-82b32e443fcf
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59754 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6416b938-b9ca-48f9-930e-8553fd918255
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59828 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=9499781f-f853-45d2-9a6c-0244b46e81ad
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59887 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59887 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5544d6ab-05a9-4ee0-92a9-f2e1a0d47492
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59970 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a41141be-161c-42c3-b8e7-d81319589868
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60172 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60172 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c068468b-0293-4779-b3b4-65ce42a6fac0
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60223 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=86e01f3d-8139-46dc-8df3-cd642a742bb3
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60286 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=916f5b41-1f60-4b5f-863b-be9ba9416b18
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60332 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60332 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=02520215-a4e8-4539-aa61-99af94aed4a7
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60413 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=11995e50-825e-426a-b6d0-4dc7ea383cec
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60580 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60580 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=acdd8acb-91e5-4c8a-a618-5a69f728ee09
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60606 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60608 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60609 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60689 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=cbffcca9-91fe-410c-8f73-49b14b7810f9
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60743 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=506cb58f-6ccf-42de-b535-a35571986852
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60762 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60803 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=2af2bb53-0dec-42e0-89b4-aaf339510d35
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60863 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e8fffa0a-cbfe-487e-a05d-df402b4fd78c
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60942 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60947 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ea8669bd-e5e4-423f-a07e-81c883e01a7d
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61000 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ed20139f-940d-4b0f-92ec-136841a04a75
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61067 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=818fb73d-d246-48de-874e-c39ee76bcaa1
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61207 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=09c04db8-d257-412b-bd53-4e77577a15a4
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61307 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a0477803-0fad-4a5e-9b75-b4754c1bbbbc
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61362 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61362 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=8697dabd-7649-47f1-a992-a516601ef9ac
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61435 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b03d0781-97d7-4bf8-a6f4-bdbc3a2d36b0
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/b03d0781-97d7-4bf8-a6f4-bdbc3a2d36b0
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/b03d0781-97d7-4bf8-a6f4-bdbc3a2d36b0 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/b03d0781-97d7-4bf8-a6f4-bdbc3a2d36b0 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n결제 API 타임아웃 및 DB 커넥션 풀 고갈 장애가 감지되었습니다. 원인 분석 및 복구를 위해 DB 및 DevOps 담당자를 긴
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61484 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5edd906c-1892-4dd0-8c4c-aeaf3d17bbe2
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61573 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fccf582e-5e9c-4932-9c81-ded7da868c8f
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61614 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61617 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61617 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=97355560-96ca-4773-bdc5-78833e5e1c2a
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61786 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61786 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=7b8dea7c-dbd6-490d-82cd-c98df00bb754
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61896 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=342c0abb-4d30-4f4b-8eb7-14f8b070ed92
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61977 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=088fbcaa-10f9-473d-bc3e-e41809a9b8a6
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62050 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62052 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62099 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62103 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e9acc35a-57eb-4ebd-ad1b-ece1d4826ce1
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62148 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ac55d9fe-cafe-4d07-b13c-7aee19d7464a
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/ac55d9fe-cafe-4d07-b13c-7aee19d7464a
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/ac55d9fe-cafe-4d07-b13c-7aee19d7464a "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/ac55d9fe-cafe-4d07-b13c-7aee19d7464a "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n결제 API 타임아웃과 DB 커넥션 풀 고갈이 동시에 감지되었습니다. DB 병목이 API 응답 지연으로 이어지는 긴급 상황으로 판
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62181 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62148 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62183 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62231 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=d226df26-e1c7-4740-9a31-f5fe7a550d5b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62304 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b9f177b3-23bb-4259-ba99-4d230fd86198
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/b9f177b3-23bb-4259-ba99-4d230fd86198
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/b9f177b3-23bb-4259-ba99-4d230fd86198 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/b9f177b3-23bb-4259-ba99-4d230fd86198 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/b9f177b3-23bb-4259-ba99-4d230fd86198 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n결제 API 타임아웃과 DB 커넥션 풀 고갈이 결합된 심각한 장애입니다. 트래픽 급증 또는 코드 내 커넥션 누수로 판단되며, 즉시 워룸을
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62342 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62346 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62304 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62450 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=3fdafa30-d450-46eb-b361-a5e2896f9545
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62552 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6cea5ed8-f536-4f99-b098-67e1d8d7b818
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62682 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62682 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=185bef8a-0ad8-44f1-8edd-0a41787f4741
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62773 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=597a0c05-6495-4b70-9da3-0a8a6db0cc54
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62904 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62904 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c3ef31ff-6720-46bc-b05f-8a5b453d62bc
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62984 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62987 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63020 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=df40ebf6-bc04-4718-9f3b-69dc089881a7
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63064 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63115 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e461cb5f-debf-4787-bf1e-219bf8a64ade
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63215 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=42572413-ffa8-45df-9c4d-41a70090bda0
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63263 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=1421d2ff-cb5c-49bd-ae1f-e40f7be5d377
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63366 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6681a1b5-e593-4392-b949-90d0ab4efe74
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63473 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63502 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ccc8eb88-43bb-4105-8069-4cf23450b494
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63662 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63665 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63665 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e7847c8b-17f2-4d48-a42a-0f068b5b1bb3
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63697 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63699 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63756 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=8684ea38-77ee-43c5-9fc5-b289feb2218e
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63837 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6ba34f7f-28b8-4115-9115-cc888929b3eb
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63890 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e2f03a3b-4403-4958-abd6-e0d210664dc5
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63905 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63906 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63904 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64031 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=216cf58d-2001-48dc-ac24-c16d1af5a0b0
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64079 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64083 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64086 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64083 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=71eb65d0-51f9-4c23-bf41-0f08e669e76d
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64172 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=11c54dc4-7e14-416a-a20d-7edc18ec1666
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64218 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f396b076-1aae-409d-b237-e67f4e3999df
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64291 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5dce4750-25b5-40d5-a3c4-399e31399fb2
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64331 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64334 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64337 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64337 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=9f5fcd56-35e4-4f82-a09c-942067d89db7
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/9f5fcd56-35e4-4f82-a09c-942067d89db7
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/9f5fcd56-35e4-4f82-a09c-942067d89db7 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/9f5fcd56-35e4-4f82-a09c-942067d89db7 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **상황 분석:** DB 커넥션 풀 고갈로 인해 결제 API 응답 지연 및 타임아웃이 연쇄적으로 발생 중입니다.\n*   
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64420 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b59fe96d-519c-4500-a5d9-569b4af4d3cc
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64606 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=555d88fb-02c1-48c9-8e32-26ed97be032b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64668 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=7a8b2c88-9ecd-4de4-8126-29a9d384d40f
+INFO:     103.203.57.20:45600 - "GET / HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64795 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=27655d0f-d57f-4c0a-a1df-5eee89a8a0de
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64867 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fbbcced7-bbf4-473d-8f2d-1b69a22f2afc
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64897 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64899 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/fbbcced7-bbf4-473d-8f2d-1b69a22f2afc
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/fbbcced7-bbf4-473d-8f2d-1b69a22f2afc "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/fbbcced7-bbf4-473d-8f2d-1b69a22f2afc "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n- **분석:** 결제 API의 응답 지연과 DB 커넥션 풀 고갈이 동시에 발생한 긴급 상황입니다.\n- **배분:** DB(세션 분석)
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64948 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64947 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64950 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:65054 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:65056 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65035 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=385cd30c-fdf3-4d15-b01d-e41a4113ab9e
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:65103 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:65105 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65115 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=81d1e244-b09b-4c4f-8aae-ffbbfdbacc41
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65133 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65132 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65138 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65190 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=069e8a3d-f468-4299-bede-36641bb2909b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65242 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f87b46e8-4abc-489c-8824-89a1d35a3318
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65307 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=018f1959-c37f-4b63-b842-61842cb12c0b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65352 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f9221f36-17bf-4b57-9d7a-05bd3c6782cb
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65441 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c15baca1-9afb-4773-8283-1cde0de1d7cd
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65486 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e9ef6970-2bd1-49f1-a906-fc144f84289b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49171 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49174 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=0110a8a3-45b1-415f-bba1-f08d00c9d725
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/0110a8a3-45b1-415f-bba1-f08d00c9d725
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/0110a8a3-45b1-415f-bba1-f08d00c9d725 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/0110a8a3-45b1-415f-bba1-f08d00c9d725 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **분석:** 결제 API 타임아웃의 근본 원인이 DB 커넥션 풀 고갈로 판단됨.\n*   **업무 배분:** DB(풀 분
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49245 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=9e728392-0796-4924-bc50-7a1f92cb939e
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49344 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49381 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fb2959cb-b843-49e2-96d1-48376dee02da
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50454 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=91034c92-830d-419a-b9fe-ae8073dda0ae
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50544 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=8f9a7e50-7080-4296-9db2-3031bac42e66
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50620 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50620 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=899e68ee-b5cd-4d91-9412-216b70502b5c
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50736 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50739 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50736 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e5d1153e-c51c-4b31-a0fe-81031bc14156
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:50850 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:50852 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50944 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50944 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=22f0eb08-95b4-453d-9cf9-0be787df09d1
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51040 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=84e562e6-9a9a-457e-a217-2c8df9dbd5e8
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/84e562e6-9a9a-457e-a217-2c8df9dbd5e8
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/84e562e6-9a9a-457e-a217-2c8df9dbd5e8 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/84e562e6-9a9a-457e-a217-2c8df9dbd5e8 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **분석:** 결제 API 타임아웃과 DB 커넥션 풀 고갈이 결합된 복합 장애로, 서비스 결제 불가 상태입니다.\n*   
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51088 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=81aee316-755e-4415-aedf-9e53fb69b2a4
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/81aee316-755e-4415-aedf-9e53fb69b2a4
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/81aee316-755e-4415-aedf-9e53fb69b2a4 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/81aee316-755e-4415-aedf-9e53fb69b2a4 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **상황 분석:** 결제 API 타임아웃 및 DB 커넥션 풀 고갈로 인한 서비스 결제 불가 상태 발생.\n*   **업무 
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51300 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51300 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=060928a6-d5d0-4b51-b2a3-a06c1f6b0d30
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51326 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51328 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51325 - "GET /warroom/rooms HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51361 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51363 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51424 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6c95e8fa-a41f-43fc-b15c-e6a5a96299a0
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51651 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51653 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51825 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5a31f859-f97a-42c9-a87b-0298a26bda88
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51887 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=71b27cd6-5c1e-401d-8a04-6db5df5df824
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51935 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=551c56bf-54a5-467e-9744-f1a6acf31ced
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52012 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52015 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52019 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52019 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=9577b7fe-3369-44d3-90e8-7cfdfe6ab655
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52064 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=11363b35-64e9-4c4d-b957-d57a231d8f9e
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52138 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52135 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52141 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52145 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fb0d9e74-c47e-49f3-90d7-c69b23b62632
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52192 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=098bdb52-49d5-492a-b726-ac8784d434a6
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/098bdb52-49d5-492a-b726-ac8784d434a6
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/098bdb52-49d5-492a-b726-ac8784d434a6 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/098bdb52-49d5-492a-b726-ac8784d434a6 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n결제 API 타임아웃 및 DB 커넥션 풀 고갈 장애가 감지되었습니다. 긴급 상황으로 판단하여 DB 및 DevOps 에이전트를 주력으로 배
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:52533 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:52919 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:52921 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53095 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53097 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53183 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53185 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53189 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a94717b4-1578-49f3-883f-ef4dd98f9f82
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/a94717b4-1578-49f3-883f-ef4dd98f9f82
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a94717b4-1578-49f3-883f-ef4dd98f9f82 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a94717b4-1578-49f3-883f-ef4dd98f9f82 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n결제 API 타임아웃과 DB 커넥션 풀 고갈이 동시에 발생한 심각 단계 상황입니다. DB 에이전트와 DevOps 에이전트를 주 담당자로 
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53247 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=d4abecd2-217b-4c8c-8643-e892490e1149
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53366 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53366 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=62b57d9b-e8d8-48e4-b90b-59ff973211c3
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53422 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=0b0fa2cb-8c7a-4c70-9e27-952bf3a68bb7
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/0b0fa2cb-8c7a-4c70-9e27-952bf3a68bb7
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/0b0fa2cb-8c7a-4c70-9e27-952bf3a68bb7 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/0b0fa2cb-8c7a-4c70-9e27-952bf3a68bb7 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **장애 요약:** 결제 API 타임아웃 및 DB 커넥션 풀(Connection Pool) 고갈 발생.\n*   **담당 
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53479 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=657b75e6-9773-4ba0-9757-91e5feab40a4
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53538 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53541 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53541 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=d68f752c-cbae-4597-9b12-10551af52c89
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53627 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=4759770c-e28c-42de-ae9e-2a72e35f77b8
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53706 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53708 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53694 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e10a19d7-3b2e-440c-b74a-723b22d6d582
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53805 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=2bdfd7a8-00cb-4f5d-a3a1-558695483c24
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53900 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=0c5044d3-a783-4faa-9193-78ee490649c1
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53907 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53957 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=548aa409-5d75-4de8-9bfb-8c2d337a4074
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54076 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54080 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54193 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c72d9a7c-299b-4c02-bcf6-b2a6fccf4ac2
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54252 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=18df060e-6015-4771-9003-33b1c14f1899
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54323 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=7693c663-bd61-4a73-86c1-4882f3f5e92f
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54375 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=868bffb1-b84c-42df-94ae-5f4775fa2ef8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54585 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54592 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54589 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54589 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f1b24c95-a070-4d28-8e1f-dc4aa3ba5519
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54676 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b0540c5a-3beb-416e-9445-31a6554d2de9
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54785 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=47a91d79-e3f8-41da-a02f-68e37e321aae
+INFO:     180.36.229.48:46033 - "GET / HTTP/1.0" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54832 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=2d6ee19f-a5a7-48c3-9af2-21785ba23e29
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54906 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54909 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54913 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54913 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=832d5780-736e-4f0b-9195-79249f39d6dd
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55013 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=55939c38-126e-429c-81d0-1ffbc551da77
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:55051 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:55053 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55091 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55091 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e1623bbd-15a6-4430-a98c-0af2de99f6ad
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:55608 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55610 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55710 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=769f9121-cc09-48ea-a31b-58cb5b535738
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55784 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55879 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=00d26f86-fc86-495d-9586-e4f38c22f953
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/00d26f86-fc86-495d-9586-e4f38c22f953
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/00d26f86-fc86-495d-9586-e4f38c22f953 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55909 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/00d26f86-fc86-495d-9586-e4f38c22f953 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='### [S-Autopilot Insight]\n*   **장애 요약:** 결제 API 타임아웃 및 DB 커넥션 풀(Connection Pool) 고갈 발생.\n*   **상황 
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55965 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=05077026-7069-46a2-80b1-35488c53a159
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/05077026-7069-46a2-80b1-35488c53a159
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/05077026-7069-46a2-80b1-35488c53a159 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/05077026-7069-46a2-80b1-35488c53a159 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='수신된 장애 로그를 바탕으로 S-GUARD 오케스트레이션 분석을 시작합니다.\n\n### [S-Autopilot Insight]\n*   **장애 요약:** 결제 API 타임아웃
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56098 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56103 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=3520420e-661f-4542-8560-3bbb386c69c6
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56148 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b045d104-306b-49c4-ae43-0e92558bbba1
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56234 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=27544b8c-3c3e-4d22-ad93-015a777428ff
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56321 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=42321761-b858-4049-9b57-47ef266e6f45
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:56368 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:56370 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56394 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=dbc120d7-e8a3-4780-8982-2635e94a4ed4
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56414 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56418 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56412 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56490 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=77d65a3a-f2c5-413d-a3a1-9cebc8eaa8e4
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56552 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=19adf1da-59ee-4a5e-b77c-ca13b89c1aac
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:56604 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:56606 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56682 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a6e8e5a7-0328-4f74-9830-7fe8bf28b86a
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:56781 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56783 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56833 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c482067e-1c00-4b09-961d-a18b864dda65
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/c482067e-1c00-4b09-961d-a18b864dda65
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/c482067e-1c00-4b09-961d-a18b864dda65 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/c482067e-1c00-4b09-961d-a18b864dda65 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n결제 API 타임아웃 및 DB 커넥션 풀 고갈 장애가 감지되었습니다. 서비스 결제 불가 상태로 판단되어 최우선 순위로 격상하며, DB 및
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56858 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56862 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56861 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56986 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=fa51e846-8057-4a1e-84d8-761daeb0dadc
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57030 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a46cc19e-6495-46ab-bd4a-6e8961a1c3a0
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57056 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57058 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57201 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=97978215-5213-473b-a994-05d5f549e4df
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57239 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:57241 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57286 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e8fffc52-323a-41ac-9675-ed4ace5993c2
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57362 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57366 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57369 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57369 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=25229c68-b1c4-4d5b-9ea9-3c65996fa3fd
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57423 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=76a9cb9e-6736-4894-884d-c65d9252879f
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/76a9cb9e-6736-4894-884d-c65d9252879f
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/76a9cb9e-6736-4894-884d-c65d9252879f "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/76a9cb9e-6736-4894-884d-c65d9252879f "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n결제 API 타임아웃과 DB 커넥션 풀 고갈이 동시 발생한 심각한 장애 상황입니다. 트래픽 급증 또는 특정 쿼리의 병목 현상으로 판단되며
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57589 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57589 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=cbfcda17-0d45-4986-942c-02c66a4de865
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57633 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=be01f2f6-c7fa-4021-9484-6ba9e865f68f
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57705 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=8eed0622-a2bd-4d34-bd45-e29001a00c6b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57747 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5115f66c-88d9-4442-b79f-9a35d2740ff9
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57826 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57826 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=d6facef4-075f-4e10-9384-8f742199b8a7
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/d6facef4-075f-4e10-9384-8f742199b8a7
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/d6facef4-075f-4e10-9384-8f742199b8a7 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/d6facef4-075f-4e10-9384-8f742199b8a7 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='### [S-Autopilot Insight]\n결제 API 타임아웃과 DB 커넥션 풀 고갈이 동시에 감지되었습니다. DB 병목이 애플리케이션 스레드 차단으로 이어진 전형적인 연
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57878 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a38c494c-d696-44d6-89cb-7274e5e00f1c
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/a38c494c-d696-44d6-89cb-7274e5e00f1c
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a38c494c-d696-44d6-89cb-7274e5e00f1c "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a38c494c-d696-44d6-89cb-7274e5e00f1c "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n결제 API 타임아웃 및 DB 커넥션 풀 고갈 장애가 감지되었습니다. 서비스 중단 방지를 위해 DB 및 DevOps 담당자를 긴급
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57912 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57914 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57878 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58010 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58027 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=167421c4-18c8-4db2-ab16-a973d03aff97
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58146 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=53f080d5-6db9-4631-808d-b43a8ddb9fa0
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58197 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5281762e-c93d-4f0f-9fa8-35b89c41a83e
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58263 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58272 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58273 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:__main__:Dify stream captured workflow_run_id=9065c003-61cf-4380-8ac7-4bde82c68a87
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58757 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58759 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58787 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5c48448d-ad4c-44b8-866c-53c79b310d5a
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58854 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=32bae77b-dbd5-4413-b4d5-7a45246feb48
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:58908 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58944 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58944 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ba2e5b18-abf8-40e1-9b66-bc81254f3797
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59069 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e620a392-52e6-4cca-a5c9-c7b0765a7a40
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59185 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59187 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59203 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ae4d0371-019e-4327-9c3d-57dd7f9b550e
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59252 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59254 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59266 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=df8b625b-19b5-48b2-9758-78d68d6c3072
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59317 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=871ffc30-26c9-42b0-a489-cf937f520097
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/871ffc30-26c9-42b0-a489-cf937f520097
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/871ffc30-26c9-42b0-a489-cf937f520097 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/871ffc30-26c9-42b0-a489-cf937f520097 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n결제 API 타임아웃 및 DB 커넥션 풀 고갈 장애가 감지되었습니다. 서비스 결제 불가 상태로 판단하여 긴급 워룸을 가동하고 보안
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59367 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59367 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e1f6e855-0c2d-45b7-94c2-e3a2dd19fcfb
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59453 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c96adcb6-8d31-4202-908d-8a4d4eaddc34
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59469 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59515 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=3fbb9458-ab0a-41d7-8175-28e3910a26b7
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59552 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59554 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59595 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=8f74b6ae-a137-4c7f-ab2c-46a0e9d53b7a
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59634 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:59636 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59670 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59670 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=271ae633-7691-4a92-9499-b764e92fb214
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59759 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=363ad07a-67d6-4532-8fca-dde9edade914
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/363ad07a-67d6-4532-8fca-dde9edade914
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/363ad07a-67d6-4532-8fca-dde9edade914 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/363ad07a-67d6-4532-8fca-dde9edade914 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **상황:** 결제 API 타임아웃 및 DB 커넥션 풀 고갈로 인한 서비스 장애 감지.\n*   **심각도:** **Cri
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59818 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=22efcb85-2336-41aa-9068-1d86fd656e18
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60000 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60000 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a6a90fe4-30d9-46bb-b529-70c3dec0ca20
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60067 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60067 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5edce63c-3c56-489c-8862-bd14aecacd3c
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60138 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=515ddd03-2b3a-4813-bbe6-907ab4847a88
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60217 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f611c95c-ebcb-4130-a119-749cb7f9a7fb
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60261 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5368e43b-790c-45ba-9eb1-5193d398d5ed
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60344 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60344 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5b6ce8ca-aaac-414f-9798-80874df7aaa8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60391 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ace83c49-e6c6-467c-92cd-d841eaad6fa4
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60472 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60476 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60472 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=00557417-a7b8-4760-a470-2162758365da
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60575 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ea4ad6e8-3a35-4cb5-91cd-a962124a98ca
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60691 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b1164bfd-4745-4e1f-aa35-9ad532c67624
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:60840 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:60842 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:60916 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:60918 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61142 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61144 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61298 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61300 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61392 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61394 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61442 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:61444 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61516 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61516 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=3399b2af-ea12-4d87-a008-9bd1757176c6
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61596 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=9f22c2f1-b3d7-4306-b5ba-27e702928d26
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61714 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61719 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c2cd0979-c1ea-4d04-9b1d-f5920697b034
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61809 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=49e6a7b2-b295-4f52-860d-b450e22a76f5
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61831 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61834 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61836 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61924 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=956a6e9c-f1a7-412e-84cc-627cdec05bf3
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61986 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a4bec5ef-a20d-41b1-816a-59dd68e2b904
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/a4bec5ef-a20d-41b1-816a-59dd68e2b904
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a4bec5ef-a20d-41b1-816a-59dd68e2b904 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/a4bec5ef-a20d-41b1-816a-59dd68e2b904 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='[S-Autopilot Insight]\n- **장애 상황**: 결제 API 타임아웃 및 DB 커넥션 풀 고갈로 인한 서비스 중단 위기.\n- **업무 배분**: 인프라 트래픽 
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62110 - "GET /ai/insight HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62132 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62134 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=987de903-431f-4f69-a50a-e4067710052f
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62209 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62211 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62339 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62341 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62386 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62386 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b70dcb32-d87a-45cc-b21f-2f49e40899da
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62493 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62495 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62730 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62750 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b6a3d898-b0eb-4a0d-8bbb-b949e29edea7
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62877 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:62879 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62915 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=07863332-5fac-4dee-85eb-fc5d2a39fa7a
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/07863332-5fac-4dee-85eb-fc5d2a39fa7a
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/07863332-5fac-4dee-85eb-fc5d2a39fa7a "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/07863332-5fac-4dee-85eb-fc5d2a39fa7a "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **상황:** 결제 API 타임아웃 및 DB 커넥션 풀 고갈로 인한 서비스 지연 발생.\n*   **배분:** DB/Dev
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62984 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5fbe5100-ec10-4a89-b04d-d166f4669c86
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63035 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=0f121e86-65bd-46a9-b54b-ebf73ff26ee8
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/0f121e86-65bd-46a9-b54b-ebf73ff26ee8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63057 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63056 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63053 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/0f121e86-65bd-46a9-b54b-ebf73ff26ee8 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/0f121e86-65bd-46a9-b54b-ebf73ff26ee8 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/0f121e86-65bd-46a9-b54b-ebf73ff26ee8 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **상황 분석:** 결제 API의 응답 지연이 DB 커넥션 풀 고갈로 이어져 서비스 전체 병목 현상 발생.\n*   **업
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63053 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63056 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63094 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63096 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63152 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=909df818-fd3e-43a5-a92c-4e78087a634a
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63217 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63225 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63223 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63230 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:__main__:Dify stream captured workflow_run_id=62c50f86-d333-47a3-8d31-e5f071caab6e
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63302 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63304 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63350 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6eb440cb-3ad7-42a5-a64e-62478b38ca52
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63412 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=48b3582b-488e-4660-8e21-829c88b7eaf0
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63485 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63487 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63712 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63712 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63781 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=2792bacd-a732-4ecc-aa42-735e44939ed9
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:63849 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63851 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63884 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63914 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=cd17a9a0-d88d-4325-a2cc-b1f92a0b8d9e
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63959 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ac8bd461-9e73-499e-af56-f5478f4fd2dc
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64002 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63998 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64000 - "GET /warroom/rooms HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64050 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64052 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64067 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64134 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=de01739c-b404-46fd-9a7b-49ce0856d4c4
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64204 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=d1d73c65-5651-4d33-8938-db9bf4ce731f
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64283 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64295 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=572a84c0-8514-482f-9da5-96e9af5bb5d5
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64372 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64372 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6f4dd751-5b7c-45ef-972f-75cd4cfde5c2
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64590 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64595 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64590 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=ffa60225-4688-4016-8db5-74653e281751
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64669 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64671 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64688 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=52594ce4-e039-436c-a025-666ed8e572f6
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64746 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:64748 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64776 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64784 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64782 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:__main__:Dify stream captured workflow_run_id=886867ea-2bc5-42f2-ad36-ad3f1936d138
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64970 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=b78a3172-30fd-40af-b990-f9ad77bc392b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65015 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=13c3adb7-b6bd-4021-b0d7-4670a630ae2f
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65073 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6f87b569-3b58-473b-9ae7-19307573f879
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:65195 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:65197 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65203 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=914445ca-a38a-4c79-9306-719167e45e1c
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65246 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65246 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f99d0ccf-f6d7-462e-97c5-45d16bd3441f
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/f99d0ccf-f6d7-462e-97c5-45d16bd3441f
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/f99d0ccf-f6d7-462e-97c5-45d16bd3441f "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/f99d0ccf-f6d7-462e-97c5-45d16bd3441f "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='수신된 장애 로그를 바탕으로 S-GUARD 오케스트레이션 분석을 시작합니다.\n\n### [S-Autopilot Insight]\n- **장애 요약:** 결제 API 타임아웃 및
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65314 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=8162e678-cb9e-4621-8e1a-0f87a899b9dc
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65357 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=7787422f-8906-44f7-92ff-1239799affa6
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/7787422f-8906-44f7-92ff-1239799affa6
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/7787422f-8906-44f7-92ff-1239799affa6 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/7787422f-8906-44f7-92ff-1239799affa6 "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **장애 분석:** 결제 API 타임아웃 및 DB 커넥션 풀 고갈 발생. 서비스 결제 불가 상태로 판단됩니다.\n*   *
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65387 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65357 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65385 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65444 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=bfdff279-7fd5-45cc-a7f7-1bbc14164f77
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49161 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=71a5af41-d419-4a7e-9cb1-133e903a0f1d
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49258 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=06e1e0b2-1fe0-454e-a28f-57f61f257a37
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:49305 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49339 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49343 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49346 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:49365 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:49367 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49346 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=31bce57a-0257-4445-bbf1-a480e0b64120
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49419 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a52e11ba-5a18-4971-9fb1-4aa500ece1c8
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49557 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6c49ac0e-efca-427d-a309-3d9258f895c3
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49636 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=211728fd-6acf-4bb3-ad80-30ea0b1bb5d3
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:49693 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49725 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=944062ed-56b3-40df-a32d-d941d2b4ac31
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49767 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=cce0a073-e793-4f44-a0b6-aa3c2b44e72f
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/cce0a073-e793-4f44-a0b6-aa3c2b44e72f
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/cce0a073-e793-4f44-a0b6-aa3c2b44e72f "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49791 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49793 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49795 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/cce0a073-e793-4f44-a0b6-aa3c2b44e72f "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n*   **장애 요약:** 결제 API 타임아웃과 DB 커넥션 풀 고갈이 동시에 발생한 복합 장애입니다.\n*   **업무 배분:
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49898 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6b967b67-9814-4a88-9fea-6e0b2908fd4c
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/6b967b67-9814-4a88-9fea-6e0b2908fd4c
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/6b967b67-9814-4a88-9fea-6e0b2908fd4c "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/6b967b67-9814-4a88-9fea-6e0b2908fd4c "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='**[S-Autopilot Insight]**\n결제 API 타임아웃과 DB 커넥션 풀 고갈이 연쇄적으로 발생한 긴급 상황입니다. DB 병목으로 인한 API 응답 지연이 주원인으
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49951 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49951 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=418ee8a0-bacd-45c6-ab21-4939f3a431e1
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50013 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=dcaca96b-da66-45f1-b72b-f19b35bfd556
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50104 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=80af3f7f-1e4f-44f1-a3df-47ad49ad839b
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50180 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=f233133e-304a-4cae-bdeb-cb8304e461c0
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:50352 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50356 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=a0792994-1219-4220-9929-e7d0f46ff02c
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:50402 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50404 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:50493 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50500 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50741 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50741 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=49b354d7-160c-480b-80af-4f9aed825642
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:50815 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:50817 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50879 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=e6680e1d-921d-4b4d-86e1-3537039c4787
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50931 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50931 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=440bad33-ae03-42e4-84be-9adcabf847cb
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51085 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=7541d60f-ab97-470d-88f7-8ade91d34819
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51139 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51141 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51161 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=90ddcd90-d9d4-4cfd-acfa-078006f876e8
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51370 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51372 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51408 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51408 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=6de36c76-13c2-4f22-9d9c-d56230a40dc5
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51456 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=c5e5c906-828b-48d5-b1bc-83d38126710a
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51613 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51644 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51646 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:51918 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:52274 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:52276 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52920 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52920 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53007 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53009 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53174 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53176 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53257 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53257 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=bed21342-86c7-4082-8e24-90dd388e7af6
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53326 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53332 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53337 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53335 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:__main__:Dify stream captured workflow_run_id=afdccee6-e07c-4458-9001-a636ab5472d1
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53385 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=013b3147-eab2-406f-adf7-cee294e475eb
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53496 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=5a84e99b-a3b4-44be-b122-a4871c5bc51b
+INFO:__main__:Dify stream polling workflow detail https://api.dify.ai/v1/workflows/run/5a84e99b-a3b4-44be-b122-a4871c5bc51b
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/5a84e99b-a3b4-44be-b122-a4871c5bc51b "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=running outputs_keys=[]
+INFO:httpx:HTTP Request: GET https://api.dify.ai/v1/workflows/run/5a84e99b-a3b4-44be-b122-a4871c5bc51b "HTTP/1.1 200 OK"
+INFO:__main__:Dify workflow detail status_code=200
+INFO:__main__:Dify workflow detail status=succeeded outputs_keys=['answer', 'files']
+INFO:__main__:Dify raw result extracted: type=str val='### [S-Autopilot Insight]\n*   **상황 분석:** 결제 API의 응답 지연(Timeout)과 DB 커넥션 풀 고갈이 동시에 발생한 긴급 상황입니다.\n*
+INFO:__main__:Dify workflow polling found result in outputs (status=succeeded)
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53542 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=1adf030f-3162-4140-8301-4534d49d6f48
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53600 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=86068386-577e-4e76-b917-37840ba952df
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53620 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53618 - "GET /warroom/rooms HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     121.172.18.77:0 - "GET /ws HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+INFO:     127.0.0.1:53686 - "GET /ws HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53839 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53839 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=dc3abadf-8c64-489d-98f2-0d58dc057a87
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53906 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=9f9155ae-82d0-4025-ab06-fbf3c464ff65
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54120 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:__main__:Dify stream captured workflow_run_id=3dde6ce3-631b-4ab5-a1f7-28d6d5d1ff3b

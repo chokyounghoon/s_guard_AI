@@ -25,6 +25,7 @@ import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import UserManagementPage from './pages/UserManagementPage';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import WarRoomManagementPage from './pages/WarRoomManagementPage';
+import WorkflowPage from './pages/WorkflowPage';
 
 // 로그인/회원가입 페이지에서는 AiChatWidget 숨김
 function AppContent() {
@@ -57,6 +58,7 @@ function AppContent() {
         <Route path="/user-management" element={<UserManagementPage />} />
         <Route path="/organization-management" element={<OrganizationManagementPage />} />
         <Route path="/warroom-management" element={<WarRoomManagementPage />} />
+        <Route path="/workflow/:inc_id" element={<WorkflowPage />} />
       </Routes>
     </>
   );

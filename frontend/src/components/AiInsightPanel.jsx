@@ -18,6 +18,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [isCritical, setIsCritical] = useState(false);
   const [smsAnalysisTitle, setSmsAnalysisTitle] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [insightTimestamp, setInsightTimestamp] = useState(null);
 
   // Streaming typewriter (SSE chunk -> queue -> char-by-char)
   const typingQueueRef = useRef('');
@@ -63,6 +64,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setAnalysisComplete(false);
       setIsCritical(false);
       delayShownRef.current = false;
+      setInsightTimestamp(null);
       return;
     }
 
@@ -84,6 +86,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               const critical = data.severity === 'CRITICAL';
               setIsCritical(critical);
               setAnalysisComplete(true);
+              setInsightTimestamp(data.reg_dt);
               setIsAnalyzingSms(false); // DB 캐시 로드 시 LIVE 애니메이션 비활성화
               if (onLogReceived) {
                 onLogReceived({
@@ -402,19 +405,32 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               : <Brain className="w-6 h-6 text-blue-400 animate-pulse" />
             }
           </div>
-          <div>
-            <h2 className="font-bold text-lg text-white flex items-center gap-2">
-              S-Autopilot Insight
-              <span className="flex h-2 w-2 relative ml-2">
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <h2 className="text-sm font-black text-white flex items-center gap-2">
+              <Brain className={`w-4 h-4 ${isAnalyzingSms ? 'text-yellow-400 animate-pulse' : isCritical ? 'text-red-400' : 'text-blue-400'}`} />
+              <span className="truncate">S-Autopilot Insight</span>
+              <span className="relative flex h-2 w-2 flex-shrink-0">
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isAnalyzingSms && isCritical ? 'bg-red-400' : isAnalyzingSms ? 'bg-yellow-400' : 'bg-blue-400'}`}></span>
                 <span className={`relative inline-flex rounded-full h-2 w-2 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
               </span>
             </h2>
-            <p className="text-xs text-slate-400">
-              {selectedSms?.message 
-                ? (selectedSms.message.length > 30 ? selectedSms.message.substring(0, 30) + '...' : selectedSms.message)
-                : '실시간 인공지능 분석 스트림'}
-            </p>
+            {insightTimestamp && (
+              <div className="flex flex-col items-start ml-2 border-l border-white/10 pl-3">
+                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest leading-none mb-1 opacity-60">Registered At</span>
+                <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded shadow-[0_0_10px_rgba(255,255,255,0.1)] border border-white/5 whitespace-nowrap">
+                  {(() => {
+                    const d = new Date(insightTimestamp);
+                    const yy = String(d.getFullYear()).slice(2);
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const min = String(d.getMinutes()).padStart(2, '0');
+                    const ss = String(d.getSeconds()).padStart(2, '0');
+                    return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
+                  })()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -532,7 +548,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               {[1, 2, 3].map(i => (
                 <div key={i} className="p-4 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] text-slate-500 font-mono">2026.03.{10-i} 14:00</span>
+                    <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2.5 py-1 rounded shadow-sm">26/03/10 14:00:00</span>
                     <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">완료</span>
                   </div>
                   <p className="text-sm font-bold text-slate-200 group-hover:text-blue-400 transition-colors">유사 장애 사례 #{i}: DB 커넥션 유실 건</p>
@@ -557,7 +573,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               {[1, 2].map(i => (
                 <div key={i} className="p-4 bg-[#11141d] rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer group">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] text-slate-500 font-mono">2026.02.{15+i} 10:30</span>
+                    <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2.5 py-1 rounded shadow-sm">26/02/15 10:30:00</span>
                     <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded border border-purple-500/20">Closed</span>
                   </div>
                   <p className="text-sm font-bold text-slate-200 group-hover:text-purple-400 transition-colors">War-Room: 시스템 연동 오류 대응 회의</p>

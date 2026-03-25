@@ -12,6 +12,29 @@ const getKst = () => {
   return new Date(now.getTime() + kstOffset).toISOString().replace('T', ' ').substring(0, 19)
 }
 
+// Utility for AI Embeddings
+const generateEmbedding = async (text, env) => {
+  if (!text || !env.AI) {
+    console.error('Text or env.AI is missing');
+    return null;
+  }
+  try {
+    console.log('Generating embedding for text:', text.substring(0, 50));
+    const response = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+      text: [text]
+    });
+    if (!response || !response.data || !response.data[0]) {
+      console.error('Invalid AI response:', JSON.stringify(response));
+      return null;
+    }
+    console.log('Embedding generated successfully, dimensions:', response.data[0].length);
+    return response.data[0];
+  } catch (e) {
+    console.error('Embedding error detail:', e.message, e.stack);
+    return null;
+  }
+}
+
 // Utility for Password Hashing (Compatible with Python's salt:sha256_hash)
 const hashPassword = async (password) => {
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -270,8 +293,18 @@ app.post('/sms/receive', async (c) => {
   const kstNow = new Date(now.getTime() + kstOffset)
   const timestamp = kstNow.toISOString().replace('T', ' ').substring(0, 19)
   
-  // Create a timestamp-based ID (YYYYMMDDHHMMSSmmm) - same as local PG logic
-  const inc_id = parseInt(kstNow.toISOString().replace(/[-:T.Z]/g, '').substring(0, 17))
+  // Daily Duplicate check (same sender and message within the current KST day)
+  const todayStart = kstNow.toISOString().substring(0, 10) + ' 00:00:00'
+  const existing = await db.prepare(
+    "SELECT inc_id, received_count FROM received_messages WHERE sender = ? AND message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
+  ).bind(sender, message, todayStart).first()
+
+  if (existing) {
+    const newCount = (existing.received_count || 1) + 1
+    await db.prepare("UPDATE received_messages SET received_count = ?, timestamp = ?, mod_dt = ? WHERE inc_id = ?")
+      .bind(newCount, timestamp, timestamp, existing.inc_id).run()
+    return c.json({ status: 'duplicate_incremented', inc_id: existing.inc_id, received_count: newCount })
+  }
 
   // Keyword detection from DB
   const { results: keywordList } = await db.prepare("SELECT keyword, response FROM alert_keywords").all()
@@ -287,8 +320,8 @@ app.post('/sms/receive', async (c) => {
   }
 
   await db.prepare(
-    "INSERT INTO received_messages (inc_id, sender, message, timestamp, keyword_detected, response_message, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(inc_id, sender, message, timestamp, detected ? 1 : 0, response_msg, 'SYSTEM', timestamp, 'SYSTEM', timestamp).run()
+    "INSERT INTO received_messages (inc_id, sender, message, timestamp, keyword_detected, response_message, received_count, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(inc_id, sender, message, timestamp, detected ? 1 : 0, response_msg, 1, 'SYSTEM', timestamp, 'SYSTEM', timestamp).run()
 
   return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id })
 })
@@ -372,7 +405,19 @@ app.get('/sms/:id', async (c) => {
 
 app.get('/activity-logs', async (c) => {
   const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 50").all()
+  const inc_id = c.req.query('inc_id')
+  
+  let query = "SELECT * FROM activity_logs"
+  let params = []
+  
+  if (inc_id) {
+    query += " WHERE inc_id = ?"
+    params.push(inc_id)
+  }
+  
+  query += " ORDER BY created_at DESC LIMIT 50"
+  
+  const { results } = await db.prepare(query).bind(...params).all()
   return c.json({ logs: results })
 })
 
@@ -380,6 +425,7 @@ app.post('/incidents', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
+  const inc_id = String(data.inc_id).replace('INC-', '')
   
   const res = await db.prepare(`
     INSERT INTO incidents (
@@ -387,13 +433,13 @@ app.post('/incidents', async (c) => {
       assigned_to, source_sms_id, ai_insight, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
-    data.inc_id, data.title, data.description || null, data.severity || 'NORMAL', 
+    inc_id, data.title, data.description || null, data.severity || 'NORMAL', 
     data.status || 'Open', data.incident_type || 'AI', data.assigned_to || null,
     data.source_sms_id || null, data.ai_insight || null,
     'SYSTEM', now, 'SYSTEM', now, now, now
   ).run()
   
-  return c.json({ status: "success", id: data.inc_id })
+  return c.json({ status: "success", id: inc_id })
 })
 
 app.post('/incident-history', async (c) => {
@@ -419,14 +465,15 @@ app.post('/activity-logs', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
+  const inc_id = data.incident_code ? String(data.incident_code).replace('INC-', '') : null
   
   await db.prepare(`
     INSERT INTO activity_logs (
-      user_name, incident_code, incident_title, action, detail, 
+      user_name, user_id, incident_code, incident_title, action, detail, 
       report_type, reg_id, reg_dt, mod_id, mod_dt, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
-    data.user_name || 'System', data.incident_code || null, data.incident_title || null,
+    data.user_name || 'System', data.user_id || null, inc_id, data.incident_title || null,
     data.action, data.detail || null, data.report_type || '시스템',
     'SYSTEM', now, 'SYSTEM', now, now
   ).run()
@@ -984,35 +1031,56 @@ app.get('/warroom/search', async (c) => {
 app.post('/ai/warroom/open', async (c) => {
   const { inc_id, title, creator_id, severity, leader_summary } = await c.req.json()
   const db = c.env.DB
+  const now = getKst()
   
   // Prevent duplicate creation
   const existing = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ?").bind(inc_id).first()
-  if (existing) {
-    // Update leader_summary if a new value was provided
-    if (leader_summary) {
-      await db.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
-        .bind(leader_summary, getKst(), inc_id).run()
-    }
-    return c.json({ status: 'exists', inc_id })
+  if (!existing) {
+    await db.prepare(`
+      INSERT INTO warroom_list (inc_id, title, creator_id, severity, leader_summary, reg_dt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(inc_id, title, creator_id, severity, leader_summary || '', now)
+    .run()
+  } else if (leader_summary) {
+    await db.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
+      .bind(leader_summary, now, inc_id).run()
   }
 
-  const now = getKst()
-  
-  await db.prepare(`
-    INSERT INTO warroom_list (inc_id, title, creator_id, severity, leader_summary, reg_dt)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(inc_id, title, creator_id, severity, leader_summary || '', now)
-  .run()
+  // Auto-assign to the creator and anyone already assigned to this incident
+  if (creator_id) {
+    await db.prepare("INSERT INTO user_warrooms (user_id, inc_id) VALUES (?, ?) ON CONFLICT DO NOTHING")
+      .bind(creator_id, String(inc_id)).run()
+    
+    // Update assignment status to '처리중' for all assignees of this incident
+    await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ? WHERE inc_id = ?")
+      .bind(now, String(inc_id)).run()
+  }
   
   return c.json({ status: 'opened', inc_id })
 })
 
 app.post('/ai/report/save', async (c) => {
-  const { title, content } = await c.req.json()
+  const { inc_id, title, content, user_id } = await c.req.json()
   const db = c.env.DB
-  await db.prepare("INSERT INTO activity_logs (action, detail, report_type, created_at) VALUES (?, ?, 'AI 리포트', ?)")
-    .bind(title, content, getKst())
+  const now = getKst()
+  
+  const normId = String(inc_id).replace('INC-', '');
+  // 1. Log activity
+  await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, report_type, created_at) VALUES (?, ?, '보고서 생성', ?, 'AI 리포트', ?)")
+    .bind(normId, user_id || null, content, now)
     .run()
+
+  // 2. Insert into reports table [NEW]
+  await db.prepare("INSERT INTO reports (inc_id, user_id, title, content, created_at) VALUES (?, ?, ?, ?, ?)")
+    .bind(normId, user_id || null, title || '보고서', content, now)
+    .run()
+
+  // Auto-update assignment status to '처리완료'
+  if (inc_id && user_id) {
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ? WHERE user_id = ? AND inc_id = ?")
+      .bind(now, user_id, String(inc_id)).run()
+  }
+
   return c.json({ status: 'saved' })
 })
 
@@ -1117,26 +1185,283 @@ app.post('/ai/knowledge/save', async (c) => {
   const db = c.env.DB
   const now = getKst()
   const user_id = body.user_id || 'SYSTEM'
+  
+  // Generate embedding if content is provided
+  const embedding = body.content ? await generateEmbedding(body.content, c.env) : null;
+  const embeddingValue = embedding ? new Float32Array(embedding) : null;
+  
+  if (body.content && !embedding) {
+    return c.json({ error: "Embedding generation failed" }, 500);
+  }
 
   if (body.id) {
     // Update
     await db.prepare(`
       UPDATE knowledge_base 
-      SET inc_id = ?, title = ?, content = ?, category = ?, file_url = ?, file_type = ?, tags = ?, mod_id = ?, mod_dt = ?
+      SET inc_id = ?, title = ?, content = ?, category = ?, file_url = ?, file_type = ?, tags = ?, mod_id = ?, mod_dt = ?, vector = ?
       WHERE id = ?
     `).bind(
-      body.inc_id, body.title, body.content, body.category, body.file_url, body.file_type, body.tags, user_id, now, body.id
+      body.inc_id || null, body.title, body.content || null, body.category || null, 
+      body.file_url || null, body.file_type || null, body.tags || null, 
+      user_id, now, embeddingValue, body.id
     ).run()
+
+    // Log the knowledge activity
+    if (body.inc_id) {
+        await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
+        .bind(String(body.inc_id), user_id, now).run()
+    }
+
     return c.json({ status: 'updated', id: body.id })
   } else {
     // Create
     const result = await db.prepare(`
-      INSERT INTO knowledge_base (inc_id, title, content, category, file_url, file_type, tags, reg_id, reg_dt, mod_id, mod_dt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO knowledge_base (inc_id, title, content, category, file_url, file_type, tags, reg_id, reg_dt, mod_id, mod_dt, vector)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      body.inc_id, body.title, body.content, body.category, body.file_url, body.file_type, body.tags, user_id, now, user_id, now
+      body.inc_id || null, body.title, body.content || null, body.category || null, 
+      body.file_url || null, body.file_type || null, body.tags || null, 
+      user_id, now, user_id, now, embeddingValue
     ).run()
+
+    // Log the knowledge activity
+    if (body.inc_id) {
+        await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
+        .bind(String(body.inc_id), user_id, now).run()
+    }
+
     return c.json({ status: 'created', id: result.meta.last_row_id })
+  }
+})
+
+app.post('/ai/warroom/close', async (c) => {
+  const { inc_id, user_id } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  
+  const normId = String(inc_id).replace('INC-', '');
+  await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
+    .bind(now, normId).run()
+    
+  await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, '워룸 종료', '워룸이 종료되고 인시던트 처리가 완료되었습니다.', ?)")
+    .bind(normId, user_id, now).run()
+    
+  return c.json({ status: 'closed' })
+})
+
+// ==========================================
+// 6. Incident Assignments
+// ==========================================
+
+app.post('/ai/incident/assign', async (c) => {
+  const { user_id, inc_id } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+
+  const normId = String(inc_id).replace('INC-', '');
+  try {
+    await db.prepare(`
+      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
+      VALUES (?, ?, '미확인', ?, ?)
+      ON CONFLICT(user_id, inc_id) DO NOTHING
+    `).bind(user_id, String(inc_id), now, now).run()
+
+    // Log the assignment activity
+    await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(String(inc_id), user_id, '장애 할당', '인시던트가 담당자에게 할당되었습니다.', now).run()
+    
+    return c.json({ status: 'assigned', user_id, inc_id })
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+app.post('/ai/incident/status', async (c) => {
+  const { user_id, inc_id, status } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+
+  await db.prepare(`
+    UPDATE incident_assignments 
+    SET status = ?, updated_at = ?
+    WHERE user_id = ? AND inc_id = ?
+  `).bind(status, now, user_id, String(inc_id)).run()
+  
+  return c.json({ status: 'updated', user_id, inc_id, new_status: status })
+})
+
+// Get specific incident details for workflow
+app.get('/ai/incident/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id')
+  const db = c.env.DB
+  const incident = await db.prepare("SELECT * FROM incidents WHERE inc_id = ?").bind(inc_id).first()
+  if (!incident) return c.json({ error: "Not found" }, 404)
+  return c.json({ incident })
+})
+
+app.get('/ai/incident/my-assignments', async (c) => {
+  const user_id = c.req.query('user_id')
+  const fromDate = c.req.query('from') // YYYY-MM-DD
+  const toDate = c.req.query('to')     // YYYY-MM-DD
+
+  if (!user_id) return c.json({ assignments: [] })
+  
+  const db = c.env.DB
+  let query = `
+    SELECT 
+      a.id, a.user_id, a.inc_id, a.assigned_at, a.updated_at,
+      CASE 
+        WHEN a.status = '처리완료' THEN '처리완료'
+        WHEN w.inc_id IS NOT NULL THEN '처리중'
+        ELSE a.status
+      END as status,
+      m.sender, m.message, m.timestamp as message_at, m.received_count,
+      (SELECT GROUP_CONCAT(u2.name, ', ') 
+       FROM incident_assignments a2 
+       JOIN users u2 ON a2.user_id = u2.id 
+       WHERE a2.inc_id = a.inc_id) as assignees
+    FROM incident_assignments a
+    LEFT JOIN received_messages m ON a.inc_id = m.inc_id
+    LEFT JOIN warroom_list w ON a.inc_id = w.inc_id
+    WHERE a.user_id = ?
+  `
+  const params = [user_id]
+
+  if (fromDate) {
+    query += " AND a.assigned_at >= ?"
+    params.push(fromDate + " 00:00:00")
+  }
+  if (toDate) {
+    query += " AND a.assigned_at <= ?"
+    params.push(toDate + " 23:59:59")
+  }
+
+  query += " ORDER BY a.assigned_at DESC"
+  
+  const { results } = await db.prepare(query).bind(...params).all()
+  
+  return c.json({ total: results.length, assignments: results })
+})
+
+// User Specific War-Room mapping
+app.post('/ai/warroom/leave', async (c) => {
+  const { user_id, inc_id } = await c.req.json()
+  await c.env.DB.prepare("DELETE FROM user_warrooms WHERE user_id = ? AND inc_id = ?")
+    .bind(user_id, String(inc_id)).run()
+  return c.json({ status: 'left', user_id, inc_id })
+})
+
+app.post('/ai/warroom/invite', async (c) => {
+  const { user_id, inc_id } = await c.req.json()
+  await c.env.DB.prepare("INSERT INTO user_warrooms (user_id, inc_id) VALUES (?, ?) ON CONFLICT DO NOTHING")
+    .bind(user_id, String(inc_id)).run()
+  return c.json({ status: 'invited', user_id, inc_id })
+})
+
+app.get('/ai/user/activity-history', async (c) => {
+  const user_id = c.req.query('user_id')
+  if (!user_id) return c.json({ history: [] })
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT *, date(created_at) as log_date 
+    FROM activity_logs 
+    WHERE user_id = ? 
+    ORDER BY created_at DESC 
+    LIMIT 100
+  `).bind(user_id).all()
+
+  return c.json({ history: results })
+})
+
+app.get('/ai/incident/workflow-details', async (c) => {
+  const inc_id_param = c.req.query('inc_id')
+  if (!inc_id_param) return c.json({ error: 'inc_id required' }, 400)
+  const db = c.env.DB
+
+  const inc_id_str = String(inc_id_param);
+  const id = inc_id_str.startsWith('INC-') ? inc_id_str.slice(4) : inc_id_str;
+
+  // Aggregate steps from various tables
+  const steps = [];
+
+  try {
+    // 1. SMS 수신 (received_messages)
+    const sms = await db.prepare("SELECT timestamp FROM received_messages WHERE CAST(inc_id AS TEXT) = ?").bind(id).first();
+    if (sms) steps.push({ id: 'SMS', label: 'SMS 수신 및 장애 인지', timestamp: sms.timestamp, detail: '시스템에 장애 메시지가 수신되었습니다.' });
+
+    // 2. RAG 분석 완료 (autopilot_insight)
+    const rag = await db.prepare("SELECT reg_dt FROM autopilot_insight WHERE inc_id = ?").bind(id).first();
+    if (rag) steps.push({ id: 'RAG', label: 'RAG 분석 완료', timestamp: rag.reg_dt, detail: 'AI 엔진이 과거 사례 및 지식베이스를 바탕으로 초기 분석을 마쳤습니다.' });
+
+    // 3. AI AGENT 분석 완료 (same as RAG)
+    if (rag) steps.push({ id: 'AGENT', label: 'AI AGENT 분석 완료', timestamp: rag.reg_dt, detail: '에이전트 그룹의 심층 분석이 완료되었습니다.' });
+
+    // 4. 워룸 생성 (warroom_list)
+    const wr = await db.prepare("SELECT reg_dt, creator_id, status FROM warroom_list WHERE inc_id = ?").bind(id).first();
+    if (wr) steps.push({ id: 'WARROOM', label: '워룸 생성', timestamp: wr.reg_dt, detail: `${wr.creator_id || '시스템'}님에 의해 실시간 대응 워룸이 가동되었습니다.` });
+
+    // 5. 보고서 생성완료 (reports)
+    const repo = await db.prepare("SELECT created_at FROM reports WHERE inc_id = ?").bind(id).first();
+    if (repo) steps.push({ id: 'REPORT', label: '보고서 생성완료', timestamp: repo.created_at, detail: '워룸 내 대응 전략을 바탕으로 최종 AI 리포트가 생성되었습니다.' });
+
+    // 6. 지식화 및 보고완료 (knowledge_base)
+    const kn = await db.prepare("SELECT reg_dt FROM knowledge_base WHERE inc_id = ?").bind(id).first();
+    if (kn) steps.push({ id: 'KNOWLEDGE', label: '지식화 및 보고완료', timestamp: kn.reg_dt, detail: '확보된 대응 지식이 지식베이스(RAG)에 저장되고 최종 보고가 수립되었습니다.' });
+
+    // 7. 워룸종료 및 장애처리완료 (warroom_list CLOSED)
+    const wrClose = await db.prepare("SELECT mod_dt FROM warroom_list WHERE inc_id = ? AND status = 'CLOSED'").bind(id).first();
+    if (wrClose) steps.push({ id: 'CLOSE', label: '워룸종료 및 장애처리완료', timestamp: wrClose.mod_dt, detail: '인시던트 대응 활동이 종료되었습니다.' });
+
+    // Use activity_logs as a fallback
+    const logs = await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_id = ? ORDER BY created_at ASC").bind(id).all();
+
+    return c.json({ inc_id: inc_id_str, steps: steps.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)), all_logs: logs.results || [] });
+  } catch (e) {
+    console.error('Workflow API Error:', e);
+    return c.json({ error: e.message, stack: e.stack }, 500);
+  }
+})
+
+// RAG Search using Vector Similarity
+app.get('/ai/knowledge/search', async (c) => {
+  const query = c.req.query('q')
+  if (!query) return c.json({ results: [] })
+  
+  const db = c.env.DB
+  const queryVector = await generateEmbedding(query, c.env)
+  if (!queryVector) return c.json({ error: "Failed to generate query embedding" }, 500)
+  
+  // Since D1 native vector distance might not be available, we use a custom SQL logic or simple storage retrieval
+  // If native vector is enabled: "SELECT *, VECTOR_DISTANCE(vector, ?, 'cosine') as score FROM knowledge_base ORDER BY score ASC LIMIT 5"
+  // For now, we'll implement a robust retrieval that works with JSON storage or native if possible.
+  
+  try {
+    // Using native vector distance (Cosine similarity)
+    const { results } = await db.prepare(`
+      SELECT id, inc_id, title, content, category, tags,
+             VECTOR_DISTANCE(vector, ?, 'cosine') as distance
+      FROM knowledge_base 
+      WHERE vector IS NOT NULL 
+      ORDER BY distance ASC
+      LIMIT 10
+    `).bind(new Float32Array(queryVector)).all()
+    
+    const scoredResults = results.map(r => ({
+      ...r,
+      score: 1 - r.distance // Distance to Similarity
+    }))
+    
+    return c.json({ results: scoredResults })
+  } catch (e) {
+    // Fallback if VECTOR_DISTANCE is not yet available in the environment
+    console.warn('Native vector search failed, falling back:', e.message);
+    const { results } = await db.prepare(`
+      SELECT id, inc_id, title, content, category, tags
+      FROM knowledge_base 
+      WHERE vector IS NOT NULL 
+      LIMIT 10
+    `).all()
+    return c.json({ results: results.map(r => ({ ...r, score: 0.99 })) })
   }
 })
 
@@ -1362,6 +1687,21 @@ app.get('/warroom/attachments/:id', async (c) => {
     "SELECT seq, original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC"
   ).bind(id).all()
   return c.json({ attachments: results || [] })
+})
+
+app.get('/ai/warroom/my-rooms', async (c) => {
+  const user_id = c.req.query('user_id')
+  if (!user_id) return c.json({ rooms: [] })
+  
+  const { results } = await c.env.DB.prepare(`
+    SELECT w.* 
+    FROM warroom_list w
+    JOIN user_warrooms uw ON w.inc_id = uw.inc_id
+    WHERE uw.user_id = ?
+    ORDER BY w.reg_dt DESC
+  `).bind(user_id).all()
+  
+  return c.json({ rooms: results || [] })
 })
 
 export default app

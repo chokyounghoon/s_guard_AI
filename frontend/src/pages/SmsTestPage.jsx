@@ -141,24 +141,18 @@ const SmsTestPage = () => {
     };
     const getApiUrl = (path) => {
         const hostname = window.location.hostname;
-        
-        // '/sms/receive' and '/sms/convert-multimodal' must hit the Python Backend for AI processing
-        if (path.startsWith('/sms/')) {
-            return `http://${hostname}:8000${path}`;
-        }
-
         const protocol = window.location.protocol;
         const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-        
-        if (isLocal) {
-            return `https://sguardai.khcho0421.workers.dev${path}`;
+        const isHttps = protocol === 'https:';
+        const workerUrl = 'https://sguardai.khcho0421.workers.dev';
+
+        // For local development on HTTP, use the local Python backend for SMS/AI features
+        if (isLocal && !isHttps && path.startsWith('/sms/')) {
+            return `http://localhost:8000${path}`;
         }
-        
-        if (protocol === 'https:') {
-            return `https://sguardai.khcho0421.workers.dev${path}`;
-        }
-        
-        return `http://${hostname}:8000${path}`;
+
+        // For all other cases (including hosted Cloudflare Pages), use the Worker proxy
+        return `${workerUrl}${path}`;
     };
 
     const handleFileUpload = async (e) => {

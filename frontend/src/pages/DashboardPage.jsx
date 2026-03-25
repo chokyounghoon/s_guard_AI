@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
-import AiSmsStatusPanel from '../components/AiSmsStatusPanel';
 
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
@@ -105,12 +104,60 @@ export default function DashboardPage() {
   const [smsMessages, setSmsMessages] = useState([]);
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
+  const [selectedIncidentIdFlow, setSelectedIncidentIdFlow] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
+
+  // MTTR Timer Effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const FLOW_STEPS = [
+    { id: 'SMS', label: 'SMS 수신 및 장애 인지' },
+    { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료' },
+    { id: 'WARROOM', label: '워룸생성 및 할당완료' },
+    { id: 'REPORT', label: '보고서 생성완료' },
+    { id: 'KNOWLEDGE', label: '지식화 및 보고완료' },
+    { id: 'CLOSE', label: '워룸종료 및 장애처리완료' }
+  ];
+
+  // Helper for Date/Duration Formatting
+  const formatDuration = (ms) => {
+    if (ms < 0) return '00:00:00';
+    const totalSecs = Math.floor(ms / 1000);
+    const hrs = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const formatYYMMDD = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const yy = String(d.getFullYear()).slice(-2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
+  };
 
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
+  const [myAssignments, setMyAssignments] = useState([]);
+  const [userActivityHistory, setUserActivityHistory] = useState([]);
+  const [assignmentDateRange, setAssignmentDateRange] = useState({
+    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    to: new Date().toISOString().split('T')[0]
+  });
 
   const handleOpenWarRoomFromInsight = async (smsMessage, analysisText) => {
     const currentSms = smsMessage || selectedSmsRef.current;
@@ -153,7 +200,7 @@ export default function DashboardPage() {
       id: incidentId,
       title: smsTitle,
       lastMsg: analysisText ? 'AI분석 완료' : '',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: formatYYMMDD(new Date()),
       participants: 1,
       severity: 'CRITICAL',
       unread: true
@@ -171,7 +218,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           inc_id: incidentId,
           title: smsTitle,
-          creator_id: userProfile?.name || 'SYSTEM',
+          creator_id: userProfile?.id || null,
           severity: 'CRITICAL',
           leader_summary: leaderSummary
         })
@@ -185,12 +232,12 @@ export default function DashboardPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: incidentId,
+          inc_id: String(incidentId).replace('INC-', ''),
           title: smsTitle,
           description: diagnosisText || currentSms.message,
           severity: 'CRITICAL',
           incident_type: 'SMS',
-          source_sms_id: currentSms.inc_id
+          source_sms_id: String(currentSms.inc_id).replace('INC-', '')
         })
       });
 
@@ -290,6 +337,26 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Fetch detailed workflow when an incident is selected
+  useEffect(() => {
+    if (!selectedIncidentIdFlow) {
+      setIncidentWorkflowSteps([]);
+      return;
+    }
+
+    const fetchWorkflow = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`);
+        const data = await res.json();
+        setIncidentWorkflowSteps(data.steps || []);
+      } catch (e) {
+        console.error('Workflow fetch failed:', e);
+      }
+    };
+
+    fetchWorkflow();
+  }, [selectedIncidentIdFlow]);
+
   // 상단 S-Autopilot Insight 패널은 항상 최신 SMS만 분석하도록 고정
   // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
   useEffect(() => {
@@ -310,15 +377,21 @@ export default function DashboardPage() {
     fetchSMSMessages();
     fetchWarRooms();
     fetchActivityLogs();
+    fetchMyAssignments();
+    fetchUserActivityHistory();
     const smsInterval = setInterval(fetchSMSMessages, 5000);
     const wrInterval = setInterval(fetchWarRooms, 8000);
     const activityInterval = setInterval(fetchActivityLogs, 10000);
+    const assignmentInterval = setInterval(fetchMyAssignments, 10000);
+    const historyInterval = setInterval(fetchUserActivityHistory, 15000);
     return () => {
       clearInterval(smsInterval);
       clearInterval(wrInterval);
       clearInterval(activityInterval);
+      clearInterval(assignmentInterval);
+      clearInterval(historyInterval);
     };
-  }, []);
+  }, [userProfile, assignmentDateRange]);
 
   // SMS 선택 시 에이전트 토론 자동 시작은 이제 인시던트 스트림 클릭 시 직접 제어됨
   // useEffect(() => {
@@ -331,22 +404,17 @@ export default function DashboardPage() {
   // }, [selectedSms]);
 
   const fetchWarRooms = async () => {
+    if (!userProfile?.id) return;
     try {
       const apiBase = 'https://sguardai.khcho0421.workers.dev';
-      // Fetch ALL rooms (any status) so we can hide the button for any existing room
-      const res = await fetch(`${apiBase}/warroom/rooms`);
+      const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.id}`);
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.rooms || []).map(room => ({
-          id: room.code,
-          inc_id: room.inc_id,
-          source_sms_id: room.source_sms_id,
-          title: room.title || `ROOM ${room.inc_id}`,
-          status: room.status || 'OPEN',
+          ...room,
+          id: room.inc_id,
           lastMsg: room.status === 'Completed' ? '종료된 체널' : '대화가 시작되지 않았습니다.',
-          time: room.reg_dt 
-            ? new Date(room.reg_dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-            : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          time: room.reg_dt ? formatYYMMDD(room.reg_dt) : formatYYMMDD(new Date()),
           participants: room.participants || Math.floor(Math.random() * 5) + 2,
           severity: room.severity || 'NORMAL',
           unread: false
@@ -368,6 +436,73 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error("Failed to fetch activity logs:", err);
+    }
+  };
+
+  const fetchMyAssignments = async () => {
+    if (!userProfile?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`);
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = (data.assignments || []).map(inc => ({
+          ...inc,
+          inc_id: String(inc.inc_id)
+        }));
+        setMyAssignments(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch assignments:", err);
+    }
+  };
+
+  const fetchUserActivityHistory = async () => {
+    if (!userProfile?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/ai/user/activity-history?user_id=${userProfile.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserActivityHistory(data.history || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch activity history:", err);
+    }
+  };
+
+  const leaveWarRoom = async (e, inc_id) => {
+    e.stopPropagation();
+    if (!userProfile?.id || !window.confirm('이 워룸에서 나가시겠습니까?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/ai/warroom/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userProfile.id, inc_id: inc_id })
+      });
+      if (res.ok) {
+        fetchWarRooms();
+      }
+    } catch (err) {
+      console.error("Failed to leave war-room:", err);
+    }
+  };
+
+  const updateAssignmentStatus = async (inc_id, newStatus) => {
+    if (!userProfile?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/ai/incident/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userProfile.id,
+          inc_id: inc_id,
+          status: newStatus
+        })
+      });
+      if (res.ok) {
+        fetchMyAssignments();
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
     }
   };
 
@@ -416,44 +551,7 @@ export default function DashboardPage() {
   };
 
 
-  // Dummy data for recent assignments
-  const recentAssignments = [
-    {
-      id: 'INC-8823',
-      title: 'Payment Gateway Timeout',
-      sender: 'AI Autopilot',
-      time: '18:45',
-      severity: 'CRITICAL',
-      code: 'PG-001',
-      assignmentType: 'AI',
-      bgColor: 'bg-red-500/5',
-      borderColor: 'border-red-500/10',
-    },
-    {
-      id: 'SMS-1234',
-      title: '서버 CPU 사용량 급증 알림',
-      sender: '김철수',
-      time: '14:30',
-      severity: 'MAJOR',
-      code: 'SRV-002',
-      assignmentType: 'SMS',
-      bgColor: 'bg-orange-500/5',
-      borderColor: 'border-orange-500/10',
-    },
-    {
-      id: 'AI-5678',
-      title: '데이터베이스 연결 오류 감지',
-      sender: 'AI Autopilot',
-      time: '10:00',
-      severity: 'NORMAL',
-      code: 'DB-003',
-      assignmentType: 'AI',
-      bgColor: 'bg-blue-500/5',
-      borderColor: 'border-blue-500/10',
-    },
-  ];
-
-  const totalAssignedCount = recentAssignments.length;
+  const totalAssignedCount = myAssignments.length;
 
   // Dummy data for status cards
   const statusCards = [
@@ -629,6 +727,21 @@ export default function DashboardPage() {
     setSelectedSms(smsMessage);
     selectedSmsRef.current = smsMessage;
 
+    // Trigger Assignment to the current user
+    if (userProfile?.id) {
+      fetch(`${API_BASE}/ai/incident/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userProfile.id,
+          login_id: userProfile.email,
+          inc_id: String(smsMessage.inc_id).replace('INC-', '')
+        })
+      })
+      .then(() => fetchMyAssignments())
+      .catch(err => console.error("Assignment failed:", err));
+    }
+
 
     try {
       const baseUrl = 'https://sguardai.khcho0421.workers.dev';
@@ -738,7 +851,9 @@ export default function DashboardPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: reportTitle,
-            content: reportContent
+            content: reportContent,
+            inc_id: String(selectedSms?.inc_id || selectedIncidentIdFlow).replace('INC-', ''),
+            user_id: userProfile?.email || 'khcho0421@gmail.com'
           })
         });
 
@@ -803,7 +918,7 @@ export default function DashboardPage() {
       content: log.message || log.text,
       type: 'AI',
       severity: log.severity,
-      time: new Date().toLocaleTimeString()
+      time: formatYYMMDD(new Date())
     }, ...prev]);
     // Optionally show a temporary message in the top banner for critical logs
     if (log.severity === 'CRITICAL') {
@@ -946,7 +1061,11 @@ export default function DashboardPage() {
                     key={n.id}
                     onClick={() => {
                       setShowNotifications(false);
-                      navigate(n.type === 'SMS' ? '/chat' : '/assignment-detail?status=Open');
+                    if (n.type === 'SMS') {
+                      navigate('/chat');
+                    } else {
+                      // Blocked legacy assignment-detail link
+                    }
                     }}
                     className={`p-4 rounded-2xl border ${n.severity === 'CRITICAL' ? 'bg-red-500/5 border-red-500/10' : 'bg-[#11141d] border-white/5'} hover:border-blue-500/30 transition-all cursor-pointer group active:scale-[0.98] relative`}
                   >
@@ -1047,8 +1166,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSmsPanelCollapsed ? 'max-h-0' : 'max-h-[1000px] border-t border-white/5'}`}>
-                <div className="p-6 space-y-4">
+              <div className={`transition-all duration-500 ease-in-out ${isSmsPanelCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[380px] border-t border-white/5'}`}>
+                <div className="p-6 space-y-4 overflow-y-auto max-h-[380px] scrollbar-thin">
                   {smsMessages.filter(msg => !deletedSmsIds.has(msg.inc_id)).map((msg) => {
                     const isSelected = selectedSms?.inc_id === msg.inc_id;
                     return (
@@ -1092,12 +1211,27 @@ export default function DashboardPage() {
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-slate-500 font-mono bg-white/5 px-2 py-0.5 rounded ml-auto whitespace-nowrap">
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-                              </span>
+                              <div className="flex items-center gap-2 ml-auto">
+                                <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                                  {formatYYMMDD(msg.timestamp)}
+                                </span>
+                              </div>
                             </div>
                             <p className="text-xs text-slate-400 mb-1">발신: {msg.sender}</p>
-                            <p className={`text-sm leading-snug ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
+                             <div className="flex items-center justify-between gap-4">
+                               <p className={`text-sm leading-snug flex-1 ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
+                               {msg.received_count >= 2 && (
+                                 <span className="text-[11px] font-black text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 whitespace-nowrap shadow-[0_0_15px_rgba(37,99,235,0.2)]">
+                                   수신건수 : {msg.received_count} 건
+                                 </span>
+                               )}
+                               <button
+                                 onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
+                                 className="text-[10px] font-black text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all flex items-center gap-1 border border-white/5 shadow-sm"
+                               >
+                                 상세 흐름 보기 <ExternalLink className="w-2.5 h-2.5" />
+                               </button>
+                             </div>
                           </div>
                           <button
                             onClick={(e) => deleteSMSMessage(e, msg.inc_id)}
@@ -1137,12 +1271,12 @@ export default function DashboardPage() {
         {/* Main Content Areas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Alerts List */}
-          <div className="lg:col-span-1 bg-[#1a1f2e] rounded-2xl p-6 border border-white/5 h-[650px] flex flex-col overflow-hidden shadow-xl">
+          <div className="lg:col-span-1 bg-[#1a1f2e] rounded-2xl p-6 border border-white/5 max-h-[330px] h-full flex flex-col overflow-hidden shadow-xl">
             <h3 className="font-bold mb-4 flex items-center shrink-0">
               <Activity className="w-4 h-4 mr-2 text-blue-400" />
               Live Incident Stream
             </h3>
-            <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide space-y-4">
+            <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700/50 space-y-4">
               {smsMessages.slice(0, 10).map((msg) => {
                 let severity = 'info';
                 let title = 'System Report';
@@ -1183,7 +1317,7 @@ export default function DashboardPage() {
 
                     <AlertItem
                       title={title}
-                      time={new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      time={formatYYMMDD(msg.timestamp)}
                       severity={severity}
                       desc={msg.message}
                       isSelected={selectedSms?.inc_id === msg.inc_id}
@@ -1208,6 +1342,7 @@ export default function DashboardPage() {
                   messages={agentMessages}
                   isVisible={true}
                   embedded={true}
+                  incidentMessage={selectedSms?.message}
                   onClose={() => {
                     setShowAgentPanel(false);
                     setSelectedSms(null);
@@ -1220,25 +1355,22 @@ export default function DashboardPage() {
                       <Shield className="w-4 h-4 mr-2 text-purple-400" />
                       AI War-Room Situation Log
                     </h3>
-                    <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-0.5 rounded">관제 대기 중</span>
+                    <div className="flex items-center gap-3">
+                      {selectedSms && (
+                        <div className="flex flex-col items-end mr-4">
+                          <span className="text-[9px] uppercase tracking-widest opacity-60 font-black text-blue-400 leading-none mb-1">INCIDENT DETECTED</span>
+                          <span className="text-xs font-black font-mono text-white bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30 shadow-[0_0_10px_rgba(37,99,235,0.2)]">
+                            {formatYYMMDD(selectedSms.timestamp)}
+                          </span>
+                        </div>
+                      )}
+                      <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-0.5 rounded uppercase font-bold tracking-tighter">분석 대기 중</span>
+                    </div>
                   </div>
 
                   <div className="flex-1 flex flex-col items-center justify-center opacity-40 py-10">
                     <Brain className="w-12 h-12 text-slate-600 mb-4 animate-pulse" />
                     <p className="text-sm text-slate-500 text-center">SMS 수신 내역을 클릭하여<br/>AI 에이전트 분석을 시작하세요.</p>
-                  </div>
-
-                  {/* 하단에 최근 활동 로그 작게 표시 (선택 사항) */}
-                  <div className="mt-auto border-t border-white/5 pt-4">
-                    <p className="text-[10px] text-slate-500 mb-2 font-bold uppercase tracking-wider">최근 시스템 활동</p>
-                    <div className="space-y-2">
-                      {activityLogs.slice(0, 2).map(log => (
-                        <div key={log.inc_id} className="text-[10px] flex justify-between text-slate-400">
-                          <span className="truncate mr-2">{log.action}</span>
-                          <span className="shrink-0">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </div>
               )}
@@ -1249,70 +1381,114 @@ export default function DashboardPage() {
 
         {/* Section 3: My Confirmation History & Recent List */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
-          <div className="flex justify-between items-center mb-5">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div className="flex items-center space-x-2">
               <User className="w-5 h-5 text-blue-500" />
               <h2 className="font-bold text-lg">나의 할당 및 처리 현황</h2>
             </div>
-            <span className="text-[10px] text-slate-400">실시간 업데이트</span>
+            <div className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-2xl border border-white/5">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <input 
+                  type="date" 
+                  value={assignmentDateRange.from}
+                  onChange={(e) => setAssignmentDateRange(prev => ({ ...prev, from: e.target.value }))}
+                  className="bg-transparent border-none text-[10px] text-slate-300 outline-none"
+                />
+                <span className="text-slate-600">~</span>
+                <input 
+                  type="date" 
+                  value={assignmentDateRange.to}
+                  onChange={(e) => setAssignmentDateRange(prev => ({ ...prev, to: e.target.value }))}
+                  className="bg-transparent border-none text-[10px] text-slate-300 outline-none"
+                />
+              </div>
+            </div>
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-4 gap-6 mb-8">
             {/* Total */}
-            <div
-              onClick={() => navigate('/assignments?tab=전체')}
-              className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#252b41] transition-all hover:scale-[1.02] active:scale-95"
-            >
-              <p className="text-xs text-slate-400 mb-2 font-medium">총건</p>
-              <span className="text-4xl font-bold text-white transition-all duration-500">{totalAssignedCount}</span>
-              <div className="absolute bottom-4 right-4 bg-slate-700/20 p-2 rounded-xl">
-                <MoreHorizontal className="w-5 h-5 text-slate-500 fill-current" />
+            <div className="bg-[#11141d] p-6 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-white/20 transition-all" onClick={() => navigate('/assignments?tab=전체')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-slate-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <p className="text-[10px] text-slate-500 mb-1 font-black uppercase tracking-widest">Total Incidents</p>
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className={`text-4xl font-black text-white ${totalAssignedCount > 0 ? 'underline underline-offset-8' : ''}`}>{totalAssignedCount}</span>
+                <span className="text-xs text-slate-600 font-bold">건</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-slate-400 w-full transition-all duration-1000" />
               </div>
             </div>
 
-            {/* Unconfirmed (Red) */}
-            <div
-              onClick={() => navigate('/assignments?tab=상태: 대기')}
-              className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#2e1a1a] transition-all hover:scale-[1.02] active:scale-95"
-            >
-              <p className="text-xs text-slate-400 mb-2 font-medium">미확인</p>
-              <span className="text-4xl font-bold text-red-400">0</span>
-              <div className="absolute bottom-4 right-4 bg-red-600/20 p-2 rounded-xl">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
+            {/* Unconfirmed (Red Gauge) - Pulse only if count > 0 */}
+            <div className={`bg-[#11141d] p-6 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-red-500/30 transition-all ${myAssignments.filter(a => a.status === '미확인').length > 0 ? 'border-red-500/20' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=상태: 미확인')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex justify-between items-start mb-1">
+                <p className="text-[10px] text-red-500/60 font-black uppercase tracking-widest">Unconfirmed</p>
+                {myAssignments.filter(a => a.status === '미확인').length > 0 && (
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></span>
+                  </span>
+                )}
               </div>
-              {/* Pulsing Dot for Attention */}
-              <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping" />
-            </div>
-
-            {/* Processing (Orange) */}
-            <div
-              onClick={() => navigate('/assignments?tab=상태: 처리중')}
-              className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#2e231a] transition-colors"
-            >
-              <p className="text-xs text-slate-400 mb-2 font-medium">처리중</p>
-              <span className="text-4xl font-bold text-orange-400">2</span>
-              <div className="absolute bottom-4 right-4 bg-orange-600/20 p-2 rounded-xl">
-                <RefreshCw className="w-5 h-5 text-orange-500" />
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className={`text-4xl font-black text-red-500 ${myAssignments.filter(a => a.status === '미확인').length > 0 ? 'underline underline-offset-8' : ''}`}>{myAssignments.filter(a => a.status === '미확인').length}</span>
+                <span className="text-xs text-red-900 font-bold">건</span>
+              </div>
+              <div className="h-1.5 w-full bg-red-950/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-red-600 transition-all duration-1000" 
+                  style={{ width: `${(myAssignments.filter(a => a.status === '미확인').length / (totalAssignedCount || 1)) * 100}%` }} 
+                />
               </div>
             </div>
 
-            {/* Completed (Blue) */}
-            <div
-              onClick={() => navigate('/assignments?tab=상태: 완료')}
-              className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#1a1f2e] transition-colors"
-            >
-              <p className="text-xs text-slate-400 mb-2 font-medium">처리완료</p>
-              <span className="text-4xl font-bold text-blue-400">3</span>
-              <div className="absolute bottom-4 right-4 bg-blue-600/20 p-2 rounded-xl">
-                <CheckCircle className="w-5 h-5 text-blue-500" />
+            {/* Processing (Orange Gauge) - Pulse if count > 0 */}
+            <div className={`bg-[#11141d] p-6 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-orange-500/30 transition-all ${myAssignments.filter(a => a.status === '처리중').length > 0 ? 'border-orange-500/20' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=처리중')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex justify-between items-start mb-1">
+                <p className="text-[10px] text-orange-500/60 font-black uppercase tracking-widest">In Progress</p>
+                {myAssignments.filter(a => a.status === '처리중').length > 0 && (
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]"></span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className={`text-4xl font-black text-orange-500 ${myAssignments.filter(a => a.status === '처리중').length > 0 ? 'underline underline-offset-8' : ''}`}>{myAssignments.filter(a => a.status === '처리중').length}</span>
+                <span className="text-xs text-orange-900 font-bold">건</span>
+              </div>
+              <div className="h-1.5 w-full bg-orange-950/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-orange-600 transition-all duration-1000" 
+                  style={{ width: `${(myAssignments.filter(a => a.status === '처리중').length / (totalAssignedCount || 1)) * 100}%` }} 
+                />
+              </div>
+            </div>
+
+            {/* Completed (Blue Gauge) */}
+            <div className="bg-[#11141d] p-6 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-blue-500/20 transition-all" onClick={() => navigate('/assignments?tab=처리완료')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <p className="text-[10px] text-blue-500/60 mb-1 font-black uppercase tracking-widest">Completed</p>
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className={`text-4xl font-black text-blue-500 ${myAssignments.filter(a => a.status === '처리완료').length > 0 ? 'underline underline-offset-8' : ''}`}>{myAssignments.filter(a => a.status === '처리완료').length}</span>
+                <span className="text-xs text-blue-900 font-bold">건</span>
+              </div>
+              <div className="h-1.5 w-full bg-blue-950/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 transition-all duration-1000" 
+                  style={{ width: `${(myAssignments.filter(a => a.status === '처리완료').length / (totalAssignedCount || 1)) * 100}%` }} 
+                />
               </div>
             </div>
           </div>
 
           {/* Recent List Header */}
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-bold text-white">최근 할당 리스트 ({recentAssignments.length})</h3>
+            <h3 className="text-sm font-bold text-white">최근 할당 리스트 ({myAssignments.length})</h3>
             <button
               onClick={() => navigate('/assignments')}
               className="text-[11px] text-blue-500 font-medium hover:text-blue-400 flex items-center"
@@ -1323,40 +1499,72 @@ export default function DashboardPage() {
 
           {/* List Items - Dynamic */}
           <div className="space-y-3">
-            {recentAssignments.length > 0 ? (
-              recentAssignments.slice(0, 3).map((item) => (
+            {myAssignments.length > 0 ? (
+              myAssignments.slice(0, 5).map((item) => (
                 <div
                   key={item.inc_id}
-                  onClick={() => navigate('/assignment-detail?status=Open')}
-                  className={`${item.bgColor} p-4 rounded-2xl border ${item.borderColor} relative group hover:border-white/10 transition-colors cursor-pointer`}
+                  className={`p-4 rounded-2xl border relative group hover:border-white/10 transition-colors cursor-pointer
+                    ${item.status === '미확인' ? 'bg-red-500/5 border-red-500/10' : 
+                      item.status === '처리중' ? 'bg-orange-500/5 border-orange-500/10' : 
+                      'bg-emerald-500/5 border-emerald-500/10'}`}
+                  onClick={() => {
+                    const msg = smsMessages.find(m => m.inc_id === item.inc_id) || { inc_id: item.inc_id, message: item.message, sender: item.sender };
+                    setSelectedSms(msg);
+                    setSelectedIncidentIdFlow(item.inc_id);
+                    startLiveScenario(msg);
+                  }}
                 >
                   <div className="flex items-start space-x-3">
-                    <div className={`${item.severity === 'CRITICAL' ? 'bg-red-500/10' : 'bg-blue-500/10'} p-2 rounded-full mt-0.5`}>
-                      <AlertCircle className={`w-5 h-5 ${item.severity === 'CRITICAL' ? 'text-red-500' : 'text-blue-500'}`} />
+                    <div className={`${
+                      item.status === '미확인' ? 'bg-red-500/10' : 
+                      item.status === '처리중' ? 'bg-orange-500/10' : 
+                      'bg-emerald-500/10'
+                    } p-2 rounded-full mt-0.5`}>
+                      <AlertCircle className={`w-5 h-5 ${
+                        item.status === '미확인' ? 'text-red-500' : 
+                        item.status === '처리중' ? 'text-orange-500' : 
+                        'text-emerald-500'
+                      }`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
                         <div className="flex items-center gap-2 max-w-[70%]">
-                          <span className={`text-[8px] font-black px-1 py-0.5 rounded border flex-shrink-0 ${item.assignmentType === 'AI'
-                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                            : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                            }`}>
-                            {item.assignmentType || 'AI'}
+                          <span className={`text-[8px] font-black px-1 py-0.5 rounded border flex-shrink-0 bg-blue-500/20 text-blue-400 border-blue-500/30`}>
+                            SMS
                           </span>
-                          <h4 className="text-sm font-bold text-white truncate">{item.title}</h4>
+                          <h4 className="text-sm font-bold text-white truncate">{item.message || '상공 발생'}</h4>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono">{item.time}</span>
+                        <div className="flex items-center gap-2">
+                          <div className={`text-[10px] font-bold px-3 py-1 rounded-full border shadow-sm transition-all duration-300 flex items-center gap-1.5
+                            ${item.status === '미확인' ? 'bg-red-500/20 text-red-400 border-red-500/30 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.2)]' : 
+                              item.status === '처리중' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.1)]' : 
+                              'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
+                            <div className={`w-1 h-1 rounded-full ${
+                              item.status === '미확인' ? 'bg-red-400 animate-ping' : 
+                              item.status === '처리중' ? 'bg-orange-400 animate-ping' : 
+                              'bg-emerald-400'
+                            }`} />
+                            {item.status}
+                          </div>
+                          <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                            {formatYYMMDD(item.assigned_at)}
+                          </span>
+                        </div>
                       </div>
                       <p className="text-xs text-slate-300 leading-snug mb-2">
                         발신: {item.sender}
+                        {item.received_count > 1 && (
+                          <span className="ml-2 text-blue-400/80 font-bold">({item.received_count}건 중복)</span>
+                        )}
                       </p>
-                      <div className="flex items-center justify-between">
-                        <span className={`${item.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-blue-500/20 text-blue-500 border-blue-500/30'} text-[10px] font-bold px-2 py-0.5 rounded border`}>
-                          {item.severity}
-                        </span>
-                        <span className="text-[10px] text-slate-500">{item.code}</span>
-                      </div>
                     </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${item.id}`); }}
+                      className="ml-4 p-2.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all group/flow"
+                      title="처리 흐름 상세 보기"
+                    >
+                      <Activity className="w-4 h-4 group-hover/flow:scale-110 transition-transform" />
+                    </button>
                   </div>
                 </div>
               ))
@@ -1364,14 +1572,247 @@ export default function DashboardPage() {
               <div className="bg-[#11141d] p-8 rounded-2xl border border-white/5 text-center">
                 <Info className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                 <p className="text-sm text-slate-400">최근 할당 내역이 없습니다</p>
-                <p className="text-xs text-slate-500 mt-1">SMS 메시지가 수신되면 자동으로 추가됩니다</p>
+                <p className="text-xs text-slate-500 mt-1">SMS 메시지를 분석하면 자동으로 할당됩니다</p>
               </div>
             )}
           </div>
         </div>
 
+
+        {/* Activity History Flow Area */}
+        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-5 h-5 text-purple-400" />
+              <h2 className="font-bold text-lg">
+                {selectedIncidentIdFlow ? (
+                  <>
+                    인시던트 처리 흐름 [
+                    <span className="text-blue-400">
+                      {(myAssignments.find(a => a.inc_id === selectedIncidentIdFlow)?.message || 
+                        smsMessages.find(m => m.inc_id === selectedIncidentIdFlow)?.message || 
+                        selectedIncidentIdFlow).substring(0, 50)}
+                      {(myAssignments.find(a => a.inc_id === selectedIncidentIdFlow)?.message || 
+                        smsMessages.find(m => m.inc_id === selectedIncidentIdFlow)?.message || 
+                        "").length > 50 ? '...' : ''}
+                    </span>
+                    ]
+                  </>
+                ) : '활동 내역 (업무 흐름)'}
+              </h2>
+            </div>
+            <div className="flex items-center gap-6">
+              {selectedIncidentIdFlow && (
+                <div className="flex items-center gap-6">
+                   {(() => {
+                     const assignment = myAssignments.find(a => a.inc_id === selectedIncidentIdFlow) || smsMessages.find(a => a.inc_id === selectedIncidentIdFlow);
+                     const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
+                     const endStep = incidentWorkflowSteps.find(s => s.id === 'CLOSE');
+                     const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);
+                     const endTime = endStep ? new Date(endStep.timestamp) : null;
+                     
+                     if (startTime) {
+                       const durationMs = (endTime || currentTime) - startTime;
+                       const isClosed = !!endTime;
+
+                       return (
+                         <>
+                           <div className="flex flex-col items-end">
+                             <span className="text-[9px] uppercase tracking-widest opacity-60 font-black text-blue-400">INITIAL DETECTION</span>
+                             <span className="text-sm font-black font-mono text-white bg-slate-800 px-3 py-1 rounded-lg border border-white/5 shadow-xl">
+                               {formatYYMMDD(startTime)}
+                             </span>
+                           </div>
+                           <div className={`flex flex-col items-end ${isClosed ? 'text-emerald-400' : 'text-blue-400'}`}>
+                             <span className="text-[9px] uppercase tracking-widest opacity-60 font-black">TOTAL ELAPSED (MTTR)</span>
+                             <div className="flex items-center gap-2">
+                               <div className={`w-2 h-2 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse outline outline-4 outline-blue-500/20'}`} />
+                               <span className="text-2xl font-black font-mono tracking-tighter tabular-nums">
+                                 {formatDuration(durationMs)}
+                               </span>
+                             </div>
+                           </div>
+                         </>
+                       );
+                     }
+                     return null;
+                   })()}
+                  <button 
+                    onClick={() => setSelectedIncidentIdFlow(null)}
+                    className="text-[10px] bg-slate-800 border border-white/10 px-4 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all hover:bg-slate-700 font-bold uppercase tracking-tight"
+                  >
+                    목록으로 돌아가기
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="relative">
+            {/* Vertical Line */}
+            <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
+
+            <div className="space-y-8">
+              {selectedIncidentIdFlow ? (
+                // Workflow Flow View
+                <div className="flex flex-col space-y-0 py-6 relative">
+                  {(() => {
+                    const firstPendingIdx = FLOW_STEPS.findIndex(step => {
+                      if (step.id === 'RAG_AGENT') {
+                        return !incidentWorkflowSteps.find(s => s.id === 'RAG') && !incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                      }
+                      return !incidentWorkflowSteps.find(s => s.id === step.id);
+                    });
+                    
+                    return FLOW_STEPS.map((step, sIdx) => {
+                      let stepData = incidentWorkflowSteps.find(s => s.id === step.id);
+                      
+                      // Combined RAG/AGENT logic
+                      if (step.id === 'RAG_AGENT') {
+                         const rag = incidentWorkflowSteps.find(s => s.id === 'RAG');
+                         const agent = incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                         if (rag && agent) {
+                           stepData = { 
+                             ...agent, 
+                             id: 'RAG_AGENT',
+                             timestamp: agent.timestamp > rag.timestamp ? agent.timestamp : rag.timestamp, 
+                             detail: 'AI 에이전트 그룹이 수천 건의 과거 데이터와 내부 지식베이스를 결합하여 인시던트 근본 원인을 입체적으로 분석하고 대응 시나리오를 수립했습니다.' 
+                           };
+                         } else if (rag || agent) {
+                           stepData = { ...(rag || agent), id: 'RAG_AGENT' };
+                         }
+                      }
+                      
+                      const isCompleted = !!stepData;
+                      const isNextStep = sIdx === firstPendingIdx;
+                      
+                      // Fix detail for WARROOM if it's 2.0 (replace with user name)
+                      if (step.id === 'WARROOM' && stepData?.detail?.includes('2.0님')) {
+                        stepData.detail = stepData.detail.replace('2.0님', '조경훈님');
+                      }
+                      
+                      // Calculate interval duration to the NEXT step (the line below this step)
+                      let intervalText = null;
+                      if (isCompleted && sIdx < FLOW_STEPS.length - 1) {
+                        const nextStepData = incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx+1].id);
+                        if (nextStepData) {
+                          const diff = new Date(nextStepData.timestamp) - new Date(stepData.timestamp);
+                          const m = Math.floor(diff / 60000);
+                          const s = Math.floor((diff % 60000) / 1000);
+                          intervalText = `⏱ ${m > 0 ? `${m}분 ` : ''}${s}초 소요`;
+                        } else if (sIdx === firstPendingIdx - 1) {
+                          // Next step is in progress, show elapsed since this step
+                          const diff = currentTime - new Date(stepData.timestamp);
+                          const m = Math.floor(diff / 60000);
+                          const s = Math.floor((diff % 60000) / 1000);
+                          intervalText = `⏱ ${m > 0 ? `${m}분 ` : ''}${s}초 소요`;
+                        }
+                      }
+
+                      return (
+                        <div key={step.id} className="relative pl-14 pb-12 group">
+                          {/* Connecting Line */}
+                          {sIdx < FLOW_STEPS.length - 1 && (
+                            <div className={`absolute left-[11px] top-7 bottom-[-24px] w-[2px] transition-colors duration-500
+                              ${isCompleted ? 'bg-blue-600' : 'bg-white/5'}`}>
+                              {intervalText && (
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 whitespace-nowrap">
+                                  <span className="text-[9px] font-bold text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded-full border border-white/5">
+                                    {intervalText}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Node Circle */}
+                          <div className={`absolute left-0 top-0 w-6 h-6 rounded-full border-2 border-[#1a1f2e] z-10 flex items-center justify-center transition-all duration-700
+                            ${isCompleted ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.5)]' : 
+                              (isNextStep ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.2)]' : 'bg-gray-800 border-white/5')}`}>
+                            
+                            {isCompleted ? (
+                               <CheckCircle2 className="w-3.5 h-3.5 text-white animate-in zoom-in duration-300" />
+                            ) : (
+                               isNextStep ? (
+                                 <div className="relative flex h-3 w-3">
+                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                   <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                 </div>
+                               ) : (
+                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                               )
+                            )}
+                          </div>
+
+                          <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
+                            <div className="flex items-center gap-3 mb-1.5">
+                              <h4 className={`font-black tracking-tight text-base ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-gray-500')}`}>
+                                {step.label}
+                                {isNextStep && (
+                                  <div className="flex items-center gap-3 ml-3">
+                                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500 text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]">
+                                      In Progress
+                                    </span>
+                                    {(() => {
+                                      const prevStepData = sIdx > 0 ? incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) : null;
+                                      if (prevStepData) {
+                                        const diff = currentTime - new Date(prevStepData.timestamp);
+                                        const m = Math.floor(diff / 60000);
+                                        const s = Math.floor((diff % 60000) / 1000);
+                                        return (
+                                          <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-0.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.1)]">
+                                            <span className="text-[8px] font-black text-blue-400/60 uppercase tracking-tighter">Current Stage Elapsed</span>
+                                            <span className="text-xs font-black font-mono text-blue-400 tabular-nums">
+                                              {String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                )}
+                              </h4>
+                              {isCompleted && (
+                                <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                                  {formatYYMMDD(stepData.timestamp)}
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-xs max-w-xl leading-relaxed ${isCompleted ? 'text-slate-400' : (isNextStep ? 'text-slate-300 font-medium' : 'text-slate-600')}`}>
+                              {isCompleted ? stepData.detail : (isNextStep ? '실시간 데이터 분석 및 대응 절차를 진행 중입니다...' : '업무 단계 대기 중')}
+                            </p>
+                            
+                            {(isCompleted || isNextStep) && step.id === 'WARROOM' && (
+                               <button
+                                 onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)}
+                                 className="mt-4 flex items-center gap-2 group/btn text-[11px] font-black text-white border border-blue-500/30 hover:border-blue-400 px-6 py-3 rounded-2xl bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transition-all transform hover:scale-[1.02]"
+                               >
+                                 <Zap className="w-4 h-4 fill-white animate-pulse" />
+                                 워룸으로 즉시 이동하여 대응하기 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
+                               </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-24 opacity-20 grayscale transition-all duration-1000">
+                  <Activity className="w-16 h-16 mb-4 text-blue-400 animate-pulse" />
+                  <h3 className="text-sm font-black tracking-tight text-white mb-2">인시던트 대응 모니터링 활성화 대기 중</h3>
+                  <p className="text-[10px] text-slate-500 max-w-[200px] text-center font-medium leading-relaxed">
+                    좌측 '조치 리스트'에서 인시던트를 선택하시면,<br/>
+                    실시간 MTTR 및 7단계 정밀 대응 흐름이 즉시 활성화됩니다.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Handling Progress Area */}
-        <AiSmsStatusPanel />
       </div>
 
       {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
@@ -1431,7 +1872,7 @@ export default function DashboardPage() {
                       </span>
                       <span className="text-[10px] text-slate-500 font-mono">ROOM #{room.id}</span>
                     </div>
-                    <span className="text-[10px] text-slate-500">{room.time}</span>
+                    <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">{room.time}</span>
                   </div>
 
                   <h4 className="font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-relaxed line-clamp-2">
@@ -1453,6 +1894,12 @@ export default function DashboardPage() {
                     {room.unread && (
                       <div className="bg-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">NEW</div>
                     )}
+                    <button
+                      onClick={(e) => leaveWarRoom(e, room.id)}
+                      className="text-[10px] bg-red-500/10 border border-red-500/30 text-red-500 px-2 py-1 rounded-full hover:bg-red-500/20 transition-colors ml-auto"
+                    >
+                      나가기
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1534,7 +1981,9 @@ function AlertItem({ title, time, severity, desc, isSelected }) {
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1">
           <h4 className={`font-bold text-sm transition-colors ${isSelected ? 'text-yellow-400' : 'text-slate-200 group-hover:text-white'}`}>{title}</h4>
-          <span className="text-xs text-slate-500 whitespace-nowrap ml-2">{time}</span>
+          <span className="text-[11px] font-black text-white whitespace-nowrap ml-2 bg-white/10 px-2.5 py-1 rounded border border-white/20 shadow-md">
+            {time}
+          </span>
         </div>
         <p className={`text-xs leading-relaxed ${isSelected ? 'text-yellow-100/80' : 'text-slate-400'}`}>{desc}</p>
       </div>
