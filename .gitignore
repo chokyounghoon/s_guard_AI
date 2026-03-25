@@ -1,4 +1,0 @@
-scripts/venv/
-scripts/post-mortems/
-workers/sms-api/node_modules/
-**/.wrangler/
