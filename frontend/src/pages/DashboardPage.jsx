@@ -104,6 +104,10 @@ export default function DashboardPage() {
   const [smsMessages, setSmsMessages] = useState([]);
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
+  const [isLiveStreamCollapsed, setIsLiveStreamCollapsed] = useState(false);
+  const [isWarRoomCollapsed, setIsWarRoomCollapsed] = useState(false);
+  const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false);
+  const [isFlowCollapsed, setIsFlowCollapsed] = useState(false);
   const [selectedIncidentIdFlow, setSelectedIncidentIdFlow] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
@@ -147,6 +151,13 @@ export default function DashboardPage() {
     return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
   };
 
+  const getKstDate = (daysAgo = 0) => {
+    const d = new Date();
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstDate = new Date(d.getTime() + kstOffset - (daysAgo * 24 * 60 * 60 * 1000));
+    return kstDate.toISOString().split('T')[0];
+  };
+
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
@@ -155,8 +166,8 @@ export default function DashboardPage() {
   const [myAssignments, setMyAssignments] = useState([]);
   const [userActivityHistory, setUserActivityHistory] = useState([]);
   const [assignmentDateRange, setAssignmentDateRange] = useState({
-    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0]
+    from: getKstDate(7),
+    to: getKstDate(0)
   });
 
   const handleOpenWarRoomFromInsight = async (smsMessage, analysisText) => {
@@ -164,11 +175,11 @@ export default function DashboardPage() {
     if (!currentSms) return;
 
     // The raw received SMS ID (e.g. 20231026154512345) MUST be the primary key DB identifier
-    // to match aichat_history, but we prefix it with INC- for the UI title.
-    const incidentId = String(currentSms.inc_id || currentSms.id || `INC-${Date.now()}`);
+    // to match aichat_history.
+    const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
     
     const baseSmsMessage = currentSms.message.length > 30 ? currentSms.message.substring(0, 30) + '...' : currentSms.message;
-    const formattedUiId = incidentId.startsWith('INC-') ? incidentId : `INC-${incidentId}`;
+    const formattedUiId = `INC-${incidentId}`; // Display prefix
     const smsTitle = `${formattedUiId} | ${baseSmsMessage}`;
     
     // Check if War-Room already exists
@@ -447,7 +458,7 @@ export default function DashboardPage() {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
           ...inc,
-          inc_id: String(inc.inc_id)
+          inc_id: String(inc.inc_id).replace('INC-', '')
         }));
         setMyAssignments(mapped);
       }
@@ -613,6 +624,22 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [systemStatus]);
 
+  const toggleAssignmentsPanel = () => {
+    setIsAssignmentsCollapsed(!isAssignmentsCollapsed);
+  };
+
+  const toggleFlowPanel = () => {
+    setIsFlowCollapsed(!isFlowCollapsed);
+  };
+
+  const toggleLiveStreamPanel = () => {
+    setIsLiveStreamCollapsed(!isLiveStreamCollapsed);
+  };
+
+  const toggleWarRoomPanel = () => {
+    setIsWarRoomCollapsed(!isWarRoomCollapsed);
+  };
+
   // Re-parse transcript (utility for handleAgentContent)
   const parseTranscript = (transcript) => {
     if (!transcript) return [];
@@ -627,9 +654,9 @@ export default function DashboardPage() {
     // 2. Normalize Agent declarations to a uniform [Role] format
     // Includes Korean synonyms for missing roles coverage
     const declarations = [
-      { name: 'Security', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Security|보안)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'Security', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Security|보안|System|시스템)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
       { name: 'DB', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:DB|데이터베이스)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
-      { name: 'DevOps', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:DevOps|데브옵스)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'DevOps', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:DevOps|데브옵스|Analyst|어낼리스트)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
       { name: 'Infra', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Infra|인프라)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
       { name: 'App', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:App|애플리케이션)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
       { name: 'Leader', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Leader|리더|최종 조치)(?:\s*Agent| Agent|분석|진단|가이드)?\s*(?:\]|:|\*\*)?/gim }
@@ -641,7 +668,7 @@ export default function DashboardPage() {
 
     // 3. Split by normalized markers
     // Prepend a newline to ensure the first marker matches the \n[...] multiline pattern
-    const rolePattern = /\n\[(Security|DB|DevOps|Infra|App|Leader)\]\n/gi;
+    const rolePattern = /\n\[(Security|DB|DevOps|Infra|App|Leader|Analyst|System)\]\n/gi;
     const parts = ('\n' + text).split(rolePattern);
     const msgs = [];
     
@@ -653,7 +680,7 @@ export default function DashboardPage() {
         if (!part) continue;
 
         // The split with capturing group puts the role name in the array
-        if (['Security', 'DB', 'DevOps', 'Infra', 'App', 'Leader'].includes(part)) {
+        if (['Security', 'DB', 'DevOps', 'Infra', 'App', 'Leader', 'Analyst', 'System'].includes(part)) {
             currentRole = part;
         } else if (currentRole) {
             // Clean the content block
@@ -735,7 +762,8 @@ export default function DashboardPage() {
         body: JSON.stringify({
           user_id: userProfile.id,
           login_id: userProfile.email,
-          inc_id: String(smsMessage.inc_id).replace('INC-', '')
+          inc_id: String(smsMessage.inc_id).replace('INC-', ''),
+          incident_title: 'SMS 수신 확인'
         })
       })
       .then(() => fetchMyAssignments())
@@ -1130,7 +1158,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-6 mb-6">
           {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
           {smsMessages.length > 0 && (
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl overflow-hidden w-full">
+            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
               <div
                 onClick={toggleSmsPanel}
                 className="p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
@@ -1270,12 +1298,21 @@ export default function DashboardPage() {
 
         {/* Main Content Areas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Alerts List */}
-          <div className="lg:col-span-1 bg-[#1a1f2e] rounded-2xl p-6 border border-white/5 max-h-[330px] h-full flex flex-col overflow-hidden shadow-xl">
-            <h3 className="font-bold mb-4 flex items-center shrink-0">
-              <Activity className="w-4 h-4 mr-2 text-blue-400" />
-              Live Incident Stream
-            </h3>
+          {/* Recent Alerts List (Section 1) */}
+          <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] p-6 rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+              <h3 className="font-bold flex items-center">
+                <Activity className="w-4 h-4 mr-2 text-blue-400" />
+                Live Incident Stream
+              </h3>
+              <button 
+                onClick={toggleLiveStreamPanel}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
+              >
+                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isLiveStreamCollapsed ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+            {!isLiveStreamCollapsed && (
             <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700/50 space-y-4">
               {smsMessages.slice(0, 10).map((msg) => {
                 let severity = 'info';
@@ -1325,56 +1362,58 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-
-              {smsMessages.length === 0 && (
-                <div className="text-center text-slate-500 text-sm py-4">
-                  Waiting for incoming incidents...
-                </div>
-              )}
-            </div>
+                {smsMessages.length === 0 && (
+                  <div className="text-center text-slate-500 text-sm py-4">Waiting...</div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Quick Actions / Assignment / Agent Panel */}
+          {/* AI War-Room Situation Log (Section 2) */}
           <div className="lg:col-span-2 h-[650px]">
-            <div className="bg-[#1a1f2e] rounded-2xl border border-white/5 h-full overflow-hidden flex flex-col shadow-xl">
-              {showAgentPanel || selectedSms ? (
-                <AgentDiscussionPanel
-                  messages={agentMessages}
-                  isVisible={true}
-                  embedded={true}
-                  incidentMessage={selectedSms?.message}
-                  onClose={() => {
-                    setShowAgentPanel(false);
-                    setSelectedSms(null);
-                  }}
-                />
-              ) : (
-                <div className="p-6 h-full flex flex-col">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold flex items-center">
-                      <Shield className="w-4 h-4 mr-2 text-purple-400" />
-                      AI War-Room Situation Log
-                    </h3>
-                    <div className="flex items-center gap-3">
-                      {selectedSms && (
-                        <div className="flex flex-col items-end mr-4">
-                          <span className="text-[9px] uppercase tracking-widest opacity-60 font-black text-blue-400 leading-none mb-1">INCIDENT DETECTED</span>
-                          <span className="text-xs font-black font-mono text-white bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30 shadow-[0_0_10px_rgba(37,99,235,0.2)]">
-                            {formatYYMMDD(selectedSms.timestamp)}
-                          </span>
-                        </div>
-                      )}
-                      <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-0.5 rounded uppercase font-bold tracking-tighter">분석 대기 중</span>
-                    </div>
+            <div className="bg-[#0a0c12] rounded-3xl border border-white/5 h-full overflow-hidden flex flex-col shadow-2xl">
+              {/* Header (Matching Screenshot) */}
+              <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                   </div>
+                  <h3 className="font-bold text-white text-[15px] tracking-tight">AI War-Room Situation Log</h3>
+                </div>
+                <div className="flex items-center gap-3">
+                   <button 
+                     onClick={toggleWarRoomPanel}
+                     className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
+                   >
+                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isWarRoomCollapsed ? 'rotate-180' : ''}`} />
+                   </button>
+                </div>
+              </div>
 
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-40 py-10">
-                    <Brain className="w-12 h-12 text-slate-600 mb-4 animate-pulse" />
-                    <p className="text-sm text-slate-500 text-center">SMS 수신 내역을 클릭하여<br/>AI 에이전트 분석을 시작하세요.</p>
-                  </div>
+              {!isWarRoomCollapsed && (
+                <div className="flex-1 overflow-hidden">
+                  {showAgentPanel || selectedSms ? (
+                    <AgentDiscussionPanel
+                      messages={agentMessages}
+                      isVisible={true}
+                      embedded={true}
+                      incidentMessage={selectedSms?.message}
+                      onClose={() => {
+                        setShowAgentPanel(false);
+                        setSelectedSms(null);
+                      }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
+                      <Brain className="w-10 h-10" />
+                      <p className="text-xs font-bold uppercase tracking-wider">Select an incident to analyze</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+
           </div>
         </div>
 
@@ -1589,11 +1628,11 @@ export default function DashboardPage() {
                   <>
                     인시던트 처리 흐름 [
                     <span className="text-blue-400">
-                      {(myAssignments.find(a => a.inc_id === selectedIncidentIdFlow)?.message || 
-                        smsMessages.find(m => m.inc_id === selectedIncidentIdFlow)?.message || 
+                      {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                        smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
                         selectedIncidentIdFlow).substring(0, 50)}
-                      {(myAssignments.find(a => a.inc_id === selectedIncidentIdFlow)?.message || 
-                        smsMessages.find(m => m.inc_id === selectedIncidentIdFlow)?.message || 
+                      {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                        smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
                         "").length > 50 ? '...' : ''}
                     </span>
                     ]
@@ -1605,7 +1644,8 @@ export default function DashboardPage() {
               {selectedIncidentIdFlow && (
                 <div className="flex items-center gap-6">
                    {(() => {
-                     const assignment = myAssignments.find(a => a.inc_id === selectedIncidentIdFlow) || smsMessages.find(a => a.inc_id === selectedIncidentIdFlow);
+                     const assignment = myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', '')) || 
+                                        smsMessages.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''));
                      const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
                      const endStep = incidentWorkflowSteps.find(s => s.id === 'CLOSE');
                      const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);

@@ -12,6 +12,21 @@ const getKst = () => {
   return new Date(now.getTime() + kstOffset).toISOString().replace('T', ' ').substring(0, 19)
 }
 
+// Utility to generate unique numeric string ID (YYYYMMDDHHMMSS + RRR)
+const generateIncId = () => {
+  const now = new Date();
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kst = new Date(now.getTime() + kstOffset);
+  const yyyy = kst.getFullYear();
+  const mm = String(kst.getMonth() + 1).padStart(2, '0');
+  const dd = String(kst.getDate()).padStart(2, '0');
+  const hh = String(kst.getHours()).padStart(2, '0');
+  const mi = String(kst.getMinutes()).padStart(2, '0');
+  const ss = String(kst.getSeconds()).padStart(2, '0');
+  const random = Math.floor(100 + Math.random() * 900); // 3 digits
+  return `${yyyy}${mm}${dd}${hh}${mi}${ss}${random}`;
+}
+
 // Utility for AI Embeddings
 const generateEmbedding = async (text, env) => {
   if (!text || !env.AI) {
@@ -84,48 +99,95 @@ app.post('/auth/login', async (c) => {
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || 'unknown'
   const ua = c.req.header('user-agent') || 'unknown'
 
-  await db.prepare("UPDATE users SET token = ?, mod_dt = ?, mod_id = ? WHERE id = ?")
-    .bind(token, now, 'SYSTEM', user.id)
+  await db.prepare("UPDATE users SET token = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
+    .bind(token, now, user.employee_id || 'SYSTEM', user.employee_id)
     .run()
 
   await db.prepare(`
     INSERT INTO login_history (
       user_id, email, ip_address, user_agent, status, login_time, reg_id, reg_dt, mod_id, mod_dt
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(user.id, user.email, ip, ua, 'SUCCESS', now, 'SYSTEM', now, 'SYSTEM', now)
+  `).bind(user.employee_id, user.email, ip, ua, 'SUCCESS', now, user.employee_id || 'SYSTEM', now, user.employee_id || 'SYSTEM', now)
     .run()
 
   return c.json({
-    id: user.id, email: user.email, name: user.name, role: user.role,
+    id: user.employee_id, // Return employee_id as the primary id
+    email: user.email, name: user.name, role: user.role,
     company: user.company, honbu: user.honbu, team: user.team,
-    token: token
+    employee_id: user.employee_id, position: user.position,
+    is_admin: user.is_admin || 0,
+    token: token,
+    numeric_id: user.id // keep original id as numeric_id if needed elsewhere
   })
 })
 
 app.post('/auth/signup', async (c) => {
-  const { email, password, name, company, honbu, team } = await c.req.json()
+  const body = await c.req.json()
+  const { email, password, name, company, honbu, team, part, subpart, phone, employee_id, position } = body
   const db = c.env.DB
+  
+  console.log('[Signup Search] employee_id:', employee_id);
 
-  const existing = await db.prepare("SELECT id FROM users WHERE email = ?").bind(email).first()
+  if (!employee_id) {
+    return c.json({ detail: "사번(Employee ID)은 필수 입력 항목입니다." }, 400)
+  }
+
+  const existing = await db.prepare("SELECT id FROM users WHERE email = ? OR employee_id = ?").bind(email, employee_id).first()
   if (existing) {
-    return c.json({ detail: "이미 등록된 이메일입니다." }, 400)
+    return c.json({ detail: "이미 등록된 이메일 또는 사번입니다." }, 400)
   }
 
   const hashedPassword = await hashPassword(password)
   const regDt = getKst()
-  const employeeId = `EMP-${Math.floor(100000 + Math.random() * 900000)}`
+  const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
+  
+  // ── 사번(Employee ID) 정제: 'EMP-' 등 접두사 강제 제거 (Type-safe) ──
+  // 사용자가 어떤 입력을 주더라도 문자열로 변환 후 접두사를 제거합니다.
+  const cleanEmpId = String(employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
+  
+  console.log('[Signup Debug] Original ID:', employee_id, '-> Cleaned ID:', cleanEmpId);
+  console.log('[Signup Debug] Phone from body:', phone);
+  
+  const finalPhone = (phone || '').trim();
+  
+  console.log('[Signup Prepare] Inserting user with cleanEmpId:', cleanEmpId, 'token:', token);
   
   const res = await db.prepare(
     `INSERT INTO users (
-      email, password_hash, name, company, honbu, team, 
-      employee_id, role, is_active, reg_id, reg_dt, mod_id, mod_dt, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      email, password_hash, name, company, honbu, team, part, subpart, phone,
+      employee_id, position, role, is_active, is_admin, token, 
+      reg_id, reg_dt, mod_id, mod_dt, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    email, hashedPassword, name, company, honbu, team, 
-    employeeId, 'user', 1, 'SYSTEM', regDt, 'SYSTEM', regDt, regDt
+    email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', finalPhone,
+    cleanEmpId, position || 'POS_001', 'user', 1, 0, token, 
+    cleanEmpId, regDt, cleanEmpId, regDt, regDt
   ).run()
 
-  return c.json({ status: "success", id: res.meta.last_row_id, employee_id: employeeId })
+  const userId = res.meta.last_row_id
+  console.log('[Signup Success] New user ID:', userId);
+
+  return c.json({ 
+    status: "success", 
+    debug_v: "20240328_final", // 배포 여부 확인용 버전 플래그
+    token: token,
+    user: {
+      id: cleanEmpId, // Return cleaned employee_id as id
+      email,
+      name,
+      role: 'user',
+      company,
+      honbu: honbu || '',
+      team: team || '',
+      part: part || '',
+      subpart: subpart || '',
+      phone: finalPhone,
+      employee_id: cleanEmpId,
+      position: position || 'POS_001',
+      is_admin: 0,
+      numeric_id: userId
+    }
+  })
 })
 
 app.post('/auth/request-reset-code', async (c) => {
@@ -174,14 +236,14 @@ app.post('/auth/verify-reset-code', async (c) => {
 
 app.get('/users', async (c) => {
   const db = c.env.DB
-  const users = await db.prepare("SELECT id, email, name, role, company, honbu, team, is_active FROM users").all()
+  const users = await db.prepare("SELECT id, email, name, role, company, honbu, team, is_active, is_admin FROM users").all()
   return c.json(users.results)
 })
 
 app.get('/users/:id', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
-  const user = await db.prepare("SELECT id, email, name, role, company, honbu, team, part, subpart, phone, is_active FROM users WHERE id = ?").bind(id).first()
+  const user = await db.prepare("SELECT employee_id, email, name, role, company, honbu, team, part, subpart, phone, is_active, is_admin FROM users WHERE employee_id = ?").bind(id).first()
   if (!user) return c.json({ detail: "User not found" }, 404)
   return c.json(user)
 })
@@ -190,25 +252,29 @@ app.patch('/auth/profile', async (c) => {
   const db = c.env.DB
   const { user_id, name, phone, company, honbu, team, part, subpart } = await c.req.json()
   const modDt = getKst()
+  
+  const empId = user_id // user_id is now already the employee_id
+
   await db.prepare(
-    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, mod_dt = ?, mod_id = ? WHERE id = ?"
-  ).bind(name, phone || null, company || null, honbu || null, team || null, part || null, subpart || null, modDt, 'USER', user_id).run()
-  const updated = await db.prepare("SELECT id, email, name, role, company, honbu, team, part, subpart, phone FROM users WHERE id = ?").bind(user_id).first()
+    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
+  ).bind(name, phone || null, company || null, honbu || null, team || null, part || null, subpart || null, modDt, empId, user_id).run()
+  const updated = await db.prepare("SELECT employee_id, email, name, role, company, honbu, team, part, subpart, phone, employee_id, position, is_admin FROM users WHERE employee_id = ?").bind(user_id).first()
   return c.json({ status: "success", user: updated })
 })
 
 app.post('/auth/change-password', async (c) => {
   const db = c.env.DB
   const { user_id, old_password, new_password } = await c.req.json()
-  const user = await db.prepare("SELECT * FROM users WHERE id = ?").bind(user_id).first()
+  const user = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(user_id).first()
   
   if (!user || !(await verifyPassword(old_password, user.password_hash))) {
     return c.json({ detail: "현재 비밀번호가 올바르지 않습니다." }, 401)
   }
   
   const hashedNewPassword = await hashPassword(new_password)
-  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ? WHERE id = ?")
-    .bind(hashedNewPassword, getKst(), user_id)
+  const modDt = getKst()
+  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
+    .bind(hashedNewPassword, modDt, user.employee_id || 'USER', user_id)
     .run()
   return c.json({ status: "success" })
 })
@@ -218,7 +284,8 @@ app.post('/users/:id/reset-password', async (c) => {
   const id = c.req.param('id')
   const { new_password } = await c.req.json()
   const hashed = await hashPassword(new_password)
-  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ? WHERE id = ?").bind(hashed, getKst(), id).run()
+  const modDt = getKst()
+  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?").bind(hashed, modDt, 'ADMIN', id).run()
   return c.json({ status: "success" })
 })
 
@@ -226,7 +293,8 @@ app.patch('/users/:id/status', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
   const { is_active } = await c.req.json()
-  await db.prepare("UPDATE users SET is_active = ?, mod_dt = ? WHERE id = ?").bind(is_active ? 1 : 0, getKst(), id).run()
+  const modDt = getKst()
+  await db.prepare("UPDATE users SET is_active = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?").bind(is_active ? 1 : 0, modDt, 'ADMIN', id).run()
   return c.json({ status: "success" })
 })
 
@@ -234,7 +302,8 @@ app.patch('/users/:id/role', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
   const { role } = await c.req.json()
-  await db.prepare("UPDATE users SET role = ?, mod_dt = ? WHERE id = ?").bind(role, getKst(), id).run()
+  const modDt = getKst()
+  await db.prepare("UPDATE users SET role = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?").bind(role, modDt, 'ADMIN', id).run()
   return c.json({ status: "success" })
 })
 
@@ -283,6 +352,18 @@ app.delete('/org/nodes/:id', async (c) => {
 })
 
 // ==========================================
+// 2.1 Universal Code Book
+// ==========================================
+app.get('/ai/codes/:category', async (c) => {
+  const category = c.req.param('category')
+  const db = c.env.DB
+  const { results } = await db.prepare(
+    "SELECT code, name, sort_order FROM code_book WHERE category = ? AND is_active = 1 ORDER BY sort_order ASC"
+  ).bind(category.toUpperCase()).all()
+  return c.json({ category, codes: results })
+})
+
+// ==========================================
 // 3. SMS Interactions
 // ==========================================
 app.post('/sms/receive', async (c) => {
@@ -319,11 +400,12 @@ app.post('/sms/receive', async (c) => {
     }
   }
 
+  const newIncId = generateIncId()
   await db.prepare(
     "INSERT INTO received_messages (inc_id, sender, message, timestamp, keyword_detected, response_message, received_count, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(inc_id, sender, message, timestamp, detected ? 1 : 0, response_msg, 1, 'SYSTEM', timestamp, 'SYSTEM', timestamp).run()
+  ).bind(newIncId, sender, message, timestamp, detected ? 1 : 0, response_msg, 1, 'SYSTEM', timestamp, 'SYSTEM', timestamp).run()
 
-  return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id })
+  return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id: newIncId })
 })
 
 app.get('/sms/recent', async (c) => {
@@ -469,11 +551,11 @@ app.post('/activity-logs', async (c) => {
   
   await db.prepare(`
     INSERT INTO activity_logs (
-      user_name, user_id, incident_code, incident_title, action, detail, 
+      inc_id, user_name, user_id, incident_code, incident_title, action, detail, 
       report_type, reg_id, reg_dt, mod_id, mod_dt, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
-    data.user_name || 'System', data.user_id || null, inc_id, data.incident_title || null,
+    inc_id || 'UNKNOWN', data.user_name || 'System', data.user_id || null, inc_id, data.incident_title || null,
     data.action, data.detail || null, data.report_type || '시스템',
     'SYSTEM', now, 'SYSTEM', now, now
   ).run()
@@ -987,7 +1069,7 @@ app.get('/ai/chat-history/:id', async (c) => {
   }
   
   // Fallback to warroom_chats (legacy)
-  const { results: wrResults } = await db.prepare("SELECT * FROM warroom_chats WHERE incident_id = ? ORDER BY timestamp ASC").bind(id).all()
+  const { results: wrResults } = await db.prepare("SELECT * FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(id).all()
   const messages = wrResults.map(r => ({ role: r.role || r.sender, text: r.text }))
   return c.json({ messages })
 })
@@ -1033,30 +1115,32 @@ app.post('/ai/warroom/open', async (c) => {
   const db = c.env.DB
   const now = getKst()
   
+  const normId = String(inc_id).replace('INC-', '');
+
   // Prevent duplicate creation
-  const existing = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ?").bind(inc_id).first()
+  const existing = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ?").bind(normId).first()
   if (!existing) {
     await db.prepare(`
       INSERT INTO warroom_list (inc_id, title, creator_id, severity, leader_summary, reg_dt)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(inc_id, title, creator_id, severity, leader_summary || '', now)
+    `).bind(normId, title, creator_id, severity, leader_summary || '', now)
     .run()
   } else if (leader_summary) {
     await db.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
-      .bind(leader_summary, now, inc_id).run()
+      .bind(leader_summary, now, normId).run()
   }
 
   // Auto-assign to the creator and anyone already assigned to this incident
   if (creator_id) {
     await db.prepare("INSERT INTO user_warrooms (user_id, inc_id) VALUES (?, ?) ON CONFLICT DO NOTHING")
-      .bind(creator_id, String(inc_id)).run()
+      .bind(creator_id, normId).run()
     
     // Update assignment status to '처리중' for all assignees of this incident
     await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ? WHERE inc_id = ?")
-      .bind(now, String(inc_id)).run()
+      .bind(now, normId).run()
   }
   
-  return c.json({ status: 'opened', inc_id })
+  return c.json({ status: 'opened', inc_id: normId })
 })
 
 app.post('/ai/report/save', async (c) => {
@@ -1066,8 +1150,11 @@ app.post('/ai/report/save', async (c) => {
   
   const normId = String(inc_id).replace('INC-', '');
   // 1. Log activity
-  await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, report_type, created_at) VALUES (?, ?, '보고서 생성', ?, 'AI 리포트', ?)")
-    .bind(normId, user_id || null, content, now)
+  const empId = user_id // user_id is now already the employee_id
+  const nowReport = getKst()
+
+  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, report_type, created_at) VALUES (?, ?, ?, '보고서 생성', ?, 'AI 리포트', ?)")
+    .bind(normId, normId, empId, `리포트 생성됨: ${title}`, nowReport)
     .run()
 
   // 2. Insert into reports table [NEW]
@@ -1078,7 +1165,7 @@ app.post('/ai/report/save', async (c) => {
   // Auto-update assignment status to '처리완료'
   if (inc_id && user_id) {
     await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ? WHERE user_id = ? AND inc_id = ?")
-      .bind(now, user_id, String(inc_id)).run()
+      .bind(now, user_id, normId).run()
   }
 
   return c.json({ status: 'saved' })
@@ -1208,8 +1295,11 @@ app.post('/ai/knowledge/save', async (c) => {
 
     // Log the knowledge activity
     if (body.inc_id) {
-        await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
-        .bind(String(body.inc_id), user_id, now).run()
+        const user = await db.prepare("SELECT employee_id FROM users WHERE id = ? OR employee_id = ?").bind(user_id, String(user_id)).first()
+        const empId = user ? user.employee_id : user_id
+        await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
+        .bind(String(body.inc_id).replace('INC-', ''), String(body.inc_id).replace('INC-', ''), empId, getKst())
+        .run()
     }
 
     return c.json({ status: 'updated', id: body.id })
@@ -1226,8 +1316,11 @@ app.post('/ai/knowledge/save', async (c) => {
 
     // Log the knowledge activity
     if (body.inc_id) {
-        await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
-        .bind(String(body.inc_id), user_id, now).run()
+        const user = await db.prepare("SELECT employee_id FROM users WHERE id = ? OR employee_id = ?").bind(user_id, String(user_id)).first()
+        const empId = user ? user.employee_id : user_id
+        await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
+        .bind(String(body.inc_id).replace('INC-', ''), String(body.inc_id).replace('INC-', ''), empId, getKst())
+        .run()
     }
 
     return c.json({ status: 'created', id: result.meta.last_row_id })
@@ -1243,8 +1336,10 @@ app.post('/ai/warroom/close', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
     .bind(now, normId).run()
     
-  await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, '워룸 종료', '워룸이 종료되고 인시던트 처리가 완료되었습니다.', ?)")
-    .bind(normId, user_id, now).run()
+  // Log termination
+  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '워룸 종료', '워룸이 종료되고 인시던트 처리가 완료되었습니다.', ?)")
+    .bind(normId, normId, user_id, getKst())
+    .run()
     
   return c.json({ status: 'closed' })
 })
@@ -1254,7 +1349,7 @@ app.post('/ai/warroom/close', async (c) => {
 // ==========================================
 
 app.post('/ai/incident/assign', async (c) => {
-  const { user_id, inc_id } = await c.req.json()
+  const { user_id, inc_id, action, detail, incident_title } = await c.req.json() // Added action, detail, incident_title for logging
   const db = c.env.DB
   const now = getKst()
 
@@ -1264,13 +1359,18 @@ app.post('/ai/incident/assign', async (c) => {
       INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
       VALUES (?, ?, '미확인', ?, ?)
       ON CONFLICT(user_id, inc_id) DO NOTHING
-    `).bind(user_id, String(inc_id), now, now).run()
+    `).bind(user_id, normId, now, now).run()
 
     // Log the assignment activity
-    await db.prepare("INSERT INTO activity_logs (incident_id, user_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?)")
-      .bind(String(inc_id), user_id, '장애 할당', '인시던트가 담당자에게 할당되었습니다.', now).run()
+    const logId = generateIncId()
+    const empId = user_id // already employee_id
+
+    await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, incident_title, user_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(normId, normId, incident_title || 'SMS 수신 확인', empId, action || '장애 할당', detail || '인시던트가 담당자에게 할당되었습니다.', getKst())
+      .run()
     
-    return c.json({ status: 'assigned', user_id, inc_id })
+    return c.json({ status: 'assigned', user_id, inc_id: normId, log_id: logId })
+
   } catch (e) {
     return c.json({ error: e.message }, 500)
   }
@@ -1280,25 +1380,20 @@ app.post('/ai/incident/status', async (c) => {
   const { user_id, inc_id, status } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
+  const normId = String(inc_id).replace('INC-', '');
 
   await db.prepare(`
     UPDATE incident_assignments 
     SET status = ?, updated_at = ?
     WHERE user_id = ? AND inc_id = ?
-  `).bind(status, now, user_id, String(inc_id)).run()
+  `).bind(status, now, user_id, normId).run()
   
-  return c.json({ status: 'updated', user_id, inc_id, new_status: status })
+  return c.json({ status: 'updated', user_id, inc_id: normId, new_status: status })
 })
 
-// Get specific incident details for workflow
-app.get('/ai/incident/:inc_id', async (c) => {
-  const inc_id = c.req.param('inc_id')
-  const db = c.env.DB
-  const incident = await db.prepare("SELECT * FROM incidents WHERE inc_id = ?").bind(inc_id).first()
-  if (!incident) return c.json({ error: "Not found" }, 404)
-  return c.json({ incident })
-})
+// ── 인시던트 관련 상세 라우트 (와일드카드 :inc_id 보다 먼저 정의되어야 함) ──
 
+// 1. 나의 할당 목록 (Shadowing 방지를 위해 위로 이동)
 app.get('/ai/incident/my-assignments', async (c) => {
   const user_id = c.req.query('user_id')
   const fromDate = c.req.query('from') // YYYY-MM-DD
@@ -1318,11 +1413,11 @@ app.get('/ai/incident/my-assignments', async (c) => {
       m.sender, m.message, m.timestamp as message_at, m.received_count,
       (SELECT GROUP_CONCAT(u2.name, ', ') 
        FROM incident_assignments a2 
-       JOIN users u2 ON a2.user_id = u2.id 
-       WHERE a2.inc_id = a.inc_id) as assignees
+       JOIN users u2 ON a2.user_id = u2.employee_id 
+       WHERE a2.inc_id = a.inc_id OR REPLACE(a2.inc_id, 'INC-', '') = a.inc_id) as assignees
     FROM incident_assignments a
-    LEFT JOIN received_messages m ON a.inc_id = m.inc_id
-    LEFT JOIN warroom_list w ON a.inc_id = w.inc_id
+    LEFT JOIN received_messages m ON (a.inc_id = m.inc_id OR REPLACE(a.inc_id, 'INC-', '') = m.inc_id)
+    LEFT JOIN warroom_list w ON (a.inc_id = w.inc_id OR REPLACE(a.inc_id, 'INC-', '') = w.inc_id)
     WHERE a.user_id = ?
   `
   const params = [user_id]
@@ -1342,6 +1437,25 @@ app.get('/ai/incident/my-assignments', async (c) => {
   
   return c.json({ total: results.length, assignments: results })
 })
+
+
+// 2. 워룸 관리 및 인시던트 연동 라우트
+
+
+// 3. 특정 인시던트 상세 (와일드카드 - 가장 마지막에 정의)
+app.get('/ai/incident/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id')
+  const db = c.env.DB
+  const incident = await db.prepare(`
+    SELECT i.*, u.name as assignee_name 
+    FROM incidents i 
+    LEFT JOIN users u ON i.assigned_to = u.employee_id 
+    WHERE i.inc_id = ?
+  `).bind(inc_id).first()
+  if (!incident) return c.json({ error: "Not found" }, 404)
+  return c.json({ incident })
+})
+
 
 // User Specific War-Room mapping
 app.post('/ai/warroom/leave', async (c) => {
@@ -1363,12 +1477,13 @@ app.get('/ai/user/activity-history', async (c) => {
   if (!user_id) return c.json({ history: [] })
 
   const { results } = await c.env.DB.prepare(`
-    SELECT *, date(created_at) as log_date 
-    FROM activity_logs 
-    WHERE user_id = ? 
-    ORDER BY created_at DESC 
+    SELECT l.*, date(l.created_at) as log_date 
+    FROM activity_logs l
+    LEFT JOIN users u ON l.user_id = u.employee_id
+    WHERE l.user_id = ? OR u.id = ?
+    ORDER BY l.created_at DESC 
     LIMIT 100
-  `).bind(user_id).all()
+  `).bind(user_id, user_id).all()
 
   return c.json({ history: results })
 })
@@ -1396,9 +1511,42 @@ app.get('/ai/incident/workflow-details', async (c) => {
     // 3. AI AGENT 분석 완료 (same as RAG)
     if (rag) steps.push({ id: 'AGENT', label: 'AI AGENT 분석 완료', timestamp: rag.reg_dt, detail: '에이전트 그룹의 심층 분석이 완료되었습니다.' });
 
-    // 4. 워룸 생성 (warroom_list)
-    const wr = await db.prepare("SELECT reg_dt, creator_id, status FROM warroom_list WHERE inc_id = ?").bind(id).first();
-    if (wr) steps.push({ id: 'WARROOM', label: '워룸 생성', timestamp: wr.reg_dt, detail: `${wr.creator_id || '시스템'}님에 의해 실시간 대응 워룸이 가동되었습니다.` });
+    // 4. 워룸 생성 (warroom_list JOIN users with extreme robustness)
+    const wr = await db.prepare(`
+      SELECT 
+        w.reg_dt, 
+        w.creator_id, 
+        w.status, 
+        u.name as creator_name
+      FROM warroom_list w
+      LEFT JOIN users u ON (
+        TRIM(CAST(w.creator_id AS TEXT)) = TRIM(CAST(u.employee_id AS TEXT)) OR
+        TRIM(CAST(w.creator_id AS TEXT)) = TRIM(REPLACE(REPLACE(CAST(u.employee_id AS TEXT), 'EMP-', ''), 'SH-', '')) OR
+        w.creator_id = u.id OR
+        w.creator_id = u.email
+      )
+      WHERE w.inc_id = ? OR REPLACE(w.inc_id, 'INC-', '') = ?
+      LIMIT 1
+    `).bind(id, id).first();
+    
+    if (wr) {
+      let dispName = wr.creator_name;
+      // Secondary fallback lookup if JOIN failed
+      if (!dispName && wr.creator_id) {
+        const uNode = await db.prepare("SELECT name FROM users WHERE employee_id = ? OR id = ? OR email = ?")
+          .bind(wr.creator_id, wr.creator_id, wr.creator_id).first();
+        if (uNode) dispName = uNode.name;
+      }
+      
+      steps.push({ 
+        id: 'WARROOM', 
+        label: '워룸 생성', 
+        timestamp: wr.reg_dt, 
+        detail: `${dispName || wr.creator_id || '시스템'}님에 의해 실시간 대응 워룸이 가동되었습니다.` 
+      });
+    }
+
+
 
     // 5. 보고서 생성완료 (reports)
     const repo = await db.prepare("SELECT created_at FROM reports WHERE inc_id = ?").bind(id).first();
@@ -1413,7 +1561,7 @@ app.get('/ai/incident/workflow-details', async (c) => {
     if (wrClose) steps.push({ id: 'CLOSE', label: '워룸종료 및 장애처리완료', timestamp: wrClose.mod_dt, detail: '인시던트 대응 활동이 종료되었습니다.' });
 
     // Use activity_logs as a fallback
-    const logs = await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_id = ? ORDER BY created_at ASC").bind(id).all();
+    const logs = await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_code = ? ORDER BY created_at ASC").bind(id).all();
 
     return c.json({ inc_id: inc_id_str, steps: steps.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)), all_logs: logs.results || [] });
   } catch (e) {
@@ -1487,11 +1635,11 @@ app.post('/warroom/reset', async (c) => {
 app.post('/warroom/feedback', async (c) => {
   const { incident_id, resolution_text, commandsUsed, feedback, user_id } = await c.req.json()
   const db = c.env.DB
-  const now = getKst()
-  await db.prepare(`
-    INSERT INTO resolution_feedback (incident_id, resolution_text, commandsUsed, feedback, reg_id, reg_dt)
+  const nowFeedback = getKst()
+  const res = await db.prepare(`
+    INSERT INTO resolution_feedback (inc_id, resolution_text, commandsUsed, feedback, reg_id, reg_dt)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(incident_id, resolution_text, JSON.stringify(commandsUsed), feedback, user_id, now).run()
+  `).bind(incident_id, resolution_text, JSON.stringify(commandsUsed), feedback, user_id, nowFeedback).run()
   return c.json({ status: "success" })
 })
 
@@ -1530,13 +1678,6 @@ app.patch('/incidents/:id', async (c) => {
     WHERE inc_id = ?
   `).bind(title || null, description || null, severity || null, status || null, assigned_to || null, now, id).run()
   return c.json({ status: "success" })
-})
-
-app.get('/warroom/attachments/:id', async (c) => {
-  const db = c.env.DB
-  const id = c.req.param('id')
-  const { results } = await db.prepare("SELECT * FROM warroom_attachments WHERE inc_id = ? ORDER BY timestamp DESC").bind(id).all()
-  return c.json(results)
 })
 
 // Warroom chat list
@@ -1653,8 +1794,7 @@ app.post('/warroom/upload', async (c) => {
     INSERT INTO warroom_attachments (inc_id, seq, filename, original_name, file_type, url, uploaded_by, timestamp, reg_id, reg_dt, mod_id, mod_dt)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
-    incident_id, seq,
-    fileKey, fileName,
+    incident_id, seq, fileKey, fileName,
     file.type || 'application/octet-stream',
     fileUrl, uploaded_by,
     now, uploaded_by, now, uploaded_by, now

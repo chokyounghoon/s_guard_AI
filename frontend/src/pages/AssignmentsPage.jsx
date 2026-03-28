@@ -124,7 +124,8 @@ export default function AssignmentsPage() {
             filteredAssignments.map((assignment) => (
               <div
                 key={assignment.id}
-                className={`p-6 rounded-3xl border ${assignment.borderColor} ${assignment.bgColor} relative overflow-hidden group transition-all duration-500 shadow-lg`}
+                onClick={() => navigate(`/chat/${String(assignment.inc_id).replace('INC-', '')}`)}
+                className={`p-6 rounded-3xl border ${assignment.borderColor} ${assignment.bgColor} relative overflow-hidden group transition-all duration-500 shadow-lg cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 active:scale-[0.98]`}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between">

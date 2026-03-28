@@ -5,12 +5,12 @@ import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar, BarChart3, Ch
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 const FLOW_STEPS = [
-  { id: 'SMS_RECEIVE', label: 'SMS 수신 및 장애 인지' },
-  { id: 'ANALYSIS_COMPLETE', label: 'RAG 및 AI AGENT 분석 완료' },
-  { id: 'WARROOM_CREATED', label: '워룸생성 및 할당완료' },
-  { id: 'REPORT_COMPLETE', label: '보고서 생성완료' },
-  { id: 'KNOWLEDGE_ADDED', label: '지식화 및 보고완료' },
-  { id: 'WARROOM_CLOSED', label: '워룸종료 및 장애처리완료' }
+  { id: 'SMS', label: 'SMS 수신 및 장애 인지' },
+  { id: 'RAG', label: 'RAG 및 AI AGENT 분석 완료' },
+  { id: 'WARROOM', label: '워룸생성 및 할당완료' },
+  { id: 'REPORT', label: '보고서 생성완료' },
+  { id: 'KNOWLEDGE', label: '지식화 및 보고완료' },
+  { id: 'CLOSE', label: '워룸종료 및 장애처리완료' }
 ];
 
 export default function WorkflowPage() {
@@ -55,32 +55,32 @@ export default function WorkflowPage() {
       try {
         const normId = inc_id.replace('INC-', '');
         
-        // Try fetching from incidents first
-        let incRes = await fetch(`${API_BASE}/incidents/${normId}`);
+        // 1. Fetch incident base data
+        let incRes = await fetch(`${API_BASE}/ai/incident/${normId}`);
         if (!incRes.ok) {
-           // Fallback to raw SMS data if not promoted to incident yet
            incRes = await fetch(`${API_BASE}/sms/${normId}`);
         }
 
         if (incRes.ok) {
-          const incData = await incRes.json();
-          // Normalize the data based on source (incidents uses title, sms uses message)
+          const data = await incRes.json();
+          const incData = data.incident || data; 
           setIncidentData({
-            title: incData.title || incData.message,
-            sender: incData.sender,
-            created_at: incData.created_at || incData.timestamp,
-            assigned_at: incData.assigned_at,
-            assignees: incData.assignees || '조경훈'
+            title: incData.title || incData.message || incData.description,
+            sender: incData.sender || 'SYSTEM',
+            created_at: incData.created_at || incData.timestamp || incData.reg_dt,
+            assigned_at: incData.assigned_at || incData.reg_dt,
+            assignees: incData.assignee_name || incData.assignees || '조경훈',
+            severity: incData.severity || 'NORMAL'
           });
+
         }
 
-        // Fetch activity logs and filter by normalized inc_id
-        const logsRes = await fetch(`${API_BASE}/activity-logs`);
-        if (logsRes.ok) {
-          const logsData = await logsRes.json();
-          const allLogs = logsData.logs || [];
-          const filteredLogs = allLogs.filter(log => String(log.inc_id).replace('INC-', '') === normId);
-          setWorkflowLogs(filteredLogs);
+        // 2. Fetch Workflow Details (This endpoint aggregates everything)
+        const flowRes = await fetch(`${API_BASE}/ai/incident/workflow-details?inc_id=${inc_id}`);
+        if (flowRes.ok) {
+          const flowData = await flowRes.json();
+          // flowData.steps contains the aggregated timeline entries
+          setWorkflowLogs(flowData.steps || []);
         }
       } catch (e) {
         console.error("Workflow fetch error:", e);
@@ -92,6 +92,7 @@ export default function WorkflowPage() {
     fetchData();
   }, [inc_id]);
 
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0f111a] flex flex-col items-center justify-center text-white">
@@ -101,14 +102,15 @@ export default function WorkflowPage() {
     );
   }
 
-  const firstPendingIdx = FLOW_STEPS.findIndex(step => !workflowLogs.find(l => l.action === step.id));
+  const firstPendingIdx = FLOW_STEPS.findIndex(step => !workflowLogs.find(l => l.id === step.id));
 
-  const startLog = workflowLogs.find(l => l.action === 'SMS_RECEIVE');
-  const endLog = workflowLogs.find(l => l.action === 'WARROOM_CLOSED');
+  const startLog = workflowLogs.find(l => l.id === 'SMS');
+  const endLog = workflowLogs.find(l => l.id === 'CLOSE' || l.id === 'WARROOM_CLOSED');
   
-  const startTime = startLog ? new Date(startLog.created_at) : (incidentData?.created_at ? new Date(incidentData.created_at) : null);
-  const endTime = endLog ? new Date(endLog.created_at) : null;
+  const startTime = startLog ? new Date(startLog.timestamp) : (incidentData?.created_at ? new Date(incidentData.created_at) : null);
+  const endTime = endLog ? new Date(endLog.timestamp) : null;
   const durationMs = (startTime && !isNaN(startTime.getTime())) ? (endTime || currentTime) - startTime : 0;
+
   const isClosed = !!endTime;
 
   return (
@@ -198,16 +200,16 @@ export default function WorkflowPage() {
 
           <div className="space-y-0 relative z-10">
             {FLOW_STEPS.map((step, sIdx) => {
-              const stepLog = workflowLogs.find(l => l.action === step.id);
+              const stepLog = workflowLogs.find(l => l.id === step.id);
               const isCompleted = !!stepLog;
               const isNextStep = sIdx === firstPendingIdx;
               
               // Calculate interval duration to the NEXT step
               let intervalText = null;
               if (isCompleted && sIdx < FLOW_STEPS.length - 1) {
-                const nextStepLog = workflowLogs.find(l => l.action === FLOW_STEPS[sIdx+1].id);
+                const nextStepLog = workflowLogs.find(l => l.id === FLOW_STEPS[sIdx+1].id);
                 if (nextStepLog) {
-                  const diff = new Date(nextStepLog.created_at) - new Date(stepLog.created_at);
+                  const diff = new Date(nextStepLog.timestamp) - new Date(stepLog.timestamp);
                   const m = Math.floor(diff / 60000);
                   const s = Math.floor((diff % 60000) / 1000);
                   intervalText = `⏱ ${m > 0 ? `${m}분 ` : ''}${s}초 소요`;
@@ -251,7 +253,7 @@ export default function WorkflowPage() {
                       </h4>
                       {isCompleted && (
                         <span className="text-[11px] text-white font-black font-mono bg-white/10 px-3 py-1 rounded-lg shadow-lg border border-white/5">
-                          {formatYYMMDD(stepLog.created_at)}
+                          {formatYYMMDD(stepLog.timestamp)}
                         </span>
                       )}
                       {isNextStep && (
@@ -260,9 +262,9 @@ export default function WorkflowPage() {
                               Processing
                             </span>
                             {(() => {
-                              const prevStepLog = sIdx > 0 ? workflowLogs.find(l => l.action === FLOW_STEPS[sIdx-1].id) : null;
+                              const prevStepLog = sIdx > 0 ? workflowLogs.find(l => l.id === FLOW_STEPS[sIdx-1].id) : null;
                               if (prevStepLog) {
-                                const diff = currentTime - new Date(prevStepLog.created_at);
+                                const diff = currentTime - new Date(prevStepLog.timestamp);
                                 const m = Math.floor(diff / 60000);
                                 const s = Math.floor((diff % 60000) / 1000);
                                 return (
@@ -281,7 +283,7 @@ export default function WorkflowPage() {
                     </div>
                     
                     <p className={`text-sm max-w-2xl leading-relaxed ${isCompleted ? 'text-slate-400 font-medium' : (isNextStep ? 'text-slate-300 font-bold' : 'text-slate-700')}`}>
-                      {isCompleted ? stepData.detail : (isNextStep ? '실시간 데이터 분석 및 연동된 보안 정책을 바탕으로 대응 절차를 집행 중입니다...' : '업무 단계 활성화 대기 중')}
+                      {isCompleted ? stepLog.detail : (isNextStep ? '실시간 데이터 분석 및 연동된 보안 정책을 바탕으로 대응 절차를 집행 중입니다...' : '업무 단계 활성화 대기 중')}
                     </p>
                     
                     {(isCompleted || isNextStep) && step.id === 'WARROOM' && (
