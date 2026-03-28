@@ -142,16 +142,10 @@ const SmsTestPage = () => {
     const getApiUrl = (path) => {
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
-        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
         const isHttps = protocol === 'https:';
         const workerUrl = 'https://sguardai.khcho0421.workers.dev';
 
-        // For local development on HTTP, use the local Python backend for SMS/AI features
-        if (isLocal && !isHttps && path.startsWith('/sms/')) {
-            return `http://localhost:8000${path}`;
-        }
-
-        // For all other cases (including hosted Cloudflare Pages), use the Worker proxy
+        // Prefer Worker even on local for D1/Cloudflare testing
         return `${workerUrl}${path}`;
     };
 

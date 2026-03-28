@@ -475,10 +475,9 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
         if m:
             extracted = json.loads(m.group())
             
-            # 새로운 인시던트 코드 생성 (Worker를 통해 인시던트 수 가져오기)
-            incidents_data = await WorkerClient.get("/incidents")
-            count = len(incidents_data) if isinstance(incidents_data, list) else 0
-            incident_code = f"INC-{20240000 + count + 1}"
+            # 새로운 인시던트 코드 생성 (2026MMDD... 형식 권장)
+            now_kst = get_kst()
+            incident_code = now_kst.strftime("%Y%m%d%H%M%S") + str(random.randint(100, 999))
             
             # 인시던트 자동 생성 (Worker API 사용)
             title = f"[{extracted.get('target_system', 'Unknown')}] {extracted.get('problem_description', masked_message[:30])}"
@@ -505,6 +504,7 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
             # 활동 로그 추가 (Worker API 사용)
             await WorkerClient.post("/activity-logs", {
                 "user_name": "System",
+                "user_id": "system@sguard.ai",
                 "incident_code": incident_code,
                 "incident_title": title,
                 "action": "장애 접수 (자동)",
@@ -1118,6 +1118,7 @@ async def join_warroom(
     # 3. Log activity
     await WorkerClient.post("/activity-logs", {
         "user_name": user_name,
+        "user_id": body.get("user_id", "Unknown"),
         "incident_code": incident_id,
         "incident_title": title,
         "action": "War-Room 참여",

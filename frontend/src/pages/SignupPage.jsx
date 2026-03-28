@@ -14,8 +14,27 @@ const SHINHAN_COMPANIES = [
   '신한자산신탁', '신한펀드파트너스', '신한금융플러스', '신한큐브리스크컨설팅',
 ];
 
-// 백엔드 API로부터 동적으로 로드받는 상수(하드코딩 제거)
+// 로컬 개발 시에도 원격 데이터베이스를 안정적으로 참조하도록 원격 서버 주소를 기본으로 설정합니다.
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+
+// API 실패 시를 대비한 비상용 정적 데이터 (Fallback)
+const FALLBACK_COMPANIES = [
+  { name: '신한DS', code: 'COM_001' },
+  { name: '신한금융지주', code: 'COM_002' },
+  { name: '신한은행', code: 'COM_003' },
+  { name: '신한카드', code: 'COM_004' },
+  { name: '신한투자증권', code: 'COM_005' },
+  { name: '신한라이프', code: 'COM_006' }
+];
+const FALLBACK_POSITIONS = [
+  { code: 'POS_001', name: '팀원' },
+  { code: 'POS_002', name: '파트장' },
+  { code: 'POS_003', name: '팀장' },
+  { code: 'POS_004', name: '본부장' },
+  { code: 'POS_005', name: '상무' },
+  { code: 'POS_006', name: '부사장' },
+  { code: 'POS_007', name: '사장' }
+];
 
 // ── 약관 텍스트 ────────────────────────────────────
 const TERMS_OF_SERVICE = `
@@ -110,8 +129,9 @@ const PRIVACY_POLICY = `
 // ── 셀렉트 + 기타 입력 컴포넌트 ───────────────────
 function SelectWithOther({ label, icon: Icon, options, value, onChange, required, disabled }) {
   // "기타" 선택 여부를 독립 state로 관리
-  const nonOther = options.filter(o => o !== '기타');
-  const initialIsOther = !!value && !nonOther.includes(value);
+  // options -> [{ name, code }, ...]
+  const nonOther = options.filter(o => o.name !== '기타');
+  const initialIsOther = !!value && !nonOther.find(o => o.code === value);
   const [isOther, setIsOther] = useState(initialIsOther);
   const [otherText, setOtherText] = useState(initialIsOther ? value : '');
 
@@ -121,12 +141,11 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
     const v = e.target.value;
     if (v === '기타') {
       setIsOther(true);
-      // 기타 선택 시 부모값은 기존 수기입력값 유지 (없으면 빈 문자열)
       onChange(otherText);
     } else {
       setIsOther(false);
       setOtherText('');
-      onChange(v);
+      onChange(v); // This will be the code
     }
   };
 
@@ -154,8 +173,9 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
           <option value="" disabled className="bg-[#1a1f2e] text-slate-500">{disabled ? '해당없음' : `${label} 선택`}</option>
 
           {options.map(o => (
-            <option key={o} value={o} className="bg-[#1a1f2e] text-white">{o}</option>
+            <option key={o.code} value={o.code} className="bg-[#1a1f2e] text-white">{o.name}</option>
           ))}
+          <option value="기타" className="bg-[#1a1f2e] text-white italic">기타(직접 입력)</option>
         </select>
         <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
       </div>
@@ -212,46 +232,16 @@ export default function SignupPage() {
   const [modal, setModal] = useState(null); // 'terms' | 'privacy' | null
 
   // ── 조직도 동적 캐시 ──
-  const [honbuList, setHonbuList] = useState([]);
-  const [orgMapping, setOrgMapping] = useState({});   // depth1 → depth2[] 맵핑
-  const [teamMapping, setTeamMapping] = useState({}); // depth2 → depth3[] 맵핑
-  const [partMapping, setPartMapping] = useState({}); // depth3 → depth4[] 맵핑
-
-  // ── 페이지 로드 시 조직도 자동 페치 ──
-  useEffect(() => {
-    fetch(`${API_BASE}/org/tree`)
-      .then(r => r.json())
-      .then(tree => {
-        const hList = [];
-        const oMap = {};
-        const tMap = {};
-        const pMap = {};
-        tree.forEach(d1 => {
-          hList.push(d1.name);
-          if (d1.children && d1.children.length > 0) {
-            oMap[d1.name] = d1.children.map(d2 => d2.name);
-            d1.children.forEach(d2 => {
-              if (d2.children && d2.children.length > 0) {
-                tMap[d2.name] = d2.children.map(d3 => d3.name);
-                d2.children.forEach(d3 => {
-                  if (d3.children && d3.children.length > 0) {
-                    pMap[d3.name] = d3.children.map(d4 => d4.name);
-                  }
-                });
-              }
-            });
-          }
-        });
-        setHonbuList(hList);
-        setOrgMapping(oMap);
-        setTeamMapping(tMap);
-        setPartMapping(pMap);
-      })
-      .catch(err => console.error('Org tree fetch failed:', err));
-  }, []);
+  const [honbuList, setHonbuList] = useState([]);     // Depth 2 (부문)
+  const [orgMapping, setOrgMapping] = useState({});   // Depth 1 → Depth 2[] (계열사 → 부문)
+  const [teamMapping, setTeamMapping] = useState({}); // Depth 2 → Depth 3[] (부문 → 본부)
+  const [partMapping, setPartMapping] = useState({}); // Depth 3 → Depth 4[] (본부 → 팀)
+  const [subMapping, setSubMapping] = useState({});   // Depth 4 → Depth 5[] (팀 → 파트)
+  const [positions, setPositions] = useState([]);    // 공통 코드북 직책 목록
+  const [companies, setCompanies] = useState([]);    // Depth 1 (계열사 목록)
 
   const [formData, setFormData] = useState({
-    company: '',
+    company: 'COM_001', // Code for '신한DS'
     employee_id: '',
     name: '',
     email: '',
@@ -260,19 +250,125 @@ export default function SignupPage() {
     team: '',
     part: '',
     subpart: '',
+    position: 'POS_001', // Code for '팀원'
     password: '',
     confirmPassword: '',
   });
 
+  useEffect(() => {
+    console.log('[SignupPage] Fetching org tree from:', `${API_BASE}/org/tree`);
+    fetch(`${API_BASE}/org/tree`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+        return r.json();
+      })
+      .then(tree => {
+        console.log('[SignupPage] Loaded org tree:', tree);
+        const cList = [];
+        const oMap = {};
+        const tMap = {};
+        const pMap = {};
+        const sMap = {};
+        
+        if (!tree || tree.length === 0) {
+          console.warn('[SignupPage] Org tree is empty!');
+        }
+
+        tree.forEach(d1 => {
+          cList.push({ name: d1.name, code: d1.code }); // Company
+          if (d1.children) {
+            oMap[d1.code] = d1.children.map(d2 => ({ name: d2.name, code: d2.code })); // Affiliate(Code) -> Dept[]
+            d1.children.forEach(d2 => {
+              if (d2.children) {
+                tMap[d2.code] = d2.children.map(d3 => ({ name: d3.name, code: d3.code })); // Dept(Code) -> Div[]
+                d2.children.forEach(d3 => {
+                  if (d3.children) {
+                    pMap[d3.code] = d3.children.map(d4 => ({ name: d4.name, code: d4.code })); // Div(Code) -> Team[]
+                    d3.children.forEach(d4 => {
+                      if (d4.children) {
+                        sMap[d4.code] = d4.children.map(d5 => ({ name: d5.name, code: d5.code })); // Team(Code) -> Part[]
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+        setCompanies(cList);
+        setOrgMapping(oMap);
+        setTeamMapping(tMap);
+        setPartMapping(pMap);
+        setSubMapping(sMap);
+      })
+      .catch(err => {
+        console.error('[SignupPage] Org tree fetch failed:', err);
+        setErrorMsg('조직도 정보를 불러오지 못했습니다. 네트워크 상태를 확인해 주세요.');
+      });
+
+    // ── 직책 코드북 페치 ──
+    console.log('[SignupPage] Fetching positions from:', `${API_BASE}/ai/codes/POSITION`);
+    fetch(`${API_BASE}/ai/codes/POSITION`)
+      .then(r => {
+        if (!r.ok) throw new Error('직책 정보를 불러오지 못했습니다.');
+        return r.json();
+      })
+      .then(data => {
+        console.log('[SignupPage] Loaded positions:', data.codes);
+        if (data.codes && data.codes.length > 0) {
+          setPositions(data.codes);
+          setFormData(prev => ({ ...prev, position: data.codes[0].code }));
+        } else {
+          // 데이터가 없거나 404인 경우 비상 데이터 사용
+          setPositions(FALLBACK_POSITIONS);
+        }
+      })
+      .catch(err => {
+        console.error('[SignupPage] Position codes fetch failed:', err);
+        setPositions(FALLBACK_POSITIONS);
+      });
+  }, []);
+
+  // ── 데이터 로드 후 초기값 동기화 (부문 목록 등) ──
+  useEffect(() => {
+    // 회사가 선택되어 있고, 해당 회사의 부서 매핑이 들어왔을 때 초기값 설정
+    if (formData.company && orgMapping[formData.company]) {
+      const depts = orgMapping[formData.company];
+      if (depts.length > 0 && !formData.honbu) {
+        // 첫 번째 부문 자동 선택은 사용자 자유도를 위해 보류하되, 
+        // 목록이 비어있는 것처럼 보이는 현상을 방지하기 위해 강제 리렌더링 유도
+        console.log(`[SignupPage] Syncing depts for ${formData.company}:`, depts);
+      }
+    }
+  }, [orgMapping, formData.company]);
+
   const API_BASE_URL = API_BASE;
 
-  const handleChange = (field) => (val) =>
-    setFormData(prev => ({ ...prev, [field]: typeof val === 'string' ? val : val.target.value }));
+  const handleChange = (field) => (val) => {
+    let value = typeof val === 'string' ? val : val.target.value;
+
+    if (field === 'phone') {
+      // 숫자만 남기기 및 11자리 제한
+      value = value.replace(/[^0-9]/g, '').slice(0, 11);
+      
+      // 하이픈 자동 삽입 (XXX-XXXX-XXXX)
+      if (value.length <= 3) {
+        // 그대로
+      } else if (value.length <= 7) {
+        value = `${value.slice(0, 3)}-${value.slice(3)}`;
+      } else {
+        value = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7)}`;
+      }
+    }
+
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     if (!formData.company) { setErrorMsg('회사소속을 선택해 주세요.'); return; }
+    if (!formData.position) { setErrorMsg('직책을 선택해 주세요.'); return; }
     if (!formData.honbu) { setErrorMsg('부문을 선택해 주세요.'); return; }
     
     // Check conditional requirements based on LIVE mapping
@@ -289,22 +385,27 @@ export default function SignupPage() {
     if (formData.password.length < 8) { setErrorMsg('비밀번호는 8자 이상이어야 합니다.'); return; }
 
     setLoading(true);
+    const signupBody = {
+      email: formData.email,
+      name: formData.name,
+      password: formData.password,
+      company: formData.company,
+      employee_id: (formData.employee_id || '').trim(),
+      position: formData.position,
+      phone: (formData.phone || '').trim(),
+      honbu: formData.honbu,
+      team: formData.team,
+      part: formData.part,
+      subpart: formData.subpart,
+    };
+
+    console.log('[SignupPage] Submitting Body:', signupBody);
+
     try {
       const res = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          name: formData.name,
-          password: formData.password,
-          company: formData.company,
-          employee_id: formData.employee_id,
-          phone: formData.phone,
-          honbu: formData.honbu,
-          team: formData.team,
-          part: formData.part,
-          subpart: formData.subpart,
-        }),
+        body: JSON.stringify(signupBody),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || '회원가입 실패');
@@ -362,13 +463,26 @@ export default function SignupPage() {
               <select
                 required
                 value={formData.company}
-                onChange={handleChange('company')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleChange('company')(val);
+                  handleChange('honbu')('');
+                  handleChange('team')('');
+                  handleChange('part')('');
+                  handleChange('subpart')('');
+                }}
                 className={`${inputClass} appearance-none pr-10`}
               >
                 <option value="" disabled className="bg-[#1a1f2e] text-slate-500">회사를 선택하세요</option>
-                {SHINHAN_COMPANIES.map(c => (
-                  <option key={c} value={c} className="bg-[#1a1f2e] text-white">{c}</option>
-                ))}
+                {companies.length > 0 ? (
+                  companies.map(c => (
+                    <option key={c.code} value={c.code} className="bg-[#1a1f2e] text-white">{c.name}</option>
+                  ))
+                ) : (
+                  FALLBACK_COMPANIES.map(c => (
+                    <option key={c.code} value={c.code} className="bg-[#1a1f2e] text-white">{c.name}</option>
+                  ))
+                )}
               </select>
               <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
             </div>
@@ -379,28 +493,29 @@ export default function SignupPage() {
             <SelectWithOther
               label="부문"
               icon={Building2}
-              options={honbuList}
+              options={orgMapping[formData.company] || []}
               value={formData.honbu}
               onChange={(val) => {
                 handleChange('honbu')(val);
-                handleChange('team')(''); // Reset team when honbu changes
-                handleChange('part')(''); // Reset part also
-                handleChange('subpart')(''); // Reset subpart also
+                handleChange('team')(''); 
+                handleChange('part')(''); 
+                handleChange('subpart')('');
               }}
-              required
+              required={(orgMapping[formData.company] || []).length > 0}
+              disabled={!(orgMapping[formData.company] || []).length > 0}
             />
             <SelectWithOther
               label="본부"
               icon={Building2}
-              options={orgMapping[formData.honbu] || []}
+              options={teamMapping[formData.honbu] || []}
               value={formData.team}
               onChange={(val) => {
                 handleChange('team')(val);
-                handleChange('part')(''); // Reset part when team changes
-                handleChange('subpart')(''); // Reset subpart when team changes
+                handleChange('part')(''); 
+                handleChange('subpart')(''); 
               }}
-              required={(orgMapping[formData.honbu] || []).length > 0}
-              disabled={!(orgMapping[formData.honbu] || []).length > 0}
+              required={(teamMapping[formData.honbu] || []).length > 0}
+              disabled={!(teamMapping[formData.honbu] || []).length > 0}
             />
           </div>
 
@@ -409,24 +524,48 @@ export default function SignupPage() {
             <SelectWithOther
               label="팀"
               icon={Building2}
-              options={teamMapping[formData.team] || []}
+              options={partMapping[formData.team] || []}
               value={formData.part}
               onChange={(val) => {
                 handleChange('part')(val);
-                handleChange('subpart')(''); // Reset subpart when team changes
+                handleChange('subpart')(''); 
               }}
-              required={(teamMapping[formData.team] || []).length > 0}
-              disabled={!(teamMapping[formData.team] || []).length > 0}
+              required={(partMapping[formData.team] || []).length > 0}
+              disabled={!(partMapping[formData.team] || []).length > 0}
             />
             <SelectWithOther
               label="파트"
               icon={Building2}
-              options={partMapping[formData.part] || []}
+              options={subMapping[formData.part] || []}
               value={formData.subpart}
               onChange={handleChange('subpart')}
-              required={(partMapping[formData.part] || []).length > 0}
-              disabled={!(partMapping[formData.part] || []).length > 0}
+              required={(subMapping[formData.part] || []).length > 0}
+              disabled={!(subMapping[formData.part] || []).length > 0}
             />
+          </div>
+          
+          {/* 직책 선택 */}
+          <div className="bg-[#1a1f2e] border border-blue-500/20 rounded-2xl p-4 shadow-inner">
+            <label className={labelClass}>직책 <span className="text-red-400">*</span></label>
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {positions.map(pos => (
+                <button
+                  key={pos.code}
+                  type="button"
+                  onClick={() => handleChange('position')(pos.code)}
+                  className={`py-2 px-1 text-[11px] font-bold rounded-lg border transition-all duration-200 ${
+                    formData.position === pos.code 
+                    ? 'bg-blue-600 border-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] scale-[1.02]' 
+                    : 'bg-[#12172a] border-white/5 text-slate-500 hover:border-white/10 hover:text-slate-400'
+                  }`}
+                >
+                  {pos.name}
+                </button>
+              ))}
+              {positions.length === 0 && Array(7).fill(0).map((_, i) => (
+                <div key={i} className="py-2 bg-white/5 border border-white/5 rounded-lg animate-pulse h-8" />
+              ))}
+            </div>
           </div>
 
           {/* 사번 + 이름 */}
@@ -461,7 +600,15 @@ export default function SignupPage() {
             <label className={labelClass}>핸드폰 번호 <span className="text-red-400">*</span></label>
             <div className="relative">
               <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input required type="tel" value={formData.phone} onChange={handleChange('phone')} placeholder="010-0000-0000" className={inputClass} />
+              <input 
+                required 
+                type="tel" 
+                value={formData.phone} 
+                onChange={handleChange('phone')} 
+                placeholder="010-0000-0000" 
+                maxLength={13} 
+                className={inputClass} 
+              />
             </div>
           </div>
 
@@ -471,14 +618,33 @@ export default function SignupPage() {
               <label className={labelClass}>비밀번호 <span className="text-red-400">*</span></label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input required type="password" value={formData.password} onChange={handleChange('password')} placeholder="••••••••" minLength={8} className={inputClass} />
+                <input 
+                  required 
+                  type="password" 
+                  value={formData.password} 
+                  onChange={handleChange('password')} 
+                  placeholder="••••••••" 
+                  minLength={8} 
+                  autoComplete="new-password" 
+                  onFocus={(e) => e.target.select()}
+                  className={inputClass} 
+                />
               </div>
             </div>
             <div>
               <label className={labelClass}>비밀번호 확인 <span className="text-red-400">*</span></label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input required type="password" value={formData.confirmPassword} onChange={handleChange('confirmPassword')} placeholder="••••••••" className={inputClass} />
+                <input 
+                  required 
+                  type="password" 
+                  value={formData.confirmPassword} 
+                  onChange={handleChange('confirmPassword')} 
+                  placeholder="••••••••" 
+                  autoComplete="new-password" 
+                  onFocus={(e) => e.target.select()}
+                  className={inputClass} 
+                />
               </div>
             </div>
           </div>

@@ -136,8 +136,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           stopTypewriter();
           setDisplayedText(prev => {
             const base = (prev || '').trimEnd();
-            return (base ? base + '\n' : '') + '선택된 SMS수신 내역이 없습니다. 내역을 선택해주세요.\n';
-
+            return (base ? base + '\n' : '');
           });
         };
 
@@ -250,8 +249,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           stopTypewriter();
           setDisplayedText(prev => {
             const base = (prev || '').trimEnd();
-            return (base ? base + '\n' : '') + '선택된 SMS수신 내역이 없습니다. 내역을 선택해주세요.\n';
-
+            return (base ? base + '\n' : '');
           });
           setAnalysisComplete(true);
         }
@@ -299,6 +297,20 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         const response = await fetch(`${API_BASE_URL}/ai/insight`);
         if (!response.ok) throw new Error('Network response was not ok');
         
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          if (data.current_log?.text) {
+            setDisplayedText(data.current_log.text);
+            setAnalysisComplete(true);
+            if (data.prediction_counts) {
+              setInsightData(prev => ({ ...prev, prediction_counts: data.prediction_counts }));
+              if (onLogReceived) onLogReceived({ type: 'info' }, data.prediction_counts);
+            }
+          }
+          return;
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let cumulativeText = '';
@@ -334,9 +346,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                 }
                 
                 // Streaming text update
-                if (data.answer) {
-                  cumulativeText += data.answer;
-                  enqueueText(data.answer);
+                if (data.answer || data.current_log?.text) {
+                  const newText = data.answer || data.current_log?.text;
+                  cumulativeText += newText;
+                  enqueueText(newText);
                 }
 
                 // Error handling
@@ -353,7 +366,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         }
       } catch (err) {
         console.error("Streaming error:", err);
-        enqueueText("선택된 SMS수신 내역이 없습니다. 내역을 선택해주세요.", { reset: true });
+        enqueueText("", { reset: true });
 
 
         if (!isCancelled) setTimeout(startStreaming, 7000);
@@ -489,7 +502,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       </div>
 
-      <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isCollapsed ? 'max-h-0 min-h-0 opacity-0' : 'max-h-[1500px] min-h-[300px] opacity-100'} -mx-2 px-2`}>
+      <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isCollapsed ? 'max-h-0 min-h-0 opacity-0' : 'max-h-[1500px] min-h-[300px] opacity-100'} -mx-2 px-2 pb-12 relative`}>
         {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
       <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px]
         ${isAnalyzingSms && isCritical ? 'bg-[#150a0a] border-red-500/30' : isAnalyzingSms ? 'bg-[#11110a] border-yellow-500/30' : 'bg-[#0a0c12] border-blue-500/10'}`}>

@@ -1,12 +1,12 @@
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     password_hash TEXT,
-    role TEXT DEFAULT 'analyst',
+    role TEXT DEFAULT 'user',
     auth_provider TEXT DEFAULT 'local',
     company TEXT,
-    employee_id TEXT,
     phone TEXT,
     honbu TEXT,
     team TEXT,
@@ -15,10 +15,12 @@ CREATE TABLE IF NOT EXISTS users (
     token TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT 1,
+    is_admin INTEGER DEFAULT 0,
     reg_id TEXT DEFAULT 'SYSTEM',
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
-    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    position TEXT DEFAULT 'POS_001'
 );
 
 CREATE TABLE IF NOT EXISTS organizations (
@@ -37,7 +39,7 @@ CREATE TABLE IF NOT EXISTS organizations (
 
 CREATE TABLE IF NOT EXISTS login_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
+    user_id TEXT,
     email TEXT,
     ip_address TEXT,
     user_agent TEXT,
@@ -47,12 +49,12 @@ CREATE TABLE IF NOT EXISTS login_history (
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
     mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    FOREIGN KEY(user_id) REFERENCES users(employee_id)
 );
 
 CREATE TABLE IF NOT EXISTS activity_logs (
-    inc_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
+    inc_id TEXT,
+    user_id TEXT,
     user_name TEXT DEFAULT 'System',
     incident_code TEXT,
     incident_title TEXT,
@@ -64,7 +66,8 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     reg_id TEXT DEFAULT 'SYSTEM',
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
-    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (inc_id, user_id, created_at)
 );
 
 CREATE TABLE IF NOT EXISTS incidents (
@@ -75,7 +78,7 @@ CREATE TABLE IF NOT EXISTS incidents (
     status TEXT DEFAULT 'Open',
     incident_type TEXT DEFAULT 'AI',
     assigned_to TEXT,
-    source_sms_id INTEGER,
+    source_sms_id TEXT,
     ai_insight TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -86,7 +89,7 @@ CREATE TABLE IF NOT EXISTS incidents (
 );
 
 CREATE TABLE IF NOT EXISTS incident_history (
-    inc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inc_id TEXT PRIMARY KEY,
     sms_id INTEGER,
     target_system TEXT,
     error_code TEXT,
@@ -113,7 +116,7 @@ CREATE TABLE IF NOT EXISTS action_results (
 );
 
 CREATE TABLE IF NOT EXISTS received_messages (
-    inc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inc_id TEXT PRIMARY KEY,
     sender TEXT,
     message TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -232,7 +235,7 @@ CREATE TABLE IF NOT EXISTS postmortems (
     reg_dt DATETIME,
     mod_id TEXT,
     mod_dt DATETIME,
-    FOREIGN KEY(incident_code) REFERENCES incidents(code)
+    FOREIGN KEY(incident_code) REFERENCES incidents(inc_id)
 );
 CREATE TABLE IF NOT EXISTS knowledge_base (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -246,7 +249,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     reg_id TEXT DEFAULT 'SYSTEM',
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
-    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_dt CURRENT_TIMESTAMP,
     vector F32_ARRAY(768),
     FOREIGN KEY (inc_id) REFERENCES received_messages(inc_id)
 );
@@ -258,25 +261,29 @@ CREATE TABLE IF NOT EXISTS warroom_list (
     creator_id TEXT,
     status TEXT DEFAULT 'OPEN',
     severity TEXT,
-    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+    leader_summary TEXT,
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 -- Incident Assignments and Status
 CREATE TABLE IF NOT EXISTS incident_assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     inc_id TEXT NOT NULL,
     status TEXT DEFAULT '미확인', -- '미확인', '처리중', '처리완료'
     assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, inc_id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    FOREIGN KEY(user_id) REFERENCES users(employee_id)
 );
 
 -- Personal War-Room Lists (Leave/Invite)
 CREATE TABLE IF NOT EXISTS user_warrooms (
-    user_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     inc_id TEXT NOT NULL,
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, inc_id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    FOREIGN KEY(user_id) REFERENCES users(employee_id)
 );

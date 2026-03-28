@@ -9,9 +9,7 @@ export default function SMSNotification() {
 
   useEffect(() => {
     // WebSocket 연결 (로컬/프로덕션 분기)
-    const wsUrl = window.location.hostname === 'localhost'
-      ? 'ws://localhost:8000/ws'
-      : 'wss://api.chokerslab.store/ws';
+    const wsUrl = 'wss://api.chokerslab.store/ws';
     const websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {
