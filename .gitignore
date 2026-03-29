@@ -1,0 +1,17 @@
+node_modules/
+.wrangler/
+.cursor/
+dist/
+*.log
+*.pid
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+__pycache__/
+backend/__pycache__/
+workers/sms-api/.wrangler/
+frontend/.wrangler/
+frontend/dist/

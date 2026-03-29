@@ -108,14 +108,14 @@ DIFY_DATASET_ID = os.getenv("DIFY_DATASET_ID", "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXX
 
 class DifyClient:
     @staticmethod
-    async def chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = []):
+    async def chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = [], api_key: Optional[str] = None):
         """
         Dify chat-messages를 streaming 모드로 호출한 뒤,
         answer만 누적해 최종 JSON 형태로 반환한다.
         (긴 응답에서도 연결 유지를 위해 streaming을 기본으로 사용)
         """
         try:
-            gen = await DifyClient.stream_chat_message(query=query, user=user, inputs=inputs, files=files)
+            gen = await DifyClient.stream_chat_message(query=query, user=user, inputs=inputs, files=files, api_key=api_key)
             answer_parts: list[str] = []
             async for chunk in gen:
                 # chunk format: "data: {...}\n\n" or "data: [DONE]\n\n"
@@ -138,10 +138,11 @@ class DifyClient:
             return {"answer": "AI 분석이 지연되고 있습니다"}
 
     @staticmethod
-    async def stream_chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = []):
+    async def stream_chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = [], api_key: Optional[str] = None):
         url = f"{DIFY_API_BASE}/chat-messages"
+        auth_key = api_key if api_key else DIFY_API_KEY
         headers = {
-            "Authorization": f"Bearer {DIFY_API_KEY}",
+            "Authorization": f"Bearer {auth_key}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
@@ -385,6 +386,37 @@ class SMSMessage(BaseModel):
     sender: str
     message: str
     received_at: Optional[str] = None
+    employee_id: Optional[str] = None
+    channel: Optional[str] = None
+    if_id: Optional[str] = None
+    service_code: Optional[str] = None
+    service_name: Optional[str] = None
+    biz_system: Optional[str] = None
+    error_code: Optional[str] = None
+    occurrence_count: Optional[Any] = None
+    occurrence_node: Optional[str] = None
+    error_message: Optional[str] = None
+    occurrence_time: Optional[str] = None
+    receiver_1: Optional[str] = None
+    receiver_2: Optional[str] = None
+    receiver_3: Optional[str] = None
+    receiver_4: Optional[str] = None
+    receiver_5: Optional[str] = None
+    receiver_6: Optional[str] = None
+    receiver_7: Optional[str] = None
+    receiver_8: Optional[str] = None
+    receiver_9: Optional[str] = None
+    receiver_10: Optional[str] = None
+    receiver_11: Optional[str] = None
+    receiver_12: Optional[str] = None
+    receiver_13: Optional[str] = None
+    receiver_14: Optional[str] = None
+    receiver_15: Optional[str] = None
+    receiver_16: Optional[str] = None
+    receiver_17: Optional[str] = None
+    receiver_18: Optional[str] = None
+    receiver_19: Optional[str] = None
+    receiver_20: Optional[str] = None
 
 class IncidentCreate(BaseModel):
     code: str
@@ -443,12 +475,32 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
         except (ValueError, TypeError):
             logger.warning(f"Invalid timestamp format: {sms.received_at}. Falling back to server time.")
 
-    # 3. Worker에 SMS 저장 요청
-    worker_res = await WorkerClient.post("/sms/receive", {
+    # 3. Worker에 SMS 저장 요청 (모든 상세 필드 포함)
+    worker_payload = {
         "sender": sms.sender,
         "message": masked_message,
+        "employee_id": sms.employee_id,
+        "channel": sms.channel,
+        "if_id": sms.if_id,
+        "service_code": sms.service_code,
+        "service_name": sms.service_name,
+        "biz_system": sms.biz_system,
+        "error_code": sms.error_code,
+        "occurrence_count": sms.occurrence_count,
+        "occurrence_node": sms.occurrence_node,
+        "error_message": sms.error_message,
+        "occurrence_time": sms.occurrence_time or ts.isoformat(),
         "received_at": ts.isoformat()
-    })
+    }
+    
+    # 수신자 목록 추가 (1~20)
+    for i in range(1, 21):
+        key = f"receiver_{i}"
+        val = getattr(sms, key, None)
+        if val:
+            worker_payload[key] = val
+
+    worker_res = await WorkerClient.post("/sms/receive", worker_payload)
     
     if "error" in worker_res:
         return {"status": "error", "message": "Failed to save to D1 via Worker"}
@@ -761,6 +813,9 @@ async def get_ai_analysis_detail(incident_id: str):
 class ChatRequest(BaseModel):
     query: str
 
+class SummarizeChatRequest(BaseModel):
+    incident_id: str
+
 @app.post("/ai/chat")
 async def chat_with_ai(request: ChatRequest):
     """
@@ -781,6 +836,73 @@ async def chat_with_ai(request: ChatRequest):
         logger.error(f"Chat Dify error: {e}")
         async def fail_gen():
             yield f"data: {json.dumps({'error': f'AI 통신 중 오류가 발생했습니다: {str(e)}'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(fail_gen(), media_type="text/event-stream")
+
+
+@app.post("/ai/summarize-chat")
+async def summarize_chat(req: SummarizeChatRequest):
+    """
+    Generate a summary of the War-Room chat for a specific incident.
+    """
+    incident_id = req.incident_id
+    if not incident_id:
+        async def err_gen():
+            yield f"data: {json.dumps({'error': 'incident_id가 필요합니다.'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(err_gen(), media_type="text/event-stream")
+
+    # 1. Fetch chat history
+    chat_res = await WorkerClient.get(f"/warroom/chat/{incident_id}")
+    messages = chat_res.get("messages", [])
+    
+    if not messages:
+        async def empty_gen():
+            yield f"data: {json.dumps({'answer': '요약할 채팅 내역이 없습니다.'}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(empty_gen(), media_type="text/event-stream")
+
+    # 2. Format transcript
+    transcript = []
+    for msg in messages:
+        role = msg.get("role", "User")
+        sender = msg.get("sender", "Unknown")
+        text = msg.get("text", "")
+        if text:
+            transcript.append(f"[{role}] {sender}: {text}")
+    
+    chat_content = "\n".join(transcript)
+    
+    # 3. Create prompt
+    prompt = f"""
+다음은 인시던트({incident_id})에 대한 War-Room 채팅 내역입니다. 
+이 내용을 바탕으로 장애 대응 과정과 결과를 요약해줘.
+
+[채팅 내역]
+{chat_content}
+
+[요약 요구사항]
+1. 장애 개요: 어떤 장애가 발생했는지 요약
+2. 주요 조치 사항: 타임라인별 주요 대응 내용
+3. 최종 결과: 현재 상태 및 조치 결과
+4. 향후 과제: 재발 방지를 위해 필요한 사항 (있을 경우)
+
+응답은 전문적이고 읽기 쉬운 Markdown 형식으로 작성해줘.
+"""
+
+    try:
+        logger.info(f"Summarizing chat for {incident_id}")
+        # Use the specific Dify API key for Chat Summary
+        gen = await DifyClient.stream_chat_message(
+            query=prompt, 
+            user="sguard-summarizer",
+            api_key="app-owwPp3j2qAvVDZpW2UUiY8L3"
+        )
+        return StreamingResponse(gen, media_type="text/event-stream")
+    except Exception as e:
+        logger.error(f"Summarization error: {e}")
+        async def fail_gen():
+            yield f"data: {json.dumps({'error': f'요약 중 오류가 발생했습니다: {str(e)}'}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(fail_gen(), media_type="text/event-stream")
 

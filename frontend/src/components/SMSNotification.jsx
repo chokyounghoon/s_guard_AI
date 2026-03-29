@@ -5,55 +5,50 @@ import { X, AlertCircle, CheckCircle, Info } from 'lucide-react';
 export default function SMSNotification() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
-  const [ws, setWs] = useState(null);
+  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
-    // WebSocket 연결 (로컬/프로덕션 분기)
-    const wsUrl = 'wss://api.chokerslab.store/ws';
-    const websocket = new WebSocket(wsUrl);
+    // Server-Sent Events (SSE) 연결
+    const eventSource = new EventSource(`${API_BASE}/sms/notification-stream`);
 
-    websocket.onopen = () => {
-      console.log('WebSocket 연결됨');
-      websocket.send('ping'); // 연결 유지
+    eventSource.onopen = () => {
+      console.log('SSE 스트림 연결됨');
     };
 
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log('SMS 수신:', data);
+    // 'sms_received' 이벤트 핸들러
+    eventSource.addEventListener('sms_received', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('실시간 SMS 수신 (SSE):', data);
 
-      if (data.type === 'sms_received') {
         const newNotification = {
           id: Date.now(),
           sender: data.sender,
           message: data.message,
-          timestamp: new Date(data.timestamp),
-          keywordDetected: data.keyword_detected,
+          timestamp: new Date(data.timestamp || Date.now()),
+          keywordDetected: data.keyword_detected === 1 || data.keyword_detected === true,
           responseMessage: data.response_message,
         };
 
-        setNotifications((prev) => [newNotification, ...prev].slice(0, 3)); // 최대 3개만 표시
+        setNotifications((prev) => [newNotification, ...prev].slice(0, 3));
 
         // 5초 후 자동 제거
         setTimeout(() => {
           setNotifications((prev) => prev.filter((n) => n.id !== newNotification.id));
         }, 5000);
+      } catch (error) {
+        console.error('SSE data parse error:', error);
       }
-    };
+    });
 
-    websocket.onerror = (error) => {
-      console.error('WebSocket 오류:', error);
+    eventSource.onerror = (error) => {
+      console.error('SSE 연결 오류:', error);
+      // 브라우저가 자동으로 재연결을 시도하지만, 에러 로그를 남깁니다.
     };
-
-    websocket.onclose = () => {
-      console.log('WebSocket 연결 종료');
-    };
-
-    setWs(websocket);
 
     return () => {
-      if (websocket) {
-        websocket.close();
-      }
+      console.log('SSE 스트림 연결 종료');
+      eventSource.close();
     };
   }, []);
 

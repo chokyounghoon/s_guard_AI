@@ -8,6 +8,7 @@ import AiReportPage from './pages/AiReportPage';
 import AiProcessReportPage from './pages/AiProcessReportPage';
 import AssignmentDetailPage from './pages/AssignmentDetailPage';
 import ChatPage from './pages/ChatPage';
+import ChatSummaryPage from './pages/ChatSummaryPage';
 import ReportPublishPage from './pages/ReportPublishPage';
 import ActivityPage from './pages/ActivityPage';
 import ActivityDetailPage from './pages/ActivityDetailPage';
@@ -43,6 +44,7 @@ function AppContent() {
         <Route path="/ai-report" element={<AiReportPage />} />
         <Route path="/assignment-detail" element={<AssignmentDetailPage />} />
         <Route path="/chat/:incidentId?" element={<ChatPage />} />
+        <Route path="/chat-summary/:incidentId" element={<ChatSummaryPage />} />
         <Route path="/ai-process-report" element={<AiProcessReportPage />} />
         <Route path="/report-publish" element={<ReportPublishPage />} />
         <Route path="/activity" element={<ActivityPage />} />

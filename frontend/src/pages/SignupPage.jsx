@@ -24,7 +24,19 @@ const FALLBACK_COMPANIES = [
   { name: '신한은행', code: 'COM_003' },
   { name: '신한카드', code: 'COM_004' },
   { name: '신한투자증권', code: 'COM_005' },
-  { name: '신한라이프', code: 'COM_006' }
+  { name: '신한라이프', code: 'COM_006' },
+  { name: '신한캐피탈', code: 'COM_007' },
+  { name: '신한자산운용', code: 'COM_008' },
+  { name: '신한저축은행', code: 'COM_009' },
+  { name: '신한AI', code: 'COM_010' },
+  { name: '제주은행', code: 'COM_011' },
+  { name: '신한벤처투자', code: 'COM_012' },
+  { name: '신한리츠운용', code: 'COM_013' },
+  { name: '신한대체투자운용', code: 'COM_014' },
+  { name: '신한자산신탁', code: 'COM_015' },
+  { name: '신한펀드파트너스', code: 'COM_016' },
+  { name: '신한금융플러스', code: 'COM_017' },
+  { name: '신한큐브리스크컨설팅', code: 'COM_018' }
 ];
 const FALLBACK_POSITIONS = [
   { code: 'POS_001', name: '팀원' },

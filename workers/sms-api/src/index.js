@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { streamSSE } from 'hono/streaming'
 
 const app = new Hono()
 
@@ -367,7 +368,14 @@ app.get('/ai/codes/:category', async (c) => {
 // 3. SMS Interactions
 // ==========================================
 app.post('/sms/receive', async (c) => {
-  const { sender, message } = await c.req.json()
+  const body = await c.req.json()
+  const { 
+    sender, message, employee_id, 
+    channel, if_id, service_code, service_name, 
+    biz_system, error_code, occurrence_count, 
+    occurrence_node, error_message, occurrence_time, received_at 
+  } = body
+  const finalOccurrenceTime = occurrence_time || received_at || null
   const db = c.env.DB
   const now = new Date()
   const kstOffset = 9 * 60 * 60 * 1000
@@ -382,8 +390,61 @@ app.post('/sms/receive', async (c) => {
 
   if (existing) {
     const newCount = (existing.received_count || 1) + 1
-    await db.prepare("UPDATE received_messages SET received_count = ?, timestamp = ?, mod_dt = ? WHERE inc_id = ?")
-      .bind(newCount, timestamp, timestamp, existing.inc_id).run()
+    const count = parseInt(String(occurrence_count || '0').replace(/[^0-9]/g, '')) || 0
+    await db.prepare(`
+      UPDATE received_messages SET 
+        received_count = ?, timestamp = ?, mod_dt = ?, employee_id = ?,
+        channel = ?, if_id = ?, service_code = ?, service_name = ?, 
+        biz_system = ?, error_code = ?, occurrence_count = ?, 
+        occurrence_node = ?, error_message = ?, occurrence_time = ?,
+        receiver_1 = ?, receiver_2 = ?, receiver_3 = ?, receiver_4 = ?, receiver_5 = ?,
+        receiver_6 = ?, receiver_7 = ?, receiver_8 = ?, receiver_9 = ?, receiver_10 = ?,
+        receiver_11 = ?, receiver_12 = ?, receiver_13 = ?, receiver_14 = ?, receiver_15 = ?,
+        receiver_16 = ?, receiver_17 = ?, receiver_18 = ?, receiver_19 = ?, receiver_20 = ?
+      WHERE inc_id = ?
+    `).bind(
+      newCount, timestamp, timestamp, employee_id || null,
+      channel || null, if_id || null, service_code || null, service_name || null,
+      biz_system || null, error_code || null, count,
+      occurrence_node || null, error_message || null, finalOccurrenceTime || null,
+      body.receiver_1 || null, body.receiver_2 || null, body.receiver_3 || null, body.receiver_4 || null, body.receiver_5 || null,
+      body.receiver_6 || null, body.receiver_7 || null, body.receiver_8 || null, body.receiver_9 || null, body.receiver_10 || null,
+      body.receiver_11 || null, body.receiver_12 || null, body.receiver_13 || null, body.receiver_14 || null, body.receiver_15 || null,
+      body.receiver_16 || null, body.receiver_17 || null, body.receiver_18 || null, body.receiver_19 || null, body.receiver_20 || null,
+      existing.inc_id
+    ).run()
+
+    // --- AUTO-ASSIGNMENT (DUPLICATE CASE) ---
+    const rawReceivers = [];
+    for (let i = 1; i <= 20; i++) {
+        const r = body[`receiver_${i}`];
+        if (r && r.trim() !== '' && String(r) !== 'null') rawReceivers.push(r.trim());
+    }
+    
+    if (rawReceivers.length > 0) {
+        // Normalize names: remove all internal whitespace
+        const normalizedReceivers = rawReceivers.map(r => r.replace(/\s+/g, '').trim()).filter(Boolean);
+        if (normalizedReceivers.length > 0) {
+            const placeholders = normalizedReceivers.map(() => '?').join(',');
+            try {
+                const result = await db.prepare(`
+                    INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
+                    SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?
+                    FROM users u_source
+                    JOIN users u_target ON u_source.company = u_target.company AND u_source.team = u_target.team
+                    WHERE u_source.is_active = 1
+                      AND u_target.is_active = 1
+                      AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
+                `).bind(existing.inc_id, timestamp, timestamp, ...normalizedReceivers, ...normalizedReceivers).run();
+                console.log(`[Assignment] Bulk assignment completed for ${existing.inc_id}. Changes: ${result.meta.changes}`);
+            } catch (assignError) {
+                console.error(`[Assignment] Error in bulk assignment for ${existing.inc_id}:`, assignError);
+            }
+        } else {
+            console.warn(`[Assignment] No valid normalized receivers for ${existing.inc_id}`);
+        }
+    }
+
     return c.json({ status: 'duplicate_incremented', inc_id: existing.inc_id, received_count: newCount })
   }
 
@@ -401,18 +462,164 @@ app.post('/sms/receive', async (c) => {
   }
 
   const newIncId = generateIncId()
-  await db.prepare(
-    "INSERT INTO received_messages (inc_id, sender, message, timestamp, keyword_detected, response_message, received_count, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(newIncId, sender, message, timestamp, detected ? 1 : 0, response_msg, 1, 'SYSTEM', timestamp, 'SYSTEM', timestamp).run()
+    const count = parseInt(String(occurrence_count || '0').replace(/[^0-9]/g, '')) || 0
+  await db.prepare(`
+    INSERT INTO received_messages (
+      inc_id, sender, message, employee_id, timestamp, keyword_detected, 
+      response_message, received_count, 
+      channel, if_id, service_code, service_name, 
+      biz_system, error_code, occurrence_count, 
+      occurrence_node, error_message, occurrence_time,
+      receiver_1, receiver_2, receiver_3, receiver_4, receiver_5,
+      receiver_6, receiver_7, receiver_8, receiver_9, receiver_10,
+      receiver_11, receiver_12, receiver_13, receiver_14, receiver_15,
+      receiver_16, receiver_17, receiver_18, receiver_19, receiver_20,
+      reg_id, reg_dt, mod_id, mod_dt
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, 
+      ?, ?, 
+      ?, ?, ?, ?, 
+      ?, ?, ?, 
+      ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?
+    )
+  `).bind(
+    newIncId, sender || null, message || null, employee_id || null, timestamp, detected ? 1 : 0, 
+    response_msg || null, 1,
+    channel || null, if_id || null, service_code || null, service_name || null,
+    biz_system || null, error_code || null, count,
+    occurrence_node || null, error_message || null, finalOccurrenceTime || null,
+    body.receiver_1 || null, body.receiver_2 || null, body.receiver_3 || null, body.receiver_4 || null, body.receiver_5 || null,
+    body.receiver_6 || null, body.receiver_7 || null, body.receiver_8 || null, body.receiver_9 || null, body.receiver_10 || null,
+    body.receiver_11 || null, body.receiver_12 || null, body.receiver_13 || null, body.receiver_14 || null, body.receiver_15 || null,
+    body.receiver_16 || null, body.receiver_17 || null, body.receiver_18 || null, body.receiver_19 || null, body.receiver_20 || null,
+    employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp
+  ).run()
+
+  // --- AUTO-ASSIGNMENT (NEW CASE) ---
+  const rawReceivers = [];
+  for (let i = 1; i <= 20; i++) {
+    const r = body[`receiver_${i}`];
+    if (r && r.trim() !== '' && String(r) !== 'null') rawReceivers.push(r.trim());
+  }
+
+  if (rawReceivers.length > 0) {
+    // Normalize names: remove all internal whitespace
+    const normalizedReceivers = rawReceivers.map(r => r.replace(/\s+/g, '').trim()).filter(Boolean);
+    if (normalizedReceivers.length > 0) {
+        const placeholders = normalizedReceivers.map(() => '?').join(',');
+        try {
+            const result = await db.prepare(`
+                INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
+                SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?
+                FROM users u_source
+                JOIN users u_target ON u_source.company = u_target.company AND u_source.team = u_target.team
+                WHERE u_source.is_active = 1
+                  AND u_target.is_active = 1
+                  AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
+            `).bind(newIncId, timestamp, timestamp, ...normalizedReceivers, ...normalizedReceivers).run();
+            console.log(`[Assignment] Bulk assignment completed for ${newIncId}. Changes: ${result.meta.changes}`);
+        } catch (assignError) {
+            console.error(`[Assignment] Error in bulk assignment for ${newIncId}:`, assignError);
+        }
+    } else {
+        console.warn(`[Assignment] No valid normalized receivers for ${newIncId}`);
+    }
+  }
 
   return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id: newIncId })
+})
+
+// ==========================================
+// 6. Real-time Notifications (SSE)
+// ==========================================
+app.get('/sms/notification-stream', async (c) => {
+  const db = c.env.DB
+  let lastSeenId = c.req.query('last_id') || null
+
+  return streamSSE(c, async (stream) => {
+    console.log('SSE Stream Connected')
+    
+    // Initial check to set lastSeenId if not provided
+    if (!lastSeenId) {
+      const latest = await db.prepare("SELECT inc_id FROM received_messages ORDER BY timestamp DESC LIMIT 1").first()
+      if (latest) {
+        lastSeenId = latest.inc_id
+      }
+    }
+
+    // Keep the connection alive with a heartbeat every 30 seconds
+    const heartbeatInterval = setInterval(async () => {
+      await stream.writeSSE({ event: 'ping', data: 'heartbeat' })
+    }, 30000)
+
+    try {
+      while (true) {
+        // Check for new SMS every 3 seconds
+        const latest = await db.prepare("SELECT * FROM received_messages ORDER BY timestamp DESC LIMIT 1").first()
+        
+        if (latest && latest.inc_id !== lastSeenId) {
+          console.log('New SMS detected in SSE stream:', latest.inc_id)
+          lastSeenId = latest.inc_id
+          await stream.writeSSE({
+            event: 'sms_received',
+            data: JSON.stringify({
+              inc_id: latest.inc_id,
+              sender: latest.sender,
+              message: latest.message,
+              timestamp: latest.timestamp,
+              keyword_detected: latest.keyword_detected === 1 || latest.keyword_detected === true,
+              response_message: latest.response_message
+            })
+          })
+        }
+        
+        // Wait for 3 seconds before next check
+        await stream.sleep(3000)
+      }
+    } catch (e) {
+      console.error('SSE Stream Error:', e)
+      clearInterval(heartbeatInterval)
+    } finally {
+      clearInterval(heartbeatInterval)
+      console.log('SSE Stream Disconnected')
+    }
+  })
 })
 
 app.get('/sms/recent', async (c) => {
   const limit = c.req.query('limit') || 10
   const db = c.env.DB
   const { results } = await db.prepare("SELECT * FROM received_messages ORDER BY inc_id DESC LIMIT ?").bind(limit).all()
-  return c.json({ total: results.length, messages: results.map(r => ({ inc_id: r.inc_id, id: r.inc_id, sender: r.sender, message: r.message, timestamp: r.timestamp, keyword_detected: r.keyword_detected })) })
+  return c.json({ total: results.length, messages: results.map(r => ({ 
+    inc_id: r.inc_id, 
+    id: r.inc_id, 
+    sender: r.sender, 
+    message: r.message, 
+    employee_id: r.employee_id,
+    timestamp: r.timestamp, 
+    keyword_detected: r.keyword_detected,
+    channel: r.channel,
+    if_id: r.if_id,
+    service_code: r.service_code,
+    service_name: r.service_name,
+    biz_system: r.biz_system,
+    error_code: r.error_code,
+    occurrence_count: r.occurrence_count,
+    occurrence_node: r.occurrence_node,
+    error_message: r.error_message,
+    occurrence_time: r.occurrence_time,
+    receivers: [
+      r.receiver_1, r.receiver_2, r.receiver_3, r.receiver_4, r.receiver_5,
+      r.receiver_6, r.receiver_7, r.receiver_8, r.receiver_9, r.receiver_10,
+      r.receiver_11, r.receiver_12, r.receiver_13, r.receiver_14, r.receiver_15,
+      r.receiver_16, r.receiver_17, r.receiver_18, r.receiver_19, r.receiver_20
+    ].filter(v => v !== null)
+  })) })
 })
 
 app.get('/sms/stats', async (c) => {
@@ -706,12 +913,52 @@ app.post('/ai/chat', async (c) => {
 
 app.post('/ai/analyze-sms', async (c) => {
   const { sender, message, sms_id } = await c.req.json()
+  const db = c.env.DB
   const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!api_key) return c.json({ error: "DIFY_API_KEY_AGENT가 설정되지 않았습니다." }, 500)
 
-  const prompt = `다음 SMS 장애 메시지를 지능형 관제 시스템의 입장에서 분석하고, [Security], [DB], [DevOps], [Leader] 관점의 대응 방안을 포함한 종합 리포트를 작성해줘:\n\n발신자: ${sender}\n메시지: ${message}`
+  // Fetch full details if sms_id is provided
+  let detailedInfo = ""
+  if (sms_id) {
+    const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(sms_id).first()
+    if (sms) {
+      detailedInfo = `
+[장애 상세 정보]
+- 유입채널: ${sms.channel || 'N/A'}
+- IF아이디: ${sms.if_id || 'N/A'}
+- 서비스명: ${sms.service_name || 'N/A'} (${sms.service_code || 'N/A'})
+- 업무시스템: ${sms.biz_system || 'N/A'}
+- 에러코드: ${sms.error_code || 'N/A'}
+- 에러메시지: ${sms.error_message || 'N/A'}
+- 발생건수: ${sms.occurrence_count || '1'}
+- 발생서버/노드: ${sms.occurrence_node || 'N/A'}
+- 실제발생시각: ${sms.occurrence_time || 'N/A'}
+`
+    }
+  }
+
+  const prompt = `당신은 S-GUARD 시스템의 핵심 오케스트레이터이자 지능형 관제 엔진입니다. 사용자가 입력하는 SMS 장애 메시지를 분석하여 실시간 인사이트를 제공하고, 전문가 에이전트들과 협업하여 최적의 조치 가이드를 도출합니다.
+
+🛠️ 핵심 관리 영역
+- S-Autopilot Insight 에이전트: 수신 문자 분석 및 전문가 4인방 업무 배분, 담당자 자동 할당 역할을 수행합니다.
+- AI War-Room Situation Log 에이전트: 워룸 내 타임라인 기록 및 상황 전파 역할을 수행합니다.
+
+👥 전문가 에이전트 페르소나
+- Security Agent: 인프라 분석 및 과거 조치 이력 분석 (없을 시 자율 분석)
+- DB Agent: 해결 가이드 및 과거 조치 이력 분석 (없을 시 자율 분석)
+- DevOps Agent: 앱 배포 이력 및 개발 관점 분석, 과거 조치 이력 분석 (없을 시 자율 분석)
+- Leader Agent: 최종 원인 특정 및 조치 가이드 제시 (없을 시 자율 분석)
+
+응답은 반드시 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 세 개 섹션으로 구성해 주세요.
+
+"⚠️ 중요: 응답 시간이 지연되지 않도록, 각 전문가의 의견은 핵심만 2~3줄 이내로 아주 짧고 간결하게 작성해."
+
+[장애 로그]
+발신자: ${sender}
+메시지: ${message}
+${detailedInfo}`
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -980,7 +1227,26 @@ app.get('/ai/agent-discussion/:id', async (c) => {
     return c.json({ error: "SMS not found" }, 404)
   }
 
-  const prompt = `다음 SMS 장애 메시지를 분석하여 담당 에이전트별로 대응 방안을 알려주세요:\n\n발신자: ${sms.sender}\n메시지: ${sms.message}\n\n[Security]: 보안 관점 분석\n[DB]: 데이터베이스 관점 분석\n[DevOps]: 서버/인프라 관점 분석\n[Leader]: 종합 의견 및 조치사항`
+  const prompt = `다음 SMS 장애 메시지와 상세 정보를 분석하여 담당 에이전트별로 대응 방안을 알려주세요:
+
+발신자: ${sms.sender}
+메시지: ${sms.message}
+
+[장애 상세 정보]
+- 유입채널: ${sms.channel || 'N/A'}
+- IF아이디: ${sms.if_id || 'N/A'}
+- 서비스명: ${sms.service_name || 'N/A'} (${sms.service_code || 'N/A'})
+- 업무시스템: ${sms.biz_system || 'N/A'}
+- 에러코드: ${sms.error_code || 'N/A'}
+- 에러메시지: ${sms.error_message || 'N/A'}
+- 발생건수: ${sms.occurrence_count || '1'}
+- 발생서버/노드: ${sms.occurrence_node || 'N/A'}
+- 실제발생시각: ${sms.occurrence_time || 'N/A'}
+
+[Security]: 보안 관점 분석
+[DB]: 데이터베이스 관점 분석
+[DevOps]: 서버/인프라 관점 분석
+[Leader]: 종합 의견 및 조치사항`
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -1132,8 +1398,8 @@ app.post('/ai/warroom/open', async (c) => {
 
   // Auto-assign to the creator and anyone already assigned to this incident
   if (creator_id) {
-    await db.prepare("INSERT INTO user_warrooms (user_id, inc_id) VALUES (?, ?) ON CONFLICT DO NOTHING")
-      .bind(creator_id, normId).run()
+    await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
+      .bind(creator_id, normId, now).run()
     
     // Update assignment status to '처리중' for all assignees of this incident
     await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ? WHERE inc_id = ?")
@@ -1250,6 +1516,35 @@ app.get('/warroom/report/:id', async (c) => {
       ? Math.round((new Date(lastChat.timestamp) - new Date(firstChat.timestamp)) / 60000) 
       : 0,
   })
+})
+
+app.get('/warroom/participants/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const normId = String(id).replace('INC-', '')
+  const { results } = await db.prepare(`
+    SELECT u.name, u.employee_id, u.role, u.company, u.position
+    FROM user_warrooms uw
+    JOIN users u ON (uw.user_id = u.employee_id OR uw.user_id = CAST(u.id AS TEXT))
+    WHERE uw.inc_id = ? OR uw.inc_id = ?
+  `).bind(normId, id).all()
+  return c.json({ participants: results || [] })
+})
+
+app.post('/warroom/join', async (c) => {
+  const { incident_id, user_id } = await c.req.json()
+  const db = c.env.DB
+  const normId = String(incident_id).replace('INC-', '')
+  
+  if (!user_id || !incident_id) {
+    return c.json({ status: 'error', message: 'user_id and incident_id are required' }, 400)
+  }
+
+  const now = getKst()
+  await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
+    .bind(user_id, normId, now).run()
+    
+  return c.json({ status: 'joined' })
 })
 
 // Knowledge Base CRUD
@@ -1410,7 +1705,7 @@ app.get('/ai/incident/my-assignments', async (c) => {
         WHEN w.inc_id IS NOT NULL THEN '처리중'
         ELSE a.status
       END as status,
-      m.sender, m.message, m.timestamp as message_at, m.received_count,
+      m.sender, m.message, m.employee_id, m.timestamp as message_at, m.received_count,
       (SELECT GROUP_CONCAT(u2.name, ', ') 
        FROM incident_assignments a2 
        JOIN users u2 ON a2.user_id = u2.employee_id 
@@ -1441,52 +1736,6 @@ app.get('/ai/incident/my-assignments', async (c) => {
 
 // 2. 워룸 관리 및 인시던트 연동 라우트
 
-
-// 3. 특정 인시던트 상세 (와일드카드 - 가장 마지막에 정의)
-app.get('/ai/incident/:inc_id', async (c) => {
-  const inc_id = c.req.param('inc_id')
-  const db = c.env.DB
-  const incident = await db.prepare(`
-    SELECT i.*, u.name as assignee_name 
-    FROM incidents i 
-    LEFT JOIN users u ON i.assigned_to = u.employee_id 
-    WHERE i.inc_id = ?
-  `).bind(inc_id).first()
-  if (!incident) return c.json({ error: "Not found" }, 404)
-  return c.json({ incident })
-})
-
-
-// User Specific War-Room mapping
-app.post('/ai/warroom/leave', async (c) => {
-  const { user_id, inc_id } = await c.req.json()
-  await c.env.DB.prepare("DELETE FROM user_warrooms WHERE user_id = ? AND inc_id = ?")
-    .bind(user_id, String(inc_id)).run()
-  return c.json({ status: 'left', user_id, inc_id })
-})
-
-app.post('/ai/warroom/invite', async (c) => {
-  const { user_id, inc_id } = await c.req.json()
-  await c.env.DB.prepare("INSERT INTO user_warrooms (user_id, inc_id) VALUES (?, ?) ON CONFLICT DO NOTHING")
-    .bind(user_id, String(inc_id)).run()
-  return c.json({ status: 'invited', user_id, inc_id })
-})
-
-app.get('/ai/user/activity-history', async (c) => {
-  const user_id = c.req.query('user_id')
-  if (!user_id) return c.json({ history: [] })
-
-  const { results } = await c.env.DB.prepare(`
-    SELECT l.*, date(l.created_at) as log_date 
-    FROM activity_logs l
-    LEFT JOIN users u ON l.user_id = u.employee_id
-    WHERE l.user_id = ? OR u.id = ?
-    ORDER BY l.created_at DESC 
-    LIMIT 100
-  `).bind(user_id, user_id).all()
-
-  return c.json({ history: results })
-})
 
 app.get('/ai/incident/workflow-details', async (c) => {
   const inc_id_param = c.req.query('inc_id')
@@ -1546,8 +1795,6 @@ app.get('/ai/incident/workflow-details', async (c) => {
       });
     }
 
-
-
     // 5. 보고서 생성완료 (reports)
     const repo = await db.prepare("SELECT created_at FROM reports WHERE inc_id = ?").bind(id).first();
     if (repo) steps.push({ id: 'REPORT', label: '보고서 생성완료', timestamp: repo.created_at, detail: '워룸 내 대응 전략을 바탕으로 최종 AI 리포트가 생성되었습니다.' });
@@ -1569,6 +1816,54 @@ app.get('/ai/incident/workflow-details', async (c) => {
     return c.json({ error: e.message, stack: e.stack }, 500);
   }
 })
+
+// 3. 특정 인시던트 상세 (와일드카드 - 가장 마지막에 정의)
+app.get('/ai/incident/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id')
+  const db = c.env.DB
+  const incident = await db.prepare(`
+    SELECT i.*, u.name as assignee_name 
+    FROM incidents i 
+    LEFT JOIN users u ON i.assigned_to = u.employee_id 
+    WHERE i.inc_id = ?
+  `).bind(inc_id).first()
+  if (!incident) return c.json({ error: "Not found" }, 404)
+  return c.json({ incident })
+})
+
+
+// User Specific War-Room mapping
+app.post('/ai/warroom/leave', async (c) => {
+  const { user_id, inc_id } = await c.req.json()
+  await c.env.DB.prepare("DELETE FROM user_warrooms WHERE user_id = ? AND inc_id = ?")
+    .bind(user_id, String(inc_id)).run()
+  return c.json({ status: 'left', user_id, inc_id })
+})
+
+app.post('/ai/warroom/invite', async (c) => {
+  const { user_id, inc_id } = await c.req.json()
+  const now = getKst()
+  await c.env.DB.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
+    .bind(user_id, String(inc_id), now).run()
+  return c.json({ status: 'invited', user_id, inc_id })
+})
+
+app.get('/ai/user/activity-history', async (c) => {
+  const user_id = c.req.query('user_id')
+  if (!user_id) return c.json({ history: [] })
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT l.*, date(l.created_at) as log_date 
+    FROM activity_logs l
+    LEFT JOIN users u ON l.user_id = u.employee_id
+    WHERE l.user_id = ? OR u.id = ?
+    ORDER BY l.created_at DESC 
+    LIMIT 100
+  `).bind(user_id, user_id).all()
+
+  return c.json({ history: results })
+})
+
 
 // RAG Search using Vector Similarity
 app.get('/ai/knowledge/search', async (c) => {
@@ -1788,17 +2083,28 @@ app.post('/warroom/upload', async (c) => {
 
   // Construct a public URL (via GET /warroom/file/:key endpoint)
   const fileUrl = `/warroom/file/${encodeURIComponent(fileKey)}`
+  const fileType = file.type || 'application/octet-stream'
 
-  // Save metadata to warroom_attachments
+  // 1. Save metadata to warroom_attachments
   await db.prepare(`
     INSERT INTO warroom_attachments (inc_id, seq, filename, original_name, file_type, url, uploaded_by, timestamp, reg_id, reg_dt, mod_id, mod_dt)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     incident_id, seq, fileKey, fileName,
-    file.type || 'application/octet-stream',
+    fileType,
     fileUrl, uploaded_by,
     now, uploaded_by, now, uploaded_by, now
   ).run()
+
+  // 2. IMPORTANT: ALSO insert into warroom_chats to unify the stream
+  // This prevents the "pushed to the end" issue by giving the file a spot in the main chat sequence
+  const lastChat = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(incident_id).first()
+  const chatSeq = (lastChat && lastChat.max_seq) ? lastChat.max_seq + 1 : 1
+  const chatText = `[첨부파일]${fileName}|${fileUrl}|${fileType}`
+
+  await db.prepare(
+    "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(incident_id, chatSeq, uploaded_by, 'Unknown', 'user', chatText, now, uploaded_by, now, uploaded_by, now).run()
 
   return c.json({ status: 'uploaded', seq, url: fileUrl, filename: fileName })
 })

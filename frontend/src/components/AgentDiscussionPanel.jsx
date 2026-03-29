@@ -32,7 +32,7 @@ const AgentAvatar = ({ role }) => {
   );
 };
 
-export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false }) {
+export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false, incident }) {
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -74,6 +74,35 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         </div>
       )}
 
+      {/* Incident Details Summary (Shared) */}
+      {incident && (
+        <div className="px-5 pt-5 pb-2 border-b border-white/5 bg-white/[0.02]">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="p-1.5 bg-blue-500/10 rounded-lg shrink-0 border border-blue-500/20">
+              <Terminal className="w-3.5 h-3.5 text-blue-400" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Source SMS Message</h4>
+              <p className="text-xs text-white line-clamp-2 leading-relaxed opacity-80 italic">"{incident.message}"</p>
+            </div>
+          </div>
+          {/* Detailed Badges */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            {[
+              { label: 'CH', value: incident.channel },
+              { label: 'SVC', value: incident.service_name || incident.service_code },
+              { label: 'ERR', value: incident.error_code },
+              { label: 'NODE', value: incident.occurrence_node },
+            ].map((d, i) => d.value && (
+              <div key={i} className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                <span className="text-[9px] text-slate-500 font-bold">{d.label}</span>
+                <span className="text-[10px] text-blue-300 font-mono">{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent" ref={scrollRef}>
         {messages.length === 0 && (
@@ -89,8 +118,8 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
           const isLeader = msg.role.toLowerCase().includes('leader') || msg.role.toLowerCase().includes('리더');
           
           return (
-            <div key={idx} className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ${isLeader ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex max-w-[85%] ${isLeader ? 'flex-row-reverse' : 'flex-row'} items-start gap-3`}>
+            <div key={idx} className="flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 justify-start">
+              <div className="flex max-w-[85%] flex-row items-start gap-3">
                 
                 {/* Avatar */}
                 <div className="shrink-0 mt-1 shadow-2xl">
@@ -98,7 +127,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                 </div>
                 
                 {/* Message Content */}
-                <div className={`flex flex-col ${isLeader ? 'items-end' : 'items-start'}`}>
+                <div className="flex flex-col items-start">
                   {/* Name */}
                   <span className={`text-[11px] mb-2 px-1 font-black tracking-widest uppercase ${
                     msg.role.toLowerCase().includes('security') || msg.role.toLowerCase().includes('system') ? 'text-red-400' :
@@ -111,11 +140,11 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                   </span>
                   
                   {/* Bubble and Time Row */}
-                  <div className={`flex items-end gap-2 ${isLeader ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className="flex items-end gap-2 flex-row">
                     {/* Bubble */}
                     <div className={`p-4 text-[13.5px] leading-relaxed shadow-2xl transition-all duration-300 whitespace-pre-wrap break-words
                       ${isLeader 
-                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tr-sm border border-purple-500/30' 
+                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tl-sm border border-purple-500/30' 
                         : 'bg-slate-800/80 text-slate-100 rounded-2xl rounded-tl-sm border border-white/5 shadow-black/40'
                     }`}>
                       {msg.text}

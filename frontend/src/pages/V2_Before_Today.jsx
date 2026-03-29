@@ -104,10 +104,6 @@ export default function DashboardPage() {
   const [smsMessages, setSmsMessages] = useState([]);
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
-  const [isLiveStreamCollapsed, setIsLiveStreamCollapsed] = useState(false);
-  const [isWarRoomCollapsed, setIsWarRoomCollapsed] = useState(false);
-  const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false);
-  const [isFlowCollapsed, setIsFlowCollapsed] = useState(false);
   const [selectedIncidentIdFlow, setSelectedIncidentIdFlow] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
@@ -151,26 +147,16 @@ export default function DashboardPage() {
     return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
   };
 
-  const getKstDate = (daysAgo = 0) => {
-    const d = new Date();
-    const kstOffset = 9 * 60 * 60 * 1000;
-    const kstDate = new Date(d.getTime() + kstOffset - (daysAgo * 24 * 60 * 60 * 1000));
-    return kstDate.toISOString().split('T')[0];
-  };
-
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
-  const [lastAutoTriggeredId, setLastAutoTriggeredId] = useState(null);
-  const lastAutoTriggeredIdRef = useRef(null);
-
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
   const [myAssignments, setMyAssignments] = useState([]);
   const [userActivityHistory, setUserActivityHistory] = useState([]);
   const [assignmentDateRange, setAssignmentDateRange] = useState({
-    from: getKstDate(7),
-    to: getKstDate(0)
+    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    to: new Date().toISOString().split('T')[0]
   });
 
   const handleOpenWarRoomFromInsight = async (smsMessage, analysisText) => {
@@ -178,11 +164,11 @@ export default function DashboardPage() {
     if (!currentSms) return;
 
     // The raw received SMS ID (e.g. 20231026154512345) MUST be the primary key DB identifier
-    // to match aichat_history.
-    const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
+    // to match aichat_history, but we prefix it with INC- for the UI title.
+    const incidentId = String(currentSms.inc_id || currentSms.id || `INC-${Date.now()}`);
     
     const baseSmsMessage = currentSms.message.length > 30 ? currentSms.message.substring(0, 30) + '...' : currentSms.message;
-    const formattedUiId = `INC-${incidentId}`; // Display prefix
+    const formattedUiId = incidentId.startsWith('INC-') ? incidentId : `INC-${incidentId}`;
     const smsTitle = `${formattedUiId} | ${baseSmsMessage}`;
     
     // Check if War-Room already exists
@@ -255,8 +241,7 @@ export default function DashboardPage() {
         })
       });
 
-      // AI Analysis Pinned Message - DEPRECATED as it messes up the clean Agent Discussion flow
-      /*
+      // AI Analysis Pinned Message
       if (analysisText) {
         await fetch(`${apiBase}/warroom/chat`, {
           method: 'POST',
@@ -270,7 +255,6 @@ export default function DashboardPage() {
           })
         });
       }
-      */
 
       // ONLY insert system intro messages if the room was NEWLY created
       if (openData.status !== 'exists') {
@@ -409,15 +393,15 @@ export default function DashboardPage() {
     };
   }, [userProfile, assignmentDateRange]);
 
-  // SMS 선택 시 에이전트 토론 자동 시작
-   useEffect(() => {
-     if (selectedSms) {
-       startLiveScenario(selectedSms);
-     } else {
-       setShowAgentPanel(false);
-       setAgentMessages([]);
-     }
-   }, [selectedSms]);
+  // SMS 선택 시 에이전트 토론 자동 시작은 이제 인시던트 스트림 클릭 시 직접 제어됨
+  // useEffect(() => {
+  //   if (selectedSms) {
+  //     startLiveScenario(selectedSms);
+  //   } else {
+  //     setShowAgentPanel(false);
+  //     setAgentMessages([]);
+  //   }
+  // }, [selectedSms]);
 
   const fetchWarRooms = async () => {
     if (!userProfile?.id) return;
@@ -463,7 +447,7 @@ export default function DashboardPage() {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
           ...inc,
-          inc_id: String(inc.inc_id).replace('INC-', '')
+          inc_id: String(inc.inc_id)
         }));
         setMyAssignments(mapped);
       }
@@ -530,22 +514,8 @@ export default function DashboardPage() {
       const response = await fetch(apiUrl);
       if (response.ok) {
         const data = await response.json();
-        const freshMsgs = (data.messages || []).filter(msg => !deletedSmsIds.has(msg.inc_id));
-        setSmsMessages(freshMsgs);
-
-        // --- 실시간 자동 분석 트리거 (New Arrival Automation) ---
-        if (freshMsgs.length > 0) {
-          const latestId = String(freshMsgs[0].inc_id);
-          // 만약 이전에 자동으로 트리거했던 ID와 다르면 (즉, 진짜 새 문자가 오면)
-          if (latestId !== lastAutoTriggeredIdRef.current) {
-            console.log(`[Automation] 신규 장애 문자 감지: ${latestId}. 자동 분석을 시작합니다.`);
-            lastAutoTriggeredIdRef.current = latestId;
-            setLastAutoTriggeredId(latestId);
-            
-            // 신규 문자를 바로 선택 -> 연동된 useEffect가 startLiveScenario를 실행함
-            setSelectedSms(freshMsgs[0]);
-          }
-        }
+        // 삭제된 항목은 필터링하여 상태 업데이트
+        setSmsMessages((data.messages || []).filter(msg => !deletedSmsIds.has(msg.inc_id)));
       }
     } catch (error) {
       console.error('SMS 메시지 로드 실패:', error);
@@ -643,100 +613,67 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [systemStatus]);
 
-  const toggleAssignmentsPanel = () => {
-    setIsAssignmentsCollapsed(!isAssignmentsCollapsed);
-  };
-
-  const toggleFlowPanel = () => {
-    setIsFlowCollapsed(!isFlowCollapsed);
-  };
-
-  const toggleLiveStreamPanel = () => {
-    setIsLiveStreamCollapsed(!isLiveStreamCollapsed);
-  };
-
-  const toggleWarRoomPanel = () => {
-    setIsWarRoomCollapsed(!isWarRoomCollapsed);
-  };
-
   // Re-parse transcript (utility for handleAgentContent)
   const parseTranscript = (transcript) => {
     if (!transcript) return [];
-    let text = transcript;
-    
-    // 1. Divide into 'Insight' and 'Expert Diagnosis' with extremely robust split markers
-    // Updated to split at both the expert block and the leader block to be truly robust.
-    const splitMarker = /\[전문가별 심층 진단\]|### 전문가별|--- ?\s*#* ?\[전문가별|\[리더의 최종 조치 가이드\]|### 리더의 최종/i;
-    const parts_split = text.split(splitMarker);
-    
-    // Only parse everything AFTER the FIRST diagnostic marker (Expert Diagnosis section)
-    if (parts_split.length > 1) {
-      // JOIN with double newline to ensure masterRegex (which uses ^|\n) catches all participants correctly!
-      text = parts_split.slice(1).join('\n\n');
-    } else {
-      // If the specific [Expert Diagnosis] marker has not appeared yet, 
-      // do not parse anything to avoid leaking the Insight summary into the agent bubbles.
-      return [];
-    }
 
-    // 2. Define the 4 target Agent roles with rich keyword mapping
+    // 1. Initial cleanup of common headers/noise
+    let text = transcript
+      .replace(/--- ?\s*#* ?\[전문가별 심층 진단\]/gi, '')
+      .replace(/#* ?\[리더의 최종 조치 가이드\]/gi, '\n[Leader]\n')
+      .replace(/Agent:?\s*\*\*/gi, '')
+      .replace(/^[ \t\n\r\W]+/gm, ''); // Remove leading non-word chars from overall transcript start
+
+    // 2. Normalize Agent declarations to a uniform [Role] format
+    // Includes Korean synonyms for missing roles coverage
     const declarations = [
-      { name: 'Security', keywords: ['Security', '보안', 'System', '시스템', '보안분석'] },
-      { name: 'DB', keywords: ['DB', '데이터베이스', 'Database', 'DATABASE', '쿼리'] },
-      { name: 'DevOps', keywords: ['DevOps', '데브옵스', 'Analyst', '어낼리스트', 'Infra', '인프라', 'App', '애플리케이션', '인프라진단', '앱분석'] },
-      { name: 'Leader', keywords: ['Leader', '리더', '최종 조치', '조항 조치', '조치 가이드', '최종판단', '리더의 최종 조치 가이드'] }
+      { name: 'Security', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Security|보안)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'DB', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:DB|데이터베이스)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'DevOps', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:DevOps|데브옵스)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'Infra', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Infra|인프라)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'App', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:App|애플리케이션)(?:\s*Agent| Agent|분석|진단)?\s*(?:\]|:|\*\*)?/gim },
+      { name: 'Leader', regex: /^[ \t]*(?:#+\s*|--- |\*\*|\[)?(?:Leader|리더|최종 조치)(?:\s*Agent| Agent|분석|진단|가이드)?\s*(?:\]|:|\*\*)?/gim }
     ];
 
-    const keywordToName = {};
-    declarations.forEach(d => {
-      d.keywords.forEach(k => { 
-        keywordToName[k.toLowerCase()] = d.name; 
-      });
+    declarations.forEach(dec => {
+      text = text.replace(dec.regex, `\n[${dec.name}]\n`);
     });
 
-    const allKeywords = declarations.flatMap(d => d.keywords).join('|');
-    // Flexible regex for agent title detection: require start of line or header context
-    // Now UPDATED to support Emojis as prefixes (e.g., ⚙️ DevOps, 👑 Leader)
-    const emojiRange = '[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]';
-    const markerPrefix = `(?:^|\\n)[ \\t]*(?:#+\\s*|--- |\\*\\*?|\\d+\\.\\s*|\\s*[\\-\\u2022\\u2043\\u2219\\u25d8\\*]\\s*|\\[|${emojiRange})*`;
-    const markerSuffix = `(?:\\s*Agent|\\s*에이전트|\\s*어낼리스트|\\s*분석전문가|\\s*전문가|\\s*분석관|\\s*진단|\\s*연구원|의 최종 조치 가이드|의| 최종 조치 가이드| 가이드|의 최종 조항 조치|${emojiRange})*\\s*(?:\\]|:|\\*\\*)*[ \\t]*`;
-    
-    const masterRegex = new RegExp(`${markerPrefix}(${allKeywords})${markerSuffix}`, 'gim');
-
-    console.group('[S-GUARD] Agent Transcript Parsing');
-    console.log('Raw Section Length:', text.length);
-
-    let normalizedText = text.replace(masterRegex, (match, keyword) => {
-      const canonicalName = keywordToName[keyword.toLowerCase()];
-      console.log(`Matched Agent: ${canonicalName} (from word: ${keyword})`);
-      return `\n\nMARKER_${canonicalName}\n`;
-    });
-
-    const parts = normalizedText.split(/\n\nMARKER_(\w+)\n/g);
-    console.log('Split Sections Count:', Math.floor(parts.length / 2));
-    console.groupEnd();
-
+    // 3. Split by normalized markers
+    // Prepend a newline to ensure the first marker matches the \n[...] multiline pattern
+    const rolePattern = /\n\[(Security|DB|DevOps|Infra|App|Leader)\]\n/gi;
+    const parts = ('\n' + text).split(rolePattern);
     const msgs = [];
     
-    for (let i = 1; i < parts.length; i += 2) {
-        const role = parts[i];
-        let content = (parts[i+1] || '').trim();
-        
-        if (content) {
-            // Aggressive cleaning of markdown artifacts, redundant labels, AND Emojis at start
-            content = content
-                .replace(/^(?:Agent|에이전트|분석|진단|가이드|전문가|[\uD800-\uDBFF][\uDC00-\uDFFF])\s*[:：]\s*/i, '')
-                .replace(/^[ \t\-\*\#\.,\:\u2022\u00b7\uD800-\uDBFF\uDC00-\uDFFF]+/gm, '') 
-                .replace(/\*\*/g, '')
-                .replace(/\n\n+/g, '\n')
+    // Safety: ignore text before the first detected role
+    let currentRole = null; 
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i].trim();
+        if (!part) continue;
+
+        // The split with capturing group puts the role name in the array
+        if (['Security', 'DB', 'DevOps', 'Infra', 'App', 'Leader'].includes(part)) {
+            currentRole = part;
+        } else if (currentRole) {
+            // Clean the content block
+            const cleanText = part
+                .replace(/^[ \t\-\*\#\d\.,\:]+/gm, (match) => {
+                  // Only remove leading symbols, but preserve numbers if they are part of guidance
+                  // unless it's just "1. " or "2. " exactly? 
+                  // Let's be conservative: only remove non-digits at the VERY start of a block
+                  return match.replace(/^[ \t\-\*\#\.,\:]+/, '');
+                })
+                .replace(/\*\*/g, '')           // Remove bolding clatter
+                .replace(/^Agent\s*:\s*/i, '')  // Extra "Agent:" check
                 .trim();
             
-            if (content) {
+            if (cleanText) {
                 const lastMsg = msgs[msgs.length - 1];
-                if (lastMsg && lastMsg.role === role) {
-                    lastMsg.text += "\n" + content;
+                if (lastMsg && lastMsg.role === currentRole) {
+                    lastMsg.text += "\n" + cleanText;
                 } else {
-                    msgs.push({ role: role, text: content, delay: 0 });
+                    msgs.push({ role: currentRole, text: cleanText, delay: 0 });
                 }
             }
         }
@@ -750,9 +687,7 @@ export default function DashboardPage() {
     if (isDone) {
       const currentMsgs = parseTranscript(fullTranscript);
       if (currentMsgs.length > 0) {
-        // FILTER: Remove any legacy 'AI분석' role messages that might be in history
-        const filteredMsgs = currentMsgs.filter(m => m.role !== 'AI분석');
-        const completedMsgs = filteredMsgs.map(m => ({ ...m, isCompleted: true }));
+        const completedMsgs = currentMsgs.map(m => ({ ...m, isCompleted: true }));
         setAgentMessages(completedMsgs);
       }
 
@@ -800,8 +735,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           user_id: userProfile.id,
           login_id: userProfile.email,
-          inc_id: String(smsMessage.inc_id).replace('INC-', ''),
-          incident_title: 'SMS 수신 확인'
+          inc_id: String(smsMessage.inc_id).replace('INC-', '')
         })
       })
       .then(() => fetchMyAssignments())
@@ -815,39 +749,17 @@ export default function DashboardPage() {
       if (checkRes.ok) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
-            // FILTER: Remove any legacy 'AI분석' role messages that might be in history
-            const filtered = data.messages.filter(m => m.role !== 'AI분석');
-            const completedMsgs = filtered.map(m => ({ ...m, isCompleted: true }));
-            
-            // Check if we already have a FULL analysis starting with at least one Expert (Security)
-            const hasInitialExpert = filtered.some(m => 
-              /Security|보안|System|시스템/i.test(m.role) && !m.text.includes('장애 로그 감지')
-            );
-            
-            // Or specifically check for Security/보안
-            const hasSecurityExpert = filtered.some(m => /Security|보안/i.test(m.role));
-
-            if (hasSecurityExpert) {
-              setAgentMessages(completedMsgs);
-              setTimeout(() => setShowEmergencyModal(true), 1500);
-              return; // Skip Dify streaming ONLY if real analysis exists
-            }
-            
-            // If the history is partial (Missing Security) or only 'System' messages exist, 
-            // we show what we have but CONTINUE to Dify streaming to restore all 4 agents.
+            const completedMsgs = data.messages.map(m => ({ ...m, isCompleted: true }));
             setAgentMessages(completedMsgs);
+            setTimeout(() => setShowEmergencyModal(true), 1500);
+            return; // Skip Dify streaming
          }
       }
-    } catch (err) {
-      console.error("Chat history check failed:", err);
-    }
 
-    try {
       // -------------------------------------------------------------
       // IF CACHE IS EMPTY OR FETCH FAILS: STREAM MANUALLY FOR BOTTOM PANEL ONLY
       // This ensures the Agent panel still streams data even if AiInsightPanel is decoupled!
       // -------------------------------------------------------------
-      const baseUrl = 'https://sguardai.khcho0421.workers.dev';
       const streamRes = await fetch(`${baseUrl}/ai/analyze-sms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -901,9 +813,7 @@ export default function DashboardPage() {
                   finalText += data.answer;
                   const currentMsgs = parseTranscript(finalText);
                   if (currentMsgs.length > 0) {
-                    // FILTER out leaking AI insight parts
-                    const filtered = currentMsgs.filter(m => m.role !== 'AI분석');
-                    setAgentMessages(filtered);
+                    setAgentMessages(currentMsgs);
                   }
                }
             } catch(e) {}
@@ -1220,7 +1130,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-6 mb-6">
           {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
           {smsMessages.length > 0 && (
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
+            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl overflow-hidden w-full">
               <div
                 onClick={toggleSmsPanel}
                 className="p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
@@ -1307,14 +1217,7 @@ export default function DashboardPage() {
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-xs text-slate-400">발신: {msg.sender}</p>
-                              {msg.employee_id && (
-                                <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-                                  사번: {msg.employee_id}
-                                </span>
-                              )}
-                            </div>
+                            <p className="text-xs text-slate-400 mb-1">발신: {msg.sender}</p>
                              <div className="flex items-center justify-between gap-4">
                                <p className={`text-sm leading-snug flex-1 ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
                                {msg.received_count >= 2 && (
@@ -1367,21 +1270,12 @@ export default function DashboardPage() {
 
         {/* Main Content Areas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Alerts List (Section 1) */}
-          <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] p-6 rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
-            <div className="flex justify-between items-center mb-4 shrink-0">
-              <h3 className="font-bold flex items-center">
-                <Activity className="w-4 h-4 mr-2 text-blue-400" />
-                Live Incident Stream
-              </h3>
-              <button 
-                onClick={toggleLiveStreamPanel}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
-              >
-                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isLiveStreamCollapsed ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-            {!isLiveStreamCollapsed && (
+          {/* Recent Alerts List */}
+          <div className="lg:col-span-1 bg-[#1a1f2e] rounded-2xl p-6 border border-white/5 max-h-[330px] h-full flex flex-col overflow-hidden shadow-xl">
+            <h3 className="font-bold mb-4 flex items-center shrink-0">
+              <Activity className="w-4 h-4 mr-2 text-blue-400" />
+              Live Incident Stream
+            </h3>
             <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700/50 space-y-4">
               {smsMessages.slice(0, 10).map((msg) => {
                 let severity = 'info';
@@ -1431,58 +1325,56 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-                {smsMessages.length === 0 && (
-                  <div className="text-center text-slate-500 text-sm py-4">Waiting...</div>
-                )}
-              </div>
-            )}
-          </div>
 
-          {/* AI War-Room Situation Log (Section 2) */}
-          <div className="lg:col-span-2 h-[650px]">
-            <div className="bg-[#0a0c12] rounded-3xl border border-white/5 h-full overflow-hidden flex flex-col shadow-2xl">
-              {/* Header (Matching Screenshot) */}
-              <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                  </div>
-                  <h3 className="font-bold text-white text-[15px] tracking-tight">AI War-Room Situation Log</h3>
-                </div>
-                <div className="flex items-center gap-3">
-                   <button 
-                     onClick={toggleWarRoomPanel}
-                     className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
-                   >
-                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isWarRoomCollapsed ? 'rotate-180' : ''}`} />
-                   </button>
-                </div>
-              </div>
-
-              {!isWarRoomCollapsed && (
-                <div className="flex-1 overflow-hidden">
-                  {showAgentPanel || selectedSms ? (
-                    <AgentDiscussionPanel
-                      messages={agentMessages}
-                      isVisible={true}
-                      embedded={true}
-                      incident={selectedSms}
-                      onClose={() => {
-                        setShowAgentPanel(false);
-                        setSelectedSms(null);
-                      }}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
-                      <Brain className="w-10 h-10" />
-                      <p className="text-xs font-bold uppercase tracking-wider">Select an incident to analyze</p>
-                    </div>
-                  )}
+              {smsMessages.length === 0 && (
+                <div className="text-center text-slate-500 text-sm py-4">
+                  Waiting for incoming incidents...
                 </div>
               )}
             </div>
+          </div>
 
+          {/* Quick Actions / Assignment / Agent Panel */}
+          <div className="lg:col-span-2 h-[650px]">
+            <div className="bg-[#1a1f2e] rounded-2xl border border-white/5 h-full overflow-hidden flex flex-col shadow-xl">
+              {showAgentPanel || selectedSms ? (
+                <AgentDiscussionPanel
+                  messages={agentMessages}
+                  isVisible={true}
+                  embedded={true}
+                  incidentMessage={selectedSms?.message}
+                  onClose={() => {
+                    setShowAgentPanel(false);
+                    setSelectedSms(null);
+                  }}
+                />
+              ) : (
+                <div className="p-6 h-full flex flex-col">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold flex items-center">
+                      <Shield className="w-4 h-4 mr-2 text-purple-400" />
+                      AI War-Room Situation Log
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      {selectedSms && (
+                        <div className="flex flex-col items-end mr-4">
+                          <span className="text-[9px] uppercase tracking-widest opacity-60 font-black text-blue-400 leading-none mb-1">INCIDENT DETECTED</span>
+                          <span className="text-xs font-black font-mono text-white bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30 shadow-[0_0_10px_rgba(37,99,235,0.2)]">
+                            {formatYYMMDD(selectedSms.timestamp)}
+                          </span>
+                        </div>
+                      )}
+                      <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-0.5 rounded uppercase font-bold tracking-tighter">분석 대기 중</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-40 py-10">
+                    <Brain className="w-12 h-12 text-slate-600 mb-4 animate-pulse" />
+                    <p className="text-sm text-slate-500 text-center">SMS 수신 내역을 클릭하여<br/>AI 에이전트 분석을 시작하세요.</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1659,15 +1551,10 @@ export default function DashboardPage() {
                           </span>
                         </div>
                       </div>
-                      <p className="text-xs text-slate-300 leading-snug mb-2 flex items-center gap-3">
-                        <span>발신: {item.sender}</span>
-                        {item.employee_id && (
-                          <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded">
-                            사번: {item.employee_id}
-                          </span>
-                        )}
+                      <p className="text-xs text-slate-300 leading-snug mb-2">
+                        발신: {item.sender}
                         {item.received_count > 1 && (
-                          <span className="text-blue-400/80 font-bold">({item.received_count}건 중복)</span>
+                          <span className="ml-2 text-blue-400/80 font-bold">({item.received_count}건 중복)</span>
                         )}
                       </p>
                     </div>
@@ -1702,11 +1589,11 @@ export default function DashboardPage() {
                   <>
                     인시던트 처리 흐름 [
                     <span className="text-blue-400">
-                      {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
-                        smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                      {(myAssignments.find(a => a.inc_id === selectedIncidentIdFlow)?.message || 
+                        smsMessages.find(m => m.inc_id === selectedIncidentIdFlow)?.message || 
                         selectedIncidentIdFlow).substring(0, 50)}
-                      {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
-                        smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                      {(myAssignments.find(a => a.inc_id === selectedIncidentIdFlow)?.message || 
+                        smsMessages.find(m => m.inc_id === selectedIncidentIdFlow)?.message || 
                         "").length > 50 ? '...' : ''}
                     </span>
                     ]
@@ -1718,8 +1605,7 @@ export default function DashboardPage() {
               {selectedIncidentIdFlow && (
                 <div className="flex items-center gap-6">
                    {(() => {
-                     const assignment = myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', '')) || 
-                                        smsMessages.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''));
+                     const assignment = myAssignments.find(a => a.inc_id === selectedIncidentIdFlow) || smsMessages.find(a => a.inc_id === selectedIncidentIdFlow);
                      const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
                      const endStep = incidentWorkflowSteps.find(s => s.id === 'CLOSE');
                      const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);

@@ -42,6 +42,7 @@ export default function AssignmentsPage() {
           title: inc.message || '상공 발생',
           sender: inc.sender,
           time: inc.assigned_at ? new Date(inc.assigned_at).toLocaleString('ko-KR') : '',
+          employee_id: inc.employee_id,
           received_count: inc.received_count || 1,
           assignees: inc.assignees || '담당자 미지정',
           inc_id: inc.inc_id,
@@ -157,8 +158,13 @@ export default function AssignmentsPage() {
                       {assignment.title}
                     </h3>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed flex items-center justify-between">
+                  <p className="text-xs text-slate-400 leading-relaxed flex items-center gap-3">
                     <span>발신: {assignment.sender}</span>
+                    {assignment.employee_id && (
+                      <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded">
+                        사번: {assignment.employee_id}
+                      </span>
+                    )}
                     {assignment.received_count > 1 && (
                       <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0.5 rounded-full border border-blue-500/20 font-bold">
                         +{assignment.received_count - 1} 중복

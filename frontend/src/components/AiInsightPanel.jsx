@@ -502,7 +502,64 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       </div>
 
-      <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isCollapsed ? 'max-h-0 min-h-0 opacity-0' : 'max-h-[1500px] min-h-[300px] opacity-100'} -mx-2 px-2 pb-12 relative`}>
+      <div className={`transition-all duration-700 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'} -mx-2 px-2 pb-12 relative`}>
+        
+        {/* 장애 상세 정보 (확장 파라미터) */}
+        {selectedSms && (
+          <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-500">
+            <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
+              <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">장애 상세 정보 (Detailed Incident Info)</span>
+                {selectedSms.occurrence_time && (
+                  <span className="text-[10px] text-blue-400 font-mono">발생: {selectedSms.occurrence_time}</span>
+                )}
+              </div>
+              <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+                {[
+                  { label: '채널', value: selectedSms.channel },
+                  { label: 'IF아이디', value: selectedSms.if_id },
+                  { label: '서비스명', value: selectedSms.service_name, code: selectedSms.service_code },
+                  { label: '업무시스템', value: selectedSms.biz_system },
+                  { label: '에러코드', value: selectedSms.error_code },
+                  { label: '발생노드', value: selectedSms.occurrence_node },
+                  { label: '발생건수', value: selectedSms.occurrence_count },
+                ].map((f, i) => f.value && (
+                  <div key={i} className="min-w-0">
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">{f.label}</p>
+                    <p className="text-[10px] text-slate-200 font-mono break-all leading-tight" title={f.value}>
+                      {f.value} {f.code && <span className="text-[10px] text-slate-500">({f.code})</span>}
+                    </p>
+                  </div>
+                ))}
+                
+                {/* 에러 메시지 - 별도 행 */}
+                {selectedSms.error_message && (
+                  <div className="col-span-2 md:col-span-4 pt-2 border-t border-white/5">
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">상세 에러 메시지</p>
+                    <p className="text-xs text-red-400/80 leading-relaxed font-mono italic">
+                      "{selectedSms.error_message}"
+                    </p>
+                  </div>
+                )}
+
+                {/* 수신자 목록 */}
+                {selectedSms.receivers && selectedSms.receivers.length > 0 && (
+                  <div className="col-span-2 md:col-span-4 pt-2 border-t border-white/5">
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">메시지 수신자 ({selectedSms.receivers.length}명)</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {selectedSms.receivers.map((r, i) => (
+                        <span key={i} className="text-[10px] text-slate-400 bg-white/10 px-2 py-0.5 rounded-md font-mono border border-white/5">
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
       <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px]
         ${isAnalyzingSms && isCritical ? 'bg-[#150a0a] border-red-500/30' : isAnalyzingSms ? 'bg-[#11110a] border-yellow-500/30' : 'bg-[#0a0c12] border-blue-500/10'}`}>

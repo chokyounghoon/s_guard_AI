@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Eye, EyeOff, AtSign, LogIn, UserPlus, AlertCircle, Save, KeyRound, Copy, CheckCircle } from 'lucide-react';
+import { Shield, Eye, EyeOff, AtSign, LogIn, UserPlus, AlertCircle, Save, KeyRound, Copy, CheckCircle, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // ────────────────────────────────────────────────
@@ -363,13 +363,24 @@ export default function LoginPage() {
                     </form>
                 )}
 
-                {/* Sign up link */}
+                {/* Sign up link & Download */}
                 {!userNotFound && (
-                    <div className="mt-8 text-center text-sm text-slate-400">
-                        계정이 없으신가요?{' '}
-                        <span onClick={() => navigate('/signup')} className="text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors">
-                            회원가입
-                        </span>
+                    <div className="mt-8 flex flex-col items-center gap-4">
+                        <div className="text-sm text-slate-400">
+                            계정이 없으신가요?{' '}
+                            <span onClick={() => navigate('/signup')} className="text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors">
+                                회원가입
+                            </span>
+                        </div>
+                        
+                        <a 
+                            href="/sguard_bridge.apk" 
+                            download 
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 text-xs text-blue-400 font-medium hover:bg-blue-600/20 hover:border-blue-500/40 transition-all group shadow-lg shadow-blue-900/10"
+                        >
+                            <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
+                            <span>S-Guard Android APK 다운로드</span>
+                        </a>
                     </div>
                 )}
 

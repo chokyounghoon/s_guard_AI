@@ -1,15 +1,42 @@
 import React, { useState, useRef } from 'react';
-import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight } from 'lucide-react';
+import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal } from 'lucide-react';
 
 const SmsTestPage = () => {
     const [sender, setSender] = useState('1544-7000');
+    const [employeeId, setEmployeeId] = useState('');
     const [message, setMessage] = useState('');
+    const [advanced, setAdvanced] = useState({
+        channel: '',
+        if_id: '',
+        service_code: '',
+        service_name: '',
+        biz_system: '',
+        error_code: '',
+        occurrence_count: '',
+        occurrence_node: '',
+        error_message: '',
+        occurrence_time: new Date().toISOString().slice(0, 16) // Default to now
+    });
+    const [receivers, setReceivers] = useState(Array(20).fill(''));
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isConverting, setIsConverting] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const fileInputRef = useRef(null);
     const recognitionRef = useRef(null);
+
+    React.useEffect(() => {
+        const savedUser = localStorage.getItem('sguard_user');
+        if (savedUser) {
+            try {
+                const user = JSON.parse(savedUser);
+                if (user.employee_id) setEmployeeId(user.employee_id);
+            } catch (e) {
+                console.error('Failed to parse saved user', e);
+            }
+        }
+    }, []);
 
     const predefinedMessages = [
         { label: 'DB Connection Error', text: 'payment API timeout 및 database connection pool error 발생' },
@@ -213,6 +240,60 @@ const SmsTestPage = () => {
         }
     };
 
+    const parseSmsMessage = (text) => {
+        if (!text) return {};
+        const result = {};
+        console.group('[S-GUARD] SMS Parsing Diagnostic');
+        
+        try {
+            const extract = (label, key) => {
+                // Support nested brackets - match until the LAST ] before a new marker or end of text
+                const regex = new RegExp(`▶\\s*${label}\\s*:\\s*\\[([\\s\\S]+?)\\](?=\\s*(?:▶|$))`, 'iu');
+                const match = text.match(regex);
+                if (match) {
+                    result[key] = match[1].trim();
+                    console.log(`Parsed ${label} ->`, result[key]);
+                } else {
+                    // Fallback for missing closing bracket
+                    const fallbackRegex = new RegExp(`▶\\s*${label}\\s*:\\s*\\[([^\\]\\n\\r]+)`, 'iu');
+                    const fbMatch = text.match(fallbackRegex);
+                    if (fbMatch) {
+                        result[key] = fbMatch[1].trim();
+                        console.log(`Parsed ${label} (Fallback) ->`, result[key]);
+                    }
+                }
+            };
+
+            ['채널', 'IF아이디', '서비스코드', '서비스명', '업무시스템', '에러코드', '발생건수', '발생노드', '에러메시지', '발생시각'].forEach(label => {
+                const keyMap = {
+                    '채널': 'channel', 'IF아이디': 'if_id', '서비스코드': 'service_code', 
+                    '서비스명': 'service_name', '업무시스템': 'biz_system', '에러코드': 'error_code',
+                    '발생건수': 'occurrence_count', '발생노드': 'occurrence_node', 
+                    '에러메시지': 'error_message', '발생시각': 'occurrence_time'
+                };
+                extract(label, keyMap[label]);
+            });
+
+            // Receivers parsing
+            const receiverRegex = /▶\s*메시지 수신자\s*:\s*\[\s*([^%\n\r\[\]]+)|▶\s*메시지 수신자\s*:\s*\[\s*([^\]]+)\]/i;
+            const receiverMatch = text.match(receiverRegex);
+            const rawContent = receiverMatch ? (receiverMatch[1] || receiverMatch[2] || '').trim() : '';
+            
+            if (rawContent) {
+                const names = rawContent.split(/[,，\s]+/).map(n => n.replace(/\s+/g, '').trim()).filter(Boolean);
+                console.log('Parsed Receivers ->', names);
+                names.forEach((name, i) => {
+                    if (i < 20) result[`receiver_${i + 1}`] = name;
+                });
+            }
+        } catch (e) {
+            console.error('Parsing Error:', e);
+        }
+        
+        console.groupEnd();
+        return result;
+    };
+
     const handleSend = async (e) => {
         e?.preventDefault();
         if (!message.trim()) return;
@@ -226,7 +307,34 @@ const SmsTestPage = () => {
         setLogs(prev => [newLog, ...prev]);
 
         try {
-            const payload = { sender, message };
+            // 1. Auto-parse message content for structured fields
+            const parsedFields = parseSmsMessage(message);
+            const hasParsed = Object.keys(parsedFields).length > 0;
+
+            if (hasParsed) {
+                setLogs(prev => [{
+                    time: new Date().toLocaleTimeString(),
+                    type: 'ai',
+                    text: `[자동 파싱 완료] ${Object.keys(parsedFields).length}개 필드 추출됨 (수신인 등)`
+                }, ...prev]);
+            }
+
+            // 2. Combine manual advanced fields and manually entered receivers
+            const receiverPayload = {};
+            receivers.forEach((r, i) => {
+                if (r.trim()) receiverPayload[`receiver_${i + 1}`] = r.trim();
+            });
+
+            // 3. Construct payload with precedence: Parsed > Manual Advanced > Manual Receivers
+            const payload = { 
+                sender, 
+                message, 
+                employee_id: employeeId,
+                ...advanced,
+                ...receiverPayload,
+                ...parsedFields // Automatic parsing takes priority
+            };
+
             const response = await fetch(getApiUrl('/sms/receive'), {
                 method: 'POST',
                 headers: {
@@ -243,7 +351,7 @@ const SmsTestPage = () => {
                     type: 'success',
                     text: `접수 성공! ${data.incident_id ? `(인시던트 ID: ${data.incident_id})` : '(API 접수 완료)'}`
                 }, ...prev]);
-                setMessage('');
+                // setMessage(''); // Keep message for reference
             } else {
                 throw new Error(data.error || '접수 실패');
             }
@@ -301,6 +409,19 @@ const SmsTestPage = () => {
                                 <form onSubmit={handleSend} className="space-y-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
+                                            <label className="text-sm font-semibold text-slate-300 ml-1">발신 사번 (Employee ID)</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={employeeId}
+                                                    onChange={(e) => setEmployeeId(e.target.value)}
+                                                    placeholder="사번 입력 (예: 1234567)"
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono"
+                                                />
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Auto Filled</div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
                                             <label className="text-sm font-semibold text-slate-300 ml-1">발신 번호 (Sender)</label>
                                             <div className="relative">
                                                 <input
@@ -353,6 +474,86 @@ const SmsTestPage = () => {
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Advanced Toggle */}
+                                        <div className="md:col-span-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAdvanced(!showAdvanced)}
+                                                className="flex items-center gap-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors bg-blue-500/5 px-4 py-2 rounded-lg border border-blue-500/20"
+                                            >
+                                                <SlidersHorizontal className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+                                                {showAdvanced ? '상세 정보 닫기' : '상세 장애 정보 입력'}
+                                            </button>
+                                        </div>
+
+                                        {showAdvanced && (
+                                            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white/5 rounded-2xl border border-white/5 animate-in fade-in slide-in-from-top-2">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">채널 (Channel)</label>
+                                                    <input type="text" value={advanced.channel} onChange={(e) => setAdvanced({...advanced, channel: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" placeholder="예: APP, WEB" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">IF아이디 (IF ID)</label>
+                                                    <input type="text" value={advanced.if_id} onChange={(e) => setAdvanced({...advanced, if_id: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">서비스코드 (Service Code)</label>
+                                                    <input type="text" value={advanced.service_code} onChange={(e) => setAdvanced({...advanced, service_code: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">서비스명 (Service Name)</label>
+                                                    <input type="text" value={advanced.service_name} onChange={(e) => setAdvanced({...advanced, service_name: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">업무시스템 (Business System)</label>
+                                                    <input type="text" value={advanced.biz_system} onChange={(e) => setAdvanced({...advanced, biz_system: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">에러코드 (Error Code)</label>
+                                                    <input type="text" value={advanced.error_code} onChange={(e) => setAdvanced({...advanced, error_code: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">발생건수 (Count)</label>
+                                                    <input type="text" value={advanced.occurrence_count} onChange={(e) => setAdvanced({...advanced, occurrence_count: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" placeholder="예: 5건" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">발생노드 (Node)</label>
+                                                    <input type="text" value={advanced.occurrence_node} onChange={(e) => setAdvanced({...advanced, occurrence_node: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+                                                <div className="space-y-2 md:col-span-2">
+                                                    <label className="text-xs font-semibold text-slate-400">에러메세지 (Error Message)</label>
+                                                    <input type="text" value={advanced.error_message} onChange={(e) => setAdvanced({...advanced, error_message: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-400">발생시각 (Occurrence Time)</label>
+                                                    <input type="datetime-local" value={advanced.occurrence_time} onChange={(e) => setAdvanced({...advanced, occurrence_time: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm focus:ring-1 focus:ring-blue-500/40 outline-none" />
+                                                </div>
+
+                                                {/* Receivers Grid */}
+                                                <div className="md:col-span-2 mt-4 space-y-4">
+                                                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2">메시지 수신자 목록 (1~20)</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                        {receivers.map((r, i) => (
+                                                            <div key={i} className="space-y-1">
+                                                                <label className="text-[10px] text-slate-500 ml-1">수신자 {i + 1}</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={r} 
+                                                                    onChange={(e) => {
+                                                                        const newRec = [...receivers];
+                                                                        newRec[i] = e.target.value;
+                                                                        setReceivers(newRec);
+                                                                    }}
+                                                                    placeholder="전화번호/사번"
+                                                                    className="w-full bg-black/30 border border-white/5 rounded-lg p-2 text-xs outline-none focus:border-blue-500/30 transition-all font-mono"
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">
