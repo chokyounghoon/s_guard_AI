@@ -181,6 +181,9 @@ CREATE TABLE IF NOT EXISTS warroom_chats (
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
     mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    parent_seq INTEGER,
+    reactions TEXT,
+    read_count INTEGER DEFAULT 0,
     PRIMARY KEY (inc_id, seq)
 );
 
@@ -301,4 +304,20 @@ CREATE TABLE IF NOT EXISTS user_warrooms (
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, inc_id),
     FOREIGN KEY(user_id) REFERENCES users(employee_id)
+);
+
+-- Direct Messaging (Notes)
+CREATE TABLE IF NOT EXISTS direct_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id TEXT,
+    receiver_id TEXT,
+    message TEXT,
+    is_read BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(sender_id) REFERENCES users(employee_id),
+    FOREIGN KEY(receiver_id) REFERENCES users(employee_id)
 );

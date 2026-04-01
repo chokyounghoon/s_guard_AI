@@ -530,19 +530,28 @@ export default function DashboardPage() {
       const response = await fetch(apiUrl);
       if (response.ok) {
         const data = await response.json();
-        const freshMsgs = (data.messages || []).filter(msg => !deletedSmsIds.has(msg.inc_id));
+        const freshMsgs = (data.messages || []).filter(msg => {
+          if (deletedSmsIds.has(msg.inc_id)) return false;
+          
+          // 🚀 Governance Filter: Only show if assigned to current user
+          if (userProfile?.name || userProfile?.employee_id) {
+            const isAssigned = (msg.receivers || []).some(r => 
+              (userProfile.name && r.includes(userProfile.name)) || 
+              (userProfile.employee_id && String(r).includes(String(userProfile.employee_id)))
+            );
+            return isAssigned;
+          }
+          return true; // Default to all if profile not loaded yet
+        });
+
         setSmsMessages(freshMsgs);
 
         // --- 실시간 자동 분석 트리거 (New Arrival Automation) ---
         if (freshMsgs.length > 0) {
           const latestId = String(freshMsgs[0].inc_id);
-          // 만약 이전에 자동으로 트리거했던 ID와 다르면 (즉, 진짜 새 문자가 오면)
           if (latestId !== lastAutoTriggeredIdRef.current) {
-            console.log(`[Automation] 신규 장애 문자 감지: ${latestId}. 자동 분석을 시작합니다.`);
             lastAutoTriggeredIdRef.current = latestId;
             setLastAutoTriggeredId(latestId);
-            
-            // 신규 문자를 바로 선택 -> 연동된 useEffect가 startLiveScenario를 실행함
             setSelectedSms(freshMsgs[0]);
           }
         }
@@ -1644,12 +1653,30 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className={`text-[10px] font-bold px-3 py-1 rounded-full border shadow-sm transition-all duration-300 flex items-center gap-1.5
-                            ${item.status === '미확인' ? 'bg-red-500/20 text-red-400 border-red-500/30 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.2)]' : 
-                              item.status === '처리중' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.1)]' : 
-                              'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
+                            ${item.status === '미확인' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
+                              item.status === '처리중' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 
+                              'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}
+                            style={{
+                              animation: item.status === '미확인' ? 'sguard-blink-fast 0.5s infinite' : 
+                                         item.status === '처리중' ? 'sguard-blink-slow 2.0s infinite' : 'none'
+                            }}>
+                            <style>{`
+                              @keyframes sguard-blink-fast {
+                                0%, 100% { opacity: 1; transform: scale(1); }
+                                50% { opacity: 0.3; transform: scale(0.98); }
+                              }
+                              @keyframes sguard-blink-slow {
+                                0%, 100% { opacity: 1; filter: brightness(1.2); }
+                                50% { opacity: 0.5; filter: brightness(0.8); }
+                              }
+                              @keyframes sguard-twinkle {
+                                0%, 100% { text-shadow: 0 0 5px rgba(59, 130, 246, 0.5); opacity: 1; }
+                                50% { text-shadow: 0 0 15px rgba(59, 130, 246, 0.8), 0 0 20px rgba(59, 130, 246, 0.4); opacity: 0.7; color: #60a5fa; }
+                              }
+                            `}</style>
                             <div className={`w-1 h-1 rounded-full ${
-                              item.status === '미확인' ? 'bg-red-400 animate-ping' : 
-                              item.status === '처리중' ? 'bg-orange-400 animate-ping' : 
+                              item.status === '미확인' ? 'bg-red-400' : 
+                              item.status === '처리중' ? 'bg-orange-400' : 
                               'bg-emerald-400'
                             }`} />
                             {item.status}

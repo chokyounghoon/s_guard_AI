@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon, Shield, Server, User, Terminal, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon, Shield, Server, User, Terminal, CheckCircle, Smile, Hash, Network, Megaphone, Star } from 'lucide-react';
 import AIChatBubble from '../components/AIChatBubble';
 import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
 import MarkdownViewer from '../components/MarkdownViewer';
+
+// API URL helper moved outside to ensure stable identity and prevent infinite rerender loops
+const getApiUrl = (endpoint) => {
+  const apiBase = window.location.hostname === 'localhost' 
+    ? 'https://sguardai.khcho0421.workers.dev' 
+    : 'https://sguardai.khcho0421.workers.dev';
+  return `${apiBase}${endpoint}`;
+};
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -13,6 +21,7 @@ export default function ChatPage() {
   const [showMenu, setShowMenu] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
+  const [activeAiTab, setActiveAiTab] = useState('chat'); // 'chat' or 'timeline'
   const [userInput, setUserInput] = useState('');
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [showFullAnalysis, setShowFullAnalysis] = useState(false);
@@ -38,47 +47,45 @@ export default function ChatPage() {
   const { incidentId: paramId } = useParams();
   const incidentId = paramId || 'INC-8823';
   
-  const [currentUser, setCurrentUser] = useState({ name: '이수민 매니저', role: 'Manager' });
-  const [aiAnalysisMessage, setAiAnalysisMessage] = useState(null);
+  const [currentUser, setCurrentUser] = useState({ 
+    employee_id: 'EMP-1234', // Local mock ID for initial state
+    name: '이수민 매니저', 
+    role: 'Manager' 
+  });
 
-  // AI Assistant SSE streaming + typewriter
-  const aiAbortRef = useRef(null);
-  const aiTypingTimerRef = useRef(null);
-  const aiQueueRef = useRef('');
+  const [relatedData, setRelatedData] = useState({ history: [], reports: [] });
 
-  const stopAiTypewriter = () => {
-    if (aiTypingTimerRef.current) {
-      clearInterval(aiTypingTimerRef.current);
-      aiTypingTimerRef.current = null;
+  useEffect(() => {
+    const userStr = localStorage.getItem('sguard_user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUser({
+          employee_id: user.employee_id || user.id || 'EMP-1234',
+          name: user.name || '이수민 매니저',
+          role: user.role || 'Manager'
+        });
+      } catch (e) { console.error("User parse error", e); }
     }
-    aiQueueRef.current = '';
-  };
+  }, []);
 
-
-  const getApiUrl = (endpoint) => {
-    const apiBase = window.location.hostname === 'localhost' 
-      ? 'https://sguardai.khcho0421.workers.dev' 
-      : 'https://sguardai.khcho0421.workers.dev';
-    return `${apiBase}${endpoint}`;
-  };
-
-  // Fetch active War-Rooms for the popup list
-  const fetchWarRooms = async () => {
-    try {
-      const res = await fetch(getApiUrl('/warroom/rooms'));
-      if (res.ok) {
-        const data = await res.json();
-        setWarRooms(data.rooms || []);
-      }
-    } catch (e) {
-      console.error('Failed to fetch war rooms', e);
+  // Fetch related history based on room title/description (with AbortController)
+  useEffect(() => {
+    const controller = new AbortController();
+    if (roomTitle || roomDescription) {
+      const q = (roomTitle + " " + roomDescription).substring(0, 100);
+      fetch(getApiUrl(`/ai/related-history?q=${encodeURIComponent(q)}`), { signal: controller.signal })
+        .then(res => res.ok ? res.json() : { history: [], reports: [] })
+        .then(data => setRelatedData(data || { history: [], reports: [] }))
+        .catch(err => {
+          if (err.name === 'AbortError') return;
+          console.warn("Related history fetch error (suppressed):", err);
+          setRelatedData({ history: [], reports: [] });
+        });
     }
-  };
+    return () => controller.abort();
+  }, [roomTitle, roomDescription]);
 
-  const handleWarRoomNavClick = () => {
-    fetchWarRooms();
-    setShowWarRoomPopup(prev => !prev);
-  };
 
   // Load chat history (reusable for polling)
   const fetchChatHistory = React.useCallback(async (isAutoPoll = false) => {
@@ -92,13 +99,14 @@ export default function ChatPage() {
         setRoomStatus(data.status || 'Open');
         
         const loadedMessages = data.messages.map(msg => ({
-          id: msg.inc_id,
+          id: `${msg.inc_id}_${msg.seq}`,
+          seq: msg.seq,
           type: msg.type === 'me' || msg.sender === currentUser.name ? 'me' : 
                (msg.type === 'system' ? 'system' : 
                (msg.type === 'ai_analysis' ? 'ai_analysis' : 'other')),
           sender: msg.sender,
           role: msg.role,
-          initials: msg.sender ? msg.sender : 'SY',
+          initials: msg.sender ? msg.sender[0] : 'SY',
           color: msg.type === 'ai_analysis' ? 'bg-purple-600' : 'bg-slate-700',
           text: msg.text,
           time: (() => {
@@ -112,6 +120,13 @@ export default function ChatPage() {
              return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
           })(),
           timestamp: msg.timestamp,
+          read_count: msg.read_count || 0,
+          reactions: (() => {
+            if (typeof msg.reactions === 'object' && msg.reactions !== null) return msg.reactions;
+            try { return JSON.parse(msg.reactions || '{}'); } catch (e) { return {}; }
+          })(),
+          parent_seq: msg.parent_seq,
+          is_key_event: !!msg.is_key_event,
           icon: msg.type === 'system' ? Info : (msg.type === 'ai_analysis' ? Sparkles : null)
         }));
 
@@ -134,12 +149,11 @@ export default function ChatPage() {
       console.error("Failed to load chat history", err);
     } finally {
       if (!isAutoPoll) {
-        setTimeout(() => setIsLoading(false), 300);
+        setIsLoading(false);
       }
     }
   }, [incidentId, currentUser.name]);
 
-  // Fetch Participants (reusable)
   const fetchParticipants = React.useCallback(async () => {
     try {
       const res = await fetch(getApiUrl(`/warroom/participants/${incidentId}`));
@@ -147,54 +161,295 @@ export default function ChatPage() {
         const data = await res.json();
         setParticipants(data.participants || []);
       }
-    } catch (err) {
-      console.error("Failed to fetch participants", err);
+    } catch (e) {
+      console.error('Failed to fetch participants', e);
     }
   }, [incidentId]);
 
-  useEffect(() => {
-    const userStr = localStorage.getItem('sguard_user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        if (user.name) {
-          const userData = {
-            name: user.name,
-            role: user.role || 'Manager',
-            employee_id: user.employee_id || user.id
-          };
-          setCurrentUser(userData);
-          
-          // AUTO-JOIN WARROOM
-          if (userData.employee_id && incidentId) {
-            fetch(getApiUrl('/warroom/join'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                incident_id: incidentId, 
-                user_id: String(userData.employee_id) 
-              })
-            })
-            .then(() => {
-              // Refresh participants immediately after joining
-              if (fetchParticipants) fetchParticipants();
-            })
-            .catch(e => console.error("Auto-join failed", e));
-          }
-        }
-      } catch(e) {}
-    }
-  }, [incidentId, fetchParticipants]);
+  const [aiAnalysisMessage, setAiAnalysisMessage] = useState(null);
+  
+  // Real-time State (DO/WS)
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [remoteTyping, setRemoteTyping] = useState({}); // { user_id: { name, is_typing } }
+  const [replyTo, setReplyTo] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDMModal, setShowDMModal] = useState(false);
+  const [dmTargetUser, setDmTargetUser] = useState(null);
+  const [dmHistory, setDmHistory] = useState([]);
+  const [dmInput, setDmInput] = useState('');
+  const [activeReactionMsg, setActiveReactionMsg] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [pinnedMessage, setPinnedMessage] = useState(null);
+  const [showPinned, setShowPinned] = useState(true);
+  
+  const wsRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
-  // Handle polling and initial load
+  // AI Assistant SSE streaming + typewriter
+  const aiAbortRef = useRef(null);
+  const aiTypingTimerRef = useRef(null);
+  const aiQueueRef = useRef('');
+
+  const stopAiTypewriter = () => {
+    if (aiTypingTimerRef.current) {
+      clearInterval(aiTypingTimerRef.current);
+      aiTypingTimerRef.current = null;
+    }
+    aiQueueRef.current = '';
+  };
+
+  useEffect(() => {
+    // When messages load, mark those with read_count > 0 as read (if not from us)
+    if (mainMessages.length > 0 && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      mainMessages.forEach(msg => {
+        if (msg.read_count > 0 && msg.sender !== currentUser.name) {
+          wsRef.current.send(JSON.stringify({
+            type: "MARK_READ",
+            incident_id: incidentId,
+            seq: msg.seq,
+            user_id: currentUser.employee_id
+          }));
+        }
+      });
+    }
+  }, [mainMessages.length, currentUser.name, currentUser.employee_id, incidentId]);
+
+
+
+  // Fetch active War-Rooms for the popup list
+  const fetchWarRooms = async () => {
+    try {
+      const res = await fetch(getApiUrl('/warroom/rooms'));
+      if (res.ok) {
+        const data = await res.json();
+        setWarRooms(data.rooms || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch war rooms', e);
+    }
+  };
+
+  const handleWarRoomNavClick = () => {
+    fetchWarRooms();
+    setShowWarRoomPopup(prev => !prev);
+  };
+
+
+  // WebSocket Connection Logic
+  useEffect(() => {
+    let socket;
+    let reconnectTimer;
+    let isMounted = true;
+
+    const connect = () => {
+      if (!isMounted) return;
+      
+      const wsUrl = `wss://sguardai.khcho0421.workers.dev/warroom/ws/${incidentId}`;
+      socket = new WebSocket(wsUrl);
+      wsRef.current = socket;
+
+      socket.onopen = () => {
+        if (!isMounted) {
+          socket.close();
+          return;
+        }
+        console.log("WebSocket connected");
+        if (currentUser.employee_id) {
+          socket.send(JSON.stringify({
+            type: "JOIN",
+            user_id: currentUser.employee_id,
+            name: currentUser.name
+          }));
+        }
+      };
+
+      socket.onmessage = (event) => {
+        if (!isMounted) return;
+        try {
+          const data = JSON.parse(event.data);
+          // ... (same cases as before)
+          switch (data.type) {
+            case 'CHAT_MESSAGE':
+              setMainMessages(prev => {
+                const exists = prev.some(m => m.id === data.msg_id || (m.temp_id && m.temp_id === data.temp_id));
+                if (exists) return prev;
+                const newMessage = {
+                  id: data.msg_id,
+                  seq: data.seq,
+                  type: data.sender === currentUser.name ? 'me' : 'other',
+                  sender: data.sender,
+                  role: data.role,
+                  initials: data.sender ? data.sender[0] : 'U',
+                  color: 'bg-slate-700',
+                  text: data.text,
+                  time: (data.timestamp && data.timestamp.includes(' ')) ? data.timestamp.split(' ')[1] : '',
+                  timestamp: data.timestamp,
+                  read_count: data.read_count || 0,
+                  reactions: (() => {
+                    if (typeof data.reactions === 'object' && data.reactions !== null) return data.reactions;
+                    try { return JSON.parse(data.reactions || '{}'); } catch (e) { return {}; }
+                  })()
+                };
+                return [...prev, newMessage];
+              });
+              if (data.sender !== currentUser.name && wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                  type: "MARK_READ", incident_id: incidentId, seq: data.seq, user_id: currentUser.employee_id
+                }));
+              }
+              break;
+            case 'TYPING':
+              setRemoteTyping(prev => ({ ...prev, [data.user_id]: { name: data.name, is_typing: data.is_typing } }));
+              break;
+            case 'ONLINE_LIST':
+              setOnlineUsers(data.users);
+              if (data.announcement) setPinnedMessage(data.announcement);
+              break;
+            case 'ANNOUNCEMENT_UPDATE':
+              setPinnedMessage(data.announcement);
+              setShowPinned(true);
+              break;
+            case 'BOOKMARK_UPDATE':
+              setMainMessages(prev => prev.map(m => (m.seq === data.seq) ? { ...m, is_key_event: data.is_key_event } : m));
+              break;
+            case 'PRESENCE_IN':
+              setOnlineUsers(prev => {
+                if (prev.some(u => u.user_id === data.user_id)) return prev;
+                return [...prev, { user_id: data.user_id, name: data.name }];
+              });
+              break;
+            case 'REACTION_UPDATE':
+              setMainMessages(prev => prev.map(m => (m.seq === data.seq) ? { ...m, reactions: data.reactions } : m));
+              break;
+            case 'DM_NOTIFICATION':
+              if (data.receiver_id === currentUser.employee_id) {
+                setNotifications(prev => [...prev, { id: Date.now(), type: 'DM', from: data.sender_name, message: data.message }]);
+                if (showDMModal && dmTargetUser?.employee_id === data.sender_id) fetchDMHistory(data.sender_id);
+              }
+              break;
+            case 'READ_UPDATE':
+              setMainMessages(prev => prev.map(m => (m.seq === data.seq) ? { ...m, read_count: Math.max(0, (m.read_count || 1) - 1) } : m));
+              break;
+            case 'PRESENCE_OUT':
+              setOnlineUsers(prev => prev.filter(u => u.user_id !== data.user_id));
+              setRemoteTyping(prev => { const next = { ...prev }; delete next[data.user_id]; return next; });
+              break;
+            case 'AI_SUMMARY':
+              setMainMessages(prev => {
+                const aiMsgId = `ai_summary_${Date.now()}`;
+                const newMessage = {
+                  id: aiMsgId, type: 'ai_analysis', sender: 'AI Analyst', role: 'AI', initials: 'AI', color: 'bg-purple-600',
+                  text: `📊 **실시간 상황 요약**\n\n${data.summary}`,
+                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), icon: Sparkles
+                };
+                return [...prev, newMessage];
+              });
+              break;
+            case 'ERROR': console.error("WS Error:", data.message); break;
+            default: console.log("WS Event:", data);
+          }
+        } catch (e) {
+          console.error("WS Message Error:", e);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!isMounted) return;
+        console.log("WebSocket closed, reconnecting...");
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(reconnectTimer);
+      if (socket) {
+        // Prevent "closed before connection established" error
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+          socket.close();
+        }
+      }
+    };
+  }, [incidentId, currentUser.name, currentUser.employee_id]);
+
+  const handleSetAnnouncement = (msg) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "SET_ANNOUNCEMENT",
+        incident_id: incidentId,
+        seq: msg.seq,
+        sender: msg.sender,
+        text: msg.text
+      }));
+    }
+  };
+
+  const handleToggleBookmark = (msg) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "TOGGLE_BOOKMARK",
+        incident_id: incidentId,
+        seq: msg.seq,
+        is_key_event: !msg.is_key_event
+      }));
+    }
+  };
+
+  const handleAISearch = async (query) => {
+    if (!query.trim()) return;
+    setIsSearching(true);
+    try {
+      const res = await fetch(getApiUrl(`/warroom/ai-search?q=${encodeURIComponent(query)}`));
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.results || []);
+      }
+    } catch (e) {
+      console.error('AI Search failed', e);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Warp/Jump to message function
+  const handleWarpToMessage = (target_incident_id, seq) => {
+    // Standardize IDs: strip 'INC-' if present
+    const currentId = incidentId.replace('INC-', '');
+    const cleanTargetId = String(target_incident_id).replace('INC-', '');
+
+    if (cleanTargetId !== currentId) {
+      if (window.confirm(`다른 장애방(INC-${target_incident_id})의 메시지입니다. 해당 방으로 이동하시겠습니까?`)) {
+        navigate(`/warroom/chat/INC-${cleanTargetId}`);
+      }
+      return;
+    }
+    
+    // In current room
+    const el = document.getElementById(`msg-seq-${seq}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('animate-pulse-gold');
+      setTimeout(() => el.classList.remove('animate-pulse-gold'), 3000);
+    }
+  };
+
+  // Handle polling for participants (less frequent now)
   useEffect(() => {
     fetchChatHistory(false);
     fetchParticipants();
 
     const pollInterval = setInterval(() => {
-      fetchChatHistory(true);
+      // Periodic sync just in case WS missed something
       fetchParticipants();
-    }, 3000); // Poll everything every 3 seconds
+    }, 10000); 
 
     return () => clearInterval(pollInterval);
   }, [fetchChatHistory, fetchParticipants, incidentId]);
@@ -463,6 +718,31 @@ export default function ChatPage() {
     );
   };
 
+  const handleTyping = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    
+    // Send TYPING_START
+    wsRef.current.send(JSON.stringify({
+      type: "TYPING_START",
+      user_id: currentUser.employee_id,
+      name: currentUser.name
+    }));
+
+    // Set timeout to send TYPING_STOP
+    typingTimeoutRef.current = setTimeout(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "TYPING_STOP",
+          user_id: currentUser.employee_id,
+          name: currentUser.name
+        }));
+      }
+    }, 2000);
+  };
+
   const handleSendMessage = async () => {
     const hasText = mainInput.trim();
     const hasFiles = selectedFiles.length > 0;
@@ -471,44 +751,63 @@ export default function ChatPage() {
     if (uploadingFile) return;
 
     setUploadingFile(true);
-    const apiBase = 'https://sguardai.khcho0421.workers.dev';
     
     try {
-      // 1. Upload files first if any
       if (hasFiles) {
-        const userStr = localStorage.getItem('sguard_user');
-        const user = userStr ? JSON.parse(userStr) : { name: '익명' };
-        const uploadedFiles = [];
-
+        const apiBase = 'https://sguardai.khcho0421.workers.dev';
         for (const fileObj of selectedFiles) {
           const formData = new FormData();
           formData.append('file', fileObj.file);
           formData.append('incident_id', incidentId);
-          formData.append('uploaded_by', user.name || '익명');
+          formData.append('uploaded_by', currentUser.name || '익명');
           const uploadRes = await fetch(`${apiBase}/warroom/upload`, { method: 'POST', body: formData });
           if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
-            uploadedFiles.push({ ...fileObj, url: uploadData.url, seq: uploadData.seq });
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({
+                type: "CHAT_SEND",
+                incident_id: incidentId,
+                sender: currentUser.name,
+                role: currentUser.role,
+                msg_type: "file",
+                text: `[첨부파일] ${fileObj.file.name}|${uploadData.url}|${fileObj.file.type}`
+              }));
+            }
           }
         }
-
         setSelectedFiles([]);
       }
 
-      // 2. Send text message if any
       if (hasText) {
-        await saveChatToDb({
-          incident_id: incidentId,
-          sender: currentUser.name,
-          role: currentUser.role,
-          type: 'me',
-          text: mainInput
-        });
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: "CHAT_SEND",
+            incident_id: incidentId,
+            sender: currentUser.name,
+            role: currentUser.role,
+            msg_type: "user",
+            text: mainInput,
+            reply_to: replyTo?.seq
+          }));
+          
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          wsRef.current.send(JSON.stringify({
+            type: "TYPING_STOP",
+            user_id: currentUser.employee_id,
+            name: currentUser.name
+          }));
+        } else {
+          await saveChatToDb({
+            incident_id: incidentId,
+            sender: currentUser.name,
+            role: currentUser.role,
+            type: 'me',
+            text: mainInput
+          });
+        }
         setMainInput('');
+        setReplyTo(null);
       }
-
-      // 3. Refresh chat history
-      await fetchChatHistory(true);
     } catch (err) {
       console.error("Failed to send message/files", err);
     } finally {
@@ -516,10 +815,93 @@ export default function ChatPage() {
     }
   };
 
+  const handleResolveOnly = async () => {
+    if (!window.confirm('보고서 생성 없이 장애를 즉시 완료 처리하시겠습니까? (통계에 반영됩니다)')) return;
+    try {
+      const res = await fetch(getApiUrl('/warroom/resolve-only'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inc_id: incidentId, user_id: currentUser.employee_id })
+      });
+      if (res.ok) {
+        alert('장애가 처리 완료되었습니다.');
+        setRoomStatus('CLOSED');
+        fetchChatHistory();
+      }
+    } catch (err) {
+      console.error("Resolve only error:", err);
+    }
+  };
+
+  const fetchDMHistory = async (otherId) => {
+    try {
+      const res = await fetch(getApiUrl(`/warroom/dm/${otherId}?my_id=${currentUser.employee_id}`));
+      if (res.ok) {
+        const data = await res.json();
+        setDmHistory(data);
+      }
+    } catch (e) { console.error("DM fetch error", e); }
+  };
+
+  const handleSendDM = async () => {
+    if (!dmInput.trim() || !dmTargetUser) return;
+    try {
+      const res = await fetch(getApiUrl('/warroom/dm'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender_id: currentUser.employee_id,
+          receiver_id: dmTargetUser.employee_id,
+          message: dmInput
+        })
+      });
+      if (res.ok) {
+        // Broadast via WS for real-time notification
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: "DM_SEND",
+            sender_id: currentUser.employee_id,
+            sender_name: currentUser.name,
+            receiver_id: dmTargetUser.employee_id,
+            message: dmInput
+          }));
+        }
+        setDmInput('');
+        fetchDMHistory(dmTargetUser.employee_id);
+      }
+    } catch (e) { console.error("DM send error", e); }
+  };
+
+  const handleAddReaction = (msgSeq, emoji) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "ADD_REACTION",
+        incident_id: incidentId,
+        seq: msgSeq,
+        user_id: currentUser.employee_id,
+        emoji: emoji
+      }));
+    }
+    setActiveReactionMsg(null);
+  };
+
   const [resolveSuccess, setResolveSuccess] = useState(false);
 
-  const handleResolveIncident = () => {
-    navigate('/ai-report', { state: { incidentId } });
+  const handleResolveIncident = async () => {
+    try {
+      // 1. Mark as Resolved in DB
+      await fetch(getApiUrl('/warroom/resolve'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident_id: incidentId })
+      });
+      // 2. Success - Navigate to Summary for report generation
+      navigate(`/chat-summary/${incidentId}`);
+    } catch (e) {
+      console.error("Resolve error", e);
+      // Fallback navigate to at least show summary
+      navigate(`/chat-summary/${incidentId}`);
+    }
   };
 
   if (isLoading) {
@@ -543,6 +925,36 @@ export default function ChatPage() {
   return (
     <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-20 relative">
       {/* Header */}
+      {/* DM Notifications Toast */}
+      <div className="fixed top-20 right-4 z-[150] flex flex-col items-end space-y-2 pointer-events-none">
+        {notifications.map(notif => (
+          <div 
+            key={notif.id} 
+            className="w-72 bg-blue-600/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-white/20 animate-in slide-in-from-right-full duration-500 pointer-events-auto cursor-pointer"
+            onClick={() => {
+              // Open modal for this user
+              // fetchDMHistory(notif.sender_id);
+              setNotifications(prev => prev.filter(n => n.id !== notif.id));
+            }}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-widest">New Private Note</span>
+              </div>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setNotifications(prev => prev.filter(n => n.id !== notif.id)); }}
+                className="opacity-50 hover:opacity-100"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <p className="text-xs font-bold mb-1">{notif.from}님</p>
+            <p className="text-[11px] opacity-90 truncate">{notif.message}</p>
+          </div>
+        ))}
+      </div>
+
       <header className="flex justify-between items-center p-4 sticky top-0 bg-[#0f1421]/90 backdrop-blur-md z-50 border-b border-white/5">
         <div className="flex items-center space-x-3">
           <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
@@ -564,6 +976,18 @@ export default function ChatPage() {
           </div>
         </div>
         <div className="flex items-center space-x-4 relative">
+          <button 
+            onClick={() => {
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({ type: "SUMMARY_REQUEST", incident_id: incidentId }));
+                alert('AI 요약을 요청했습니다. 잠시만 기다려주세요.');
+              }
+            }}
+            className="flex items-center px-3 py-1.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg text-xs font-bold hover:bg-purple-500/30 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
+            AI 요약 요청
+          </button>
           <button 
             onClick={() => navigate(`/chat-summary/${incidentId}`)}
             className="flex items-center px-3 py-1.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-bold hover:bg-blue-500/30 transition-colors"
@@ -654,7 +1078,27 @@ export default function ChatPage() {
                                     <span className="text-[10px] text-slate-500">{person.role}</span>
                                 </div>
                             </div>
-                            <Phone className="w-4 h-4 text-green-500" />
+                            <div className="flex items-center space-x-2">
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDmTargetUser(person);
+                                        setShowDMModal(true);
+                                        fetchDMHistory(person.employee_id);
+                                    }}
+                                    className="p-1.5 hover:bg-blue-500/20 rounded-lg transition-colors group/dm"
+                                    title="쪽지 보내기"
+                                >
+                                    <MessageSquare className="w-4 h-4 text-slate-400 group-hover/dm:text-blue-400" />
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleCall(person.phone); }}
+                                    className="p-1.5 hover:bg-green-500/20 rounded-lg transition-colors group/phone"
+                                    title="전화 걸기"
+                                >
+                                    <Phone className="w-4 h-4 text-slate-400 group-hover/phone:text-green-500" />
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -703,112 +1147,360 @@ export default function ChatPage() {
       )}
 
 
-      {/* Persistent AI Analysis / Error Log Banner (Collapsible) */}
-      <div className="bg-slate-900/80 border-b border-white/5 backdrop-blur-md z-30 sticky top-[73px]">
-        <div className="px-4 py-2">
+      {/* [S-AutoPilot Insight] Area */}
+      <div className="bg-[#0f1421]/95 border-b border-white/10 backdrop-blur-xl z-30 sticky top-[73px] shadow-2xl">
+        <style>{`
+          @keyframes sguard-twinkle {
+            0%, 100% { text-shadow: 0 0 4px rgba(59, 130, 246, 0.4); color: #fff; }
+            50% { text-shadow: 0 0 15px rgba(59, 130, 246, 0.9), 0 0 20px rgba(59, 130, 246, 0.4); color: #60a5fa; transform: scale(1.05); }
+          }
+          .animate-sguard-twinkle {
+            animation: sguard-twinkle 1.5s ease-in-out infinite;
+            display: inline-block;
+          }
+        `}</style>
+        <div className="px-5 py-4">
             <div 
                 onClick={() => setIsLogExpanded(!isLogExpanded)}
-                className="flex items-center justify-between cursor-pointer group"
+                className="flex items-center justify-between cursor-pointer group mb-1"
             >
-                <div className="flex items-center space-x-2">
-                    {aiAnalysisMessage ? (
-                      <>
-                        <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
-                        <span className="text-xs font-bold text-purple-300">✨ AI Autopilot 분석 리포트 고정</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
-                        <span className="text-xs font-bold text-red-400">🚨 현재 발생 중인 장애 (Ongoing Issue)</span>
-                      </>
-                    )}
+                <div className="flex items-center space-x-2.5">
+                    <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-xl shadow-lg shadow-purple-900/30">
+                      <Sparkles className="w-4 h-4 text-white animate-pulse" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black text-white tracking-tight uppercase">[S-AutoPilot Insight]</h2>
+                      <p className="text-[10px] text-slate-500 font-bold tracking-widest">REAL-TIME INTELLIGENCE COMMAND</p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  {aiAnalysisMessage && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMainInput(prev => prev ? prev + '\n\n' + aiAnalysisMessage.text : aiAnalysisMessage.text);
-                      }}
-                      title="채팅창에 붙여넣기"
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold hover:bg-purple-500/30 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                      채팅에 붙여넣기
-                    </button>
-                  )}
-                  <button className="p-1 rounded-full group-hover:bg-white/10 transition-colors">
-                      {isLogExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                  </button>
-                </div>
+                <button className="p-2 rounded-full hover:bg-white/10 transition-all border border-white/5 hover:border-white/20">
+                    {isLogExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
             </div>
             
             {isLogExpanded && (
-                <div className={`rounded-lg border overflow-hidden mt-2 mb-1 animate-in slide-in-from-top-2 duration-200 ${aiAnalysisMessage ? 'bg-purple-900/10 border-purple-500/30 shadow-lg shadow-purple-900/20' : 'bg-red-900/10 border-red-500/20'}`}>
-                    <div className={`${aiAnalysisMessage ? 'bg-purple-500/10 border-purple-500/10' : 'bg-red-900/10 border-red-500/10'} px-3 py-1.5 border-b flex justify-between items-center`}>
-                      <span className={`text-[10px] font-mono ${aiAnalysisMessage ? 'text-purple-300' : 'text-red-300'}`}>
-                        {aiAnalysisMessage ? 'AI ANALYSIS SUMMARY' : 'INCIDENT DESCRIPTION'}
-                      </span>
-                      <span className={`text-[10px] opacity-70 ${aiAnalysisMessage ? 'text-purple-400' : 'text-red-400'}`}>Live Update</span>
-                    </div>
-                    <div className="p-3 text-[12px] leading-relaxed">
-                      {aiAnalysisMessage ? (
-                        <div className={`text-slate-200 transition-all duration-300 ${!showFullAnalysis ? 'max-h-24 overflow-hidden mask-bottom' : ''}`}>
-                          <MarkdownViewer text={aiAnalysisMessage.text} />
+                <div className="mt-4 space-y-4 animate-in slide-in-from-top-4 duration-300">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1 group hover:border-blue-500/30 transition-all flex-1">
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">대응 전문가진</span>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <User className="w-4 h-4 text-blue-400" />
+                          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                            {participants.length > 0 ? (
+                                participants.map((p, i) => (
+                                    <span key={p.id || i} className="text-sm font-black animate-sguard-twinkle tracking-tighter">
+                                        {p.name}{i < participants.length - 1 ? ',' : ''}
+                                    </span>
+                                ))
+                            ) : (
+                                <span className="text-sm font-black animate-sguard-twinkle tracking-tighter">
+                                    {currentUser.name}
+                                </span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-slate-300 italic">
-                          {roomDescription || '장애 내용을 포함한 SMS 원문 또는 AI 분석 내용을 기다리고 있습니다...'}
-                        </div>
-                      )}
-                    </div>
-                    {aiAnalysisMessage && (
-                      <div className="px-3 pb-2 flex justify-end">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setShowFullAnalysis(!showFullAnalysis); }}
-                          className="text-[10px] text-purple-400 font-bold uppercase tracking-wider hover:text-purple-300 flex items-center gap-1"
-                        >
-                          {showFullAnalysis ? (
-                            <>Collapse <ChevronUp className="w-3 h-3" /></>
-                          ) : (
-                            <>Show Full Analysis <ChevronDown className="w-3 h-3" /></>
-                          )}
-                        </button>
                       </div>
-                    )}
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1">
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">현재 처리 상태</span>
+                        <div className="flex items-center gap-2 text-emerald-400">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                          <span className="text-base font-black tracking-tight">{roomStatus || 'Open'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-900/10 border border-purple-500/30 rounded-[1.5rem] overflow-hidden shadow-xl shadow-purple-900/10">
+                        <div className="bg-purple-500/10 px-4 py-2 border-b border-purple-500/20 flex justify-between items-center">
+                          <span className="text-[10px] font-black text-purple-400 tracking-widest">AI ANALYSIS SUMMARY</span>
+                          <span className="flex h-2 w-2 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                          </span>
+                        </div>
+                        <div className="p-4 text-[13px] leading-relaxed relative">
+                          <div className={`text-slate-200 transition-all duration-300 ${!showFullAnalysis ? 'max-h-24 overflow-hidden' : ''}`}>
+                            <MarkdownViewer text={aiAnalysisMessage?.text || roomDescription || '장애 내용을 포함한 실시간 지식 분석을 기다리고 있습니다...'} />
+                          </div>
+                          {(aiAnalysisMessage?.text || roomDescription) && (
+                            <button 
+                              onClick={() => setShowFullAnalysis(!showFullAnalysis)}
+                              className="mt-3 text-[10px] text-purple-400 font-black uppercase tracking-wider hover:text-purple-300 flex items-center gap-1"
+                            >
+                              {showFullAnalysis ? "Collapse" : "Show Full Insight"}
+                            </button>
+                          )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MessageSquare className="w-4 h-4 text-blue-400" />
+                          <span className="text-[11px] font-black text-blue-400 tracking-tight">관련 워룸 히스토리</span>
+                        </div>
+                        <div className="space-y-2">
+                          {relatedData?.history?.slice(0, 3).map((h, i) => (
+                            <div key={i} onClick={() => h.id !== incidentId && navigate(`/chat/${h.id}`)} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
+                              <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-blue-300">{h.title || h.id}</p>
+                            </div>
+                          ))}
+                          {(!relatedData?.history || relatedData.history.length === 0) && (
+                            <p className="text-[10px] text-slate-600 italic">검색된 유사 워룸이 없습니다</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <FileText className="w-4 h-4 text-emerald-400" />
+                          <span className="text-[11px] font-black text-emerald-400 tracking-tight">관련 지식 보고서</span>
+                        </div>
+                        <div className="space-y-2">
+                          {relatedData?.reports?.slice(0, 3).map((r, i) => (
+                            <div key={i} onClick={() => window.open(r.url, '_blank')} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group">
+                              <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-emerald-300">{r.title}</p>
+                            </div>
+                          ))}
+                          {(!relatedData?.reports || relatedData.reports.length === 0) && (
+                            <p className="text-[10px] text-slate-600 italic">연동된 지식 자산이 없습니다</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                 </div>
             )}
         </div>
       </div>
 
       {/* Chat Area */}
-      <main ref={scrollRef} className="flex-1 p-4 space-y-6 overflow-y-auto pb-40">
+      <main ref={scrollRef} className="flex-1 p-4 space-y-6 overflow-y-auto pb-40 relative">
+        
+        {/* Pinned Announcement Bar */}
+        {pinnedMessage && showPinned && (
+          <div className="sticky top-0 z-40 mb-4 animate-in slide-in-from-top-4 duration-300">
+            <div className="bg-[#1e2538]/95 backdrop-blur-md border border-blue-500/30 rounded-2xl p-3 shadow-xl shadow-blue-900/20 flex items-center justify-between group">
+              <div 
+                className="flex items-center gap-3 flex-1 cursor-pointer overflow-hidden"
+                onClick={() => {
+                  const el = document.getElementById(`msg-seq-${pinnedMessage.seq}`);
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+              >
+                <div className="bg-blue-500/20 p-2 rounded-xl">
+                  <Megaphone className="w-4 h-4 text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Announcement</span>
+                    <span className="text-[9px] text-slate-500">• {pinnedMessage.sender}</span>
+                  </div>
+                  <p className="text-sm text-slate-200 truncate font-medium">{pinnedMessage.text}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowPinned(false)}
+                className="p-1.5 hover:bg-white/5 rounded-full text-slate-500 transition-colors"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!showPinned && pinnedMessage && (
+          <button 
+            onClick={() => setShowPinned(true)}
+            className="sticky top-0 z-40 mb-4 ml-auto block bg-blue-600/20 border border-blue-500/30 p-1.5 rounded-full text-blue-400 hover:bg-blue-600/30 transition-all shadow-lg"
+          >
+            <Megaphone className="w-4 h-4" />
+          </button>
+        )}
 
         {mainMessages.filter(msg => msg.type !== 'ai_analysis').map((msg) => (
-          <div key={msg.inc_id || msg.id}>
+          <div key={msg.inc_id || msg.id} id={`msg-seq-${msg.seq}`}>
             {msg.type === 'other' && (
-              <div className="flex items-start space-x-3 mb-4">
+              <div className="flex items-start space-x-3 mb-4 group">
                 <div className={`px-2 py-1 h-10 min-w-[40px] rounded-xl ${msg.color} flex items-center justify-center font-bold text-xs shrink-0 whitespace-nowrap`}>
                   {msg.initials}
                 </div>
                 <div className="flex flex-col space-y-1">
                   <span className="text-xs text-slate-400 font-medium">{msg.sender}</span>
-                  <div className="flex items-end space-x-2">
-                    <div className="bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[280px] text-[15px] leading-relaxed whitespace-pre-wrap">
+                  <div className="flex items-end space-x-2 relative group/bubble">
+                    <div className="bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[280px] text-[15px] leading-relaxed whitespace-pre-wrap relative group/bubble">
+                      {msg.parent_seq && (
+                        <div className="mb-2 p-2 bg-black/10 rounded-lg text-[11px] border-l-2 border-white/20 opacity-80 cursor-alias" onClick={() => {
+                          const el = document.getElementById(`msg-seq-${msg.parent_seq}`);
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}>
+                          <span className="font-bold block text-slate-400">
+                            Reply to {mainMessages.find(m => m.seq === msg.parent_seq)?.sender || 'Original'}
+                          </span>
+                          <span className="truncate block italic text-slate-300/70">
+                            {mainMessages.find(m => m.seq === msg.parent_seq)?.text || '원본 메시지를 찾을 수 없습니다'}
+                          </span>
+                        </div>
+                      )}
                       {msg.fileAttachment ? renderAttachment(msg.fileAttachment, false) : renderMessageContent(msg.text, false)}
+                      
+                      {/* Reaction Badges */}
+                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-white/5">
+                          {Object.entries(msg.reactions).map(([emoji, users]) => (
+                            users.length > 0 && (
+                              <button 
+                                key={emoji} 
+                                onClick={() => handleAddReaction(msg.seq, emoji)}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-all ${users.includes(currentUser.employee_id) ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-slate-700/50 border-white/10 text-slate-400'}`}
+                              >
+                                <span>{emoji}</span>
+                                <span className="font-bold">{users.length}</span>
+                              </button>
+                            )
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
+                    <div className="flex flex-col items-center">
+                      {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
+                      {msg.read_count > 0 && <span className="text-[10px] text-yellow-500 font-bold leading-none mb-0.5">1</span>}
+                      <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
+                    </div>
+                    {/* Reply & Reaction Actions */}
+                    <div className="absolute right-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
+                      <button 
+                        onClick={() => handleSetAnnouncement(msg)}
+                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                        title="공지로 고정"
+                      >
+                        <Megaphone className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleToggleBookmark(msg)}
+                        className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
+                        title="타임라인 등록"
+                      >
+                        <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
+                      </button>
+                      <button 
+                        onClick={() => setActiveReactionMsg(activeReactionMsg === msg.seq ? null : msg.seq)}
+                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
+                      >
+                        <Smile className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setReplyTo(msg)}
+                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Emoji Picker Popover */}
+                    {activeReactionMsg === msg.seq && (
+                      <div className="absolute top-[-45px] left-0 bg-[#1a2033] border border-white/10 rounded-full p-1 shadow-2xl flex items-center space-x-1 z-[60] animate-in zoom-in-95 duration-200">
+                        {['👍', '🚨', '✅', '🙏', '💡'].map(emoji => (
+                          <button 
+                            key={emoji}
+                            onClick={() => handleAddReaction(msg.seq, emoji)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
             {msg.type === 'me' && (
-              <div className="flex flex-col items-end space-y-1 mb-4">
+              <div className="flex flex-col items-end space-y-1 mb-4 group">
                 <div className="flex items-end space-x-2">
-                  <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
-                  <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[280px] text-[15px] leading-relaxed shadow-lg shadow-blue-900/20 whitespace-pre-wrap">
-                    {msg.fileAttachment ? renderAttachment(msg.fileAttachment, true) : renderMessageContent(msg.text, true)}
+                  <div className="flex flex-col items-center">
+                    {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
+                    {msg.read_count > 0 && <span className="text-[10px] text-yellow-500 font-bold leading-none mb-0.5">1</span>}
+                    <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
+                  </div>
+                  <div className="relative group/bubble">
+                    <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[280px] text-[15px] leading-relaxed shadow-lg shadow-blue-900/20 whitespace-pre-wrap relative">
+                      {msg.parent_seq && (
+                        <div className="mb-2 p-2 bg-black/10 rounded-lg text-[11px] border-l-2 border-white/20 opacity-80 cursor-alias text-left" onClick={() => {
+                          const el = document.getElementById(`msg-seq-${msg.parent_seq}`);
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}>
+                          <span className="font-bold block text-blue-100">
+                            Reply to {mainMessages.find(m => m.seq === msg.parent_seq)?.sender || 'Original'}
+                          </span>
+                          <span className="truncate block italic text-blue-100/70">
+                            {mainMessages.find(m => m.seq === msg.parent_seq)?.text || '원본 메시지를 찾을 수 없습니다'}
+                          </span>
+                        </div>
+                      )}
+                      {msg.fileAttachment ? renderAttachment(msg.fileAttachment, true) : renderMessageContent(msg.text, true)}
+                      
+                      {/* Reaction Badges (me) */}
+                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-white/10">
+                          {Object.entries(msg.reactions).map(([emoji, users]) => (
+                            users.length > 0 && (
+                              <button 
+                                key={emoji} 
+                                onClick={() => handleAddReaction(msg.seq, emoji)}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-all ${users.includes(currentUser.employee_id) ? 'bg-white/20 border-white/40 text-blue-100' : 'bg-black/20 border-white/10 text-blue-100'}`}
+                              >
+                                <span>{emoji}</span>
+                                <span className="font-bold">{users.length}</span>
+                              </button>
+                            )
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Reply & Reaction Actions (me) */}
+                    <div className="absolute left-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
+                      <button 
+                        onClick={() => setReplyTo(msg)}
+                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveReactionMsg(activeReactionMsg === msg.seq ? null : msg.seq)}
+                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
+                      >
+                        <Smile className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleToggleBookmark(msg)}
+                        className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
+                        title="타임라인 등록"
+                      >
+                        <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
+                      </button>
+                      <button 
+                        onClick={() => handleSetAnnouncement(msg)}
+                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                        title="공지로 고정"
+                      >
+                        <Megaphone className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Emoji Picker Popover (me) */}
+                    {activeReactionMsg === msg.seq && (
+                      <div className="absolute top-[-45px] right-0 bg-[#1a2033] border border-white/10 rounded-full p-1 shadow-2xl flex items-center space-x-1 z-[60] animate-in zoom-in-95 duration-200">
+                        {['👍', '🚨', '✅', '🙏', '💡'].map(emoji => (
+                          <button 
+                            key={emoji}
+                            onClick={() => handleAddReaction(msg.seq, emoji)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -913,136 +1605,299 @@ export default function ChatPage() {
               </button>
             </div>
 
-            {/* Quick Actions */}
-            {aiMessages.length === 0 && (
-              <div className="p-4 space-y-3 border-b border-white/5">
-                <p className="text-xs text-slate-400 mb-2">💡 빠른 질문</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {quickActions.map((action) => (
-                    <button
-                      key={action.id}
-                      onClick={() => handleQuickAction(action)}
-                      className="flex items-center space-x-2 p-3 bg-gradient-to-br from-slate-800/60 to-slate-900/60 hover:from-purple-900/30 hover:to-blue-900/30 border border-white/5 hover:border-purple-500/30 rounded-xl text-left transition-all group"
-                    >
-                      <action.icon className="w-4 h-4 text-purple-400 group-hover:text-purple-300 flex-shrink-0" />
-                      <span className="text-[11px] text-slate-300 leading-tight">{action.label}</span>
-                    </button>
+            {/* AI Panel Tabs */}
+            <div className="flex border-b border-white/5 bg-[#0a0d14]">
+              <button 
+                onClick={() => setActiveAiTab('chat')}
+                className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeAiTab === 'chat' ? 'text-purple-400 border-purple-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+              >
+                AI 어시스턴트
+              </button>
+              <button 
+                onClick={() => setActiveAiTab('timeline')}
+                className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeAiTab === 'timeline' ? 'text-yellow-400 border-yellow-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+              >
+                핵심 타임라인
+              </button>
+              <button 
+                onClick={() => setActiveAiTab('search')}
+                className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeAiTab === 'search' ? 'text-cyan-400 border-cyan-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+              >
+                지능형 검색
+              </button>
+            </div>
+
+            {activeAiTab === 'chat' && (
+              <>
+                {/* Quick Actions */}
+                {aiMessages.length === 0 && (
+                  <div className="p-4 space-y-3 border-b border-white/5">
+                    <p className="text-xs text-slate-400 mb-2">💡 빠른 질문</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {quickActions.map((action) => (
+                        <button
+                          key={action.id}
+                          onClick={() => handleQuickAction(action)}
+                          className="flex items-center space-x-2 p-3 bg-gradient-to-br from-slate-800/60 to-slate-900/60 hover:from-purple-900/30 hover:to-blue-900/30 border border-white/5 hover:border-purple-500/30 rounded-xl text-left transition-all group"
+                        >
+                          <action.icon className="w-4 h-4 text-purple-400 group-hover:text-purple-300 flex-shrink-0" />
+                          <span className="text-[11px] text-slate-300 leading-tight">{action.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Chat Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                  {aiMessages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600/20 to-blue-600/20 flex items-center justify-center border border-purple-500/20">
+                        <Bot className="w-8 h-8 text-purple-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white mb-1">AI와 대화를 시작하세요</h4>
+                        <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
+                          서버 상태, 에러 원인, 조치 방법 등<br/>무엇이든 물어보세요!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {aiMessages.map((msg, index) => (
+                    <div key={index}>
+                      {msg.type === 'user' ? (
+                        <div className="flex flex-col items-end space-y-1">
+                          <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] text-sm leading-relaxed shadow-lg shadow-blue-900/20">
+                            {msg.text}
+                          </div>
+                          <span className="text-[10px] text-slate-500">
+                            {msg.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <AIChatBubble 
+                            message={msg}
+                            onCopy={handleCopyMessage}
+                            onShare={handleShareToTeam}
+                          />
+                          {msg.metrics && (
+                            <div className="ml-10 max-w-[85%] mt-2 animate-fade-in-up">
+                                <ServerStatusChart />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   ))}
+
+                  {isAiThinking && <AIThinkingIndicator />}
+                </div>
+
+                {/* AI Input Area */}
+                <div className="p-3 border-t border-white/10 bg-[#0a0d14]">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAIMessage(userInput)}
+                      placeholder="AI에게 질문하세요..."
+                      className="flex-1 bg-slate-800/60 rounded-full py-2.5 px-4 text-sm border border-white/5 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-slate-500"
+                    />
+                    <button
+                      onClick={() => handleAIMessage(userInput)}
+                      disabled={!userInput.trim()}
+                      className="p-2.5 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeAiTab === 'timeline' && (
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                <div className="flex flex-col space-y-1 mb-6">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                    장애 조치 핵심 타임라인
+                  </h4>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">KEY EVENTS FOR INCIDENT REPORT</p>
+                </div>
+
+                {mainMessages.filter(m => m.is_key_event).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
+                    <div className="w-12 h-12 rounded-full border border-dashed border-white/20 flex items-center justify-center mb-4">
+                      <Star className="w-6 h-6 text-slate-600" />
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      북마크된 중요 사건이 없습니다.<br/>메시지의 별 아이콘을 눌러 등록하세요.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="relative pl-3 border-l border-white/5 space-y-6">
+                    {mainMessages.filter(m => m.is_key_event).map((event, idx) => (
+                      <div key={idx} className="relative group">
+                        <div className="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-yellow-500 shadow-lg shadow-yellow-900/50" />
+                        <div 
+                          className="bg-slate-800/40 border border-white/5 hover:border-yellow-500/30 rounded-xl p-3 transition-all cursor-pointer group"
+                          onClick={() => {
+                            const el = document.getElementById(`msg-seq-${event.seq}`);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }}
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] font-bold text-yellow-500">{event.time}</span>
+                            <span className="text-[9px] text-slate-500">@{event.sender}</span>
+                          </div>
+                          <p className="text-[12px] text-slate-200 leading-relaxed">{event.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="mt-8 p-4 rounded-2xl bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-white/10">
+                  <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+                    💡 타임라인에 등록된 이벤트들은 장애 완료 시 **자동으로 사후 보고서(Post-mortem)**의 일지로 변환됩니다.
+                  </p>
+                  <button className="w-full py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[11px] font-bold transition-colors">
+                    전체 타임라인 복사하기
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* AI Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {aiMessages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600/20 to-blue-600/20 flex items-center justify-center border border-purple-500/20">
-                    <Bot className="w-8 h-8 text-purple-400" />
+            {activeAiTab === 'search' && (
+              <div className="flex-1 flex flex-col min-h-0 bg-[#0a0d14]">
+                <div className="p-4 border-b border-white/5 space-y-3">
+                  <div className="flex flex-col space-y-1 mb-1">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                       <Zap className="w-4 h-4 text-cyan-400 fill-current" />
+                       과거 장애 지능형 검색
+                    </h4>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">AI SEMANTIC SEARCH ACROSS WARROOMS</p>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white mb-1">AI와 대화를 시작하세요</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
-                      서버 상태, 에러 원인, 조치 방법 등<br/>무엇이든 물어보세요!
-                    </p>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAISearch(searchQuery)}
+                      placeholder="자연어로 물어보세요 (예: DB 데드락 조치법)"
+                      className="w-full bg-slate-800/80 border border-white/10 rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:border-cyan-500 transition-all placeholder:text-slate-600"
+                    />
+                    <button 
+                       onClick={() => handleAISearch(searchQuery)}
+                       className="absolute right-2 top-2 p-1.5 rounded-lg bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/40 transition-all"
+                    >
+                       <Zap className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-              )}
 
-              {aiMessages.map((msg, index) => (
-                <div key={index}>
-                  {msg.type === 'user' ? (
-                    <div className="flex flex-col items-end space-y-1">
-                      <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] text-sm leading-relaxed shadow-lg shadow-blue-900/20">
-                        {msg.text}
-                      </div>
-                      <span className="text-[10px] text-slate-500">
-                        {msg.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {isSearching ? (
+                    <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+                      <Zap className="w-8 h-8 text-cyan-600 mb-4 animate-bounce" />
+                      <p className="text-xs text-slate-500 italic">의미론적 유사도 분석 중...</p>
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+                      <Database className="w-12 h-12 text-slate-600 mb-4" />
+                      <p className="text-xs text-slate-500">검색 결과가 없습니다.</p>
                     </div>
                   ) : (
-                    <>
-                      <AIChatBubble 
-                        message={msg}
-                        onCopy={handleCopyMessage}
-                        onShare={handleShareToTeam}
-                      />
-                      {msg.metrics && (
-                        <div className="ml-10 max-w-[85%] mt-2 animate-fade-in-up">
-                            <ServerStatusChart />
+                    <div className="space-y-4 pb-10">
+                      {searchResults.map((res, idx) => (
+                        <div 
+                           key={idx} 
+                           className="bg-slate-800/40 border border-white/5 hover:border-cyan-500/30 rounded-2xl p-4 transition-all cursor-pointer group hover:bg-cyan-900/5"
+                           onClick={() => handleWarpToMessage(res.incident_id, res.seq)}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${
+                              res.score > 0.8 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-700/50 text-slate-400'
+                            }`}>
+                              {res.label}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">INC-{res.incident_id}</span>
+                          </div>
+                          <p className="text-[13px] text-slate-200 leading-relaxed mb-3 line-clamp-3">
+                             {res.text}
+                          </p>
+                          <div className="flex justify-between items-center text-[10px] text-slate-500 border-t border-white/5 pt-3">
+                             <div className="flex items-center gap-2">
+                               <div className="w-5 h-5 rounded-md bg-slate-700 flex items-center justify-center text-white text-[8px]">
+                                 {res.sender ? res.sender[0] : 'S'}
+                               </div>
+                               <span>@{res.sender}</span>
+                             </div>
+                             <div className="flex items-center gap-1 text-cyan-500 font-bold group-hover:translate-x-1 transition-transform">
+                               이동하기 <ArrowLeft className="w-3 h-3 rotate-180" />
+                             </div>
+                          </div>
                         </div>
-                      )}
-                    </>
+                      ))}
+                    </div>
                   )}
                 </div>
-              ))}
-
-              {isAiThinking && <AIThinkingIndicator />}
-            </div>
-
-            {/* AI Input Area */}
-            <div className="p-3 border-t border-white/10 bg-[#0a0d14]">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAIMessage(userInput)}
-                  placeholder="AI에게 질문하세요..."
-                  className="flex-1 bg-slate-800/60 rounded-full py-2.5 px-4 text-sm border border-white/5 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-slate-500"
-                />
-                <button
-                  onClick={() => handleAIMessage(userInput)}
-                  disabled={!userInput.trim()}
-                  className="p-2.5 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
 
       <div className="px-4 pb-2 bg-[#0f1421]">
-        {roomStatus === 'Completed' ? (
-          <div className="w-full py-3.5 rounded-xl bg-slate-700 text-slate-500 text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed">
-            <CheckCircle className="w-4 h-4" />
-            이미 해결된 장애입니다
+        {roomStatus === 'CLOSED' ? (
+          <div className="w-full py-4 rounded-2xl bg-slate-900/50 border border-white/5 text-slate-500 text-sm font-bold flex items-center justify-center gap-3 animate-in fade-in duration-500">
+            <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
+            이 War-Room은 종료되었습니다. (읽기 전용)
           </div>
         ) : (
-          <div className="flex gap-2">
-            {/* Button 1: Simple close (WIP) */}
+          <div className="flex gap-3">
+            {/* Button 1: Resolve Only */}
             <button
-              onClick={() => {
-                setShowWipToast(true);
-                setTimeout(() => setShowWipToast(false), 2500);
-              }}
-              className="flex-1 py-3 rounded-xl bg-slate-700/80 border border-white/10 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-600/80 transition-all active:scale-[0.97]"
+              onClick={handleResolveOnly}
+              className="flex-1 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 text-[13px] font-black flex items-center justify-center gap-2 transition-all active:scale-[0.97] group"
             >
-              <CheckCircle className="w-4 h-4 text-slate-400" />
-              장애완료만 처리<br/>(보고불필요)
+              <CheckCircle className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+              장애완료만 처리<br/><span className="text-[10px] opacity-60 font-normal">(보고서 제외)</span>
             </button>
-            {/* Button 2: Full report flow */}
+            {/* Button 2: Resolve & Report */}
             <button
               onClick={handleResolveIncident}
-              className="flex-1 py-3 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/30 hover:from-emerald-500 hover:to-teal-600 transition-all active:scale-[0.97]"
+              className="flex-[1.8] py-3.5 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-[13px] font-black flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/40 hover:from-emerald-500 hover:to-teal-600 transition-all active:scale-[0.97] group"
             >
-              <FileText className="w-4 h-4" />
-              완료 및 REPORT·<br/>지식DB생성 진행
+              <FileText className="w-5 h-5 group-hover:animate-bounce" />
+              완료 및 REPORT·지식DB 생성
             </button>
-          </div>
-        )}
-        {/* 구현중 toast */}
-        {showWipToast && (
-          <div className="mt-2 w-full text-center text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg py-2 animate-in fade-in duration-300">
-            ⚙️ 해당 기능은 현재 구현 중입니다.
           </div>
         )}
       </div>
 
+      {/* Typing Indicator */}
+      {Object.values(remoteTyping).some(u => u.is_typing) && (
+        <div className="px-5 py-1 flex items-center gap-2 animate-pulse">
+          <div className="flex -space-x-1">
+            {Object.entries(remoteTyping).filter(([_, u]) => u.is_typing).map(([id, u]) => (
+              <div key={id} className="w-5 h-5 rounded-full bg-slate-700 border border-[#0f1421] flex items-center justify-center text-[8px] font-bold">
+                {u.name?.[0]}
+              </div>
+            ))}
+          </div>
+          <span className="text-[10px] text-slate-400">
+            {Object.values(remoteTyping).filter(u => u.is_typing).map(u => u.name).join(', ')}님이 입력 중...
+          </span>
+        </div>
+      )}
+
       {/* Input Area */}
-      <div className="p-3 bg-[#0f1421] border-t border-white/5 flex flex-col mb-[70px] space-y-2">
-        {roomStatus === 'Completed' ? (
+       <div className="p-3 bg-[#0f1421] border-t border-white/5 flex flex-col mb-[70px] space-y-2">
+        {roomStatus === 'CLOSED' ? (
           <div className="bg-slate-900/50 rounded-2xl py-4 px-5 border border-white/5 flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
             <span className="text-sm text-slate-500 font-medium">이 War-Room은 종료되었습니다. (읽기 전용)</span>
@@ -1099,13 +1954,26 @@ export default function ChatPage() {
             <Paperclip className="w-5 h-5 text-slate-400" />
           </button>
           <div className="flex-1 relative">
+            {replyTo && (
+              <div className="absolute bottom-full left-0 w-full bg-[#1e2538] border border-white/5 rounded-t-xl p-2 mb-[-1px] flex justify-between items-center text-[11px] animate-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-2 text-slate-300 truncate">
+                  <span className="font-bold text-blue-400">@{replyTo.sender}</span>
+                  <span className="truncate opacity-70">{replyTo.text}</span>
+                </div>
+                <button onClick={() => setReplyTo(null)}><X className="w-3.5 h-3.5 text-slate-500" /></button>
+              </div>
+            )}
             <input
               type="text"
+              disabled={roomStatus === 'CLOSED'}
               value={mainInput}
-              onChange={(e) => setMainInput(e.target.value)}
+              onChange={(e) => {
+                setMainInput(e.target.value);
+                handleTyping();
+              }}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="메시지를 입력하세요..."
-              className="w-full bg-slate-800/60 rounded-full py-2.5 px-5 text-[15px] border border-white/5 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500"
+              placeholder={roomStatus === 'CLOSED' ? "종료된 워룸은 입력할 수 없습니다" : "메시지를 입력하세요..."}
+              className={`w-full bg-slate-800/60 py-2.5 px-5 text-[15px] border border-white/5 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500 ${replyTo ? 'rounded-b-2xl' : 'rounded-full'} ${roomStatus === 'CLOSED' ? 'cursor-not-allowed opacity-50' : ''}`}
             />
             <button
               onClick={handleSendMessage}
@@ -1123,6 +1991,70 @@ export default function ChatPage() {
       </>
     )}
   </div>
+      
+      {/* Direct Message (Note) Modal */}
+      {showDMModal && dmTargetUser && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowDMModal(false)} />
+          <div className="bg-[#1a1f2e] w-full max-w-lg rounded-[2rem] border border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-blue-400">
+                  {dmTargetUser.name[0]}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">{dmTargetUser.name}님과의 쪽지</h3>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">{dmTargetUser.role} • PRIVATE CHANNEL</p>
+                </div>
+              </div>
+              <button onClick={() => setShowDMModal(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#0f1421]/50">
+              {dmHistory.length === 0 ? (
+                <div className="text-center py-10">
+                  <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-8 h-8 text-slate-600" />
+                  </div>
+                  <p className="text-sm text-slate-500">대화 내역이 없습니다.<br/>첫 쪽지를 보내보세요.</p>
+                </div>
+              ) : (
+                dmHistory.map((dm) => (
+                  <div key={dm.id} className={`flex ${dm.sender_id === currentUser.employee_id ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${dm.sender_id === currentUser.employee_id ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-100 rounded-tl-none'}`}>
+                      {dm.message}
+                      <div className={`text-[9px] mt-1 opacity-50 ${dm.sender_id === currentUser.employee_id ? 'text-right' : 'text-left'}`}>
+                        {new Date(dm.created_at).toLocaleTimeString().slice(0, 5)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 border-t border-white/5 bg-[#1a1f2e]">
+              <div className="relative">
+                <textarea
+                  value={dmInput}
+                  onChange={(e) => setDmInput(e.target.value)}
+                  onKeyPress={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendDM(); }}}
+                  placeholder="쪽지를 입력하세요..."
+                  className="w-full bg-[#0f1421] border border-white/10 rounded-2xl py-3 px-4 pr-12 text-sm focus:outline-none focus:border-blue-500/50 resize-none min-h-[80px]"
+                />
+                <button 
+                  onClick={handleSendDM}
+                  disabled={!dmInput.trim()}
+                  className="absolute right-3 bottom-3 p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-500 transition-all"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* War-Room List Popup */}
       {showWarRoomPopup && (

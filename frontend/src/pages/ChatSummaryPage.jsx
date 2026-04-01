@@ -7,14 +7,18 @@ import {
   Share2, 
   Copy, 
   Check, 
+  CheckCircle2,
   Sparkles, 
   Clock, 
   AlertCircle,
   Shield,
   Printer,
-  History
+  History,
+  BookMarked,
+  Database
 } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
+import html2pdf from 'html2pdf.js';
 
 export default function ChatSummaryPage() {
   const { incidentId } = useParams();
@@ -68,8 +72,8 @@ export default function ChatSummaryPage() {
           for (const evt of events) {
             const lines = evt.split('\n');
             for (const line of lines) {
-              if (!line.startsWith('data:')) continue;
-              const dataStr = line.slice(5).trim();
+              if (!line.trim().startsWith('data:')) continue;
+              const dataStr = line.replace(/^data:\s*/, '').trim();
               if (dataStr === '[DONE]') continue;
               
               try {
@@ -81,7 +85,7 @@ export default function ChatSummaryPage() {
                   setError(data.error);
                 }
               } catch (e) {
-                console.error('Error parsing SSE data', e);
+                console.error('Error parsing SSE data', e, 'DataStr:', dataStr);
               }
             }
           }
@@ -105,6 +109,175 @@ export default function ChatSummaryPage() {
     };
   }, [incidentId]);
 
+  const [isSending, setIsSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+
+  const handleSendEmail = async () => {
+    if (isSending || !summary) return;
+    setIsSending(true);
+    setSendSuccess(false);
+
+    let styleElement = null;
+    try {
+      const reportElement = document.getElementById('report-content');
+      if (!reportElement) throw new Error('Report container (report-content) not found');
+
+      // 🛡️ OKLCH Nuclear Option: Inject a global override stylesheet
+      styleElement = document.createElement("style");
+      styleElement.id = "s-guard-pdf-override";
+      styleElement.innerText = `
+        /* Force standard color space for ALL elements in the report area during capture */
+        #report-content, #report-content *, #report-content *::before, #report-content *::after {
+          /* Neutralize oklch variables by forcing HEX equivalents */
+          --color-slate-50: #f8fafc !important; --color-slate-100: #f1f5f9 !important; --color-slate-200: #e2e8f0 !important;
+          --color-slate-300: #cbd5e1 !important; --color-slate-400: #94a3b8 !important; --color-slate-500: #64748b !important;
+          --color-slate-600: #475569 !important; --color-slate-700: #334155 !important; --color-slate-800: #1e293b !important;
+          --color-slate-900: #0f172a !important; --color-slate-950: #020617 !important;
+          
+          --color-blue-300: #93c5fd !important; --color-blue-400: #60a5fa !important; --color-blue-500: #3b82f6 !important; --color-blue-600: #2563eb !important;
+          --color-indigo-400: #818cf8 !important; --color-indigo-500: #6366f1 !important; --color-indigo-600: #4f46e5 !important;
+          
+          --color-emerald-400: #34d399 !important; --color-emerald-500: #10b981 !important;
+          --color-amber-400: #fbbf24 !important; --color-amber-500: #f59e0b !important;
+          --color-red-400: #f87171 !important; --color-red-500: #ef4444 !important;
+          --color-purple-400: #c084fc !important; --color-purple-500: #a855f7 !important;
+
+          /* Prose Variable Neutralization */
+          --tw-prose-body: #d1d5db !important; --tw-prose-headings: #ffffff !important;
+          --tw-prose-links: #60a5fa !important; --tw-prose-bold: #ffffff !important;
+          --tw-prose-counters: #94a3b8 !important; --tw-prose-bullets: #3b82f6 !important;
+          --tw-prose-hr: #1e293b !important; --tw-prose-quote-borders: #3b82f6 !important;
+          --tw-prose-code: #ffffff !important; --tw-prose-pre-bg: #0f172a !important;
+          --tw-prose-th-borders: #1e293b !important; --tw-prose-td-borders: #111827 !important;
+
+          /* Atomic class & Direct oklch neutralization */
+          background-image: none !important; /* Remove potentially crashing gradients */
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        /* Specific known crashing points & HEX Fallbacks */
+        .text-blue-400 { color: #60a5fa !important; }
+        .text-emerald-400 { color: #34d399 !important; }
+        .border-white\\/10 { border-color: #1e293b !important; }
+        .bg-white\\/5 { background-color: #0f172a !important; }
+        .bg-blue-600 { background-color: #2563eb !important; }
+      `;
+      document.head.appendChild(styleElement);
+
+      const opt = {
+        margin: 5,
+        filename: `SGuard_Report_${incidentId}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          backgroundColor: '#1a1f2e',
+          logging: false,
+          onclone: (clonedDoc) => {
+            // 🛡️ Global Style Sanitization: Fix for "Unsupported color function oklch"
+            // 1. Sanitize all <style> tags in the head
+            const styleTags = clonedDoc.getElementsByTagName('style');
+            for (let i = 0; i < styleTags.length; i++) {
+              const tag = styleTags[i];
+              if (tag.textContent && (tag.textContent.includes('oklch') || tag.textContent.includes('oklab'))) {
+                // Aggressively replace oklch(...) and oklab(...) with a safe hex value
+                tag.textContent = tag.textContent.replace(/(oklch|oklab)\([^)]+\)/g, '#cbd5e1');
+              }
+            }
+
+            // 2. Aggressive stripping from all individual elements
+            const allElements = clonedDoc.querySelectorAll('*');
+            allElements.forEach(el => {
+              const inlineStyle = el.getAttribute('style');
+              if (inlineStyle && (inlineStyle.includes('oklch') || inlineStyle.includes('oklab'))) {
+                // Remove the offending style or replace with safe fallback
+                el.setAttribute('style', inlineStyle.replace(/(oklch|oklab)\([^)]+\)/g, '#cbd5e1'));
+              }
+            });
+          }
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      // Create PDF as blob
+      const pdfBlob = await html2pdf().set(opt).from(reportElement).output('blob');
+
+      // 🧹 Clean up the override stylesheet
+      if (styleElement && styleElement.parentNode) {
+        document.head.removeChild(styleElement);
+        styleElement = null;
+      }
+
+      // 2. Prepare FormData and Send with Auth Header
+      const formData = new FormData();
+      formData.append('pdf', pdfBlob, 'report.pdf');
+      formData.append('incident_id', incidentId);
+
+      const res = await fetch(getApiUrl('/ai/send-report-email'), {
+        method: 'POST',
+        headers: { 
+          'X-SGuard-Auth': 'my-secret-key'
+        },
+        body: formData
+      });
+      
+      if (res.ok) {
+        setSendSuccess(true);
+        alert('팀장님께 전송 완료하였습니다.');
+        setTimeout(() => setSendSuccess(false), 3000);
+      } else {
+        const err = await res.json();
+        alert(`전송 실패: ${err.error || '접근이 거부되었습니다.'}`);
+      }
+    } catch (err) {
+      console.error('PDF Email send error:', err);
+      // Ensure cleanup even on error
+      if (styleElement && styleElement.parentNode) {
+        document.head.removeChild(styleElement);
+      }
+      alert(`보고서 생성 오류: ${err.message}`);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
+
+  const handleRegisterKnowledge = async () => {
+    if (!summary || isRegistering) return;
+    setIsRegistering(true);
+    
+    try {
+      const res = await fetch(getApiUrl('/ai/register-knowledge'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incident_id: incidentId,
+          title: `[WAR-ROOM REPORT] ${incidentId}`,
+          content: summary,
+          category: '인시던트 요약',
+          tags: 'WarRoom,Summary,AI'
+        })
+      });
+      
+      if (res.ok) {
+        setRegisterSuccess(true);
+        alert('S-Guard 지식 베이스에 성공적으로 등록되었습니다.');
+        setTimeout(() => setRegisterSuccess(false), 3000);
+      } else {
+        const err = await res.json();
+        alert(`등록 실패: ${err.error || '알 수 없는 오류'}`);
+      }
+    } catch (err) {
+      console.error('Knowledge register error:', err);
+      alert('지식 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   const handleCopy = () => {
     navigator.clipboard.writeText(summary);
     setIsCopied(true);
@@ -127,7 +300,7 @@ export default function ChatSummaryPage() {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div>
-            <h1 className="text-sm font-black tracking-widest uppercase text-blue-400">AI Chat Briefing</h1>
+            <h1 className="text-sm font-black tracking-widest uppercase text-blue-400">WAR-ROOM SUMMARY</h1>
             <p className="text-[10px] text-slate-500 font-mono">{incidentId}</p>
           </div>
         </div>
@@ -140,6 +313,48 @@ export default function ChatSummaryPage() {
             {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{isCopied ? 'Copied' : 'Copy'}</span>
           </button>
+          
+          <button 
+            onClick={handleRegisterKnowledge}
+            disabled={isRegistering || isLoading || !summary}
+            className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all border active:scale-95 shadow-xl ${
+              registerSuccess 
+                ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20' 
+                : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 border-indigo-400/30 text-white shadow-indigo-500/20 hover:scale-105 active:scale-95'
+            } disabled:opacity-50 group origin-right`}
+          >
+            {isRegistering ? (
+              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : registerSuccess ? (
+              <CheckCircle2 className="w-4 h-4" />
+            ) : (
+              <Shield className="w-4 h-4 text-indigo-200 group-hover:rotate-12 transition-transform" />
+            )}
+            <div className="flex flex-col items-start leading-none space-y-0.5">
+              <span className="text-[10px] opacity-70 font-mono tracking-widest uppercase">Governance</span>
+              <span>{isRegistering ? 'Approving Knowledge...' : registerSuccess ? 'RAG Updated' : '최종 승인 및 RAG 업데이트'}</span>
+            </div>
+          </button>
+
+          <button 
+            onClick={handleSendEmail}
+            disabled={isSending || isLoading || !summary}
+            className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-lg active:scale-95 ${
+              sendSuccess 
+                ? 'bg-emerald-600 text-white shadow-emerald-500/20' 
+                : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/20'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {isSending ? (
+              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : sendSuccess ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Database className="w-3.5 h-3.5 font-bold" />
+            )}
+            <span>{isSending ? 'Sending PDF...' : sendSuccess ? 'Sent to Leader ✓' : '팀장님 전송'}</span>
+          </button>
+
           <button 
             onClick={handlePrint}
             className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold transition-all shadow-lg shadow-blue-500/20 active:scale-95"
@@ -153,7 +368,7 @@ export default function ChatSummaryPage() {
       {/* Main Content */}
       <main className="pt-24 px-6 max-w-4xl mx-auto">
         {/* Report Cover Style Component */}
-        <div className="bg-[#1a1f2e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl mb-8 print:shadow-none print:border-slate-200">
+        <div id="report-content" className="bg-[#1a1f2e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl mb-8 print:shadow-none print:border-slate-200">
           {/* Top accent bar */}
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
           
@@ -166,7 +381,7 @@ export default function ChatSummaryPage() {
                 </div>
                 <h2 className="text-3xl md:text-4xl font-black leading-tight">
                   장애 대응 협업 <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">최종 요약 리포트</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">WAR-ROOM 요약 레포트</span>
                 </h2>
               </div>
               <div className="text-right hidden sm:block">
@@ -203,7 +418,7 @@ export default function ChatSummaryPage() {
             </div>
 
             {/* Content Area */}
-            <div className="prose prose-invert prose-blue max-w-none">
+            <div className="content-area min-h-[400px]">
               {isLoading && !summary ? (
                 <div className="flex flex-col items-center justify-center py-20 space-y-4">
                   <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
@@ -220,12 +435,12 @@ export default function ChatSummaryPage() {
                   </div>
                 </div>
               ) : (
-                <div className="animate-in fade-in duration-1000">
+                <div className="animate-in fade-in duration-1000 relative">
                   <MarkdownViewer text={summary} />
                   {isLoading && (
-                    <div className="flex items-center space-x-2 mt-4 text-xs text-blue-400 animate-pulse">
+                    <div className="flex items-center space-x-2 mt-4 text-xs text-blue-400 animate-pulse bg-blue-500/5 p-2 rounded-lg border border-blue-500/10 inline-flex">
                       <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
-                      <span>작성 중...</span>
+                      <span className="font-bold uppercase tracking-widest text-[9px]">S-Guard AI 분석 진행 중...</span>
                     </div>
                   )}
                 </div>
@@ -259,15 +474,72 @@ export default function ChatSummaryPage() {
       </button>
 
       <style dangerouslySetInnerHTML={{ __html: `
+        #report-content {
+          /* Force standard color space for html2canvas compatibility */
+          --tw-bg-opacity: 1 !important;
+          color: #ffffff !important;
+          
+          /* Full Slate/Gray Palette Reset */
+          --color-slate-50: #f8fafc !important; --color-slate-100: #f1f5f9 !important; --color-slate-200: #e2e8f0 !important;
+          --color-slate-300: #cbd5e1 !important; --color-slate-400: #94a3b8 !important; --color-slate-500: #64748b !important;
+          --color-slate-600: #475569 !important; --color-slate-700: #334155 !important; --color-slate-800: #1e293b !important;
+          --color-slate-900: #0f172a !important; --color-slate-950: #020617 !important;
+          
+          /* Full Blue/Indigo Palette Reset */
+          --color-blue-400: #60a5fa !important; --color-blue-500: #3b82f6 !important; --color-blue-600: #2563eb !important;
+          --color-indigo-400: #818cf8 !important; --color-indigo-500: #6366f1 !important; --color-indigo-600: #4f46e5 !important;
+          
+          /* Semantic Colors */
+          --color-emerald-400: #34d399 !important; --color-emerald-500: #10b981 !important;
+          --color-amber-400: #fbbf24 !important; --color-amber-500: #f59e0b !important;
+          --color-red-400: #f87171 !important; --color-red-500: #ef4444 !important;
+          --color-purple-400: #c084fc !important; --color-purple-500: #a855f7 !important;
+
+          /* Prose Variables (Critical for Markdown) */
+          --tw-prose-body: #94a3b8 !important;
+          --tw-prose-headings: #ffffff !important;
+          --tw-prose-lead: #64748b !important;
+          --tw-prose-links: #60a5fa !important;
+          --tw-prose-bold: #ffffff !important;
+          --tw-prose-counters: #64748b !important;
+          --tw-prose-bullets: #475569 !important;
+          --tw-prose-hr: #1e293b !important;
+          --tw-prose-quotes: #f1f5f9 !important;
+          --tw-prose-quote-borders: #2563eb !important;
+          --tw-prose-captions: #64748b !important;
+          --tw-prose-code: #ffffff !important;
+          --tw-prose-pre-code: #e2e8f0 !important;
+          --tw-prose-pre-bg: #0f172a !important;
+          --tw-prose-th-borders: #334155 !important;
+          --tw-prose-td-borders: #1e293b !important;
+        }
+        
+        /* Utility Class Forced HEX Overrides */
+        #report-content .text-slate-200 { color: #e2e8f0 !important; }
+        #report-content .text-slate-300 { color: #cbd5e1 !important; }
+        #report-content .text-slate-400 { color: #94a3b8 !important; }
+        #report-content .text-slate-500 { color: #64748b !important; }
+        #report-content .text-blue-300 { color: #93c5fd !important; }
+        #report-content .text-blue-400 { color: #60a5fa !important; }
+        #report-content .text-emerald-400 { color: #34d399 !important; }
+        #report-content .text-amber-500 { color: #f59e0b !important; }
+        #report-content .text-red-400 { color: #f87171 !important; }
+        
+        #report-content .bg-blue-500\\/10 { background-color: rgba(59, 130, 246, 0.1) !important; }
+        #report-content .border-blue-500\\/20 { border-color: rgba(59, 130, 246, 0.2) !important; }
+        #report-content .bg-black\\/20 { background-color: rgba(0, 0, 0, 0.2) !important; }
+        #report-content .border-white\\/10 { border-color: rgba(255, 255, 255, 0.1) !important; }
+        #report-content .border-white\\/5 { border-color: rgba(255, 255, 255, 0.05) !important; }
+
         @media print {
-          body { background: white !important; color: black !important; }
-          .bg-slate-900, .bg-[#0f1421], .bg-[#1a1f2e], .bg-black\\/20 { background: white !important; }
-          .text-white, .text-slate-200, .text-slate-300 { color: black !important; }
+          body { background: #ffffff !important; color: #000000 !important; }
+          #report-content { background: #ffffff !important; color: #000000 !important; border-color: #e2e8f0 !important; }
+          .bg-slate-900, .bg-[#0f1421], .bg-[#1a1f2e], .bg-black\\/20 { background: #ffffff !important; }
+          .text-white, .text-slate-200, .text-slate-300, .text-slate-400 { color: #000000 !important; }
           .border, .border-white\\/10, .border-white\\/5 { border-color: #e2e8f0 !important; }
           .text-blue-400, .text-blue-300, .text-emerald-400, .text-purple-400 { color: #2563eb !important; }
           .bg-gradient-to-r { background: #2563eb !important; }
-          .prose { color: black !important; max-width: 100% !important; }
-          main { padding-top: 0 !important; }
+          .prose { color: #000000 !important; max-width: 100% !important; }
         }
       ` }} />
     </div>

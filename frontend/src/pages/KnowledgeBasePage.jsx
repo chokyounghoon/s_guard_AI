@@ -29,10 +29,14 @@ export default function KnowledgeBasePage() {
     fetchKnowledge();
   }, []);
 
-  const fetchKnowledge = async () => {
+  const fetchKnowledge = async (query = '') => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/ai/knowledge`);
+      const url = query.trim() 
+        ? `${API_BASE}/ai/knowledge?q=${encodeURIComponent(query)}`
+        : `${API_BASE}/ai/knowledge`;
+        
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setKnowledge(data.results || []);
@@ -41,6 +45,12 @@ export default function KnowledgeBasePage() {
       console.error("Fetch knowledge error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearchKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      fetchKnowledge(searchTerm);
     }
   };
 
@@ -120,11 +130,20 @@ export default function KnowledgeBasePage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input 
             type="text" 
-            placeholder="지식 제안, 태그, 본문 내용 검색..." 
+            placeholder="지식 제안, 태그, 본문 내용 검색... (Enter 시 시맨틱 검색)" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleSearchKeyPress}
             className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-all"
           />
+          {searchTerm && (
+            <button 
+              onClick={() => { setSearchTerm(''); fetchKnowledge(''); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 text-slate-500"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
         
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">

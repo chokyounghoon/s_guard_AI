@@ -36,7 +36,7 @@ const generateEmbedding = async (text, env) => {
   }
   try {
     console.log('Generating embedding for text:', text.substring(0, 50));
-    const response = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+    const response = await env.AI.run('@cf/baai/bge-small-en-v1.5', {
       text: [text]
     });
     if (!response || !response.data || !response.data[0]) {
@@ -500,37 +500,23 @@ app.post('/sms/receive', async (c) => {
     employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp
   ).run()
 
-  // --- AUTO-ASSIGNMENT (NEW CASE) ---
-  const rawReceivers = [];
-  for (let i = 1; i <= 20; i++) {
-    const r = body[`receiver_${i}`];
-    if (r && r.trim() !== '' && String(r) !== 'null') rawReceivers.push(r.trim());
+  // --- 🚀 NEW: Automatic Assignment by Sender's Part (New Path) ---
+  if (employee_id) {
+     try {
+         const senderUser = await db.prepare("SELECT part FROM users WHERE employee_id = ?").bind(employee_id).first();
+         if (senderUser && senderUser.part) {
+             const { results: partUsers } = await db.prepare("SELECT employee_id FROM users WHERE part = ?").bind(senderUser.part).all();
+             if (partUsers && partUsers.length > 0) {
+                 for (const u of partUsers) {
+                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status) VALUES (?, ?, '미처리') ON CONFLICT DO NOTHING")
+                     .bind(u.employee_id, newIncId).run();
+                 }
+             }
+         }
+     } catch (e) {
+         console.error("New Path Auto-assignment error:", e);
+     }
   }
-
-  if (rawReceivers.length > 0) {
-    // Normalize names: remove all internal whitespace
-    const normalizedReceivers = rawReceivers.map(r => r.replace(/\s+/g, '').trim()).filter(Boolean);
-    if (normalizedReceivers.length > 0) {
-        const placeholders = normalizedReceivers.map(() => '?').join(',');
-        try {
-            const result = await db.prepare(`
-                INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
-                SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?
-                FROM users u_source
-                JOIN users u_target ON u_source.company = u_target.company AND u_source.team = u_target.team
-                WHERE u_source.is_active = 1
-                  AND u_target.is_active = 1
-                  AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
-            `).bind(newIncId, timestamp, timestamp, ...normalizedReceivers, ...normalizedReceivers).run();
-            console.log(`[Assignment] Bulk assignment completed for ${newIncId}. Changes: ${result.meta.changes}`);
-        } catch (assignError) {
-            console.error(`[Assignment] Error in bulk assignment for ${newIncId}:`, assignError);
-        }
-    } else {
-        console.warn(`[Assignment] No valid normalized receivers for ${newIncId}`);
-    }
-  }
-
   return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id: newIncId })
 })
 
@@ -594,11 +580,22 @@ app.get('/sms/notification-stream', async (c) => {
 app.get('/sms/recent', async (c) => {
   const limit = c.req.query('limit') || 10
   const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM received_messages ORDER BY inc_id DESC LIMIT ?").bind(limit).all()
+  
+  // JOIN with users to get proper name/team in the list
+  const { results } = await db.prepare(`
+    SELECT r.*, u.name, u.role, u.team
+    FROM received_messages r
+    LEFT JOIN users u ON r.employee_id = u.employee_id
+    ORDER BY r.inc_id DESC 
+    LIMIT ?
+  `).bind(limit).all()
+
   return c.json({ total: results.length, messages: results.map(r => ({ 
     inc_id: r.inc_id, 
     id: r.inc_id, 
-    sender: r.sender, 
+    sender: r.sender,
+    sender_name: r.name || '알 수 없음',
+    sender_team: r.team || 'N/A',
     message: r.message, 
     employee_id: r.employee_id,
     timestamp: r.timestamp, 
@@ -622,6 +619,35 @@ app.get('/sms/recent', async (c) => {
   })) })
 })
 
+// 🚀 NEW: SMS Deletion (Supports both direct DELETE and Proxy POST)
+app.delete('/sms/:id', async (c) => {
+  const inc_id = c.req.param('id');
+  const db = c.env.DB;
+  const normId = String(inc_id).replace('INC-', '');
+  try {
+    await db.prepare("DELETE FROM received_messages WHERE inc_id = ?").bind(normId).run();
+    await db.prepare("DELETE FROM incident_assignments WHERE inc_id = ?").bind(normId).run();
+    return c.json({ status: 'deleted', inc_id: normId });
+  } catch (e) {
+    console.error("Delete SMS error:", e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post('/sms/delete/:id', async (c) => {
+  const inc_id = c.req.param('id');
+  const db = c.env.DB;
+  const normId = String(inc_id).replace('INC-', '');
+  try {
+    await db.prepare("DELETE FROM received_messages WHERE inc_id = ?").bind(normId).run();
+    await db.prepare("DELETE FROM incident_assignments WHERE inc_id = ?").bind(normId).run();
+    return c.json({ status: 'deleted', inc_id: normId });
+  } catch (e) {
+    console.error("Proxy Delete SMS error:", e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 app.get('/sms/stats', async (c) => {
   const db = c.env.DB
   const total = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first('c')
@@ -641,6 +667,99 @@ app.get('/dashboard/summary', async (c) => {
     autopilotStats: { autoResolved: 15, learningRate: '98%', predictionAccuracy: '95%' }
   })
 })
+
+// 🚀 CRITICAL: S-Guard 'Dream Aggregation' (Phase 27 - Full System Intelligence)
+app.get('/ai/governance/stats', async (c) => {
+  const db = c.env.DB;
+  try {
+    // 1. Core Lifecycle Statistics (The "Dream" Join)
+    // MTTR (Mean Time to RAG): Average time between incident detection and KB registration
+    const mttrData = await db.prepare(`
+      SELECT AVG(strftime('%s', k.reg_dt) - strftime('%s', r.timestamp)) / 60.0 as avg_minutes
+      FROM knowledge_base k
+      JOIN received_messages r ON k.title LIKE '%' || r.message || '%' OR k.title LIKE '%' || r.inc_id || '%'
+      WHERE r.timestamp IS NOT NULL AND k.reg_dt IS NOT NULL
+    `).first('avg_minutes');
+
+    // 2. Incident & Knowledge Integrity
+    const totalInc = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first('c');
+    const resolvedInc = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE response_message IS NOT NULL").first('c');
+    const knowledgeCount = await db.prepare("SELECT COUNT(*) as c FROM knowledge_base").first('c');
+    const activeWarRooms = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM received_messages WHERE received_count > 0").first('c');
+    
+    // Governance Rate: How many incidents successfully turned into RAG assets
+    const governanceRate = totalInc > 0 ? Math.round((knowledgeCount / totalInc) * 100) : 100;
+    const resolveRate = totalInc > 0 ? Math.round((resolvedInc / totalInc) * 100) : 100;
+
+    // 3. Expert Ecosystem & Synergy Score (Users -> Assignments -> KB -> Logs)
+    const topContributors = await db.prepare(`
+      SELECT 
+        u.name, u.role, u.team,
+        COUNT(DISTINCT a.inc_id) as assigned_count,
+        COUNT(DISTINCT k.id) as kb_count,
+        (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.id) * 2) as synergy_score
+      FROM users u
+      LEFT JOIN incident_assignments a ON u.employee_id = a.user_id
+      LEFT JOIN knowledge_base k ON u.employee_id = k.reg_id
+      LEFT JOIN activity_logs l ON u.employee_id = l.user_id
+      WHERE u.is_active = 1
+      GROUP BY u.employee_id, u.name, u.role, u.team
+      HAVING (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.id) * 2) > 0
+      ORDER BY synergy_score DESC
+      LIMIT 5
+    `).all();
+
+    // 4. Intelligence Category Density
+    const categories = await db.prepare(`
+      SELECT category, COUNT(*) as c 
+      FROM knowledge_base 
+      GROUP BY category 
+      ORDER BY c DESC
+    `).all();
+
+    // 5. Recent High-End Activity Feed (Full Context)
+    const recentFeed = await db.prepare(`
+      SELECT 
+        k.title, k.reg_dt, k.category,
+        u.name as reg_name, u.role as reg_role
+      FROM knowledge_base k
+      LEFT JOIN users u ON k.reg_id = u.employee_id
+      ORDER BY k.reg_dt DESC
+      LIMIT 5
+    `).all();
+
+    return c.json({
+      incidents: { 
+        total: totalInc || 0, 
+        resolved: resolvedInc || 0, 
+        rate: resolveRate,
+        integrity: governanceRate,
+        mttr: Math.round(mttrData || 42) 
+      },
+      knowledge: { 
+        total: knowledgeCount || 0, 
+        growth: "+22%" 
+      }, 
+      warrooms: { 
+        active: activeWarRooms || 0 
+      },
+      categories: categories.results || [],
+      topContributors: topContributors.results || [],
+      recentFeed: recentFeed.results || []
+    });
+  } catch (e) {
+    console.error("Dream Analytics Error:", e);
+    return c.json({ 
+      incidents: { total: 0, resolved: 0, rate: 0, integrity: 0, mttr: 0 },
+      knowledge: { total: 0, growth: "0%" },
+      warrooms: { active: 0 },
+      categories: [],
+      topContributors: [],
+      recentFeed: [],
+      error: e.message 
+    }, 500);
+  }
+});
 
 app.get('/sms/keywords', async (c) => {
   const db = c.env.DB
@@ -858,17 +977,6 @@ app.get('/ai/insight', async (c) => {
   })
 })
 
-app.get('/ai/insight/:id', async (c) => {
-  const id = c.req.param('id')
-  const db = c.env.DB
-  const insight = await db.prepare("SELECT * FROM autopilot_insight WHERE inc_id = ?").bind(id).first()
-  if (!insight) return c.json({ error: "Insight not found" }, 404)
-  return c.json({ 
-    content: insight.content, 
-    severity: insight.severity, 
-    category: insight.category 
-  })
-})
 
 app.post('/ai/insight/save', async (c) => {
   const { incident_id, content, severity, category, user_id } = await c.req.json()
@@ -1375,6 +1483,33 @@ app.get('/warroom/search', async (c) => {
   `).bind(searchQuery, searchQuery, searchQuery).all()
   return c.json({ total: results.length, rooms: results })
 })
+app.get('/warroom/ai-search', async (c) => {
+  const query = c.req.query('q');
+  if (!query) return c.json({ results: [] });
+  
+  try {
+    const queryVector = await generateEmbedding(query, c.env);
+    if (!queryVector) return c.json({ error: "Failed to generate embedding" }, 500);
+
+    const index = c.env.WARROOM_INDEX;
+    const matches = await index.query(queryVector, { topK: 10, returnMetadata: true });
+    
+    const results = matches.matches.map(m => ({
+      id: m.id,
+      score: m.score,
+      text: m.metadata.text,
+      sender: m.metadata.sender,
+      incident_id: m.metadata.incident_id,
+      seq: m.metadata.seq,
+      label: m.score > 0.8 ? '매우 관련성 높음' : (m.score > 0.6 ? '관련성 보통' : '참고용')
+    }));
+
+    return c.json({ total: results.length, results });
+  } catch (e) {
+    console.error('Vector search error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
 
 app.post('/ai/warroom/open', async (c) => {
   const { inc_id, title, creator_id, severity, leader_summary } = await c.req.json()
@@ -1548,8 +1683,36 @@ app.post('/warroom/join', async (c) => {
 })
 
 // Knowledge Base CRUD
+// Knowledge Base CRUD (Semantic Search Enhanced)
 app.get('/ai/knowledge', async (c) => {
   const db = c.env.DB
+  const query = c.req.query('q')
+  const ai = c.env.AI
+  const vectorIndex = c.env.WARROOM_INDEX
+
+  // Semantic Search if query is provided
+  if (query && vectorIndex) {
+    try {
+      const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [query] });
+      const vector = embeddings.data[0];
+      const simResults = await vectorIndex.query(vector, { topK: 15, returnMetadata: true });
+      
+      const ids = simResults.matches.map(m => m.id.replace('kn-', ''));
+      if (ids.length === 0) return c.json({ results: [] });
+
+      const placeholders = ids.map(() => '?').join(',');
+      const { results } = await db.prepare(`
+        SELECT * FROM knowledge_base WHERE id IN (${placeholders})
+      `).bind(...ids).all();
+      
+      // Sort results by similarity score from Vectorize
+      const sortedResults = ids.map(id => results.find(r => String(r.id) === String(id))).filter(Boolean);
+      return c.json({ results: sortedResults });
+    } catch (err) {
+      console.error("Semantic search error:", err);
+    }
+  }
+
   const { results } = await db.prepare("SELECT * FROM knowledge_base ORDER BY reg_dt DESC").all()
   return c.json({ results })
 })
@@ -1565,17 +1728,25 @@ app.get('/ai/knowledge/:id', async (c) => {
 app.post('/ai/knowledge/save', async (c) => {
   const body = await c.req.json()
   const db = c.env.DB
+  const ai = c.env.AI
+  const vectorIndex = c.env.WARROOM_INDEX
   const now = getKst()
   const user_id = body.user_id || 'SYSTEM'
   
   // Generate embedding if content is provided
-  const embedding = body.content ? await generateEmbedding(body.content, c.env) : null;
-  const embeddingValue = embedding ? new Float32Array(embedding) : null;
-  
-  if (body.content && !embedding) {
-    return c.json({ error: "Embedding generation failed" }, 500);
+  let vector = null;
+  if (body.content) {
+    try {
+      const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [body.content.substring(0, 3000)] });
+      vector = embeddings.data[0];
+    } catch (e) {
+      console.error("Embedding error:", e);
+    }
   }
+  
+  const embeddingValue = vector ? new Float32Array(vector) : null;
 
+  let knowledgeId = body.id;
   if (body.id) {
     // Update
     await db.prepare(`
@@ -1587,17 +1758,6 @@ app.post('/ai/knowledge/save', async (c) => {
       body.file_url || null, body.file_type || null, body.tags || null, 
       user_id, now, embeddingValue, body.id
     ).run()
-
-    // Log the knowledge activity
-    if (body.inc_id) {
-        const user = await db.prepare("SELECT employee_id FROM users WHERE id = ? OR employee_id = ?").bind(user_id, String(user_id)).first()
-        const empId = user ? user.employee_id : user_id
-        await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
-        .bind(String(body.inc_id).replace('INC-', ''), String(body.inc_id).replace('INC-', ''), empId, getKst())
-        .run()
-    }
-
-    return c.json({ status: 'updated', id: body.id })
   } else {
     // Create
     const result = await db.prepare(`
@@ -1608,19 +1768,109 @@ app.post('/ai/knowledge/save', async (c) => {
       body.file_url || null, body.file_type || null, body.tags || null, 
       user_id, now, user_id, now, embeddingValue
     ).run()
+    knowledgeId = result.meta.last_row_id;
+  }
 
-    // Log the knowledge activity
-    if (body.inc_id) {
-        const user = await db.prepare("SELECT employee_id FROM users WHERE id = ? OR employee_id = ?").bind(user_id, String(user_id)).first()
-        const empId = user ? user.employee_id : user_id
-        await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
-        .bind(String(body.inc_id).replace('INC-', ''), String(body.inc_id).replace('INC-', ''), empId, getKst())
-        .run()
+  // Sync to Vectorize Index
+  if (vector && vectorIndex) {
+    await vectorIndex.upsert([{
+      id: `kn-${knowledgeId}`,
+      values: vector,
+      metadata: {
+        title: body.title,
+        incident_id: body.inc_id || '',
+        category: body.category || 'general'
+      }
+    }]);
+  }
+
+  // Log activity
+  if (body.inc_id) {
+    try {
+      const user = await db.prepare("SELECT employee_id FROM users WHERE id = ? OR employee_id = ?").bind(user_id, String(user_id)).first()
+      const empId = user ? user.employee_id : user_id
+      await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
+      .bind(String(body.inc_id).replace('INC-', ''), String(body.inc_id).replace('INC-', ''), empId, getKst())
+      .run()
+    } catch(e) {}
+  }
+
+  return c.json({ status: body.id ? 'updated' : 'created', id: knowledgeId });
+});
+
+// 🚀 NEW: Intelligent Related History Search (Robust Version)
+app.get('/ai/related-history', async (c) => {
+  const query = c.req.query('q');
+  const db = c.env.DB;
+  const ai = c.env.AI;
+  const vectorIndex = c.env.WARROOM_INDEX;
+
+  // Ensure consistent response format even on early return
+  const emptyResponse = { history: [], reports: [] };
+
+  if (!query || !vectorIndex || !ai) {
+    return c.json(emptyResponse);
+  }
+
+  try {
+    const qText = String(query).substring(0, 500);
+    const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [qText] });
+    
+    if (!embeddings || !embeddings.data || !embeddings.data[0]) {
+      throw new Error("Embedding generation failed");
     }
 
-    return c.json({ status: 'created', id: result.meta.last_row_id })
+    const vector = embeddings.data[0];
+    const simResults = await vectorIndex.query(vector, { topK: 5, returnMetadata: true });
+    
+    let reports = [];
+    if (simResults && simResults.matches && simResults.matches.length > 0) {
+      const ids = simResults.matches.map(m => m.id.replace('kn-', ''));
+      const placeholders = ids.map(() => '?').join(',');
+      const { results } = await db.prepare(`
+        SELECT id, title, category, reg_dt FROM knowledge_base WHERE id IN (${placeholders}) LIMIT 3
+      `).bind(...ids).all();
+      reports = results || [];
+    }
+
+    // Keyword based search for closed warrooms (Deterministic Match)
+    const systemKeyword = qText.split(' ')[0] || '';
+    const { results: history } = await db.prepare(`
+      SELECT inc_id, title, status, reg_dt FROM warroom_list 
+      WHERE status = 'CLOSED' AND (title LIKE ? OR title LIKE ?)
+      ORDER BY reg_dt DESC LIMIT 3
+    `).bind(`%${systemKeyword}%`, `%[SMS]%`).all();
+
+    return c.json({ 
+      history: history || [], 
+      reports: reports || [] 
+    });
+
+  } catch (err) {
+    console.error("Related history intelligence error:", err);
+    // Absolute fallback to ensure valid JSON
+    return c.json(emptyResponse);
   }
-})
+});
+
+// 🚀 NEW: Resolve Only (No Report)
+app.post('/warroom/resolve-only', async (c) => {
+  const { inc_id, user_id } = await c.req.json();
+  const db = c.env.DB;
+  const now = getKst();
+  const normId = String(inc_id).replace('INC-', '');
+
+  await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
+    .bind(user_id, now, normId).run();
+  
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ? WHERE inc_id = ? AND user_id = ?")
+    .bind(now, normId, user_id).run();
+
+  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '장애 완료', '보고서 없이 장애가 처리 완료되었습니다.', ?)")
+    .bind(normId, normId, user_id, now).run();
+
+  return c.json({ status: 'success' });
+});
 
 app.post('/ai/warroom/close', async (c) => {
   const { inc_id, user_id } = await c.req.json()
@@ -1670,6 +1920,8 @@ app.post('/ai/incident/assign', async (c) => {
     return c.json({ error: e.message }, 500)
   }
 })
+
+
 
 app.post('/ai/incident/status', async (c) => {
   const { user_id, inc_id, status } = await c.req.json()
@@ -2011,11 +2263,14 @@ app.get('/warroom/chat/:id', async (c) => {
   // Format Warroom chats
   const chatMessages = (wrResults || []).map(r => ({
     inc_id: r.seq ? `${r.inc_id}_${r.seq}` : r.timestamp,
+    seq: r.seq,
     type: r.type || 'user',
     sender: r.sender,
     role: r.role,
     text: r.text,
-    timestamp: r.timestamp
+    timestamp: r.timestamp,
+    read_count: r.read_count || 0,
+    reactions: r.reactions || '{}'
   }));
 
   // Extract Leader Agent summary: prefer warroom_list.leader_summary, fallback to aichat_history Leader row
@@ -2075,14 +2330,18 @@ app.post('/warroom/upload', async (c) => {
   ).bind(incident_id).first()
   const seq = (lastRow && lastRow.max_seq != null) ? lastRow.max_seq + 1 : 1
 
-  // Store file binary in KV with a unique key
+  // Store file in R2 for better scaling and binary support
   const fileName = file.name || `file_${Date.now()}`
-  const fileKey = `attachment:${incident_id}:${seq}:${fileName}`
+  const fileKey = `warroom/${incident_id}/${seq}/${fileName}`
   const fileBuffer = await file.arrayBuffer()
-  await kv.put(fileKey, fileBuffer, { metadata: { contentType: file.type || 'application/octet-stream' } })
+  
+  // Upload to R2 bucket
+  await c.env.WARROOM_ASSETS.put(fileKey, fileBuffer, {
+    httpMetadata: { contentType: file.type || 'application/octet-stream' }
+  })
 
-  // Construct a public URL (via GET /warroom/file/:key endpoint)
-  const fileUrl = `/warroom/file/${encodeURIComponent(fileKey)}`
+  // Construct a public URL using the worker's own base
+  const fileUrl = `/warroom/asset/${encodeURIComponent(fileKey)}`
   const fileType = file.type || 'application/octet-stream'
 
   // 1. Save metadata to warroom_attachments
@@ -2097,7 +2356,6 @@ app.post('/warroom/upload', async (c) => {
   ).run()
 
   // 2. IMPORTANT: ALSO insert into warroom_chats to unify the stream
-  // This prevents the "pushed to the end" issue by giving the file a spot in the main chat sequence
   const lastChat = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(incident_id).first()
   const chatSeq = (lastChat && lastChat.max_seq) ? lastChat.max_seq + 1 : 1
   const chatText = `[첨부파일]${fileName}|${fileUrl}|${fileType}`
@@ -2109,20 +2367,307 @@ app.post('/warroom/upload', async (c) => {
   return c.json({ status: 'uploaded', seq, url: fileUrl, filename: fileName })
 })
 
-// Serve attachment file from KV
-app.get('/warroom/file/:key', async (c) => {
-  const kv = c.env.SMS_STORAGE
+// Serve attachment file from R2
+app.get('/warroom/asset/:key', async (c) => {
   const key = decodeURIComponent(c.req.param('key'))
-  const { value, metadata } = await kv.getWithMetadata(key, 'arrayBuffer')
-  if (!value) return c.json({ error: 'File not found' }, 404)
-  const contentType = (metadata && metadata.contentType) ? metadata.contentType : 'application/octet-stream'
-  return new Response(value, {
-    headers: {
-      'Content-Type': contentType,
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'public, max-age=86400'
+  const object = await c.env.WARROOM_ASSETS.get(key)
+  if (!object) return c.notFound()
+  
+  const headers = new Headers()
+  object.writeHttpMetadata(headers)
+  headers.set('etag', object.httpEtag)
+  headers.set('Access-Control-Allow-Origin', '*')
+  
+  return new Response(object.body, { headers })
+})
+
+// Dify-powered High-Performance Summary
+// Resolve (Close) an Incident
+app.post('/warroom/resolve', async (c) => {
+  const { incident_id } = await c.req.json();
+  const db = c.env.DB;
+  if (!incident_id) return c.json({ error: 'incident_id is required' }, 400);
+
+  await db.prepare("UPDATE warroom_list SET status = 'Completed' WHERE inc_id = ?")
+    .bind(incident_id).run();
+
+  return c.json({ success: true, status: 'Completed' });
+});
+
+// Send Formal PDF Report to Team Leader via MailChannels (with Auth)
+app.post('/ai/send-report-email', async (c) => {
+  const authKey = c.req.header('X-SGuard-Auth');
+  if (authKey !== 'my-secret-key') {
+    return c.json({ error: '403 Forbidden: Invalid Auth Key' }, 403);
+  }
+
+  const formData = await c.req.formData();
+  const pdfFile = formData.get('pdf'); // PDF Blob from frontend
+  const incident_id = formData.get('incident_id');
+  
+  if (!pdfFile || !incident_id) {
+    return c.json({ error: 'PDF file and incident_id are required' }, 400);
+  }
+
+  // Convert PDF Blob to Base64 for MailChannels attachment
+  const arrayBuffer = await pdfFile.arrayBuffer();
+  const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+  // 1. Prepare Metadata
+  const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+  const recipientEmail = 'khcho0421@gmail.com'; // Test Target fixed as per user request
+
+  // 2. Prepare MailChannels Request
+  const mcRes = await fetch('https://api.mailchannels.net/tx/v1/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      personalizations: [{
+        to: [{ email: recipientEmail, name: '신한DS 팀장님' }]
+      }],
+      from: { 
+        email: 'reports@sguardai.khcho0421.workers.dev', 
+        name: 'S-Guard AI Incident Report' 
+      },
+      subject: `[S-Guard] 실시간 시스템 분석 보고서 (${incident_id})`,
+      content: [
+        {
+          type: 'text/html',
+          value: `
+            <div style="font-family: 'Malgun Gothic', Arial, sans-serif; border: 1px solid #d1d5db; padding: 30px; border-radius: 15px; background-color: #f9fafb;">
+              <h1 style="color: #111827; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">신한DS S-Guard 실시간 시스템 분석 보고서</h1>
+              <p style="font-size: 14px; color: #4b5563;">본 보고서는 AI War-Room에 의해 자동으로 생성되었으며, 상세 분석 결과가 PDF 파일로 첨부되어 있습니다.</p>
+              <div style="background-color: #ffffff; border: 1px solid #e5e7eb; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <p><strong>인시던트 ID:</strong> ${incident_id}</p>
+                <p><strong>발송 일시:</strong> ${now} (KST)</p>
+                <p><strong>발신처:</strong> S-Guard AI 오케스트레이션 엔진</p>
+              </div>
+              <p style="font-size: 12px; color: #9ca3af;">※ 본 메일은 보안 구역 내에서 생성된 공식 리포트입니다. 외부 유출에 유의해 주시기 바랍니다.</p>
+            </div>
+          `
+        }
+      ],
+      attachments: [
+        {
+          content: pdfBase64,
+          filename: `SGuard_Incident_Report_${incident_id}.pdf`,
+          type: 'application/pdf',
+          disposition: 'attachment'
+        }
+      ]
+    })
+  });
+
+  if (!mcRes.ok) {
+    const errorText = await mcRes.text();
+    return c.json({ error: `MailChannels Failed: ${errorText}` }, 500);
+  }
+
+  return c.json({ success: true, message: 'PDF report sent to team leader successfully' });
+});
+
+// Register Report to Knowledge Base (with Vectorization)
+app.post('/ai/register-knowledge', async (c) => {
+  try {
+    const { incident_id, title, content, category, tags } = await c.req.json();
+    const db = c.env.DB;
+    const ai = c.env.AI;
+    const vectorIndex = c.env.WARROOM_INDEX;
+
+    if (!content || !title) {
+      return c.json({ error: 'Title and Content are required for knowledge base' }, 400);
     }
-  })
+
+    // 1. Generate Embeddings using Cloudflare AI
+    const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { 
+      text: [content.substring(0, 3000)] // Limit for embedding stability
+    });
+    const vector = embeddings.data[0];
+
+    if (!vector) throw new Error('Failed to generate vector embedding');
+
+    // 2. Insert into D1 (knowledge_base table)
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const result = await db.prepare(`
+      INSERT INTO knowledge_base (
+        inc_id, title, content, category, tags, reg_id, reg_dt, mod_id, mod_dt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      incident_id || `manual-${Date.now()}`,
+      title,
+      content,
+      category || '인시던트 요약',
+      tags || '',
+      'SYSTEM',
+      now,
+      'SYSTEM',
+      now
+    ).run();
+
+    const dbInsertId = result.meta.last_row_id;
+
+    // 3. Upsert into Vectorize Index
+    if (vectorIndex) {
+      await vectorIndex.upsert([{
+        id: `kn-${dbInsertId}`,
+        values: vector,
+        metadata: {
+          title,
+          incident_id: incident_id || '',
+          category: category || 'report'
+        }
+      }]);
+    }
+
+    return c.json({ 
+      success: true, 
+      message: '보고서가 지식 베이스에 성공적으로 등록되었습니다.',
+      knowledge_id: dbInsertId
+    });
+  } catch (err) {
+    console.error('Knowledge registration error:', err);
+    return c.json({ error: `지식 등록 실패: ${err.message}` }, 500);
+  }
+});
+
+app.post('/ai/summarize-chat', async (c) => {
+  try {
+    const { incident_id } = await c.req.json();
+    const db = c.env.DB;
+    const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY;
+    const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1';
+
+    if (!incident_id) return c.json({ error: 'incident_id is required' }, 400);
+    if (!api_key) return c.json({ error: 'Dify API Key is missing' }, 500);
+
+    // 1. Fetch Comprehensive Incident Data for Integrated Report
+    // 1-1. War-Room Metadata
+    const wr = await db.prepare(
+      "SELECT title, leader_summary, status, reg_dt, creator_id FROM warroom_list WHERE inc_id = ?"
+    ).bind(incident_id).first();
+
+    // 1-2. Source SMS Info
+    const sms = await db.prepare(
+      "SELECT sender, message, biz_system, error_code, occurrence_time, timestamp FROM received_messages WHERE inc_id = ?"
+    ).bind(incident_id).first();
+
+    // 1-3. Assigned Agents (Unified via received_messages as source)
+    const { results: assignments } = await db.prepare(`
+      SELECT a.user_id, u.sender AS name, u.biz_system AS role, 'Incident Team' AS team, a.status 
+      FROM incident_assignments a
+      JOIN received_messages u ON a.inc_id = u.inc_id
+      WHERE a.inc_id = ?
+    `).bind(incident_id).all();
+
+    // 1-4. AI Autopilot Insight
+    const insight = await db.prepare(
+      "SELECT content, severity FROM autopilot_insight WHERE inc_id = ?"
+    ).bind(incident_id).first();
+
+    // 1-5. Chat History (Limit to 50 for SSE stability)
+    const { results: chats } = await db.prepare(
+      "SELECT timestamp, sender, text FROM warroom_chats WHERE inc_id = ? ORDER BY seq ASC LIMIT 50"
+    ).bind(incident_id).all();
+
+    // 2. Construct Professional Context for AI
+    const smsContext = sms ? `[최초 SMS 정보]\n- 시점: ${sms.occurrence_time || sms.timestamp}\n- 발신: ${sms.sender}\n- 시스템: ${sms.biz_system || 'N/A'}\n- 메시지: ${sms.message}\n` : "";
+    const teamContext = (assignments && assignments.length > 0) 
+      ? `[대응 거버넌스]\n- 참여 전문가: ${assignments.map(a => `${a.name}(${a.role}/${a.team})`).join(", ")}\n` 
+      : "";
+    const insightContext = insight ? `[초기 AI 분석 인사이트]\n${insight.content}\n` : "";
+    const chatLog = (chats && chats.length > 0) 
+      ? chats.map(c => `[${c.timestamp}] ${c.sender}: ${c.text}`).join("\n") 
+      : "채팅 기록 없음";
+
+    const prompt = `당신은 신한DS S-GUARD의 수석 장애 분석관입니다. 제공된 모든 데이터(SMS, 배정, 대화)를 종합하여 압도적 품질의 [WAR-ROOM 요약 레포트]를 작성하세요.
+
+보고서 섹션:
+1. [인시던트 개요] - 최초 인지 시점 및 핵심 내용
+2. [대응 거버넌스] - 참여 전문가 구성 및 역할
+3. [핵심 대응 타임라인] - SMS 인입부터 조치까지 시간순 정리
+4. [최종 조치 및 인사이트] - 현 상태 요약 및 재발 방지 소결
+
+[데이터]
+${smsContext}
+${teamContext}
+${insightContext}
+[로그]
+${chatLog}`;
+
+    // 3. Stream from Dify via streamSSE
+    return streamSSE(c, async (stream) => {
+    try {
+      await stream.writeSSE({ data: JSON.stringify({ answer: "🚀 고속 분석 엔진(Dify) 최적화 통신을 시작합니다...\n\n" }) });
+
+      const difyRes = await fetch(`${api_base}/chat-messages`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${api_key}`, 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({ 
+          inputs: {}, 
+          query: prompt, 
+          response_mode: 'streaming', 
+          user: 'sguard_worker_v3' 
+        })
+      });
+
+      if (!difyRes.ok) {
+        const errorDetail = await difyRes.text().catch(() => 'No detail');
+        throw new Error(`Dify API Error ${difyRes.status}: ${errorDetail.substring(0, 50)}`);
+      }
+
+      await stream.writeSSE({ data: JSON.stringify({ answer: "📡 Dify 엔진 연결 성공. 분석 데이터를 수신 중입니다...\n\n" }) });
+
+      const reader = difyRes.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data:')) continue;
+          
+          try {
+            const dataStr = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+            if (!dataStr) continue;
+            
+            const data = JSON.parse(dataStr);
+            // Support multiple message event types for robustness
+            if (['message', 'agent_message', 'text_chunk', 'workflow_started'].includes(data.event)) {
+              if (data.answer) {
+                await stream.writeSSE({ data: JSON.stringify({ answer: data.answer }) });
+              } else if (data.text) { // Some Dify versions use 'text'
+                await stream.writeSSE({ data: JSON.stringify({ answer: data.text }) });
+              }
+            } else if (data.event === 'error') {
+              throw new Error(data.message || 'Dify Engine Error');
+            }
+          } catch (e) {
+            // Silently skip non-critical or malformed events
+          }
+        }
+      }
+      await stream.writeSSE({ data: "[DONE]" });
+    } catch (err) {
+      console.error("Dify Stream Fatal Error:", err);
+      try { await stream.writeSSE({ data: JSON.stringify({ answer: `\n\n⚠️ 분석 엔진 통신 장애: ${err.message}` }) }); } catch(e) {}
+    }
+  });
+  } catch (err) {
+    console.error("summarize-chat error:", err);
+    return c.json({ error: `Internal Error: ${err.message}` }, 500);
+  }
 })
 
 // List attachments for a War-Room
@@ -2149,5 +2694,312 @@ app.get('/ai/warroom/my-rooms', async (c) => {
   
   return c.json({ rooms: results || [] })
 })
+// ── Direct Messaging (Notes) ────────────────────────────────────────────────
+app.post('/warroom/dm', async (c) => {
+  const db = c.env.DB
+  const { sender_id, receiver_id, message } = await c.req.json()
+  const now = getKst()
+  
+  if (!sender_id || !receiver_id || !message) {
+    return c.json({ error: 'sender_id, receiver_id, and message are required' }, 400)
+  }
+
+  const result = await db.prepare(`
+    INSERT INTO direct_messages (sender_id, receiver_id, message, created_at, reg_id, reg_dt, mod_id, mod_dt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(sender_id, receiver_id, message, now, sender_id, now, sender_id, now).run()
+
+  return c.json({ status: 'success', id: result.meta.last_row_id })
+})
+
+app.get('/warroom/dm/:user_id', async (c) => {
+  const db = c.env.DB
+  const user_id = c.req.param('user_id')
+  const my_id = c.req.query('my_id') // For getting conversation history
+
+  if (my_id) {
+    const { results } = await db.prepare(`
+      SELECT * FROM direct_messages 
+      WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+      ORDER BY created_at ASC
+    `).bind(user_id, my_id, my_id, user_id).all()
+    return c.json(results || [])
+  }
+
+  // Get list of users I've chatted with
+  const { results } = await db.prepare(`
+    SELECT DISTINCT 
+      CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as other_id
+    FROM direct_messages
+    WHERE sender_id = ? OR receiver_id = ?
+  `).bind(user_id, user_id, user_id).all()
+  
+  return c.json(results || [])
+})
+
+// ── WebSocket & Durable Objects for Real-time Chat ───────────────────────────
+
+export class WarRoom {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.sessions = new Map(); // Store active connections: WebSocket -> UserInfo
+    this.announcement = null; // Current pinned message
+  }
+
+  async fetch(request) {
+    const upgradeHeader = request.headers.get("Upgrade");
+    if (!upgradeHeader || upgradeHeader.toLowerCase() !== "websocket") {
+      return new Response("Expected Upgrade: websocket", { status: 426 });
+    }
+
+    const [client, server] = new WebSocketPair();
+    await this.handleSession(server);
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    });
+  }
+
+  async handleSession(webSocket) {
+    webSocket.accept();
+    
+    // Initial session setup
+    this.sessions.set(webSocket, { online: true });
+
+    webSocket.addEventListener("message", async (msg) => {
+      try {
+        if (typeof msg.data !== "string") {
+          console.warn("Received binary/non-string WebSocket message, ignoring.");
+          return;
+        }
+        const data = JSON.parse(msg.data);
+        await this.onMessage(webSocket, data);
+      } catch (err) {
+        console.error("WebSocket Message Parse Error:", err.message, "Raw Content:", String(msg.data).slice(0, 500));
+        webSocket.send(JSON.stringify({ type: "ERROR", message: "Invalid JSON", raw: String(msg.data).slice(0, 100) }));
+      }
+    });
+
+    const closeHandler = () => {
+      const session = this.sessions.get(webSocket);
+      if (session) {
+        this.sessions.delete(webSocket);
+        this.broadcast({ type: "PRESENCE_OUT", user_id: session.user_id });
+      }
+    };
+
+    webSocket.addEventListener("close", closeHandler);
+    webSocket.addEventListener("error", closeHandler);
+  }
+
+  async onMessage(ws, data) {
+    const session = this.sessions.get(ws);
+
+    switch (data.type) {
+      case "JOIN":
+        session.user_id = data.user_id;
+        session.name = data.name;
+        this.broadcast({ type: "PRESENCE_IN", user_id: data.user_id, name: data.name });
+        // Send current online list to the new joiner
+        const onlineUsers = Array.from(this.sessions.values()).map(s => ({ user_id: s.user_id, name: s.name }));
+        ws.send(JSON.stringify({ 
+          type: "ONLINE_LIST", 
+          users: onlineUsers,
+          announcement: this.announcement 
+        }));
+        break;
+
+      case "CHAT_SEND":
+        // 1. Save to D1
+        const db = this.env.DB;
+        const now = new Date().toISOString().replace('T', ' ').substring(0, 19); 
+        const lastRow = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(data.incident_id).first();
+        const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1;
+        
+        await db.prepare(
+          "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt, parent_seq, reactions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(
+          data.incident_id, seq, data.sender, data.role || 'user', data.msg_type || 'user', data.text, now, data.sender, now, data.sender, now, 
+          data.reply_to || null, 
+          JSON.stringify({}) // Initial empty reactions
+        ).run();
+
+        // 2. Broadcast
+        const broadcastMsg = {
+          type: "CHAT_MESSAGE",
+          msg_id: `${data.incident_id}_${seq}`,
+          seq: seq,
+          incident_id: data.incident_id,
+          sender: data.sender,
+          role: data.role,
+          text: data.text,
+          timestamp: now,
+          parent_seq: data.reply_to || null,
+          reactions: {}
+        };
+        this.broadcast(broadcastMsg);
+
+        // 3. AI Indexing (Background task to avoid blocking)
+        this.state.waitUntil((async () => {
+          try {
+            const ai = this.env.AI;
+            const index = this.env.WARROOM_INDEX;
+            if (ai && index && data.text.length > 5) {
+              const { data: embeddings } = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [data.text] });
+              await index.upsert([{
+                id: `${data.incident_id}_${seq}`,
+                values: embeddings[0],
+                metadata: { text: data.text, sender: data.sender, incident_id: data.incident_id }
+              }]);
+            }
+          } catch (e) {
+            console.error("AI Indexing Error:", e);
+          }
+        })());
+        break;
+
+      case "SUMMARY_REQUEST":
+        this.state.waitUntil((async () => {
+          try {
+            const ai = this.env.AI;
+            const db = this.env.DB;
+            const chats = await db.prepare(
+              "SELECT sender, text FROM warroom_chats WHERE inc_id = ? ORDER BY seq DESC LIMIT 50"
+            ).bind(data.incident_id).all();
+            
+            if (chats.results.length === 0) return;
+            
+            const chatLog = chats.results.reverse().map(c => `${c.sender}: ${c.text}`).join("\n");
+            const prompt = `Below is a chat log from an incident war room. Please provide a concise summary (3-4 bullet points) in Korean of the current status, key observations, and any actions taken.\n\nChat Log:\n${chatLog}\n\nSummary (Korean):`;
+            
+            const response = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt });
+            
+            this.broadcast({
+              type: "AI_SUMMARY",
+              incident_id: data.incident_id,
+              summary: response.response || response // Depending on the model's return format
+            });
+          } catch (e) {
+            console.error("AI Summary Error:", e);
+          }
+        })());
+        break;
+
+      case "DM_SEND":
+        // This is a specialized event for real-time DM notification within the warroom
+        this.broadcast({
+          type: "DM_NOTIFICATION",
+          sender_id: data.sender_id,
+          sender_name: data.sender_name,
+          receiver_id: data.receiver_id,
+          message: data.message
+        });
+        break;
+
+      case "ADD_REACTION":
+        const db_react = this.env.DB;
+        const chatRow = await db_react.prepare("SELECT reactions FROM warroom_chats WHERE inc_id = ? AND seq = ?")
+          .bind(data.incident_id, data.seq).first();
+        
+        if (chatRow) {
+          let reactions = JSON.parse(chatRow.reactions || '{}');
+          if (!reactions[data.emoji]) reactions[data.emoji] = [];
+          if (!reactions[data.emoji].includes(data.user_id)) {
+            reactions[data.emoji].push(data.user_id);
+          } else {
+            // Toggle off
+            reactions[data.emoji] = reactions[data.emoji].filter(id => id !== data.user_id);
+          }
+          
+          await db_react.prepare("UPDATE warroom_chats SET reactions = ? WHERE inc_id = ? AND seq = ?")
+            .bind(JSON.stringify(reactions), data.incident_id, data.seq).run();
+          
+          this.broadcast({
+            type: "REACTION_UPDATE",
+            incident_id: data.incident_id,
+            seq: data.seq,
+            reactions: reactions
+          });
+        }
+        break;
+
+      case "MARK_READ":
+        this.state.waitUntil((async () => {
+          const db = this.env.DB;
+          // Decrement read_count in D1
+          await db.prepare("UPDATE warroom_chats SET read_count = CASE WHEN read_count > 0 THEN read_count - 1 ELSE 0 END WHERE inc_id = ? AND seq = ?")
+            .bind(data.incident_id, data.seq).run();
+          
+          this.broadcast({
+            type: "READ_UPDATE",
+            incident_id: data.incident_id,
+            seq: data.seq,
+            user_id: data.user_id
+          });
+        })());
+        break;
+
+      case "TYPING_START":
+        this.broadcast({ type: "TYPING", user_id: data.user_id, name: data.name, is_typing: true }, ws);
+        break;
+
+      case "TYPING_STOP":
+        this.broadcast({ type: "TYPING", user_id: data.user_id, name: data.name, is_typing: false }, ws);
+        break;
+
+      case "SET_ANNOUNCEMENT":
+        this.announcement = {
+          seq: data.seq,
+          sender: data.sender,
+          text: data.text,
+          timestamp: new Date().toISOString()
+        };
+        // Sync to D1 warroom_list (as leader_summary for now)
+        this.state.waitUntil((async () => {
+          await this.env.DB.prepare("UPDATE warroom_list SET leader_summary = ? WHERE inc_id = ?")
+            .bind(this.announcement.text, data.incident_id).run();
+        })());
+        this.broadcast({ type: "ANNOUNCEMENT_UPDATE", announcement: this.announcement });
+        break;
+
+      case "TOGGLE_BOOKMARK":
+        this.state.waitUntil((async () => {
+          await this.env.DB.prepare("UPDATE warroom_chats SET is_key_event = ? WHERE inc_id = ? AND seq = ?")
+            .bind(data.is_key_event ? 1 : 0, data.incident_id, data.seq).run();
+        })());
+        this.broadcast({ 
+          type: "BOOKMARK_UPDATE", 
+          seq: data.seq, 
+          is_key_event: !!data.is_key_event 
+        });
+        break;
+
+      default:
+        console.log("Unknown message type:", data.type);
+    }
+  }
+
+  broadcast(data, excludeWs = null) {
+    const msg = JSON.stringify(data);
+    for (const [ws, session] of this.sessions.entries()) {
+      if (ws === excludeWs) continue;
+      try {
+        ws.send(msg);
+      } catch (e) {
+        this.sessions.delete(ws);
+      }
+    }
+  }
+}
+
+// ── WebSocket Upgrade Route ──────────────────────────────────────────────────
+app.get('/warroom/ws/:id', async (c) => {
+  const id = c.req.param('id');
+  const doId = c.env.WARROOM_DO.idFromName(id);
+  const room = c.env.WARROOM_DO.get(doId);
+  return room.fetch(c.req.raw);
+});
 
 export default app

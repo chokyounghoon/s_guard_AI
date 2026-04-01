@@ -22,7 +22,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import asyncio
 import base64
-import httpx
+import httpxㄹ
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -889,7 +889,7 @@ async def summarize_chat(req: SummarizeChatRequest):
 
 응답은 전문적이고 읽기 쉬운 Markdown 형식으로 작성해줘.
 """
-
+    
     try:
         logger.info(f"Summarizing chat for {incident_id}")
         # Use the specific Dify API key for Chat Summary

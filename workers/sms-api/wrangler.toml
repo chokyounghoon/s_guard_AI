@@ -9,13 +9,26 @@ DIFY_API_BASE = "https://api.dify.ai/v1"
 [ai]
 binding = "AI"
 
-# KV Namespace for storing SMS messages
+[durable_objects]
+bindings = [
+  { name = "WARROOM_DO", class_name = "WarRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WarRoom"]
+
 [[kv_namespaces]]
 binding = "SMS_STORAGE"
 id = "2b426805a38f4403ac1e4f8a03c22d00"
 
-# Local Backend URL (set via `wrangler secret put BACKEND_URL`)
-# Leave empty to use built-in mock responses
+[[r2_buckets]]
+binding = "WARROOM_ASSETS"
+bucket_name = "sguard-warroom-assets"
+
+[[vectorize]]
+binding = "WARROOM_INDEX"
+index_name = "sguard-warroom-index"
 
 [[d1_databases]]
 binding = "DB"

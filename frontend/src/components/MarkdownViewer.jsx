@@ -63,9 +63,21 @@ const MarkdownViewer = ({ text }) => {
               </div>
             );
           },
-          p: ({ children }) => (
-            <p className="mb-4 text-gray-200 leading-relaxed text-sm antialiased">{children}</p>
-          ),
+          p: ({ children }) => {
+            // Check if children contain any block-level components to avoid invalid nesting
+            const hasBlockElement = React.Children.toArray(children).some(child => {
+              if (React.isValidElement(child)) {
+                // If it's a code block (rendered as CodeBlock) or has display: block traits
+                return typeof child.type !== 'string' || ['div', 'pre', 'table', 'blockquote', 'h1', 'h2', 'h3'].includes(child.type);
+              }
+              return false;
+            });
+
+            if (hasBlockElement) {
+              return <div className="mb-4 text-gray-200 leading-relaxed text-sm antialiased">{children}</div>;
+            }
+            return <p className="mb-4 text-gray-200 leading-relaxed text-sm antialiased">{children}</p>;
+          },
           strong: ({ children }) => {
             const content = String(children);
             const isCritical = /CRITICAL|ERROR|장애|위험|9[0-9]%/.test(content);
@@ -109,7 +121,18 @@ const MarkdownViewer = ({ text }) => {
           ),
           td: ({ children }) => (
             <td className="border-b border-white/5 px-4 py-3 text-gray-300">{children}</td>
-          )
+          ),
+          img: ({ src, alt }) => {
+            if (src && (src.includes('aitopia.ai') || src.includes('logo.svg'))) {
+              return (
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 text-xs font-black my-4 animate-pulse shadow-lg shadow-blue-500/5">
+                  <Brain className="h-4 w-4" />
+                  <span className="uppercase tracking-tighter">S-Guard Intelligent Asset</span>
+                </span>
+              );
+            }
+            return <img src={src} alt={alt} className="rounded-xl border border-white/10 my-6 max-w-full h-auto shadow-2xl transition-all hover:scale-[1.02]" />;
+          }
         }}
       >
         {text}
