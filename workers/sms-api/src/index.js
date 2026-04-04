@@ -948,9 +948,13 @@ app.get('/ai/insight', async (c) => {
   let timestamp = null
 
   if (recent_sms) {
-    current_log_id = `KMS-${recent_sms.inc_id}`
+    // Normalize ID for lookup
+    const norm_id = String(recent_sms.inc_id).replace('INC-', '').trim()
+    current_log_id = `KMS-${norm_id}`
     timestamp = recent_sms.timestamp
-    const insight = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(recent_sms.inc_id).first()
+    
+    // Attempt lookup with normalized ID
+    const insight = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(norm_id).first()
     if (insight) {
       insight_text = insight.content
     } else {
@@ -982,16 +986,34 @@ app.post('/ai/insight/save', async (c) => {
   const { incident_id, content, severity, category, user_id } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
+  
+  // Normalize ID for saving
+  const norm_id = String(incident_id || '').replace('INC-', '').trim()
+  
   await db.prepare(`
     INSERT OR REPLACE INTO autopilot_insight (inc_id, content, severity, category, reg_id, reg_dt, mod_id, mod_dt)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(incident_id, content, severity, category, user_id || 'SYSTEM', now, user_id || 'SYSTEM', now).run()
-  return c.json({ status: 'saved' })
+  `).bind(norm_id, content, severity, category, user_id || 'SYSTEM', now, user_id || 'SYSTEM', now).run()
+  
+  return c.json({ status: 'saved', inc_id: norm_id })
+})
+
+app.get('/ai/insight/:id', async (c) => {
+  const raw_id = c.req.param('id')
+  const inc_id = String(raw_id).replace('INC-', '').trim()
+  const db = c.env.DB
+  try {
+    const insight = await db.prepare("SELECT * FROM autopilot_insight WHERE inc_id = ?").bind(inc_id).first()
+    if (!insight) return c.json({ error: "Insight not found" }, 404)
+    return c.json(insight)
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
 })
 
 app.post('/ai/chat', async (c) => {
   const { query } = await c.req.json()
-  const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!api_key) {
@@ -1022,7 +1044,7 @@ app.post('/ai/chat', async (c) => {
 app.post('/ai/analyze-sms', async (c) => {
   const { sender, message, sms_id } = await c.req.json()
   const db = c.env.DB
-  const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!api_key) return c.json({ error: "DIFY_API_KEY_AGENT가 설정되지 않았습니다." }, 500)
@@ -1327,7 +1349,7 @@ ${insightTxt.includes('재발')
 app.get('/ai/agent-discussion/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
-  const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
@@ -1417,6 +1439,140 @@ app.get('/ai/agent-discussion/:id', async (c) => {
       const fallback = `[Security]: SMS 장애 분석 중입니다. 상세 분석 결과가 곧 업데이트됩니다.\n[DB]: 데이터베이스 연결 상태 및 쿼리 성능 점검 중입니다.\n[DevOps]: 서버 로그 및 인프라 매트릭(CPU/MEM)을 실시간 분석 중입니다.\n[Leader]: 전체 상황 파악 후 즉시 조치 가이드를 공유하겠습니다.`
       await writer.write(encode(`data: ${JSON.stringify({ answer: fallback })}\n\n`))
       await writer.write(encode('data: [DONE]\n\n'))
+    } finally {
+      await writer.close()
+    }
+  })()
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
+    }
+  })
+})
+
+// --- Chat Summary Database Endpoints ---
+app.get('/db/summary/:inc_id', async (c) => {
+  const raw_id = c.req.param('inc_id')
+  const inc_id = String(raw_id).replace('INC-', '').trim()
+  const db = c.env.DB
+  try {
+    const res = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(inc_id).first()
+    return c.json({ summary: res ? res.summary : null })
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+app.post('/db/summary', async (c) => {
+  const { inc_id, summary, model } = await c.req.json()
+  const db = c.env.DB
+  try {
+    await db.prepare(`
+      INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(inc_id) DO UPDATE SET 
+        summary = excluded.summary,
+        model = excluded.model,
+        mod_dt = CURRENT_TIMESTAMP
+    `).bind(inc_id, summary, model || 'dify-summarizer').run()
+    return c.json({ success: true })
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+app.post('/ai/summarize-chat', async (c) => {
+  const { incident_id } = await c.req.json()
+  const db = c.env.DB
+  const api_key = "app-owwPp3j2qAvVDZpW2UUiY8L3" 
+  const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
+
+  if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
+
+  // 1. Fetch chat history (both AI agent and user chats)
+  const { results: aiResults } = await db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(incident_id).all()
+  const { results: wrResults } = await db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(incident_id).all()
+  const { results: attResults } = await db.prepare("SELECT original_name, url FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC").bind(incident_id).all()
+
+  const transcript = []
+  const combined = [
+    ...(aiResults || []).map(r => ({ role: r.agent_role, sender: r.agent_role + ' Agent', text: r.content, timestamp: r.reg_dt })), 
+    ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender, text: r.text, timestamp: r.timestamp }))
+  ]
+  
+  // Sort chronologically
+  combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+
+  for (const msg of combined) {
+    if (msg.text) transcript.push(`[${msg.role}] ${msg.sender}: ${msg.text}`)
+  }
+
+  const prompt = `다음은 인시던트(${incident_id})에 대한 War-Room 채팅 내역입니다. 이 내용을 바탕으로 장애 대응 과정과 결과를 요약해줘.\n\n[채팅 내역]\n${transcript.join('\n')}\n\n[요약 요구사항]\n1. 장애 개요: 어떤 장애가 발생했는지 요약\n2. 주요 조치 사항: 타임라인별 주요 대응 내용\n3. 최종 결과: 현재 상태 및 조치 결과\n4. 향후 과제: 재발 방지를 위해 필요한 사항 (있을 경우)`
+
+  const { readable, writable } = new TransformStream()
+  const writer = writable.getWriter()
+  const encode = (s) => new TextEncoder().encode(s)
+
+  ;(async () => {
+    try {
+      const difyRes = await fetch(`${api_base}/workflows/run`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${api_key}`, 
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({ 
+          inputs: {
+            chat_log: transcript.join('\n'),
+            incident_images: []
+          }, 
+          response_mode: 'streaming', 
+          user: 'sguard-worker' 
+        })
+      })
+
+      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
+      
+      const reader = difyRes.body.getReader()
+      const decoder = new TextDecoder()
+      let lineBuffer = ""
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        lineBuffer += decoder.decode(value, { stream: true })
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop()
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim()
+          if (!trimmedLine.startsWith('data: ')) continue
+          
+          const dataStr = trimmedLine.substring(6)
+          if (dataStr === '[DONE]') continue
+          
+          try {
+            const data = JSON.parse(dataStr)
+            if (data.event === 'message' || data.event === 'agent_message') {
+              await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+            } else if (data.event === 'text_chunk') {
+              // Handle Workflow text_chunk
+              await writer.write(encode(`data: ${JSON.stringify({ answer: data.data.text })}\n\n`))
+            }
+          } catch (e) {
+            continue
+          }
+        }
+      }
+      await writer.write(encode('data: [DONE]\n\n'))
+    } catch (e) {
+      console.error('Summarize-Chat error:', e)
+      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
     } finally {
       await writer.close()
     }
@@ -1531,15 +1687,27 @@ app.post('/ai/warroom/open', async (c) => {
       .bind(leader_summary, now, normId).run()
   }
 
-  // Auto-assign to the creator and anyone already assigned to this incident
+  // 🚀 CRITICAL: Auto-join ALL assigned users for this incident to the warroom
+  // This ensures the warroom is "opened" for everyone assigned to it.
+  try {
+    await db.prepare(`
+      INSERT INTO user_warrooms (user_id, inc_id, joined_at)
+      SELECT user_id, ?, ? FROM incident_assignments WHERE inc_id = ?
+      ON CONFLICT DO NOTHING
+    `).bind(normId, now, normId).run();
+  } catch (e) {
+    console.error("Bulk join error:", e);
+  }
+
+  // Also ensure creator is joined (if not already listed in assignments)
   if (creator_id) {
     await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
       .bind(creator_id, normId, now).run()
-    
-    // Update assignment status to '처리중' for all assignees of this incident
-    await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ? WHERE inc_id = ?")
-      .bind(now, normId).run()
   }
+
+  // Update assignment status to '처리중' for all assignees of this incident
+  await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ? WHERE inc_id = ?")
+    .bind(now, normId).run()
   
   return c.json({ status: 'opened', inc_id: normId })
 })
@@ -1894,30 +2062,43 @@ app.post('/ai/warroom/close', async (c) => {
 // ==========================================
 
 app.post('/ai/incident/assign', async (c) => {
-  const { user_id, inc_id, action, detail, incident_title } = await c.req.json() // Added action, detail, incident_title for logging
+  const { user_id, login_id, inc_id, action, detail, incident_title } = await c.req.json() // Added action, detail, incident_title for logging
   const db = c.env.DB
   const now = getKst()
-
+  
   const normId = String(inc_id).replace('INC-', '');
   try {
+    // 1. Verify User Exists in 'users' table
+    let user = await db.prepare("SELECT employee_id, name FROM users WHERE employee_id = ? OR email = ?")
+      .bind(user_id, login_id || user_id)
+      .first()
+
+    if (!user) {
+      console.warn(`[Assign] User not found: id=${user_id}, login=${login_id}`);
+      return c.json({ error: "담당자를 찾을 수 없습니다. (Employee ID lookup failed)" }, 404)
+    }
+    
+    const empId = user.employee_id;
+
+    // 2. Perform Assignment
     await db.prepare(`
       INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
       VALUES (?, ?, '미확인', ?, ?)
       ON CONFLICT(user_id, inc_id) DO NOTHING
-    `).bind(user_id, normId, now, now).run()
+    `).bind(empId, normId, now, now).run()
 
-    // Log the assignment activity
-    const logId = generateIncId()
-    const empId = user_id // already employee_id
-
-    await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, incident_title, user_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(normId, normId, incident_title || 'SMS 수신 확인', empId, action || '장애 할당', detail || '인시던트가 담당자에게 할당되었습니다.', getKst())
+    // 3. Log activity with INSERT OR IGNORE to prevent PK collision
+    await db.prepare(`
+      INSERT OR IGNORE INTO activity_logs (inc_id, incident_code, incident_title, user_id, user_name, action, detail, created_at) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(normId, normId, incident_title || 'SMS 수신 확인', empId, user.name || '알 수 없음', action || '장애 할당', detail || '인시던트가 담당자에게 할당되었습니다.', now)
       .run()
     
-    return c.json({ status: 'assigned', user_id, inc_id: normId, log_id: logId })
+    return c.json({ status: 'assigned', user_id: empId, inc_id: normId })
 
   } catch (e) {
-    return c.json({ error: e.message }, 500)
+    console.error("[Assign Error]:", e);
+    return c.json({ error: `할당 중 오류: ${e.message}` }, 400)
   }
 })
 
@@ -2478,9 +2659,12 @@ app.post('/ai/register-knowledge', async (c) => {
       return c.json({ error: 'Title and Content are required for knowledge base' }, 400);
     }
 
+    // Clean content by removing the fixed Dify header message if it exists
+    const sanitizedContent = content.replace(/🚀 고속 분석 엔진\(Dify\) 최적화 통신을 시작합니다\.\.\.\s*/g, "").trim();
+
     // 1. Generate Embeddings using Cloudflare AI
     const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { 
-      text: [content.substring(0, 3000)] // Limit for embedding stability
+      text: [sanitizedContent.substring(0, 3000)] // Limit for embedding stability
     });
     const vector = embeddings.data[0];
 
@@ -2495,7 +2679,7 @@ app.post('/ai/register-knowledge', async (c) => {
     `).bind(
       incident_id || `manual-${Date.now()}`,
       title,
-      content,
+      sanitizedContent,
       category || '인시던트 요약',
       tags || '',
       'SYSTEM',
@@ -2530,145 +2714,98 @@ app.post('/ai/register-knowledge', async (c) => {
   }
 });
 
-app.post('/ai/summarize-chat', async (c) => {
+// Governance Approval & Knowledge Registration (Dify + Vectorize)
+app.post('/ai/governance/approve', async (c) => {
   try {
-    const { incident_id } = await c.req.json();
+    const { incident_id, title, content } = await c.req.json();
     const db = c.env.DB;
-    const api_key = c.env.DIFY_API_KEY_AGENT || c.env.DIFY_API_KEY;
+    const ai = c.env.AI;
+    const vectorIndex = c.env.WARROOM_INDEX;
+    const api_key = c.env.DIFY_API_KEY_GOVERNANCE;
     const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1';
 
-    if (!incident_id) return c.json({ error: 'incident_id is required' }, 400);
-    if (!api_key) return c.json({ error: 'Dify API Key is missing' }, 500);
-
-    // 1. Fetch Comprehensive Incident Data for Integrated Report
-    // 1-1. War-Room Metadata
-    const wr = await db.prepare(
-      "SELECT title, leader_summary, status, reg_dt, creator_id FROM warroom_list WHERE inc_id = ?"
-    ).bind(incident_id).first();
-
-    // 1-2. Source SMS Info
-    const sms = await db.prepare(
-      "SELECT sender, message, biz_system, error_code, occurrence_time, timestamp FROM received_messages WHERE inc_id = ?"
-    ).bind(incident_id).first();
-
-    // 1-3. Assigned Agents (Unified via received_messages as source)
-    const { results: assignments } = await db.prepare(`
-      SELECT a.user_id, u.sender AS name, u.biz_system AS role, 'Incident Team' AS team, a.status 
-      FROM incident_assignments a
-      JOIN received_messages u ON a.inc_id = u.inc_id
-      WHERE a.inc_id = ?
-    `).bind(incident_id).all();
-
-    // 1-4. AI Autopilot Insight
-    const insight = await db.prepare(
-      "SELECT content, severity FROM autopilot_insight WHERE inc_id = ?"
-    ).bind(incident_id).first();
-
-    // 1-5. Chat History (Limit to 50 for SSE stability)
-    const { results: chats } = await db.prepare(
-      "SELECT timestamp, sender, text FROM warroom_chats WHERE inc_id = ? ORDER BY seq ASC LIMIT 50"
-    ).bind(incident_id).all();
-
-    // 2. Construct Professional Context for AI
-    const smsContext = sms ? `[최초 SMS 정보]\n- 시점: ${sms.occurrence_time || sms.timestamp}\n- 발신: ${sms.sender}\n- 시스템: ${sms.biz_system || 'N/A'}\n- 메시지: ${sms.message}\n` : "";
-    const teamContext = (assignments && assignments.length > 0) 
-      ? `[대응 거버넌스]\n- 참여 전문가: ${assignments.map(a => `${a.name}(${a.role}/${a.team})`).join(", ")}\n` 
-      : "";
-    const insightContext = insight ? `[초기 AI 분석 인사이트]\n${insight.content}\n` : "";
-    const chatLog = (chats && chats.length > 0) 
-      ? chats.map(c => `[${c.timestamp}] ${c.sender}: ${c.text}`).join("\n") 
-      : "채팅 기록 없음";
-
-    const prompt = `당신은 신한DS S-GUARD의 수석 장애 분석관입니다. 제공된 모든 데이터(SMS, 배정, 대화)를 종합하여 압도적 품질의 [WAR-ROOM 요약 레포트]를 작성하세요.
-
-보고서 섹션:
-1. [인시던트 개요] - 최초 인지 시점 및 핵심 내용
-2. [대응 거버넌스] - 참여 전문가 구성 및 역할
-3. [핵심 대응 타임라인] - SMS 인입부터 조치까지 시간순 정리
-4. [최종 조치 및 인사이트] - 현 상태 요약 및 재발 방지 소결
-
-[데이터]
-${smsContext}
-${teamContext}
-${insightContext}
-[로그]
-${chatLog}`;
-
-    // 3. Stream from Dify via streamSSE
-    return streamSSE(c, async (stream) => {
-    try {
-      await stream.writeSSE({ data: JSON.stringify({ answer: "🚀 고속 분석 엔진(Dify) 최적화 통신을 시작합니다...\n\n" }) });
-
-      const difyRes = await fetch(`${api_base}/chat-messages`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${api_key}`, 
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify({ 
-          inputs: {}, 
-          query: prompt, 
-          response_mode: 'streaming', 
-          user: 'sguard_worker_v3' 
-        })
-      });
-
-      if (!difyRes.ok) {
-        const errorDetail = await difyRes.text().catch(() => 'No detail');
-        throw new Error(`Dify API Error ${difyRes.status}: ${errorDetail.substring(0, 50)}`);
-      }
-
-      await stream.writeSSE({ data: JSON.stringify({ answer: "📡 Dify 엔진 연결 성공. 분석 데이터를 수신 중입니다...\n\n" }) });
-
-      const reader = difyRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data:')) continue;
-          
-          try {
-            const dataStr = trimmed.substring(trimmed.indexOf(':') + 1).trim();
-            if (!dataStr) continue;
-            
-            const data = JSON.parse(dataStr);
-            // Support multiple message event types for robustness
-            if (['message', 'agent_message', 'text_chunk', 'workflow_started'].includes(data.event)) {
-              if (data.answer) {
-                await stream.writeSSE({ data: JSON.stringify({ answer: data.answer }) });
-              } else if (data.text) { // Some Dify versions use 'text'
-                await stream.writeSSE({ data: JSON.stringify({ answer: data.text }) });
-              }
-            } else if (data.event === 'error') {
-              throw new Error(data.message || 'Dify Engine Error');
-            }
-          } catch (e) {
-            // Silently skip non-critical or malformed events
-          }
-        }
-      }
-      await stream.writeSSE({ data: "[DONE]" });
-    } catch (err) {
-      console.error("Dify Stream Fatal Error:", err);
-      try { await stream.writeSSE({ data: JSON.stringify({ answer: `\n\n⚠️ 분석 엔진 통신 장애: ${err.message}` }) }); } catch(e) {}
+    if (!content || !incident_id) {
+      return c.json({ error: 'incident_id and content are required' }, 400);
     }
-  });
+
+    // Clean content by removing the fixed Dify header message if it exists
+    const cleanContent = (text) => {
+      if (!text) return "";
+      // Remove the specific Dify optimization message and any leading newlines/spaces it leaves behind
+      return text.replace(/🚀 고속 분석 엔진\(Dify\) 최적화 통신을 시작합니다\.\.\.\s*/g, "").trim();
+    };
+
+    const sanitizedContent = cleanContent(content);
+
+    // 1. Call Dify Knowledge Registration App (Internal)
+    // We send the summary as the query to trigger any registration workflow/processing
+    let difyAnswer = '';
+    if (api_key) {
+      try {
+        const difyRes = await fetch(`${api_base}/chat-messages`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${api_key}`, 
+            'Content-Type': 'application/json' 
+          },
+          body: JSON.stringify({
+            inputs: {},
+            query: `REGISTER_KNOWLEDGE: [${incident_id}] ${sanitizedContent}`,
+            response_mode: "blocking",
+            user: "governance-admin"
+          })
+        });
+        const data = await difyRes.json();
+        difyAnswer = data.answer || '';
+      } catch (e) {
+        console.error('Dify Governance call error:', e.message);
+      }
+    }
+
+    // 2. Generate Embeddings for Vector DB
+    const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { 
+      text: [sanitizedContent.substring(0, 3000)]
+    });
+    const vector = embeddings.data[0];
+
+    // 3. Upsert into Vectorize Index
+    if (vectorIndex && vector) {
+      await vectorIndex.upsert([{
+        id: `gov-${incident_id}`,
+        values: vector,
+        metadata: {
+          title: title || `Governance Approved: ${incident_id}`,
+          incident_id: incident_id,
+          category: 'governance_report'
+        }
+      }]);
+    }
+
+    // 4. Update Incident Status & Knowledge Base in D1
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    await db.prepare(`
+      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt)
+      VALUES (?, ?, ?, '거버넌스 승인', ?)
+      ON CONFLICT(inc_id) DO UPDATE SET
+        content = excluded.content,
+        mod_dt = ?
+    `).bind(incident_id, title || `Governance: ${incident_id}`, sanitizedContent, now, now).run();
+
+    await db.prepare("UPDATE incidents SET status = 'GOVERNED', updated_at = ? WHERE inc_id = ?")
+      .bind(now, incident_id).run();
+
+    return c.json({ 
+      success: true, 
+      message: '거버넌스 최종 승인 및 RAG 데이터베이스 업데이트가 완료되었습니다.',
+      dify_response: difyAnswer
+    });
   } catch (err) {
-    console.error("summarize-chat error:", err);
-    return c.json({ error: `Internal Error: ${err.message}` }, 500);
+    console.error('Governance approval error:', err);
+    return c.json({ error: `거버넌스 승인 실패: ${err.message}` }, 500);
   }
-})
+});
+
+
 
 // List attachments for a War-Room
 app.get('/warroom/attachments/:id', async (c) => {

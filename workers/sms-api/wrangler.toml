@@ -4,6 +4,10 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ENVIRONMENT = "production"
+DIFY_API_KEY = "app-owwPp3j2qAvVDZpW2UUiY8L3"
+DIFY_API_KEY_DASHBOARD = "app-TSlqmp329iKOzpXUP90iC6Kw"
+DIFY_API_KEY_SUMMARIZER = "app-owwPp3j2qAvVDZpW2UUiY8L3"
+DIFY_API_KEY_GOVERNANCE = "app-QHxJQTBSKJlTw2gVeGgTk915"
 DIFY_API_BASE = "https://api.dify.ai/v1"
 
 [ai]

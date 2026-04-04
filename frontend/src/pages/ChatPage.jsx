@@ -6,12 +6,36 @@ import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
 import MarkdownViewer from '../components/MarkdownViewer';
 
-// API URL helper moved outside to ensure stable identity and prevent infinite rerender loops
+const agentColors = {
+  Security: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', icon: Shield },
+  DB:       { bg: 'bg-purple-500/15', border: 'border-purple-500/30', text: 'text-purple-400', icon: Database },
+  DevOps:   { bg: 'bg-green-500/15', border: 'border-green-500/30', text: 'text-green-400', icon: Server },
+  Leader:   { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-400', icon: Bot },
+};
+
+// API URL helper: /ai/ endpoints go to local FastAPI, others to Cloudflare Worker
 const getApiUrl = (endpoint) => {
-  const apiBase = window.location.hostname === 'localhost' 
-    ? 'https://sguardai.khcho0421.workers.dev' 
-    : 'https://sguardai.khcho0421.workers.dev';
-  return `${apiBase}${endpoint}`;
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocalDev && endpoint.startsWith('/ai/')) {
+    return `http://127.0.0.1:8000${endpoint}`;
+  }
+  return 'https://sguardai.khcho0421.workers.dev' + endpoint;
+};
+
+// 한국 시간(KST) 포맷팅 헬퍼
+const formatKst = (dateInput) => {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return dateInput;
+
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+
+  return `${yyyy}년 ${mm}월 ${dd}일 ${hh}:${min}:${ss}`;
 };
 
 export default function ChatPage() {
@@ -32,6 +56,8 @@ export default function ChatPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]); // Array of { name, url, type, file }
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
+  const [showAgentInsights, setShowAgentInsights] = useState(true);
+  const [showAnalysisSummary, setShowAnalysisSummary] = useState(true);
   const [warRooms, setWarRooms] = useState([]);
   const [showWipToast, setShowWipToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,16 +135,7 @@ export default function ChatPage() {
           initials: msg.sender ? msg.sender[0] : 'SY',
           color: msg.type === 'ai_analysis' ? 'bg-purple-600' : 'bg-slate-700',
           text: msg.text,
-          time: (() => {
-             const d = new Date(msg.timestamp);
-             const yy = String(d.getFullYear()).slice(2);
-             const mm = String(d.getMonth() + 1).padStart(2, '0');
-             const dd = String(d.getDate()).padStart(2, '0');
-             const hh = String(d.getHours()).padStart(2, '0');
-             const min = String(d.getMinutes()).padStart(2, '0');
-             const ss = String(d.getSeconds()).padStart(2, '0');
-             return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
-          })(),
+          time: formatKst(msg.timestamp),
           timestamp: msg.timestamp,
           read_count: msg.read_count || 0,
           reactions: (() => {
@@ -284,7 +301,7 @@ export default function ChatPage() {
                   initials: data.sender ? data.sender[0] : 'U',
                   color: 'bg-slate-700',
                   text: data.text,
-                  time: (data.timestamp && data.timestamp.includes(' ')) ? data.timestamp.split(' ')[1] : '',
+                  time: formatKst(data.timestamp),
                   timestamp: data.timestamp,
                   read_count: data.read_count || 0,
                   reactions: (() => {
@@ -342,7 +359,7 @@ export default function ChatPage() {
                 const newMessage = {
                   id: aiMsgId, type: 'ai_analysis', sender: 'AI Analyst', role: 'AI', initials: 'AI', color: 'bg-purple-600',
                   text: `📊 **실시간 상황 요약**\n\n${data.summary}`,
-                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), icon: Sparkles
+                  time: formatKst(new Date()), icon: Sparkles
                 };
                 return [...prev, newMessage];
               });
@@ -481,16 +498,7 @@ export default function ChatPage() {
           initials: messageData.sender,
           color: messageData.type === 'system' ? 'bg-indigo-600' : 'bg-slate-700',
           text: messageData.text,
-          time: (() => {
-             const d = new Date();
-             const yy = String(d.getFullYear()).slice(2);
-             const mm = String(d.getMonth() + 1).padStart(2, '0');
-             const dd = String(d.getDate()).padStart(2, '0');
-             const hh = String(d.getHours()).padStart(2, '0');
-             const min = String(d.getMinutes()).padStart(2, '0');
-             const ss = String(d.getSeconds()).padStart(2, '0');
-             return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
-          })()
+          time: formatKst(new Date())
         };
         setMainMessages(prev => [...prev, newMessage]);
         if (newMessage.type === 'ai_analysis') setAiAnalysisMessage(newMessage);
@@ -895,12 +903,11 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ incident_id: incidentId })
       });
-      // 2. Success - Navigate to Summary for report generation
-      navigate(`/chat-summary/${incidentId}`);
+      // 2. Success - Navigate to AI Report Page (as per user request to restore legacy behavior)
+      navigate(`/ai-report`, { state: { incidentId } });
     } catch (e) {
       console.error("Resolve error", e);
-      // Fallback navigate to at least show summary
-      navigate(`/chat-summary/${incidentId}`);
+      alert('장애 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -923,7 +930,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-20 relative">
+    <div className="h-screen overflow-hidden bg-[#0f1421] text-white font-sans flex flex-col relative">
       {/* Header */}
       {/* DM Notifications Toast */}
       <div className="fixed top-20 right-4 z-[150] flex flex-col items-end space-y-2 pointer-events-none">
@@ -1127,153 +1134,255 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* 성공 토스트 알림바 */}
-      {resolveSuccess && (
-        <div className="bg-gradient-to-r from-emerald-600/20 to-blue-600/20 border-b border-emerald-500/30 p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <div className="bg-emerald-500/20 p-1.5 rounded-full">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Sidebar */}
+        <div className={`hidden lg:flex flex-col w-[380px] bg-[#0f1421] border-r border-white/5 transition-all duration-300 overflow-hidden shrink-0 ${!isLogExpanded ? 'w-0 border-none' : ''}`}>
+          <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar relative">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-400" />
+                <span className="text-[10px] font-black text-slate-500 tracking-widest uppercase">Expert Panel</span>
+              </div>
             </div>
-            <p className="text-sm text-emerald-100 font-medium">장애가 해결되었으며, 대화 내역이 AI RAG 모델에 학습되었습니다.</p>
+            <div className="space-y-3">
+              {participants.map((person, index) => (
+                <div key={index} className="flex items-center space-x-3 p-3 bg-white/5 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xs font-bold border border-white/5 group-hover:scale-105 transition-transform text-center">
+                    {person.name?.[0] || 'U'}
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-left">
+                      <span className="text-sm font-bold text-white truncate">{person.name}</span>
+                      <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">{person.position || '담당'}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 truncate text-left">{person.company || '신한DS'} / {person.role || '협업자'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <button
-            onClick={() => navigate('/knowledge-base')}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/20 active:scale-95"
-          >
-            <Database className="w-4 h-4" />
-            학습된 내역 확인하기
-          </button>
         </div>
-      )}
 
-
-      {/* [S-AutoPilot Insight] Area */}
-      <div className="bg-[#0f1421]/95 border-b border-white/10 backdrop-blur-xl z-30 sticky top-[73px] shadow-2xl">
-        <style>{`
-          @keyframes sguard-twinkle {
-            0%, 100% { text-shadow: 0 0 4px rgba(59, 130, 246, 0.4); color: #fff; }
-            50% { text-shadow: 0 0 15px rgba(59, 130, 246, 0.9), 0 0 20px rgba(59, 130, 246, 0.4); color: #60a5fa; transform: scale(1.05); }
-          }
-          .animate-sguard-twinkle {
-            animation: sguard-twinkle 1.5s ease-in-out infinite;
-            display: inline-block;
-          }
-        `}</style>
-        <div className="px-5 py-4">
-            <div 
-                onClick={() => setIsLogExpanded(!isLogExpanded)}
-                className="flex items-center justify-between cursor-pointer group mb-1"
-            >
-                <div className="flex items-center space-x-2.5">
-                    <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-xl shadow-lg shadow-purple-900/30">
-                      <Sparkles className="w-4 h-4 text-white animate-pulse" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-black text-white tracking-tight uppercase">[S-AutoPilot Insight]</h2>
-                      <p className="text-[10px] text-slate-500 font-bold tracking-widest">REAL-TIME INTELLIGENCE COMMAND</p>
-                    </div>
+        {/* Main Chat Column */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+          
+          {/* 성공 토스트 알림바 (Inside Chat Column) */}
+          {resolveSuccess && (
+            <div className="bg-gradient-to-r from-emerald-600/20 to-blue-600/20 border-b border-emerald-500/30 p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="bg-emerald-500/20 p-1.5 rounded-full">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
                 </div>
-                <button className="p-2 rounded-full hover:bg-white/10 transition-all border border-white/5 hover:border-white/20">
-                    {isLogExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
+                <p className="text-sm text-emerald-100 font-medium">장애가 해결되었으며, 대화 내역이 AI RAG 모델에 학습되었습니다.</p>
+              </div>
+              <button
+                onClick={() => navigate('/knowledge-base')}
+                className="shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+              >
+                <Database className="w-4 h-4" />
+                학습된 내역 확인하기
+              </button>
             </div>
-            
-            {isLogExpanded && (
-                <div className="mt-4 space-y-4 animate-in slide-in-from-top-4 duration-300">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1 group hover:border-blue-500/30 transition-all flex-1">
-                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">대응 전문가진</span>
-                        <div className="flex flex-wrap items-center justify-center gap-2">
-                          <User className="w-4 h-4 text-blue-400" />
-                          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                            {participants.length > 0 ? (
-                                participants.map((p, i) => (
-                                    <span key={p.id || i} className="text-sm font-black animate-sguard-twinkle tracking-tighter">
-                                        {p.name}{i < participants.length - 1 ? ',' : ''}
-                                    </span>
-                                ))
-                            ) : (
-                                <span className="text-sm font-black animate-sguard-twinkle tracking-tighter">
-                                    {currentUser.name}
-                                </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1">
-                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">현재 처리 상태</span>
-                        <div className="flex items-center gap-2 text-emerald-400">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                          <span className="text-base font-black tracking-tight">{roomStatus || 'Open'}</span>
-                        </div>
-                      </div>
-                    </div>
+          )}
 
-                    <div className="bg-purple-900/10 border border-purple-500/30 rounded-[1.5rem] overflow-hidden shadow-xl shadow-purple-900/10">
-                        <div className="bg-purple-500/10 px-4 py-2 border-b border-purple-500/20 flex justify-between items-center">
-                          <span className="text-[10px] font-black text-purple-400 tracking-widest">AI ANALYSIS SUMMARY</span>
-                          <span className="flex h-2 w-2 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
-                          </span>
+          {/* [S-AutoPilot Insight] Area */}
+          <div className="bg-[#0f1421]/95 border-b border-white/10 backdrop-blur-xl z-20 shadow-2xl shrink-0">
+            <style>{`
+              @keyframes sguard-twinkle {
+                0%, 100% { text-shadow: 0 0 4px rgba(59, 130, 246, 0.4); color: #fff; }
+                50% { text-shadow: 0 0 15px rgba(59, 130, 246, 0.9), 0 0 20px rgba(59, 130, 246, 0.4); color: #60a5fa; transform: scale(1.05); }
+              }
+              .animate-sguard-twinkle {
+                animation: sguard-twinkle 1.5s ease-in-out infinite;
+                display: inline-block;
+              }
+            `}</style>
+            <div className="px-5 py-4">
+                <div 
+                    onClick={() => setIsLogExpanded(!isLogExpanded)}
+                    className="flex items-center justify-between cursor-pointer group mb-1"
+                >
+                    <div className="flex items-center space-x-2.5">
+                        <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-xl shadow-lg shadow-purple-900/30">
+                          <Sparkles className="w-4 h-4 text-white animate-pulse" />
                         </div>
-                        <div className="p-4 text-[13px] leading-relaxed relative">
-                          <div className={`text-slate-200 transition-all duration-300 ${!showFullAnalysis ? 'max-h-24 overflow-hidden' : ''}`}>
-                            <MarkdownViewer text={aiAnalysisMessage?.text || roomDescription || '장애 내용을 포함한 실시간 지식 분석을 기다리고 있습니다...'} />
-                          </div>
-                          {(aiAnalysisMessage?.text || roomDescription) && (
-                            <button 
-                              onClick={() => setShowFullAnalysis(!showFullAnalysis)}
-                              className="mt-3 text-[10px] text-purple-400 font-black uppercase tracking-wider hover:text-purple-300 flex items-center gap-1"
-                            >
-                              {showFullAnalysis ? "Collapse" : "Show Full Insight"}
-                            </button>
-                          )}
+                        <div>
+                          <h2 className="text-sm font-black text-white tracking-tight uppercase">[S-AutoPilot Insight]</h2>
+                          <p className="text-[10px] text-slate-500 font-bold tracking-widest">REAL-TIME INTELLIGENCE COMMAND</p>
                         </div>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <MessageSquare className="w-4 h-4 text-blue-400" />
-                          <span className="text-[11px] font-black text-blue-400 tracking-tight">관련 워룸 히스토리</span>
-                        </div>
-                        <div className="space-y-2">
-                          {relatedData?.history?.slice(0, 3).map((h, i) => (
-                            <div key={i} onClick={() => h.id !== incidentId && navigate(`/chat/${h.id}`)} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
-                              <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-blue-300">{h.title || h.id}</p>
-                            </div>
-                          ))}
-                          {(!relatedData?.history || relatedData.history.length === 0) && (
-                            <p className="text-[10px] text-slate-600 italic">검색된 유사 워룸이 없습니다</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FileText className="w-4 h-4 text-emerald-400" />
-                          <span className="text-[11px] font-black text-emerald-400 tracking-tight">관련 지식 보고서</span>
-                        </div>
-                        <div className="space-y-2">
-                          {relatedData?.reports?.slice(0, 3).map((r, i) => (
-                            <div key={i} onClick={() => window.open(r.url, '_blank')} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group">
-                              <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-emerald-300">{r.title}</p>
-                            </div>
-                          ))}
-                          {(!relatedData?.reports || relatedData.reports.length === 0) && (
-                            <p className="text-[10px] text-slate-600 italic">연동된 지식 자산이 없습니다</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <button className="p-2 rounded-full hover:bg-white/10 transition-all border border-white/5 hover:border-white/20">
+                        {isLogExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </button>
                 </div>
-            )}
-        </div>
-      </div>
+                
+                {isLogExpanded && (
+                    <div className="mt-4 space-y-4 animate-in slide-in-from-top-4 duration-300">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1 group hover:border-blue-500/30 transition-all flex-1 text-center">
+                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">대응 전문가진</span>
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                              <User className="w-4 h-4 text-blue-400" />
+                              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                                {participants.length > 0 ? (
+                                    participants.map((p, i) => (
+                                        <span key={p.id || i} className="text-sm font-black animate-sguard-twinkle tracking-tighter">
+                                            {p.name}{i < participants.length - 1 ? ',' : ''}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="text-sm font-black animate-sguard-twinkle tracking-tighter">
+                                        {currentUser.name}
+                                    </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1 text-center">
+                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">현재 처리 상태</span>
+                            <div className="flex items-center gap-2 text-emerald-400 justify-center">
+                              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                              <span className="text-base font-black tracking-tight">{roomStatus || 'Open'}</span>
+                            </div>
+                          </div>
+                        </div>
 
-      {/* Chat Area */}
-      <main ref={scrollRef} className="flex-1 p-4 space-y-6 overflow-y-auto pb-40 relative">
+                        <div className="bg-purple-900/10 border border-purple-500/30 rounded-[1.5rem] overflow-hidden shadow-xl shadow-purple-900/10">
+                            <button 
+                              onClick={() => setShowAnalysisSummary(!showAnalysisSummary)}
+                              className="w-full bg-purple-500/10 px-4 py-2 border-b border-purple-500/20 flex justify-between items-center group transition-colors hover:bg-purple-500/20"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Sparkles className={`w-3 h-3 ${showAnalysisSummary ? 'text-purple-400' : 'text-slate-500'}`} />
+                                <span className={`text-[10px] font-black tracking-widest ${showAnalysisSummary ? 'text-purple-400' : 'text-slate-500'}`}>AI ANALYSIS SUMMARY</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {showAnalysisSummary ? (
+                                  <>
+                                    <span className="flex h-2 w-2 relative">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                                    </span>
+                                    <ChevronUp className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400 transition-colors" />
+                                  </>
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400 transition-colors" />
+                                )}
+                              </div>
+                            </button>
+
+                            {showAnalysisSummary && (
+                              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="p-4 text-[13px] leading-relaxed relative border-b border-purple-500/10 text-left">
+                                  <div className={`text-slate-200 transition-all duration-300 ${!showFullAnalysis ? 'max-h-24 overflow-hidden' : ''}`}>
+                                    <MarkdownViewer text={aiAnalysisMessage?.text || roomDescription || '장애 내용을 포함한 실시간 지식 분석을 기다리고 있습니다...'} />
+                                  </div>
+                                  {(aiAnalysisMessage?.text || roomDescription) && (
+                                    <button 
+                                      onClick={() => setShowFullAnalysis(!showFullAnalysis)}
+                                      className="mt-3 text-[10px] text-purple-400 font-black uppercase tracking-wider hover:text-purple-300 flex items-center gap-1"
+                                    >
+                                      {showFullAnalysis ? "Collapse" : "Show Full Insight"}
+                                    </button>
+                                  )}
+                                </div>
+                                
+                                {/* ── Agent Intelligence Logs (Collapsible) ── */}
+                                <div className="p-4 space-y-3 bg-black/20 text-left">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowAgentInsights(!showAgentInsights);
+                                    }}
+                                    className="flex items-center justify-between w-full group"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Bot className={`w-3.5 h-3.5 ${showAgentInsights ? 'text-purple-400' : 'text-slate-500'}`} />
+                                      <span className={`text-[10px] font-black uppercase tracking-widest ${showAgentInsights ? 'text-purple-400' : 'text-slate-500'}`}>Agent Insights</span>
+                                      {!showAgentInsights && mainMessages.filter(m => m.type === 'ai_analysis' && m.role !== 'Leader').length > 0 && (
+                                        <span className="flex h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse ml-1"></span>
+                                      )}
+                                    </div>
+                                    {showAgentInsights ? (
+                                      <ChevronUp className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400 transition-colors" />
+                                    ) : (
+                                      <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400 transition-colors" />
+                                    )}
+                                  </button>
+                                  
+                                  {showAgentInsights && (
+                                    <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1 animate-in fade-in slide-in-from-top-2 duration-300 custom-scrollbar">
+                                      {mainMessages
+                                        .filter(m => m.type === 'ai_analysis' && m.role !== 'Leader')
+                                        .map((log, i) => {
+                                          const cfg = agentColors[log.role] || agentColors.Leader;
+                                          const Icon = cfg.icon;
+                                          return (
+                                            <div key={i} className={`rounded-xl border p-3 ${cfg.bg} ${cfg.border} animate-in slide-in-from-right-2 duration-300 text-left`}>
+                                              <div className="flex items-center gap-2 mb-1.5">
+                                                <Icon className={`w-3.5 h-3.5 ${cfg.text}`} />
+                                                <span className={`text-[11px] font-bold ${cfg.text}`}>{log.role} Agent</span>
+                                                <span className="ml-auto text-[9px] text-slate-500">{log.time}</span>
+                                              </div>
+                                              <div className="text-[12px] text-slate-300 leading-normal">
+                                                <MarkdownViewer text={log.text} />
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      
+                                      {mainMessages.filter(m => m.type === 'ai_analysis' && m.role !== 'Leader').length === 0 && (
+                                        <p className="text-[11px] text-slate-600 italic py-2">대기 중인 에이전트 로그가 없습니다.</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MessageSquare className="w-4 h-4 text-blue-400" />
+                              <span className="text-[11px] font-black text-blue-400 tracking-tight text-left">관련 워룸 히스토리</span>
+                            </div>
+                            <div className="space-y-2">
+                              {relatedData?.history?.slice(0, 3).map((h, i) => (
+                                <div key={i} onClick={() => h.id !== incidentId && navigate(`/chat/${h.id}`)} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
+                                  <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-blue-300 text-left">{h.title || h.id}</p>
+                                </div>
+                              ))}
+                              {(!relatedData?.history || relatedData.history.length === 0) && (
+                                <p className="text-[10px] text-slate-600 italic text-left">검색된 유사 워룸이 없습니다</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <FileText className="w-4 h-4 text-emerald-400" />
+                              <span className="text-[11px] font-black text-emerald-400 tracking-tight text-left">관련 지식 보고서</span>
+                            </div>
+                            <div className="space-y-2">
+                              {relatedData?.reports?.slice(0, 3).map((r, i) => (
+                                <div key={i} onClick={() => window.open(r.url, '_blank')} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group">
+                                  <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-emerald-300 text-left">{r.title}</p>
+                                </div>
+                              ))}
+                              {(!relatedData?.reports || relatedData.reports.length === 0) && (
+                                <p className="text-[10px] text-slate-600 italic text-left">연동된 지식 자산이 없습니다</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+          </div>
+
+          {/* Chat Messages Area (THE ONLY SCROLLABLE PART) */}
+          <main ref={scrollRef} className="flex-1 p-4 space-y-6 overflow-y-auto relative custom-scrollbar pb-10">
         
         {/* Pinned Announcement Bar */}
         {pinnedMessage && showPinned && (
@@ -1315,6 +1424,20 @@ export default function ChatPage() {
             <Megaphone className="w-4 h-4" />
           </button>
         )}
+
+        {/* 상단 하드코딩 안내 메시지 (DB 저장 없이 UI에만 표시) */}
+        <div className="flex flex-col items-center justify-center py-4 mb-6 animate-in fade-in slide-in-from-top-1 duration-700">
+          <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl px-6 py-3 flex items-center gap-3 shadow-lg shadow-blue-900/5">
+            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+              <Info className="w-4 h-4 text-blue-400" />
+            </div>
+            <div className="flex flex-col">
+              <p className="text-[13px] font-bold text-blue-100 leading-tight">War-Room 채팅방이 생성되었습니다.</p>
+              <p className="text-[11px] text-blue-400/80 mt-0.5">모든 대화 내용은 장애 해결 시 AI 학습에 사용됩니다.</p>
+            </div>
+          </div>
+          <div className="w-px h-8 bg-gradient-to-b from-blue-500/20 to-transparent mt-2" />
+        </div>
 
         {mainMessages.filter(msg => msg.type !== 'ai_analysis').map((msg) => (
           <div key={msg.inc_id || msg.id} id={`msg-seq-${msg.seq}`}>
@@ -1879,118 +2002,119 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* Typing Indicator */}
-      {Object.values(remoteTyping).some(u => u.is_typing) && (
-        <div className="px-5 py-1 flex items-center gap-2 animate-pulse">
-          <div className="flex -space-x-1">
-            {Object.entries(remoteTyping).filter(([_, u]) => u.is_typing).map(([id, u]) => (
-              <div key={id} className="w-5 h-5 rounded-full bg-slate-700 border border-[#0f1421] flex items-center justify-center text-[8px] font-bold">
-                {u.name?.[0]}
-              </div>
-            ))}
-          </div>
-          <span className="text-[10px] text-slate-400">
-            {Object.values(remoteTyping).filter(u => u.is_typing).map(u => u.name).join(', ')}님이 입력 중...
-          </span>
-        </div>
-      )}
-
-      {/* Input Area */}
-       <div className="p-3 bg-[#0f1421] border-t border-white/5 flex flex-col mb-[70px] space-y-2">
-        {roomStatus === 'CLOSED' ? (
-          <div className="bg-slate-900/50 rounded-2xl py-4 px-5 border border-white/5 flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
-            <span className="text-sm text-slate-500 font-medium">이 War-Room은 종료되었습니다. (읽기 전용)</span>
-          </div>
-        ) : (
-          <>
-           {/* File preview */}
-           {selectedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {selectedFiles.map((file, idx) => (
-                <div key={idx} className="flex items-center gap-2 bg-slate-800/80 rounded-xl px-2 py-1.5 border border-white/10 group animate-in zoom-in-95 duration-200">
-                  {file.type.startsWith('image/') ? (
-                    <img src={file.localUrl} alt={file.name} className="w-8 h-8 rounded-lg object-cover" />
-                  ) : (
-                    <FileText className="w-6 h-6 text-blue-400" />
-                  )}
-                  <span className="text-[10px] text-slate-300 max-w-[80px] truncate">{file.name}</span>
-                  <button 
-                    onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))} 
-                    className="text-slate-500 hover:text-white p-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+          {/* Typing Indicator & Input Area (Now sticky/fixed at the bottom of the column) */}
+          <div className="shrink-0 bg-[#0f1421] border-t border-white/5 pb-[70px] z-30">
+            {Object.values(remoteTyping).some(u => u.is_typing) && (
+              <div className="px-5 py-1.5 flex items-center gap-2 animate-pulse bg-black/10">
+                <div className="flex -space-x-1">
+                  {Object.entries(remoteTyping).filter(([_, u]) => u.is_typing).map(([id, u]) => (
+                    <div key={id} className="w-5 h-5 rounded-full bg-slate-700 border border-[#0f1421] flex items-center justify-center text-[8px] font-bold">
+                      {u.name?.[0]}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-           )}
-        <div className="flex items-center space-x-3">
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.target.files);
-              if (files.length === 0) return;
-              const newFiles = files.map(file => ({
-                name: file.name,
-                type: file.type,
-                localUrl: URL.createObjectURL(file),
-                file: file
-              }));
-              setSelectedFiles(prev => [...prev, ...newFiles]);
-              e.target.value = '';
-            }}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 rounded-full bg-slate-800/60 hover:bg-slate-700 transition-colors"
-            title="파일/이미지 첨부"
-          >
-            <Paperclip className="w-5 h-5 text-slate-400" />
-          </button>
-          <div className="flex-1 relative">
-            {replyTo && (
-              <div className="absolute bottom-full left-0 w-full bg-[#1e2538] border border-white/5 rounded-t-xl p-2 mb-[-1px] flex justify-between items-center text-[11px] animate-in slide-in-from-bottom-2">
-                <div className="flex items-center gap-2 text-slate-300 truncate">
-                  <span className="font-bold text-blue-400">@{replyTo.sender}</span>
-                  <span className="truncate opacity-70">{replyTo.text}</span>
-                </div>
-                <button onClick={() => setReplyTo(null)}><X className="w-3.5 h-3.5 text-slate-500" /></button>
+                <span className="text-[10px] text-slate-400">
+                  {Object.values(remoteTyping).filter(u => u.is_typing).map(u => u.name).join(', ')}님이 입력 중...
+                </span>
               </div>
             )}
-            <input
-              type="text"
-              disabled={roomStatus === 'CLOSED'}
-              value={mainInput}
-              onChange={(e) => {
-                setMainInput(e.target.value);
-                handleTyping();
-              }}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder={roomStatus === 'CLOSED' ? "종료된 워룸은 입력할 수 없습니다" : "메시지를 입력하세요..."}
-              className={`w-full bg-slate-800/60 py-2.5 px-5 text-[15px] border border-white/5 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500 ${replyTo ? 'rounded-b-2xl' : 'rounded-full'} ${roomStatus === 'CLOSED' ? 'cursor-not-allowed opacity-50' : ''}`}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile}
-              className="absolute right-1 top-1 p-1.5 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {uploadingFile ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+
+            <div className="p-3 flex flex-col space-y-2">
+              {roomStatus === 'CLOSED' ? (
+                <div className="bg-slate-900/50 rounded-2xl py-4 px-5 border border-white/5 flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
+                  <span className="text-sm text-slate-500 font-medium">이 War-Room은 종료되었습니다. (읽기 전용)</span>
+                </div>
               ) : (
-                <Send className="w-5 h-5 fill-current" />
+                <>
+                  {/* File preview */}
+                  {selectedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2 p-1">
+                      {selectedFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-slate-800/80 rounded-xl px-2 py-1.5 border border-white/10 group animate-in zoom-in-95 duration-200">
+                          {file.type.startsWith('image/') ? (
+                            <img src={file.localUrl} alt={file.name} className="w-8 h-8 rounded-lg object-cover" />
+                          ) : (
+                            <FileText className="w-6 h-6 text-blue-400" />
+                          )}
+                          <span className="text-[10px] text-slate-300 max-w-[80px] truncate">{file.name}</span>
+                          <button 
+                            onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))} 
+                            className="text-slate-500 hover:text-white p-0.5"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files);
+                        if (files.length === 0) return;
+                        const newFiles = files.map(file => ({
+                          name: file.name,
+                          type: file.type,
+                          localUrl: URL.createObjectURL(file),
+                          file: file
+                        }));
+                        setSelectedFiles(prev => [...prev, ...newFiles]);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2.5 rounded-full bg-slate-800/60 hover:bg-slate-700 transition-colors"
+                    >
+                      <Paperclip className="w-5 h-5 text-slate-400" />
+                    </button>
+                    <div className="flex-1 relative">
+                      {replyTo && (
+                        <div className="absolute bottom-full left-0 w-full bg-[#1e2538] border border-white/5 rounded-t-xl p-2 mb-[-1px] flex justify-between items-center text-[11px] animate-in slide-in-from-bottom-2">
+                          <div className="flex items-center gap-2 text-slate-300 truncate">
+                            <span className="font-bold text-blue-400">@{replyTo.sender}</span>
+                            <span className="truncate opacity-70">{replyTo.text}</span>
+                          </div>
+                          <button onClick={() => setReplyTo(null)}><X className="w-3.5 h-3.5 text-slate-500" /></button>
+                        </div>
+                      )}
+                      <input
+                        type="text"
+                        disabled={roomStatus === 'CLOSED'}
+                        value={mainInput}
+                        onChange={(e) => {
+                          setMainInput(e.target.value);
+                          handleTyping();
+                        }}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                        placeholder={roomStatus === 'CLOSED' ? "종료된 워룸은 입력할 수 없습니다" : "메시지를 입력하세요..."}
+                        className={`w-full bg-slate-800/60 py-2.5 px-5 text-[15px] border border-white/5 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500 ${replyTo ? 'rounded-b-2xl' : 'rounded-full'}`}
+                      />
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile}
+                        className="absolute right-1 top-1 p-1.5 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {uploadingFile ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Send className="w-5 h-5 fill-current" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
-            </button>
+            </div>
           </div>
         </div>
-      </>
-    )}
-  </div>
+      </div>
       
       {/* Direct Message (Note) Modal */}
       {showDMModal && dmTargetUser && (

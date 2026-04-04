@@ -41,7 +41,7 @@ function AppContent() {
         <Route path="/" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-        <Route path="/ai-report" element={<AiReportPage />} />
+        <Route path="/ai-report/:incidentId?" element={<AiReportPage />} />
         <Route path="/assignment-detail" element={<AssignmentDetailPage />} />
         <Route path="/chat/:incidentId?" element={<ChatPage />} />
         <Route path="/chat-summary/:incidentId" element={<ChatSummaryPage />} />

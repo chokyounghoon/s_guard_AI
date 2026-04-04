@@ -90,13 +90,26 @@ const MarkdownViewer = ({ text }) => {
             );
           },
           ul: ({ children }) => (
-            <ul className="mb-6 space-y-3 list-none p-0">{children}</ul>
-          ),
-          li: ({ children }) => (
-            <li className="relative pl-6 text-gray-300 text-sm leading-relaxed before:absolute before:left-0 before:top-2 before:h-2 before:w-2 before:rounded-full before:bg-blue-500/50 hover:text-white transition-colors">
+            <ul className="mb-8 space-y-6 list-none p-0 relative before:absolute before:left-[3px] before:top-2 before:bottom-2 before:w-[1.5px] before:bg-blue-500/20">
               {children}
-            </li>
+            </ul>
           ),
+          li: ({ children }) => {
+            const content = String(children);
+            // Check if it starts with [HH:mm:ss] or similar
+            const hasTimestamp = /^\[\d{2}:\d{2}:\d{2}\]/.test(content);
+            
+            return (
+              <li className={`relative pl-8 text-gray-300 text-sm leading-relaxed 
+                before:absolute before:left-[-1px] before:top-1.5 before:z-10 before:h-2.5 before:w-2.5 before:rounded-full 
+                before:border-2 before:border-[#1a1f2e] before:bg-blue-500
+                hover:text-white transition-all group`}>
+                <div className={`${hasTimestamp ? 'bg-blue-500/5 p-2 rounded-lg border border-blue-500/10 -ml-2' : ''}`}>
+                  {children}
+                </div>
+              </li>
+            );
+          },
           code: ({ node, inline, className, children, ...props }) => {
             return !inline ? (
               <CodeBlock children={children} className={className} />

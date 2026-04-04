@@ -22,7 +22,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import asyncio
 import base64
-import httpxㄹ
+import httpx
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -102,7 +102,10 @@ class WorkerClient:
 
 
 # Dify API Configuration
-DIFY_API_KEY = os.getenv("DIFY_API_KEY", "app-XXXXXXXX")
+DIFY_API_KEY_DASHBOARD = os.getenv("DIFY_API_KEY_DASHBOARD", "app-TSlqmp329iKOzpXUP90iC6Kw")
+DIFY_API_KEY_SUMMARIZER = os.getenv("DIFY_API_KEY_SUMMARIZER", "app-owwPp3j2qAvVDZpW2UUiY8L3")
+DIFY_API_KEY_GOVERNANCE = os.getenv("DIFY_API_KEY_GOVERNANCE", "app-QHxJQTBSKJlTw2gVeGgTk915")
+DIFY_API_KEY = DIFY_API_KEY_DASHBOARD # ✅ Default to Dashboard (Chat App)
 DIFY_API_BASE = os.getenv("DIFY_API_BASE", "https://api.dify.ai/v1")
 DIFY_DATASET_ID = os.getenv("DIFY_DATASET_ID", "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
 
@@ -112,13 +115,11 @@ class DifyClient:
         """
         Dify chat-messages를 streaming 모드로 호출한 뒤,
         answer만 누적해 최종 JSON 형태로 반환한다.
-        (긴 응답에서도 연결 유지를 위해 streaming을 기본으로 사용)
         """
         try:
             gen = await DifyClient.stream_chat_message(query=query, user=user, inputs=inputs, files=files, api_key=api_key)
             answer_parts: list[str] = []
             async for chunk in gen:
-                # chunk format: "data: {...}\n\n" or "data: [DONE]\n\n"
                 if not chunk.startswith("data:"):
                     continue
                 data_str = chunk[5:].strip()
@@ -138,7 +139,60 @@ class DifyClient:
             return {"answer": "AI 분석이 지연되고 있습니다"}
 
     @staticmethod
-    async def stream_chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = [], api_key: Optional[str] = None):
+    async def stream_workflow(inputs: dict, user: str = "sguard-user", api_key: Optional[str] = None):
+        """
+        Dify Workflow (/workflows/run) 를 streaming 모드로 호출한다.
+        """
+        url = f"{DIFY_API_BASE}/workflows/run"
+        auth_key = api_key if api_key else DIFY_API_KEY
+        headers = {
+            "Authorization": f"Bearer {auth_key}",
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        payload = {
+            "inputs": inputs,
+            "response_mode": "streaming",
+            "user": user
+        }
+        
+        async def event_generator():
+            timeout = httpx.Timeout(120.0, connect=20.0, read=300.0, write=20.0, pool=20.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                try:
+                    async with client.stream("POST", url, json=payload, headers=headers) as response:
+                        if response.status_code != 200:
+                            error_body = await response.aread()
+                            error_text = error_body.decode("utf-8", "ignore")
+                            logger.error(f"Dify Workflow API error ({response.status_code}): {error_text}")
+                            yield f"data: {json.dumps({'error': error_text}, ensure_ascii=False)}\n\n"
+                            return
+                        async for line in response.aiter_lines():
+                            if line:
+                                yield line + "\n\n"
+                except Exception as e:
+                    logger.error(f"Dify Workflow system error: {e}")
+                    yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+        return event_generator()
+
+    @staticmethod
+    async def workflow_run(inputs: dict, user: str = "sguard-user", api_key: Optional[str] = None):
+        """
+        Dify Workflow를 차단(Blocking) 모드로 호출하여 최종 결과가 나올 때까지 대기한다.
+        """
+        try:
+            gen = await DifyClient.stream_workflow(inputs=inputs, user=user, api_key=api_key)
+            async for chunk in gen:
+                # 스트림을 끝까지 소모
+                pass
+            return {"status": "success", "message": "Workflow completed"}
+        except Exception as e:
+            logger.error(f"Dify workflow_run error: {e}")
+            return {"status": "error", "message": str(e)}
+
+    @staticmethod
+    async def stream_chat_message(query: str, user: str = "sguard-user", inputs: dict = {}, files: list = [], api_key: Optional[str] = None, max_tokens: int = 2048):
         url = f"{DIFY_API_BASE}/chat-messages"
         auth_key = api_key if api_key else DIFY_API_KEY
         headers = {
@@ -153,6 +207,8 @@ class DifyClient:
             "user": user,
             "files": files
         }
+        # Optional metadata/parameters can be passed here if the model/app allows overrides
+        # Setting a large response window for reports
         
         async def event_generator():
             # Dify가 첫 토큰을 늦게 보내는 경우가 있어 read timeout은 넉넉히 둔다.
@@ -160,6 +216,12 @@ class DifyClient:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 try:
                     async with client.stream("POST", url, json=payload, headers=headers) as response:
+                        if response.status_code != 200:
+                            error_body = await response.aread()
+                            error_text = error_body.decode("utf-8", "ignore")
+                            logger.error(f"Dify Chat API error ({response.status_code}): {error_text}")
+                            raise HTTPException(status_code=response.status_code, detail=f"Dify API error: {response.status_code} - {error_text[:200]}")
+                            
                         response.raise_for_status()
                         # heartbeat: SSE 연결이 열렸음을 즉시 알림 (클라이언트 무응답 체감 완화)
                         yield f"data: {json.dumps({'status': 'connected'}, ensure_ascii=False)}\n\n"
@@ -333,7 +395,8 @@ async def convert_multimodal(file: UploadFile = File(...)):
             dify_res = await DifyClient.chat_message(
                 query="이 이미지에 포함된 텍스트를 모두 추출해서 한국어로 보여줘.",
                 user="sguard-multimodal-user",
-                files=[{"type": "image", "transfer_method": "remote_url", "url": f"data:{content_type};base64,{base64_image}"}]
+                files=[{"type": "image", "transfer_method": "remote_url", "url": f"data:{content_type};base64,{base64_image}"}],
+                api_key=DIFY_API_KEY_DASHBOARD
             )
             result_text = dify_res.get("answer", "이미지 분석 실패")
         except Exception as e:
@@ -520,7 +583,7 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
     
     incident_code = None
     try:
-        extraction_res = await DifyClient.chat_message(query=prompt, user="sguard-extractor")
+        extraction_res = await DifyClient.chat_message(query=prompt, user="sguard-extractor", api_key=DIFY_API_KEY_DASHBOARD)
         raw_json = extraction_res.get("answer", "{}")
         import json
         m = re.search(r"\{.*\}", raw_json, re.DOTALL)
@@ -637,17 +700,54 @@ async def get_ai_insight():
             yield "data: [DONE]\n\n"
         return StreamingResponse(empty_gen(), media_type="text/event-stream")
 
-    # [핵심] Dify 스트리밍 호출
+    # [핵심] Dify 스트리밍 호출 (캐시 확인 로직 추가)
+    # 만약 Worker에서 이미 실질적인 분석 결과가 있다면 (대기 중 문구가 아니라면) 바로 그 내용을 반환
+    cached_text = data.get("current_log", {}).get("text", "")
+    is_placeholder = "🔍 [Insight]" in cached_text or "새로운 장애 SMS 분석을 준비하고 있습니다" in cached_text
+    
+    incident_id = str(recent_sms['inc_id']).replace("INC-", "").strip()
     prompt = f"다음 SMS 장애 내용을 분석하고 1~2문장으로 대응 가이드를 한글로 제시해줘: {recent_sms['message']}"
     
     async def insight_stream():
-        # 먼저 지표 데이터 전송
-        yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'sms_id': str(recent_sms['inc_id'])}, ensure_ascii=False)}\n\n"
+        # 먼저 지표 데이터 전송 (항상 필요)
+        yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'sms_id': str(incident_id)}, ensure_ascii=False)}\n\n"
         
+        # 캐시된 데이터가 있는 경우
+        if not is_placeholder and cached_text:
+            logger.info(f"Using cached Autopilot Insight for {incident_id}")
+            yield f"data: {json.dumps({'answer': cached_text}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        logger.info(f"Triggering new Dify Insight calculation for {incident_id}")
         # Dify 스트림 전송
-        gen = await DifyClient.stream_chat_message(query=prompt, user="sguard-autopilot")
+        gen = await DifyClient.stream_chat_message(query=prompt, user="sguard-autopilot", api_key=DIFY_API_KEY_DASHBOARD)
+        
+        full_answer = []
         async for chunk in gen:
             yield chunk
+            if chunk.startswith("data:"):
+                data_str = chunk[5:].strip()
+                if data_str != "[DONE]":
+                    try:
+                        data_json = json.loads(data_str)
+                        if data_json.get("answer"):
+                            full_answer.append(data_json["answer"])
+                    except: pass
+        
+        if full_answer:
+            final_text = "".join(full_answer)
+            try:
+                await WorkerClient.post("/ai/insight/save", {
+                    "incident_id": incident_id,
+                    "content": final_text,
+                    "severity": "high",
+                    "category": "server",
+                    "user_id": "sguard-autopilot"
+                })
+                logger.info(f"Successfully cached new insight for {incident_id}")
+            except Exception as e:
+                logger.error(f"Failed to cache insight: {e}")
 
     return StreamingResponse(insight_stream(), media_type="text/event-stream")
 
@@ -669,19 +769,46 @@ async def generate_ai_report(req: GenerateReportRequest):
             yield "data: [DONE]\n\n"
         return StreamingResponse(err_gen(), media_type="text/event-stream")
 
-    prompt = f"""
-다음 incident_id에 대한 장애 보고서를 한국어로 작성해줘: {incident_id}
+    # 1. 기존 요약(타임라인) 데이터가 있는지 DB에서 조회
+    summary_data = await WorkerClient.get(f"/db/summary/{incident_id}")
+    existing_summary = ""
+    if isinstance(summary_data, dict) and "summary" in summary_data:
+        existing_summary = summary_data["summary"]
 
-요구사항:
-- 먼저 보고서 본문(요약)을 자연어로 작성
-- 이어서 6W1H를 JSON으로 출력 (키: who, when, where, what, why, how, report_text)
-- JSON은 코드블록 없이 순수 JSON 텍스트로만 출력
+    prompt = f"""
+다음 incident_id에 대한 [장애 상세 종합 보고서]를 한국어로 작성하십시오: {incident_id}
+
+[데이터 소스: War-Room 실시간 기록]
+{existing_summary if existing_summary else "(분석 가능한 채팅 기록이 없습니다)"}
+
+[작성 지침]
+- 기술적 깊이가 있는 전문적인 문체로 작성하십시오.
+- '요약'이나 '생략'이라는 표현을 피하고, 모든 프로세스를 상세히 기술하십시오.
+- 특히 '4. War-Room 대응 타임라인'은 위 데이터 소스의 시점별 기록을 유실 없이 전문적으로 재구성하여 포함하십시오.
+
+[보고서 구조]
+1. 장애 개요: 발생 시점, 시스템 환경, 영향 범위 및 심각도
+2. 원인 분석: 이상 징후 분석, 근본 원인(Root Cause) 및 기술적 메커니즘
+3. 조치 내용: 상황별 분 단위 대응 단계 및 최종 복구 내역
+4. War-Room 대응 타임라인: 시점별 상세 대응 기록 전체 (누락 금지)
+5. 향후 대책: 단기 복구 및 장기적 재발 방지안, 모니터링 강화 계획
+
+[출력 형식]
+- 마크다운(Markdown) 형식을 사용하십시오.
+- 마지막에 6W1H 구조화 데이터를 JSON으로만 출력하십시오. (키: who, when, where, what, why, how, report_text)
+- JSON 출력 시 코드 블럭(```)을 사용하지 마십시오.
 """
 
     async def report_stream():
         accumulated: list[str] = []
         try:
-            gen = await DifyClient.stream_chat_message(query=prompt, user="sguard-report")
+            # 보고서 생성에는 더 높은 성능과 토큰 제한을 가진 GOVERNANCE 키를 사용
+            gen = await DifyClient.stream_chat_message(
+                query=prompt, 
+                user="sguard-report", 
+                api_key=DIFY_API_KEY_GOVERNANCE,
+                max_tokens=4096
+            )
             async for chunk in gen:
                 if chunk.startswith("data:"):
                     data_str = chunk[5:].strip()
@@ -750,7 +877,7 @@ async def get_agent_discussion_stream(sms_id: str):
 
         try:
             # Dify 스트리밍 호출
-            gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user")
+            gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user", api_key=DIFY_API_KEY_DASHBOARD)
             async for chunk in gen:
                 # Dify chunk를 그대로 전달하되, 프론트에서 파싱하기 쉽게 [Agent]: 포맷 유지
                 yield chunk
@@ -816,6 +943,11 @@ class ChatRequest(BaseModel):
 class SummarizeChatRequest(BaseModel):
     incident_id: str
 
+class GovernanceApproveRequest(BaseModel):
+    incident_id: str
+    title: str
+    content: str
+
 @app.post("/ai/chat")
 async def chat_with_ai(request: ChatRequest):
     """
@@ -830,7 +962,7 @@ async def chat_with_ai(request: ChatRequest):
 
     try:
         logger.info(f"S-GUARD Chat Dify 스트리밍 연동 중: {query}")
-        gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user")
+        gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user", api_key=DIFY_API_KEY_DASHBOARD)
         return StreamingResponse(gen, media_type="text/event-stream")
     except Exception as e:
         logger.error(f"Chat Dify error: {e}")
@@ -844,15 +976,32 @@ async def chat_with_ai(request: ChatRequest):
 async def summarize_chat(req: SummarizeChatRequest):
     """
     Generate a summary of the War-Room chat for a specific incident.
+    Utilizes a dedicated chat_summaries table for caching.
     """
-    incident_id = req.incident_id
-    if not incident_id:
+    raw_id = req.incident_id
+    if not raw_id:
         async def err_gen():
             yield f"data: {json.dumps({'error': 'incident_id가 필요합니다.'}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(err_gen(), media_type="text/event-stream")
 
-    # 1. Fetch chat history
+    # [Normalization] Strip 'INC-' and whitespace to ensure proper matching
+    incident_id = str(raw_id).replace("INC-", "").strip()
+    logger.info(f"SummarizeChat request for: {raw_id} (normalized: {incident_id})")
+
+    # 1. Check if summary already exists in dedicated table
+    try:
+        cache_res = await WorkerClient.get(f"/db/summary/{incident_id}")
+        if cache_res and cache_res.get("summary"):
+            logger.info(f"Using cached summary from DB for {incident_id}")
+            async def cached_gen():
+                yield f"data: {json.dumps({'answer': cache_res['summary']}, ensure_ascii=False)}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(cached_gen(), media_type="text/event-stream")
+    except Exception as e:
+        logger.warning(f"Cache check failed, proceeding with generation: {e}")
+
+    # 2. Fetch chat history to generate new summary
     chat_res = await WorkerClient.get(f"/warroom/chat/{incident_id}")
     messages = chat_res.get("messages", [])
     
@@ -862,49 +1011,140 @@ async def summarize_chat(req: SummarizeChatRequest):
             yield "data: [DONE]\n\n"
         return StreamingResponse(empty_gen(), media_type="text/event-stream")
 
-    # 2. Format transcript
+    # 3. Format transcript with timestamps for timeline analysis
     transcript = []
     for msg in messages:
+        # AI ANALYSIS SUMMARY 영역의 데이터(ai_analysis 타입 또는 'AI분석' 역할)는 제외
+        if msg.get("type") == "ai_analysis" or msg.get("role") == "AI분석":
+            continue
+            
         role = msg.get("role", "User")
         sender = msg.get("sender", "Unknown")
         text = msg.get("text", "")
+        ts = msg.get("timestamp", "")
+        
+        # Format timestamp to HH:mm:ss if it's a string
+        time_str = ""
+        if ts:
+            try:
+                # Assuming ts might be '2026-04-04 11:00:00' or ISO format
+                if " " in ts:
+                    time_str = ts.split(" ")[1] # Take HH:mm:ss
+                elif "T" in ts:
+                    time_str = ts.split("T")[1].split(".")[0] # Take HH:mm:ss
+                else: 
+                    time_str = ts
+            except:
+                time_str = ts
+        
         if text:
-            transcript.append(f"[{role}] {sender}: {text}")
+            transcript.append(f"[{time_str}] [{role}] {sender}: {text}")
     
-    chat_content = "\n".join(transcript)
+    # Analyze ONLY chat room contents as a timeline
+    chat_content = "### WAR-ROOM CHAT LOG FOR TIMELINE ANALYSIS ###\n" + "\n".join(transcript)
     
-    # 3. Create prompt
-    prompt = f"""
-다음은 인시던트({incident_id})에 대한 War-Room 채팅 내역입니다. 
-이 내용을 바탕으로 장애 대응 과정과 결과를 요약해줘.
-
-[채팅 내역]
-{chat_content}
+    # 4. Create prompt (for logging/debugging purposes, though workflow uses inputs)
+    prompt_instruction = f"""
+다음은 인시던트({incident_id})에 대한 실시간 War-Room 채팅 내역입니다. 
+다른 외부 정보나 추측을 배제하고, 오직 아래 채팅 내역만을 분석하여 사건 발생부터 해결까지의 상세 타임라인을 작성해줘.
 
 [요약 요구사항]
-1. 장애 개요: 어떤 장애가 발생했는지 요약
-2. 주요 조치 사항: 타임라인별 주요 대응 내용
-3. 최종 결과: 현재 상태 및 조치 결과
-4. 향후 과제: 재발 방지를 위해 필요한 사항 (있을 경우)
+1. 장애 개요: 어떤 장애가 감지되었는지 1-2문장으로 간략히 요약
+2. 상세 조치 타임라인: **반드시** 아래 형식을 지킨 불렛 리스트 형태로 시간순 작성 (가장 중요)
+   - 형식: `- [HH:mm:ss] 주요 대응 및 조치 내용`
+   - 순차적으로 모든 핵심 이벤트를 누락 없이 포함할 것
+3. 최종 결과: 현재 조치 상태 및 해결 여부
+4. 핵심 인사이트: 이번 장애 대응에서 얻은 교훈이나 특이점
 
-응답은 전문적이고 읽기 쉬운 Markdown 형식으로 작성해줘.
+전문적인 Markdown 형식을 사용하되, 타임라인 섹션은 반드시 리스트 형식을 유지해줘.
 """
     
     try:
-        logger.info(f"Summarizing chat for {incident_id}")
-        # Use the specific Dify API key for Chat Summary
-        gen = await DifyClient.stream_chat_message(
-            query=prompt, 
+        logger.info(f"Generating new summary via Dify (Workflow) for {incident_id}")
+        
+        gen = await DifyClient.stream_workflow(
+            inputs={
+                "chat_log": chat_content,
+                "incident_images": []
+            },
             user="sguard-summarizer",
-            api_key="app-owwPp3j2qAvVDZpW2UUiY8L3"
+            api_key=DIFY_API_KEY_SUMMARIZER
         )
-        return StreamingResponse(gen, media_type="text/event-stream")
+
+        async def saving_gen():
+            full_answer = []
+            async for chunk in gen:
+                yield chunk
+                # Extract answer from chunk to save to DB
+                if chunk.startswith("data:"):
+                    data_str = chunk[5:].strip()
+                    if data_str != "[DONE]":
+                        try:
+                            data = json.loads(data_str)
+                            if data.get("answer"):
+                                full_answer.append(data["answer"])
+                        except: pass
+            
+            # Save to DB after streaming completes
+            if full_answer:
+                summary_text = "".join(full_answer)
+                try:
+                    await WorkerClient.post("/db/summary", {
+                        "inc_id": incident_id,
+                        "summary": summary_text,
+                        "model": "dify-summarizer"
+                    })
+                    logger.info(f"Saved new summary to DB for {incident_id}")
+                except Exception as e:
+                    logger.error(f"Failed to save summary to DB: {e}")
+
+        return StreamingResponse(saving_gen(), media_type="text/event-stream")
     except Exception as e:
         logger.error(f"Summarization error: {e}")
         async def fail_gen():
             yield f"data: {json.dumps({'error': f'요약 중 오류가 발생했습니다: {str(e)}'}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(fail_gen(), media_type="text/event-stream")
+
+
+@app.post("/ai/governance/approve")
+async def governance_approve(req: GovernanceApproveRequest):
+    """
+    Final governance approval: Sends the incident summary to a special Dify app
+    for archiving and RAG knowledge base update.
+    """
+    incident_id = req.incident_id
+    content = req.content # This is the "Collaborative Timeline" summary
+    current_date = get_kst().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Combine data as requested for the 'sguardlog' variable
+    sguard_log_input = f"""
+### [GOVERNANCE REPORT] ###
+INCIDENT ID: {incident_id}
+DATE: {current_date}
+REPORT CONTENT:
+{content}
+""".strip()
+
+    try:
+        logger.info(f"Starting Governance Approval Workflow for {incident_id}")
+        
+        # Dify Workflow 호출 (Key: app-QHxJQTBSKJlTw2gVeGgTk915)
+        # Variable: sguardlog
+        gen = await DifyClient.stream_workflow(
+            inputs={
+                "sguardlog": sguard_log_input,
+                "incident_images": [] # Required by Workflow helper to avoid 400
+            },
+            user="sguard-governor",
+            api_key=DIFY_API_KEY_GOVERNANCE
+        )
+        
+        return StreamingResponse(gen, media_type="text/event-stream")
+
+    except Exception as e:
+        logger.error(f"Governance approval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/ai/analyze-sms/{sms_id}")
@@ -940,7 +1180,11 @@ async def analyze_sms_multi_agent(sms_id: str):
     """
     
     try:
-        res = await DifyClient.chat_message(query=query, user="sguard-multi-agent")
+        res = await DifyClient.chat_message(
+            query=query, 
+            user="sguard-multi-agent",
+            api_key=DIFY_API_KEY_DASHBOARD
+        )
         analysis = res.get("answer", "AI 분석 결과를 생성할 수 없습니다.")
         return {"status": "success", "analysis": analysis}
     except Exception as e:
@@ -994,8 +1238,10 @@ async def analyze_sms_stream(req: AnalyzeSmsRequest):
         # 1. 기 분석된 결과가 있는지 DB 조회 (캐시 히트)
         if req.sms_id:
             try:
+                # Normalize SMS ID for lookup
+                norm_id = str(req.sms_id or "").replace("INC-", "").strip()
                 # Use Worker API for autopilot insight
-                insight_res = await WorkerClient.get(f"/ai/insight/{req.sms_id}")
+                insight_res = await WorkerClient.get(f"/ai/insight/{norm_id}")
                 if "error" not in insight_res and insight_res.get("content"):
                     logger.info(f"[analyze-sms:{req_id}] Cache Hit for SMS_ID: {req.sms_id}")
                     # 저장된 내용을 즉시 반환
@@ -1009,7 +1255,12 @@ async def analyze_sms_stream(req: AnalyzeSmsRequest):
         yield f"data: {json.dumps({'status': 'working'}, ensure_ascii=False)}\n\n"
         
         try:
-            gen = await DifyClient.stream_chat_message(query=query, user="sguard-sms-analyze")
+            # Use the specific Dify API key for Dashboard/Analysis
+            gen = await DifyClient.stream_chat_message(
+                query=query, 
+                user="sguard-sms-analyze",
+                api_key=DIFY_API_KEY_DASHBOARD
+            )
             answer_chars = 0
             answer_parts = []
             done_sent = False
@@ -1055,9 +1306,10 @@ async def analyze_sms_stream(req: AnalyzeSmsRequest):
             if (req.sms_id or sender) and answer_chars > 0:
                 try:
                     # Save via Worker Proxy (using sms_id or a hashed sender+msg as fallback ID)
-                    save_id = req.sms_id or hashlib.md5(f"{sender}:{message}".encode()).hexdigest()[:16]
+                    raw_id = req.sms_id or hashlib.md5(f"{sender}:{message}".encode()).hexdigest()[:16]
+                    save_id = str(raw_id).replace("INC-", "").strip()
                     await WorkerClient.post("/ai/insight/save", {
-                        "incident_id": str(save_id),
+                        "incident_id": save_id,
                         "content": "".join(answer_parts),
                         "severity": "NORMAL",
                         "category": "분석"

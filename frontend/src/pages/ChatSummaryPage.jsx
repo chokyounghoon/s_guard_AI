@@ -15,7 +15,13 @@ import {
   Printer,
   History,
   BookMarked,
-  Database
+  Database,
+  Zap,
+  Send,
+  User,
+  X,
+  ChevronRight,
+  CheckCircle
 } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import html2pdf from 'html2pdf.js';
@@ -27,14 +33,27 @@ export default function ChatSummaryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCopied, setIsCopied] = useState(false);
   const [error, setError] = useState(null);
+  const [modalStep, setModalStep] = useState(null); // 'selection' or null
+  const [selectedLines, setSelectedLines] = useState([]);
+  const [additionalNotes, setAdditionalNotes] = useState('');
   
   const abortControllerRef = useRef(null);
 
+  const reportingLines = [
+    { id: 'leader', role: '팀장', name: '김철수 팀장', desc: '직속 상급자' },
+    { id: 'director', role: '본부장', name: '이영희 본부장', desc: '부서 책임자' },
+    { id: 'exec', role: '상무', name: '박지성 상무', desc: '사업부 임원' },
+  ];
+
   const getApiUrl = (endpoint) => {
-    const apiBase = window.location.hostname === 'localhost' 
-      ? 'https://sguardai.khcho0421.workers.dev' 
-      : 'https://sguardai.khcho0421.workers.dev';
-    return `${apiBase}${endpoint}`;
+    // AI 분석/요약 엔드포인트(/ai/)는 로컬 FastAPI 백엔드로 라우팅
+    // 그 외 Worker 데이터 API는 Cloudflare Worker로 라우팅
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalDev && endpoint.startsWith('/ai/')) {
+      return `http://127.0.0.1:8000${endpoint}`;
+    }
+    const workerBase = 'https://sguardai.khcho0421.workers.dev';
+    return `${workerBase}${endpoint}`;
   };
 
   useEffect(() => {
@@ -79,7 +98,11 @@ export default function ChatSummaryPage() {
               try {
                 const data = JSON.parse(dataStr);
                 if (data.answer) {
-                  setSummary(prev => prev + data.answer);
+                  setSummary(prev => {
+                    const newText = prev + data.answer;
+                    // Clean up the specific Dify optimization message if it appears
+                    return newText.replace(/🚀 고속 분석 엔진\(Dify\) 최적화 통신을 시작합니다\.\.\.\s*/g, "");
+                  });
                 }
                 if (data.error) {
                   setError(data.error);
@@ -93,7 +116,7 @@ export default function ChatSummaryPage() {
       } catch (err) {
         if (err.name !== 'AbortError') {
           console.error('Summary fetch error:', err);
-          setError('요크 생성 중 오류가 발생했습니다.');
+          setError('요약 생성 중 오류가 발생했습니다.');
         }
       } finally {
         setIsLoading(false);
@@ -242,42 +265,6 @@ export default function ChatSummaryPage() {
     }
   };
 
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [registerSuccess, setRegisterSuccess] = useState(false);
-
-  const handleRegisterKnowledge = async () => {
-    if (!summary || isRegistering) return;
-    setIsRegistering(true);
-    
-    try {
-      const res = await fetch(getApiUrl('/ai/register-knowledge'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          incident_id: incidentId,
-          title: `[WAR-ROOM REPORT] ${incidentId}`,
-          content: summary,
-          category: '인시던트 요약',
-          tags: 'WarRoom,Summary,AI'
-        })
-      });
-      
-      if (res.ok) {
-        setRegisterSuccess(true);
-        alert('S-Guard 지식 베이스에 성공적으로 등록되었습니다.');
-        setTimeout(() => setRegisterSuccess(false), 3000);
-      } else {
-        const err = await res.json();
-        alert(`등록 실패: ${err.error || '알 수 없는 오류'}`);
-      }
-    } catch (err) {
-      console.error('Knowledge register error:', err);
-      alert('지식 등록 중 오류가 발생했습니다.');
-    } finally {
-      setIsRegistering(false);
-    }
-  };
-
   const handleCopy = () => {
     navigator.clipboard.writeText(summary);
     setIsCopied(true);
@@ -286,6 +273,48 @@ export default function ChatSummaryPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const [isGoverning, setIsGoverning] = useState(false);
+  const [govSuccess, setGovSuccess] = useState(false);
+
+  const handleGovernance = async () => {
+    if (!summary || isGoverning) return;
+    setIsGoverning(true);
+    
+    const fullContent = `${summary}\n\n### [그외 처리 사항]\n${additionalNotes || '없음'}`;
+
+    try {
+      const res = await fetch(getApiUrl('/ai/governance/approve'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incident_id: incidentId,
+          title: `[GOVERNANCE APPROVED] ${incidentId}`,
+          content: fullContent
+        })
+      });
+      
+      if (res.ok) {
+        setGovSuccess(true);
+        alert('거버넌스 최종 승인이 완료되었습니다. RAG 데이터베이스가 업데이트되었습니다.');
+        // Optionally navigate or refresh status
+      } else {
+        const err = await res.json();
+        alert(`거버넌스 승인 실패: ${err.error || '알 수 없는 오류'}`);
+      }
+    } catch (err) {
+      console.error('Governance error:', err);
+      alert('거버넌스 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsGoverning(false);
+    }
+  };
+
+  const toggleLine = (id) => {
+    setSelectedLines(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
   };
 
   return (
@@ -300,12 +329,40 @@ export default function ChatSummaryPage() {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div>
-            <h1 className="text-sm font-black tracking-widest uppercase text-blue-400">WAR-ROOM SUMMARY</h1>
+            <h1 className="text-sm font-black tracking-widest uppercase text-blue-400">WAR-ROOM TIMELINE REPORT</h1>
             <p className="text-[10px] text-slate-500 font-mono">{incidentId}</p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
+          <button 
+            onClick={handleGovernance}
+            disabled={isGoverning || isLoading || !summary}
+            className={`hidden md:flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all shadow-lg active:scale-95 border ${
+              govSuccess 
+                ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20' 
+                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-white/10 shadow-indigo-500/20'
+            } disabled:opacity-50`}
+          >
+            {isGoverning ? (
+              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : govSuccess ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : (
+              <Shield className="w-3.5 h-3.5" />
+            )}
+            <span>{isGoverning ? 'Approving...' : govSuccess ? 'Approved' : 'Governance'}</span>
+          </button>
+
+          {/* Team Leader Transmission Button */}
+          <button 
+            onClick={() => setModalStep('selection')}
+            className="flex items-center space-x-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-xs font-black transition-all shadow-lg shadow-purple-500/20 active:scale-95 border border-white/10"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>타임라인 전송</span>
+          </button>
+
           <button 
             onClick={handleCopy}
             className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold transition-all active:scale-95"
@@ -315,24 +372,24 @@ export default function ChatSummaryPage() {
           </button>
           
           <button 
-            onClick={handleRegisterKnowledge}
-            disabled={isRegistering || isLoading || !summary}
+            onClick={handleGovernance}
+            disabled={isGoverning || isLoading || !summary}
             className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all border active:scale-95 shadow-xl ${
-              registerSuccess 
+              govSuccess 
                 ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20' 
                 : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 border-indigo-400/30 text-white shadow-indigo-500/20 hover:scale-105 active:scale-95'
             } disabled:opacity-50 group origin-right`}
           >
-            {isRegistering ? (
+            {isGoverning ? (
               <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : registerSuccess ? (
+            ) : govSuccess ? (
               <CheckCircle2 className="w-4 h-4" />
             ) : (
               <Shield className="w-4 h-4 text-indigo-200 group-hover:rotate-12 transition-transform" />
             )}
             <div className="flex flex-col items-start leading-none space-y-0.5">
               <span className="text-[10px] opacity-70 font-mono tracking-widest uppercase">Governance</span>
-              <span>{isRegistering ? 'Approving Knowledge...' : registerSuccess ? 'RAG Updated' : '최종 승인 및 RAG 업데이트'}</span>
+              <span>{isGoverning ? 'Approving Knowledge...' : govSuccess ? 'RAG Updated' : '최종 승인 및 RAG 업데이트'}</span>
             </div>
           </button>
 
@@ -368,20 +425,20 @@ export default function ChatSummaryPage() {
       {/* Main Content */}
       <main className="pt-24 px-6 max-w-4xl mx-auto">
         {/* Report Cover Style Component */}
-        <div id="report-content" className="bg-[#1a1f2e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl mb-8 print:shadow-none print:border-slate-200">
+        <div id="report-content" className="bg-[#1a1f2e] border border-white/10 rounded-3xl overflow-visible shadow-2xl mb-8 print:shadow-none print:border-slate-200">
           {/* Top accent bar */}
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
           
           <div className="p-8 md:p-12">
             <div className="flex justify-between items-start mb-10">
               <div className="space-y-4">
-                <div className="bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full inline-flex items-center space-x-2">
+                <div className="bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full inline-flex items-center space-x-2 font-mono">
                   <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tighter">AI-Generated Summary</span>
+                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-tighter">AI-Generated Timeline</span>
                 </div>
-                <h2 className="text-3xl md:text-4xl font-black leading-tight">
-                  장애 대응 협업 <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">WAR-ROOM 요약 레포트</span>
+                <h2 className="text-3xl md:text-4xl font-black leading-tight uppercase tracking-tight">
+                  장애 대응 <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Collaborative Timeline</span>
                 </h2>
               </div>
               <div className="text-right hidden sm:block">
@@ -392,10 +449,10 @@ export default function ChatSummaryPage() {
             </div>
 
             {/* Metadata Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 p-6 bg-black/20 rounded-2xl border border-white/5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 p-6 bg-black/20 rounded-2xl border border-white/5 font-mono">
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Incident ID</div>
-                <div className="text-sm font-mono text-blue-300">{incidentId}</div>
+                <div className="text-sm font-bold text-blue-300">{incidentId}</div>
               </div>
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Summary Date</div>
@@ -412,7 +469,7 @@ export default function ChatSummaryPage() {
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Confidentiality</div>
                 <div className="flex items-center space-x-1.5">
                   <Shield className="w-3.5 h-3.5 text-amber-500/70" />
-                  <span className="text-sm text-amber-500/70 font-bold">Restricted</span>
+                  <span className="text-sm text-amber-500/70 font-bold uppercase">Restricted</span>
                 </div>
               </div>
             </div>
@@ -423,7 +480,7 @@ export default function ChatSummaryPage() {
                 <div className="flex flex-col items-center justify-center py-20 space-y-4">
                   <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
                   <p className="text-sm text-slate-400 animate-pulse font-mono tracking-wide">
-                    AI가 채팅 내역을 분석하여 요약 리포트를 생성하고 있습니다...
+                    채팅 내역을 기반으로 장애 대응 타임라인 리포트를 생성하고 있습니다...
                   </p>
                 </div>
               ) : error ? (
@@ -446,6 +503,31 @@ export default function ChatSummaryPage() {
                 </div>
               )}
             </div>
+
+            {/* Additional Notes Section */}
+            {!isLoading && summary && (
+              <div className="mt-12 pt-8 border-t border-white/10 animate-in slide-in-from-bottom-4 duration-700 delay-300 fill-mode-both print:border-slate-200">
+                <div className="flex items-center space-x-2 mb-4 text-blue-400 print:text-blue-600">
+                  <Zap className="w-4 h-4" />
+                  <h3 className="text-sm font-black uppercase tracking-widest">그외 처리 사항</h3>
+                </div>
+                <div className="relative group">
+                  <textarea
+                    className="w-full bg-black/20 border border-white/5 rounded-2xl p-6 text-sm text-slate-300 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all min-h-[160px] resize-none placeholder:text-slate-600 print:bg-white print:border-slate-200 print:text-black print:placeholder:text-slate-300"
+                    placeholder="여기에 추가적인 조치 사항이나 특이 사항을 입력하세요..."
+                    value={additionalNotes}
+                    onChange={(e) => setAdditionalNotes(e.target.value)}
+                  />
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <BookMarked className="w-4 h-4 text-blue-500/50" />
+                  </div>
+                </div>
+                <p className="mt-2 text-[10px] text-slate-500 font-mono uppercase tracking-tight flex items-center print:hidden">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  이 영역의 내용은 PDF 리포트와 메일 전송 시 함께 포함됩니다.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -463,6 +545,94 @@ export default function ChatSummaryPage() {
           <p>© 2026 S-GUARD AI. All Rights Reserved.</p>
         </div>
       </main>
+
+      {/* Recipient Selection Modal */}
+      {modalStep === 'selection' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-[#06080c]/95 backdrop-blur-md" onClick={() => setModalStep(null)} />
+          
+          <div className="bg-[#0f1219] w-full max-w-lg rounded-[2.5rem] border border-white/10 shadow-[0_0_50px_-12px_rgba(37,99,235,0.3)] relative z-10 overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-600/20 p-2 rounded-xl border border-blue-500/30">
+                  <FileText className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-white">보고 대상 선정</h3>
+                  <p className="text-[10px] text-slate-500 font-mono">STEP 1: 수신자 확인</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setModalStep(null)}
+                className="p-2 rounded-full hover:bg-white/5 transition-colors group"
+              >
+                <X className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-4">
+              <p className="text-sm text-slate-400 mb-4">분석 보고서를 전송할 상급자를 선택해주세요.</p>
+              {reportingLines.map((line) => (
+                <div 
+                  key={line.id}
+                  onClick={() => toggleLine(line.id)}
+                  className={`flex items-center justify-between p-5 rounded-3xl border transition-all cursor-pointer ${
+                    selectedLines.includes(line.id) 
+                      ? 'bg-blue-600/10 border-blue-500 shadow-xl shadow-blue-900/20' 
+                      : 'bg-[#161b2a]/50 border-white/5 hover:border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                       selectedLines.includes(line.id) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      <User className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-200 text-sm">{line.role} {line.name}</p>
+                      <p className="text-[11px] text-slate-500 italic">{line.desc}</p>
+                    </div>
+                  </div>
+                  <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
+                    selectedLines.includes(line.id) ? 'bg-blue-600 border-blue-400 scale-110' : 'border-slate-700'
+                  }`}>
+                    {selectedLines.includes(line.id) && <Check className="w-4 h-4 text-white" />}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-8 border-t border-white/5 bg-[#0a0d14] flex space-x-4">
+              <button 
+                onClick={() => setModalStep(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 h-16 rounded-[1.25rem] font-bold text-slate-300 transition-all border border-white/10 active:scale-95 text-sm"
+              >
+                닫기
+              </button>
+              <button 
+                onClick={() => {
+                  if (selectedLines.length > 0) {
+                    alert(`${selectedLines.length}명의 상급자에게 보고서가 전송되었습니다.\n전송완료 처리되었습니다.`);
+                    setModalStep(null);
+                  }
+                }}
+                disabled={selectedLines.length === 0}
+                className={`flex-[1.8] h-16 rounded-[1.25rem] font-bold text-white transition-all flex items-center justify-center space-x-3 active:scale-95 text-sm shadow-lg ${
+                  selectedLines.length === 0
+                    ? 'bg-slate-800 opacity-50 cursor-not-allowed text-slate-500' 
+                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-blue-600/20'
+                }`}
+              >
+                <span>보고서 최종 전송</span>
+                <CheckCircle className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Action Button for returning */}
       <button 

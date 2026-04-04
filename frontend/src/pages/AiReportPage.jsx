@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -11,19 +11,19 @@ import {
 const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
 const mdComponents = {
-  h1: ({children}) => <h1 className="text-lg font-black text-white mt-4 mb-2 border-b border-white/10 pb-1">{children}</h1>,
-  h2: ({children}) => <h2 className="text-sm font-bold text-blue-300 mt-4 mb-2 uppercase tracking-wide">{children}</h2>,
-  h3: ({children}) => <h3 className="text-sm font-bold text-slate-200 mt-3 mb-1">{children}</h3>,
-  p:  ({children}) => <p className="text-[13px] text-slate-300 leading-relaxed mb-2">{children}</p>,
+  h1: ({children}) => <h1 className="text-lg font-black text-white mt-3 mb-1.5 border-b border-white/10 pb-1">{children}</h1>,
+  h2: ({children}) => <h2 className="text-sm font-bold text-blue-300 mt-3 mb-1 uppercase tracking-wide">{children}</h2>,
+  h3: ({children}) => <h3 className="text-sm font-bold text-slate-200 mt-2 mb-0.5">{children}</h3>,
+  p:  ({children}) => <div className="text-[13px] text-slate-300 leading-normal mb-1 break-all overflow-wrap-anywhere">{children}</div>,
   strong: ({children}) => <strong className="text-white font-bold">{children}</strong>,
   em: ({children}) => <em className="text-slate-400 italic">{children}</em>,
   blockquote: ({children}) => <blockquote className="border-l-2 border-blue-500/50 pl-3 my-2 text-slate-400 italic text-[12px]">{children}</blockquote>,
   code: ({inline, children}) => inline
     ? <code className="bg-slate-800 text-emerald-400 text-[11px] px-1.5 py-0.5 rounded font-mono">{children}</code>
     : <pre className="bg-slate-900 border border-white/5 rounded-xl p-3 my-2 overflow-x-auto text-[11px] text-emerald-300 font-mono whitespace-pre-wrap">{children}</pre>,
-  ul: ({children}) => <ul className="list-disc list-inside space-y-1 my-2 text-[13px] text-slate-300">{children}</ul>,
-  ol: ({children}) => <ol className="list-decimal list-inside space-y-1 my-2 text-[13px] text-slate-300">{children}</ol>,
-  li: ({children}) => <li className="leading-relaxed">{children}</li>,
+  ul: ({children}) => <ul className="list-outside ml-5 space-y-0.5 my-1 text-[13px] text-slate-300">{children}</ul>,
+  ol: ({children}) => <ol className="list-decimal list-outside ml-5 space-y-0.5 my-1 text-[13px] text-slate-300">{children}</ol>,
+  li: ({children}) => <li className="leading-normal mb-0.5 break-all overflow-wrap-anywhere">{children}</li>,
   hr: () => <hr className="border-white/10 my-3" />,
   table: ({children}) => <div className="overflow-x-auto my-3"><table className="w-full text-[12px] border-collapse">{children}</table></div>,
   thead: ({children}) => <thead>{children}</thead>,
@@ -35,7 +35,7 @@ const mdComponents = {
 function MarkdownBlock({ text }) {
   if (!text) return <span className="text-slate-500">-</span>;
   return (
-    <div className="text-[13px]">
+    <div className="text-[13px] break-words whitespace-pre-wrap leading-normal overflow-wrap-anywhere">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{text}</ReactMarkdown>
     </div>
   );
@@ -58,7 +58,11 @@ const agentColors = {
 export default function AiReportPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const incidentId = location.state?.incidentId;
+  const params = useParams();
+  
+  // Robust ID retrieval: Params first (persistence), State secondary (initial navigation)
+  const rawId = params.incidentId || location.state?.incidentId;
+  const incidentId = rawId ? String(rawId).replace("INC-", "").trim() : null;
 
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +75,9 @@ export default function AiReportPage() {
   const [aiGenText, setAiGenText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const genAbortRef = useRef(null);
+  
+  // Incident Summary (Timeline) from DB
+  const [chatSummary, setChatSummary] = useState('');
   
   const generateAiReport = async () => {
     if (!incidentId) return;
@@ -93,35 +100,42 @@ export default function AiReportPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
+
+      const processBlock = (block) => {
+        if (!block) return;
+        const lines = block.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            const d = line.slice(5).trim();
+            if (d === '[DONE]') { setIsGenerating(false); return; }
+            try {
+              const obj = JSON.parse(d);
+              if (obj.error) {
+                setAiGenText(prev => prev + `\n\n⚠️ 서버 내부 오류 (스트림): ${obj.error}`);
+              } else if (obj.answer) {
+                setAiGenText(prev => prev + obj.answer);
+              }
+            } catch (e) {
+              console.warn('Parse error:', e, d);
+            }
+          }
+        }
+      };
+
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
+        buf += decoder.decode(value || new Uint8Array(), { stream: !done });
         
         let newlineIdx;
         while ((newlineIdx = buf.indexOf('\n\n')) >= 0) {
           const block = buf.slice(0, newlineIdx).trim();
           buf = buf.slice(newlineIdx + 2);
-          
-          if (!block) continue;
-          
-          const lines = block.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data:')) {
-              const d = line.slice(5).trim();
-              if (d === '[DONE]') { setIsGenerating(false); return; }
-              try {
-                const obj = JSON.parse(d);
-                if (obj.error) {
-                  setAiGenText(prev => prev + `\n\n⚠️ 서버 내부 오류 (스트림): ${obj.error}`);
-                } else if (obj.answer) {
-                  setAiGenText(prev => prev + obj.answer);
-                }
-              } catch (e) {
-                setAiGenText(prev => prev + `\n\n[PARSE ERROR ON CHUNK]: ${d}\n[ERROR]: ${e.message}\n\n`);
-              }
-            }
-          }
+          processBlock(block);
+        }
+
+        if (done) {
+          if (buf.trim()) processBlock(buf.trim());
+          break;
         }
       }
     } catch (e) {
@@ -160,7 +174,29 @@ export default function AiReportPage() {
       }
     };
     fetchReport();
+
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/db/summary/${incidentId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.summary) {
+            setChatSummary(data.summary);
+          }
+        }
+      } catch (e) {
+        console.warn('Summary fetch failed:', e);
+      }
+    };
+    fetchSummary();
   }, [incidentId]);
+
+  // Auto-generate AI report when tab is active
+  useEffect(() => {
+    if (activeTab === 'ai_report' && !aiGenText && !isGenerating && report) {
+      generateAiReport();
+    }
+  }, [activeTab, aiGenText, isGenerating, report]);
 
   const toggleLine = (id) => {
     setSelectedLines(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -187,7 +223,7 @@ export default function AiReportPage() {
     { id: 'summary',   label: 'AI 분석 요약' },
     { id: '6w1h',      label: '6W1H 분석' },
     { id: 'agents',    label: 'Agent 로그' },
-    { id: 'chat',      label: '채팅 기록' },
+    { id: 'chat',      label: 'War-Room 요약' },
     { id: 'files',     label: '첨부파일' },
     { id: 'ai_report', label: '✨ AI 종합보고서' },
   ];
@@ -198,30 +234,32 @@ export default function AiReportPage() {
   return (
     <div className="min-h-screen bg-[#0a0d14] text-white font-sans flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 sticky top-0 bg-[#0a0d14]/90 backdrop-blur-lg z-50 border-b border-white/5">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
-          <ArrowLeft className="w-5 h-5 text-slate-400" />
-        </button>
-        <div className="flex flex-col items-center flex-1 mx-3">
-          {report ? (
-            <>
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter ${sevClass}`}>
-                  {sev}
-                </span>
-                <span className="text-[11px] text-slate-500 font-mono">{incidentId?.slice(-10)}</span>
-              </div>
-              <h1 className="font-bold text-sm text-slate-200 truncate max-w-[220px] text-center">
-                {report.title}
-              </h1>
-            </>
-          ) : (
-            <span className="text-sm text-slate-400">장애 보고서</span>
-          )}
+      <header className="flex items-center justify-between px-4 py-2 sticky top-0 bg-[#0a0d14]/90 backdrop-blur-lg z-50 border-b border-white/5">
+        <div className="max-w-5xl mx-auto w-full flex items-center justify-between">
+          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+            <ArrowLeft className="w-5 h-5 text-slate-400" />
+          </button>
+          <div className="flex flex-col items-center flex-1 mx-3">
+            {report ? (
+              <>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter ${sevClass}`}>
+                    {sev}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-mono">{incidentId?.slice(-10)}</span>
+                </div>
+                <h1 className="font-bold text-sm text-slate-200 text-center px-4 leading-snug">
+                  {report.title}
+                </h1>
+              </>
+            ) : (
+              <span className="text-sm text-slate-400">장애 보고서</span>
+            )}
+          </div>
+          <button className="p-2 rounded-full hover:bg-white/5 transition-colors">
+            <Share2 className="w-5 h-5 text-slate-400" />
+          </button>
         </div>
-        <button className="p-2 rounded-full hover:bg-white/5 transition-colors">
-          <Share2 className="w-5 h-5 text-slate-400" />
-        </button>
       </header>
 
       {/* Stats Bar */}
@@ -247,24 +285,26 @@ export default function AiReportPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto border-b border-white/5 bg-[#0a0d14] sticky top-[57px] z-40">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-2.5 text-xs font-bold whitespace-nowrap transition-all border-b-2 ${
-              activeTab === t.id
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex overflow-x-auto border-b border-white/5 bg-[#0a0d14] sticky top-[49px] z-40 justify-center">
+        <div className="flex max-w-5xl w-full">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-5 py-2 text-[13px] font-bold whitespace-nowrap transition-all border-b-2 ${
+                activeTab === t.id
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
-      <main className="flex-1 px-4 py-4 mb-28 overflow-y-auto">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 mb-24 overflow-y-auto">
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
             <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
@@ -272,16 +312,16 @@ export default function AiReportPage() {
           </div>
         )}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">{error}</div>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm mx-auto max-w-2xl">{error}</div>
         )}
         {report && !loading && (
           <>
             {/* ── AI 분석 요약 ── */}
             {activeTab === 'summary' && (
-              <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="space-y-3 animate-in fade-in duration-300">
                 {/* S-Autopilot Insight */}
                 {report.autopilot_insight && (
-                  <section className="bg-[#0f1421] rounded-2xl border border-blue-500/10 overflow-hidden">
+                  <section className="bg-[#0f1421] rounded-2xl border border-blue-500/10 overflow-visible">
                     <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5 bg-blue-500/5">
                       <Sparkles className="w-4 h-4 text-blue-400" />
                       <span className="text-xs font-bold text-blue-400">S-Autopilot Insight</span>
@@ -293,7 +333,7 @@ export default function AiReportPage() {
                 )}
                 {/* Leader Summary */}
                 {report.leader_summary && (
-                  <section className="bg-[#0f1421] rounded-2xl border border-amber-500/10 overflow-hidden">
+                  <section className="bg-[#0f1421] rounded-2xl border border-amber-500/10 overflow-visible">
                     <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5 bg-amber-500/5">
                       <Bot className="w-4 h-4 text-amber-400" />
                       <span className="text-xs font-bold text-amber-400">Leader Agent 종합 요약</span>
@@ -303,12 +343,26 @@ export default function AiReportPage() {
                     </div>
                   </section>
                 )}
-                {!report.autopilot_insight && !report.leader_summary && (
+
+                {/* ── [NEW] War-Room Response Timeline (moved to main summary tab) ── */}
+                {chatSummary && (
+                  <section className="bg-blue-600/5 rounded-2xl border border-blue-500/20 overflow-visible shadow-lg shadow-blue-500/5">
+                    <div className="px-4 py-2.5 flex items-center gap-2 border-b border-blue-500/10 bg-blue-500/10">
+                      <Sparkles className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
+                    </div>
+                    <div className="p-5 overflow-visible">
+                      <MarkdownBlock text={chatSummary} />
+                    </div>
+                  </section>
+                )}
+
+                {!report.autopilot_insight && !report.leader_summary && !chatSummary && (
                   <div className="text-center py-10 text-slate-500 text-sm">분석 데이터가 없습니다.</div>
                 )}
 
                 {/* Memo */}
-                <section className="bg-[#0f1421] rounded-2xl border border-white/5 overflow-hidden">
+                <section className="bg-[#0f1421] rounded-2xl border border-white/5 overflow-visible">
                   <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5">
                     <MessageSquare className="w-4 h-4 text-slate-400" />
                     <span className="text-xs font-bold text-slate-400">처리자 메모 (지식DB 학습 데이터)</span>
@@ -327,7 +381,7 @@ export default function AiReportPage() {
 
             {/* ── 6W1H ── */}
             {activeTab === '6w1h' && (
-              <div className="space-y-3 animate-in fade-in duration-300">
+              <div className="space-y-2.5 animate-in fade-in duration-300">
                 {[
                   { label: 'WHO (담당자)', value: report.who, color: 'text-blue-400' },
                   { label: 'WHEN (발생 일시)', value: report.when, color: 'text-purple-400' },
@@ -336,7 +390,7 @@ export default function AiReportPage() {
                   { label: 'WHY (원인 분석)', value: report.why, color: 'text-red-400', wide: true },
                   { label: 'HOW (조치 방법)', value: report.how, color: 'text-emerald-400', wide: true },
                 ].map(item => (
-                  <div key={item.label} className="bg-[#0f1421] rounded-xl p-4 border border-white/5">
+                  <div key={item.label} className="bg-[#0f1421] rounded-xl p-3.5 border border-white/5">
                     <span className={`text-[10px] font-black uppercase tracking-wider ${item.color}`}>{item.label}</span>
                     <div className="mt-1.5">
                       <MarkdownBlock text={item.value} />
@@ -348,7 +402,7 @@ export default function AiReportPage() {
 
             {/* ── Agent 로그 ── */}
             {activeTab === 'agents' && (
-              <div className="space-y-3 animate-in fade-in duration-300">
+              <div className="space-y-2.5 animate-in fade-in duration-300">
                 {(report.agent_logs || []).length === 0 && (
                   <div className="text-center py-10 text-slate-500 text-sm">에이전트 로그가 없습니다.</div>
                 )}
@@ -356,7 +410,7 @@ export default function AiReportPage() {
                   const cfg = agentColors[log.agent_role] || agentColors.Leader;
                   const Icon = cfg.icon;
                   return (
-                    <div key={i} className={`rounded-xl border p-4 ${cfg.bg} ${cfg.border}`}>
+                    <div key={i} className={`rounded-xl border p-3.5 ${cfg.bg} ${cfg.border}`}>
                       <div className="flex items-center gap-2 mb-2">
                         <Icon className={`w-4 h-4 ${cfg.text}`} />
                         <span className={`text-xs font-bold ${cfg.text}`}>{log.agent_role} Agent</span>
@@ -369,28 +423,18 @@ export default function AiReportPage() {
               </div>
             )}
 
-            {/* ── 채팅 기록 ── */}
+            {/* ── War-Room 채팅 전체 기록 (필요시 상세 조회용) ── */}
             {activeTab === 'chat' && (
-              <div className="space-y-2 animate-in fade-in duration-300">
-                {(report.chat_logs || []).length === 0 && (
-                  <div className="text-center py-10 text-slate-500 text-sm">채팅 기록이 없습니다.</div>
-                )}
-                {(report.chat_logs || []).map((msg, i) => (
-                  <div key={i} className={`flex gap-2.5 ${msg.type === 'me' ? 'flex-row-reverse' : ''}`}>
-                    <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center text-[10px] font-bold shrink-0">
-                      {(msg.sender || '?').slice(0, 2)}
-                    </div>
-                    <div className={`max-w-[75%] ${msg.type === 'me' ? 'items-end' : 'items-start'} flex flex-col`}>
-                      <span className="text-[10px] text-slate-500 mb-0.5">{msg.sender} · {msg.timestamp?.slice(11, 16)}</span>
-                      <div className={`px-3 py-2 rounded-xl text-xs leading-relaxed ${
-                        msg.type === 'system' ? 'bg-slate-800/50 text-slate-400 italic' :
-                        msg.type === 'me' ? 'bg-blue-600 text-white' : 'bg-[#1a2035] text-slate-200'
-                      }`}>
-                        {msg.text}
-                      </div>
-                    </div>
+              <div className="space-y-6 animate-in fade-in duration-300 overflow-visible">
+                <section className="bg-[#0f1421] rounded-2xl border border-white/5 overflow-visible">
+                  <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5 bg-white/5">
+                    <MessageSquare className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">War-Room Chat Context</span>
                   </div>
-                ))}
+                  <div className="p-5 text-center text-slate-500 text-sm italic">
+                    상세 채팅 로그 분석 데이터는 [AI 분석 요약] 탭 상단의 타임라인을 참고해 주시기 바랍니다.
+                  </div>
+                </section>
               </div>
             )}
 
@@ -406,7 +450,7 @@ export default function AiReportPage() {
                     href={`${API_BASE_URL}${att.url}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 bg-[#0f1421] rounded-xl p-4 border border-white/5 hover:border-blue-500/30 transition-colors"
+                    className="flex items-center gap-3 bg-[#0f1421] rounded-xl p-3 border border-white/5 hover:border-blue-500/30 transition-colors"
                   >
                     <div className="w-9 h-9 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center shrink-0">
                       <Paperclip className="w-4 h-4 text-blue-400" />
@@ -423,24 +467,13 @@ export default function AiReportPage() {
 
             {/* ── AI 종합보고서 ── */}
             {activeTab === 'ai_report' && (
-              <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="space-y-3 animate-in fade-in duration-300 overflow-visible">
                 {!aiGenText && !isGenerating && (
-                  <div className="flex flex-col items-center justify-center py-16 gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center">
-                      <Sparkles className="w-8 h-8 text-blue-400" />
+                  <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
+                    <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center animate-pulse">
+                      <Sparkles className="w-6 h-6 text-blue-400" />
                     </div>
-                    <div className="text-center">
-                      <p className="text-slate-300 font-semibold">AI 종합 보고서 생성</p>
-                      <p className="text-slate-500 text-sm mt-1">채팅 기록, 에이전트 분석, AI Insight를<br/>모두 참조하여 보고서를 생성합니다.</p>
-                    </div>
-                    <button
-                      onClick={generateAiReport}
-                      disabled={!report}
-                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-sm font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-900/30 active:scale-95"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      보고서 생성 시작
-                    </button>
+                    <p className="text-sm font-medium">데이터 분석을 바탕으로 종합 보고서를 생성합니다...</p>
                   </div>
                 )}
                 {isGenerating && !aiGenText && (
@@ -450,24 +483,30 @@ export default function AiReportPage() {
                   </div>
                 )}
                 {aiGenText && (
-                  <section className="bg-[#0f1421] rounded-2xl border border-blue-500/10 overflow-hidden">
+                  <section className="bg-[#0f1421]/60 rounded-2xl border border-blue-500/10 overflow-visible shadow-2xl shadow-blue-500/5">
                     <div className="px-4 py-2.5 flex items-center justify-between border-b border-white/5 bg-blue-500/5">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-blue-400" />
-                        <span className="text-xs font-bold text-blue-400">AI 종합 장애 보고서 (Dify 생성)</span>
-                        {isGenerating && <Loader className="w-3 h-3 text-blue-400 animate-spin ml-1" />}
+                        <span className="text-xs font-bold text-blue-400">AI 종합 장애 보고서 (Dify 전문가 분석)</span>
+                        {isGenerating && (
+                          <div className="flex items-center gap-1.5 ml-3 px-2 py-0.5 bg-blue-500/20 rounded-full border border-blue-500/30">
+                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-ping" />
+                            <span className="text-[10px] text-blue-300 font-medium">분석 진행 중...</span>
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={generateAiReport}
                         disabled={isGenerating}
-                        className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors disabled:opacity-40"
+                        className="text-[10px] text-slate-500 hover:text-blue-400 flex items-center gap-1 transition-colors disabled:opacity-30"
                       >
-                        <RefreshCw className="w-3 h-3" /> 재생성
+                        <RefreshCw className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} />
+                        재생성
                       </button>
                     </div>
-                    <div className="p-4">
+                    <div className="p-5 md:p-6 overflow-visible min-h-[400px]">
                       <MarkdownBlock text={aiGenText} />
-                      {isGenerating && <span className="inline-block w-1.5 h-4 bg-blue-400 animate-pulse align-middle ml-0.5" />}
+                      {isGenerating && <span className="inline-block w-1.5 h-4 bg-blue-400 animate-pulse align-middle ml-2" />}
                     </div>
                   </section>
                 )}
@@ -481,7 +520,7 @@ export default function AiReportPage() {
       {modalStep && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => modalStep !== 'generating' && setModalStep(null)} />
-          <div className="relative z-10 w-full max-w-lg bg-[#0f1219] rounded-t-3xl border border-white/10 overflow-hidden max-h-[80vh] flex flex-col">
+          <div className="relative z-10 w-full max-w-2xl bg-[#0f1219] rounded-t-3xl border border-white/10 overflow-visible max-h-[90vh] flex flex-col">
             <div className="p-5 border-b border-white/5 flex items-center justify-between">
               <h3 className="font-bold text-white">
                 {modalStep === 'preview' ? '📋 보고서 최종 확인' : '📤 보고 대상 선정'}
@@ -500,7 +539,7 @@ export default function AiReportPage() {
                   ].map(({ k, v }) => (
                     <div key={k} className="bg-[#161b24] rounded-xl p-3 border border-white/5">
                       <span className="text-[10px] text-slate-500 uppercase font-bold">{k}</span>
-                      <p className="text-slate-300 mt-0.5 text-xs truncate">{v || '-'}</p>
+                      <p className="text-slate-300 mt-0.5 text-xs break-words">{v || '-'}</p>
                     </div>
                   ))}
                   {memo && <div className="bg-blue-500/10 rounded-xl p-3 border border-blue-500/20 text-blue-200 text-xs italic">"{memo}"</div>}

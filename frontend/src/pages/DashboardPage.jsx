@@ -181,9 +181,8 @@ export default function DashboardPage() {
     // to match aichat_history.
     const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
     
-    const baseSmsMessage = currentSms.message.length > 30 ? currentSms.message.substring(0, 30) + '...' : currentSms.message;
     const formattedUiId = `INC-${incidentId}`; // Display prefix
-    const smsTitle = `${formattedUiId} | ${baseSmsMessage}`;
+    const smsTitle = `${formattedUiId} | SMS 장애 감지`; // Do not include raw SMS message in title
     
     // Check if War-Room already exists
     const existingRoom = warRooms.find(r => r.id === incidentId);
@@ -248,7 +247,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           inc_id: String(incidentId).replace('INC-', ''),
           title: smsTitle,
-          description: diagnosisText || currentSms.message,
+          description: diagnosisText || 'SMS 장애 상세 분석 대기 중',
           severity: 'CRITICAL',
           incident_type: 'SMS',
           source_sms_id: String(currentSms.inc_id).replace('INC-', '')
@@ -274,18 +273,6 @@ export default function DashboardPage() {
 
       // ONLY insert system intro messages if the room was NEWLY created
       if (openData.status !== 'exists') {
-        await fetch(`${apiBase}/warroom/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            incident_id: incidentId,
-            sender: '시스템',
-            role: 'System',
-            type: 'system',
-            text: `[장애발생] ${currentSms.sender}로부터 SMS 수신: ${currentSms.message}`
-          })
-        });
-        
         await fetch(`${apiBase}/warroom/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
