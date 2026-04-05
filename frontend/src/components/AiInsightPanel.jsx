@@ -2,15 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'https://sguardai.khcho0421.workers.dev'
-  : 'https://sguardai.khcho0421.workers.dev';
+const getApiUrl = (endpoint) => {
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocalDev && (endpoint.startsWith('/ai/') || endpoint.startsWith('/db/'))) {
+    return `http://127.0.0.1:8000${endpoint}`;
+  }
+  return 'https://sguardai.khcho0421.workers.dev' + endpoint;
+};
+
+const API_BASE_URL = getApiUrl('');
 
 export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms }) {
 
   const [insightData, setInsightData] = useState({
     status: 'active',
-    current_log: { type: 'info', text: 'AI 엔진 연결 중...' }
+    current_log: { type: 'info', text: 'AI 엔진 연결 중...' },
+    prediction_counts: { critical: 0, server: 0, security: 0, report: 0 }
   });
   const [displayedText, setDisplayedText] = useState('');
   const [isAnalyzingSms, setIsAnalyzingSms] = useState(false);

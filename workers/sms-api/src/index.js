@@ -1096,6 +1096,49 @@ ${detailedInfo}`
 
   ;(async () => {
     try {
+      // 1. Check D1 cache first
+      if (sms_id) {
+        const cached = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
+        if (cached && cached.content) {
+          console.log(`[Cache Hit] Serving cached insight for ${sms_id}`);
+          const chars = Array.from(cached.content);
+          const chunkSize = 50;
+          for (let i = 0; i < chars.length; i += chunkSize) {
+            const chunk = chars.slice(i, i + chunkSize).join('');
+            await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
+          }
+          await writer.write(encode('data: [DONE]\n\n'));
+          return;
+        }
+      }
+
+      // 2. Concurrency Lock check (KV)
+      const lockKey = `lock:analyze:${sms_id}`;
+      const kv = c.env.SMS_STORAGE;
+      if (kv && sms_id) {
+        let lock = await kv.get(lockKey);
+        if (lock === 'processing') {
+          console.log(`[Concurrency] Another user is analyzing ${sms_id}. Waiting...`);
+          // Wait and Poll D1 for the result saved by the other process
+          for (let attempt = 0; attempt < 30; attempt++) {
+            await new Promise(r => setTimeout(r, 1000));
+            const polled = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
+            if (polled && polled.content) {
+              const chars = Array.from(polled.content);
+              for (let i = 0; i < chars.length; i += 50) {
+                await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+              }
+              await writer.write(encode('data: [DONE]\n\n'));
+              return;
+            }
+          }
+          throw new Error("분석 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
+        }
+        // Acquire Lock
+        await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+      }
+
+      // 3. Call Dify (Original logic)
       const difyRes = await fetch(`${api_base}/chat-messages`, {
         method: 'POST',
         headers: { 
@@ -1116,6 +1159,7 @@ ${detailedInfo}`
       const reader = difyRes.body.getReader()
       const decoder = new TextDecoder()
       let lineBuffer = ""
+      let fullContent = ""
       
       while (true) {
         const { done, value } = await reader.read()
@@ -1135,7 +1179,7 @@ ${detailedInfo}`
           try {
             const data = JSON.parse(dataStr)
             if (data.event === 'message' || data.event === 'agent_message') {
-              // Send ONLY THE DELTA (data.answer)
+              fullContent += data.answer;
               await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
             }
           } catch (e) {
@@ -1143,6 +1187,24 @@ ${detailedInfo}`
           }
         }
       }
+      
+      // Auto-save insight to DB if successful (First time) - Backend side saving
+      if (fullContent && sms_id) {
+        const now = getKst();
+        // Determine severity/category simple logic
+        const severity = fullContent.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
+        await db.prepare(`
+          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt)
+          VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
+          ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt
+        `).bind(String(sms_id), fullContent, severity, now, now).run();
+      }
+
+      // 4. Release Lock
+      if (kv && sms_id) {
+        await kv.delete(lockKey);
+      }
+
       await writer.write(encode('data: [DONE]\n\n'))
     } catch (e) {
       console.error('Analyze-SMS error:', e)
@@ -1346,18 +1408,62 @@ ${insightTxt.includes('재발')
 
 
 // AI Agent Discussion (SSE) - called when user clicks an SMS
+// AI Agent Discussion (SSE) - called when user clicks an SMS
 app.get('/ai/agent-discussion/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
+  const kv = c.env.SMS_STORAGE;
   const api_key = c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
-  const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
-  if (!sms) {
-    return c.json({ error: "SMS not found" }, 404)
-  }
+  const { readable, writable } = new TransformStream()
+  const writer = writable.getWriter()
+  const encode = (s) => new TextEncoder().encode(s)
 
-  const prompt = `다음 SMS 장애 메시지와 상세 정보를 분석하여 담당 에이전트별로 대응 방안을 알려주세요:
+  ;(async () => {
+    try {
+      // 1. Check D1 Cache first
+      const { results: cached } = await db.prepare("SELECT agent_role, content FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all();
+      if (cached && cached.length > 0) {
+        console.log(`[Cache Hit] Serving cached discussion for ${id}`);
+        // Format cached messages to match the expected stream format
+        const fullCachedContent = cached.map(m => `[${m.agent_role}]: ${m.content}`).join('\n\n');
+        const chars = Array.from(fullCachedContent);
+        for (let i = 0; i < chars.length; i += 50) {
+          await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+        }
+        await writer.write(encode('data: [DONE]\n\n'));
+        return;
+      }
+
+      // 2. Concurrency Lock check (KV)
+      const lockKey = `lock:agent-discussion:${id}`;
+      if (kv) {
+        let lock = await kv.get(lockKey);
+        if (lock === 'processing') {
+          console.log(`[Concurrency] Another user is generating discussion for ${id}. Waiting...`);
+          for (let attempt = 0; attempt < 30; attempt++) {
+            await new Promise(r => setTimeout(r, 1000));
+            const polled = await db.prepare("SELECT agent_role, content FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all();
+            if (polled.results && polled.results.length > 0) {
+              const fullContent = polled.results.map(m => `[${m.agent_role}]: ${m.content}`).join('\n\n');
+              const chars = Array.from(fullContent);
+              for (let i = 0; i < chars.length; i += 50) {
+                await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+              }
+              await writer.write(encode('data: [DONE]\n\n'));
+              return;
+            }
+          }
+          throw new Error("분석 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
+        }
+        await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+      }
+
+      const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
+      if (!sms) throw new Error("SMS not found");
+
+      const prompt = `다음 SMS 장애 메시지와 상세 정보를 분석하여 담당 에이전트별로 대응 방안을 알려주세요:
 
 발신자: ${sms.sender}
 메시지: ${sms.message}
@@ -1378,13 +1484,6 @@ app.get('/ai/agent-discussion/:id', async (c) => {
 [DevOps]: 서버/인프라 관점 분석
 [Leader]: 종합 의견 및 조치사항`
 
-  const { readable, writable } = new TransformStream()
-  const writer = writable.getWriter()
-  const encode = (s) => new TextEncoder().encode(s)
-
-  // Start Dify call in background
-  ;(async () => {
-    try {
       const difyRes = await fetch(`${api_base}/chat-messages`, {
         method: 'POST',
         headers: { 
@@ -1406,6 +1505,7 @@ app.get('/ai/agent-discussion/:id', async (c) => {
       const reader = difyRes.body.getReader()
       const decoder = new TextDecoder()
       let lineBuffer = ""
+      let fullContent = ""
       
       while (true) {
         const { done, value } = await reader.read()
@@ -1425,20 +1525,34 @@ app.get('/ai/agent-discussion/:id', async (c) => {
           try {
             const data = JSON.parse(dataStr)
             if (data.event === 'message' || data.event === 'agent_message') {
-              // Send ONLY THE DELTA
+              fullContent += data.answer;
               await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
             }
-          } catch (e) {
-            continue
+          } catch (e) { continue }
+        }
+      }
+
+      // Auto-save parsed agents to aichat_history
+      if (fullContent) {
+        const now = getKst();
+        const agents = ['Security', 'DB', 'DevOps', 'Leader'];
+        for (const agent of agents) {
+          const regex = new RegExp(`\\[${agent}\\]:?\\s*([\\s\\S]*?)(?=\\n\\[|$)`, 'i');
+          const match = fullContent.match(regex);
+          if (match && match[1]) {
+            await db.prepare(`
+              INSERT INTO aichat_history (inc_id, agent_role, content, reg_id, reg_dt, mod_id, mod_dt)
+              VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
+            `).bind(id, agent, match[1].trim(), now, now).run();
           }
         }
       }
+
+      if (kv) await kv.delete(lockKey);
       await writer.write(encode('data: [DONE]\n\n'))
     } catch (e) {
       console.error('Dify Stream Error:', e)
-      const fallback = `[Security]: SMS 장애 분석 중입니다. 상세 분석 결과가 곧 업데이트됩니다.\n[DB]: 데이터베이스 연결 상태 및 쿼리 성능 점검 중입니다.\n[DevOps]: 서버 로그 및 인프라 매트릭(CPU/MEM)을 실시간 분석 중입니다.\n[Leader]: 전체 상황 파악 후 즉시 조치 가이드를 공유하겠습니다.`
-      await writer.write(encode(`data: ${JSON.stringify({ answer: fallback })}\n\n`))
-      await writer.write(encode('data: [DONE]\n\n'))
+      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
     } finally {
       await writer.close()
     }
@@ -1487,30 +1601,11 @@ app.post('/db/summary', async (c) => {
 app.post('/ai/summarize-chat', async (c) => {
   const { incident_id } = await c.req.json()
   const db = c.env.DB
+  const kv = c.env.SMS_STORAGE
   const api_key = "app-owwPp3j2qAvVDZpW2UUiY8L3" 
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
-
-  // 1. Fetch chat history (both AI agent and user chats)
-  const { results: aiResults } = await db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(incident_id).all()
-  const { results: wrResults } = await db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(incident_id).all()
-  const { results: attResults } = await db.prepare("SELECT original_name, url FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC").bind(incident_id).all()
-
-  const transcript = []
-  const combined = [
-    ...(aiResults || []).map(r => ({ role: r.agent_role, sender: r.agent_role + ' Agent', text: r.content, timestamp: r.reg_dt })), 
-    ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender, text: r.text, timestamp: r.timestamp }))
-  ]
-  
-  // Sort chronologically
-  combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-
-  for (const msg of combined) {
-    if (msg.text) transcript.push(`[${msg.role}] ${msg.sender}: ${msg.text}`)
-  }
-
-  const prompt = `다음은 인시던트(${incident_id})에 대한 War-Room 채팅 내역입니다. 이 내용을 바탕으로 장애 대응 과정과 결과를 요약해줘.\n\n[채팅 내역]\n${transcript.join('\n')}\n\n[요약 요구사항]\n1. 장애 개요: 어떤 장애가 발생했는지 요약\n2. 주요 조치 사항: 타임라인별 주요 대응 내용\n3. 최종 결과: 현재 상태 및 조치 결과\n4. 향후 과제: 재발 방지를 위해 필요한 사항 (있을 경우)`
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -1518,6 +1613,59 @@ app.post('/ai/summarize-chat', async (c) => {
 
   ;(async () => {
     try {
+      // 1. Check D1 Cache first
+      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first()
+      if (cached && cached.summary) {
+        console.log(`[Cache Hit] Serving cached summary for ${incident_id}`);
+        const chars = Array.from(cached.summary);
+        for (let i = 0; i < chars.length; i += 50) {
+          await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+        }
+        await writer.write(encode('data: [DONE]\n\n'));
+        return;
+      }
+
+      // 2. Concurrency Lock check (KV)
+      const lockKey = `lock:summarize-chat:${incident_id}`;
+      if (kv) {
+        let lock = await kv.get(lockKey);
+        if (lock === 'processing') {
+          console.log(`[Concurrency] Another user is summarizing chat for ${incident_id}. Waiting...`);
+          for (let attempt = 0; attempt < 30; attempt++) {
+            await new Promise(r => setTimeout(r, 1000));
+            const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first();
+            if (polled && polled.summary) {
+              const chars = Array.from(polled.summary);
+              for (let i = 0; i < chars.length; i += 50) {
+                await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+              }
+              await writer.write(encode('data: [DONE]\n\n'));
+              return;
+            }
+          }
+          throw new Error("요약 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
+        }
+        await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+      }
+
+      // 3. Fetch chat history (both AI agent and user chats)
+      const { results: aiResults } = await db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(incident_id).all()
+      const { results: wrResults } = await db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(incident_id).all()
+      
+      const transcript = []
+      const combined = [
+        ...(aiResults || []).map(r => ({ role: r.agent_role, sender: r.agent_role + ' Agent', text: r.content, timestamp: r.reg_dt })), 
+        ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender, text: r.text, timestamp: r.timestamp }))
+      ]
+      
+      combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+
+      for (const msg of combined) {
+        if (msg.text) transcript.push(`[${msg.role}] ${msg.sender}: ${msg.text}`)
+      }
+
+      const prompt = `다음은 인시던트(${incident_id})에 대한 War-Room 채팅 내역입니다. 이 내용을 바탕으로 장애 대응 과정과 결과를 요약해줘.\n\n[채팅 내역]\n${transcript.join('\n')}\n\n[요약 요구사항]\n1. 장애 개요: 어떤 장애가 발생했는지 요약\n2. 주요 조치 사항: 타임라인별 주요 대응 내용\n3. 최종 결과: 현재 상태 및 조치 결과\n4. 향후 과제: 재발 방지를 위해 필요한 사항 (있을 경우)`
+
       const difyRes = await fetch(`${api_base}/workflows/run`, {
         method: 'POST',
         headers: { 
@@ -1526,10 +1674,7 @@ app.post('/ai/summarize-chat', async (c) => {
           'Accept': 'text/event-stream'
         },
         body: JSON.stringify({ 
-          inputs: {
-            chat_log: transcript.join('\n'),
-            incident_images: []
-          }, 
+          inputs: { chat_log: transcript.join('\n'), incident_images: [] }, 
           response_mode: 'streaming', 
           user: 'sguard-worker' 
         })
@@ -1540,6 +1685,7 @@ app.post('/ai/summarize-chat', async (c) => {
       const reader = difyRes.body.getReader()
       const decoder = new TextDecoder()
       let lineBuffer = ""
+      let fullContent = ""
       
       while (true) {
         const { done, value } = await reader.read()
@@ -1559,16 +1705,26 @@ app.post('/ai/summarize-chat', async (c) => {
           try {
             const data = JSON.parse(dataStr)
             if (data.event === 'message' || data.event === 'agent_message') {
+              fullContent += data.answer;
               await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
             } else if (data.event === 'text_chunk') {
-              // Handle Workflow text_chunk
+              fullContent += data.data.text;
               await writer.write(encode(`data: ${JSON.stringify({ answer: data.data.text })}\n\n`))
             }
-          } catch (e) {
-            continue
-          }
+          } catch (e) { continue }
         }
       }
+      
+      // Auto-save summary to DB
+      if (fullContent) {
+        await db.prepare(`
+          INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
+          VALUES (?, ?, 'dify-workflow', CURRENT_TIMESTAMP)
+          ON CONFLICT(inc_id) DO UPDATE SET summary = excluded.summary, mod_dt = CURRENT_TIMESTAMP
+        `).bind(incident_id, fullContent).run();
+      }
+
+      if (kv) await kv.delete(lockKey);
       await writer.write(encode('data: [DONE]\n\n'))
     } catch (e) {
       console.error('Summarize-Chat error:', e)
@@ -2999,14 +3155,30 @@ export class WarRoom {
 
       case "SUMMARY_REQUEST":
         this.state.waitUntil((async () => {
+          const kv = this.env.SMS_STORAGE;
+          const lockKey = `lock:summary-ws:${data.incident_id}`;
+          
           try {
+            // Check Lock
+            if (kv) {
+              const lock = await kv.get(lockKey);
+              if (lock === 'processing') {
+                console.log(`[WS] Summary already in progress for ${data.incident_id}. Skipping.`);
+                return;
+              }
+              await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+            }
+
             const ai = this.env.AI;
             const db = this.env.DB;
             const chats = await db.prepare(
               "SELECT sender, text FROM warroom_chats WHERE inc_id = ? ORDER BY seq DESC LIMIT 50"
             ).bind(data.incident_id).all();
             
-            if (chats.results.length === 0) return;
+            if (chats.results.length === 0) {
+              if (kv) await kv.delete(lockKey);
+              return;
+            }
             
             const chatLog = chats.results.reverse().map(c => `${c.sender}: ${c.text}`).join("\n");
             const prompt = `Below is a chat log from an incident war room. Please provide a concise summary (3-4 bullet points) in Korean of the current status, key observations, and any actions taken.\n\nChat Log:\n${chatLog}\n\nSummary (Korean):`;
@@ -3016,10 +3188,13 @@ export class WarRoom {
             this.broadcast({
               type: "AI_SUMMARY",
               incident_id: data.incident_id,
-              summary: response.response || response // Depending on the model's return format
+              summary: response.response || response 
             });
+
+            if (kv) await kv.delete(lockKey);
           } catch (e) {
             console.error("AI Summary Error:", e);
+            if (kv) await kv.delete(lockKey);
           }
         })());
         break;

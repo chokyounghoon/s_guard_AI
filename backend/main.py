@@ -682,72 +682,37 @@ cached_insight_response = None
 async def get_ai_insight():
     """
     대시보드 상단 AI Insight (Autopilot) 패널용 데이터 (Streaming SSE)
+    Worker에서 수행되는 분석 엔진 동기화 결과를 그대로 프록시한다.
     """
-    # 1. Worker에서 최근 SMS 및 지표 조회
-    data = await WorkerClient.get("/ai/insight")
-    if "error" in data:
-        async def err_gen():
-            yield f"data: {json.dumps({'error': data['error']}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(err_gen(), media_type="text/event-stream")
-
-    prediction_counts = data.get("prediction_counts", {"critical": 0, "server": 0, "security": 0, "report": 0})
-    recent_sms = data.get("recent_sms")
-
-    if not recent_sms:
-        async def empty_gen():
-            yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'answer': '새로운 장애 SMS를 기다리고 있습니다.'}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(empty_gen(), media_type="text/event-stream")
-
-    # [핵심] Dify 스트리밍 호출 (캐시 확인 로직 추가)
-    # 만약 Worker에서 이미 실질적인 분석 결과가 있다면 (대기 중 문구가 아니라면) 바로 그 내용을 반환
-    cached_text = data.get("current_log", {}).get("text", "")
-    is_placeholder = "🔍 [Insight]" in cached_text or "새로운 장애 SMS 분석을 준비하고 있습니다" in cached_text
-    
-    incident_id = str(recent_sms['inc_id']).replace("INC-", "").strip()
-    prompt = f"다음 SMS 장애 내용을 분석하고 1~2문장으로 대응 가이드를 한글로 제시해줘: {recent_sms['message']}"
-    
     async def insight_stream():
-        # 먼저 지표 데이터 전송 (항상 필요)
-        yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts, 'sms_id': str(incident_id)}, ensure_ascii=False)}\n\n"
+        url = f"{WORKER_URL}/ai/analyze-sms"
         
-        # 캐시된 데이터가 있는 경우
-        if not is_placeholder and cached_text:
-            logger.info(f"Using cached Autopilot Insight for {incident_id}")
-            yield f"data: {json.dumps({'answer': cached_text}, ensure_ascii=False)}\n\n"
+        # 1. 먼저 Worker의 /ai/insight 상태 호출하여 최근 SMS 정보 획득
+        data = await WorkerClient.get("/ai/insight")
+        recent_sms = data.get("recent_sms")
+        prediction_counts = data.get("prediction_counts", {"critical": 0, "server": 0, "security": 0, "report": 0})
+        
+        # 지표 데이터 전송
+        yield f"data: {json.dumps({'status': 'active', 'prediction_counts': prediction_counts}, ensure_ascii=False)}\n\n"
+        
+        if not recent_sms:
+            yield f"data: {json.dumps({'answer': '새로운 장애 SMS를 기다리고 있습니다.'}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-        logger.info(f"Triggering new Dify Insight calculation for {incident_id}")
-        # Dify 스트림 전송
-        gen = await DifyClient.stream_chat_message(query=prompt, user="sguard-autopilot", api_key=DIFY_API_KEY_DASHBOARD)
+        # 2. Worker의 /ai/analyze-sms 호출 (스트리밍 프록시)
+        # 이 호출은 Worker 내부에서 KV Lock + D1 Cache 시스템을 통해 중복을 방지함
+        payload = {
+            "sender": recent_sms.get("sender", "System"),
+            "message": recent_sms.get("message", ""),
+            "sms_id": str(recent_sms['inc_id']).replace("INC-", "").strip()
+        }
         
-        full_answer = []
-        async for chunk in gen:
-            yield chunk
-            if chunk.startswith("data:"):
-                data_str = chunk[5:].strip()
-                if data_str != "[DONE]":
-                    try:
-                        data_json = json.loads(data_str)
-                        if data_json.get("answer"):
-                            full_answer.append(data_json["answer"])
-                    except: pass
-        
-        if full_answer:
-            final_text = "".join(full_answer)
-            try:
-                await WorkerClient.post("/ai/insight/save", {
-                    "incident_id": incident_id,
-                    "content": final_text,
-                    "severity": "high",
-                    "category": "server",
-                    "user_id": "sguard-autopilot"
-                })
-                logger.info(f"Successfully cached new insight for {incident_id}")
-            except Exception as e:
-                logger.error(f"Failed to cache insight: {e}")
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            async with client.stream("POST", url, json=payload) as response:
+                async for line in response.aiter_lines():
+                    if line:
+                        yield line + "\n\n"
 
     return StreamingResponse(insight_stream(), media_type="text/event-stream")
 
@@ -758,9 +723,8 @@ class GenerateReportRequest(BaseModel):
 @app.post("/ai/generate-report")
 async def generate_ai_report(req: GenerateReportRequest):
     """
-    AI Report 생성 (Dify Streaming SSE)
-    - 프론트에서 SSE로 받아 Typewriter로 렌더링할 수 있도록 answer 스트림을 그대로 전달한다.
-    - 스트림 종료 시, 파싱 가능한 경우 6W1H 구조화 데이터도 함께 보낸다.
+    AI Report 생성 프록시
+    Worker의 /ai/generate-report 기능을 사용하여 동기화 및 중복 방지 혜택을 받는다.
     """
     incident_id = (req.incident_id or "").strip()
     if not incident_id:
@@ -769,74 +733,20 @@ async def generate_ai_report(req: GenerateReportRequest):
             yield "data: [DONE]\n\n"
         return StreamingResponse(err_gen(), media_type="text/event-stream")
 
-    # 1. 기존 요약(타임라인) 데이터가 있는지 DB에서 조회
-    summary_data = await WorkerClient.get(f"/db/summary/{incident_id}")
-    existing_summary = ""
-    if isinstance(summary_data, dict) and "summary" in summary_data:
-        existing_summary = summary_data["summary"]
-
-    prompt = f"""
-다음 incident_id에 대한 [장애 상세 종합 보고서]를 한국어로 작성하십시오: {incident_id}
-
-[데이터 소스: War-Room 실시간 기록]
-{existing_summary if existing_summary else "(분석 가능한 채팅 기록이 없습니다)"}
-
-[작성 지침]
-- 기술적 깊이가 있는 전문적인 문체로 작성하십시오.
-- '요약'이나 '생략'이라는 표현을 피하고, 모든 프로세스를 상세히 기술하십시오.
-- 특히 '4. War-Room 대응 타임라인'은 위 데이터 소스의 시점별 기록을 유실 없이 전문적으로 재구성하여 포함하십시오.
-
-[보고서 구조]
-1. 장애 개요: 발생 시점, 시스템 환경, 영향 범위 및 심각도
-2. 원인 분석: 이상 징후 분석, 근본 원인(Root Cause) 및 기술적 메커니즘
-3. 조치 내용: 상황별 분 단위 대응 단계 및 최종 복구 내역
-4. War-Room 대응 타임라인: 시점별 상세 대응 기록 전체 (누락 금지)
-5. 향후 대책: 단기 복구 및 장기적 재발 방지안, 모니터링 강화 계획
-
-[출력 형식]
-- 마크다운(Markdown) 형식을 사용하십시오.
-- 마지막에 6W1H 구조화 데이터를 JSON으로만 출력하십시오. (키: who, when, where, what, why, how, report_text)
-- JSON 출력 시 코드 블럭(```)을 사용하지 마십시오.
-"""
-
     async def report_stream():
-        accumulated: list[str] = []
-        try:
-            # 보고서 생성에는 더 높은 성능과 토큰 제한을 가진 GOVERNANCE 키를 사용
-            gen = await DifyClient.stream_chat_message(
-                query=prompt, 
-                user="sguard-report", 
-                api_key=DIFY_API_KEY_GOVERNANCE,
-                max_tokens=4096
-            )
-            async for chunk in gen:
-                if chunk.startswith("data:"):
-                    data_str = chunk[5:].strip()
-                    if data_str == "[DONE]":
-                        full_text = "".join(accumulated)
-                        # best-effort: JSON block extraction
-                        try:
-                            json_match = re.search(r'\{[\s\S]*\}$', full_text.strip())
-                            if json_match:
-                                report_obj = json.loads(json_match.group())
-                                yield f"data: {json.dumps({'final_report': report_obj}, ensure_ascii=False)}\n\n"
-                        except Exception:
-                            pass
-                        yield "data: [DONE]\n\n"
-                        break
-                    try:
-                        data = json.loads(data_str)
-                    except Exception:
-                        continue
-                    if data.get("answer"):
-                        accumulated.append(data["answer"])
-                    yield chunk
-                else:
-                    yield chunk
-        except Exception as e:
-            logger.error(f"Generate report stream error: {e}")
-            yield f"data: {json.dumps({'error': 'AI 분석이 지연되고 있습니다'}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
+        url = f"{WORKER_URL}/ai/generate-report"
+        payload = {"incident_id": incident_id}
+        
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            try:
+                async with client.stream("POST", url, json=payload) as response:
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield line + "\n\n"
+            except Exception as e:
+                logger.error(f"Generate report proxy error: {e}")
+                yield f"data: {json.dumps({'error': 'AI 분석 서버와의 통신이 원활하지 않습니다.'}, ensure_ascii=False)}\n\n"
+                yield "data: [DONE]\n\n"
 
     return StreamingResponse(report_stream(), media_type="text/event-stream")
 
@@ -844,49 +754,25 @@ async def generate_ai_report(req: GenerateReportRequest):
 @app.get("/ai/discussion/{sms_id}")
 async def get_agent_discussion_stream(sms_id: str):
     """
-    특정 장애 SMS에 대해 4인의 에이전트(Security, DB, DevOps, Leader)가 협업하여 분석하는 실시간 상황 로그 (Streaming)
+    특정 장애 SMS에 대해 4인의 에이전트 분석 결과 프록시
+    Worker의 /ai/agent-discussion 기능을 사용하여 동기화 및 중복 방지 혜택을 받는다.
     """
-    sms = await WorkerClient.get(f"/incidents/sms/{sms_id}")
-    if isinstance(sms, dict) and "error" in sms:
-        async def err_gen():
-            yield f"data: {json.dumps({'error': 'SMS not found'}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(err_gen(), media_type="text/event-stream")
-
-    message = sms.get("message", "") if isinstance(sms, dict) else ""
-    query = f"""
-    다음 장애 SMS 내용에 대해 보안 전문가(Security), DB 전문가(DB), 인프라 전문가(DevOps), 실시간 대응팀장(Leader)이 
-    서로 대화하며 원인을 분석하고 해결 방안을 도출하는 'AI War-Room 상황 로그' 대본을 작성해라.
-    
-    내용: {message}
-    
-    [규칙]
-    1. 각 대사는 반드시 '[에이전트명]: 내용' 형식을 지켜라.
-    2. 에이전트명은 반드시 [Security, DB, DevOps, Leader] 중 하나여야 한다.
-    3. 각 에이전트별로 최소 1회 이상 발언해라.
-    4. 기술적인 전문 내용을 포함하되, 긴박한 상황실 분위기를 연출해라.
-    5. 마지막은 반드시 Leader가 최종 조치를 지시하며 마무리해라.
-    """
-
     async def stream():
-        req_id = secrets.token_hex(4)
-        logger.info(f"[discussion-stream:{req_id}] start sms_id={sms_id}")
+        url = f"{WORKER_URL}/ai/agent-discussion/{sms_id}"
         
-        # 1. 연결 성공 알림
-        yield f"data: {json.dumps({'status': 'connected'}, ensure_ascii=False)}\n\n"
-
-        try:
-            # Dify 스트리밍 호출
-            gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user", api_key=DIFY_API_KEY_DASHBOARD)
-            async for chunk in gen:
-                # Dify chunk를 그대로 전달하되, 프론트에서 파싱하기 쉽게 [Agent]: 포맷 유지
-                yield chunk
-        except Exception as e:
-            logger.error(f"[discussion-stream:{req_id}] error: {e}")
-            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
-        finally:
-            yield "data: [DONE]\n\n"
-            logger.info(f"[discussion-stream:{req_id}] end")
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            try:
+                # 연결 성공 알림 (프록시 레벨)
+                yield f"data: {json.dumps({'status': 'connected'}, ensure_ascii=False)}\n\n"
+                
+                async with client.stream("GET", url) as response:
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield line + "\n\n"
+            except Exception as e:
+                logger.error(f"Agent discussion proxy error: {e}")
+                yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+                yield "data: [DONE]\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -975,136 +861,32 @@ async def chat_with_ai(request: ChatRequest):
 @app.post("/ai/summarize-chat")
 async def summarize_chat(req: SummarizeChatRequest):
     """
-    Generate a summary of the War-Room chat for a specific incident.
-    Utilizes a dedicated chat_summaries table for caching.
+    채팅 요약 프록시
+    Worker의 /ai/summarize-chat 기능을 사용하여 동기화 및 중복 방지 혜택을 받는다.
     """
-    raw_id = req.incident_id
-    if not raw_id:
+    incident_id = (req.incident_id or "").strip()
+    if not incident_id:
         async def err_gen():
             yield f"data: {json.dumps({'error': 'incident_id가 필요합니다.'}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(err_gen(), media_type="text/event-stream")
 
-    # [Normalization] Strip 'INC-' and whitespace to ensure proper matching
-    incident_id = str(raw_id).replace("INC-", "").strip()
-    logger.info(f"SummarizeChat request for: {raw_id} (normalized: {incident_id})")
-
-    # 1. Check if summary already exists in dedicated table
-    try:
-        cache_res = await WorkerClient.get(f"/db/summary/{incident_id}")
-        if cache_res and cache_res.get("summary"):
-            logger.info(f"Using cached summary from DB for {incident_id}")
-            async def cached_gen():
-                yield f"data: {json.dumps({'answer': cache_res['summary']}, ensure_ascii=False)}\n\n"
-                yield "data: [DONE]\n\n"
-            return StreamingResponse(cached_gen(), media_type="text/event-stream")
-    except Exception as e:
-        logger.warning(f"Cache check failed, proceeding with generation: {e}")
-
-    # 2. Fetch chat history to generate new summary
-    chat_res = await WorkerClient.get(f"/warroom/chat/{incident_id}")
-    messages = chat_res.get("messages", [])
-    
-    if not messages:
-        async def empty_gen():
-            yield f"data: {json.dumps({'answer': '요약할 채팅 내역이 없습니다.'}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(empty_gen(), media_type="text/event-stream")
-
-    # 3. Format transcript with timestamps for timeline analysis
-    transcript = []
-    for msg in messages:
-        # AI ANALYSIS SUMMARY 영역의 데이터(ai_analysis 타입 또는 'AI분석' 역할)는 제외
-        if msg.get("type") == "ai_analysis" or msg.get("role") == "AI분석":
-            continue
-            
-        role = msg.get("role", "User")
-        sender = msg.get("sender", "Unknown")
-        text = msg.get("text", "")
-        ts = msg.get("timestamp", "")
+    async def summary_stream():
+        url = f"{WORKER_URL}/ai/summarize-chat"
+        payload = {"incident_id": incident_id}
         
-        # Format timestamp to HH:mm:ss if it's a string
-        time_str = ""
-        if ts:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             try:
-                # Assuming ts might be '2026-04-04 11:00:00' or ISO format
-                if " " in ts:
-                    time_str = ts.split(" ")[1] # Take HH:mm:ss
-                elif "T" in ts:
-                    time_str = ts.split("T")[1].split(".")[0] # Take HH:mm:ss
-                else: 
-                    time_str = ts
-            except:
-                time_str = ts
-        
-        if text:
-            transcript.append(f"[{time_str}] [{role}] {sender}: {text}")
-    
-    # Analyze ONLY chat room contents as a timeline
-    chat_content = "### WAR-ROOM CHAT LOG FOR TIMELINE ANALYSIS ###\n" + "\n".join(transcript)
-    
-    # 4. Create prompt (for logging/debugging purposes, though workflow uses inputs)
-    prompt_instruction = f"""
-다음은 인시던트({incident_id})에 대한 실시간 War-Room 채팅 내역입니다. 
-다른 외부 정보나 추측을 배제하고, 오직 아래 채팅 내역만을 분석하여 사건 발생부터 해결까지의 상세 타임라인을 작성해줘.
+                async with client.stream("POST", url, json=payload) as response:
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield line + "\n\n"
+            except Exception as e:
+                logger.error(f"Summarize chat proxy error: {e}")
+                yield f"data: {json.dumps({'error': f'AI 요약 서버와의 통신 중 오류가 발생했습니다: {str(e)}'}, ensure_ascii=False)}\n\n"
+                yield "data: [DONE]\n\n"
 
-[요약 요구사항]
-1. 장애 개요: 어떤 장애가 감지되었는지 1-2문장으로 간략히 요약
-2. 상세 조치 타임라인: **반드시** 아래 형식을 지킨 불렛 리스트 형태로 시간순 작성 (가장 중요)
-   - 형식: `- [HH:mm:ss] 주요 대응 및 조치 내용`
-   - 순차적으로 모든 핵심 이벤트를 누락 없이 포함할 것
-3. 최종 결과: 현재 조치 상태 및 해결 여부
-4. 핵심 인사이트: 이번 장애 대응에서 얻은 교훈이나 특이점
-
-전문적인 Markdown 형식을 사용하되, 타임라인 섹션은 반드시 리스트 형식을 유지해줘.
-"""
-    
-    try:
-        logger.info(f"Generating new summary via Dify (Workflow) for {incident_id}")
-        
-        gen = await DifyClient.stream_workflow(
-            inputs={
-                "chat_log": chat_content,
-                "incident_images": []
-            },
-            user="sguard-summarizer",
-            api_key=DIFY_API_KEY_SUMMARIZER
-        )
-
-        async def saving_gen():
-            full_answer = []
-            async for chunk in gen:
-                yield chunk
-                # Extract answer from chunk to save to DB
-                if chunk.startswith("data:"):
-                    data_str = chunk[5:].strip()
-                    if data_str != "[DONE]":
-                        try:
-                            data = json.loads(data_str)
-                            if data.get("answer"):
-                                full_answer.append(data["answer"])
-                        except: pass
-            
-            # Save to DB after streaming completes
-            if full_answer:
-                summary_text = "".join(full_answer)
-                try:
-                    await WorkerClient.post("/db/summary", {
-                        "inc_id": incident_id,
-                        "summary": summary_text,
-                        "model": "dify-summarizer"
-                    })
-                    logger.info(f"Saved new summary to DB for {incident_id}")
-                except Exception as e:
-                    logger.error(f"Failed to save summary to DB: {e}")
-
-        return StreamingResponse(saving_gen(), media_type="text/event-stream")
-    except Exception as e:
-        logger.error(f"Summarization error: {e}")
-        async def fail_gen():
-            yield f"data: {json.dumps({'error': f'요약 중 오류가 발생했습니다: {str(e)}'}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(fail_gen(), media_type="text/event-stream")
+    return StreamingResponse(summary_stream(), media_type="text/event-stream")
 
 
 @app.post("/ai/governance/approve")

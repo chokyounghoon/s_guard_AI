@@ -12,14 +12,17 @@ import BottomMenu from '../components/BottomMenu';
 
 
 // ── 데이터 ─────────────────────────────────────────
-const SHINHAN_COMPANIES = [
-  '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
-  '신한캐피탈', '신한자산운용', '신한저축은행', '신한AI', '신한DS',
-  '제주은행', '신한벤처투자', '신한리츠운용', '신한대체투자운용',
-  '신한자산신탁', '신한펀드파트너스', '신한금융플러스', '신한큐브리스크컨설팅',
-];
+const getApiUrl = (endpoint) => {
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  // AI 및 DB 관련 에코시스템은 FastAPI 백엔드 프록시를 통해 동기화 이점을 누린다.
+  if (isLocalDev && (endpoint.startsWith('/ai/') || endpoint.startsWith('/db/'))) {
+    return `http://127.0.0.1:8000${endpoint}`;
+  }
+  // 그 외 SMS 목록 조회 등 순수 데이터는 Worker API 직접 호출
+  return 'https://sguardai.khcho0421.workers.dev' + endpoint;
+};
 
-const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+const API_BASE = getApiUrl('');
 
 // ── 셀렉트 + 기타 입력 컴포넌트 ───────────────────
 function SelectWithOther({ label, icon: Icon, options, value, onChange, required, disabled }) {
@@ -511,10 +514,7 @@ export default function DashboardPage() {
 
   const fetchSMSMessages = async () => {
     try {
-      // Cloudflare Workers API 사용
-      const apiUrl = 'https://sguardai.khcho0421.workers.dev/sms/recent?limit=20';
-
-      const response = await fetch(apiUrl);
+      const response = await fetch(getApiUrl('/sms/recent?limit=20'));
       if (response.ok) {
         const data = await response.json();
         const freshMsgs = (data.messages || []).filter(msg => {
@@ -540,6 +540,13 @@ export default function DashboardPage() {
             lastAutoTriggeredIdRef.current = latestId;
             setLastAutoTriggeredId(latestId);
             setSelectedSms(freshMsgs[0]);
+
+            // ⚡ One-View Automation: Expand all relevant panels on new arrival
+            setIsSmsPanelCollapsed(false);       // Top SMS Bar
+            setIsLiveStreamCollapsed(false);    // Left Incident Stream
+            setIsWarRoomCollapsed(false);       // Middle War-Room Header
+            setIsAssignmentsCollapsed(false);    // Right Assignments Panel
+            setShowAgentPanel(true);             // Bottom Agent Discussion
           }
         }
       }
@@ -557,11 +564,7 @@ export default function DashboardPage() {
   const deleteSMSMessage = async (e, id) => {
     e.stopPropagation();
     try {
-      const apiUrl = window.location.hostname === 'localhost'
-        ? `https://sguardai.khcho0421.workers.dev/sms/${id}`
-        : `https://sguardai.khcho0421.workers.dev/sms/${id}`;
-
-      const response = await fetch(apiUrl, { method: 'DELETE' });
+      const response = await fetch(getApiUrl(`/sms/${id}`), { method: 'DELETE' });
       if (response.ok) {
         // 즉시 화면에서 제거하기 위한 로컬 상태 업데이트
         setDeletedSmsIds(prev => {
@@ -788,6 +791,13 @@ export default function DashboardPage() {
     setSelectedSms(smsMessage);
     selectedSmsRef.current = smsMessage;
 
+    // ⚡ One-View Automation: Ensure visibility when explicitly selected
+    setIsSmsPanelCollapsed(false);
+    setIsLiveStreamCollapsed(false);
+    setIsWarRoomCollapsed(false);
+    setIsAssignmentsCollapsed(false);
+    setShowAgentPanel(true);
+
     // Trigger Assignment to the current user
     if (userProfile?.id) {
       fetch(`${API_BASE}/ai/incident/assign`, {
@@ -806,31 +816,23 @@ export default function DashboardPage() {
 
 
     try {
-      const baseUrl = 'https://sguardai.khcho0421.workers.dev';
-      const checkRes = await fetch(`${baseUrl}/ai/chat-history/${smsMessage.inc_id}`);
+      // -------------------------------------------------------------
+      // UNIFIED STREAMING: AiInsightPanel에서 통합 수행하므로 중복 호출 제거.
+      // Dashboard에서는 히스토리 존재 여부만 체크하고 패널을 열어준다.
+      // -------------------------------------------------------------
+      const checkRes = await fetch(getApiUrl(`/ai/chat-history/${smsMessage.inc_id}`));
       if (checkRes.ok) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
-            // FILTER: Remove any legacy 'AI분석' role messages that might be in history
             const filtered = data.messages.filter(m => m.role !== 'AI분석');
             const completedMsgs = filtered.map(m => ({ ...m, isCompleted: true }));
-            
-            // Check if we already have a FULL analysis starting with at least one Expert (Security)
-            const hasInitialExpert = filtered.some(m => 
-              /Security|보안|System|시스템/i.test(m.role) && !m.text.includes('장애 로그 감지')
-            );
-            
-            // Or specifically check for Security/보안
             const hasSecurityExpert = filtered.some(m => /Security|보안/i.test(m.role));
 
             if (hasSecurityExpert) {
               setAgentMessages(completedMsgs);
               setTimeout(() => setShowEmergencyModal(true), 1500);
-              return; // Skip Dify streaming ONLY if real analysis exists
+              return; 
             }
-            
-            // If the history is partial (Missing Security) or only 'System' messages exist, 
-            // we show what we have but CONTINUE to Dify streaming to restore all 4 agents.
             setAgentMessages(completedMsgs);
          }
       }
@@ -838,79 +840,9 @@ export default function DashboardPage() {
       console.error("Chat history check failed:", err);
     }
 
-    try {
-      // -------------------------------------------------------------
-      // IF CACHE IS EMPTY OR FETCH FAILS: STREAM MANUALLY FOR BOTTOM PANEL ONLY
-      // This ensures the Agent panel still streams data even if AiInsightPanel is decoupled!
-      // -------------------------------------------------------------
-      const baseUrl = 'https://sguardai.khcho0421.workers.dev';
-      const streamRes = await fetch(`${baseUrl}/ai/analyze-sms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sender: smsMessage.sender, 
-          message: smsMessage.message, 
-          sms_id: smsMessage.inc_id 
-        })
-      });
-      if (!streamRes.ok) throw new Error('Stream failed');
-
-      const reader = streamRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let finalText = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const evt of events) {
-          const lines = evt.split('\n');
-          for (const line of lines) {
-            if (!line.startsWith('data:')) continue;
-            const dataStr = line.slice(5).trim();
-            if (!dataStr) continue;
-            if (dataStr === '[DONE]') {
-               // Finished streaming
-               console.log(`Standalone stream done for ${smsMessage.inc_id}`);
-               const finalMsgs = parseTranscript(finalText);
-               
-               // Save to DB
-               fetch(`${baseUrl}/ai/chat-history/save`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    incident_id: String(smsMessage.inc_id),
-                    messages: finalMsgs
-                  })
-               }).catch(console.error);
-
-               setTimeout(() => setShowEmergencyModal(true), 1500);
-               return;
-            }
-            try {
-               const data = JSON.parse(dataStr);
-               if (data.answer) {
-                  finalText += data.answer;
-                  const currentMsgs = parseTranscript(finalText);
-                  if (currentMsgs.length > 0) {
-                    // FILTER out leaking AI insight parts
-                    const filtered = currentMsgs.filter(m => m.role !== 'AI분석');
-                    setAgentMessages(filtered);
-                  }
-               }
-            } catch(e) {}
-          }
-        }
-      }
-
-    } catch(e) {
-      console.error("Agent panel stream err:", e);
-      setAgentMessages([{ role: 'System', text: '데이터 조회에 실패했습니다. 캐시 데이터나 네트워크 상태를 확인해주세요.', delay: 0, isCompleted: true }]);
-    }
+    // Note: AiInsightPanel이 마운트되어 있으면 selectedSms 변경 시 자동으로 분석 스트림이 시작됩니다.
+    console.log("Waiting for AiInsightPanel to handle streaming for:", smsMessage.inc_id);
+    
   };
 
   const handleApproveAction = () => {
