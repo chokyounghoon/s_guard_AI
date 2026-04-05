@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Check, CheckCircle2, FileText, Mail } from 'lucide-react';
-import BottomMenu from '../components/BottomMenu';
 
 export default function ReportPublishPage() {
   const navigate = useNavigate();
@@ -123,9 +122,6 @@ export default function ReportPublishPage() {
             </button>
         </div>
       </main>
-
-      {/* Navigation */}
-      <BottomMenu currentPath="/activity" />
     </div>
   );
 }

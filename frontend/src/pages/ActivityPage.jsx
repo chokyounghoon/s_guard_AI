@@ -2,34 +2,86 @@ import React, { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 import { Search, Calendar, SlidersHorizontal, CheckCircle2, ChevronRight, User, ArrowLeft } from 'lucide-react';
-import BottomMenu from '../components/BottomMenu';
 
 export default function ActivityPage() {
   const navigate = useNavigate();
 
   const [activities, setActivities] = useState([]);
+  const [userData, setUserData] = useState([]);
+  const [orgTree, setOrgTree] = useState([]);
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
+  // Helper to find a node in the organization tree by code or name at specific depth
+  const findNodeInTree = (nodes, target, depth) => {
+    if (!nodes || !target) return null;
+    const norm = String(target).trim().toLowerCase();
+    for (const node of nodes) {
+      if (node.depth === depth) {
+        if ((node.code && String(node.code).trim().toLowerCase() === norm) || 
+            (String(node.name).trim().toLowerCase() === norm)) {
+          return node;
+        }
+      }
+      if (node.children && node.children.length > 0) {
+        const found = findNodeInTree(node.children, target, depth);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
-    fetch(`${API_BASE}/activity-logs?limit=50`)
-      .then(r => r.json())
-      .then(data => {
+    Promise.all([
+      fetch(`${API_BASE}/activity-logs?limit=50`).then(r => r.json()),
+      fetch(`${API_BASE}/users`).then(r => r.json()),
+      fetch(`${API_BASE}/org/tree`).then(r => r.json())
+    ])
+      .then(([logData, users, tree]) => {
+        setUserData(users);
+        setOrgTree(tree);
+
+        // Map users for easy lookup
+        const userMap = {};
+        users.forEach(u => {
+          userMap[u.employee_id] = u;
+          userMap[u.name] = u;
+        });
+
         // Group logs by date
         const grouped = {};
-        (data.logs || []).forEach(log => {
+        (logData.logs || []).forEach(log => {
           const dateObj = log.created_at ? new Date(log.created_at) : new Date();
           const today = new Date();
           const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
           let dateLabel = dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
           if (dateObj.toDateString() === today.toDateString()) dateLabel = '오늘 - ' + dateLabel;
           else if (dateObj.toDateString() === yesterday.toDateString()) dateLabel = '어제 - ' + dateLabel;
+          
           if (!grouped[dateLabel]) grouped[dateLabel] = [];
+
+          // Resolve organization path for the user
+          const u = userMap[log.user_id] || userMap[log.user_name] || {};
+          let resolvedTeam = log.team || '시스템';
+          
+          if (u.employee_id) {
+            const orgPath = [
+              u.honbu_name || u.honbu,
+              u.team_name || u.team,
+              u.part_name || u.part,
+              u.subpart_name || u.subpart
+            ]
+              .filter(Boolean)
+              .join(' > ');
+            
+            if (orgPath) resolvedTeam = orgPath;
+          }
+
           grouped[dateLabel].push({
             id: log.inc_id,
             time: dateObj.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료',
             title: log.incident_title || log.action,
             status: log.action,
-            team: log.team || '시스템',
+            team: resolvedTeam,
             type: log.report_type || 'AI 리포트',
           });
         });
@@ -126,7 +178,6 @@ export default function ActivityPage() {
       </div>
 
       {/* Navigation */}
-      <BottomMenu currentPath="/activity" />
     </div>
   );
 }

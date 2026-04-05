@@ -7,7 +7,6 @@ import AiInsightPanel from '../components/AiInsightPanel';
 
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
-import BottomMenu from '../components/BottomMenu';
 
 
 
@@ -1919,7 +1918,6 @@ export default function DashboardPage() {
       )}
 
       {/* Bottom Navigation */}
-      <BottomMenu 
         currentPath="/dashboard" 
         onWarRoomClick={() => {
           fetchWarRooms();

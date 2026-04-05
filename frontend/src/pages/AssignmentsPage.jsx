@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Bell, Search, SlidersHorizontal, Clock, User, ChevronRight, AlertCircle } from 'lucide-react';
-import BottomMenu from '../components/BottomMenu';
 
 export default function AssignmentsPage() {
   const navigate = useNavigate();
@@ -224,8 +223,6 @@ export default function AssignmentsPage() {
         </div>
       </main>
 
-      {/* Navigation */}
-      <BottomMenu currentPath="/assignments" />
     </div>
   );
 }

@@ -321,3 +321,22 @@ CREATE TABLE IF NOT EXISTS direct_messages (
     FOREIGN KEY(sender_id) REFERENCES users(employee_id),
     FOREIGN KEY(receiver_id) REFERENCES users(employee_id)
 );
+
+-- AI Chat Sessions
+CREATE TABLE IF NOT EXISTS user_chat_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    messages TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Report Hierarchy Matrix
+CREATE TABLE IF NOT EXISTS report_lines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hierarchy_level INTEGER NOT NULL,
+    role_name TEXT,
+    user_id TEXT NOT NULL,
+    user_name TEXT,
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+);

@@ -237,7 +237,44 @@ app.post('/auth/verify-reset-code', async (c) => {
 
 app.get('/users', async (c) => {
   const db = c.env.DB
-  const users = await db.prepare("SELECT id, email, name, role, company, honbu, team, is_active, is_admin FROM users").all()
+  const { company, honbu, team, part, subpart, orgCode } = c.req.query()
+  
+  let query = `
+    SELECT 
+      u.id, u.employee_id, u.email, u.name, u.role, u.phone,
+      COALESCE(oc.name, u.company) as company_name, 
+      COALESCE(oh.name, u.honbu) as honbu_name, 
+      COALESCE(ot.name, u.team) as team_name,
+      COALESCE(op.name, u.part) as part_name,
+      COALESCE(os.name, u.subpart) as subpart_name,
+      u.company as company_code,
+      u.honbu as honbu_code,
+      u.team as team_code,
+      u.part as part_code,
+      u.subpart as subpart_code,
+      u.is_active, u.is_admin 
+    FROM users u
+    LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+    LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+    LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+    LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+    LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+    WHERE 1=1
+  `
+  const params = []
+  
+  if (orgCode) {
+    query += " AND (u.company = ? OR u.honbu = ? OR u.team = ? OR u.part = ? OR u.subpart = ?)";
+    params.push(orgCode, orgCode, orgCode, orgCode, orgCode);
+  } else {
+    if (company) { query += " AND u.company = ?"; params.push(company); }
+    if (honbu) { query += " AND u.honbu = ?"; params.push(honbu); }
+    if (team) { query += " AND u.team = ?"; params.push(team); }
+    if (part) { query += " AND u.part = ?"; params.push(part); }
+    if (subpart) { query += " AND u.subpart = ?"; params.push(subpart); }
+  }
+
+  const users = await db.prepare(query).bind(...params).all()
   return c.json(users.results)
 })
 
@@ -305,6 +342,25 @@ app.patch('/users/:id/role', async (c) => {
   const { role } = await c.req.json()
   const modDt = getKst()
   await db.prepare("UPDATE users SET role = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?").bind(role, modDt, 'ADMIN', id).run()
+  return c.json({ status: "success" })
+})
+
+app.patch('/users/:id/org', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const { company, honbu, team, part, subpart } = await c.req.json()
+  const modDt = getKst()
+  
+  const result = await db.prepare(
+    "UPDATE users SET company = ?, honbu = ?, team = ?, part = ?, subpart = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
+  )
+  .bind(company || null, honbu || null, team || null, part || null, subpart || null, modDt, 'ADMIN', id)
+  .run()
+    
+  if (result.meta?.changes === 0) {
+    return c.json({ detail: "해당 사번의 사용자를 찾을 수 없거나 변경 사항이 없습니다." }, 404)
+  }
+  
   return c.json({ status: "success" })
 })
 
@@ -586,7 +642,7 @@ app.get('/sms/recent', async (c) => {
     SELECT r.*, u.name, u.role, u.team
     FROM received_messages r
     LEFT JOIN users u ON r.employee_id = u.employee_id
-    ORDER BY r.inc_id DESC 
+    ORDER BY r.timestamp DESC 
     LIMIT ?
   `).bind(limit).all()
 
@@ -659,6 +715,18 @@ app.get('/sms/stats', async (c) => {
 // 4. Incident & Dashboard Summary
 // ==========================================
 app.get('/dashboard/summary', async (c) => {
+  // --- 보안: Dify Tool API Key 인증 로직 추가 ---
+  const authHeader = c.req.header('Authorization');
+  const toolKey = c.env.DIFY_TOOL_KEY;
+
+  if (toolKey) {
+    const providedKey = (authHeader || '').replace('Bearer ', '').trim();
+    if (providedKey !== toolKey) {
+      return c.json({ error: '401 Unauthorized: Invalid Dify Tool Key' }, 401);
+    }
+  }
+  // ---------------------------------------------
+
   const db = c.env.DB
   const incidents = await db.prepare("SELECT * FROM incidents ORDER BY created_at DESC LIMIT 5").all()
   
@@ -667,6 +735,146 @@ app.get('/dashboard/summary', async (c) => {
     autopilotStats: { autoResolved: 15, learningRate: '98%', predictionAccuracy: '95%' }
   })
 })
+
+// ==========================================
+// 🚀 Dify 전용: 현재 서버 상태 체크 API
+// ==========================================
+app.get('/api/v1/system/status', async (c) => {
+  // --- 보안: Dify Tool API Key 인증 로직 ---
+  const authHeader = c.req.header('Authorization');
+  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+    return c.json({ 
+      error: "401 Unauthorized", 
+      sent: authHeader || "Header가 아예 전송되지 않았습니다(Missing)", // 값이 없으면 JSON에서 빠져버리는 현상 방지
+      expected: `Bearer ${c.env.DIFY_TOOL_KEY}` // 서버가 기다린 키 확인용
+    }, 401);
+  }
+  // ---------------------------------------------
+
+  const serverName = c.req.query('server_name') || 'unknown';
+  const db = c.env.DB;
+
+  try {
+    // 해당 서버와 관련된 진행 중인(장애) 인시던트가 있는지 확인
+    const activeIncidents = await db.prepare(
+      "SELECT * FROM incidents WHERE status != '처리완료' AND (title LIKE ? OR description LIKE ?)"
+    ).bind(`%${serverName}%`, `%${serverName}%`).all();
+
+    const isHealthy = activeIncidents.results.length === 0;
+
+    return c.json({
+      server_name: serverName,
+      status: isHealthy ? 'Healthy' : 'Warning/Error',
+      active_incidents_count: activeIncidents.results.length,
+      recent_issues: activeIncidents.results.map(i => i.title),
+      message: isHealthy 
+        ? `${serverName} 서버는 현재 정상적으로 동작 중입니다.`
+        : `${serverName} 서버에 ${activeIncidents.results.length}건의 진행 중인 이슈가 있습니다.`
+    });
+  } catch (err) {
+    return c.json({ error: 'Database query failed', details: err.message }, 500);
+  }
+})
+
+// ==========================================
+// 🚀 Dify 전용: DB 구조 및 데이터 탐색 도구 API
+// ==========================================
+// 전체 실제 테이블 목록 조회 (/api/v1/db/tables)
+app.get('/api/v1/db/tables', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+    return c.json({ error: "401 Unauthorized", sent: authHeader || "Missing", expected: `Bearer ${c.env.DIFY_TOOL_KEY}` }, 401);
+  }
+  
+  const db = c.env.DB;
+  try {
+    const result = await db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'd1_%'").all();
+    const tables = result.results.map(row => row.name);
+    return c.json({ tables });
+  } catch (err) {
+    return c.json({ error: 'DB 조회 실패', details: err.message }, 500);
+  }
+});
+
+// 특정 실제 테이블 데이터 조회 (/api/v1/db/contents)
+app.get('/api/v1/db/contents', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+    return c.json({ error: "401 Unauthorized", sent: authHeader || "Missing", expected: `Bearer ${c.env.DIFY_TOOL_KEY}` }, 401);
+  }
+  
+  const tableName = c.req.query("table_name");
+  if (!tableName) {
+    return c.json({ error: "table_name 파라미터가 필요합니다." }, 400);
+  }
+
+  const db = c.env.DB;
+  try {
+    // SQL Injection 방지를 위한 영문, 숫자, 언더바 패턴 검증
+    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+      return c.json({ error: "유효하지 않은 테이블 이름입니다." }, 400);
+    }
+    
+    // 테이블의 최근 데이터를 최대 20개 조회
+    const data = await db.prepare(`SELECT * FROM ${tableName} LIMIT 20`).all();
+    return c.json({ table: tableName, rows: data.results });
+  } catch (err) {
+    return c.json({ error: `데이터 조회 실패`, details: err.message }, 500);
+  }
+});
+
+// Dify Tool: get_incident_history (과거 장애 이력 및 원인 분석)
+app.get('/api/v1/incident/history', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+    return c.json({ error: "401 Unauthorized" }, 401);
+  }
+  const query = c.req.query('query') || '';
+  const limit = parseInt(c.req.query('limit') || '5', 10);
+  const db = c.env.DB;
+  
+  try {
+    const likeQuery = `%${query}%`;
+    const data = await db.prepare(`
+      SELECT h.inc_id, h.problem_description, h.error_code, h.target_system, h.created_at, p.what_happened 
+      FROM incident_history h 
+      LEFT JOIN postmortems p ON h.inc_id = p.incident_code
+      WHERE h.problem_description LIKE ? OR h.error_code LIKE ? OR h.target_system LIKE ?
+      ORDER BY h.created_at DESC LIMIT ?
+    `).bind(likeQuery, likeQuery, likeQuery, limit).all();
+    return c.json({ results: data.results });
+  } catch (err) {
+    return c.json({ error: '조회 실패', details: err.message }, 500);
+  }
+});
+
+// Dify Tool: get_incident_solutions (조치 방법 가이드 및 Knowledge Base 참조)
+app.get('/api/v1/incident/solutions', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+    return c.json({ error: "401 Unauthorized" }, 401);
+  }
+  const query = c.req.query('query') || '';
+  const limit = parseInt(c.req.query('limit') || '5', 10);
+  const db = c.env.DB;
+  
+  try {
+    const likeQuery = `%${query}%`;
+    const data = await db.prepare(`
+      SELECT title, content, category, tags FROM knowledge_base
+      WHERE title LIKE ? OR content LIKE ?
+      UNION ALL
+      SELECT title as title, how_resolved as content, 'postmortem' as category, '' as tags 
+      FROM postmortems p JOIN incidents i ON p.incident_code = i.inc_id
+      WHERE (p.how_resolved IS NOT NULL AND p.how_resolved != '') 
+      AND (i.title LIKE ? OR p.why_happened LIKE ?)
+      LIMIT ?
+    `).bind(likeQuery, likeQuery, likeQuery, likeQuery, limit).all();
+    return c.json({ results: data.results });
+  } catch (err) {
+    return c.json({ error: '조회 실패', details: err.message }, 500);
+  }
+});
 
 // 🚀 CRITICAL: S-Guard 'Dream Aggregation' (Phase 27 - Full System Intelligence)
 app.get('/ai/governance/stats', async (c) => {
@@ -783,7 +991,82 @@ app.post('/sms/keywords/delete/:keyword', async (c) => {
 
 app.get('/incidents', async (c) => {
   const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM incidents ORDER BY created_at DESC").all()
+  const { inc_id, keyword, startDate, endDate, orgCode, assignee } = c.req.query()
+  
+  // High-performance MULTI-JOIN query to check all possible affiliation sources
+  // i: incidents
+  // ua: the explicit main assignee
+  // ia / uaa: all users in the incident_assignments list
+  // r / us: the original reporter/sender
+  let query = `
+    SELECT 
+      i.*, 
+      r.message as raw_message,
+      r.phone as sender_phone,
+      r.employee_id as sender_employee_id,
+      r.received_count,
+      ua.name as assignee_name,
+      GROUP_CONCAT(DISTINCT uaa.name) as assignment_list,
+      COALESCE(ua.company, uaa.company) as company,
+      COALESCE(ua.honbu, uaa.honbu) as honbu,
+      COALESCE(ua.team, uaa.team) as team,
+      COALESCE(ua.part, uaa.part) as part,
+      COALESCE(ua.subpart, uaa.subpart) as subpart
+    FROM incidents i
+    LEFT JOIN users ua ON i.assigned_to = ua.employee_id
+    LEFT JOIN incident_assignments ia ON i.inc_id = ia.inc_id
+    LEFT JOIN users uaa ON ia.user_id = uaa.employee_id
+    LEFT JOIN received_messages r ON (i.inc_id = r.inc_id OR i.source_sms_id = r.inc_id)
+    LEFT JOIN users us ON r.employee_id = us.employee_id
+    WHERE 1=1
+  `
+  const params = []
+  
+  if (inc_id) {
+    query += " AND i.inc_id LIKE ?"
+    params.push(`%${inc_id}%`)
+  }
+  
+  if (keyword) {
+    query += " AND (i.title LIKE ? OR i.description LIKE ?)"
+    params.push(`%${keyword}%`, `%${keyword}%`)
+  }
+  
+  if (startDate) {
+    query += " AND i.created_at >= ?"
+    params.push(startDate + " 00:00:00")
+  }
+  
+  if (endDate) {
+    query += " AND i.created_at <= ?"
+    params.push(endDate + " 23:59:59")
+  }
+  
+  if (orgCode) {
+    // 100% Strict Filtering: INCIDENTS are only returned if at least one ASSIGNED user belongs to the selected ORG
+    query += ` AND (
+      i.assigned_to IN (SELECT employee_id FROM users WHERE company = ? OR honbu = ? OR team = ? OR part = ? OR subpart = ?)
+      OR EXISTS (
+        SELECT 1 FROM incident_assignments ia_sub
+        INNER JOIN users u_sub ON ia_sub.user_id = u_sub.employee_id
+        WHERE ia_sub.inc_id = i.inc_id
+        AND (u_sub.company = ? OR u_sub.honbu = ? OR u_sub.team = ? OR u_sub.part = ? OR u_sub.subpart = ?)
+      )
+    )`
+    // 10 total placeholders (5 for assigned_to IN, 5 for EXISTS)
+    for(let i=0; i<10; i++) params.push(orgCode)
+  }
+  
+  if (assignee) {
+    // Check if the name or ID exists in the main assignee field OR the assignment list
+    query += " AND (ua.name LIKE ? OR i.assigned_to = ? OR uaa.name LIKE ? OR ia.user_id = ?)"
+    params.push(`%${assignee}%`, assignee, `%${assignee}%`, assignee)
+  }
+  
+  query += " GROUP BY i.inc_id"
+  query += " ORDER BY i.created_at DESC"
+  
+  const { results } = await db.prepare(query).bind(...params).all()
   return c.json(results)
 })
 
@@ -1013,7 +1296,7 @@ app.get('/ai/insight/:id', async (c) => {
 
 app.post('/ai/chat', async (c) => {
   const { query } = await c.req.json()
-  const api_key = c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_ASSISTANT || c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!api_key) {
@@ -1648,13 +1931,11 @@ app.post('/ai/summarize-chat', async (c) => {
         await kv.put(lockKey, 'processing', { expirationTtl: 60 });
       }
 
-      // 3. Fetch chat history (both AI agent and user chats)
-      const { results: aiResults } = await db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(incident_id).all()
-      const { results: wrResults } = await db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(incident_id).all()
+      // 3. Fetch ONLY user chat history (excluding AI and system messages)
+      const { results: wrResults } = await db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? AND type NOT IN ('system', 'ai_analysis') ORDER BY timestamp ASC").bind(incident_id).all()
       
       const transcript = []
       const combined = [
-        ...(aiResults || []).map(r => ({ role: r.agent_role, sender: r.agent_role + ' Agent', text: r.content, timestamp: r.reg_dt })), 
         ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender, text: r.text, timestamp: r.timestamp }))
       ]
       
@@ -1742,6 +2023,50 @@ app.post('/ai/summarize-chat', async (c) => {
     }
   })
 })
+
+// User Context AI Chat Sessions (Personalized Drawer)
+app.get('/api/v1/user/chat-sessions/:user_id', async (c) => {
+  const userId = c.req.param('user_id');
+  const db = c.env.DB;
+  try {
+    const data = await db.prepare("SELECT * FROM user_chat_sessions WHERE user_id = ? ORDER BY updated_at DESC").bind(userId).all();
+    const sessions = data.results.map(row => ({
+      ...row,
+      messages: row.messages ? JSON.parse(row.messages) : []
+    }));
+    return c.json({ sessions });
+  } catch(e) {
+    return c.json({ error: "Failed to fetch chat sessions", details: e.message }, 500);
+  }
+});
+
+app.post('/api/v1/user/chat-sessions', async (c) => {
+  const body = await c.req.json();
+  const { id, user_id, title, messages, updated_at } = body;
+  const db = c.env.DB;
+  try {
+    const messagesStr = JSON.stringify(messages || []);
+    await db.prepare(`
+      INSERT INTO user_chat_sessions (id, user_id, title, messages, updated_at) 
+      VALUES (?, ?, ?, ?, ?) 
+      ON CONFLICT(id) DO UPDATE SET title = excluded.title, messages = excluded.messages, updated_at = excluded.updated_at
+    `).bind(id, user_id, title, messagesStr, updated_at || new Date().toISOString()).run();
+    return c.json({ success: true });
+  } catch(e) {
+    return c.json({ error: "Failed to save chat session", details: e.message }, 500);
+  }
+});
+
+app.delete('/api/v1/user/chat-sessions/:id', async (c) => {
+  const id = c.req.param('id');
+  const db = c.env.DB;
+  try {
+    await db.prepare("DELETE FROM user_chat_sessions WHERE id = ?").bind(id).run();
+    return c.json({ success: true });
+  } catch(e) {
+    return c.json({ error: "Failed to delete chat session", details: e.message }, 500);
+  }
+});
 
 // Chat history (autopilot insight save/load)
 // Chat history (AI Agent Discussion)
@@ -2960,7 +3285,70 @@ app.post('/ai/governance/approve', async (c) => {
     return c.json({ error: `거버넌스 승인 실패: ${err.message}` }, 500);
   }
 });
+// -----------------------------------------
+//  REPORT LINE MANAGEMENT APIs
+// -----------------------------------------
 
+// GET all active users for organization tree
+app.get('/api/v1/users/organization', async (c) => {
+  const db = c.env.DB;
+  try {
+    const { results } = await db.prepare(`
+      SELECT 
+        u.employee_id as id, u.name, u.role, 
+        COALESCE(h.name, u.honbu) as honbu, 
+        COALESCE(t.name, u.team) as team, 
+        u.part, u.position 
+      FROM users u
+      LEFT JOIN organizations h ON u.honbu = h.code
+      LEFT JOIN organizations t ON u.team = t.code
+      WHERE u.is_active = 1 
+      ORDER BY COALESCE(h.name, u.honbu, 'Z'), COALESCE(t.name, u.team, 'Z'), u.name
+    `).all();
+    return c.json({ users: results || [] });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// GET report lines
+app.get('/api/v1/report-lines', async (c) => {
+  const db = c.env.DB;
+  try {
+    const { results } = await db.prepare(
+      "SELECT * FROM report_lines ORDER BY hierarchy_level ASC"
+    ).all();
+    return c.json({ report_lines: results || [] });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// POST save report lines
+app.post('/api/v1/report-lines', async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const lines = body.report_lines || [];
+  
+  try {
+    const stmts = [];
+    stmts.push(db.prepare("DELETE FROM report_lines"));
+    
+    for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i];
+        stmts.push(
+            db.prepare("INSERT INTO report_lines (hierarchy_level, role_name, user_id, user_name) VALUES (?, ?, ?, ?)")
+            .bind(i + 1, ln.role_name || '결재자', ln.user_id, ln.user_name || '')
+        );
+    }
+    
+    await db.batch(stmts);
+    return c.json({ success: true, message: '보고 라인이 성공적으로 저장되었습니다.' });
+  } catch (err) {
+    console.error('Report lines save error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
 
 
 // List attachments for a War-Room

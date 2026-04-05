@@ -3,11 +3,13 @@ import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, Ch
 import MarkdownViewer from './MarkdownViewer';
 
 const getApiUrl = (endpoint) => {
-  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   if (isLocalDev && (endpoint.startsWith('/ai/') || endpoint.startsWith('/db/'))) {
     return `http://127.0.0.1:8000${endpoint}`;
   }
-  return 'https://sguardai.khcho0421.workers.dev' + endpoint;
+  // Production Worker API Base
+  const apiBase = 'https://sguardai.khcho0421.workers.dev';
+  return `${apiBase}${endpoint}`;
 };
 
 const API_BASE_URL = getApiUrl('');

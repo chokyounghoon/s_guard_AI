@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Plus, Edit3, Trash2, Building2, GitMerge, Users, Save, X, Network, Search, Command
+  ArrowLeft, Plus, Edit3, Trash2, Building2, GitMerge, Users, Save, X, Network, Search, Command, User
 } from 'lucide-react';
 
 export default function OrganizationManagementPage() {
@@ -14,11 +14,16 @@ export default function OrganizationManagementPage() {
   const [selectedDepth2, setSelectedDepth2] = useState(null);
   const [selectedDepth3, setSelectedDepth3] = useState(null);
   const [selectedDepth4, setSelectedDepth4] = useState(null);
+  const [selectedDepth5, setSelectedDepth5] = useState(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit'
   const [modalData, setModalData] = useState({ id: null, name: '', code: '', parentId: null, depth: 1 });
+  
+  // Member List State
+  const [partUsers, setPartUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -36,6 +41,43 @@ export default function OrganizationManagementPage() {
   useEffect(() => {
     fetchTree();
   }, []);
+
+  // Fetch users when any selection (Company to Part) changes
+  useEffect(() => {
+    const deepestId = selectedDepth5 || selectedDepth4 || selectedDepth3 || selectedDepth2 || selectedDepth1;
+    if (!deepestId) {
+      setPartUsers([]);
+      return;
+    }
+
+    setLoadingUsers(true);
+    // Find the node to get its code
+    const findNode = (nodes, id) => {
+      for (const n of nodes) {
+        if (n.id === id) return n;
+        if (n.children) {
+          const found = findNode(n.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const node = findNode(tree, deepestId);
+    if (!node || !node.code) {
+      // If code is missing, we can't filter correctly, so clear users
+      setPartUsers([]);
+      setLoadingUsers(false);
+      return;
+    }
+
+    // Use the robust 'orgCode' generic filter that matches any column
+    fetch(`${API_BASE}/users?orgCode=${encodeURIComponent(node.code)}`)
+      .then(r => r.json())
+      .then(data => setPartUsers(data))
+      .catch(console.error)
+      .finally(() => setLoadingUsers(false));
+  }, [selectedDepth1, selectedDepth2, selectedDepth3, selectedDepth4, selectedDepth5, tree]);
 
   const handleOpenAddModal = (parentId, depth) => {
     setModalMode('add');
@@ -86,23 +128,32 @@ export default function OrganizationManagementPage() {
     try {
       const res = await fetch(`${API_BASE}/org/nodes/${nodeId}`, { method: 'DELETE' });
       if (res.ok) {
-        if (nodeId === selectedDepth1) {
+        const resetAll = () => {
           setSelectedDepth1(null);
           setSelectedDepth2(null);
           setSelectedDepth3(null);
           setSelectedDepth4(null);
-        }
-        if (nodeId === selectedDepth2) {
+          setSelectedDepth5(null);
+        };
+
+        if (nodeId === selectedDepth1) resetAll();
+        else if (nodeId === selectedDepth2) {
           setSelectedDepth2(null);
           setSelectedDepth3(null);
           setSelectedDepth4(null);
+          setSelectedDepth5(null);
         }
-        if (nodeId === selectedDepth3) {
+        else if (nodeId === selectedDepth3) {
           setSelectedDepth3(null);
           setSelectedDepth4(null);
+          setSelectedDepth5(null);
         }
-        if (nodeId === selectedDepth4) {
+        else if (nodeId === selectedDepth4) {
           setSelectedDepth4(null);
+          setSelectedDepth5(null);
+        }
+        else if (nodeId === selectedDepth5) {
+          setSelectedDepth5(null);
         }
         fetchTree();
       }
@@ -114,6 +165,7 @@ export default function OrganizationManagementPage() {
   const depth2Nodes = selectedDepth1 ? tree.find(n => n.id === selectedDepth1)?.children || [] : [];
   const depth3Nodes = selectedDepth2 ? depth2Nodes.find(n => n.id === selectedDepth2)?.children || [] : [];
   const depth4Nodes = selectedDepth3 ? depth3Nodes.find(n => n.id === selectedDepth3)?.children || [] : [];
+  const depth5Nodes = selectedDepth4 ? depth4Nodes.find(n => n.id === selectedDepth4)?.children || [] : [];
 
   // Filter by search if needed (simply filtering names for now)
   const filterNodes = (nodes) => {
@@ -129,21 +181,23 @@ export default function OrganizationManagementPage() {
           <div className="flex items-center gap-2">
             {icon}
             <h3 className="font-bold text-white tracking-wide">
-              {depth === 1 ? '부문/실' : depth === 2 ? '본부' : depth === 3 ? '팀' : '파트'}
+              {depth === 1 ? '회사' : depth === 2 ? '부문/실' : depth === 3 ? '본부' : depth === 4 ? '팀' : '파트'}
             </h3>
           </div>
           <button
             onClick={() => handleOpenAddModal(
               depth === 1 ? null : 
               depth === 2 ? selectedDepth1 : 
-              depth === 3 ? selectedDepth2 : selectedDepth3, 
+              depth === 3 ? selectedDepth2 : 
+              depth === 4 ? selectedDepth3 : selectedDepth4, 
               depth
             )}
             className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
             title="추가"
             disabled={depth > 1 && !(
               depth === 2 ? selectedDepth1 : 
-              depth === 3 ? selectedDepth2 : selectedDepth3
+              depth === 3 ? selectedDepth2 : 
+              depth === 4 ? selectedDepth3 : selectedDepth4
             )}
           >
             <Plus className="w-4 h-4 text-white" />
@@ -216,7 +270,7 @@ export default function OrganizationManagementPage() {
               <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
                  <GitMerge className="w-5 h-5 text-blue-500" /> 조직 구조 관리
               </h1>
-              <p className="text-[10px] text-slate-500 font-mono tracking-[0.2em] uppercase mt-0.5">3-Depth Org Structure Admin</p>
+              <p className="text-[10px] text-slate-500 font-mono tracking-[0.2em] uppercase mt-0.5">5-Depth Org Structure Admin</p>
             </div>
           </div>
           
@@ -240,33 +294,93 @@ export default function OrganizationManagementPage() {
                 <p className="text-sm text-slate-500 animate-pulse">조직도를 불러오는 중입니다...</p>
              </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-             {/* Depth 1: 부문/실 */}
-             {renderList(depth1Nodes, 1, selectedDepth1, (id) => {
-               setSelectedDepth1(id);
-               setSelectedDepth2(null);
-               setSelectedDepth3(null);
-               setSelectedDepth4(null);
-             }, <Building2 className="w-5 h-5 text-blue-400" />, 'bg-[#121623]', 'border-blue-500/10')}
-
-             {/* Depth 2: 본부 */}
-             {renderList(depth2Nodes, 2, selectedDepth2, (id) => {
-               setSelectedDepth2(id);
-               setSelectedDepth3(null);
-               setSelectedDepth4(null);
-             }, <Network className="w-5 h-5 text-purple-400" />, 'bg-[#151928]', 'border-purple-500/10')}
-
-             {/* Depth 3: 팀 */}
-             {renderList(depth3Nodes, 3, selectedDepth3, (id) => {
-               setSelectedDepth3(id);
-               setSelectedDepth4(null);
-             }, <Users className="w-5 h-5 text-emerald-400" />, 'bg-[#181d2f]', 'border-emerald-500/10')}
-
-             {/* Depth 4: 파트 */}
-             {renderList(depth4Nodes, 4, selectedDepth4, (id) => {
-               setSelectedDepth4(id);
-             }, <Network className="w-5 h-5 text-indigo-400" />, 'bg-[#1a1f33]', 'border-indigo-500/10')}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+               {/* Depth 1: 회사 */}
+               {renderList(depth1Nodes, 1, selectedDepth1, (id) => {
+                 setSelectedDepth1(id);
+                 setSelectedDepth2(null);
+                 setSelectedDepth3(null);
+                 setSelectedDepth4(null);
+                 setSelectedDepth5(null);
+               }, <Building2 className="w-5 h-5 text-blue-400" />, 'bg-[#121623]', 'border-blue-500/10')}
+   
+               {/* Depth 2: 부문/실 */}
+               {renderList(depth2Nodes, 2, selectedDepth2, (id) => {
+                 setSelectedDepth2(id);
+                 setSelectedDepth3(null);
+                 setSelectedDepth4(null);
+                 setSelectedDepth5(null);
+               }, <Network className="w-5 h-5 text-purple-400" />, 'bg-[#151928]', 'border-purple-500/10')}
+   
+               {/* Depth 3: 본부 */}
+               {renderList(depth3Nodes, 3, selectedDepth3, (id) => {
+                 setSelectedDepth3(id);
+                 setSelectedDepth4(null);
+                 setSelectedDepth5(null);
+               }, <Users className="w-5 h-5 text-emerald-400" />, 'bg-[#181d2f]', 'border-emerald-500/10')}
+   
+               {/* Depth 4: 팀 */}
+               {renderList(depth4Nodes, 4, selectedDepth4, (id) => {
+                 setSelectedDepth4(id);
+                 setSelectedDepth5(null);
+               }, <Network className="w-5 h-5 text-indigo-400" />, 'bg-[#1a1f33]', 'border-indigo-500/10')}
+  
+               {/* Depth 5: 파트 */}
+               {renderList(depth5Nodes, 5, selectedDepth5, (id) => {
+                 setSelectedDepth5(id);
+               }, <Users className="w-5 h-5 text-blue-300" />, 'bg-[#1c223a]', 'border-blue-400/10')}
+            </div>
+  
+            {/* Member List Section */}
+            {selectedDepth5 && (
+              <section className="bg-[#121623] border border-white/5 rounded-[40px] p-8 shadow-2xl animate-in slide-in-from-bottom-5 duration-500">
+                 <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                       <div className="bg-blue-600/20 p-3 rounded-2xl">
+                          <Users className="w-6 h-6 text-blue-400" />
+                       </div>
+                       <div>
+                          <h2 className="text-2xl font-bold text-white tracking-tight">소속 인원 현황</h2>
+                          <p className="text-xs text-slate-500 font-mono tracking-widest uppercase mt-1">Organization Members</p>
+                       </div>
+                    </div>
+                    <div className="px-4 py-1.5 bg-blue-600/10 border border-blue-500/20 rounded-full">
+                       <span className="text-xs font-bold text-blue-400">Total: {partUsers.length}명</span>
+                    </div>
+                 </div>
+  
+                 {loadingUsers ? (
+                    <div className="flex justify-center py-12">
+                       <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-500 rounded-full animate-spin" />
+                    </div>
+                 ) : partUsers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                       {partUsers.map((user, i) => (
+                          <div 
+                             key={i}
+                             className="bg-white/5 border border-white/5 p-4 rounded-3xl hover:border-blue-500/30 transition-all group"
+                          >
+                             <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                   <User className="w-5 h-5" />
+                                </div>
+                                <div>
+                                   <p className="font-bold text-slate-100">{user.name}</p>
+                                   <p className="text-[10px] text-slate-500">{user.position} | {user.employee_id}</p>
+                                </div>
+                             </div>
+                          </div>
+                       ))}
+                    </div>
+                 ) : (
+                    <div className="text-center py-12 bg-white/5 rounded-3xl border border-dashed border-white/10">
+                       <p className="text-sm text-slate-500">배정된 인원이 없습니다.</p>
+                    </div>
+                 )}
+              </section>
+            )}
+          </>
         )}
       </main>
 

@@ -43,11 +43,6 @@ export default function ChatPage() {
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [showPhoneList, setShowPhoneList] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [aiMessages, setAiMessages] = useState([]);
-  const [activeAiTab, setActiveAiTab] = useState('chat'); // 'chat' or 'timeline'
-  const [userInput, setUserInput] = useState('');
-  const [isAiThinking, setIsAiThinking] = useState(false);
   const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [roomTitle, setRoomTitle] = useState('');
@@ -55,10 +50,8 @@ export default function ChatPage() {
   const [roomStatus, setRoomStatus] = useState('Open');
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]); // Array of { name, url, type, file }
-  const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [showAgentInsights, setShowAgentInsights] = useState(true);
   const [showAnalysisSummary, setShowAnalysisSummary] = useState(true);
-  const [warRooms, setWarRooms] = useState([]);
   const [showWipToast, setShowWipToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [participants, setParticipants] = useState([]);
@@ -79,7 +72,6 @@ export default function ChatPage() {
     role: 'Manager' 
   });
 
-  const [relatedData, setRelatedData] = useState({ history: [], reports: [] });
 
   useEffect(() => {
     const userStr = localStorage.getItem('sguard_user');
@@ -95,22 +87,6 @@ export default function ChatPage() {
     }
   }, []);
 
-  // Fetch related history based on room title/description (with AbortController)
-  useEffect(() => {
-    const controller = new AbortController();
-    if (roomTitle || roomDescription) {
-      const q = (roomTitle + " " + roomDescription).substring(0, 100);
-      fetch(getApiUrl(`/ai/related-history?q=${encodeURIComponent(q)}`), { signal: controller.signal })
-        .then(res => res.ok ? res.json() : { history: [], reports: [] })
-        .then(data => setRelatedData(data || { history: [], reports: [] }))
-        .catch(err => {
-          if (err.name === 'AbortError') return;
-          console.warn("Related history fetch error (suppressed):", err);
-          setRelatedData({ history: [], reports: [] });
-        });
-    }
-    return () => controller.abort();
-  }, [roomTitle, roomDescription]);
 
 
   // Load chat history (reusable for polling)
@@ -183,6 +159,30 @@ export default function ChatPage() {
     }
   }, [incidentId]);
 
+  const fetchActivityLogs = React.useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl(`/warroom/activity-logs/${incidentId}`));
+      if (res.ok) {
+        const data = await res.json();
+        setActivityLogs(data.logs || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch activity logs', e);
+    }
+  }, [incidentId]);
+
+  const fetchAnalysisSummary = React.useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl(`/warroom/analysis-summary/${incidentId}`));
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysisSummary(data.summary || '');
+      }
+    } catch (e) {
+      console.error('Failed to fetch analysis summary', e);
+    }
+  }, [incidentId]);
+
   const [aiAnalysisMessage, setAiAnalysisMessage] = useState(null);
   
   // Real-time State (DO/WS)
@@ -205,17 +205,7 @@ export default function ChatPage() {
   const typingTimeoutRef = useRef(null);
 
   // AI Assistant SSE streaming + typewriter
-  const aiAbortRef = useRef(null);
-  const aiTypingTimerRef = useRef(null);
-  const aiQueueRef = useRef('');
-
-  const stopAiTypewriter = () => {
-    if (aiTypingTimerRef.current) {
-      clearInterval(aiTypingTimerRef.current);
-      aiTypingTimerRef.current = null;
-    }
-    aiQueueRef.current = '';
-  };
+  // Post Chat Logic
 
   useEffect(() => {
     // When messages load, mark those with read_count > 0 as read (if not from us)
@@ -234,25 +224,11 @@ export default function ChatPage() {
   }, [mainMessages.length, currentUser.name, currentUser.employee_id, incidentId]);
 
 
-
-  // Fetch active War-Rooms for the popup list
-  const fetchWarRooms = async () => {
-    try {
-      const res = await fetch(getApiUrl('/warroom/rooms'));
-      if (res.ok) {
-        const data = await res.json();
-        setWarRooms(data.rooms || []);
-      }
-    } catch (e) {
-      console.error('Failed to fetch war rooms', e);
-    }
-  };
-
-  const handleWarRoomNavClick = () => {
-    fetchWarRooms();
-    setShowWarRoomPopup(prev => !prev);
-  };
-
+  useEffect(() => {
+    fetchParticipants();
+    fetchActivityLogs();
+    fetchAnalysisSummary();
+  }, [fetchParticipants, fetchActivityLogs, fetchAnalysisSummary, incidentId]);
 
   // WebSocket Connection Logic
   useEffect(() => {
@@ -513,116 +489,6 @@ export default function ChatPage() {
     setShowPhoneList(false);
   };
 
-  // AI Assistant Logic
-  const quickActions = [
-    { id: 'status', label: '현재 서버 상태 알려줘', icon: BarChart2 },
-    { id: 'error', label: '이 에러 원인 분석해줘', icon: AlertTriangle },
-    { id: 'history', label: '유사 장애 이력 찾아줘', icon: FileText },
-    { id: 'action', label: '조치 방법 추천해줘', icon: Zap }
-  ];
-
-  const handleAIMessage = async (message) => {
-    if (!message.trim()) return;
-
-    // Add user message
-    const userMessage = {
-      type: 'user',
-      text: message,
-      timestamp: new Date()
-    };
-    
-    setAiMessages(prev => [...prev, userMessage]);
-    setUserInput('');
-    setIsAiThinking(true);
-
-    try {
-      // cancel previous AI request
-      if (aiAbortRef.current) aiAbortRef.current.abort();
-      const controller = new AbortController();
-      aiAbortRef.current = controller;
-
-      stopAiTypewriter();
-
-      // create placeholder AI message to stream into
-      const aiMsgId = Date.now() + Math.random();
-      setAiMessages(prev => [...prev, { id: aiMsgId, type: 'ai', text: '', timestamp: new Date() }]);
-
-      const apiResponse = await fetch(getApiUrl('/ai/chat'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query: message }),
-        signal: controller.signal,
-      });
-      
-      if (!apiResponse.ok || !apiResponse.body) throw new Error(`API Error: ${apiResponse.status}`);
-
-      const reader = apiResponse.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      const enqueue = (text) => {
-        if (!text) return;
-        aiQueueRef.current += text;
-        if (aiTypingTimerRef.current) return;
-        aiTypingTimerRef.current = setInterval(() => {
-          if (!aiQueueRef.current.length) {
-            clearInterval(aiTypingTimerRef.current);
-            aiTypingTimerRef.current = null;
-            return;
-          }
-          const ch = aiQueueRef.current[0];
-          aiQueueRef.current = aiQueueRef.current.slice(1);
-          setAiMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: (m.text || '') + ch } : m));
-        }, 18);
-      };
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const evt of events) {
-          const lines = evt.split('\n');
-          for (const line of lines) {
-            if (!line.startsWith('data:')) continue;
-            const dataStr = line.slice(5).trim();
-            if (!dataStr) continue;
-            if (dataStr === '[DONE]') {
-              return;
-            }
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.error) {
-                setAiMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: 'AI 분석이 지연되고 있습니다' } : m));
-                stopAiTypewriter();
-                return;
-              }
-              if (data.answer) enqueue(data.answer);
-            } catch (e) {}
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Failed to connect to AI backend:", error);
-      setAiMessages(prev => [...prev, { type: 'ai', text: "AI 분석이 지연되고 있습니다", timestamp: new Date() }]);
-    } finally {
-      setIsAiThinking(false);
-    }
-  };
-
-  const handleQuickAction = (action) => {
-    handleAIMessage(action.label);
-  };
-
-  const handleCopyMessage = (text) => {
-    navigator.clipboard.writeText(text);
-    alert('메시지가 클립보드에 복사되었습니다.');
-  };
-
   const handleShareToTeam = (text) => {
     const shareText = `[AI Analysis Shared]\n\n${text}`;
     saveChatToDb({
@@ -632,7 +498,6 @@ export default function ChatPage() {
       type: 'me',
       text: shareText
     });
-    setShowAIAssistant(false);
   };
 
   const renderMessageContent = (text, isMe = false) => {
@@ -1341,41 +1206,6 @@ export default function ChatPage() {
                             )}
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-4 space-y-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <MessageSquare className="w-4 h-4 text-blue-400" />
-                              <span className="text-[11px] font-black text-blue-400 tracking-tight text-left">관련 워룸 히스토리</span>
-                            </div>
-                            <div className="space-y-2">
-                              {relatedData?.history?.slice(0, 3).map((h, i) => (
-                                <div key={i} onClick={() => h.id !== incidentId && navigate(`/chat/${h.id}`)} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
-                                  <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-blue-300 text-left">{h.title || h.id}</p>
-                                </div>
-                              ))}
-                              {(!relatedData?.history || relatedData.history.length === 0) && (
-                                <p className="text-[10px] text-slate-600 italic text-left">검색된 유사 워룸이 없습니다</p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-2xl p-4 space-y-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <FileText className="w-4 h-4 text-emerald-400" />
-                              <span className="text-[11px] font-black text-emerald-400 tracking-tight text-left">관련 지식 보고서</span>
-                            </div>
-                            <div className="space-y-2">
-                              {relatedData?.reports?.slice(0, 3).map((r, i) => (
-                                <div key={i} onClick={() => window.open(r.url, '_blank')} className="p-2.5 bg-black/20 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group">
-                                  <p className="text-[11px] font-bold text-slate-200 truncate group-hover:text-emerald-300 text-left">{r.title}</p>
-                                </div>
-                              ))}
-                              {(!relatedData?.reports || relatedData.reports.length === 0) && (
-                                <p className="text-[10px] text-slate-600 italic text-left">연동된 지식 자산이 없습니다</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
                     </div>
                 )}
             </div>
@@ -1702,278 +1532,6 @@ export default function ChatPage() {
         ))}
       </main>
     
-      {/* AI Assistant Panel */}
-      {showAIAssistant && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowAIAssistant(false)}>
-          <div 
-            className="absolute right-0 top-0 h-full w-full max-w-md bg-[#0f1421] border-l border-white/10 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* AI Panel Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10 bg-gradient-to-r from-purple-900/20 to-blue-900/20">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white">AI Assistant</h3>
-                  <p className="text-[10px] text-slate-400">S-Autopilot 실시간 분석</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAIAssistant(false)}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            {/* AI Panel Tabs */}
-            <div className="flex border-b border-white/5 bg-[#0a0d14]">
-              <button 
-                onClick={() => setActiveAiTab('chat')}
-                className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeAiTab === 'chat' ? 'text-purple-400 border-purple-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
-              >
-                AI 어시스턴트
-              </button>
-              <button 
-                onClick={() => setActiveAiTab('timeline')}
-                className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeAiTab === 'timeline' ? 'text-yellow-400 border-yellow-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
-              >
-                핵심 타임라인
-              </button>
-              <button 
-                onClick={() => setActiveAiTab('search')}
-                className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeAiTab === 'search' ? 'text-cyan-400 border-cyan-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
-              >
-                지능형 검색
-              </button>
-            </div>
-
-            {activeAiTab === 'chat' && (
-              <>
-                {/* Quick Actions */}
-                {aiMessages.length === 0 && (
-                  <div className="p-4 space-y-3 border-b border-white/5">
-                    <p className="text-xs text-slate-400 mb-2">💡 빠른 질문</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {quickActions.map((action) => (
-                        <button
-                          key={action.id}
-                          onClick={() => handleQuickAction(action)}
-                          className="flex items-center space-x-2 p-3 bg-gradient-to-br from-slate-800/60 to-slate-900/60 hover:from-purple-900/30 hover:to-blue-900/30 border border-white/5 hover:border-purple-500/30 rounded-xl text-left transition-all group"
-                        >
-                          <action.icon className="w-4 h-4 text-purple-400 group-hover:text-purple-300 flex-shrink-0" />
-                          <span className="text-[11px] text-slate-300 leading-tight">{action.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* AI Chat Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                  {aiMessages.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600/20 to-blue-600/20 flex items-center justify-center border border-purple-500/20">
-                        <Bot className="w-8 h-8 text-purple-400" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white mb-1">AI와 대화를 시작하세요</h4>
-                        <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
-                          서버 상태, 에러 원인, 조치 방법 등<br/>무엇이든 물어보세요!
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {aiMessages.map((msg, index) => (
-                    <div key={index}>
-                      {msg.type === 'user' ? (
-                        <div className="flex flex-col items-end space-y-1">
-                          <div className="bg-blue-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] text-sm leading-relaxed shadow-lg shadow-blue-900/20">
-                            {msg.text}
-                          </div>
-                          <span className="text-[10px] text-slate-500">
-                            {msg.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      ) : (
-                        <>
-                          <AIChatBubble 
-                            message={msg}
-                            onCopy={handleCopyMessage}
-                            onShare={handleShareToTeam}
-                          />
-                          {msg.metrics && (
-                            <div className="ml-10 max-w-[85%] mt-2 animate-fade-in-up">
-                                <ServerStatusChart />
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  ))}
-
-                  {isAiThinking && <AIThinkingIndicator />}
-                </div>
-
-                {/* AI Input Area */}
-                <div className="p-3 border-t border-white/10 bg-[#0a0d14]">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAIMessage(userInput)}
-                      placeholder="AI에게 질문하세요..."
-                      className="flex-1 bg-slate-800/60 rounded-full py-2.5 px-4 text-sm border border-white/5 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-slate-500"
-                    />
-                    <button
-                      onClick={() => handleAIMessage(userInput)}
-                      disabled={!userInput.trim()}
-                      className="p-2.5 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      <Send className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeAiTab === 'timeline' && (
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                <div className="flex flex-col space-y-1 mb-6">
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    장애 조치 핵심 타임라인
-                  </h4>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">KEY EVENTS FOR INCIDENT REPORT</p>
-                </div>
-
-                {mainMessages.filter(m => m.is_key_event).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
-                    <div className="w-12 h-12 rounded-full border border-dashed border-white/20 flex items-center justify-center mb-4">
-                      <Star className="w-6 h-6 text-slate-600" />
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      북마크된 중요 사건이 없습니다.<br/>메시지의 별 아이콘을 눌러 등록하세요.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="relative pl-3 border-l border-white/5 space-y-6">
-                    {mainMessages.filter(m => m.is_key_event).map((event, idx) => (
-                      <div key={idx} className="relative group">
-                        <div className="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-yellow-500 shadow-lg shadow-yellow-900/50" />
-                        <div 
-                          className="bg-slate-800/40 border border-white/5 hover:border-yellow-500/30 rounded-xl p-3 transition-all cursor-pointer group"
-                          onClick={() => {
-                            const el = document.getElementById(`msg-seq-${event.seq}`);
-                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          }}
-                        >
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-[10px] font-bold text-yellow-500">{event.time}</span>
-                            <span className="text-[9px] text-slate-500">@{event.sender}</span>
-                          </div>
-                          <p className="text-[12px] text-slate-200 leading-relaxed">{event.text}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                <div className="mt-8 p-4 rounded-2xl bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-white/10">
-                  <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
-                    💡 타임라인에 등록된 이벤트들은 장애 완료 시 **자동으로 사후 보고서(Post-mortem)**의 일지로 변환됩니다.
-                  </p>
-                  <button className="w-full py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[11px] font-bold transition-colors">
-                    전체 타임라인 복사하기
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {activeAiTab === 'search' && (
-              <div className="flex-1 flex flex-col min-h-0 bg-[#0a0d14]">
-                <div className="p-4 border-b border-white/5 space-y-3">
-                  <div className="flex flex-col space-y-1 mb-1">
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                       <Zap className="w-4 h-4 text-cyan-400 fill-current" />
-                       과거 장애 지능형 검색
-                    </h4>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">AI SEMANTIC SEARCH ACROSS WARROOMS</p>
-                  </div>
-                  <div className="relative">
-                    <input 
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAISearch(searchQuery)}
-                      placeholder="자연어로 물어보세요 (예: DB 데드락 조치법)"
-                      className="w-full bg-slate-800/80 border border-white/10 rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:border-cyan-500 transition-all placeholder:text-slate-600"
-                    />
-                    <button 
-                       onClick={() => handleAISearch(searchQuery)}
-                       className="absolute right-2 top-2 p-1.5 rounded-lg bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/40 transition-all"
-                    >
-                       <Zap className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {isSearching ? (
-                    <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-                      <Zap className="w-8 h-8 text-cyan-600 mb-4 animate-bounce" />
-                      <p className="text-xs text-slate-500 italic">의미론적 유사도 분석 중...</p>
-                    </div>
-                  ) : searchResults.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
-                      <Database className="w-12 h-12 text-slate-600 mb-4" />
-                      <p className="text-xs text-slate-500">검색 결과가 없습니다.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 pb-10">
-                      {searchResults.map((res, idx) => (
-                        <div 
-                           key={idx} 
-                           className="bg-slate-800/40 border border-white/5 hover:border-cyan-500/30 rounded-2xl p-4 transition-all cursor-pointer group hover:bg-cyan-900/5"
-                           onClick={() => handleWarpToMessage(res.incident_id, res.seq)}
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${
-                              res.score > 0.8 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-700/50 text-slate-400'
-                            }`}>
-                              {res.label}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-mono">INC-{res.incident_id}</span>
-                          </div>
-                          <p className="text-[13px] text-slate-200 leading-relaxed mb-3 line-clamp-3">
-                             {res.text}
-                          </p>
-                          <div className="flex justify-between items-center text-[10px] text-slate-500 border-t border-white/5 pt-3">
-                             <div className="flex items-center gap-2">
-                               <div className="w-5 h-5 rounded-md bg-slate-700 flex items-center justify-center text-white text-[8px]">
-                                 {res.sender ? res.sender[0] : 'S'}
-                               </div>
-                               <span>@{res.sender}</span>
-                             </div>
-                             <div className="flex items-center gap-1 text-cyan-500 font-bold group-hover:translate-x-1 transition-transform">
-                               이동하기 <ArrowLeft className="w-3 h-3 rotate-180" />
-                             </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       <div className="px-4 pb-2 bg-[#0f1421]">
         {roomStatus === 'CLOSED' ? (
           <div className="w-full py-4 rounded-2xl bg-slate-900/50 border border-white/5 text-slate-500 text-sm font-bold flex items-center justify-center gap-3 animate-in fade-in duration-500">
@@ -2003,7 +1561,7 @@ export default function ChatPage() {
       </div>
 
           {/* Typing Indicator & Input Area (Now sticky/fixed at the bottom of the column) */}
-          <div className="shrink-0 bg-[#0f1421] border-t border-white/5 pb-[70px] z-30">
+          <div className="shrink-0 bg-[#0f1421] border-t border-white/5 pb-24 z-30">
             {Object.values(remoteTyping).some(u => u.is_typing) && (
               <div className="px-5 py-1.5 flex items-center gap-2 animate-pulse bg-black/10">
                 <div className="flex -space-x-1">
@@ -2180,193 +1738,6 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* War-Room List Popup */}
-      {showWarRoomPopup && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
-                  <MessageSquare className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>
-                  <p className="text-[10px] text-slate-500 font-mono">ACTIVE CHANNELS ({warRooms.length})</p>
-                </div>
-              </div>
-              <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {warRooms.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">진행 중인 War-Room이 없습니다.</div>
-              ) : warRooms.map((room) => {
-                const roomId = room.inc_id || room.id;
-                return (
-                  <div
-                    key={roomId}
-                    onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
-                    className={`bg-[#11141d] p-4 rounded-2xl border transition-all cursor-pointer group ${roomId === incidentId ? 'border-blue-500/40 bg-blue-900/10' : 'border-white/5 hover:border-blue-500/30'}`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30">CRITICAL</span>
-                      {roomId === incidentId && <span className="text-[9px] text-blue-400 font-bold">● 현재 채팅방</span>}
-                    </div>
-                    <p className="text-sm font-semibold text-white truncate">{room.title || roomId}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full bg-[#0f1421] border-t border-white/5 px-6 py-3 flex justify-between items-center z-50 pb-safe">
-        <div className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => navigate('/dashboard')}>
-            <Home className="w-6 h-6" />
-            <span className="text-[10px] font-medium">홈</span>
-        </div>
-        <div className="flex flex-col items-center space-y-1 text-blue-500 relative cursor-pointer" onClick={handleWarRoomNavClick}>
-            <div className="relative">
-                <MessageSquare className="w-6 h-6" />
-                {warRooms.length > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0f1421]"></span>}
-            </div>
-            <span className="text-[10px] font-medium">War-Room</span>
-        </div>
-
-        <div className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => navigate('/overall-status')}>
-            <BarChart2 className="w-6 h-6" />
-            <span className="text-[10px] font-medium">통계</span>
-        </div>
-        
-        {/* AI Assistant Nav Button */}
-        <div 
-          className={`flex flex-col items-center space-y-1 transition-colors cursor-pointer ${
-            showAIAssistant ? 'text-purple-400' : 'text-slate-500 hover:text-purple-400'
-          }`}
-          onClick={() => setShowAIAssistant(!showAIAssistant)}
-        >
-            <div className="relative">
-              <Bot className="w-6 h-6" />
-              {!showAIAssistant && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border-2 border-[#0f1421] animate-pulse"></span>
-              )}
-            </div>
-            <span className="text-[10px] font-medium">AI</span>
-        </div>
-        
-        <div className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => setShowMoreMenu(true)}>
-            <Settings className="w-6 h-6" />
-            <span className="text-[10px] font-medium">설정</span>
-        </div>
-      </nav>
-
-      {/* More Menu Popup (Settings) */}
-      {showMoreMenu && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowMoreMenu(false)} />
-          <div className="w-full bg-[#1a1f2e] rounded-t-[40px] border-t border-white/10 shadow-2xl relative z-10 animate-in slide-in-from-bottom duration-500 overflow-hidden max-h-[90vh] overflow-y-auto pb-safe">
-            <div className="p-8 pb-4">
-              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-8" />
-              <h3 className="text-xl font-bold text-white mb-2 text-center">시스템 관리 설정</h3>
-              <p className="text-xs text-slate-500 text-center mb-10 uppercase tracking-[4px]">System Operations</p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/keyword-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Hash className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">할당 키워드 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Critical Alert Keywords</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/report-line-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-purple-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Users className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">보고 라인 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Approval Hierarchy</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/sms-test');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-green-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-green-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 text-green-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">수동 장애 접수</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Manual Incident Submission</span>
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/user-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <User className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">사용자 계정 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Account & Security Admin</span>
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/organization-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-emerald-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Network className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">부서/조직도 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Org Hierarchy Tree Admin</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-8 pt-4 pb-12">
-              <button
-                onClick={() => setShowMoreMenu(false)}
-                className="w-full py-4 rounded-2xl bg-white/5 text-slate-400 font-bold hover:bg-white/10 transition-colors"
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

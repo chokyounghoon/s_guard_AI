@@ -14,7 +14,6 @@ import ActivityPage from './pages/ActivityPage';
 import ActivityDetailPage from './pages/ActivityDetailPage';
 import AssignmentsPage from './pages/AssignmentsPage';
 import SMSNotification from './components/SMSNotification';
-import AiChatWidget from './components/AiChatWidget';
 import ErrorBoundary from './components/ErrorBoundary';
 import OverallStatusPage from './pages/OverallStatusPage';
 import SearchPage from './pages/SearchPage';
@@ -28,15 +27,60 @@ import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import WarRoomManagementPage from './pages/WarRoomManagementPage';
 import WorkflowPage from './pages/WorkflowPage';
 
-// 로그인/회원가입 페이지에서는 AiChatWidget 숨김
+import BottomMenu from './components/BottomMenu';
+import AIAssistantPanel from './components/AIAssistantPanel';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { X, MessageSquare } from 'lucide-react';
+
 function AppContent() {
   const location = useLocation();
-  const hideWidget = ['/', '/signup'].includes(location.pathname);
+  const navigate = useNavigate();
+  
+  const isAuthPage = ['/', '/signup'].includes(location.pathname);
+  
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
+  const [warRooms, setWarRooms] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
+
+  // Load user profile
+  useEffect(() => {
+    const savedUser = localStorage.getItem('sguard_user');
+    if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
+      try {
+        setUserProfile(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("User profile parse error", e);
+      }
+    }
+  }, []);
+
+  const fetchWarRooms = async () => {
+    try {
+      const res = await fetch('https://sguardai.khcho0421.workers.dev/warroom/rooms');
+      if (res.ok) {
+        const data = await res.json();
+        setWarRooms(data.rooms || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch war rooms', e);
+    }
+  };
+
+  const handleWarRoomClick = () => {
+    fetchWarRooms();
+    setShowWarRoomPopup(true);
+  };
+
+  // Extract incidentId from path if in /chat/:id
+  const pathParts = location.pathname.split('/');
+  const currentIncidentId = (pathParts[1] === 'chat' && pathParts[2]) ? pathParts[2] : null;
 
   return (
     <>
       <SMSNotification />
-      {!hideWidget && <AiChatWidget />}
+      
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
@@ -62,6 +106,69 @@ function AppContent() {
         <Route path="/warroom-management" element={<WarRoomManagementPage />} />
         <Route path="/workflow/:inc_id" element={<WorkflowPage />} />
       </Routes>
+
+      {/* Global Bottom Navigation */}
+      {!isAuthPage && (
+        <BottomMenu 
+          currentPath={location.pathname.startsWith('/chat') ? '/chat' : location.pathname} 
+          onWarRoomClick={handleWarRoomClick}
+          onAiClick={() => setShowAIAssistant(true)}
+        />
+      )}
+
+      {/* Global War-Room List Popup */}
+      {showWarRoomPopup && (
+        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
+          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
+                  <MessageSquare className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>
+                  <p className="text-[10px] text-slate-500 font-mono">ACTIVE CHANNELS ({warRooms.length})</p>
+                </div>
+              </div>
+              <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {warRooms.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">진행 중인 War-Room이 없습니다.</div>
+              ) : warRooms.map((room) => {
+                const roomId = room.inc_id || room.id;
+                return (
+                  <div
+                    key={roomId}
+                    onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
+                    className={`bg-[#11141d] p-4 rounded-2xl border transition-all cursor-pointer group ${roomId === currentIncidentId ? 'border-blue-500/40 bg-blue-900/10' : 'border-white/5 hover:border-blue-500/30'}`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30">CRITICAL</span>
+                      {roomId === currentIncidentId && <span className="text-[9px] text-blue-400 font-bold">● 현재 채팅방</span>}
+                    </div>
+                    <p className="text-sm font-semibold text-white truncate">{room.title || roomId}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global AI Assistant Panel */}
+      {!isAuthPage && (
+        <AIAssistantPanel 
+          isOpen={showAIAssistant} 
+          onClose={() => setShowAIAssistant(false)} 
+          incidentId={currentIncidentId}
+          userProfile={userProfile}
+        />
+      )}
     </>
   );
 }

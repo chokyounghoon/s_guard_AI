@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Hash, Users, User, Network, Shield, FileText } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot } from 'lucide-react';
 
-export default function BottomMenu({ currentPath, onWarRoomClick }) {
+export default function BottomMenu({ currentPath, onWarRoomClick, onAiClick, showAiPulse = true }) {
   const navigate = useNavigate();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
@@ -31,13 +31,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick }) {
           <span className="text-[10px] font-medium">War-Room</span>
         </div>
         
-        <div
-          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/activity' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
-          onClick={() => navigate('/activity')}
-        >
-          <Activity className={`w-6 h-6 ${currentPath === '/activity' ? 'fill-current' : ''}`} />
-          <span className="text-[10px] font-medium">활동</span>
-        </div>
+
         
         <div
           className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/search' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
@@ -45,6 +39,20 @@ export default function BottomMenu({ currentPath, onWarRoomClick }) {
         >
           <Search className={`w-6 h-6 ${currentPath === '/search' ? 'fill-current' : ''}`} />
           <span className="text-[10px] font-medium">검색</span>
+        </div>
+
+        {/* AI Assistant Nav Button */}
+        <div 
+          className="flex flex-col items-center space-y-1 text-slate-500 hover:text-purple-400 transition-colors cursor-pointer"
+          onClick={onAiClick}
+        >
+            <div className="relative">
+              <Bot className="w-6 h-6" />
+              {showAiPulse && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border-2 border-[#0f111a] animate-pulse"></span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium">AI</span>
         </div>
         
         <div
@@ -67,21 +75,6 @@ export default function BottomMenu({ currentPath, onWarRoomClick }) {
               <p className="text-xs text-slate-500 text-center mb-10 uppercase tracking-[4px]">System Operations</p>
 
               <div className="grid grid-cols-2 gap-4">
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/keyword-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Hash className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">할당 키워드 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Critical Alert Keywords</span>
-                  </div>
-                </div>
 
                 <div
                   onClick={() => {
@@ -110,8 +103,8 @@ export default function BottomMenu({ currentPath, onWarRoomClick }) {
                     <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 text-green-400" />
                   </div>
                   <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">SMS 테스트</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">SMS Simulation & Testing</span>
+                    <span className="block font-bold text-slate-200 text-sm sm:text-base">장애 수동 접수</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Manual Incident Entry & Testing</span>
                   </div>
                 </div>
                 <div
@@ -187,6 +180,22 @@ export default function BottomMenu({ currentPath, onWarRoomClick }) {
                   <div>
                     <span className="block font-bold text-slate-200 text-sm sm:text-base">WAR-ROOM 현황</span>
                     <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Incident War-Room Hub</span>
+                  </div>
+                </div>
+                
+                <div
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    navigate('/activity');
+                  }}
+                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-cyan-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
+                >
+                  <div className="bg-cyan-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
+                    <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
+                  </div>
+                  <div>
+                    <span className="block font-bold text-slate-200 text-sm sm:text-base">사용자 활동 기록</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">System Activity Logs</span>
                   </div>
                 </div>
               </div>

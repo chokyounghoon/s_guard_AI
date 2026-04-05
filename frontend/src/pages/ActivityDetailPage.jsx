@@ -1,8 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, MoreVertical, ShieldCheck, Sparkles, AlertTriangle, ListChecks, History, User, FileDown, Share2 } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, MoreVertical, Sparkles, AlertTriangle, ListChecks, History, User, FileDown, Share2 } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-import BottomMenu from '../components/BottomMenu';
 
 const chartData = [
   { time: '01:00', value: 30 },
@@ -16,7 +15,7 @@ export default function ActivityDetailPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-32">
+    <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-8">
       {/* Header */}
       <header className="flex items-start p-5 sticky top-0 bg-[#0f1421]/90 backdrop-blur-md z-40 space-x-4">
         <button onClick={() => navigate(-1)} className="mt-1 p-1 rounded-full hover:bg-white/10 transition-colors">
@@ -182,22 +181,19 @@ export default function ActivityDetailPage() {
                 </div>
             </div>
         </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-3 pt-4">
+            <button className="flex-1 flex items-center justify-center space-x-2 bg-[#1a1f2e] border border-white/10 h-16 rounded-2xl hover:bg-slate-800 transition-all active:scale-95 shadow-xl">
+                <FileDown className="w-5 h-5 text-slate-200" />
+                <span className="font-bold text-slate-200">PDF 다운로드</span>
+            </button>
+            <button className="flex-1 flex items-center justify-center space-x-3 bg-blue-600 hover:bg-blue-500 h-16 rounded-2xl transition-all active:scale-[0.98] shadow-2xl shadow-blue-900/50">
+                <Share2 className="w-5 h-5 text-white fill-current" />
+                <span className="font-bold text-lg text-white">공유하기</span>
+            </button>
+        </div>
       </main>
-
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-8 left-0 w-full px-5 flex items-center space-x-3 z-50">
-        <button className="flex-1 flex items-center justify-center space-x-2 bg-[#1a1f2e] border border-white/10 h-16 rounded-2xl hover:bg-slate-800 transition-all active:scale-95 shadow-xl">
-            <FileDown className="w-5 h-5 text-slate-200" />
-            <span className="font-bold text-slate-200">PDF 다운로드</span>
-        </button>
-        <button className="flex-1 flex items-center justify-center space-x-3 bg-blue-600 hover:bg-blue-500 h-16 rounded-2xl transition-all active:scale-[0.98] shadow-2xl shadow-blue-900/50">
-            <Share2 className="w-5 h-5 text-white fill-current" />
-            <span className="font-bold text-lg text-white">공유하기</span>
-        </button>
-      </div>
-
-      {/* Navigation */}
-       <BottomMenu currentPath="/activity" />
     </div>
   );
 }

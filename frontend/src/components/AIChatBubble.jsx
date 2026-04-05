@@ -2,6 +2,9 @@ import React from 'react';
 import { Copy, Share2, Sparkles, CheckCircle } from 'lucide-react';
 
 export default function AIChatBubble({ message, onCopy, onShare }) {
+  if (!message.text && (!message.logs || message.logs.length === 0) && !message.metrics) {
+    return null;
+  }
   const formatTimestamp = () => {
     const date = new Date();
     return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });

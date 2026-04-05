@@ -103,6 +103,7 @@ class WorkerClient:
 
 # Dify API Configuration
 DIFY_API_KEY_DASHBOARD = os.getenv("DIFY_API_KEY_DASHBOARD", "app-TSlqmp329iKOzpXUP90iC6Kw")
+DIFY_API_KEY_ASSISTANT = os.getenv("DIFY_API_KEY_ASSISTANT", "app-ZDaVB8EWtA5vmTYJLmbysdQq")
 DIFY_API_KEY_SUMMARIZER = os.getenv("DIFY_API_KEY_SUMMARIZER", "app-owwPp3j2qAvVDZpW2UUiY8L3")
 DIFY_API_KEY_GOVERNANCE = os.getenv("DIFY_API_KEY_GOVERNANCE", "app-QHxJQTBSKJlTw2gVeGgTk915")
 DIFY_API_KEY = DIFY_API_KEY_DASHBOARD # ✅ Default to Dashboard (Chat App)
@@ -433,16 +434,6 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-app = FastAPI(title="S-Guard AI SMS Service")
-
-# CORS 설정
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Pydantic 모델
 class SMSMessage(BaseModel):
@@ -848,7 +839,7 @@ async def chat_with_ai(request: ChatRequest):
 
     try:
         logger.info(f"S-GUARD Chat Dify 스트리밍 연동 중: {query}")
-        gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user", api_key=DIFY_API_KEY_DASHBOARD)
+        gen = await DifyClient.stream_chat_message(query=query, user="sguard-chat-user", api_key=DIFY_API_KEY_ASSISTANT)
         return StreamingResponse(gen, media_type="text/event-stream")
     except Exception as e:
         logger.error(f"Chat Dify error: {e}")
@@ -889,8 +880,20 @@ async def summarize_chat(req: SummarizeChatRequest):
     return StreamingResponse(summary_stream(), media_type="text/event-stream")
 
 
+async def sync_to_vectorize(payload: dict):
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{WORKER_URL}/ai/register-knowledge",
+                json=payload,
+                timeout=10.0
+            )
+            logger.info(f"Successfully synced Governance Approval to Vectorize for {payload.get('incident_id')}")
+    except Exception as e:
+        logger.error(f"Failed to sync to Vectorize Knowledge Base: {e}")
+
 @app.post("/ai/governance/approve")
-async def governance_approve(req: GovernanceApproveRequest):
+async def governance_approve(req: GovernanceApproveRequest, background_tasks: BackgroundTasks):
     """
     Final governance approval: Sends the incident summary to a special Dify app
     for archiving and RAG knowledge base update.
@@ -922,6 +925,15 @@ REPORT CONTENT:
             api_key=DIFY_API_KEY_GOVERNANCE
         )
         
+        # Schedule the vector database insertion background task
+        background_tasks.add_task(sync_to_vectorize, {
+            "incident_id": incident_id,
+            "title": req.title,
+            "content": content,
+            "category": "장애 워룸 요약",
+            "tags": "S-GUARD, WARROOM, TIMELINE"
+        })
+
         return StreamingResponse(gen, media_type="text/event-stream")
 
     except Exception as e:

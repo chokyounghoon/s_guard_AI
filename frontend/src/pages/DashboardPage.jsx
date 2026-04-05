@@ -7,18 +7,17 @@ import AiInsightPanel from '../components/AiInsightPanel';
 
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
-import BottomMenu from '../components/BottomMenu';
 
 
 
 // ── 데이터 ─────────────────────────────────────────
 const getApiUrl = (endpoint) => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  // AI 및 DB 관련 에코시스템은 FastAPI 백엔드 프록시를 통해 동기화 이점을 누린다.
+  // AI 및 DB 관련 에코시스템은 FastAPI 백엔드 프록시를 통해 동기화 이점을 누린다 (로컬 한정)
   if (isLocalDev && (endpoint.startsWith('/ai/') || endpoint.startsWith('/db/'))) {
     return `http://127.0.0.1:8000${endpoint}`;
   }
-  // 그 외 SMS 목록 조회 등 순수 데이터는 Worker API 직접 호출
+  // 그 외 운영 환경 및 고정 주소는 Cloudflare Worker API 직접 호출
   return 'https://sguardai.khcho0421.workers.dev' + endpoint;
 };
 
@@ -92,6 +91,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [showAgentPanel, setShowAgentPanel] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [agentMessages, setAgentMessages] = useState([]);
   const [systemStatus, setSystemStatus] = useState('normal'); // normal, critical, recovering
   const [messages, setMessages] = useState([]); // For top-banner messages
@@ -103,7 +103,6 @@ export default function DashboardPage() {
   const [selectedInsight, setSelectedInsight] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [smsMessages, setSmsMessages] = useState([]);
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
@@ -166,6 +165,18 @@ export default function DashboardPage() {
   const selectedSmsRef = useRef(null);
   const [lastAutoTriggeredId, setLastAutoTriggeredId] = useState(null);
   const lastAutoTriggeredIdRef = useRef(null);
+
+  useEffect(() => {
+    if (selectedSms) {
+      localStorage.setItem('sguard_current_incident', JSON.stringify({
+        id: selectedSms.inc_id,
+        title: selectedSms.service_name || selectedSms.title || "시스템 장애",
+        message: selectedSms.message || selectedSms.error_message || "상세 정보 없음"
+      }));
+    } else {
+      localStorage.removeItem('sguard_current_incident');
+    }
+  }, [selectedSms]);
 
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
@@ -390,12 +401,27 @@ export default function DashboardPage() {
     const activityInterval = setInterval(fetchActivityLogs, 10000);
     const assignmentInterval = setInterval(fetchMyAssignments, 10000);
     const historyInterval = setInterval(fetchUserActivityHistory, 15000);
+
+    // 🚀 NEW: Real-time SMS Stream (SSE)
+    const sse = new EventSource(getApiUrl('/sms/notification-stream'));
+    sse.addEventListener('new_sms', (event) => {
+      console.log('Real-time SMS Event:', event.data);
+      // Immediately pull fresh data when a new SMS notification arrives
+      fetchSMSMessages();
+    });
+
+    sse.onerror = () => {
+       console.warn('SMS SSE Connection failed, falling back to polling.');
+       sse.close();
+    };
+
     return () => {
       clearInterval(smsInterval);
       clearInterval(wrInterval);
       clearInterval(activityInterval);
       clearInterval(assignmentInterval);
       clearInterval(historyInterval);
+      sse.close();
     };
   }, [userProfile, assignmentDateRange]);
 
@@ -531,10 +557,19 @@ export default function DashboardPage() {
           return true; // Default to all if profile not loaded yet
         });
 
-        setSmsMessages(freshMsgs);
+        // 🚀 Duplicate Prevention: Ensure unique inc_id in the list
+        const uniqueMap = new Map();
+        freshMsgs.forEach(msg => {
+          if (!uniqueMap.has(msg.inc_id)) {
+            uniqueMap.set(msg.inc_id, msg);
+          }
+        });
+        const finalMsgs = Array.from(uniqueMap.values());
+
+        setSmsMessages(finalMsgs);
 
         // --- 실시간 자동 분석 트리거 (New Arrival Automation) ---
-        if (freshMsgs.length > 0) {
+        if (finalMsgs.length > 0) {
           const latestId = String(freshMsgs[0].inc_id);
           if (latestId !== lastAutoTriggeredIdRef.current) {
             lastAutoTriggeredIdRef.current = latestId;
@@ -798,6 +833,9 @@ export default function DashboardPage() {
     setIsAssignmentsCollapsed(false);
     setShowAgentPanel(true);
 
+    // Filter inc_id to strictly numeric if it has INC- prefix
+    const cleanIncId = String(smsMessage.inc_id).replace('INC-', '');
+
     // Trigger Assignment to the current user
     if (userProfile?.id) {
       fetch(`${API_BASE}/ai/incident/assign`, {
@@ -820,7 +858,7 @@ export default function DashboardPage() {
       // UNIFIED STREAMING: AiInsightPanel에서 통합 수행하므로 중복 호출 제거.
       // Dashboard에서는 히스토리 존재 여부만 체크하고 패널을 열어준다.
       // -------------------------------------------------------------
-      const checkRes = await fetch(getApiUrl(`/ai/chat-history/${smsMessage.inc_id}`));
+      const checkRes = await fetch(getApiUrl(`/ai/chat-history/${cleanIncId}`));
       if (checkRes.ok) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
@@ -1410,7 +1448,6 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-
           </div>
         </div>
 
@@ -1977,15 +2014,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Bottom Navigation */}
-      <BottomMenu 
-        currentPath="/dashboard" 
-        onWarRoomClick={() => {
-          fetchWarRooms();
-          setShowWarRoomPopup(true);
-        }} 
-      />
     </div>
   );
 }
