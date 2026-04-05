@@ -16,7 +16,7 @@ const agentColors = {
 // API URL helper: /ai/ endpoints go to local FastAPI, others to Cloudflare Worker
 const getApiUrl = (endpoint) => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isLocalDev && endpoint.startsWith('/ai/')) {
+  if (isLocalDev && endpoint.startsWith('/ai/summarize-chat')) {
     return `http://127.0.0.1:8000${endpoint}`;
   }
   return 'https://sguardai.khcho0421.workers.dev' + endpoint;
@@ -51,7 +51,7 @@ export default function ChatPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]); // Array of { name, url, type, file }
   const [showAgentInsights, setShowAgentInsights] = useState(true);
-  const [showAnalysisSummary, setShowAnalysisSummary] = useState(true);
+  const [showAnalysisSummary, setShowAnalysisSummary] = useState(false);
   const [showWipToast, setShowWipToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [participants, setParticipants] = useState([]);
@@ -65,6 +65,8 @@ export default function ChatPage() {
   const [mainInput, setMainInput] = useState('');
   const { incidentId: paramId } = useParams();
   const incidentId = paramId || 'INC-8823';
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [analysisSummary, setAnalysisSummary] = useState('');
   
   const [currentUser, setCurrentUser] = useState({ 
     employee_id: 'EMP-1234', // Local mock ID for initial state
@@ -161,7 +163,7 @@ export default function ChatPage() {
 
   const fetchActivityLogs = React.useCallback(async () => {
     try {
-      const res = await fetch(getApiUrl(`/warroom/activity-logs/${incidentId}`));
+      const res = await fetch(getApiUrl(`/activity-logs?inc_id=${incidentId}`));
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(data.logs || []);
@@ -173,10 +175,10 @@ export default function ChatPage() {
 
   const fetchAnalysisSummary = React.useCallback(async () => {
     try {
-      const res = await fetch(getApiUrl(`/warroom/analysis-summary/${incidentId}`));
+      const res = await fetch(getApiUrl(`/incidents/${incidentId}`));
       if (res.ok) {
         const data = await res.json();
-        setAnalysisSummary(data.summary || '');
+        setAnalysisSummary(data.ai_insight || '');
       }
     } catch (e) {
       console.error('Failed to fetch analysis summary', e);
@@ -849,23 +851,11 @@ export default function ChatPage() {
         </div>
         <div className="flex items-center space-x-4 relative">
           <button 
-            onClick={() => {
-              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify({ type: "SUMMARY_REQUEST", incident_id: incidentId }));
-                alert('AI 요약을 요청했습니다. 잠시만 기다려주세요.');
-              }
-            }}
-            className="flex items-center px-3 py-1.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg text-xs font-bold hover:bg-purple-500/30 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
-            AI 요약 요청
-          </button>
-          <button 
             onClick={() => navigate(`/chat-summary/${incidentId}`)}
-            className="flex items-center px-3 py-1.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-bold hover:bg-blue-500/30 transition-colors"
+            className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 rounded-lg text-sm font-extrabold shadow-[0_0_15px_rgba(59,130,246,0.6)] hover:shadow-[0_0_25px_rgba(59,130,246,0.9)] hover:scale-105 transition-all duration-300"
           >
-            <FileText className="w-3.5 h-3.5 mr-1.5" />
-            채팅 요약
+            <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
+            WAR-ROOM 분석
           </button>
           <button 
             onClick={handleResolveIncident}
@@ -1140,9 +1130,9 @@ export default function ChatPage() {
                               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                                 <div className="p-4 text-[13px] leading-relaxed relative border-b border-purple-500/10 text-left">
                                   <div className={`text-slate-200 transition-all duration-300 ${!showFullAnalysis ? 'max-h-24 overflow-hidden' : ''}`}>
-                                    <MarkdownViewer text={aiAnalysisMessage?.text || roomDescription || '장애 내용을 포함한 실시간 지식 분석을 기다리고 있습니다...'} />
+                                    <MarkdownViewer text={aiAnalysisMessage?.text || analysisSummary || roomDescription || '장애 내용을 포함한 실시간 지식 분석을 기다리고 있습니다...'} />
                                   </div>
-                                  {(aiAnalysisMessage?.text || roomDescription) && (
+                                  {(aiAnalysisMessage?.text || analysisSummary || roomDescription) && (
                                     <button 
                                       onClick={() => setShowFullAnalysis(!showFullAnalysis)}
                                       className="mt-3 text-[10px] text-purple-400 font-black uppercase tracking-wider hover:text-purple-300 flex items-center gap-1"
@@ -1533,31 +1523,7 @@ export default function ChatPage() {
       </main>
     
       <div className="px-4 pb-2 bg-[#0f1421]">
-        {roomStatus === 'CLOSED' ? (
-          <div className="w-full py-4 rounded-2xl bg-slate-900/50 border border-white/5 text-slate-500 text-sm font-bold flex items-center justify-center gap-3 animate-in fade-in duration-500">
-            <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
-            이 War-Room은 종료되었습니다. (읽기 전용)
-          </div>
-        ) : (
-          <div className="flex gap-3">
-            {/* Button 1: Resolve Only */}
-            <button
-              onClick={handleResolveOnly}
-              className="flex-1 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 text-[13px] font-black flex items-center justify-center gap-2 transition-all active:scale-[0.97] group"
-            >
-              <CheckCircle className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
-              장애완료만 처리<br/><span className="text-[10px] opacity-60 font-normal">(보고서 제외)</span>
-            </button>
-            {/* Button 2: Resolve & Report */}
-            <button
-              onClick={handleResolveIncident}
-              className="flex-[1.8] py-3.5 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-[13px] font-black flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/40 hover:from-emerald-500 hover:to-teal-600 transition-all active:scale-[0.97] group"
-            >
-              <FileText className="w-5 h-5 group-hover:animate-bounce" />
-              완료 및 REPORT·지식DB 생성
-            </button>
-          </div>
-        )}
+        {/* Resolution buttons removed per user request */}
       </div>
 
           {/* Typing Indicator & Input Area (Now sticky/fixed at the bottom of the column) */}
@@ -1578,7 +1544,7 @@ export default function ChatPage() {
             )}
 
             <div className="p-3 flex flex-col space-y-2">
-              {roomStatus === 'CLOSED' ? (
+              { (roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료') ? (
                 <div className="bg-slate-900/50 rounded-2xl py-4 px-5 border border-white/5 flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
                   <span className="text-sm text-slate-500 font-medium">이 War-Room은 종료되었습니다. (읽기 전용)</span>
@@ -1644,14 +1610,14 @@ export default function ChatPage() {
                       )}
                       <input
                         type="text"
-                        disabled={roomStatus === 'CLOSED'}
+                        disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료'}
                         value={mainInput}
                         onChange={(e) => {
                           setMainInput(e.target.value);
                           handleTyping();
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                        placeholder={roomStatus === 'CLOSED' ? "종료된 워룸은 입력할 수 없습니다" : "메시지를 입력하세요..."}
+                        placeholder={(roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료') ? "종료된 워룸은 입력할 수 없습니다" : "메시지를 입력하세요..."}
                         className={`w-full bg-slate-800/60 py-2.5 px-5 text-[15px] border border-white/5 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500 ${replyTo ? 'rounded-b-2xl' : 'rounded-full'}`}
                       />
                       <button

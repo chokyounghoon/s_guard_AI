@@ -6,11 +6,9 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 const FLOW_STEPS = [
   { id: 'SMS', label: 'SMS 수신 및 장애 인지' },
-  { id: 'RAG', label: 'RAG 및 AI AGENT 분석 완료' },
+  { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료' },
   { id: 'WARROOM', label: '워룸생성 및 할당완료' },
-  { id: 'REPORT', label: '보고서 생성완료' },
-  { id: 'KNOWLEDGE', label: '지식화 및 보고완료' },
-  { id: 'CLOSE', label: '워룸종료 및 장애처리완료' }
+  { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료' }
 ];
 
 export default function WorkflowPage() {
@@ -102,10 +100,15 @@ export default function WorkflowPage() {
     );
   }
 
-  const firstPendingIdx = FLOW_STEPS.findIndex(step => !workflowLogs.find(l => l.id === step.id));
+  const firstPendingIdx = FLOW_STEPS.findIndex(step => {
+    if (step.id === 'RAG_AGENT') {
+      return !workflowLogs.find(l => l.id === 'RAG') && !workflowLogs.find(l => l.id === 'AGENT');
+    }
+    return !workflowLogs.find(l => l.id === step.id);
+  });
 
   const startLog = workflowLogs.find(l => l.id === 'SMS');
-  const endLog = workflowLogs.find(l => l.id === 'CLOSE' || l.id === 'WARROOM_CLOSED');
+  const endLog = workflowLogs.find(l => l.id === 'KNOWLEDGE');
   
   const startTime = startLog ? new Date(startLog.timestamp) : (incidentData?.created_at ? new Date(incidentData.created_at) : null);
   const endTime = endLog ? new Date(endLog.timestamp) : null;
@@ -200,7 +203,13 @@ export default function WorkflowPage() {
 
           <div className="space-y-0 relative z-10">
             {FLOW_STEPS.map((step, sIdx) => {
-              const stepLog = workflowLogs.find(l => l.id === step.id);
+              let stepLog = workflowLogs.find(l => l.id === step.id);
+              
+              // Handle RAG_AGENT combined logic
+              if (step.id === 'RAG_AGENT') {
+                stepLog = workflowLogs.find(l => l.id === 'RAG') || workflowLogs.find(l => l.id === 'AGENT');
+              }
+
               const isCompleted = !!stepLog;
               const isNextStep = sIdx === firstPendingIdx;
               
@@ -229,8 +238,9 @@ export default function WorkflowPage() {
 
                   {/* Node Circle */}
                   <div className={`absolute left-0 top-0 w-12 h-12 rounded-[1.25rem] border-2 border-[#1a1f2e] z-30 flex items-center justify-center transition-all duration-700
-                    ${isCompleted ? 'bg-blue-600 border-blue-400 shadow-[0_0_25px_rgba(37,99,235,0.4)]' : 
-                      (isNextStep ? 'bg-blue-500/20 border-blue-400/50 shadow-[0_0_15px_rgba(37,99,235,0.1)]' : 'bg-[#0f111a] border-white/5')}`}>
+                    ${isCompleted 
+                      ? (step.id === 'KNOWLEDGE' ? 'bg-emerald-600 border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.4)]' : 'bg-blue-600 border-blue-400 shadow-[0_0_25px_rgba(37,99,235,0.4)]')
+                      : (isNextStep ? 'bg-blue-500/20 border-blue-400/50 shadow-[0_0_15px_rgba(37,99,235,0.1)]' : 'bg-[#0f111a] border-white/5')}`}>
                     
                     {isCompleted ? (
                        <CheckCircle2 className="w-5 h-5 text-white" />
@@ -248,7 +258,7 @@ export default function WorkflowPage() {
 
                   <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100 translate-x-0' : (isNextStep ? 'opacity-100 translate-x-2' : 'opacity-20')}`}>
                     <div className="flex items-center gap-4 mb-3">
-                      <h4 className={`font-black text-xl tracking-tight ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-slate-600')}`}>
+                      <h4 className={`font-black text-xl tracking-tight ${isCompleted ? (step.id === 'KNOWLEDGE' ? 'text-emerald-400' : 'text-white') : (isNextStep ? 'text-blue-400' : 'text-slate-600')}`}>
                         {step.label}
                       </h4>
                       {isCompleted && (
@@ -289,10 +299,10 @@ export default function WorkflowPage() {
                     {(isCompleted || isNextStep) && step.id === 'WARROOM' && (
                        <button
                          onClick={() => navigate(`/chat/${inc_id}`)}
-                         className="mt-6 flex items-center gap-3 group/btn text-xs font-black text-white bg-blue-600 border border-blue-400/30 px-8 py-4 rounded-[1.25rem] shadow-[0_15px_35px_rgba(37,99,235,0.4)] hover:shadow-[0_20px_50px_rgba(37,99,235,0.6)] transition-all transform hover:scale-[1.03] active:scale-[0.98]"
+                         className={`mt-6 flex items-center gap-3 group/btn text-xs font-black text-white border border-blue-400/30 px-8 py-4 rounded-[1.25rem] ${isClosed ? 'bg-slate-800 shadow-xl' : 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:shadow-[0_0_20px_rgba(37,99,235,0.6)]'} transition-all transform hover:scale-[1.03] active:scale-[0.98]`}
                        >
-                         <Zap className="w-4 h-4 fill-white animate-pulse" />
-                         워룸 상황판으로 즉시 이동하여 대응하기 <ChevronRight className="w-5 h-5 group-hover/btn:translate-x-1.5 transition-transform" />
+                         <Zap className={`w-4 h-4 fill-white ${isClosed ? '' : 'animate-pulse'}`} />
+                         {isClosed ? '워룸 히스토리 보기(readOnly)' : '워룸으로 즉시 이동하여 대응하기'} <ChevronRight className="w-5 h-5 group-hover/btn:translate-x-1.5 transition-transform" />
                        </button>
                     )}
                   </div>

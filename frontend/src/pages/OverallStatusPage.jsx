@@ -115,7 +115,7 @@ export default function OverallStatusPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-6 space-y-6 relative z-10 pb-24">
+      <main className="max-w-7xl mx-auto p-6 space-y-6 relative z-10 pb-60">
         
         {/* 꿈의 집계 핵심 인디케이터 (With Methodology) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -267,7 +267,7 @@ export default function OverallStatusPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
            
            {/* 전문가 시너지 보드 (입체적 기여도 산출) */}
            <div className="bg-[#11141d]/60 backdrop-blur-2xl p-8 rounded-[2.5rem] border border-white/5 shadow-2xl group">
@@ -371,14 +371,14 @@ export default function OverallStatusPage() {
       </main>
 
       {/* 플로팅 내비게이션 버튼 (글로벌 맵 테마) */}
-      <div className="fixed bottom-12 inset-x-0 w-full px-6 pointer-events-none group">
+      <div className="fixed bottom-28 inset-x-0 w-full px-6 pointer-events-none group">
         <div className="max-w-7xl mx-auto flex justify-end pointer-events-auto">
           <button 
              onClick={() => navigate('/dashboard')}
              className="relative flex items-center space-x-4 px-10 py-5 bg-black text-white rounded-full shadow-[0_0_40px_rgba(59,130,246,0.3)] hover:shadow-[0_0_50px_rgba(59,130,246,0.5)] hover:scale-[1.03] active:scale-95 transition-all group/btn border border-blue-500/30 overflow-hidden"
           >
              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 opacity-80 group-hover/btn:opacity-100 transition-opacity" />
-             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
+             <div className="absolute inset-0 bg-[#06080c] opacity-20 pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
              <Sparkles className="w-6 h-6 text-white group-hover/btn:animate-spin relative z-10" />
              <span className="text-sm font-black uppercase tracking-[0.4em] relative z-10">S-Guard Command Tower</span>
              <ChevronRight className="w-5 h-5 opacity-50 relative z-10 group-hover/btn:translate-x-1 transition-transform" />

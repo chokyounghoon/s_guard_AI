@@ -18,7 +18,7 @@ const getDefaultConfig = () => {
   return {
     startDate: new Date(start.getTime() - tzOffset).toISOString().split('T')[0],
     endDate: new Date(end.getTime() - tzOffset).toISOString().split('T')[0],
-    assignee: ''
+    assignee: savedUser.name || ''
   };
 };
 
@@ -65,8 +65,17 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
+    const savedUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+    const deepestVal = savedUser.subpart_code || savedUser.subpart || savedUser.part_code || savedUser.part || savedUser.team_code || savedUser.team || savedUser.honbu_code || savedUser.honbu || savedUser.company_code || savedUser.company || '신한DS';
+    const defaultData = getDefaultConfig();
+    const params = new URLSearchParams();
+    if (defaultData.startDate) params.append('startDate', defaultData.startDate);
+    if (defaultData.endDate) params.append('endDate', defaultData.endDate);
+    if (deepestVal && deepestVal !== '신한DS') params.append('orgCode', deepestVal);
+    if (savedUser.name) params.append('assignee', savedUser.name);
+
     Promise.all([
-      fetch(`${SMS_WORKER_URL}/incidents`).then(r => r.json()),
+      fetch(`${SMS_WORKER_URL}/incidents?${params.toString()}`).then(r => r.json()),
       fetch(`${SMS_WORKER_URL}/users`).then(r => r.json()).catch(() => []),
       fetch(`${SMS_WORKER_URL}/org/tree`).then(r => r.json()).catch(() => [])
     ])
@@ -75,13 +84,20 @@ export default function SearchPage() {
          const savedUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
          const currentUser = userData.find(u => u.employee_id === savedUser.employee_id || u.name === savedUser.name) || savedUser;
 
+         const getOrgCode = (val) => {
+           if (!val) return '';
+           const node = findNodeInTree(treeData, val);
+           return node ? (node.code || node.name) : val;
+         };
+
          setSearchParams(prev => ({
            ...prev,
-           org1: currentUser.company_code || currentUser.company || '신한DS',
-           org2: currentUser.honbu_code || currentUser.honbu || '',
-           org3: currentUser.team_code || currentUser.team || '',
-           org4: currentUser.part_code || currentUser.part || '',
-           org5: currentUser.subpart_code || currentUser.subpart || ''
+           org1: getOrgCode(currentUser.company_code || currentUser.company || '신한DS'),
+           org2: getOrgCode(currentUser.honbu_code || currentUser.honbu),
+           org3: getOrgCode(currentUser.team_code || currentUser.team),
+           org4: getOrgCode(currentUser.part_code || currentUser.part),
+           org5: getOrgCode(currentUser.subpart_code || currentUser.subpart),
+           assignee: currentUser.name || ''
          }));
          
          setAllUsers(userData);
@@ -92,15 +108,26 @@ export default function SearchPage() {
             else if (st.includes('처리') || st.includes('진행')) cat = '처리중';
             if (st.includes('완료') || st === '정상' || st === 'GOVERNED') cat = '조치완료';
 
+            const mainAssignee = inc.assignee_name || inc.assigned_to;
+            const others = inc.assignment_list ? inc.assignment_list.split(',').filter(name => name !== mainAssignee) : [];
+            const displayAssignee = others.length > 0 ? `${mainAssignee} 외 ${others.length}명` : (mainAssignee || '미지정');
+
             return {
               id: inc.inc_id,
               name: inc.title || 'Untitled',
-              description: inc.description || '',
+              description: inc.raw_message || inc.description || '',
+              raw_message: inc.raw_message || '',
               severity: inc.severity || 'INFO',
               status: st,
               category: cat,
               date: inc.created_at ? inc.created_at.replace('T', ' ').substring(0, 16) : '',
-              assignee: inc.assignee || '미지정',
+              assignee: displayAssignee,
+              assignee_details: others.length > 0 ? [mainAssignee, ...others].join(', ') : mainAssignee,
+              company: inc.company || '',
+              honbu: inc.honbu || '',
+              team: inc.team || '',
+              part: inc.part || '',
+              subpart: inc.subpart || '',
               sender: inc.sender_phone || '알 수 없음',
               sender_id: inc.sender_employee_id || '',
               received_count: inc.received_count || 0,
@@ -111,6 +138,7 @@ export default function SearchPage() {
          });
 
          setAllIncidents(processed);
+         setSearchResults(processed);
          setStats({
            total: processed.length,
            unconfirmed: processed.filter(i => i.category === '미확인').length,

@@ -60,9 +60,9 @@ export default function AiReportPage() {
   const location = useLocation();
   const params = useParams();
   
-  // Robust ID retrieval: Params first (persistence), State secondary (initial navigation)
   const rawId = params.incidentId || location.state?.incidentId;
   const incidentId = rawId ? String(rawId).replace("INC-", "").trim() : null;
+  const currentUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
 
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -208,6 +208,8 @@ export default function AiReportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          inc_id: incidentId,
+          user_id: currentUser.employee_id,
           title: report?.title || incidentId,
           content: `[6W1H]\nWho: ${report?.who}\nWhen: ${report?.when}\nWhere: ${report?.where}\nWhat: ${report?.what}\nWhy: ${report?.why}\nHow: ${report?.how}\n\n[메모]\n${memo}`,
         }),
@@ -360,22 +362,6 @@ export default function AiReportPage() {
                 {!report.autopilot_insight && !report.leader_summary && !chatSummary && (
                   <div className="text-center py-10 text-slate-500 text-sm">분석 데이터가 없습니다.</div>
                 )}
-
-                {/* Memo */}
-                <section className="bg-[#0f1421] rounded-2xl border border-white/5 overflow-visible">
-                  <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5">
-                    <MessageSquare className="w-4 h-4 text-slate-400" />
-                    <span className="text-xs font-bold text-slate-400">처리자 메모 (지식DB 학습 데이터)</span>
-                  </div>
-                  <div className="p-4">
-                    <textarea
-                      value={memo}
-                      onChange={e => setMemo(e.target.value)}
-                      placeholder="장애 처리 과정에 대한 추가 코멘트를 입력하세요..."
-                      className="w-full h-28 bg-transparent text-slate-300 text-sm outline-none resize-none placeholder:text-slate-600 leading-relaxed"
-                    />
-                  </div>
-                </section>
               </div>
             )}
 
@@ -426,13 +412,19 @@ export default function AiReportPage() {
             {/* ── War-Room 채팅 전체 기록 (필요시 상세 조회용) ── */}
             {activeTab === 'chat' && (
               <div className="space-y-6 animate-in fade-in duration-300 overflow-visible">
-                <section className="bg-[#0f1421] rounded-2xl border border-white/5 overflow-visible">
-                  <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5 bg-white/5">
-                    <MessageSquare className="w-4 h-4 text-slate-400" />
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">War-Room Chat Context</span>
+                <section className="bg-blue-600/5 rounded-2xl border border-blue-500/20 overflow-visible shadow-lg shadow-blue-500/5">
+                  <div className="px-4 py-2.5 flex items-center gap-2 border-b border-blue-500/10 bg-blue-500/10">
+                    <Sparkles className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
                   </div>
-                  <div className="p-5 text-center text-slate-500 text-sm italic">
-                    상세 채팅 로그 분석 데이터는 [AI 분석 요약] 탭 상단의 타임라인을 참고해 주시기 바랍니다.
+                  <div className="p-5 overflow-visible">
+                    {chatSummary ? (
+                      <MarkdownBlock text={chatSummary} />
+                    ) : (
+                      <div className="text-center py-10 text-slate-500 text-sm">
+                        요약된 타임라인 정보가 없습니다. [AI 분석 요약] 탭에서 분석이 진행되었는지 확인해주세요.
+                      </div>
+                    )}
                   </div>
                 </section>
               </div>

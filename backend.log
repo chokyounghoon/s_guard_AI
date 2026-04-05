@@ -10658,3 +10658,1558 @@ INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "
 INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
 INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214009391 "HTTP/1.1 200 OK"
 INFO:     127.0.0.1:57128 - "GET /ai/chat-history/20260405214009391 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57270 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57301 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57301 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57332 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214009391 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57341 - "GET /ai/chat-history/20260405214009391 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214009391 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57346 - "GET /ai/chat-history/20260405214009391 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57443 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57443 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214009391 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57484 - "GET /ai/chat-history/20260405214009391 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405213946632 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57484 - "GET /ai/chat-history/20260405213946632 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405213946632 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57501 - "GET /ai/chat-history/20260405213946632 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214009391 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57501 - "GET /ai/chat-history/20260405214009391 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405213946632 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57501 - "GET /ai/chat-history/20260405213946632 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405213946632 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57523 - "GET /ai/chat-history/20260405213946632 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214009391 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57518 - "GET /ai/chat-history/20260405214009391 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214009391 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57544 - "GET /ai/chat-history/20260405214009391 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57760 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57785 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57810 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57843 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405214536127 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57931 - "GET /ai/chat-history/20260405214536127 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57984 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     13.86.112.154:51104 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58032 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58568 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58568 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58629 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58648 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58680 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58714 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58755 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58785 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58785 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58799 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58797 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405215135731 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58825 - "GET /ai/chat-history/20260405215135731 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58854 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58905 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58935 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58945 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58947 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58944 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405215135731 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59087 - "GET /ai/chat-history/20260405215135731 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405215135731 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59093 - "GET /ai/chat-history/20260405215135731 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59119 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59119 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59160 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59210 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59276 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59276 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59318 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59380 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59506 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59515 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59506 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59517 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59612 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59645 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59763 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59781 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59825 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59842 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59844 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59840 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59840 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59886 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59913 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59940 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59965 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59984 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59987 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59988 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59988 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60025 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60049 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60076 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60103 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60134 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60132 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60130 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60128 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60162 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60189 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60235 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60263 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60272 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60276 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60300 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60301 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60303 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60354 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60383 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60420 - "GET /ai/insight HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60454 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60744 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60840 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60928 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60929 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60928 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60929 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+WARNING:  Invalid HTTP request received.
+INFO:     185.93.89.193:21361 - "CONNECT proxy.proxiesfood.com%3A443 HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     185.93.89.192:56243 - "CONNECT proxy.proxiesfood.com%3A443 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61119 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61119 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61119 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61138 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61142 - "OPTIONS /ai/governance/approve HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:61142 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61134 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:61168 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 200 OK"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 200 OK"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:     127.0.0.1:61291 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61344 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61372 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61514 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61514 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61682 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61682 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61737 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61774 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62037 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62054 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62058 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62077 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62134 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62140 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62134 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62140 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62274 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62274 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62287 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62329 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62421 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62422 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62422 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62460 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62461 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62565 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62565 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62565 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62622 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62834 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62867 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62910 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62914 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62914 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62944 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62964 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62968 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63021 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63100 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63173 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63173 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63215 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63340 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63340 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63375 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63434 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63430 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63464 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63508 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63550 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63565 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63550 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63563 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63613 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63645 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63710 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63713 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63719 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63716 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63748 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63845 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63853 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63854 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63853 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63854 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     45.205.1.26:46992 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     45.205.1.26:47006 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     45.205.1.26:47018 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     45.205.1.26:47022 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     45.205.1.26:47034 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63870 - "OPTIONS /ai/governance/approve HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:63870 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:     45.205.1.26:47046 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64098 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64176 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64283 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64284 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64525 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64546 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64818 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64819 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64961 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64989 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65022 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65060 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65217 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65281 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65325 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49216 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49239 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49294 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49334 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49511 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49511 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49592 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49784 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49804 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49962 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50004 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50149 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50144 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50150 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50151 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50151 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50198 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50235 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50239 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50298 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50302 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50323 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50327 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50859 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50859 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50965 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50998 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50998 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51095 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51466 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51466 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51502 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51571 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51572 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51572 - "OPTIONS /ai/governance/approve HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:51572 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:     127.0.0.1:51681 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51889 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51893 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51893 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51908 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51943 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51943 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52090 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:52090 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52099 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52166 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52167 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:52167 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52311 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52312 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:52312 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52362 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52398 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52399 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52423 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52457 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52520 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52662 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52663 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52663 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52662 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52677 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52701 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52778 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52779 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52857 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52861 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52861 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52857 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52904 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52922 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:52923 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52946 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52954 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52950 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52954 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52950 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52946 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 200 OK"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:     127.0.0.1:52997 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53029 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53260 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53261 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53275 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53396 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53437 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53467 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53467 - "OPTIONS /ai/governance/approve HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:53467 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53505 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53509 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53513 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:     127.0.0.1:53558 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53559 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:53559 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:53568 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53579 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:53606 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 200 OK"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:     127.0.0.1:53627 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:53648 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 200 OK"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53662 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53662 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:     127.0.0.1:53742 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53784 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53785 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53826 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53873 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53919 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53920 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53943 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53983 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54051 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54052 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54136 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54137 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54247 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54251 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54247 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54251 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54294 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54295 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54295 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54302 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54330 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54395 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54601 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54601 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54654 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54736 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54757 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54757 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54806 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54861 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54862 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54872 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54903 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55069 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55069 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55112 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55102 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55108 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55105 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55174 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55357 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55470 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55503 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55504 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55549 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55556 - "OPTIONS /ai/governance/approve HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:55556 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55569 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55574 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55574 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55617 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55795 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55796 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55796 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55805 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55800 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55838 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55871 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55875 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55873 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55873 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55907 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:55942 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55950 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:55954 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56011 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56015 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56023 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56023 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56015 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56034 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56128 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56240 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56234 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56274 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56328 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56373 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56480 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56481 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56481 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56503 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56541 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56545 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56541 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56545 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56545 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56541 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56709 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56709 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56748 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56819 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56820 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56849 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56989 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56993 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56993 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56989 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57094 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57097 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57145 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57149 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57149 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57164 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57195 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57275 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57377 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57398 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57417 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57424 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57492 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57496 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57496 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57492 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57545 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57551 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57566 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57566 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57636 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57637 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57638 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57637 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57636 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57664 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57668 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57668 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57681 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57696 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57696 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57807 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57904 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57949 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57947 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57948 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57951 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57977 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57977 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58034 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58091 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58099 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58099 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58091 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58262 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58320 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58351 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58423 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58549 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58587 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58594 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58594 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58587 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58688 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58692 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58744 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58748 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58760 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58748 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58771 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58748 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58771 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58748 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58771 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58771 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58815 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58815 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58834 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59197 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59203 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59210 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59375 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59381 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59565 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59569 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59599 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59603 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59644 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59652 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59660 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59727 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59728 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59729 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59728 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59727 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59814 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59818 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59854 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59852 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59853 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59857 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59844 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59993 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59992 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59994 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59995 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59994 - "OPTIONS /ai/governance/approve HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:59994 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60014 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60018 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60130 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60130 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60190 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60228 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60227 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60229 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60477 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60861 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60906 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60904 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60905 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60907 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:60938 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60947 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60951 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60988 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:60993 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61012 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61013 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61016 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61015 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61233 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61307 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61311 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61350 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61504 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61505 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61506 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61504 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61505 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61523 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61522 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61524 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:61522 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61547 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61551 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61712 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61724 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61782 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:61788 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62330 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62779 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62976 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63276 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63361 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63451 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63582 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63684 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63765 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63763 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63764 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63780 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64207 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64206 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64208 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64215 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64208 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64261 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64344 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64352 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64832 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64833 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64834 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64833 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64842 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64833 - "OPTIONS /ai/governance/approve HTTP/1.1" 200 OK
+INFO:backend.main:Starting Governance Approval Workflow for 20260405220112668
+INFO:     127.0.0.1:64842 - "POST /ai/governance/approve HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/workflows/run "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64888 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64900 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/register-knowledge "HTTP/1.1 500 Internal Server Error"
+INFO:backend.main:Successfully synced Governance Approval to Vectorize for 20260405220112668
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65180 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65188 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49174 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49178 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49483 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49492 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51217 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51749 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51748 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51748 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51750 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51863 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51990 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52153 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52342 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52402 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52406 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52405 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52474 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52638 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52794 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52803 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52892 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52893 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52894 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52892 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52893 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52895 - "GET /ai/incident/INC-20260405220112668 HTTP/1.1" 404 Not Found
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53154 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53154 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53198 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53198 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53243 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53243 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54338 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54339 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54365 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54370 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54724 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54738 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54795 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54799 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54843 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54847 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56382 - "GET /warroom/rooms HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56632 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56632 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56666 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56787 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56788 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56788 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56972 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56973 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:57790 - "OPTIONS /ai/chat HTTP/1.1" 200 OK
+INFO:backend.main:S-GUARD Chat Dify 스트리밍 연동 중: 조치 방법 추천해줘 (반드시 get_incident_solutions 도구를 사용하여 조치 방법을 추천해줘)
+
+[참고: 현재 대응 중인 장애 현황 - ID: 20260405220112668, 시스템: [pLay-상담, 내역: [Web발신]
+[신한카드] <신MCI-mc2> IF 오류발생
+
+▶ 채널       : [FAN]
+▶ IF아이디   : [FAN00200]
+▶ 서비스코드 : [SCSL02024U]
+▶ 서비스명   : [[pLay-상담]마케팅대상여부조회]
+▶ 업무시스템 : [FRC]
+
+▶ 에러코드   : [EGRT0096]
+▶ 발생건수   : [최근 2분동안 총 78건 발생]
+▶ 발생노드   : [B1:21건, B3:11건, B4:47건]
+▶ 에러메시지 : [송신실패-세션 쓰는 도중 오류가 발생하였습니다]
+
+▶ 메시지 수신자 : [윤학민, 이장규, 이재연, 조경훈, 박준현, 김성원, 최경희, 정경성, 변영진, 황광덕]
+
+▶ 발생시각 : [2026-04-02 21:40:03]]
+INFO:     127.0.0.1:57790 - "POST /ai/chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:backend.main:S-GUARD Chat Dify 스트리밍 연동 중: 유사 장애 이력 찾아줘 (반드시 get_incident_history 도구를 사용하여 유사 장애 이력을 찾아줘)
+
+[참고: 현재 대응 중인 장애 현황 - ID: 20260405220112668, 시스템: [pLay-상담, 내역: [Web발신]
+[신한카드] <신MCI-mc2> IF 오류발생
+
+▶ 채널       : [FAN]
+▶ IF아이디   : [FAN00200]
+▶ 서비스코드 : [SCSL02024U]
+▶ 서비스명   : [[pLay-상담]마케팅대상여부조회]
+▶ 업무시스템 : [FRC]
+
+▶ 에러코드   : [EGRT0096]
+▶ 발생건수   : [최근 2분동안 총 78건 발생]
+▶ 발생노드   : [B1:21건, B3:11건, B4:47건]
+▶ 에러메시지 : [송신실패-세션 쓰는 도중 오류가 발생하였습니다]
+
+▶ 메시지 수신자 : [윤학민, 이장규, 이재연, 조경훈, 박준현, 김성원, 최경희, 정경성, 변영진, 황광덕]
+
+▶ 발생시각 : [2026-04-02 21:40:03]]
+INFO:     127.0.0.1:57790 - "POST /ai/chat HTTP/1.1" 200 OK
+INFO:backend.main:S-GUARD Chat Dify 스트리밍 연동 중: 유사 장애 이력 찾아줘 (반드시 get_incident_history 도구를 사용하여 유사 장애 이력을 찾아줘)
+
+[참고: 현재 대응 중인 장애 현황 - ID: 20260405220112668, 시스템: [pLay-상담, 내역: [Web발신]
+[신한카드] <신MCI-mc2> IF 오류발생
+
+▶ 채널       : [FAN]
+▶ IF아이디   : [FAN00200]
+▶ 서비스코드 : [SCSL02024U]
+▶ 서비스명   : [[pLay-상담]마케팅대상여부조회]
+▶ 업무시스템 : [FRC]
+
+▶ 에러코드   : [EGRT0096]
+▶ 발생건수   : [최근 2분동안 총 78건 발생]
+▶ 발생노드   : [B1:21건, B3:11건, B4:47건]
+▶ 에러메시지 : [송신실패-세션 쓰는 도중 오류가 발생하였습니다]
+
+▶ 메시지 수신자 : [윤학민, 이장규, 이재연, 조경훈, 박준현, 김성원, 최경희, 정경성, 변영진, 황광덕]
+
+▶ 발생시각 : [2026-04-02 21:40:03]]
+INFO:     127.0.0.1:58050 - "POST /ai/chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.dify.ai/v1/chat-messages "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58479 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58480 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:58994 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59013 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/sms/recent?limit=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59022 - "GET /sms/recent?limit=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61750 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61751 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61751 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62836 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62837 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/warroom/rooms?status=Open "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63351 - "GET /warroom/rooms?status=Open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63531 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63532 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64378 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65160 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260405220112668 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65177 - "GET /ai/chat-history/20260405220112668 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51071 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51083 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51083 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51071 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51670 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51671 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51671 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51777 - "GET /ai/insight HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/insight "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/analyze-sms "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51957 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51969 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52066 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52077 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52077 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52119 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52119 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52161 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52119 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52316 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52342 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52351 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52316 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52651 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52665 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52651 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:52665 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53268 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53282 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53282 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010349608 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53268 - "GET /ai/chat-history/20260406010349608 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53368 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53378 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53368 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53559 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53577 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53697 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53704 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53789 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53797 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53839 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53856 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53839 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53856 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54053 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54073 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54270 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54271 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54380 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54392 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54431 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54432 - "OPTIONS /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54432 - "POST /ai/summarize-chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://sguardai.khcho0421.workers.dev/ai/summarize-chat "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54631 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54647 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK

@@ -36,20 +36,17 @@ export default function ChatSummaryPage() {
   const [modalStep, setModalStep] = useState(null); // 'selection' or null
   const [selectedLines, setSelectedLines] = useState([]);
   const [additionalNotes, setAdditionalNotes] = useState('');
+  const [incidentStatus, setIncidentStatus] = useState('');
   
   const abortControllerRef = useRef(null);
 
-  const reportingLines = [
-    { id: 'leader', role: '팀장', name: '김철수 팀장', desc: '직속 상급자' },
-    { id: 'director', role: '본부장', name: '이영희 본부장', desc: '부서 책임자' },
-    { id: 'exec', role: '상무', name: '박지성 상무', desc: '사업부 임원' },
-  ];
+  const [reportingLines, setReportingLines] = useState([]);
 
   const getApiUrl = (endpoint) => {
     // AI 분석/요약 엔드포인트(/ai/)는 로컬 FastAPI 백엔드로 라우팅
     // 그 외 Worker 데이터 API는 Cloudflare Worker로 라우팅
     const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocalDev && endpoint.startsWith('/ai/')) {
+    if (isLocalDev && endpoint.startsWith('/ai/summarize-chat')) {
       return `http://127.0.0.1:8000${endpoint}`;
     }
     const workerBase = 'https://sguardai.khcho0421.workers.dev';
@@ -124,6 +121,55 @@ export default function ChatSummaryPage() {
     };
 
     fetchSummary();
+
+    // Fetch Personalized Reporting Lines
+    const fetchReportLines = async () => {
+      const savedUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+      if (!savedUser.employee_id) return;
+      
+      try {
+        const res = await fetch(getApiUrl(`/api/v1/report-lines?user_id=${savedUser.employee_id}`));
+        if (res.ok) {
+          const data = await res.json();
+          if (data.report_lines?.length > 0) {
+            setReportingLines(data.report_lines.map(line => ({
+              id: line.user_id,
+              role: line.role_name,
+              name: line.user_name,
+              desc: `${line.role_name} 결재자`
+            })));
+          } else {
+            // Default if none set
+            setReportingLines([
+              { id: 'system-default', role: '시스템', name: '관리자', desc: '기본 보고 대상' }
+            ]);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch custom report lines:", e);
+      }
+    };
+    fetchReportLines();
+
+    // Fetch Incident Metadata (Status)
+    const fetchIncidentStatus = async () => {
+      try {
+        const res = await fetch(getApiUrl(`/ai/incident/${incidentId.startsWith('INC-') ? incidentId : `INC-${incidentId}`}`));
+        if (res.ok) {
+          const data = await res.json();
+          if (data.incident) {
+            setIncidentStatus(data.incident.status);
+            // If already completed, set govSuccess to true to show the 'Checked' state
+            if (data.incident.status === '처리완료') {
+              setGovSuccess(true);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch incident status:", e);
+      }
+    };
+    fetchIncidentStatus();
 
     return () => {
       if (abortControllerRef.current) {
@@ -280,32 +326,55 @@ export default function ChatSummaryPage() {
 
   const handleGovernance = async () => {
     if (!summary || isGoverning) return;
+
+    // 1. Validation for "Other Actions" (그외 처리 사항)
+    if (!additionalNotes.trim()) {
+      const isConfirmed = window.confirm(
+        "더 등록할 내용이 없는지 확인해주세요.\n해당 war-room의 내용이 지식화되며 장애처리가 완료됩니다."
+      );
+      if (!isConfirmed) return;
+    }
+
     setIsGoverning(true);
     
     const fullContent = `${summary}\n\n### [그외 처리 사항]\n${additionalNotes || '없음'}`;
 
     try {
-      const res = await fetch(getApiUrl('/ai/governance/approve'), {
+      // Step 1: Knowledge Base Registration (RAG Update)
+      const resGov = await fetch(getApiUrl('/ai/governance/approve'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           incident_id: incidentId,
-          title: `[GOVERNANCE APPROVED] ${incidentId}`,
+          title: `[KNOWLEDGE REG] ${incidentId}`,
           content: fullContent
         })
       });
       
-      if (res.ok) {
+      if (!resGov.ok) {
+        const err = await resGov.json();
+        throw new Error(err.error || '거버넌스 승인 실패');
+      }
+
+      // Step 2: War-Room Status Resolution
+      const resRes = await fetch(getApiUrl('/warroom/resolve'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident_id: incidentId })
+      });
+
+      if (resRes.ok) {
         setGovSuccess(true);
-        alert('거버넌스 최종 승인이 완료되었습니다. RAG 데이터베이스가 업데이트되었습니다.');
-        // Optionally navigate or refresh status
+        setIncidentStatus('처리완료');
+        alert("지식화 및 장애/보고 처리가 성공적으로 완료되었습니다.\n인시던트 상태가 '처리완료'로 업데이트되었습니다.");
+        // Final Step: Redirect to Dashboard
+        navigate('/dashboard');
       } else {
-        const err = await res.json();
-        alert(`거버넌스 승인 실패: ${err.error || '알 수 없는 오류'}`);
+        throw new Error('장애 처리 상태 업데이트 실패');
       }
     } catch (err) {
-      console.error('Governance error:', err);
-      alert('거버넌스 처리 중 오류가 발생했습니다.');
+      console.error('Resolution error:', err);
+      alert(`처리 중 오류가 발생했습니다: ${err.message}`);
     } finally {
       setIsGoverning(false);
     }
@@ -336,34 +405,6 @@ export default function ChatSummaryPage() {
 
         <div className="flex items-center space-x-2">
           <button 
-            onClick={handleGovernance}
-            disabled={isGoverning || isLoading || !summary}
-            className={`hidden md:flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all shadow-lg active:scale-95 border ${
-              govSuccess 
-                ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20' 
-                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-white/10 shadow-indigo-500/20'
-            } disabled:opacity-50`}
-          >
-            {isGoverning ? (
-              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : govSuccess ? (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            ) : (
-              <Shield className="w-3.5 h-3.5" />
-            )}
-            <span>{isGoverning ? 'Approving...' : govSuccess ? 'Approved' : 'Governance'}</span>
-          </button>
-
-          {/* Team Leader Transmission Button */}
-          <button 
-            onClick={() => setModalStep('selection')}
-            className="flex items-center space-x-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-xs font-black transition-all shadow-lg shadow-purple-500/20 active:scale-95 border border-white/10"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>타임라인 전송</span>
-          </button>
-
-          <button 
             onClick={handleCopy}
             className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold transition-all active:scale-95"
           >
@@ -373,10 +414,10 @@ export default function ChatSummaryPage() {
           
           <button 
             onClick={handleGovernance}
-            disabled={isGoverning || isLoading || !summary}
+            disabled={isGoverning || isLoading || !summary || govSuccess || incidentStatus === '처리완료'}
             className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all border active:scale-95 shadow-xl ${
-              govSuccess 
-                ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20' 
+              (govSuccess || incidentStatus === '처리완료')
+                ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20 opacity-80 cursor-default' 
                 : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 border-indigo-400/30 text-white shadow-indigo-500/20 hover:scale-105 active:scale-95'
             } disabled:opacity-50 group origin-right`}
           >
@@ -388,28 +429,9 @@ export default function ChatSummaryPage() {
               <Shield className="w-4 h-4 text-indigo-200 group-hover:rotate-12 transition-transform" />
             )}
             <div className="flex flex-col items-start leading-none space-y-0.5">
-              <span className="text-[10px] opacity-70 font-mono tracking-widest uppercase">Governance</span>
-              <span>{isGoverning ? 'Approving Knowledge...' : govSuccess ? 'RAG Updated' : '최종 승인 및 RAG 업데이트'}</span>
+              <span className="text-[10px] opacity-70 font-mono tracking-widest uppercase">Closure</span>
+              <span>{isGoverning ? 'Processing Closure...' : (govSuccess || incidentStatus === '처리완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}</span>
             </div>
-          </button>
-
-          <button 
-            onClick={handleSendEmail}
-            disabled={isSending || isLoading || !summary}
-            className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-lg active:scale-95 ${
-              sendSuccess 
-                ? 'bg-emerald-600 text-white shadow-emerald-500/20' 
-                : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/20'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {isSending ? (
-              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : sendSuccess ? (
-              <Check className="w-3.5 h-3.5" />
-            ) : (
-              <Database className="w-3.5 h-3.5 font-bold" />
-            )}
-            <span>{isSending ? 'Sending PDF...' : sendSuccess ? 'Sent to Leader ✓' : '팀장님 전송'}</span>
           </button>
 
           <button 
@@ -480,8 +502,9 @@ export default function ChatSummaryPage() {
                 <div className="flex flex-col items-center justify-center py-20 space-y-4">
                   <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
                   <p className="text-sm text-slate-400 animate-pulse font-mono tracking-wide">
-                    채팅 내역을 기반으로 장애 대응 타임라인 리포트를 생성하고 있습니다...
+                    Dify AI 엔진을 통해 채팅 내역을 분석하여 리포트를 생성하고 있습니다. 잠시만 기다려 주세요...
                   </p>
+                  <p className="text-xs text-blue-500 font-black animate-bounce tracking-widest uppercase">처리중입니다..</p>
                 </div>
               ) : error ? (
                 <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl flex items-center space-x-4">
@@ -495,9 +518,12 @@ export default function ChatSummaryPage() {
                 <div className="animate-in fade-in duration-1000 relative">
                   <MarkdownViewer text={summary} />
                   {isLoading && (
-                    <div className="flex items-center space-x-2 mt-4 text-xs text-blue-400 animate-pulse bg-blue-500/5 p-2 rounded-lg border border-blue-500/10 inline-flex">
-                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
-                      <span className="font-bold uppercase tracking-widest text-[9px]">S-Guard AI 분석 진행 중...</span>
+                    <div className="flex items-center space-x-2 mt-6 text-xs text-blue-400 animate-pulse bg-blue-500/10 p-3 rounded-2xl border border-blue-500/20 inline-flex shadow-lg shadow-blue-500/10">
+                      <div className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      </div>
+                      <span className="font-black uppercase tracking-widest text-[10px]">Dify AI Hyper-Processing: 처리중입니다..</span>
                     </div>
                   )}
                 </div>
@@ -613,13 +639,8 @@ export default function ChatSummaryPage() {
                 닫기
               </button>
               <button 
-                onClick={() => {
-                  if (selectedLines.length > 0) {
-                    alert(`${selectedLines.length}명의 상급자에게 보고서가 전송되었습니다.\n전송완료 처리되었습니다.`);
-                    setModalStep(null);
-                  }
-                }}
-                disabled={selectedLines.length === 0}
+                onClick={handleSendEmail}
+                disabled={selectedLines.length === 0 || isSending}
                 className={`flex-[1.8] h-16 rounded-[1.25rem] font-bold text-white transition-all flex items-center justify-center space-x-3 active:scale-95 text-sm shadow-lg ${
                   selectedLines.length === 0
                     ? 'bg-slate-800 opacity-50 cursor-not-allowed text-slate-500' 

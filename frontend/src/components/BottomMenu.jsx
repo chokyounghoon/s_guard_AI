@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot } from 'lucide-react';
 
-export default function BottomMenu({ currentPath, onWarRoomClick, onAiClick, showAiPulse = true }) {
+export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true }) {
   const navigate = useNavigate();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
@@ -31,7 +31,19 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onAiClick, sho
           <span className="text-[10px] font-medium">War-Room</span>
         </div>
         
-
+        <div
+          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath.startsWith('/ai-report') ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
+          onClick={() => {
+            if (onReportClick) {
+              onReportClick();
+            } else {
+              navigate('/report-publish');
+            }
+          }}
+        >
+          <FileText className={`w-6 h-6 ${currentPath.startsWith('/ai-report') ? 'fill-current' : ''}`} />
+          <span className="text-[10px] font-medium">Report</span>
+        </div>
         
         <div
           className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/search' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}

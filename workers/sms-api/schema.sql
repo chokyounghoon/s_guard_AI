@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS login_history (
 );
 
 CREATE TABLE IF NOT EXISTS activity_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     inc_id TEXT,
     user_id TEXT,
     user_name TEXT DEFAULT 'System',
@@ -293,6 +294,10 @@ CREATE TABLE IF NOT EXISTS incident_assignments (
     status TEXT DEFAULT '미확인', -- '미확인', '처리중', '처리완료'
     assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, inc_id),
     FOREIGN KEY(user_id) REFERENCES users(employee_id)
 );
@@ -334,9 +339,18 @@ CREATE TABLE IF NOT EXISTS user_chat_sessions (
 -- Report Hierarchy Matrix
 CREATE TABLE IF NOT EXISTS report_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id TEXT NOT NULL,
     hierarchy_level INTEGER NOT NULL,
     role_name TEXT,
     user_id TEXT NOT NULL,
     user_name TEXT,
-    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME
 );
+
+CREATE INDEX IF NOT EXISTS idx_report_lines_owner ON report_lines(owner_id);
+
+-- Support for RAG Upsert
+CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_inc_id ON knowledge_base(inc_id);

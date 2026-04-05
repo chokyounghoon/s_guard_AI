@@ -47,10 +47,18 @@ export default function ReportLineManagementPage() {
 
   const fetchData = async () => {
     setIsLoading(true);
+    let userId = currentUser?.employee_id || '';
+    if (!userId) {
+      const savedUser = localStorage.getItem('sguard_user');
+      if (savedUser) {
+        try { userId = JSON.parse(savedUser).employee_id; } catch (e) {}
+      }
+    }
+    
     try {
       const [usersRes, linesRes] = await Promise.all([
         fetch(getApiUrl('/api/v1/users/organization')),
-        fetch(getApiUrl('/api/v1/report-lines'))
+        fetch(getApiUrl(`/api/v1/report-lines?user_id=${userId}`))
       ]);
       
       if (usersRes.ok && linesRes.ok) {
@@ -94,7 +102,10 @@ export default function ReportLineManagementPage() {
       const res = await fetch(getApiUrl('/api/v1/report-lines'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ report_lines: payload })
+        body: JSON.stringify({ 
+          owner_id: currentUser?.employee_id,
+          report_lines: payload 
+        })
       });
 
       if (res.ok) {

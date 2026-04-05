@@ -484,14 +484,14 @@ app.post('/sms/receive', async (c) => {
             const placeholders = normalizedReceivers.map(() => '?').join(',');
             try {
                 const result = await db.prepare(`
-                    INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
-                    SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?
+                    INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
+                    SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?, ?, ?
                     FROM users u_source
                     JOIN users u_target ON u_source.company = u_target.company AND u_source.team = u_target.team
                     WHERE u_source.is_active = 1
                       AND u_target.is_active = 1
                       AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
-                `).bind(existing.inc_id, timestamp, timestamp, ...normalizedReceivers, ...normalizedReceivers).run();
+                `).bind(existing.inc_id, timestamp, timestamp, employee_id || 'SYSTEM', employee_id || 'SYSTEM', ...normalizedReceivers, ...normalizedReceivers).run();
                 console.log(`[Assignment] Bulk assignment completed for ${existing.inc_id}. Changes: ${result.meta.changes}`);
             } catch (assignError) {
                 console.error(`[Assignment] Error in bulk assignment for ${existing.inc_id}:`, assignError);
@@ -564,8 +564,8 @@ app.post('/sms/receive', async (c) => {
              const { results: partUsers } = await db.prepare("SELECT employee_id FROM users WHERE part = ?").bind(senderUser.part).all();
              if (partUsers && partUsers.length > 0) {
                  for (const u of partUsers) {
-                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status) VALUES (?, ?, '미처리') ON CONFLICT DO NOTHING")
-                     .bind(u.employee_id, newIncId).run();
+                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id) VALUES (?, ?, '미처리', ?, ?, ?, ?) ON CONFLICT DO NOTHING")
+                     .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', employee_id || 'SYSTEM').run();
                  }
              }
          }
@@ -586,12 +586,13 @@ app.get('/sms/notification-stream', async (c) => {
   return streamSSE(c, async (stream) => {
     console.log('SSE Stream Connected')
     
-    // Initial check to set lastSeenId if not provided
-    if (!lastSeenId) {
-      const latest = await db.prepare("SELECT inc_id FROM received_messages ORDER BY timestamp DESC LIMIT 1").first()
-      if (latest) {
-        lastSeenId = latest.inc_id
-      }
+    let lastSeenKey = null;
+    if (lastSeenId) {
+       const initial = await db.prepare("SELECT timestamp FROM received_messages WHERE inc_id = ?").bind(lastSeenId).first();
+       if (initial) lastSeenKey = `${lastSeenId}_${initial.timestamp}`;
+    } else {
+       const latest = await db.prepare("SELECT inc_id, timestamp FROM received_messages ORDER BY timestamp DESC LIMIT 1").first();
+       if (latest) lastSeenKey = `${latest.inc_id}_${latest.timestamp}`;
     }
 
     // Keep the connection alive with a heartbeat every 30 seconds
@@ -603,10 +604,11 @@ app.get('/sms/notification-stream', async (c) => {
       while (true) {
         // Check for new SMS every 3 seconds
         const latest = await db.prepare("SELECT * FROM received_messages ORDER BY timestamp DESC LIMIT 1").first()
+        const currentKey = latest ? `${latest.inc_id}_${latest.timestamp}` : null;
         
-        if (latest && latest.inc_id !== lastSeenId) {
-          console.log('New SMS detected in SSE stream:', latest.inc_id)
-          lastSeenId = latest.inc_id
+        if (latest && currentKey !== lastSeenKey) {
+          console.log('New/Updated SMS detected in SSE stream:', latest.inc_id)
+          lastSeenKey = currentKey;
           await stream.writeSSE({
             event: 'sms_received',
             data: JSON.stringify({
@@ -885,7 +887,7 @@ app.get('/ai/governance/stats', async (c) => {
     const mttrData = await db.prepare(`
       SELECT AVG(strftime('%s', k.reg_dt) - strftime('%s', r.timestamp)) / 60.0 as avg_minutes
       FROM knowledge_base k
-      JOIN received_messages r ON k.title LIKE '%' || r.message || '%' OR k.title LIKE '%' || r.inc_id || '%'
+      JOIN received_messages r ON k.inc_id = r.inc_id
       WHERE r.timestamp IS NOT NULL AND k.reg_dt IS NOT NULL
     `).first('avg_minutes');
 
@@ -905,14 +907,14 @@ app.get('/ai/governance/stats', async (c) => {
         u.name, u.role, u.team,
         COUNT(DISTINCT a.inc_id) as assigned_count,
         COUNT(DISTINCT k.id) as kb_count,
-        (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.id) * 2) as synergy_score
+        (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.rowid) * 2) as synergy_score
       FROM users u
       LEFT JOIN incident_assignments a ON u.employee_id = a.user_id
       LEFT JOIN knowledge_base k ON u.employee_id = k.reg_id
       LEFT JOIN activity_logs l ON u.employee_id = l.user_id
       WHERE u.is_active = 1
       GROUP BY u.employee_id, u.name, u.role, u.team
-      HAVING (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.id) * 2) > 0
+      HAVING (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.rowid) * 2) > 0
       ORDER BY synergy_score DESC
       LIMIT 5
     `).all();
@@ -1002,8 +1004,8 @@ app.get('/incidents', async (c) => {
     SELECT 
       i.*, 
       r.message as raw_message,
-      r.phone as sender_phone,
-      r.employee_id as sender_employee_id,
+      r.sender as sender_phone,
+      NULL as sender_employee_id,
       r.received_count,
       ua.name as assignee_name,
       GROUP_CONCAT(DISTINCT uaa.name) as assignment_list,
@@ -1017,7 +1019,7 @@ app.get('/incidents', async (c) => {
     LEFT JOIN incident_assignments ia ON i.inc_id = ia.inc_id
     LEFT JOIN users uaa ON ia.user_id = uaa.employee_id
     LEFT JOIN received_messages r ON (i.inc_id = r.inc_id OR i.source_sms_id = r.inc_id)
-    LEFT JOIN users us ON r.employee_id = us.employee_id
+    LEFT JOIN users us ON r.sender = us.phone
     WHERE 1=1
   `
   const params = []
@@ -1116,7 +1118,13 @@ app.post('/incidents', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  const inc_id = String(data.inc_id).replace('INC-', '')
+  const rawId = String(data.inc_id).replace('INC-', '')
+  const inc_id = `INC-${rawId}`
+
+  // Fetch actual message from received_messages
+  const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
+  const msg = sms ? sms.message : (data.title || 'SMS 장애 감지')
+  const finalTitle = `${inc_id} | ${msg}`
   
   const res = await db.prepare(`
     INSERT INTO incidents (
@@ -1124,13 +1132,13 @@ app.post('/incidents', async (c) => {
       assigned_to, source_sms_id, ai_insight, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
-    inc_id, data.title, data.description || null, data.severity || 'NORMAL', 
+    rawId, finalTitle, data.description || null, data.severity || 'NORMAL', 
     data.status || 'Open', data.incident_type || 'AI', data.assigned_to || null,
     data.source_sms_id || null, data.ai_insight || null,
     'SYSTEM', now, 'SYSTEM', now, now, now
   ).run()
   
-  return c.json({ status: "success", id: inc_id })
+  return c.json({ status: "success", id: rawId, title: finalTitle })
 })
 
 app.post('/incident-history', async (c) => {
@@ -2050,7 +2058,7 @@ app.post('/api/v1/user/chat-sessions', async (c) => {
       INSERT INTO user_chat_sessions (id, user_id, title, messages, updated_at) 
       VALUES (?, ?, ?, ?, ?) 
       ON CONFLICT(id) DO UPDATE SET title = excluded.title, messages = excluded.messages, updated_at = excluded.updated_at
-    `).bind(id, user_id, title, messagesStr, updated_at || new Date().toISOString()).run();
+    `).bind(id, user_id, title, messagesStr, updated_at || getKst()).run();
     return c.json({ success: true });
   } catch(e) {
     return c.json({ error: "Failed to save chat session", details: e.message }, 500);
@@ -2105,7 +2113,12 @@ app.post('/ai/chat-history/save', async (c) => {
 // War-Room Tracking
 app.get('/ai/warroom/list', async (c) => {
   const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM warroom_list ORDER BY reg_dt DESC").all()
+  const { results } = await db.prepare(`
+    SELECT wl.*, rm.message as msg
+    FROM warroom_list wl
+    LEFT JOIN received_messages rm ON wl.inc_id = rm.inc_id
+    ORDER BY wl.reg_dt DESC
+  `).all()
   return c.json({ results })
 })
 
@@ -2187,8 +2200,8 @@ app.post('/ai/warroom/open', async (c) => {
   }
 
   // Update assignment status to '처리중' for all assignees of this incident
-  await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ? WHERE inc_id = ?")
-    .bind(now, normId).run()
+  await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+    .bind(now, now, creator_id || 'SYSTEM', normId, `INC-${normId}`).run()
   
   return c.json({ status: 'opened', inc_id: normId })
 })
@@ -2196,29 +2209,78 @@ app.post('/ai/warroom/open', async (c) => {
 app.post('/ai/report/save', async (c) => {
   const { inc_id, title, content, user_id } = await c.req.json()
   const db = c.env.DB
+  const ai = c.env.AI
+  const vectorIndex = c.env.WARROOM_INDEX
   const now = getKst()
   
   const normId = String(inc_id).replace('INC-', '');
+  const empId = user_id || 'SYSTEM'
+  
   // 1. Log activity
-  const empId = user_id // user_id is now already the employee_id
-  const nowReport = getKst()
-
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, report_type, created_at) VALUES (?, ?, ?, '보고서 생성', ?, 'AI 리포트', ?)")
-    .bind(normId, normId, empId, `리포트 생성됨: ${title}`, nowReport)
+    .bind(normId, normId, empId, `리포트 생성됨: ${title}`, now)
     .run()
 
-  // 2. Insert into reports table [NEW]
+  // 2. Insert into reports table
   await db.prepare("INSERT INTO reports (inc_id, user_id, title, content, created_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(normId, user_id || null, title || '보고서', content, now)
+    .bind(normId, empId, title || '보고서', content, now)
     .run()
 
-  // Auto-update assignment status to '처리완료'
-  if (inc_id && user_id) {
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ? WHERE user_id = ? AND inc_id = ?")
-      .bind(now, user_id, normId).run()
+  // 3. Knowledge Base Persistence (RAG)
+  let embeddingValue = null;
+  let vector = null;
+  if (ai && content) {
+    try {
+      // Clean content for embedding
+      const sanitizedContent = content.replace(/\[메모\]\s*undefined/g, '').trim();
+      const res = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [sanitizedContent.substring(0, 3000)] });
+      if (res && res.data && res.data[0]) {
+        vector = res.data[0];
+        embeddingValue = new Float32Array(vector);
+      }
+    } catch (e) {
+      console.error("Embedding generation failed in report save:", e.message);
+    }
   }
 
-  return c.json({ status: 'saved' })
+  // UPSERT Knowledge: Ensure exactly 1 row per inc_id
+  await db.prepare(`
+    INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector)
+    VALUES (?, ?, ?, '장애 보고서', ?, ?, ?, ?, ?)
+    ON CONFLICT(inc_id) DO UPDATE SET
+      title = excluded.title,
+      content = excluded.content,
+      mod_id = excluded.mod_id,
+      mod_dt = excluded.mod_dt,
+      vector = excluded.vector
+  `).bind(
+    normId, 
+    title || `Report: ${inc_id}`, 
+    content, 
+    empId, now, empId, now, 
+    embeddingValue
+  ).run()
+
+  // Sync to Vectorize Index
+  if (vector && vectorIndex) {
+    try {
+      await vectorIndex.upsert([{
+        id: `inc-${normId}`,
+        values: vector,
+        metadata: { title, type: 'report', inc_id: normId }
+      }]);
+    } catch (e) {
+      console.error("Vectorize sync failed in report save:", e.message);
+    }
+  }
+
+  // 4. Auto-update assignment status to '처리완료'
+  if (normId && empId) {
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE (inc_id = ? OR inc_id = ?) AND user_id = ?")
+      .bind(now, now, empId, normId, `INC-${normId}`, empId).run()
+  }
+
+  return c.json({ status: 'saved', knowledge_synced: !!embeddingValue })
 })
 
 // ==========================================
@@ -2512,8 +2574,8 @@ app.post('/warroom/resolve-only', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
     .bind(user_id, now, normId).run();
   
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ? WHERE inc_id = ? AND user_id = ?")
-    .bind(now, normId, user_id).run();
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE (inc_id = ? OR inc_id = ?) AND user_id = ?")
+    .bind(now, now, user_id, normId, `INC-${normId}`, user_id).run();
 
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '장애 완료', '보고서 없이 장애가 처리 완료되었습니다.', ?)")
     .bind(normId, normId, user_id, now).run();
@@ -2563,8 +2625,8 @@ app.post('/ai/incident/assign', async (c) => {
 
     // 2. Perform Assignment
     await db.prepare(`
-      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at)
-      VALUES (?, ?, '미확인', ?, ?)
+      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
+      VALUES (?, ?, '미확인', ?, ?, 'SYSTEM', 'SYSTEM')
       ON CONFLICT(user_id, inc_id) DO NOTHING
     `).bind(empId, normId, now, now).run()
 
@@ -2593,9 +2655,9 @@ app.post('/ai/incident/status', async (c) => {
 
   await db.prepare(`
     UPDATE incident_assignments 
-    SET status = ?, updated_at = ?
-    WHERE user_id = ? AND inc_id = ?
-  `).bind(status, now, user_id, normId).run()
+    SET status = ?, updated_at = ?, mod_dt = ?, mod_id = ?
+    WHERE user_id = ? AND (inc_id = ? OR inc_id = ?)
+  `).bind(status, now, now, user_id || 'SYSTEM', user_id, normId, `INC-${normId}`).run()
   
   return c.json({ status: 'updated', user_id, inc_id: normId, new_status: status })
 })
@@ -2709,17 +2771,11 @@ app.get('/ai/incident/workflow-details', async (c) => {
       });
     }
 
-    // 5. 보고서 생성완료 (reports)
-    const repo = await db.prepare("SELECT created_at FROM reports WHERE inc_id = ?").bind(id).first();
-    if (repo) steps.push({ id: 'REPORT', label: '보고서 생성완료', timestamp: repo.created_at, detail: '워룸 내 대응 전략을 바탕으로 최종 AI 리포트가 생성되었습니다.' });
-
-    // 6. 지식화 및 보고완료 (knowledge_base)
+    // 6. 지식화/장애/보고 처리완료 (knowledge_base)
     const kn = await db.prepare("SELECT reg_dt FROM knowledge_base WHERE inc_id = ?").bind(id).first();
-    if (kn) steps.push({ id: 'KNOWLEDGE', label: '지식화 및 보고완료', timestamp: kn.reg_dt, detail: '확보된 대응 지식이 지식베이스(RAG)에 저장되고 최종 보고가 수립되었습니다.' });
+    if (kn) steps.push({ id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', timestamp: kn.reg_dt, detail: '인시던트 대응 지식이 지식베이스(RAG)에 저장되고 최종 보고 및 장애 처리가 완료되었습니다.' });
 
-    // 7. 워룸종료 및 장애처리완료 (warroom_list CLOSED)
-    const wrClose = await db.prepare("SELECT mod_dt FROM warroom_list WHERE inc_id = ? AND status = 'CLOSED'").bind(id).first();
-    if (wrClose) steps.push({ id: 'CLOSE', label: '워룸종료 및 장애처리완료', timestamp: wrClose.mod_dt, detail: '인시던트 대응 활동이 종료되었습니다.' });
+    // Step 5 (REPORT) and Step 7 (CLOSE) removed per user request for a cleaner 4-step flow
 
     // Use activity_logs as a fallback
     const logs = await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_code = ? ORDER BY created_at ASC").bind(id).all();
@@ -2733,25 +2789,56 @@ app.get('/ai/incident/workflow-details', async (c) => {
 
 // 3. 특정 인시던트 상세 (와일드카드 - 가장 마지막에 정의)
 app.get('/ai/incident/:inc_id', async (c) => {
-  const inc_id = c.req.param('inc_id')
+  const rawId = c.req.param('inc_id')
+  const normId = String(rawId).replace('INC-', '')
   const db = c.env.DB
+  
   const incident = await db.prepare(`
     SELECT i.*, u.name as assignee_name 
     FROM incidents i 
     LEFT JOIN users u ON i.assigned_to = u.employee_id 
-    WHERE i.inc_id = ?
-  `).bind(inc_id).first()
+    WHERE i.inc_id = ? OR i.inc_id = ?
+  `).bind(normId, `INC-${normId}`).first()
+  
   if (!incident) return c.json({ error: "Not found" }, 404)
   return c.json({ incident })
 })
 
 
 // User Specific War-Room mapping
-app.post('/ai/warroom/leave', async (c) => {
+app.post('/warroom/leave', async (c) => {
   const { user_id, inc_id } = await c.req.json()
   await c.env.DB.prepare("DELETE FROM user_warrooms WHERE user_id = ? AND inc_id = ?")
     .bind(user_id, String(inc_id)).run()
   return c.json({ status: 'left', user_id, inc_id })
+})
+
+app.patch('/incidents/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const rawId = id.startsWith('INC-') ? id.slice(4) : id
+  const fullId = `INC-${rawId}`
+  const data = await c.req.json()
+  const now = getKst()
+  
+  let finalTitle = data.title;
+  if (!finalTitle || finalTitle === 'SMS 장애 감지') {
+    const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
+    if (sms) finalTitle = `${fullId} | ${sms.message}`
+  }
+
+  await db.prepare(`
+    UPDATE incidents 
+    SET title = COALESCE(?, title),
+        description = COALESCE(?, description),
+        severity = COALESCE(?, severity),
+        status = COALESCE(?, status),
+        assigned_to = COALESCE(?, assigned_to),
+        mod_dt = ?
+    WHERE inc_id = ?
+  `).bind(finalTitle || null, data.description || null, data.severity || null, data.status || null, data.assigned_to || null, now, rawId).run()
+  
+  return c.json({ status: "success", id: rawId, title: finalTitle })
 })
 
 app.post('/ai/warroom/invite', async (c) => {
@@ -2822,12 +2909,7 @@ app.get('/ai/knowledge/search', async (c) => {
   }
 })
 
-app.post('/warroom/resolve', async (c) => {
-  const { incident_id } = await c.req.json()
-  const db = c.env.DB
-  await db.prepare("UPDATE incidents SET status = ?, updated_at = ? WHERE inc_id = ?").bind("완료", getKst(), incident_id).run()
-  return c.json({ status: "success" })
-})
+// Consolidation: Moved to line 3147
 
 app.post('/warroom/reset', async (c) => {
   const db = c.env.DB
@@ -2856,8 +2938,17 @@ app.post('/warroom/feedback', async (c) => {
 app.post('/incidents', async (c) => {
   const { inc_id, title, description, severity, incident_type, source_sms_id } = await c.req.json()
   const db = c.env.DB
-  const existing = await db.prepare("SELECT inc_id FROM incidents WHERE inc_id = ?").bind(inc_id).first()
-  if (existing) return c.json({ status: 'exists', inc_id })
+  const rawId = String(inc_id).replace('INC-', '')
+  const fullId = `INC-${rawId}`
+
+  const existing = await db.prepare("SELECT inc_id FROM incidents WHERE inc_id = ?").bind(rawId).first()
+  if (existing) return c.json({ status: 'exists', inc_id: rawId })
+
+  // Fetch actual message from received_messages
+  const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
+  const msg = sms ? sms.message : (title || 'SMS 장애 감지')
+  const finalTitle = `${fullId} | ${msg}`
+
   const now = getKst()
   await db.prepare(
     `INSERT INTO incidents (
@@ -2865,10 +2956,10 @@ app.post('/incidents', async (c) => {
       reg_id, reg_dt, mod_id, mod_dt, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    inc_id, title, description, severity, 'OPEN', incident_type, source_sms_id || null, 
+    rawId, finalTitle, description, severity, 'OPEN', incident_type, source_sms_id || null, 
     'SYSTEM', now, 'SYSTEM', now, now
   ).run()
-  return c.json({ status: 'created', inc_id })
+  return c.json({ status: 'created', inc_id: rawId, title: finalTitle })
 })
 
 app.patch('/incidents/:id', async (c) => {
@@ -3044,16 +3135,33 @@ app.get('/warroom/asset/:key', async (c) => {
 })
 
 // Dify-powered High-Performance Summary
-// Resolve (Close) an Incident
+// Consolidated Resolve (Close) an Incident
 app.post('/warroom/resolve', async (c) => {
   const { incident_id } = await c.req.json();
   const db = c.env.DB;
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400);
 
-  await db.prepare("UPDATE warroom_list SET status = 'Completed' WHERE inc_id = ?")
-    .bind(incident_id).run();
+  const now = getKst();
+  const normId = String(incident_id).replace('INC-', '');
 
-  return c.json({ success: true, status: 'Completed' });
+  try {
+    // 1. Update War-Room Status
+    await db.prepare("UPDATE warroom_list SET status = '최종완료', mod_dt = ? WHERE inc_id = ?")
+      .bind(now, incident_id).run();
+
+    // 2. Update Incident Status to '처리완료'
+    await db.prepare("UPDATE incidents SET status = '처리완료', mod_dt = ? WHERE inc_id = ?")
+      .bind(now, normId).run();
+
+    // 3. Update ALL incident assignments to '처리완료' (check both ID formats)
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+      .bind(now, now, 'SYSTEM', normId, `INC-${normId}`).run();
+
+    return c.json({ success: true, status: '최종완료' });
+  } catch (err) {
+    console.error('Final resolution error:', err);
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 // Send Formal PDF Report to Team Leader via MailChannels (with Auth)
@@ -3131,7 +3239,8 @@ app.post('/ai/send-report-email', async (c) => {
 // Register Report to Knowledge Base (with Vectorization)
 app.post('/ai/register-knowledge', async (c) => {
   try {
-    const { incident_id, title, content, category, tags } = await c.req.json();
+    const body = await c.req.json();
+    const { incident_id, title, content, category, tags, user_id } = body;
     const db = c.env.DB;
     const ai = c.env.AI;
     const vectorIndex = c.env.WARROOM_INDEX;
@@ -3152,21 +3261,24 @@ app.post('/ai/register-knowledge', async (c) => {
     if (!vector) throw new Error('Failed to generate vector embedding');
 
     // 2. Insert into D1 (knowledge_base table)
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const now = getKst();
+    const actor = user_id || 'SYSTEM';
+
     const result = await db.prepare(`
       INSERT INTO knowledge_base (
-        inc_id, title, content, category, tags, reg_id, reg_dt, mod_id, mod_dt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        inc_id, title, content, category, tags, reg_id, reg_dt, mod_id, mod_dt, vector
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       incident_id || `manual-${Date.now()}`,
       title,
       sanitizedContent,
       category || '인시던트 요약',
       tags || '',
-      'SYSTEM',
+      actor,
       now,
-      'SYSTEM',
-      now
+      actor,
+      now,
+      vector ? new Float32Array(vector) : null
     ).run();
 
     const dbInsertId = result.meta.last_row_id;
@@ -3198,7 +3310,7 @@ app.post('/ai/register-knowledge', async (c) => {
 // Governance Approval & Knowledge Registration (Dify + Vectorize)
 app.post('/ai/governance/approve', async (c) => {
   try {
-    const { incident_id, title, content } = await c.req.json();
+    const { incident_id, title, content, user_id } = await c.req.json();
     const db = c.env.DB;
     const ai = c.env.AI;
     const vectorIndex = c.env.WARROOM_INDEX;
@@ -3263,17 +3375,62 @@ app.post('/ai/governance/approve', async (c) => {
     }
 
     // 4. Update Incident Status & Knowledge Base in D1
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    await db.prepare(`
-      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt)
-      VALUES (?, ?, ?, '거버넌스 승인', ?)
-      ON CONFLICT(inc_id) DO UPDATE SET
-        content = excluded.content,
-        mod_dt = ?
-    `).bind(incident_id, title || `Governance: ${incident_id}`, sanitizedContent, now, now).run();
+    const now = getKst();
+    let embeddingValue = null;
+    
+    // 🛡️ Robust Embedding Generation with Logging
+    if (ai && sanitizedContent) {
+      try {
+        console.log(`[RAG] Generating embedding for ${incident_id}...`);
+        const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { 
+          text: [sanitizedContent.substring(0, 3000)]
+        });
+        if (embeddings && embeddings.data && embeddings.data[0]) {
+          embeddingValue = new Float32Array(embeddings.data[0]);
+          console.log(`[RAG] Embedding generated successfully (Dimension: ${embeddings.data[0].length})`);
+        } else {
+          console.warn(`[RAG] Embedding generation returned empty data for ${incident_id}`);
+        }
+      } catch (e) {
+        console.error(`[RAG] Embedding generation failed for ${incident_id}:`, e.message);
+      }
+    }
 
-    await db.prepare("UPDATE incidents SET status = 'GOVERNED', updated_at = ? WHERE inc_id = ?")
+    // UPSERT Knowledge: Ensure exactly 1 row per inc_id
+    const actor = user_id || 'SYSTEM';
+    await db.prepare(`
+      INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector)
+      VALUES (?, ?, ?, '거버넌스 승인', ?, ?, ?, ?, ?)
+      ON CONFLICT(inc_id) DO UPDATE SET
+        title = excluded.title,
+        content = excluded.content,
+        mod_id = excluded.mod_id,
+        mod_dt = excluded.mod_dt,
+        vector = excluded.vector
+    `).bind(
+      incident_id, 
+      title || `Governance: ${incident_id}`, 
+      sanitizedContent, 
+      actor,
+      now,
+      actor,
+      now,
+      embeddingValue
+    ).run();
+
+    // 5. Update Incident Status to '처리완료'
+    await db.prepare("UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ?")
       .bind(now, incident_id).run();
+
+    const normId = String(incident_id).replace('INC-', '');
+
+    // 6. Update ALL assignments for this incident to '처리완료'
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+      .bind(now, now, 'SYSTEM', normId, `INC-${normId}`).run();
+
+    // 7. Auto-update War-Room Status here to prevent sync issues
+    await db.prepare("UPDATE warroom_list SET status = '최종완료', mod_dt = ? WHERE inc_id = ? OR inc_id = ?")
+      .bind(now, normId, `INC-${normId}`).run();
 
     return c.json({ 
       success: true, 
@@ -3311,34 +3468,58 @@ app.get('/api/v1/users/organization', async (c) => {
   }
 });
 
-// GET report lines
+// GET report lines (Filtered by current user/owner)
 app.get('/api/v1/report-lines', async (c) => {
   const db = c.env.DB;
+  const owner_id = c.req.query('user_id'); // Passed from frontend or middleware
+  
+  if (!owner_id) {
+    return c.json({ error: 'owner_id (user_id) is required' }, 400);
+  }
+
   try {
     const { results } = await db.prepare(
-      "SELECT * FROM report_lines ORDER BY hierarchy_level ASC"
-    ).all();
+      "SELECT * FROM report_lines WHERE owner_id = ? ORDER BY hierarchy_level ASC"
+    ).bind(owner_id).all();
     return c.json({ report_lines: results || [] });
   } catch (err) {
     return c.json({ error: err.message }, 500);
   }
 });
 
-// POST save report lines
+// POST save report lines (Per-user isolation)
 app.post('/api/v1/report-lines', async (c) => {
   const db = c.env.DB;
   const body = await c.req.json();
   const lines = body.report_lines || [];
+  const owner_id = body.owner_id;
   
+  if (!owner_id) {
+    return c.json({ error: 'owner_id is required for personalized report lines' }, 400);
+  }
+
   try {
     const stmts = [];
-    stmts.push(db.prepare("DELETE FROM report_lines"));
+    const now = getKst();
+    
+    // Only delete lines belonging to the current owner
+    stmts.push(db.prepare("DELETE FROM report_lines WHERE owner_id = ?").bind(owner_id));
     
     for (let i = 0; i < lines.length; i++) {
         const ln = lines[i];
         stmts.push(
-            db.prepare("INSERT INTO report_lines (hierarchy_level, role_name, user_id, user_name) VALUES (?, ?, ?, ?)")
-            .bind(i + 1, ln.role_name || '결재자', ln.user_id, ln.user_name || '')
+            db.prepare("INSERT INTO report_lines (owner_id, hierarchy_level, role_name, user_id, user_name, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(
+                owner_id, 
+                i + 1, 
+                ln.role_name || '결재자', 
+                ln.user_id, 
+                ln.user_name || '',
+                owner_id, // Setting registrant as the owner themselves
+                now,
+                owner_id,
+                now
+            )
         );
     }
     
@@ -3495,7 +3676,7 @@ export class WarRoom {
       case "CHAT_SEND":
         // 1. Save to D1
         const db = this.env.DB;
-        const now = new Date().toISOString().replace('T', ' ').substring(0, 19); 
+        const now = getKst(); 
         const lastRow = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(data.incident_id).first();
         const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1;
         
@@ -3649,17 +3830,17 @@ export class WarRoom {
         this.broadcast({ type: "TYPING", user_id: data.user_id, name: data.name, is_typing: false }, ws);
         break;
 
-      case "SET_ANNOUNCEMENT":
+        const nowAnnounce = getKst();
         this.announcement = {
           seq: data.seq,
           sender: data.sender,
           text: data.text,
-          timestamp: new Date().toISOString()
+          timestamp: nowAnnounce
         };
         // Sync to D1 warroom_list (as leader_summary for now)
         this.state.waitUntil((async () => {
-          await this.env.DB.prepare("UPDATE warroom_list SET leader_summary = ? WHERE inc_id = ?")
-            .bind(this.announcement.text, data.incident_id).run();
+          await this.env.DB.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
+            .bind(this.announcement.text, nowAnnounce, data.incident_id).run();
         })());
         this.broadcast({ type: "ANNOUNCEMENT_UPDATE", announcement: this.announcement });
         break;

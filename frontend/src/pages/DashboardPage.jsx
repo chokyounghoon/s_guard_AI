@@ -126,9 +126,7 @@ export default function DashboardPage() {
     { id: 'SMS', label: 'SMS 수신 및 장애 인지' },
     { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료' },
     { id: 'WARROOM', label: '워룸생성 및 할당완료' },
-    { id: 'REPORT', label: '보고서 생성완료' },
-    { id: 'KNOWLEDGE', label: '지식화 및 보고완료' },
-    { id: 'CLOSE', label: '워룸종료 및 장애처리완료' }
+    { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료' }
   ];
 
   // Helper for Date/Duration Formatting
@@ -143,7 +141,21 @@ export default function DashboardPage() {
 
   const formatYYMMDD = (dateStr) => {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
+    
+    // DB에서 '2026-04-03 12:00:00' 형태로 들어올 때 브라우저가 Local로 오해하지 않도록 보정
+    // 만약 ISO 형식이 아니면 ISO로 변환 (특히 ' '를 'T'로)
+    let d;
+    if (typeof dateStr === 'string' && !dateStr.includes('T') && !dateStr.includes('Z')) {
+       // '2026-04-05 21:00:00' -> '2026-04-05T21:00:00'
+       // 브라우저는 T가 없으면 로컬 시간으로 해석함. DB값이 KST라면 그대로 쓰면 됨.
+       // 하지만 DB값이 UTC인데 T/Z가 없다면 직접 보정 필요.
+       d = new Date(dateStr.replace(' ', 'T'));
+    } else {
+       d = new Date(dateStr);
+    }
+
+    if (isNaN(d.getTime())) return dateStr;
+
     const yy = String(d.getFullYear()).slice(-2);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
@@ -163,8 +175,8 @@ export default function DashboardPage() {
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
-  const [lastAutoTriggeredId, setLastAutoTriggeredId] = useState(null);
-  const lastAutoTriggeredIdRef = useRef(null);
+  const [lastAutoTriggeredKey, setLastAutoTriggeredKey] = useState(null);
+  const lastAutoTriggeredKeyRef = useRef(null);
 
   useEffect(() => {
     if (selectedSms) {
@@ -568,20 +580,25 @@ export default function DashboardPage() {
 
         setSmsMessages(finalMsgs);
 
-        // --- 실시간 자동 분석 트리거 (New Arrival Automation) ---
+        // --- 실시간 자동 분석 트리거 (New Arrival OR Update Automation) ---
         if (finalMsgs.length > 0) {
-          const latestId = String(freshMsgs[0].inc_id);
-          if (latestId !== lastAutoTriggeredIdRef.current) {
-            lastAutoTriggeredIdRef.current = latestId;
-            setLastAutoTriggeredId(latestId);
-            setSelectedSms(freshMsgs[0]);
+          const latestMsg = finalMsgs[0];
+          const latestKey = `${latestMsg.inc_id}_${latestMsg.timestamp}`;
+          
+          if (latestKey !== lastAutoTriggeredKeyRef.current) {
+            lastAutoTriggeredKeyRef.current = latestKey;
+            setLastAutoTriggeredKey(latestKey);
+            setSelectedSms(latestMsg);
 
-            // ⚡ One-View Automation: Expand all relevant panels on new arrival
-            setIsSmsPanelCollapsed(false);       // Top SMS Bar
-            setIsLiveStreamCollapsed(false);    // Left Incident Stream
-            setIsWarRoomCollapsed(false);       // Middle War-Room Header
-            setIsAssignmentsCollapsed(false);    // Right Assignments Panel
-            setShowAgentPanel(true);             // Bottom Agent Discussion
+            // ⚡ One-View Automation: Expand all relevant panels on arrival/update
+            setIsSmsPanelCollapsed(false);       
+            setIsLiveStreamCollapsed(false);    
+            setIsWarRoomCollapsed(false);       
+            setIsAssignmentsCollapsed(false);    
+            setShowAgentPanel(true);             
+            
+            // Trigger AI analysis / History fetch
+            startLiveScenario(latestMsg);
           }
         }
       }
@@ -750,10 +767,10 @@ export default function DashboardPage() {
     console.log('Split Sections Count:', Math.floor(parts.length / 2));
     console.groupEnd();
 
-    const msgs = [];
+    const msgsMap = new Map();
     
     for (let i = 1; i < parts.length; i += 2) {
-        const role = parts[i];
+        const rawRole = parts[i];
         let content = (parts[i+1] || '').trim();
         
         if (content) {
@@ -766,16 +783,27 @@ export default function DashboardPage() {
                 .trim();
             
             if (content) {
-                const lastMsg = msgs[msgs.length - 1];
-                if (lastMsg && lastMsg.role === role) {
-                    lastMsg.text += "\n" + content;
+                // Use the canonical role name for grouping
+                const role = rawRole;
+                if (msgsMap.has(role)) {
+                    // Check for near-identical duplicate text within the same role section
+                    const existingText = msgsMap.get(role);
+                    if (!existingText.includes(content)) {
+                        msgsMap.set(role, existingText + "\n\n" + content);
+                    }
                 } else {
-                    msgs.push({ role: role, text: content, delay: 0 });
+                    msgsMap.set(role, content);
                 }
             }
         }
     }
-    return msgs;
+    
+    // Convert back to original msgs array format for compatibility
+    return Array.from(msgsMap.entries()).map(([role, text]) => ({ 
+      role: role, 
+      text: text, 
+      delay: 0 
+    }));
   };
 
   // Callback called from AiInsightPanel
@@ -1704,7 +1732,7 @@ export default function DashboardPage() {
                      const assignment = myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', '')) || 
                                         smsMessages.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''));
                      const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
-                     const endStep = incidentWorkflowSteps.find(s => s.id === 'CLOSE');
+                     const endStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
                      const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);
                      const endTime = endStep ? new Date(endStep.timestamp) : null;
                      

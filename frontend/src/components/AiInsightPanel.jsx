@@ -106,6 +106,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   category: data.category
                 });
               }
+              // 🚀 NEW: Ensure the AI War-Room Log is populated with cached data
+              if (onAgentContent) {
+                onAgentContent(data.content, true);
+              }
               return; // Skip Dify streaming
             }
           }
@@ -386,8 +390,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     return () => { isCancelled = true; };
   }, [isAnalyzingSms, selectedSms]);
 
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const handleOpenWarRoom = () => {
     if (onOpenWarRoom && selectedSms) {
@@ -457,20 +459,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
 
         <div className="flex items-center space-x-2">
-          <button 
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-[10px] font-bold"
-            onClick={() => setShowReportModal(true)}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>관련 보고서</span>
-          </button>
-          <button 
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 transition-all text-[10px] font-bold"
-            onClick={() => setShowHistoryModal(true)}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>관련 워룸 히스토리</span>
-          </button>
           {isAnalyzingSms && (
             <div className={`px-3 py-1.5 rounded-lg flex items-center space-x-2 border ${isCritical ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
               <Zap className={`w-3 h-3 animate-pulse ${isCritical ? 'text-red-400' : 'text-yellow-400'}`} />
@@ -615,55 +603,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       )}
       </div>
 
-      {/* 관련 보고서 모달 리스트 (Mock) */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-md rounded-3xl border border-white/10 p-6 relative z-10 shadow-2xl animate-in fade-in zoom-in-95">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-blue-400">
-              <FileText className="w-5 h-5" /> 과거 관련 보고서 리스트
-            </h3>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="p-4 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2.5 py-1 rounded shadow-sm">26/03/10 14:00:00</span>
-                    <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">완료</span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-200 group-hover:text-blue-400 transition-colors">유사 장애 사례 #{i}: DB 커넥션 유실 건</p>
-                  <p className="text-[11px] text-slate-500 mt-1">Dify RAG 분석 결과 관련성 92%</p>
-                </div>
-              ))}
-            </div>
-            <button className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all" onClick={() => setShowReportModal(false)}>닫기</button>
-          </div>
-        </div>
-      )}
-
-      {/* 관련 워룸 히스토리 모달 (Mock) */}
-      {showHistoryModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowHistoryModal(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-md rounded-3xl border border-white/10 p-6 relative z-10 shadow-2xl animate-in fade-in zoom-in-95">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-purple-400">
-              <MessageSquare className="w-5 h-5" /> 과거 워룸 대화 히스토리
-            </h3>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {[1, 2].map(i => (
-                <div key={i} className="p-4 bg-[#11141d] rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer group">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2.5 py-1 rounded shadow-sm">26/02/15 10:30:00</span>
-                    <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded border border-purple-500/20">Closed</span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-200 group-hover:text-purple-400 transition-colors">War-Room: 시스템 연동 오류 대응 회의</p>
-                  <p className="text-[11px] text-slate-500 mt-1">참여자: 김철수, 이영희 외 4명</p>
-                </div>
-              ))}
-            </div>
-            <button className="w-full mt-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all" onClick={() => setShowHistoryModal(false)}>닫기</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

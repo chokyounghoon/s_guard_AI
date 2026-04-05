@@ -31,7 +31,7 @@ import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, MessageSquare } from 'lucide-react';
+import { X, MessageSquare, FileText } from 'lucide-react';
 
 function AppContent() {
   const location = useLocation();
@@ -41,6 +41,7 @@ function AppContent() {
   
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
+  const [showReportPopup, setShowReportPopup] = useState(false);
   const [warRooms, setWarRooms] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
 
@@ -71,6 +72,11 @@ function AppContent() {
   const handleWarRoomClick = () => {
     fetchWarRooms();
     setShowWarRoomPopup(true);
+  };
+
+  const handleReportClick = () => {
+    fetchWarRooms();
+    setShowReportPopup(true);
   };
 
   // Extract incidentId from path if in /chat/:id
@@ -112,6 +118,7 @@ function AppContent() {
         <BottomMenu 
           currentPath={location.pathname.startsWith('/chat') ? '/chat' : location.pathname} 
           onWarRoomClick={handleWarRoomClick}
+          onReportClick={handleReportClick}
           onAiClick={() => setShowAIAssistant(true)}
         />
       )}
@@ -150,7 +157,50 @@ function AppContent() {
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30">CRITICAL</span>
                       {roomId === currentIncidentId && <span className="text-[9px] text-blue-400 font-bold">● 현재 채팅방</span>}
                     </div>
-                    <p className="text-sm font-semibold text-white truncate">{room.title || roomId}</p>
+                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global Report List Popup */}
+      {showReportPopup && (
+        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReportPopup(false)} />
+          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-emerald-600/10 to-transparent">
+              <div className="flex items-center space-x-3">
+                <div className="bg-emerald-600/20 p-2.5 rounded-xl border border-emerald-500/30">
+                  <FileText className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-white">장애 보고서 선택</h3>
+                  <p className="text-[10px] text-slate-500 font-mono">AVAILABLE REPORTS ({warRooms.length})</p>
+                </div>
+              </div>
+              <button onClick={() => setShowReportPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {warRooms.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">리포트 가능한 장애 건이 없습니다.</div>
+              ) : warRooms.map((room) => {
+                const roomId = room.inc_id || room.id;
+                return (
+                  <div
+                    key={roomId}
+                    onClick={() => { setShowReportPopup(false); navigate(`/ai-report/${roomId}`); }}
+                    className="bg-[#11141d] p-4 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-blue-500/20 text-blue-400 border-blue-500/30">COMPLETED</span>
+                    </div>
+                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
                   </div>
                 );
