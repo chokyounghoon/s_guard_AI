@@ -558,13 +558,14 @@ export default function DashboardPage() {
         const freshMsgs = (data.messages || []).filter(msg => {
           if (deletedSmsIds.has(msg.inc_id)) return false;
           
-          // 🚀 Governance Filter: Only show if assigned to current user
+          // 🚀 Governance Filter: Only show if assigned to current user OR if current user is the sender
           if (userProfile?.name || userProfile?.employee_id) {
             const isAssigned = (msg.receivers || []).some(r => 
               (userProfile.name && r.includes(userProfile.name)) || 
               (userProfile.employee_id && String(r).includes(String(userProfile.employee_id)))
             );
-            return isAssigned;
+            const isSender = msg.employee_id && String(msg.employee_id) === String(userProfile.employee_id || userProfile.id);
+            return isAssigned || isSender;
           }
           return true; // Default to all if profile not loaded yet
         });
