@@ -12213,3 +12213,8 @@ INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-hist
 INFO:     127.0.0.1:54631 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
 INFO:httpx:HTTP Request: GET https://sguardai.khcho0421.workers.dev/ai/chat-history/20260406010351409 "HTTP/1.1 200 OK"
 INFO:     127.0.0.1:54647 - "GET /ai/chat-history/20260406010351409 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [54805]
+INFO:     Stopping reloader process [54537]

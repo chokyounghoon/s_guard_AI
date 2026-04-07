@@ -281,7 +281,22 @@ app.get('/users', async (c) => {
 app.get('/users/:id', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
-  const user = await db.prepare("SELECT employee_id, email, name, role, company, honbu, team, part, subpart, phone, is_active, is_admin FROM users WHERE employee_id = ?").bind(id).first()
+  const user = await db.prepare(`
+    SELECT 
+      u.employee_id, u.email, u.name, u.role, u.phone, u.is_active, u.is_admin,
+      COALESCE(oc.name, u.company) as company, 
+      COALESCE(oh.name, u.honbu) as honbu, 
+      COALESCE(ot.name, u.team) as team,
+      COALESCE(op.name, u.part) as part,
+      COALESCE(os.name, u.subpart) as subpart
+    FROM users u
+    LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+    LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+    LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+    LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+    LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+    WHERE u.employee_id = ?
+  `).bind(id).first()
   if (!user) return c.json({ detail: "User not found" }, 404)
   return c.json(user)
 })
@@ -418,6 +433,77 @@ app.get('/ai/codes/:category', async (c) => {
     "SELECT code, name, sort_order FROM code_book WHERE category = ? AND is_active = 1 ORDER BY sort_order ASC"
   ).bind(category.toUpperCase()).all()
   return c.json({ category, codes: results })
+})
+
+app.post('/sms/convert-multimodal', async (c) => {
+  let formData
+  try {
+    formData = await c.req.formData()
+  } catch (e) {
+    return c.json({ error: 'Invalid form data' }, 400)
+  }
+
+  const file = formData.get('file')
+  if (!file) {
+    return c.json({ error: 'file is required' }, 400)
+  }
+
+  const contentType = file.type || 'image/jpeg'
+  const buffer = await file.arrayBuffer()
+  
+  // Convert ArrayBuffer to Base64 (needed for Dify remote_url base64 format)
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  const base64Image = btoa(binary)
+
+    // Use the specific Dify API key provided by the user
+    const api_key = "app-NKmE6uOd6n7FteajnHh1xXuf"
+    const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
+
+    try {
+        console.log(`[OCR] Processing image via Dify Workflow (Key: app-NK...Xuf, size: ${buffer.byteLength} bytes)`)
+        
+        // Using Dify's Workflow API (/workflows/run) which is often more stable for multimodal inputs
+        const response = await fetch(`${api_base}/workflows/run`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${api_key}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user: "sguard-multimodal-user",
+                response_mode: "blocking",
+                inputs: {
+                    sms_image: {
+                        type: "image",
+                        transfer_method: "remote_url",
+                        url: `data:${contentType};base64,${base64Image}`
+                    }
+                }
+            })
+        })
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error(`[OCR] Dify API Error: ${response.status}`, errText)
+            return c.json({ error: `Dify API 오류 (${response.status})` }, response.status)
+        }
+
+        const data = await response.json()
+        // Dify Workflow returns result in data.outputs
+        const resultText = data.data?.outputs?.text || data.data?.outputs?.result || data.answer || "이미지 분석 결과를 추출하지 못했습니다."
+    
+    return c.json({ 
+      status: "success", 
+      converted_text: resultText 
+    })
+  } catch (e) {
+    console.error('[OCR] Dify API Error:', e)
+    return c.json({ error: `Dify 분석 실패: ${e.message}` }, 500)
+  }
 })
 
 // ==========================================
@@ -1005,7 +1091,8 @@ app.get('/incidents', async (c) => {
       i.*, 
       r.message as raw_message,
       r.sender as sender_phone,
-      NULL as sender_employee_id,
+      r.employee_id as sender_employee_id,
+      us.name as sender_name,
       r.received_count,
       ua.name as assignee_name,
       GROUP_CONCAT(DISTINCT uaa.name) as assignment_list,
@@ -1019,7 +1106,7 @@ app.get('/incidents', async (c) => {
     LEFT JOIN incident_assignments ia ON i.inc_id = ia.inc_id
     LEFT JOIN users uaa ON ia.user_id = uaa.employee_id
     LEFT JOIN received_messages r ON (i.inc_id = r.inc_id OR i.source_sms_id = r.inc_id)
-    LEFT JOIN users us ON r.sender = us.phone
+    LEFT JOIN users us ON (r.employee_id = us.employee_id OR r.sender = us.phone)
     WHERE 1=1
   `
   const params = []

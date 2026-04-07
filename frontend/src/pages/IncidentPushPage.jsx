@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal } from 'lucide-react';
 
-const SmsTestPage = () => {
-    const [sender, setSender] = useState('1544-7000');
+const IncidentPushPage = () => {
+    const [sender, setSender] = useState('');
     const [employeeId, setEmployeeId] = useState('');
     const [message, setMessage] = useState('');
     const [advanced, setAdvanced] = useState({
@@ -23,26 +23,38 @@ const SmsTestPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isConverting, setIsConverting] = useState(false);
     const [isListening, setIsListening] = useState(false);
+    const [uploadedImages, setUploadedImages] = useState([]);
+    const [userProfile, setUserProfile] = useState(null);
     const fileInputRef = useRef(null);
     const recognitionRef = useRef(null);
+
+    const getApiUrl = (path) => {
+        const workerUrl = 'https://sguardai.khcho0421.workers.dev';
+        return `${workerUrl}${path}`;
+    };
 
     React.useEffect(() => {
         const savedUser = localStorage.getItem('sguard_user');
         if (savedUser) {
             try {
                 const user = JSON.parse(savedUser);
-                if (user.employee_id) setEmployeeId(user.employee_id);
+                if (user.employee_id) {
+                    setEmployeeId(user.employee_id);
+                    fetch(getApiUrl(`/users/${user.employee_id}`))
+                        .then(res => res.json())
+                        .then(dbUser => {
+                            if (dbUser.phone) setSender(dbUser.phone);
+                            if (dbUser.name) setUserProfile(dbUser);
+                        })
+                        .catch(err => console.error('Failed to fetch user info:', err));
+                }
             } catch (e) {
                 console.error('Failed to parse saved user', e);
             }
         }
     }, []);
 
-    const predefinedMessages = [
-        { label: 'DB Connection Error', text: 'payment API timeout 및 database connection pool error 발생' },
-        { label: 'Network Timeout', text: 'gateway 504 timeout error in user service' },
-        { label: 'CPU Overload', text: 'CRITICAL: batch server CPU utilization reached 99%' }
-    ];
+
 
     const toggleSTT = () => {
         if (isListening) {
@@ -166,78 +178,77 @@ const SmsTestPage = () => {
             reader.readAsDataURL(file);
         });
     };
-    const getApiUrl = (path) => {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        const isHttps = protocol === 'https:';
-        const workerUrl = 'https://sguardai.khcho0421.workers.dev';
-
-        // Prefer Worker even on local for D1/Cloudflare testing
-        return `${workerUrl}${path}`;
-    };
-
     const handleFileUpload = async (e) => {
-        let file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
 
-        if (file.type.includes('image')) {
-            setIsConverting(true);
+        const maxFiles = 5;
+        // Limit processing to remaining slots if they upload sequentially
+        // For simplicity, we just take the first 5 selected files if they upload multiple
+        const filesToProcess = files.slice(0, maxFiles);
+
+        if (files.length > maxFiles) {
             setLogs(prev => [{
                 time: new Date().toLocaleTimeString(),
-                type: 'ai',
-                text: `[단계 1/2] 이미지 최적화 중: ${file.name}`
-            }, ...prev]);
-
-            try {
-                // 클라이언트 사이드 압축 적용
-                file = await compressImage(file);
-                
-                setLogs(prev => [{
-                    time: new Date().toLocaleTimeString(),
-                    type: 'ai',
-                    text: `[단계 2/2] AI 분석 요청 중 (크기: ${(file.size / 1024).toFixed(1)}KB)`
-                }, ...prev]);
-
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const response = await fetch(getApiUrl('/sms/convert-multimodal'), {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) throw new Error('변환 실패');
-                const data = await response.json();
-                console.log('DEBUG: OCR Response Data:', data);
-                
-                if (data.converted_text) {
-                    setMessage(prev => prev ? `${prev}\n\n${data.converted_text}` : data.converted_text);
-                } else {
-                    console.warn('DEBUG: No converted_text in response');
-                }
-                
-                setLogs(prev => [{
-                    time: new Date().toLocaleTimeString(),
-                    type: 'ai',
-                    text: `[AI 이미지 인식 완료] ${file.name} 추출 성공: "${data.converted_text?.substring(0, 30)}..."`
-                }, ...prev]);
-            } catch (error) {
-                setLogs(prev => [{
-                    time: new Date().toLocaleTimeString(),
-                    type: 'error',
-                    text: `[AI 분석 실패] ${error.message}`
-                }, ...prev]);
-            } finally {
-                setIsConverting(false);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            }
-        } else {
-            setLogs(prev => [{
-                time: new Date().toLocaleTimeString(),
-                type: 'request',
-                text: '[안내] 실시간 음성 인식(StT) 버튼을 사용해 보세요.'
+                type: 'error',
+                text: `최대 ${maxFiles}개의 이미지만 첨부할 수 있습니다. 처음 ${maxFiles}개만 업로드됩니다.`
             }, ...prev]);
         }
+
+        const newUploads = filesToProcess.filter(f => f.type.includes('image')).map(file => {
+            return {
+                file,
+                info: {
+                    id: Math.random().toString(36).substr(2, 9),
+                    name: file.name,
+                    size: (file.size / 1024).toFixed(1) + ' KB',
+                    url: URL.createObjectURL(file),
+                    status: 'converting'
+                }
+            };
+        });
+
+        if (!newUploads.length) {
+            setLogs(prev => [{ time: new Date().toLocaleTimeString(), type: 'request', text: '[안내] 이미지 파일이 아닙니다.' }, ...prev]);
+            return;
+        }
+
+        setUploadedImages(prev => {
+            const combined = [...prev, ...newUploads.map(u => u.info)];
+            return combined.slice(-5); // Keep max 5 across multiple uploads
+        });
+        
+        setIsConverting(true);
+
+        for (const upload of newUploads) {
+            setLogs(prev => [{ time: new Date().toLocaleTimeString(), type: 'ai', text: `[최적화 및 AI 분석 중] ${upload.info.name}` }, ...prev]);
+
+            try {
+                const compressedFile = await compressImage(upload.file);
+                const formData = new FormData();
+                formData.append('file', compressedFile);
+
+                const response = await fetch(getApiUrl('/sms/convert-multimodal'), { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                if (!response.ok) throw new Error(data.error || '변환 실패');
+
+                if (data.converted_text) {
+                    setMessage(prev => prev ? `${prev}\n\n[첨부: ${upload.info.name}]\n${data.converted_text}` : `[첨부: ${upload.info.name}]\n${data.converted_text}`);
+                }
+
+                setUploadedImages(prev => prev.map(img => img.id === upload.info.id ? { ...img, status: 'success' } : img));
+                setLogs(prev => [{ time: new Date().toLocaleTimeString(), type: 'ai', text: `[AI 이미지 인식 완료] ${upload.info.name} 추출 성공` }, ...prev]);
+
+            } catch (error) {
+                setUploadedImages(prev => prev.map(img => img.id === upload.info.id ? { ...img, status: 'error' } : img));
+                setLogs(prev => [{ time: new Date().toLocaleTimeString(), type: 'error', text: `[AI 분석 실패] ${upload.info.name}: ${error.message}` }, ...prev]);
+            }
+        }
+
+        setIsConverting(false);
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const parseSmsMessage = (text) => {
@@ -367,7 +378,7 @@ const SmsTestPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#0a0c14] text-white p-6 md:p-12 font-sans selection:bg-blue-500/30">
+        <div className="min-h-screen bg-[#0a0c14] text-white p-4 sm:p-6 md:p-12 pb-24 font-sans selection:bg-blue-500/30 overflow-x-hidden">
             {/* Background Gradients */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
@@ -382,12 +393,12 @@ const SmsTestPage = () => {
                             <div className="p-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
                                 <Terminal className="w-6 h-6 text-blue-400" />
                             </div>
-                            <span className="text-blue-400 font-mono text-sm tracking-widest uppercase">Manual Incident Entry</span>
+                            <span className="text-blue-400 font-mono text-sm tracking-widest uppercase">Incident Push (Direct Entry)</span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">
                             S-Guard 장애 수동 접수
                         </h1>
-                        <p className="text-slate-400 mt-4 text-lg max-w-2xl leading-relaxed">
+                        <p className="text-slate-400 mt-4 text-sm sm:text-base md:text-lg max-w-2xl leading-relaxed">
                             자동 감지되지 않은 특이 장애 상황을 수동으로 접수합니다. 
                             <span className="text-blue-400/80"> 이미지(OCR) 및 음성(STT) AI 분석</span> 기능을 통해 현장 상황을 빠르게 텍스트로 전환할 수 있습니다.
                         </p>
@@ -405,11 +416,18 @@ const SmsTestPage = () => {
                     <div className="lg:col-span-12 xl:col-span-8 space-y-6">
                         <div className="bg-[#151926]/60 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/50">
                             <div className="p-1 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-transparent"></div>
-                            <div className="p-8">
+                            <div className="p-4 sm:p-8">
                                 <form onSubmit={handleSend} className="space-y-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-sm font-semibold text-slate-300 ml-1">발신 사번 (Employee ID)</label>
+                                            <div className="flex items-center justify-between ml-1 mb-2">
+                                                <label className="text-sm font-semibold text-slate-300">발신 사번 (Employee ID)</label>
+                                                {userProfile && (
+                                                    <span className="text-[9px] sm:text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 truncate max-w-[150px] sm:max-w-[400px]">
+                                                        {userProfile.name} {userProfile.role ? `(${userProfile.role})` : ''} - {userProfile.company || ''} {userProfile.honbu ? `> ${userProfile.honbu}` : ''} {userProfile.team ? `> ${userProfile.team}` : ''} {userProfile.part ? `> ${userProfile.part}` : ''}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="relative">
                                                 <input
                                                     type="text"
@@ -471,21 +489,51 @@ const SmsTestPage = () => {
                                                     onChange={handleFileUpload}
                                                     className="hidden"
                                                     accept="image/*,audio/*"
+                                                    multiple
                                                 />
                                             </div>
+                                            
+                                            {/* Image Preview Area */}
+                                            {uploadedImages.length > 0 && (
+                                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                    {uploadedImages.map(img => (
+                                                        <div key={img.id} className="p-3 bg-white/5 border border-white/10 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 relative group">
+                                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-black/50">
+                                                                <img src={img.url} alt="Preview" className="w-full h-full object-cover" />
+                                                            </div>
+                                                            <div className="flex-1 overflow-hidden">
+                                                                <div className="flex justify-between items-start">
+                                                                    <h4 className="text-xs font-semibold text-slate-200 truncate pr-4">{img.name}</h4>
+                                                                    <button 
+                                                                        type="button" 
+                                                                        onClick={() => setUploadedImages(prev => prev.filter(i => i.id !== img.id))}
+                                                                        className="absolute top-2 right-2 p-1 text-slate-500 hover:text-red-400 transition-colors leading-none text-base opacity-0 group-hover:opacity-100"
+                                                                    >
+                                                                        &times;
+                                                                    </button>
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-400 mt-0.5">{img.size}</p>
+                                                                {img.status === 'converting' ? (
+                                                                    <p className="text-[10px] text-blue-400 mt-1 animate-pulse flex items-center gap-1">
+                                                                        <Loader2 className="w-3 h-3 animate-spin"/> 분석 중...
+                                                                    </p>
+                                                                ) : img.status === 'success' ? (
+                                                                    <p className="text-[10px] text-green-400 mt-1 flex items-center gap-1">
+                                                                        <CheckCircle className="w-3 h-3"/> 완료
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-[10px] text-red-400 mt-1 flex items-center gap-1">
+                                                                        <AlertTriangle className="w-3 h-3"/> 실패
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Advanced Toggle */}
-                                        <div className="md:col-span-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowAdvanced(!showAdvanced)}
-                                                className="flex items-center gap-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors bg-blue-500/5 px-4 py-2 rounded-lg border border-blue-500/20"
-                                            >
-                                                <SlidersHorizontal className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-                                                {showAdvanced ? '상세 정보 닫기' : '상세 장애 정보 입력'}
-                                            </button>
-                                        </div>
+                                        {/* Advanced Toggle Removed as per request */}
 
                                         {showAdvanced && (
                                             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white/5 rounded-2xl border border-white/5 animate-in fade-in slide-in-from-top-2">
@@ -565,9 +613,9 @@ const SmsTestPage = () => {
                                             <textarea
                                                 value={message}
                                                 onChange={(e) => setMessage(e.target.value)}
-                                                rows="10"
+                                                rows="8"
                                                 placeholder="예: 센터 네트워크 장비 L3 고용량 트래픽으로 인한 간헐적 지연 발생..."
-                                                className="w-full bg-black/40 border border-white/10 rounded-2xl p-6 text-white text-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all resize-none leading-relaxed placeholder:text-white/10"
+                                                className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 sm:p-6 text-white text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all resize-none leading-relaxed placeholder:text-white/10 font-sans"
                                                 required
                                             />
                                             {message && (
@@ -585,7 +633,7 @@ const SmsTestPage = () => {
                                     <button
                                         type="submit"
                                         disabled={isLoading || !message.trim()}
-                                        className="w-full relative group overflow-hidden bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-5 px-6 rounded-2xl flex items-center justify-center transition-all shadow-2xl shadow-blue-900/40 active:scale-[0.98]"
+                                        className="w-full relative group overflow-hidden bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 sm:py-5 px-6 rounded-2xl flex items-center justify-center transition-all shadow-2xl shadow-blue-900/40 active:scale-[0.98]"
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite] transition-transform"></div>
                                         {isLoading ? (
@@ -604,27 +652,12 @@ const SmsTestPage = () => {
                             </div>
                         </div>
 
-                        {/* Presets */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {predefinedMessages.map((preset, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => setMessage(preset.text)}
-                                    className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-5 text-left transition-all group hover:border-blue-500/50"
-                                >
-                                    <div className="flex items-center justify-between mb-3 text-blue-400 font-bold text-sm">
-                                        {preset.label}
-                                        <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
-                                    </div>
-                                    <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">{preset.text}</p>
-                                </button>
-                            ))}
-                        </div>
+
                     </div>
 
                     {/* Logs - 4 Cols */}
                     <div className="lg:col-span-12 xl:col-span-4 flex flex-col h-full space-y-4">
-                        <div className="bg-[#151926]/40 backdrop-blur-xl border border-white/5 rounded-3xl p-8 flex flex-col h-[740px] shadow-xl">
+                        <div className="bg-[#151926]/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 sm:p-8 flex flex-col h-[500px] xl:h-[740px] shadow-xl">
                             <div className="flex items-center justify-between mb-6">
                                 <h2 className="text-xl font-bold flex items-center">
                                     <Clipboard className="w-5 h-5 mr-3 text-green-400" />
@@ -671,12 +704,10 @@ const SmsTestPage = () => {
 
                             <div className="mt-6 pt-6 border-t border-white/5">
                                 <a
-                                    href="/#/dashboard"
-                                    target="_blank"
-                                    rel="noreferrer"
+                                    href="/"
                                     className="group w-full bg-white/5 hover:bg-white/10 py-3 rounded-xl text-slate-400 hover:text-white text-sm font-medium flex items-center justify-center gap-2 transition-all border border-white/5 hover:border-white/20"
                                 >
-                                    실시간 대시보드 모니터링
+                                    메인 홈으로 이동
                                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                 </a>
                             </div>
@@ -685,7 +716,7 @@ const SmsTestPage = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 @keyframes shimmer {
                     100% { transform: translateX(100%); }
                 }
@@ -707,4 +738,4 @@ const SmsTestPage = () => {
     );
 };
 
-export default SmsTestPage;
+export default IncidentPushPage;

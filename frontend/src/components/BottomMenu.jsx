@@ -107,7 +107,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 <div
                   onClick={() => {
                     setShowMoreMenu(false);
-                    navigate('/sms-test');
+                    navigate('/incident-push');
                   }}
                   className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-green-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
                 >

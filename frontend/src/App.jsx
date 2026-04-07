@@ -20,7 +20,7 @@ import SearchPage from './pages/SearchPage';
 import IncidentListPage from './pages/IncidentListPage';
 import KeywordManagementPage from './pages/KeywordManagementPage';
 import ReportLineManagementPage from './pages/ReportLineManagementPage';
-import SmsTestPage from './pages/SmsTestPage';
+import IncidentPushPage from './pages/IncidentPushPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import UserManagementPage from './pages/UserManagementPage';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
@@ -105,7 +105,7 @@ function AppContent() {
         <Route path="/incident-list" element={<IncidentListPage />} />
         <Route path="/keyword-management" element={<KeywordManagementPage />} />
         <Route path="/report-line-management" element={<ReportLineManagementPage />} />
-        <Route path="/sms-test" element={<SmsTestPage />} />
+        <Route path="/incident-push" element={<IncidentPushPage />} />
         <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
         <Route path="/user-management" element={<UserManagementPage />} />
         <Route path="/organization-management" element={<OrganizationManagementPage />} />
