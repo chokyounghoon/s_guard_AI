@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal } from 'lucide-react';
+import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal, ChevronDown, ChevronUp, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const IncidentPushPage = () => {
@@ -27,6 +27,8 @@ const IncidentPushPage = () => {
     const [isListening, setIsListening] = useState(false);
     const [uploadedImages, setUploadedImages] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
+    const [showSenderInfo, setShowSenderInfo] = useState(false);
+    const [showLogs, setShowLogs] = useState(false);
     const fileInputRef = useRef(null);
     const recognitionRef = useRef(null);
 
@@ -421,40 +423,59 @@ const IncidentPushPage = () => {
                             <div className="p-1 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-transparent"></div>
                             <div className="p-4 sm:p-8">
                                 <form onSubmit={handleSend} className="space-y-8">
+                                    <div className="border border-white/10 bg-white/5 rounded-2xl overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowSenderInfo(!showSenderInfo)}
+                                            className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors focus:outline-none"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <UserCircle className="w-5 h-5 text-indigo-400" />
+                                                <span className="text-sm font-bold text-slate-200">발신자 기본 정보 (Sender Info)</span>
+                                            </div>
+                                            {showSenderInfo ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                                        </button>
+                                        
+                                        <div className={`transition-all duration-500 ease-in-out origin-top ${showSenderInfo ? 'max-h-[500px] opacity-100 scale-y-100' : 'max-h-0 opacity-0 scale-y-0 overflow-hidden hidden'}`}>
+                                            <div className="p-5 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6 bg-black/20">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between ml-1 mb-2">
+                                                        <label className="text-sm font-semibold text-slate-300">발신 사번 (Employee ID)</label>
+                                                        {userProfile && (
+                                                            <span className="text-[9px] sm:text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 truncate max-w-[150px] sm:max-w-[400px]">
+                                                                {userProfile.name} {userProfile.role ? `(${userProfile.role})` : ''} - {userProfile.company || ''} {userProfile.honbu ? `> ${userProfile.honbu}` : ''} {userProfile.team ? `> ${userProfile.team}` : ''} {userProfile.part ? `> ${userProfile.part}` : ''}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            value={employeeId}
+                                                            readOnly
+                                                            placeholder="사번 입력 (예: 1234567)"
+                                                            className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-slate-400 cursor-not-allowed focus:outline-none transition-all font-mono"
+                                                        />
+                                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Auto Filled</div>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-semibold text-slate-300 ml-1">발신 번호 (Sender)</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            value={sender}
+                                                            readOnly
+                                                            className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-slate-400 cursor-not-allowed focus:outline-none transition-all font-mono"
+                                                        />
+                                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">System Default</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between ml-1 mb-2">
-                                                <label className="text-sm font-semibold text-slate-300">발신 사번 (Employee ID)</label>
-                                                {userProfile && (
-                                                    <span className="text-[9px] sm:text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 truncate max-w-[150px] sm:max-w-[400px]">
-                                                        {userProfile.name} {userProfile.role ? `(${userProfile.role})` : ''} - {userProfile.company || ''} {userProfile.honbu ? `> ${userProfile.honbu}` : ''} {userProfile.team ? `> ${userProfile.team}` : ''} {userProfile.part ? `> ${userProfile.part}` : ''}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="relative">
-                                                <input
-                                                    type="text"
-                                                    value={employeeId}
-                                                    readOnly
-                                                    placeholder="사번 입력 (예: 1234567)"
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-slate-400 cursor-not-allowed focus:outline-none transition-all font-mono"
-                                                />
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Auto Filled</div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-semibold text-slate-300 ml-1">발신 번호 (Sender)</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="text"
-                                                    value={sender}
-                                                    readOnly
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-slate-400 cursor-not-allowed focus:outline-none transition-all font-mono"
-                                                />
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">System Default</div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
+                                        <div className="space-y-2 md:col-span-2">
                                             <label className="text-sm font-semibold text-slate-300 ml-1 flex justify-between">
                                                 AI 멀티모달 인식 (Image/Audio)
                                                 {isConverting && <span className="text-blue-400 animate-pulse flex items-center gap-1 text-[11px]"><Loader2 className="w-3 h-3 animate-spin"/> AI 분석 중...</span>}
@@ -660,16 +681,26 @@ const IncidentPushPage = () => {
 
                     {/* Logs - 4 Cols */}
                     <div className="lg:col-span-12 xl:col-span-4 flex flex-col h-full space-y-4">
-                        <div className="bg-[#151926]/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 sm:p-8 flex flex-col h-[500px] xl:h-[740px] shadow-xl">
-                            <div className="flex items-center justify-between mb-6">
+                        <div className={`bg-[#151926]/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 sm:p-8 flex flex-col shadow-xl transition-all duration-500 overflow-hidden ${showLogs ? 'h-[500px] xl:h-[740px]' : 'h-auto'}`}>
+                            <div className="flex items-center justify-between">
                                 <h2 className="text-xl font-bold flex items-center">
                                     <Clipboard className="w-5 h-5 mr-3 text-green-400" />
                                     접수 처리 로그
                                 </h2>
-                                <div className="text-[10px] font-mono text-slate-500 bg-white/5 px-2 py-1 rounded">LIVE FEED</div>
+                                <div className="flex items-center gap-3">
+                                    <div className="text-[10px] font-mono text-slate-500 bg-white/5 px-2 py-1 rounded">LIVE FEED</div>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowLogs(!showLogs)} 
+                                        className="p-1 hover:bg-white/10 rounded transition-colors focus:outline-none"
+                                    >
+                                        {showLogs ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="flex-1 bg-black/60 rounded-2xl p-6 overflow-y-auto font-mono text-sm space-y-4 custom-scrollbar">
+                            <div className={`transition-all duration-500 flex flex-col flex-1 ease-in-out ${showLogs ? 'mt-6 opacity-100' : 'h-0 mt-0 opacity-0 overflow-hidden hidden'}`}>
+                                <div className="flex-1 bg-black/60 rounded-2xl p-6 overflow-y-auto font-mono text-sm space-y-4 custom-scrollbar">
                                 {logs.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 space-y-3">
                                         <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center">
@@ -703,9 +734,10 @@ const IncidentPushPage = () => {
                                         </div>
                                     ))
                                 )}
+                                </div>
                             </div>
 
-                            <div className="mt-6 pt-6 border-t border-white/5">
+                            <div className={`pt-6 border-t border-white/5 ${showLogs ? 'mt-6' : 'mt-4'}`}>
                                 <button
                                     type="button"
                                     onClick={() => navigate('/dashboard')}
