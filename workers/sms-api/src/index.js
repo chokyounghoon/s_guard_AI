@@ -466,8 +466,8 @@ app.post('/sms/convert-multimodal', async (c) => {
     try {
         console.log(`[OCR] Processing image via Dify Workflow (Key: app-NK...Xuf, size: ${buffer.byteLength} bytes)`)
         
-        // Using Dify's Workflow API (/workflows/run) which is often more stable for multimodal inputs
-        const response = await fetch(`${api_base}/workflows/run`, {
+        // Using Dify's Chat API (/chat-messages) since the provided API Key is for a Chat App
+        const response = await fetch(`${api_base}/chat-messages`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${api_key}`,
@@ -476,13 +476,15 @@ app.post('/sms/convert-multimodal', async (c) => {
             body: JSON.stringify({
                 user: "sguard-multimodal-user",
                 response_mode: "blocking",
-                inputs: {
-                    sms_image: {
+                query: "Extract text from this image as accurately as possible.",
+                inputs: {},
+                files: [
+                    {
                         type: "image",
                         transfer_method: "remote_url",
                         url: `data:${contentType};base64,${base64Image}`
                     }
-                }
+                ]
             })
         })
 
