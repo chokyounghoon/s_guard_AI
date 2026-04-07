@@ -476,7 +476,7 @@ app.post('/sms/convert-multimodal', async (c) => {
             body: JSON.stringify({
                 user: "sguard-multimodal-user",
                 response_mode: "blocking",
-                query: "Extract text from this image as accurately as possible.",
+                query: "첨부된 이미지의 텍스트를 정확하게 추출해서 알려주세요.",
                 inputs: {},
                 files: [
                     {
