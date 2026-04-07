@@ -448,12 +448,12 @@ app.post('/sms/convert-multimodal', async (c) => {
     return c.json({ error: 'file is required' }, 400)
   }
 
-  // Use the specific Dify API key provided by the user
+  // Use the MULTIMODAL key for OCR
   const api_key = "app-NKmE6uOd6n7FteajnHh1xXuf"
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   try {
-    console.log(`[OCR] Processing multimodal image via Dify Upload + Chat API`)
+    console.log(`[OCR] Processing multimodal image via Dify Upload + Chat API (Key: ${api_key.substring(0, 10)}...)`)
     
     // 1. Upload the file to Dify first
     const difyUploadForm = new FormData()
@@ -464,7 +464,6 @@ app.post('/sms/convert-multimodal', async (c) => {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${api_key}`
-            // Let Fetch handle Content-Type and boundary for FormData automatically
         },
         body: difyUploadForm
     })
@@ -478,7 +477,7 @@ app.post('/sms/convert-multimodal', async (c) => {
     const uploadData = await uploadRes.json()
     console.log(`[OCR] Dify File Upload Success, ID: ${uploadData.id}`)
     
-    // 2. Feed the uploaded file ID as variable to the Advanced Chat
+    // 2. Feed the uploaded file ID as 'sms_image' variable (Advanced Chat App structure)
     const response = await fetch(`${api_base}/chat-messages`, {
         method: 'POST',
         headers: {
@@ -487,15 +486,16 @@ app.post('/sms/convert-multimodal', async (c) => {
         },
         body: JSON.stringify({
             user: "sguard-multimodal-user",
-            response_mode: "blocking",
-            query: "첨부된 이미지의 텍스트를 정확하게 추출해서 알려주세요.",
+            response_mode: "streaming", // Switch to streaming to avoid 504 timeouts
+            query: "이미지 속 텍스트를 정확하게 추출해서 알려주세요. 불필요한 설명은 생략해 주세요.",
             inputs: {
                 sms_image: {
                     type: "image",
                     transfer_method: "local_file",
                     upload_file_id: uploadData.id
                 }
-            }
+            },
+            files: [] // Advanced Chat uses inputs for variables like sms_image
         })
     })
 
@@ -505,12 +505,33 @@ app.post('/sms/convert-multimodal', async (c) => {
         return c.json({ error: `Dify API 오류 (${response.status})` }, response.status)
     }
 
-    const data = await response.json()
-    const resultText = data.data?.outputs?.text || data.data?.outputs?.result || data.answer || "이미지 분석 결과를 추출하지 못했습니다."
+    // Proxy the SSE stream to the frontend
+    const { readable, writable } = new TransformStream()
+    const writer = writable.getWriter()
 
-    return c.json({ 
-      status: "success", 
-      converted_text: resultText 
+    ;(async () => {
+      try {
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          // Directly proxy the chunk from Dify
+          await writer.write(value)
+        }
+      } catch(e) {
+        console.error(`[OCR] Stream Error:`, e)
+      } finally {
+        await writer.close()
+      }
+    })()
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      }
     })
   } catch (e) {
     console.error('[OCR] Dify API Error:', e)
@@ -739,7 +760,7 @@ app.get('/sms/recent', async (c) => {
   
   // JOIN with users to get proper name/team in the list
   const { results } = await db.prepare(`
-    SELECT r.*, u.name, u.role, u.team
+    SELECT r.*, u.name, u.role, u.team, u.part
     FROM received_messages r
     LEFT JOIN users u ON r.employee_id = u.employee_id
     ORDER BY r.timestamp DESC 
@@ -750,8 +771,9 @@ app.get('/sms/recent', async (c) => {
     inc_id: r.inc_id, 
     id: r.inc_id, 
     sender: r.sender,
-    sender_name: r.name || '알 수 없음',
-    sender_team: r.team || 'N/A',
+    sender_name: r.name || '',
+    sender_team: r.team || '',
+    sender_part: r.part || '',
     message: r.message, 
     employee_id: r.employee_id,
     timestamp: r.timestamp, 
@@ -1394,7 +1416,7 @@ app.get('/ai/insight/:id', async (c) => {
   const db = c.env.DB
   try {
     const insight = await db.prepare("SELECT * FROM autopilot_insight WHERE inc_id = ?").bind(inc_id).first()
-    if (!insight) return c.json({ error: "Insight not found" }, 404)
+    if (!insight) return c.json({ exists: false, error: "Insight not found" }, 200)
     return c.json(insight)
   } catch (e) {
     return c.json({ error: e.message }, 500)
@@ -1402,32 +1424,71 @@ app.get('/ai/insight/:id', async (c) => {
 })
 
 app.post('/ai/chat', async (c) => {
-  const { query } = await c.req.json()
-  const api_key = c.env.DIFY_API_KEY_ASSISTANT || c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
+  const { query, incident_id, conversation_id } = await c.req.json()
+  const api_key = c.env.DIFY_API_KEY_ASSISTANT || "app-ZDaVB8EWtA5vmTYJLmbysdQq"
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!api_key) {
-    return c.json({ response: "DIFY_API_KEY_AGENT가 설정되지 않았습니다." })
+    return c.json({ response: "DIFY_API_KEY_ASSISTANT가 설정되지 않았습니다." })
   }
 
+  // Use streaming mode as Agent Chat Apps (like the Assistant) generally require it
   const payload = {
     inputs: {},
     query: query,
-    response_mode: "blocking",
-    conversation_id: "",
+    response_mode: "streaming",
+    conversation_id: conversation_id || "",
     user: "sguard-worker"
   }
 
   try {
-    const difyRes = await fetch(`${api_base}/chat-messages`, {
+    const response = await fetch(`${api_base}/chat-messages`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${api_key}`, 'Content-Type': 'application/json' },
+      headers: { 
+        'Authorization': `Bearer ${api_key}`, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(payload)
     })
-    const data = await difyRes.json()
-    return c.json({ response: data.answer || "응답이 없습니다." })
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[AI Chat] Dify Error: ${response.status}`, errText)
+      return c.json({ response: `Dify API 오류 (${response.status})` }, response.status)
+    }
+
+    // SSE Streaming Proxy to the Frontend (Maintains real-time response)
+    const { readable, writable } = new TransformStream()
+    const writer = writable.getWriter()
+    const encoder = new TextEncoder()
+
+    ;(async () => {
+      try {
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          // Directly proxy the chunk from Dify
+          await writer.write(value)
+        }
+      } catch(e) {
+        console.error(`[AI Chat] Stream Error:`, e)
+      } finally {
+        await writer.close()
+      }
+    })()
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      }
+    })
   } catch (e) {
-    return c.json({ response: `Dify API 오류: ${e.message}` })
+    console.error(`[AI Chat] Failed to fetch:`, e)
+    return c.json({ response: `AI 서버 연결 실패: ${e.message}` }, 500)
   }
 })
 
@@ -2781,12 +2842,14 @@ app.get('/ai/incident/my-assignments', async (c) => {
         ELSE a.status
       END as status,
       m.sender, m.message, m.employee_id, m.timestamp as message_at, m.received_count,
+      u1.name as sender_name, u1.part as sender_part,
       (SELECT GROUP_CONCAT(u2.name, ', ') 
        FROM incident_assignments a2 
        JOIN users u2 ON a2.user_id = u2.employee_id 
        WHERE a2.inc_id = a.inc_id OR REPLACE(a2.inc_id, 'INC-', '') = a.inc_id) as assignees
     FROM incident_assignments a
     LEFT JOIN received_messages m ON (a.inc_id = m.inc_id OR REPLACE(a.inc_id, 'INC-', '') = m.inc_id)
+    LEFT JOIN users u1 ON m.employee_id = u1.employee_id
     LEFT JOIN warroom_list w ON (a.inc_id = w.inc_id OR REPLACE(a.inc_id, 'INC-', '') = w.inc_id)
     WHERE a.user_id = ?
   `

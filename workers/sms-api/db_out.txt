@@ -1,0 +1,50 @@
+
+ ⛅️ wrangler 4.80.0
+───────────────────
+Resource location: remote 
+
+🌀 Executing on remote database sguard-db (cec6c7cc-5bce-4fdf-a500-e1976b1fb66f):
+🌀 To execute on your local development database, remove the --remote flag from your wrangler command.
+🚣 Executed 1 command in 0.24ms
+[
+  {
+    "results": [
+      {
+        "inc_id": "20260407222026616",
+        "employee_id": "18121020",
+        "sender": "010-4732-8880",
+        "message": "ㅅㄷ"
+      },
+      {
+        "inc_id": "20260407215127934",
+        "employee_id": "18121020",
+        "sender": "03180074391",
+        "message": "[Web발신]\n[신한카드] <신MCI-mc1> IF 오류발생\r\n\r\n▶ 채널       : [FAN]\r\n▶ IF아이디   : [FAN00200]\r\n▶ 서비스코드 : [SCSL02024U]\r\n▶ 서비스명   : [[pLay-상담]마케팅대상여부조회]\r\n▶ 업무시스템 : [FRC]\r\n\r\n▶ 에러코드   : [EGRT0096]\r\n▶ 발생건수   : [최근 2분동안 총 29건 발생]\r\n▶ 발생노드   : [노드A3: 29건]\r\n▶ 에러메시지 : [송신실패-세션 쓰는 도중 오류가 발생하였습니다]\r\n\r\n▶ 메시지 수신자 : [윤학민, 이장규, 이재연, 조경훈, 박준현, 김성원, 최경희, 정경성, 변영진, 황광덕]\r\n\r\n▶ 발생시각 : [2026-04-07 21:40:03]"
+      },
+      {
+        "inc_id": "20260407172557749",
+        "employee_id": "18121020",
+        "sender": "1544-7000",
+        "message": "11122ㄷ"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "APAC",
+      "served_by_colo": "ICN",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.2415
+      },
+      "duration": 0.2415,
+      "changes": 0,
+      "last_row_id": 727,
+      "changed_db": false,
+      "size_after": 512000,
+      "rows_read": 14,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

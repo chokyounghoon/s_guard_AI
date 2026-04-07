@@ -13,11 +13,12 @@ import AIInsightModal from '../components/AIInsightModal';
 // ── 데이터 ─────────────────────────────────────────
 const getApiUrl = (endpoint) => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  // AI 및 DB 관련 에코시스템은 FastAPI 백엔드 프록시를 통해 동기화 이점을 누린다 (로컬 한정)
-  if (isLocalDev && (endpoint.startsWith('/ai/') || endpoint.startsWith('/db/'))) {
+  // 🚀 AI 에코시스템은 로컬 백엔드(Python)가 꺼져있을 경우를 대비해 배포된 Worker를 직접 호출한다.
+  // DB 관련 에코시스템만 FastAPI 백엔드 프록시를 통해 동기화 이점을 누린다 (로컬 한정)
+  if (isLocalDev && endpoint.startsWith('/db/')) {
     return `http://127.0.0.1:8000${endpoint}`;
   }
-  // 그 외 운영 환경 및 고정 주소는 Cloudflare Worker API 직접 호출
+  // 그 외 AI 운영 환경 및 고정 주소는 Cloudflare Worker API 직접 호출
   return 'https://sguardai.khcho0421.workers.dev' + endpoint;
 };
 
@@ -1675,7 +1676,7 @@ export default function DashboardPage() {
                         <span>발신: {item.sender}</span>
                         {item.employee_id && (
                           <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded">
-                            사번: {item.employee_id}
+                            {item.sender_part || ''} {item.sender_name || item.employee_id}
                           </span>
                         )}
                         {item.received_count > 1 && (

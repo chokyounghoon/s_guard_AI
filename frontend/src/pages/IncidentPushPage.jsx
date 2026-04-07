@@ -233,14 +233,52 @@ const IncidentPushPage = () => {
                 const formData = new FormData();
                 formData.append('file', compressedFile);
 
-                const response = await fetch(getApiUrl('/sms/convert-multimodal'), { method: 'POST', body: formData });
-                const data = await response.json();
+                const response = await fetch(getApiUrl('/sms/convert-multimodal'), { 
+                    method: 'POST', 
+                    body: formData 
+                });
                 
-                if (!response.ok) throw new Error(data.error || '변환 실패');
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || '변환 실패');
+                }
 
-                if (data.converted_text) {
-                    let cleanedText = data.converted_text.replace(/\[(?:Web발신|신한카드)\]\s*/g, '').trim();
-                    setMessage(prev => prev ? `${prev}\n\n${cleanedText}` : cleanedText);
+                // Handle SSE Stream for OCR
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulatedText = "";
+                
+                // Capture the current message as a base before this image's stream starts
+                // to avoid duplicated appending during incremental updates.
+                const baseMessageBeforeStream = message;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith('data:')) {
+                            try {
+                                const data = JSON.parse(trimmed.slice(5));
+                                if (data.event === 'message' || data.event === 'agent_message') {
+                                    const token = data.answer || "";
+                                    accumulatedText += token;
+                                    
+                                    // Update message state incrementally for better UX
+                                    const cleanedText = accumulatedText.replace(/\[(?:Web발신|신한카드)\]\s*/g, '').trim();
+                                    
+                                    // Always append to the base message captured before THIS stream began
+                                    setMessage(baseMessageBeforeStream ? `${baseMessageBeforeStream}\n\n${cleanedText}` : cleanedText);
+                                }
+                            } catch (e) {
+                                // Heartbeat or incomplete JSON
+                            }
+                        }
+                    }
                 }
 
                 setUploadedImages(prev => prev.map(img => img.id === upload.info.id ? { ...img, status: 'success' } : img));

@@ -7,7 +7,8 @@ import ServerStatusChart from './chat/ServerStatusChart';
 // API URL helper: /ai/ endpoints go to local FastAPI, others to Cloudflare Worker
 const getApiUrl = (endpoint) => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isLocalDev && endpoint.startsWith('/ai/')) {
+  // Use Worker for AI Chat to bypass local backend issues and leverage streaming
+  if (isLocalDev && endpoint.startsWith('/ai/') && endpoint !== '/ai/chat') {
     return `http://127.0.0.1:8000${endpoint}`;
   }
   return 'https://sguardai.khcho0421.workers.dev' + endpoint;

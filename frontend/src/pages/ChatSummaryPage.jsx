@@ -43,12 +43,14 @@ export default function ChatSummaryPage() {
   const [reportingLines, setReportingLines] = useState([]);
 
   const getApiUrl = (endpoint) => {
-    // AI 분석/요약 엔드포인트(/ai/)는 로컬 FastAPI 백엔드로 라우팅
-    // 그 외 Worker 데이터 API는 Cloudflare Worker로 라우팅
+    // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보)
     const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocalDev && endpoint.startsWith('/ai/summarize-chat')) {
+    
+    // DB 동기화가 필요한 특정 API만 로컬 백엔드 이용
+    if (isLocalDev && endpoint.startsWith('/api/v1/db-sync')) {
       return `http://127.0.0.1:8000${endpoint}`;
     }
+    
     const workerBase = 'https://sguardai.khcho0421.workers.dev';
     return `${workerBase}${endpoint}`;
   };
