@@ -236,7 +236,8 @@ const IncidentPushPage = () => {
                 if (!response.ok) throw new Error(data.error || '변환 실패');
 
                 if (data.converted_text) {
-                    setMessage(prev => prev ? `${prev}\n\n${data.converted_text}` : `${data.converted_text}`);
+                    let cleanedText = data.converted_text.replace(/\[(?:Web발신|신한카드)\]\s*/g, '').trim();
+                    setMessage(prev => prev ? `${prev}\n\n${cleanedText}` : cleanedText);
                 }
 
                 setUploadedImages(prev => prev.map(img => img.id === upload.info.id ? { ...img, status: 'success' } : img));
