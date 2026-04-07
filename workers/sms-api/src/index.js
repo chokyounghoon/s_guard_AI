@@ -448,56 +448,66 @@ app.post('/sms/convert-multimodal', async (c) => {
     return c.json({ error: 'file is required' }, 400)
   }
 
-  const contentType = file.type || 'image/jpeg'
-  const buffer = await file.arrayBuffer()
-  
-  // Convert ArrayBuffer to Base64 (needed for Dify remote_url base64 format)
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  const base64Image = btoa(binary)
+  // Use the specific Dify API key provided by the user
+  const api_key = "app-NKmE6uOd6n7FteajnHh1xXuf"
+  const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
-    // Use the specific Dify API key provided by the user
-    const api_key = "app-NKmE6uOd6n7FteajnHh1xXuf"
-    const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
-
-    try {
-        console.log(`[OCR] Processing image via Dify Workflow (Key: app-NK...Xuf, size: ${buffer.byteLength} bytes)`)
-        
-        // Using Dify's Chat API (/chat-messages) since the provided API Key is for a Chat App
-        const response = await fetch(`${api_base}/chat-messages`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${api_key}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                user: "sguard-multimodal-user",
-                response_mode: "blocking",
-                query: "첨부된 이미지의 텍스트를 정확하게 추출해서 알려주세요.",
-                inputs: {},
-                files: [
-                    {
-                        type: "image",
-                        transfer_method: "remote_url",
-                        url: `data:${contentType};base64,${base64Image}`
-                    }
-                ]
-            })
-        })
-
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error(`[OCR] Dify API Error: ${response.status}`, errText)
-            return c.json({ error: `Dify API 오류 (${response.status})` }, response.status)
-        }
-
-        const data = await response.json()
-        // Dify Workflow returns result in data.outputs
-        const resultText = data.data?.outputs?.text || data.data?.outputs?.result || data.answer || "이미지 분석 결과를 추출하지 못했습니다."
+  try {
+    console.log(`[OCR] Processing multimodal image via Dify Upload + Chat API`)
     
+    // 1. Upload the file to Dify first
+    const difyUploadForm = new FormData()
+    difyUploadForm.append('file', file)
+    difyUploadForm.append('user', 'sguard-multimodal-user')
+    
+    const uploadRes = await fetch(`${api_base}/files/upload`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${api_key}`
+            // Let Fetch handle Content-Type and boundary for FormData automatically
+        },
+        body: difyUploadForm
+    })
+    
+    if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        console.error(`[OCR] Dify File Upload Error: ${uploadRes.status}`, errText)
+        return c.json({ error: `Dify 파일 임시 업로드 오류 (${uploadRes.status})` }, uploadRes.status)
+    }
+    
+    const uploadData = await uploadRes.json()
+    console.log(`[OCR] Dify File Upload Success, ID: ${uploadData.id}`)
+    
+    // 2. Feed the uploaded file ID as variable to the Advanced Chat
+    const response = await fetch(`${api_base}/chat-messages`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${api_key}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user: "sguard-multimodal-user",
+            response_mode: "blocking",
+            query: "첨부된 이미지의 텍스트를 정확하게 추출해서 알려주세요.",
+            inputs: {
+                sms_image: {
+                    type: "image",
+                    transfer_method: "local_file",
+                    upload_file_id: uploadData.id
+                }
+            }
+        })
+    })
+
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[OCR] Dify API Error: ${response.status}`, errText)
+        return c.json({ error: `Dify API 오류 (${response.status})` }, response.status)
+    }
+
+    const data = await response.json()
+    const resultText = data.data?.outputs?.text || data.data?.outputs?.result || data.answer || "이미지 분석 결과를 추출하지 못했습니다."
+
     return c.json({ 
       status: "success", 
       converted_text: resultText 
