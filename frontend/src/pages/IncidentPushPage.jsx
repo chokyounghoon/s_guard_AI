@@ -366,9 +366,12 @@ const IncidentPushPage = () => {
                 setLogs(prev => [{
                     time: new Date().toLocaleTimeString(),
                     type: 'success',
-                    text: `접수 성공! ${data.incident_id ? `(인시던트 ID: ${data.incident_id})` : '(API 접수 완료)'}`
+                    text: `접수 성공! ${data.incident_id ? `(인시던트 ID: ${data.incident_id})` : '(API 접수 완료)'} - 1.5초 후 대시보드로 이동합니다.`
                 }, ...prev]);
-                // setMessage(''); // Keep message for reference
+                
+                setTimeout(() => {
+                    navigate('/dashboard');
+                }, 1500);
             } else {
                 throw new Error(data.error || '접수 실패');
             }
