@@ -236,7 +236,7 @@ const IncidentPushPage = () => {
                 if (!response.ok) throw new Error(data.error || '변환 실패');
 
                 if (data.converted_text) {
-                    setMessage(prev => prev ? `${prev}\n\n[첨부: ${upload.info.name}]\n${data.converted_text}` : `[첨부: ${upload.info.name}]\n${data.converted_text}`);
+                    setMessage(prev => prev ? `${prev}\n\n${data.converted_text}` : `${data.converted_text}`);
                 }
 
                 setUploadedImages(prev => prev.map(img => img.id === upload.info.id ? { ...img, status: 'success' } : img));
