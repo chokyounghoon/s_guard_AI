@@ -27,6 +27,7 @@ const IncidentPushPage = () => {
     const [isListening, setIsListening] = useState(false);
     const [uploadedImages, setUploadedImages] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
+    const [isProfileExpanded, setIsProfileExpanded] = useState(false);
     const [showSenderInfo, setShowSenderInfo] = useState(false);
     const [showLogs, setShowLogs] = useState(false);
     const fileInputRef = useRef(null);
@@ -392,7 +393,7 @@ const IncidentPushPage = () => {
 
             <div className="max-w-6xl mx-auto relative z-10 space-y-10">
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-8">
+                <div className="flex flex-col border-b border-white/10 pb-8">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
@@ -400,19 +401,19 @@ const IncidentPushPage = () => {
                             </div>
                             <span className="text-blue-400 font-mono text-sm tracking-widest uppercase">Incident Push (Direct Entry)</span>
                         </div>
-                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">
-                            S-Guard 장애 수동 접수
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight flex items-center gap-4 flex-wrap">
+                            <span className="bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">
+                                S-GUARD 장애 접수
+                            </span>
+                            <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] sm:text-xs font-mono text-slate-400 flex items-center gap-2 shrink-0 mt-1 sm:mt-0">
+                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                                SYSTEM ACTIVE
+                            </div>
                         </h1>
                         <p className="text-slate-400 mt-4 text-sm sm:text-base md:text-lg max-w-2xl leading-relaxed">
                             자동 감지되지 않은 특이 장애 상황을 수동으로 접수합니다. 
                             <span className="text-blue-400/80"> 이미지(OCR) 및 음성(STT) AI 분석</span> 기능을 통해 현장 상황을 빠르게 텍스트로 전환할 수 있습니다.
                         </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs font-mono text-slate-400 flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                            SYSTEM ACTIVE
-                        </div>
                     </div>
                 </div>
 
@@ -442,9 +443,15 @@ const IncidentPushPage = () => {
                                                     <div className="flex items-center justify-between ml-1 mb-2">
                                                         <label className="text-sm font-semibold text-slate-300">발신 사번 (Employee ID)</label>
                                                         {userProfile && (
-                                                            <span className="text-[9px] sm:text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 truncate max-w-[150px] sm:max-w-[400px]">
-                                                                {userProfile.name} {userProfile.role ? `(${userProfile.role})` : ''} - {userProfile.company || ''} {userProfile.honbu ? `> ${userProfile.honbu}` : ''} {userProfile.team ? `> ${userProfile.team}` : ''} {userProfile.part ? `> ${userProfile.part}` : ''}
-                                                            </span>
+                                                            <div className="flex flex-col items-end">
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => setIsProfileExpanded(!isProfileExpanded)}
+                                                                    className={`text-[9px] sm:text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 border border-blue-500/20 text-left transition-all ${isProfileExpanded ? 'rounded-lg whitespace-normal break-words w-[200px] sm:w-[400px] relative z-10 shadow-lg' : 'rounded-full truncate max-w-[150px] sm:max-w-[400px]'}`}
+                                                                >
+                                                                    {userProfile.name} {userProfile.role ? `(${userProfile.role})` : ''} - {userProfile.company || ''} {userProfile.honbu ? `> ${userProfile.honbu}` : ''} {userProfile.team ? `> ${userProfile.team}` : ''} {userProfile.part ? `> ${userProfile.part}` : ''}
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </div>
                                                     <div className="relative">
