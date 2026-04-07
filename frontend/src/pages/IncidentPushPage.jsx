@@ -247,23 +247,28 @@ const IncidentPushPage = () => {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let accumulatedText = "";
+                let buffer = ""; // Add streaming buffer
                 
-                // Capture the current message as a base before this image's stream starts
-                // to avoid duplicated appending during incremental updates.
-                const baseMessageBeforeStream = message;
+                // Track where this specific image's analysis started
+                const baseBeforeThisImage = message;
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    // Retain the last incomplete line in the buffer
+                    buffer = lines.pop() || '';
 
                     for (const line of lines) {
                         const trimmed = line.trim();
                         if (trimmed.startsWith('data:')) {
                             try {
-                                const data = JSON.parse(trimmed.slice(5));
+                                const dataStr = trimmed.slice(5).trim();
+                                if (dataStr === '[DONE]') continue;
+                                
+                                const data = JSON.parse(dataStr);
                                 if (data.event === 'message' || data.event === 'agent_message') {
                                     const token = data.answer || "";
                                     accumulatedText += token;
@@ -271,11 +276,12 @@ const IncidentPushPage = () => {
                                     // Update message state incrementally for better UX
                                     const cleanedText = accumulatedText.replace(/\[(?:Web발신|신한카드)\]\s*/g, '').trim();
                                     
-                                    // Always append to the base message captured before THIS stream began
-                                    setMessage(baseMessageBeforeStream ? `${baseMessageBeforeStream}\n\n${cleanedText}` : cleanedText);
+                                    // Update the temporary local buffer and the React state
+                                    const updatedMessage = baseBeforeThisImage ? `${baseBeforeThisImage}\n\n${cleanedText}` : cleanedText;
+                                    setMessage(updatedMessage);
                                 }
                             } catch (e) {
-                                // Heartbeat or incomplete JSON
+                                // Silent catch for true incomplete JSON anomalies safely bypassed
                             }
                         }
                     }
