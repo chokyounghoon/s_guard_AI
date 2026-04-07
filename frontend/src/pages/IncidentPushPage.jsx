@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const IncidentPushPage = () => {
+    const navigate = useNavigate();
     const [sender, setSender] = useState('');
     const [employeeId, setEmployeeId] = useState('');
     const [message, setMessage] = useState('');
@@ -432,9 +434,9 @@ const IncidentPushPage = () => {
                                                 <input
                                                     type="text"
                                                     value={employeeId}
-                                                    onChange={(e) => setEmployeeId(e.target.value)}
+                                                    readOnly
                                                     placeholder="사번 입력 (예: 1234567)"
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono"
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-slate-400 cursor-not-allowed focus:outline-none transition-all font-mono"
                                                 />
                                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Auto Filled</div>
                                             </div>
@@ -445,8 +447,8 @@ const IncidentPushPage = () => {
                                                 <input
                                                     type="text"
                                                     value={sender}
-                                                    onChange={(e) => setSender(e.target.value)}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono"
+                                                    readOnly
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-slate-400 cursor-not-allowed focus:outline-none transition-all font-mono"
                                                 />
                                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">System Default</div>
                                             </div>
@@ -703,13 +705,14 @@ const IncidentPushPage = () => {
                             </div>
 
                             <div className="mt-6 pt-6 border-t border-white/5">
-                                <a
-                                    href="/"
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/dashboard')}
                                     className="group w-full bg-white/5 hover:bg-white/10 py-3 rounded-xl text-slate-400 hover:text-white text-sm font-medium flex items-center justify-center gap-2 transition-all border border-white/5 hover:border-white/20"
                                 >
                                     메인 홈으로 이동
                                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                </a>
+                                </button>
                             </div>
                         </div>
                     </div>
