@@ -98,7 +98,7 @@ export default function ActivityPage() {
           <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
-          <h1 className="text-2xl font-bold tracking-tight">활동 내역</h1>
+          <h1 className="text-2xl font-bold tracking-tight">장애 처리 현황</h1>
         </div>
         <div className="w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center border border-white/5">
           <User className="w-5 h-5 text-slate-400" />
@@ -112,7 +112,7 @@ export default function ActivityPage() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
-              placeholder="활동 내역 검색"
+              placeholder="장애 처리 현황 검색"
               className="w-full bg-slate-800/40 border border-white/5 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500"
             />
           </div>

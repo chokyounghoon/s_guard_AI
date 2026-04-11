@@ -19,7 +19,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [insightData, setInsightData] = useState({
     status: 'active',
     current_log: { type: 'info', text: 'AI 엔진 연결 중...' },
-    prediction_counts: { critical: 0, server: 0, security: 0, report: 0 }
+    prediction_counts: { critical: 0, server: 0, security: 0, report: 0 },
+    similarity_score: null,
+    similarity_reason: null
   });
   const [displayedText, setDisplayedText] = useState('');
   const [isAnalyzingSms, setIsAnalyzingSms] = useState(false);
@@ -28,6 +30,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [smsAnalysisTitle, setSmsAnalysisTitle] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [insightTimestamp, setInsightTimestamp] = useState(null);
+  const [lockingUser, setLockingUser] = useState(null);
 
   // Streaming typewriter (SSE chunk -> queue -> char-by-char)
   const typingQueueRef = useRef('');
@@ -74,6 +77,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setIsCritical(false);
       delayShownRef.current = false;
       setInsightTimestamp(null);
+      setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
       return;
     }
 
@@ -81,6 +85,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     setAnalysisComplete(false);
     setIsCritical(false);
     delayShownRef.current = false;
+    setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
     setSmsAnalysisTitle(`분석 중: "${selectedSms.sender}" 발신 SMS`);
 
     const analyze = async () => {
@@ -109,6 +114,14 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               // 🚀 NEW: Ensure the AI War-Room Log is populated with cached data
               if (onAgentContent) {
                 onAgentContent(data.content, true);
+              }
+              if (data.similarity_score !== undefined && data.similarity_score !== null) {
+                console.log("Loading cached similarity score:", data.similarity_score);
+                setInsightData(prev => ({ 
+                  ...prev, 
+                  similarity_score: data.similarity_score,
+                  similarity_reason: data.similarity_reason 
+                }));
               }
               return; // Skip Dify streaming
             }
@@ -183,6 +196,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                 const critical = isCriticalAnalysis(finalText, selectedSms.message);
                 setIsCritical(critical);
                 setAnalysisComplete(true);
+                setIsAnalyzingSms(false); // 🚀 FIX: Unlock UI since stream finished
                 
                 // Save insight to DB
                 try {
@@ -196,7 +210,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                       content: finalText,
                       severity: critical ? 'CRITICAL' : 'INFO',
                       category: category,
-                      user_id: String(userData.inc_id || 'SYSTEM')
+                      user_id: String(userData.inc_id || 'SYSTEM'),
+                      similarity_score: insightData.similarity_score,
+                      similarity_reason: insightData.similarity_reason
                     })
                   }).catch(console.error);
                 } catch (e) {
@@ -230,6 +246,14 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     showedWorkingHint = true;
                     enqueueText('\n⏳ AI 분석 진행 중...\n');
                   }
+                }
+                if (data.similarity_score !== undefined && data.similarity_score !== null) {
+                  console.log("Received streaming similarity score:", data.similarity_score);
+                  setInsightData(prev => ({ 
+                    ...prev, 
+                    similarity_score: data.similarity_score,
+                    similarity_reason: data.similarity_reason !== undefined ? data.similarity_reason : prev.similarity_reason
+                  }));
                 }
                 if (data.answer) {
                   // if we got real content, cancel delay timers
@@ -266,6 +290,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           });
           setAnalysisComplete(true);
         }
+      } finally {
+        setIsAnalyzingSms(false); // 🚀 FIX: Unlock regardless of success or failure
       }
     };
 
@@ -390,6 +416,36 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     return () => { isCancelled = true; };
   }, [isAnalyzingSms, selectedSms]);
 
+  // 현재 SMS incident에 이미 생성된 War-Room이 있는지 확인 (status 무관)
+  const warRoomExists = warRooms && selectedSms && warRooms.some(r => 
+    String(r.inc_id) === String(selectedSms.inc_id) ||
+    String(r.id) === String(selectedSms.inc_id)
+  );
+
+  // Polling for War-Room Lock status
+  useEffect(() => {
+    if (!selectedSms || warRoomExists) {
+      setLockingUser(null);
+      return;
+    }
+
+    const checkLock = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/ai/warroom/lock/${selectedSms.inc_id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLockingUser(data.locked ? data.owner : null);
+        }
+      } catch (e) {
+        console.error("Lock check error", e);
+      }
+    };
+
+    checkLock();
+    const timer = setInterval(checkLock, 3000);
+    return () => clearInterval(timer);
+  }, [selectedSms, warRoomExists]);
+
 
   const handleOpenWarRoom = () => {
     if (onOpenWarRoom && selectedSms) {
@@ -403,11 +459,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     : insightData.current_log?.type === 'warning' ? 'text-orange-400'
     : insightData.current_log?.type === 'success' ? 'text-emerald-400'
     : 'text-blue-200';
-
-  // 현재 SMS incident에 이미 생성된 War-Room이 있는지 확인 (status 무관)
-  const warRoomExists = warRooms && selectedSms && warRooms.some(r => 
-    String(r.inc_id) === String(selectedSms.inc_id)
-  );
 
   // War-Room 개설 버튼 (분석 완료 시 표시, 이미 개설된 경우 텍스트를 변경해서 표시)
   const showWarRoomButton = analysisComplete;
@@ -499,6 +550,46 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       </div>
 
+      {/* Similarity Score Indicator - 분석 완료 시 항상 표시 (null = 0%) */}
+      {analysisComplete && (() => {
+        const score = insightData.similarity_score ?? 0;
+        const pct = Math.min(100, score * 100);
+        const color = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-yellow-500' : score > 0 ? 'bg-orange-500' : 'bg-slate-600';
+        const textColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-yellow-400' : score > 0 ? 'text-orange-400' : 'text-slate-500';
+        return (
+          <div className="flex items-center space-x-4 mb-4 relative z-10 animate-in fade-in duration-700">
+            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-1000 ease-out ${color}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Similarity</span>
+              <span className={`text-xs font-mono font-black ${textColor}`}>
+                {pct.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {insightData.similarity_reason && (
+        <div className="mb-4 px-1 animate-in fade-in slide-in-from-left-2 duration-1000">
+          <div className="flex items-start gap-2 bg-blue-500/5 border border-blue-500/10 rounded-xl p-3 shadow-inner">
+            <div className="mt-0.5 bg-blue-500/20 p-1 rounded-md">
+              <Zap className="w-3 h-3 text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-black text-blue-400/80 uppercase tracking-widest mb-0.5">Matching Rationale</p>
+              <p className="text-[11px] text-slate-300 font-medium italic leading-relaxed">
+                "{insightData.similarity_reason}"
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={`transition-all duration-700 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'} -mx-2 px-2 pb-12 relative`}>
         
         {/* 장애 상세 정보 (확장 파라미터) */}
@@ -569,7 +660,14 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           <div className="flex items-start space-x-3 text-slate-400 min-h-full">
             <span className={`mt-0.5 shrink-0 font-black ${isAnalyzingSms && isCritical ? 'text-red-500' : isAnalyzingSms ? 'text-yellow-500' : 'text-blue-500'}`}>❯</span>
             <div className={`leading-relaxed w-full ${textColor}`}>
-              <MarkdownViewer text={displayedText} />
+              {displayedText ? (
+                <MarkdownViewer text={displayedText} />
+              ) : (
+                <span className="text-slate-500 font-bold tracking-tight animate-pulse flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
+                  AI 모델이 관련 데이터를 검색하고 해결 방안을 실시간으로 분석하고 있습니다...
+                </span>
+              )}
               <span className={`animate-pulse inline-block w-1.5 h-4 align-middle ml-1 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
             </div>
           </div>
@@ -577,30 +675,40 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       </div>
 
       {/* War-Room 개설 버튼 */}
-      {showWarRoomButton && (
-        <div className={`mt-4 flex items-center gap-3 p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-500
-          ${isCritical ? 'bg-red-500/5 border-red-500/20' : 'bg-yellow-500/5 border-yellow-500/20'}`}>
-          <div className={`flex-1 text-xs ${isCritical ? 'text-red-300' : 'text-yellow-300'}`}>
-            {warRoomExists 
-              ? '💡 해당 장애 건에 대해 이미 War-Room이 개설되어 진행 중입니다.'
-              : isCritical
-                ? '⚠️ CRITICAL 장애가 감지되었습니다. 즉시 팀 전체가 참여하는 War-Room을 개설하세요.'
-                : '💡 분석이 완료되었습니다. 필요 시 War-Room을 개설하여 팀과 상황을 공유하세요.'}
-          </div>
-          <button
-            onClick={handleOpenWarRoom}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all active:scale-95 shadow-lg
-              ${isCritical && !warRoomExists
-                ? 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/30'
-                : warRoomExists
-                ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/30'
-                : 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-yellow-500/30'}`}
-          >
-            <Users className="w-4 h-4" />
-            {warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}
-          </button>
+      {/* War-Room 개설 버튼 (항상 표시하며, 상태에 따라 disabled 처리) */}
+      <div className={`mt-4 flex items-center gap-3 p-4 rounded-2xl border transition-all duration-500
+        ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30) 
+          ? 'bg-slate-800/50 border-slate-700/50' 
+          : isCritical 
+            ? 'bg-red-500/5 border-red-500/20' 
+            : 'bg-yellow-500/5 border-yellow-500/20'}`}>
+        <div className={`flex-1 text-xs ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || lockingUser) ? 'text-slate-400 animate-pulse' : isCritical ? 'text-red-300' : 'text-yellow-300'}`}>
+          {(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30)
+            ? '⏳ AI 에이전트가 진단 정보를 통합 분석하고 있습니다. 분석 완료 후 개설 가능합니다...'
+            : lockingUser
+              ? `⚠️ ${lockingUser} 매니저가 현재 War-Room 개설 작업을 진행 중입니다...`
+              : warRoomExists 
+                ? '💡 해당 장애 건에 대해 이미 War-Room이 개설되어 진행 중입니다.'
+                : isCritical
+                  ? '⚠️ CRITICAL 장애가 감지되었습니다. 즉시 팀 전체가 참여하는 War-Room을 개설하세요.'
+                  : '💡 분석이 완료되었습니다. 필요 시 War-Room을 개설하여 팀과 상황을 공유하세요.'}
         </div>
-      )}
+        <button
+          onClick={handleOpenWarRoom}
+          disabled={!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || (lockingUser && !warRoomExists)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-lg
+            ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || (lockingUser && !warRoomExists))
+              ? 'bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+              : isCritical && !warRoomExists
+              ? 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/30 active:scale-95'
+              : warRoomExists
+              ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/30 active:scale-95'
+              : 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-yellow-500/30 active:scale-95'}`}
+        >
+          <Users className="w-4 h-4" />
+          {lockingUser && !warRoomExists ? '다른 사용자 처리 중' : warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}
+        </button>
+      </div>
       </div>
 
     </div>

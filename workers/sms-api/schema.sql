@@ -232,6 +232,8 @@ CREATE TABLE IF NOT EXISTS autopilot_insight (
     content TEXT NOT NULL,
     severity TEXT,
     category TEXT,
+    similarity_score REAL,
+    similarity_reason TEXT,
     reg_id TEXT,
     reg_dt DATETIME,
     mod_id TEXT,
@@ -284,7 +286,9 @@ CREATE TABLE IF NOT EXISTS warroom_list (
     reg_id TEXT DEFAULT 'SYSTEM',
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
-    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_analyzing INTEGER DEFAULT 0,
+    analyzer_name TEXT DEFAULT ''
 );
 -- Incident Assignments and Status
 CREATE TABLE IF NOT EXISTS incident_assignments (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -33,7 +33,7 @@ export default function KnowledgeBasePage() {
     setLoading(true);
     try {
       const url = query.trim() 
-        ? `${API_BASE}/ai/knowledge?q=${encodeURIComponent(query)}`
+        ? `${API_BASE}/ai/knowledge/search?q=${encodeURIComponent(query)}`
         : `${API_BASE}/ai/knowledge`;
         
       const res = await fetch(url);
@@ -43,6 +43,8 @@ export default function KnowledgeBasePage() {
       }
     } catch (err) {
       console.error("Fetch knowledge error:", err);
+      alert("AI 지식 베이스 조회 중 요류가 발생했습니다. 페이지를 새로고침합니다.");
+      window.location.reload();
     } finally {
       setLoading(false);
     }
@@ -198,12 +200,34 @@ export default function KnowledgeBasePage() {
 
               {/* Card Body */}
               <div className="p-5 flex-1 cursor-pointer">
-                <h3 className="text-lg font-bold mb-3 group-hover:text-blue-400 transition-colors leading-tight">
-                  {item.title}
-                </h3>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <h3 className="text-lg font-bold group-hover:text-blue-400 transition-colors leading-tight flex-1">
+                    {item.title}
+                  </h3>
+                  {item.score !== undefined && item.score !== null && !isNaN(item.score) && (
+                    <div className="shrink-0 bg-blue-500/20 border border-blue-500/30 rounded-lg px-2 py-1 flex items-center gap-1.5 shadow-lg shadow-blue-500/10">
+                      <Zap className="w-3 h-3 text-blue-400 fill-blue-400/20" />
+                      <span className="text-[10px] font-black text-blue-400 font-mono">
+                        {Math.max(0, Math.min(100, Math.round(item.score * 100)))}% 유사도
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <p className="text-slate-400 text-sm line-clamp-3 leading-relaxed mb-4">
                   {item.content}
                 </p>
+                
+                {item.reason && (
+                  <div className="mb-4 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 animate-in fade-in slide-in-from-left-2 duration-500">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sparkles className="w-3 h-3 text-blue-400" />
+                      <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Matching Rationale</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed italic">
+                      "{item.reason}"
+                    </p>
+                  </div>
+                )}
 
                 {/* Multimodal Preview Placeholder */}
                 {item.file_url ? (

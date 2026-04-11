@@ -51,6 +51,178 @@ const generateEmbedding = async (text, env) => {
   }
 }
 
+// ==========================================
+// AI Background Analysis (Eager Loading)
+// ==========================================
+const performBackgroundAiAnalysis = async (sms_id, env) => {
+  const db = env.DB;
+  const kv = env.SMS_STORAGE;
+  const api_key = env.DIFY_API_KEY_ASSISTANT || "app-ZDaVB8EWtA5vmTYJLmbysdQq";
+  const api_base = env.DIFY_API_BASE || 'https://api.dify.ai/v1';
+
+  try {
+    // 1. Lock check
+    const lockKey = `lock:analyze:${sms_id}`;
+    if (kv) {
+      let lock = await kv.get(lockKey);
+      if (lock === 'processing') return;
+      await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+    }
+
+    // 2. Cache check
+    const cached = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
+    if (cached && cached.content) {
+      if (kv) await kv.delete(lockKey);
+      return;
+    }
+
+    // 3. Fetch SMS details for prompt
+    const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(sms_id).first();
+    if (!sms) {
+      if (kv) await kv.delete(lockKey);
+      return;
+    }
+
+    const detailedInfo = `
+[장애 상세 정보]
+- 유입채널: ${sms.channel || 'N/A'}
+- IF아이디: ${sms.if_id || 'N/A'}
+- 서비스명: ${sms.service_name || 'N/A'} (${sms.service_code || 'N/A'})
+- 업무시스템: ${sms.biz_system || 'N/A'}
+- 에러코드: ${sms.error_code || 'N/A'}
+- 에러메시지: ${sms.error_message || 'N/A'}
+- 발생건수: ${sms.occurrence_count || '1'}
+- 발생서버/노드: ${sms.occurrence_node || 'N/A'}
+- 실제발생시각: ${sms.occurrence_time || 'N/A'}
+`;
+
+    const prompt = `당신은 S-GUARD 시스템의 핵심 오케스트레이터이자 지능형 관제 엔진입니다. 사용자가 입력하는 SMS 장애 메시지를 분석하여 실시간 인사이트 제공 및 전문가 에이전트들과 협업하여 최적의 조치 가이드를 도출합니다.
+
+🛠️ 핵심 관리 영역
+- S-Autopilot Insight: 수신 문자 분석, 자원 배분
+- AI War-Room Log: 워룸 기록
+
+👥 전문가 에이전트
+- Security/DB/DevOps/Leader Agent: 각 영역별 진단
+
+응답은 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 세 개 섹션으로 구성해 주세요.
+"⚠️ 중요: 전문가의 의견은 핵심만 2~3줄 이내로 간결하게 작성해."
+
+[장애 로그]
+발신자: ${sms.sender || 'Unknown'}
+메시지: ${sms.message || 'N/A'}
+${detailedInfo}`;
+
+    // 4. Vectorize similarity check
+    let similarityScore = null;
+    let matchedContent = null;
+    let matchedTitle = null;
+    let similarityReason = null;
+
+    if (env.WARROOM_INDEX && sms.message) {
+      try {
+        const vector = await generateEmbedding(sms.message, env);
+        if (vector) {
+          const simResults = await env.WARROOM_INDEX.query(vector, { topK: 1 });
+          if (simResults.matches && simResults.matches.length > 0) {
+            similarityScore = simResults.matches[0].score;
+            const matchId = simResults.matches[0].id;
+
+            if (similarityScore >= 0.7) {
+              let querySql = "";
+              let queryParam = "";
+              if (matchId.startsWith('kn-')) {
+                querySql = "SELECT content, title FROM knowledge_base WHERE id = ?";
+                queryParam = matchId.replace('kn-', '');
+              } else {
+                const possibleId = matchId.split('_')[0];
+                querySql = "SELECT content, title FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?";
+                queryParam = possibleId;
+              }
+
+              const kbMatch = await db.prepare(querySql).bind(queryParam, queryParam).first();
+              if (kbMatch) {
+                matchedContent = kbMatch.content;
+                matchedTitle = kbMatch.title;
+                
+                // Generate rationale for background analysis
+                if (env.AI) {
+                  try {
+                    const rationalePrompt = `당신은 지능형 관제 전문가입니다. 아래 수신된 메시지[SMS]와 검색된 지식[Knowledge]을 비교하여, 왜 두 건이 유사한지 그 이유를 한 문장으로 아주 짧게 설명하세요.
+                    필요한 정보: 동일 에러코드, 유사 서비스 명칭, 동일 증상 등. (한글로 15자 이내)
+                    
+                    [SMS]: ${sms.message}
+                    [Knowledge Title]: ${matchedTitle}
+                    [Knowledge Content]: ${matchedContent.substring(0, 100)}...`;
+
+                    const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', { prompt: rationalePrompt });
+                    similarityReason = aiRes.response || aiRes;
+                  } catch (e) {
+                    console.error("BG Rationale generation error:", e);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (ve) {
+        console.error('Vectorize background error:', ve.message);
+      }
+    }
+
+    let fullOutput = "";
+    const now = getKst();
+
+    // 5. Decision: Cached match vs Dify Blocking Call
+    if (similarityScore >= 0.7 && matchedContent) {
+      fullOutput = `[지능형 지식 활용] 유사도(${(similarityScore * 100).toFixed(1)}%)가 매우 높음\n\n### ${matchedTitle}\n\n` + matchedContent;
+      
+      await db.prepare(`
+        INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
+        VALUES (?, ?, 'INFO', 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
+        ON CONFLICT(inc_id) DO UPDATE SET 
+          content=excluded.content, 
+          mod_dt=excluded.mod_dt, 
+          similarity_score=excluded.similarity_score,
+          similarity_reason=excluded.similarity_reason
+      `).bind(String(sms_id), fullOutput, now, now, similarityScore, "지식 DB 고정 매칭").run();
+      
+    } else {
+      const difyRes = await fetch(`${api_base}/chat-messages`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${api_key}`, 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          inputs: {}, 
+          query: prompt, 
+          response_mode: 'blocking', 
+          user: 'sguard-worker-bg' 
+        })
+      });
+
+      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`);
+      const resultData = await difyRes.json();
+      fullOutput = resultData.answer;
+
+      if (fullOutput) {
+        const severity = fullOutput.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
+        await db.prepare(`
+          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
+          VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?)
+          ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
+        `).bind(String(sms_id), fullOutput, severity, now, now, similarityScore).run();
+      }
+    }
+
+    if (kv) await kv.delete(lockKey);
+  } catch (err) {
+    console.error(`[Background] Error analyzing SMS ${sms_id}:`, err);
+    if (env.SMS_STORAGE) await env.SMS_STORAGE.delete(`lock:analyze:${sms_id}`);
+  }
+};
+
 // Utility for Password Hashing (Compatible with Python's salt:sha256_hash)
 const hashPassword = async (password) => {
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -615,10 +787,13 @@ app.post('/sms/receive', async (c) => {
             } catch (assignError) {
                 console.error(`[Assignment] Error in bulk assignment for ${existing.inc_id}:`, assignError);
             }
-        } else {
-            console.warn(`[Assignment] No valid normalized receivers for ${existing.inc_id}`);
         }
+    } else {
+        console.warn(`[Assignment] No valid normalized receivers for ${existing.inc_id}`);
     }
+
+    // Trigger AI background processing if not already handled
+    c.executionCtx.waitUntil(performBackgroundAiAnalysis(existing.inc_id, c.env).catch(e => console.error(e)));
 
     return c.json({ status: 'duplicate_incremented', inc_id: existing.inc_id, received_count: newCount })
   }
@@ -637,7 +812,7 @@ app.post('/sms/receive', async (c) => {
   }
 
   const newIncId = generateIncId()
-    const count = parseInt(String(occurrence_count || '0').replace(/[^0-9]/g, '')) || 0
+  const parsedCount = parseInt(String(occurrence_count || '0').replace(/[^0-9]/g, '')) || 0
   await db.prepare(`
     INSERT INTO received_messages (
       inc_id, sender, message, employee_id, timestamp, keyword_detected, 
@@ -666,7 +841,7 @@ app.post('/sms/receive', async (c) => {
     newIncId, sender || null, message || null, employee_id || null, timestamp, detected ? 1 : 0, 
     response_msg || null, 1,
     channel || null, if_id || null, service_code || null, service_name || null,
-    biz_system || null, error_code || null, count,
+    biz_system || null, error_code || null, parsedCount,
     occurrence_node || null, error_message || null, finalOccurrenceTime || null,
     body.receiver_1 || null, body.receiver_2 || null, body.receiver_3 || null, body.receiver_4 || null, body.receiver_5 || null,
     body.receiver_6 || null, body.receiver_7 || null, body.receiver_8 || null, body.receiver_9 || null, body.receiver_10 || null,
@@ -692,6 +867,10 @@ app.post('/sms/receive', async (c) => {
          console.error("New Path Auto-assignment error:", e);
      }
   }
+  
+  // Eager Loading: Trigger background AI immediately for new insert
+  c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
+
   return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id: newIncId })
 })
 
@@ -1311,6 +1490,7 @@ app.get('/warroom/rooms', async (c) => {
       w.inc_id                          AS code,
       w.inc_id,
       w.title,
+      r.message                         AS sms_message,
       w.severity,
       w.status,
       w.creator_id,
@@ -1322,6 +1502,7 @@ app.get('/warroom/rooms', async (c) => {
       (SELECT wc2.sender FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
       (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
     FROM warroom_list w
+    LEFT JOIN received_messages r ON w.inc_id = r.inc_id
     WHERE 1=1
   `
   const params = []
@@ -1395,17 +1576,15 @@ app.get('/ai/insight', async (c) => {
 
 
 app.post('/ai/insight/save', async (c) => {
-  const { incident_id, content, severity, category, user_id } = await c.req.json()
+  const { incident_id, content, severity, category, user_id, similarity_score, similarity_reason } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
   
-  // Normalize ID for saving
   const norm_id = String(incident_id || '').replace('INC-', '').trim()
   
   await db.prepare(`
-    INSERT OR REPLACE INTO autopilot_insight (inc_id, content, severity, category, reg_id, reg_dt, mod_id, mod_dt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(norm_id, content, severity, category, user_id || 'SYSTEM', now, user_id || 'SYSTEM', now).run()
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(norm_id, content, severity, category, user_id || 'SYSTEM', now, user_id || 'SYSTEM', now, (similarity_score !== undefined && similarity_score !== null) ? similarity_score : null, (similarity_reason !== undefined && similarity_reason !== null) ? similarity_reason : null).run()
   
   return c.json({ status: 'saved', inc_id: norm_id })
 })
@@ -1549,9 +1728,13 @@ ${detailedInfo}`
     try {
       // 1. Check D1 cache first
       if (sms_id) {
-        const cached = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
+        const cached = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
         if (cached && cached.content) {
           console.log(`[Cache Hit] Serving cached insight for ${sms_id}`);
+          
+          if (cached.similarity_score) {
+            await writer.write(encode(`data: ${JSON.stringify({ similarity_score: cached.similarity_score, similarity_reason: cached.similarity_reason })}\n\n`));
+          }
           const chars = Array.from(cached.content);
           const chunkSize = 50;
           for (let i = 0; i < chars.length; i += chunkSize) {
@@ -1573,8 +1756,12 @@ ${detailedInfo}`
           // Wait and Poll D1 for the result saved by the other process
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(r => setTimeout(r, 1000));
-            const polled = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
+            const polled = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
             if (polled && polled.content) {
+              // Send similarity score first if available
+              if (polled.similarity_score !== null && polled.similarity_score !== undefined) {
+                await writer.write(encode(`data: ${JSON.stringify({ similarity_score: polled.similarity_score, similarity_reason: polled.similarity_reason })}\n\n`));
+              }
               const chars = Array.from(polled.content);
               for (let i = 0; i < chars.length; i += 50) {
                 await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
@@ -1589,66 +1776,149 @@ ${detailedInfo}`
         await kv.put(lockKey, 'processing', { expirationTtl: 60 });
       }
 
-      // 3. Call Dify (Original logic)
-      const difyRes = await fetch(`${api_base}/chat-messages`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${api_key}`, 
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify({ 
-          inputs: {}, 
-          query: prompt, 
-          response_mode: 'streaming', 
-          user: 'sguard-worker' 
-        })
-      })
+      // 3. Vectorize similarity check (Dynamic Score)
+      let similarityScore = null;
+      let matchedContent = null;
+      let matchedTitle = null;
 
-      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
-      
-      const reader = difyRes.body.getReader()
-      const decoder = new TextDecoder()
-      let lineBuffer = ""
-      let fullContent = ""
-      
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        lineBuffer += decoder.decode(value, { stream: true })
-        const lines = lineBuffer.split('\n')
-        lineBuffer = lines.pop()
-        
-        for (const line of lines) {
-          const trimmedLine = line.trim()
-          if (!trimmedLine.startsWith('data: ')) continue
-          
-          const dataStr = trimmedLine.substring(6)
-          if (dataStr === '[DONE]') continue
-          
-          try {
-            const data = JSON.parse(dataStr)
-            if (data.event === 'message' || data.event === 'agent_message') {
-              fullContent += data.answer;
-              await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+      if (c.env.WARROOM_INDEX && message) {
+        try {
+          const vector = await generateEmbedding(message, c.env);
+          if (vector) {
+            const simResults = await c.env.WARROOM_INDEX.query(vector, { topK: 1 });
+            if (simResults.matches && simResults.matches.length > 0) {
+              similarityScore = simResults.matches[0].score;
+              const matchId = simResults.matches[0].id;
+              
+              // Send score to frontend immediately
+              await writer.write(encode(`data: ${JSON.stringify({ similarity_score: similarityScore })}\n\n`));
+
+              // If similarity >= 0.7, fetch content from knowledge_base for high-confidence match
+              if (similarityScore >= 0.7) {
+                let querySql = "";
+                let queryParam = "";
+                if (matchId.startsWith('kn-')) {
+                  querySql = "SELECT content, title FROM knowledge_base WHERE id = ?";
+                  queryParam = matchId.replace('kn-', '');
+                } else {
+                  const possibleId = matchId.split('_')[0];
+                  querySql = "SELECT content, title FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?";
+                  queryParam = possibleId;
+                }
+
+                const kbMatch = await db.prepare(querySql).bind(queryParam, queryParam).first();
+                if (kbMatch) {
+                  matchedContent = kbMatch.content;
+                  matchedTitle = kbMatch.title;
+                  
+                  // Generate rationale
+                  const ai = c.env.AI;
+                  if (ai) {
+                    try {
+                      const rationalePrompt = `당신은 지능형 관제 전문가입니다. 아래 수신된 메시지[SMS]와 검색된 지식[Knowledge]을 비교하여, 왜 두 건이 유사한지 그 이유를 한 문장으로 아주 짧게 설명하세요.
+                      필요한 정보: 동일 에러코드, 유사 서비스 명칭, 동일 증상 등. (한글로 15자 이내)
+                      
+                      [SMS]: ${message}
+                      [Knowledge Title]: ${matchedTitle}
+                      [Knowledge Content]: ${matchedContent.substring(0, 100)}...`;
+
+                      const aiRes = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: rationalePrompt });
+                      const similarityReason = aiRes.response || aiRes;
+                      
+                      // Stream rationale to frontend
+                      await writer.write(encode(`data: ${JSON.stringify({ similarity_reason: String(similarityReason).trim() })}\n\n`));
+                    } catch (aiErr) {
+                      console.error("Rationale generation error:", aiErr);
+                    }
+                  }
+                }
+              }
             }
-          } catch (e) {
-            continue
           }
+        } catch (ve) {
+          console.error('Vectorize search error in analysis:', ve.message);
         }
       }
-      
-      // Auto-save insight to DB if successful (First time) - Backend side saving
-      if (fullContent && sms_id) {
-        const now = getKst();
-        // Determine severity/category simple logic
-        const severity = fullContent.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
-        await db.prepare(`
-          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt)
-          VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
-          ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt
-        `).bind(String(sms_id), fullContent, severity, now, now).run();
+
+      // 4. Decision: Use existing content or call Dify
+      if (similarityScore >= 0.7 && matchedContent) {
+        // Bypass Dify - use proven knowledge
+        const headerText = `[지능형 지식 활용] 유사도(${(similarityScore * 100).toFixed(1)}%)가 매우 높음\n\n### ${matchedTitle}\n\n`;
+        const fullOutput = headerText + matchedContent;
+        
+        // Stream back immediately
+        await writer.write(encode(`data: ${JSON.stringify({ answer: fullOutput })}\n\n`));
+        
+        // Save to autopilot_insight
+        if (sms_id) {
+          const now = getKst();
+          await db.prepare(`
+            INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
+            VALUES (?, ?, 'INFO', 'SYSTEM', ?, 'SYSTEM', ?, ?)
+            ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
+          `).bind(String(sms_id), fullOutput, now, now, similarityScore).run();
+        }
+      } else {
+        // Call Dify (Original logic)
+        const difyRes = await fetch(`${api_base}/chat-messages`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${api_key}`, 
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+          },
+          body: JSON.stringify({ 
+            inputs: {}, 
+            query: prompt, 
+            response_mode: 'streaming', 
+            user: 'sguard-worker' 
+          })
+        })
+
+        if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
+        
+        const reader = difyRes.body.getReader()
+        const decoder = new TextDecoder()
+        let lineBuffer = ""
+        let fullContent = ""
+        
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          
+          lineBuffer += decoder.decode(value, { stream: true })
+          const lines = lineBuffer.split('\n')
+          lineBuffer = lines.pop()
+          
+          for (const line of lines) {
+            const trimmedLine = line.trim()
+            if (!trimmedLine.startsWith('data: ')) continue
+            
+            const dataStr = trimmedLine.substring(6)
+            if (dataStr === '[DONE]') continue
+            
+            try {
+              const data = JSON.parse(dataStr)
+              if (data.event === 'message' || data.event === 'agent_message') {
+                fullContent += data.answer;
+                await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+              }
+            } catch (e) {
+              continue
+            }
+          }
+        }
+        
+        // Auto-save insight to DB if successful
+        if (fullContent && sms_id) {
+          const now = getKst();
+          const severity = fullContent.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
+          await db.prepare(`
+            INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
+            VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?)
+            ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
+          `).bind(String(sms_id), fullContent, severity, now, now, similarityScore).run();
+        }
       }
 
       // 4. Release Lock
@@ -2247,10 +2517,8 @@ app.get('/ai/chat-history/:id', async (c) => {
     return c.json({ messages: aiResults.map(r => ({ role: r.agent_role, text: r.content })) })
   }
   
-  // Fallback to warroom_chats (legacy)
-  const { results: wrResults } = await db.prepare("SELECT * FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(id).all()
-  const messages = wrResults.map(r => ({ role: r.role || r.sender, text: r.text }))
-  return c.json({ messages })
+  // Only return AI agent chat history. Do not fallback to warroom_chats as they belong to different domains.
+  return c.json({ messages: [] })
 })
 
 app.post('/ai/chat-history/save', async (c) => {
@@ -2259,6 +2527,9 @@ app.post('/ai/chat-history/save', async (c) => {
   const db = c.env.DB
   const now = getKst()
   
+  // 🚀 Deduplication: Clear existing generated chat history for this incident before saving
+  await db.prepare(`DELETE FROM aichat_history WHERE inc_id = ?`).bind(incident_id).run();
+
   for (const msg of messages) {
     // Insert into aichat_history
     await db.prepare(`
@@ -2269,6 +2540,38 @@ app.post('/ai/chat-history/save', async (c) => {
   }
   return c.json({ status: 'saved', count: messages.length })
 })
+// War-Room Concurrency Locking (KV based)
+app.get('/ai/warroom/lock/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id');
+  const kv = c.env.SMS_STORAGE;
+  if (!kv) return c.json({ locked: false });
+  
+  const owner = await kv.get(`lock:warroom:${inc_id}`);
+  return c.json({ locked: !!owner, owner });
+});
+
+app.post('/ai/warroom/lock/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id');
+  const { user_name } = await c.req.json();
+  const kv = c.env.SMS_STORAGE;
+  if (!kv) return c.json({ success: true }); // Fail-safe
+  
+  const existing = await kv.get(`lock:warroom:${inc_id}`);
+  if (existing && existing !== user_name) {
+    return c.json({ success: false, owner: existing });
+  }
+  
+  // Set lock with 60s TTL
+  await kv.put(`lock:warroom:${inc_id}`, user_name, { expirationTtl: 60 });
+  return c.json({ success: true });
+});
+
+app.delete('/ai/warroom/lock/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id');
+  const kv = c.env.SMS_STORAGE;
+  if (kv) await kv.delete(`lock:warroom:${inc_id}`);
+  return c.json({ success: true });
+});
 
 // War-Room Tracking
 app.get('/ai/warroom/list', async (c) => {
@@ -2362,6 +2665,17 @@ app.post('/ai/warroom/open', async (c) => {
   // Update assignment status to '처리중' for all assignees of this incident
   await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
     .bind(now, now, creator_id || 'SYSTEM', normId, `INC-${normId}`).run()
+
+  // Release Lock if exists (KV cleanup)
+  const kv = c.env.SMS_STORAGE;
+  if (kv) {
+    try {
+      await kv.delete(`lock:warroom:${normId}`);
+      await kv.delete(`lock:warroom:INC-${normId}`);
+    } catch (e) {
+      console.error("Lock release error:", e);
+    }
+  }
   
   return c.json({ status: 'opened', inc_id: normId })
 })
@@ -2724,6 +3038,224 @@ app.get('/ai/related-history', async (c) => {
   }
 });
 
+app.post('/retrieval', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    const envKey = c.env.DIFY_TOOL_KEY;
+    
+    // Robust Bearer token check (case-insensitive and handles various spacing)
+    const token = authHeader ? authHeader.replace(/bearer\s+/i, '').trim() : '';
+    
+    // Support all variations of I/l typos in Dify Dataset Key
+    const allowedTokens = [
+      'dataset-IEg4X7UTG3j4IukgkZQV7WUP',
+      'dataset-lEg4X7UTG3j4lukgkZQV7WUP',
+      'dataset-IEg4X7UTG3j4lukgkZQV7WUP',
+      'dataset-lEg4X7UTG3j4IukgkZQV7WUP'
+    ];
+    
+    if (token !== envKey && !allowedTokens.includes(token)) {
+      console.error(`[Dify] Unauthorized. Expected: ${envKey} or Dataset Key, Got: ${token}`);
+      return c.json({ error: "401 Unauthorized" }, 401);
+    }
+
+    let body = {};
+    const contentType = c.req.header('Content-Type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        body = await c.req.json();
+      } catch (e) {
+        body = {};
+      }
+    }
+
+    const query = body.query || "";
+    const retrieval_setting = body.retrieval_setting;
+    const top_k = retrieval_setting?.top_k || 5;
+    const score_threshold = retrieval_setting?.score_threshold || 0.0;
+
+    const db = c.env.DB;
+    const vectorIndex = c.env.WARROOM_INDEX;
+    
+    // For Dify connectivity test (empty query), return empty records but 200 OK
+    if (!query || !vectorIndex) {
+      return c.json({ records: [] });
+    }
+
+    const vector = await generateEmbedding(query, c.env);
+    if (!vector) return c.json({ records: [] });
+
+    const simResults = await vectorIndex.query(vector, { topK: top_k, returnMetadata: true });
+    
+    const records = [];
+    if (simResults.matches && simResults.matches.length > 0) {
+      const filteredMatches = simResults.matches.filter(m => m.score >= score_threshold);
+      
+      for (const m of filteredMatches) {
+        let kbResult = null;
+        let querySql = "";
+        let queryParam = "";
+
+        if (m.id.startsWith('kn-')) {
+          querySql = "SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE id = ?";
+          queryParam = m.id.replace('kn-', '');
+        } else if (m.id.startsWith('inc-')) {
+          querySql = "SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ?";
+          queryParam = m.id.replace('inc-', '');
+        } else if (m.id.startsWith('gov-')) {
+          querySql = "SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ?";
+          queryParam = m.id.replace('gov-', '');
+        }
+
+        if (querySql) {
+          kbResult = await db.prepare(querySql).bind(queryParam).first();
+        } else {
+          // Fallback for legacy IDs (e.g. 20260401094557143_20)
+          const possibleId = m.id.split('_')[0];
+          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
+        }
+
+        if (kbResult) {
+          records.push({
+            content: kbResult.content,
+            score: m.score,
+            title: kbResult.title,
+            metadata: {
+              category: kbResult.category,
+              tags: kbResult.tags,
+              incident_id: kbResult.inc_id,
+              origin_id: m.id
+            }
+          });
+        }
+      }
+    }
+
+    return c.json({ records });
+  } catch (err) {
+    console.error("Critical /retrieval error:", err);
+    // Return empty results instead of 500 to pass Dify connectivity check
+    return c.json({ records: [], error: err.message });
+  }
+});
+
+app.post('/upsert', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader ? authHeader.replace(/bearer\s+/i, '').trim() : '';
+    const envKey = c.env.DIFY_TOOL_KEY;
+    
+    // Support both the existing tool key and the Dify dataset transfer key from screenshot
+    const allowedTokens = [
+      'dataset-IEg4X7UTG3j4IukgkZQV7WUP',
+      'dataset-lEg4X7UTG3j4lukgkZQV7WUP',
+      'dataset-IEg4X7UTG3j4lukgkZQV7WUP',
+      'dataset-lEg4X7UTG3j4IukgkZQV7WUP'
+    ];
+    if (token !== envKey && !allowedTokens.includes(token)) {
+      return c.json({ error: "401 Unauthorized" }, 401);
+    }
+
+    const body = await c.req.json();
+    const { name, text } = body;
+
+    if (!text) {
+      return c.json({ error: "Content (text) is required" }, 400);
+    }
+
+    const db = c.env.DB;
+    const ai = c.env.AI;
+    const vectorIndex = c.env.WARROOM_INDEX;
+
+    // 1. Generate Embedding
+    const vector = await generateEmbedding(text, c.env);
+    if (!vector) throw new Error("Failed to generate embedding");
+
+    // 2. Save to D1
+    const now = getKst();
+    const title = name || `Dify Import: ${new Date().toISOString()}`;
+    
+    const result = await db.prepare(`
+      INSERT INTO knowledge_base (title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector)
+      VALUES (?, ?, 'Dify 수집', 'DIFY_BOT', ?, 'DIFY_BOT', ?, ?)
+    `).bind(title, text, now, now, new Float32Array(vector)).run();
+
+    const insertId = result.meta.last_row_id;
+
+    // 3. Upsert to Vectorize
+    if (vectorIndex) {
+      await vectorIndex.upsert([{
+        id: `kn-${insertId}`,
+        values: vector,
+        metadata: {
+          title: title,
+          category: 'dify_import',
+          source: 'dify_workflow'
+        }
+      }]);
+    }
+
+    return c.json({ 
+      success: true, 
+      id: `kn-${insertId}`,
+      message: "지식이 성공적으로 저장되었습니다." 
+    });
+
+  } catch (err) {
+    console.error("Upsert error:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.post('/ai/knowledge/sync', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+    return c.json({ error: "401 Unauthorized" }, 401);
+  }
+
+  const db = c.env.DB;
+  const ai = c.env.AI;
+  const vectorIndex = c.env.WARROOM_INDEX;
+
+  if (!vectorIndex || !ai) return c.json({ error: "Required bindings missing" }, 500);
+
+  try {
+    const { results } = await db.prepare("SELECT id, title, content, inc_id, category FROM knowledge_base").all();
+    
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const row of results) {
+      try {
+        const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [row.content.substring(0, 3000)] });
+        const vector = embeddings.data[0];
+        
+        if (vector) {
+          await vectorIndex.upsert([{
+            id: `kn-${row.id}`,
+            values: vector,
+            metadata: {
+              title: row.title,
+              incident_id: row.inc_id || '',
+              category: row.category || 'general'
+            }
+          }]);
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (e) {
+        console.error(`Sync error for ID ${row.id}:`, e.message);
+        failCount++;
+      }
+    }
+
+    return c.json({ success: true, processed: results.length, successCount, failCount });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 🚀 NEW: Resolve Only (No Report)
 app.post('/warroom/resolve-only', async (c) => {
   const { inc_id, user_id } = await c.req.json();
@@ -2838,9 +3370,10 @@ app.get('/ai/incident/my-assignments', async (c) => {
       a.id, a.user_id, a.inc_id, a.assigned_at, a.updated_at,
       CASE 
         WHEN a.status = '처리완료' THEN '처리완료'
-        WHEN w.inc_id IS NOT NULL THEN '처리중'
+        WHEN chat_counts.cnt > 0 THEN '처리중'
         ELSE a.status
       END as status,
+      COALESCE(chat_counts.cnt, 0) as chat_count,
       m.sender, m.message, m.employee_id, m.timestamp as message_at, m.received_count,
       u1.name as sender_name, u1.part as sender_part,
       (SELECT GROUP_CONCAT(u2.name, ', ') 
@@ -2850,7 +3383,11 @@ app.get('/ai/incident/my-assignments', async (c) => {
     FROM incident_assignments a
     LEFT JOIN received_messages m ON (a.inc_id = m.inc_id OR REPLACE(a.inc_id, 'INC-', '') = m.inc_id)
     LEFT JOIN users u1 ON m.employee_id = u1.employee_id
-    LEFT JOIN warroom_list w ON (a.inc_id = w.inc_id OR REPLACE(a.inc_id, 'INC-', '') = w.inc_id)
+    LEFT JOIN (
+      SELECT inc_id, COUNT(*) as cnt
+      FROM warroom_chats
+      GROUP BY inc_id
+    ) chat_counts ON (a.inc_id = chat_counts.inc_id OR REPLACE(a.inc_id, 'INC-', '') = chat_counts.inc_id)
     WHERE a.user_id = ?
   `
   const params = [user_id]
@@ -3051,11 +3588,44 @@ app.get('/ai/knowledge/search', async (c) => {
       ORDER BY distance ASC
       LIMIT 10
     `).bind(new Float32Array(queryVector)).all()
-    
     const scoredResults = results.map(r => ({
       ...r,
-      score: 1 - r.distance // Distance to Similarity
+      score: 1 - r.distance,
+      reason: ""
     }))
+    
+    // Generate AI Matching Reason for top 3 results
+    const ai = c.env.AI;
+    if (ai && scoredResults.length > 0) {
+      try {
+        const top3 = scoredResults.slice(0, 3);
+        const reasoningPrompt = `당신은 지능형 관제 시스템 전문가입니다. 아래 질문(Query)과 검색된 과거 지식 항목들을 비교하여, 왜 이 항목들이 유사한지 그 이유를 각각 '한 문장'으로 설명하세요. 
+        필요한 정보: 시스템명, 에러 코드, 장애 현상의 유사성 등. 답변은 한국어로 하세요.
+
+        [분석 요청 Query]: ${query}
+
+        ${top3.map((r, i) => `[항목 ${i+1}]: ${r.title}\n[내용]: ${r.content?.substring(0, 100)}...`).join('\n\n')}
+
+        답변 형식 (반드시 이 형식을 지키세요):
+        항목 1 이유: ...
+        항목 2 이유: ...
+        항목 3 이유: ...`;
+
+        const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: reasoningPrompt });
+        const reasoningText = aiResponse.response || aiResponse;
+
+        // Parse reasoning (Simple line-based extraction)
+        const lines = String(reasoningText).split('\n');
+        top3.forEach((r, i) => {
+          const reasonLine = lines.find(l => l.includes(`항목 ${i+1} 이유:`));
+          if (reasonLine) {
+            r.reason = reasonLine.split(`항목 ${i+1} 이유:`)[1].trim();
+          }
+        });
+      } catch (aiErr) {
+        console.error("Reasoning generation failed:", aiErr);
+      }
+    }
     
     return c.json({ results: scoredResults })
   } catch (e) {
@@ -3108,8 +3678,9 @@ app.post('/incidents', async (c) => {
 
   // Fetch actual message from received_messages
   const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
-  const msg = sms ? sms.message : (title || 'SMS 장애 감지')
-  const finalTitle = `${fullId} | ${msg}`
+  const rawMsg = sms ? sms.message : (title || 'SMS 장애 감지')
+  const truncatedMsg = rawMsg.length > 50 ? rawMsg.substring(0, 50) + "..." : rawMsg;
+  const finalTitle = `${fullId} | ${truncatedMsg}`
 
   const now = getKst()
   await db.prepare(
@@ -3709,9 +4280,10 @@ app.get('/ai/warroom/my-rooms', async (c) => {
   if (!user_id) return c.json({ rooms: [] })
   
   const { results } = await c.env.DB.prepare(`
-    SELECT w.* 
+    SELECT w.*, r.message AS sms_message
     FROM warroom_list w
     JOIN user_warrooms uw ON w.inc_id = uw.inc_id
+    LEFT JOIN received_messages r ON w.inc_id = r.inc_id
     WHERE uw.user_id = ?
     ORDER BY w.reg_dt DESC
   `).bind(user_id).all()

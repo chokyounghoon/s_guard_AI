@@ -59,6 +59,8 @@ export default function ChatPage() {
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
 
+  const isResolved = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료'].includes(roomStatus);
+
 
   // Main Chat State
   const [mainMessages, setMainMessages] = useState([]);
@@ -409,6 +411,8 @@ export default function ChatPage() {
       }
     } catch (e) {
       console.error('AI Search failed', e);
+      alert("AI 검색 엔진 조회 중 오류가 발생했습니다. 시스템 안정화를 위해 페이지를 새로고침합니다.");
+      window.location.reload();
     } finally {
       setIsSearching(false);
     }
@@ -851,17 +855,16 @@ export default function ChatPage() {
         </div>
         <div className="flex items-center space-x-4 relative">
           <button 
-            onClick={() => navigate(`/chat-summary/${incidentId}`)}
-            className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 rounded-lg text-sm font-extrabold shadow-[0_0_15px_rgba(59,130,246,0.6)] hover:shadow-[0_0_25px_rgba(59,130,246,0.9)] hover:scale-105 transition-all duration-300"
+            onClick={() => isResolved ? null : navigate(`/chat-summary/${incidentId}`)}
+            disabled={isResolved}
+            className={`flex items-center px-4 py-2 rounded-lg text-sm font-extrabold transition-all duration-300 ${
+              isResolved 
+                ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed opacity-60' 
+                : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.6)] hover:shadow-[0_0_25px_rgba(59,130,246,0.9)] hover:scale-105'
+            }`}
           >
-            <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
+            <Sparkles className={`w-4 h-4 mr-2 ${isResolved ? 'text-slate-600' : 'animate-pulse'}`} />
             WAR-ROOM 분석
-          </button>
-          <button 
-            onClick={handleResolveIncident}
-            className="flex items-center px-3 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold hover:bg-emerald-500/30 transition-colors animate-pulse"
-          >
-            Resolve
           </button>
           <div className="relative">
             <button 
@@ -904,10 +907,15 @@ export default function ChatPage() {
                 </div>
                 <div className="p-2 bg-[#11141d] border-t border-white/5">
                   <button 
-                    onClick={() => alert('사용자 초대 대화상자가 열립니다.')}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold transition-colors shadow-lg shadow-blue-900/20"
+                    onClick={() => isResolved ? null : alert('사용자 초대 대화상자가 열립니다.')}
+                    disabled={isResolved}
+                    className={`w-full py-2 rounded-lg text-[11px] font-bold transition-all shadow-lg ${
+                      isResolved 
+                        ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed shadow-none' 
+                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20 active:scale-95'
+                    }`}
                   >
-                    참여자 초대하기
+                    {isResolved ? '초대 불가 (종료됨)' : '참여자 초대하기'}
                   </button>
                 </div>
               </div>
@@ -971,11 +979,11 @@ export default function ChatPage() {
           {showMenu && (
             <div className="absolute top-12 right-0 w-48 bg-[#1a1f2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
                 <div 
-                    onClick={() => { alert('사용자 초대 기능이 실행됩니다.'); setShowMenu(false); }}
-                    className="flex items-center space-x-3 p-3 hover:bg-white/5 cursor-pointer transition-colors border-b border-white/5"
+                    onClick={() => { if (!isResolved) { alert('사용자 초대 기능이 실행됩니다.'); setShowMenu(false); } }}
+                    className={`flex items-center space-x-3 p-3 transition-colors border-b border-white/5 ${isResolved ? 'opacity-50 cursor-not-allowed bg-black/10' : 'hover:bg-white/5 cursor-pointer'}`}
                 >
-                    <UserPlus className="w-4 h-4 text-blue-400" />
-                    <span className="text-sm text-slate-200">초대하기</span>
+                    <UserPlus className={`w-4 h-4 ${isResolved ? 'text-slate-600' : 'text-blue-400'}`} />
+                    <span className={`text-sm ${isResolved ? 'text-slate-500' : 'text-slate-200'}`}>초대하기 {isResolved && '(종료됨)'}</span>
                 </div>
               <div 
                 onClick={() => { if(confirm('대화방을 나가시겠습니까?')) navigate('/dashboard'); }}
@@ -1309,34 +1317,36 @@ export default function ChatPage() {
                       <span className="text-[10px] text-slate-500 pb-1">{msg.time}</span>
                     </div>
                     {/* Reply & Reaction Actions */}
-                    <div className="absolute right-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
-                      <button 
-                        onClick={() => handleSetAnnouncement(msg)}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
-                        title="공지로 고정"
-                      >
-                        <Megaphone className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleToggleBookmark(msg)}
-                        className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
-                        title="타임라인 등록"
-                      >
-                        <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
-                      </button>
-                      <button 
-                        onClick={() => setActiveReactionMsg(activeReactionMsg === msg.seq ? null : msg.seq)}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
-                      >
-                        <Smile className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => setReplyTo(msg)}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {!isResolved && (
+                      <div className="absolute right-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
+                        <button 
+                          onClick={() => handleSetAnnouncement(msg)}
+                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                          title="공지로 고정"
+                        >
+                          <Megaphone className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleToggleBookmark(msg)}
+                          className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
+                          title="타임라인 등록"
+                        >
+                          <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
+                        </button>
+                        <button 
+                          onClick={() => setActiveReactionMsg(activeReactionMsg === msg.seq ? null : msg.seq)}
+                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
+                        >
+                          <Smile className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setReplyTo(msg)}
+                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Emoji Picker Popover */}
                     {activeReactionMsg === msg.seq && (
@@ -1401,34 +1411,36 @@ export default function ChatPage() {
                       )}
                     </div>
                     {/* Reply & Reaction Actions (me) */}
-                    <div className="absolute left-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
-                      <button 
-                        onClick={() => setReplyTo(msg)}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => setActiveReactionMsg(activeReactionMsg === msg.seq ? null : msg.seq)}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
-                      >
-                        <Smile className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleToggleBookmark(msg)}
-                        className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
-                        title="타임라인 등록"
-                      >
-                        <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
-                      </button>
-                      <button 
-                        onClick={() => handleSetAnnouncement(msg)}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
-                        title="공지로 고정"
-                      >
-                        <Megaphone className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {!isResolved && (
+                      <div className="absolute left-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
+                        <button 
+                          onClick={() => setReplyTo(msg)}
+                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setActiveReactionMsg(activeReactionMsg === msg.seq ? null : msg.seq)}
+                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
+                        >
+                          <Smile className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleToggleBookmark(msg)}
+                          className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
+                          title="타임라인 등록"
+                        >
+                          <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
+                        </button>
+                        <button 
+                          onClick={() => handleSetAnnouncement(msg)}
+                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                          title="공지로 고정"
+                        >
+                          <Megaphone className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Emoji Picker Popover (me) */}
                     {activeReactionMsg === msg.seq && (
@@ -1544,7 +1556,7 @@ export default function ChatPage() {
             )}
 
             <div className="p-3 flex flex-col space-y-2">
-              { (roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료') ? (
+              { isResolved ? (
                 <div className="bg-slate-900/50 rounded-2xl py-4 px-5 border border-white/5 flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
                   <span className="text-sm text-slate-500 font-medium">이 War-Room은 종료되었습니다. (읽기 전용)</span>

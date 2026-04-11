@@ -485,8 +485,10 @@ export default function ChatSummaryPage() {
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Report Status</div>
                 <div className="flex items-center space-x-1.5">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-sm text-emerald-400 font-bold">Verified</span>
+                  <span className={`w-2 h-2 rounded-full animate-pulse ${isLoading ? 'bg-orange-500 box-shadow-glow-orange' : 'bg-emerald-500'}`} />
+                  <span className={`text-sm font-bold ${isLoading ? 'text-orange-400' : 'text-emerald-400'}`}>
+                    {isLoading ? '처리중...' : 'Verified'}
+                  </span>
                 </div>
               </div>
               <div className="space-y-1">

@@ -7,6 +7,7 @@ import AiInsightPanel from '../components/AiInsightPanel';
 
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
+import BottomMenu from '../components/BottomMenu';
 
 
 
@@ -209,13 +210,32 @@ export default function DashboardPage() {
     const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
     
     const formattedUiId = `INC-${incidentId}`; // Display prefix
-    const smsTitle = `${formattedUiId} | SMS 장애 감지`; // Do not include raw SMS message in title
+    const rawMsg = currentSms.message || currentSms.error_message || "SMS 장애 감지";
+    const truncatedMsg = rawMsg.length > 50 ? rawMsg.substring(0, 50) + "..." : rawMsg;
+    const smsTitle = `${formattedUiId} | ${truncatedMsg}`;
     
     // Check if War-Room already exists
     const existingRoom = warRooms.find(r => r.id === incidentId);
     if (existingRoom) {
       navigate(`/chat/${incidentId}`);
       return;
+    }
+
+    // 🚀 Concurrency Lock: Try to acquire lock before proceeding
+    const lockApiBase = 'https://sguardai.khcho0421.workers.dev';
+    try {
+      const lockRes = await fetch(`${lockApiBase}/ai/warroom/lock/${incidentId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_name: userProfile?.name || 'Unknown User' })
+      });
+      const lockData = await lockRes.json();
+      if (!lockData.success) {
+        alert(`이미 ${lockData.owner} 매니저님이 워룸 개설을 진행 중입니다.`);
+        return;
+      }
+    } catch (lockError) {
+      console.error("Lock acquisition failed, proceeding anyway", lockError);
     }
     
     let diagnosisText = '';
@@ -298,26 +318,16 @@ export default function DashboardPage() {
       }
       */
 
-      // ONLY insert system intro messages if the room was NEWLY created
-      if (openData.status !== 'exists') {
-        await fetch(`${apiBase}/warroom/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            incident_id: incidentId,
-            sender: '시스템',
-            role: 'System',
-            type: 'system',
-            text: 'War-Room 채팅방이 생성되었습니다. 모든 대화 내용은 장애 해결 시 AI 학습에 사용됩니다.'
-          })
-        });
-      }
+      // System intro user message is now only handled on the UI layer.
 
       await fetchWarRooms();
       setShowEmergencyModal(false);
       navigate(`/chat/${incidentId}`);
     } catch (err) {
       console.error("Failed to open War-Room:", err);
+      // Clean up lock on failure so others can try
+      const lockApiBase = 'https://sguardai.khcho0421.workers.dev';
+      fetch(`${lockApiBase}/ai/warroom/lock/${incidentId}`, { method: 'DELETE' }).catch(() => {});
     }
   };
 
@@ -381,6 +391,8 @@ export default function DashboardPage() {
         setIncidentWorkflowSteps(data.steps || []);
       } catch (e) {
         console.error('Workflow fetch failed:', e);
+        alert("원활한 서비스 조회를 위해 페이지를 새로고침합니다.");
+        window.location.reload();
       }
     };
 
@@ -559,16 +571,27 @@ export default function DashboardPage() {
         const freshMsgs = (data.messages || []).filter(msg => {
           if (deletedSmsIds.has(msg.inc_id)) return false;
           
-          // 🚀 Governance Filter: Only show if assigned to current user OR if current user is the sender
-          if (userProfile?.name || userProfile?.employee_id) {
-            const isAssigned = (msg.receivers || []).some(r => 
-              (userProfile.name && r.includes(userProfile.name)) || 
-              (userProfile.employee_id && String(r).includes(String(userProfile.employee_id)))
-            );
-            const isSender = msg.employee_id && String(msg.employee_id) === String(userProfile.employee_id || userProfile.id);
-            return isAssigned || isSender;
+          // UI 깜박임(Flashing) 방지: 사용자 프로필이 로드되기 전에는 숨김 처리
+          if (!userProfile) return false;
+          
+          // 관리자 권한 예외: 모든 SMS 확인 가능
+          const role = userProfile.role || '';
+          if (role.includes('관리자') || role.toLowerCase().includes('admin') || role.includes('팀장')) {
+            return true;
           }
-          return true; // Default to all if profile not loaded yet
+
+          // 수신자가 아예 지정되지 않은 메시지(브로드캐스트/공용/테스트)는 대시보드에 전체 공개
+          const isPublicBroadcast = (!msg.receivers || msg.receivers.length === 0);
+          if (isPublicBroadcast) return true;
+
+          // 🚀 Governance Filter: 본인이 발신했거나 수신자로 지정된 경우만 표시
+          const isAssigned = (msg.receivers || []).some(r => 
+            (userProfile.name && r.includes(userProfile.name)) || 
+            (userProfile.employee_id && String(r).includes(String(userProfile.employee_id)))
+          );
+          const isSender = msg.employee_id && String(msg.employee_id) === String(userProfile.employee_id || userProfile.id);
+          
+          return isAssigned || isSender;
         });
 
         // 🚀 Duplicate Prevention: Ensure unique inc_id in the list
@@ -597,6 +620,7 @@ export default function DashboardPage() {
             setIsLiveStreamCollapsed(false);    
             setIsWarRoomCollapsed(false);       
             setIsAssignmentsCollapsed(false);    
+            setIsFlowCollapsed(false);
             setShowAgentPanel(true);             
             
             // Trigger AI analysis / History fetch
@@ -712,100 +736,67 @@ export default function DashboardPage() {
     setIsWarRoomCollapsed(!isWarRoomCollapsed);
   };
 
-  // Re-parse transcript (utility for handleAgentContent)
-  const parseTranscript = (transcript) => {
-    if (!transcript) return [];
-    let text = transcript;
-    
-    // 1. Divide into 'Insight' and 'Expert Diagnosis' with extremely robust split markers
-    // Updated to split at both the expert block and the leader block to be truly robust.
-    const splitMarker = /\[전문가별 심층 진단\]|### 전문가별|--- ?\s*#* ?\[전문가별|\[리더의 최종 조치 가이드\]|### 리더의 최종/i;
-    const parts_split = text.split(splitMarker);
-    
-    // Only parse everything AFTER the FIRST diagnostic marker (Expert Diagnosis section)
-    if (parts_split.length > 1) {
-      // JOIN with double newline to ensure masterRegex (which uses ^|\n) catches all participants correctly!
-      text = parts_split.slice(1).join('\n\n');
-    } else {
-      // If the specific [Expert Diagnosis] marker has not appeared yet, 
-      // do not parse anything to avoid leaking the Insight summary into the agent bubbles.
-      return [];
-    }
+  // Helper to parse transcript string into array of message objects
+  const parseTranscript = (text) => {
+    if (!text) return [];
 
-    // 2. Define the 4 target Agent roles with rich keyword mapping
     const declarations = [
       { name: 'Security', keywords: ['Security', '보안', 'System', '시스템', '보안분석'] },
       { name: 'DB', keywords: ['DB', '데이터베이스', 'Database', 'DATABASE', '쿼리'] },
-      { name: 'DevOps', keywords: ['DevOps', '데브옵스', 'Analyst', '어낼리스트', 'Infra', '인프라', 'App', '애플리케이션', '인프라진단', '앱분석'] },
-      { name: 'Leader', keywords: ['Leader', '리더', '최종 조치', '조항 조치', '조치 가이드', '최종판단', '리더의 최종 조치 가이드'] }
+      { name: 'DevOps', keywords: ['DevOps', '데브옵스', 'Analyst', '어낼리스트', 'Infra', '인프라', 'App', '애플리케이션'] },
+      { name: 'Leader', keywords: ['Leader', '리더', '최종 조치', '조항 조치', '조치 가이드', '최종판단'] }
     ];
 
-    const keywordToName = {};
-    declarations.forEach(d => {
-      d.keywords.forEach(k => { 
-        keywordToName[k.toLowerCase()] = d.name; 
-      });
-    });
-
-    const allKeywords = declarations.flatMap(d => d.keywords).join('|');
-    // Flexible regex for agent title detection: require start of line or header context
-    // Now UPDATED to support Emojis as prefixes (e.g., ⚙️ DevOps, 👑 Leader)
-    const emojiRange = '[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]';
-    const markerPrefix = `(?:^|\\n)[ \\t]*(?:#+\\s*|--- |\\*\\*?|\\d+\\.\\s*|\\s*[\\-\\u2022\\u2043\\u2219\\u25d8\\*]\\s*|\\[|${emojiRange})*`;
-    const markerSuffix = `(?:\\s*Agent|\\s*에이전트|\\s*어낼리스트|\\s*분석전문가|\\s*전문가|\\s*분석관|\\s*진단|\\s*연구원|의 최종 조치 가이드|의| 최종 조치 가이드| 가이드|의 최종 조항 조치|${emojiRange})*\\s*(?:\\]|:|\\*\\*)*[ \\t]*`;
+    let startIndex = text.indexOf('[전문가별 심층 진단]');
+    if (startIndex === -1) startIndex = 0; // Fallback to entire text if heading is missing
     
-    const masterRegex = new RegExp(`${markerPrefix}(${allKeywords})${markerSuffix}`, 'gim');
-
-    console.group('[S-GUARD] Agent Transcript Parsing');
-    console.log('Raw Section Length:', text.length);
-
-    let normalizedText = text.replace(masterRegex, (match, keyword) => {
-      const canonicalName = keywordToName[keyword.toLowerCase()];
-      console.log(`Matched Agent: ${canonicalName} (from word: ${keyword})`);
-      return `\n\nMARKER_${canonicalName}\n`;
-    });
-
-    const parts = normalizedText.split(/\n\nMARKER_(\w+)\n/g);
-    console.log('Split Sections Count:', Math.floor(parts.length / 2));
-    console.groupEnd();
-
+    const diagnosticsText = text.substring(startIndex);
+    const lines = diagnosticsText.split('\n');
+    let currentAgent = null;
     const msgsMap = new Map();
-    
-    for (let i = 1; i < parts.length; i += 2) {
-        const rawRole = parts[i];
-        let content = (parts[i+1] || '').trim();
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
         
-        if (content) {
-            // Aggressive cleaning of markdown artifacts, redundant labels, AND Emojis at start
-            content = content
-                .replace(/^(?:Agent|에이전트|분석|진단|가이드|전문가|[\uD800-\uDBFF][\uDC00-\uDFFF])\s*[:：]\s*/i, '')
-                .replace(/^[ \t\-\*\#\.,\:\u2022\u00b7\uD800-\uDBFF\uDC00-\uDFFF]+/gm, '') 
-                .replace(/\*\*/g, '')
-                .replace(/\n\n+/g, '\n')
-                .trim();
-            
-            if (content) {
-                // Use the canonical role name for grouping
-                const role = rawRole;
-                if (msgsMap.has(role)) {
-                    // Check for near-identical duplicate text within the same role section
-                    const existingText = msgsMap.get(role);
-                    if (!existingText.includes(content)) {
-                        msgsMap.set(role, existingText + "\n\n" + content);
-                    }
-                } else {
-                    msgsMap.set(role, content);
+        let foundAgent = null;
+        
+        // A line is considered an agent header if it's relatively short, contains a keyword, 
+        // AND looks like a heading or bold text, or ends with a colon.
+        const isHeaderFormat = /^(###?|\*\*|-|\d+\.|\[|[\uD800-\uDBFF][\uDC00-\uDFFF])/.test(trimmedLine) || /:\s*$/.test(trimmedLine);
+        
+        if (isHeaderFormat && trimmedLine.length < 100) {
+            const lowerLine = trimmedLine.toLowerCase();
+            for (const decl of declarations) {
+                if (decl.keywords.some(k => lowerLine.includes(k.toLowerCase()))) {
+                    foundAgent = decl.name;
+                    break;
                 }
             }
         }
+        
+        if (foundAgent) {
+            currentAgent = foundAgent;
+            continue; // Skip the header line itself
+        }
+        
+        if (currentAgent) {
+            const existing = msgsMap.get(currentAgent) || '';
+            msgsMap.set(currentAgent, existing + (existing ? '\n' : '') + trimmedLine);
+        }
     }
     
-    // Convert back to original msgs array format for compatibility
-    return Array.from(msgsMap.entries()).map(([role, text]) => ({ 
-      role: role, 
-      text: text, 
-      delay: 0 
-    }));
+    return Array.from(msgsMap.entries()).map(([role, content]) => {
+      // Clean up markdown artifacts dynamically
+      let cleanText = content
+          .replace(/^\*\*.*?\*\*\s*[:：]\s*/i, '') // Remove prefix like **DevOps**: 
+          .replace(/^[ \t\-\*\#\.,\:\u2022\u00b7]+\s*/gm, '') // Remove list bullets or extra artifacts at start of lines
+          .replace(/\n\n+/g, '\n\n')
+          .trim();
+          
+      return { role: role, text: cleanText, delay: 0 };
+    }).filter(msg => msg.text.length > 5);
   };
 
   // Callback called from AiInsightPanel
@@ -861,7 +852,9 @@ export default function DashboardPage() {
     setIsLiveStreamCollapsed(false);
     setIsWarRoomCollapsed(false);
     setIsAssignmentsCollapsed(false);
+    setIsFlowCollapsed(false);
     setShowAgentPanel(true);
+    setSelectedIncidentIdFlow(smsMessage.inc_id); // Ensure the flow panel displays its data
 
     // Filter inc_id to strictly numeric if it has INC- prefix
     const cleanIncId = String(smsMessage.inc_id).replace('INC-', '');
@@ -1607,8 +1600,8 @@ export default function DashboardPage() {
                 <div
                   key={item.inc_id}
                   className={`p-4 rounded-2xl border relative group hover:border-white/10 transition-colors cursor-pointer
-                    ${item.status === '미확인' ? 'bg-red-500/5 border-red-500/10' : 
-                      item.status === '처리중' ? 'bg-orange-500/5 border-orange-500/10' : 
+                    ${(item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/5 border-red-500/10' : 
+                      (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/5 border-orange-500/10' : 
                       'bg-emerald-500/5 border-emerald-500/10'}`}
                   onClick={() => {
                     const msg = smsMessages.find(m => m.inc_id === item.inc_id) || { inc_id: item.inc_id, message: item.message, sender: item.sender };
@@ -1619,15 +1612,15 @@ export default function DashboardPage() {
                 >
                   <div className="flex items-start space-x-3">
                     <div className={`${
-                      item.status === '미확인' ? 'bg-red-500/10' : 
-                      item.status === '처리중' ? 'bg-orange-500/10' : 
+                      (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/10' : 
+                      (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/10' : 
                       'bg-emerald-500/10'
                     } p-2 rounded-full mt-0.5`}>
                       <AlertCircle className={`w-5 h-5 ${
-                        item.status === '미확인' ? 'text-red-500' : 
-                        item.status === '처리중' ? 'text-orange-500' : 
-                        'text-emerald-500'
-                      }`} />
+                          (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'text-red-500' : 
+                          (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'text-orange-500' : 
+                          'text-emerald-500'
+                        }`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
@@ -1639,12 +1632,12 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className={`text-[10px] font-bold px-3 py-1 rounded-full border shadow-sm transition-all duration-300 flex items-center gap-1.5
-                            ${item.status === '미확인' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
-                              item.status === '처리중' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 
+                            ${(item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
+                              (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 font-black' : 
                               'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}
                             style={{
-                              animation: item.status === '미확인' ? 'sguard-blink-fast 0.5s infinite' : 
-                                         item.status === '처리중' ? 'sguard-blink-slow 2.0s infinite' : 'none'
+                              animation: (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'sguard-blink-fast 0.5s infinite' : 
+                                         (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'sguard-blink-slow 2.0s infinite' : 'none'
                             }}>
                             <style>{`
                               @keyframes sguard-blink-fast {
@@ -1661,12 +1654,18 @@ export default function DashboardPage() {
                               }
                             `}</style>
                             <div className={`w-1 h-1 rounded-full ${
-                              item.status === '미확인' ? 'bg-red-400' : 
+                              (item.status === '미확인' || item.status === '미처리') ? 'bg-red-400' : 
                               item.status === '처리중' ? 'bg-orange-400' : 
                               'bg-emerald-400'
                             }`} />
-                            {item.status}
-                          </div>
+                             {item.status}
+                             {(item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') && (
+                               <span className="text-[9px] opacity-70 ml-1 border-l border-orange-500/30 pl-1.5 flex items-center gap-1">
+                                 <MessageSquare className="w-2.5 h-2.5" />
+                                 대화중
+                               </span>
+                             )}
+                           </div>
                           <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
                             {formatYYMMDD(item.assigned_at)}
                           </span>
@@ -1685,11 +1684,11 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${item.id}`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/chat/${String(item.inc_id).replace('INC-', '')}`); }}
                       className="ml-4 p-2.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all group/flow"
-                      title="처리 흐름 상세 보기"
+                      title="해당 War-Room으로 즉시 이동"
                     >
-                      <Activity className="w-4 h-4 group-hover/flow:scale-110 transition-transform" />
+                      <Users className="w-4 h-4 group-hover/flow:scale-110 transition-transform" />
                     </button>
                   </div>
                 </div>
@@ -1707,13 +1706,13 @@ export default function DashboardPage() {
 
         {/* Activity History Flow Area */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-6 cursor-pointer group" onClick={toggleFlowPanel}>
             <div className="flex items-center space-x-2">
-              <Activity className="w-5 h-5 text-purple-400" />
+              <Activity className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
               <h2 className="font-bold text-lg">
                 {selectedIncidentIdFlow ? (
                   <>
-                    인시던트 처리 흐름 [
+                    장애 처리 현황 [
                     <span className="text-blue-400">
                       {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
                         smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
@@ -1724,7 +1723,7 @@ export default function DashboardPage() {
                     </span>
                     ]
                   </>
-                ) : '활동 내역 (업무 흐름)'}
+                ) : '장애 처리 현황'}
               </h2>
             </div>
             <div className="flex items-center gap-6">
@@ -1764,17 +1763,15 @@ export default function DashboardPage() {
                      }
                      return null;
                    })()}
-                  <button 
-                    onClick={() => setSelectedIncidentIdFlow(null)}
-                    className="text-[10px] bg-slate-800 border border-white/10 px-4 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all hover:bg-slate-700 font-bold uppercase tracking-tight"
-                  >
-                    목록으로 돌아가기
-                  </button>
                 </div>
               )}
+              <div className="ml-2 p-2 rounded-full group-hover:bg-white/5 transition-all">
+                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${isFlowCollapsed ? 'rotate-180' : ''}`} />
+              </div>
             </div>
           </div>
 
+          {!isFlowCollapsed && (
           <div className="relative">
             {/* Vertical Line */}
             <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
@@ -1910,15 +1907,26 @@ export default function DashboardPage() {
                               {isCompleted ? stepData.detail : (isNextStep ? '실시간 데이터 분석 및 대응 절차를 진행 중입니다...' : '업무 단계 대기 중')}
                             </p>
                             
-                            {(isCompleted || isNextStep) && step.id === 'WARROOM' && (
-                               <button
-                                 onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)}
-                                 className="mt-4 flex items-center gap-2 group/btn text-[11px] font-black text-white border border-blue-500/30 hover:border-blue-400 px-6 py-3 rounded-2xl bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transition-all transform hover:scale-[1.02]"
-                               >
-                                 <Zap className="w-4 h-4 fill-white animate-pulse" />
-                                 워룸으로 즉시 이동하여 대응하기 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
-                               </button>
-                            )}
+                            {(isCompleted || isNextStep) && step.id === 'WARROOM' && (() => {
+                               const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
+                               return roomExists ? (
+                                 <button
+                                   onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)}
+                                   className="mt-4 flex items-center gap-2 group/btn text-[11px] font-black text-white border border-blue-500/30 hover:border-blue-400 px-6 py-3 rounded-2xl bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transition-all transform hover:scale-[1.02]"
+                                 >
+                                   <Zap className="w-4 h-4 fill-white animate-pulse" />
+                                   워룸으로 즉시 이동하여 대응하기 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
+                                 </button>
+                               ) : (
+                                 <button
+                                   onClick={() => handleOpenWarRoomFromInsight(selectedSms, '')}
+                                   className="mt-4 flex items-center gap-2 group/btn text-[11px] font-black text-white border border-red-500/30 hover:border-red-400 px-6 py-3 rounded-2xl bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all transform hover:scale-[1.02]"
+                                 >
+                                   <Users className="w-4 h-4 fill-white animate-pulse" />
+                                   War-Room 개설 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
+                                 </button>
+                               );
+                            })()}
                           </div>
                         </div>
                       );
@@ -1937,6 +1945,7 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* Handling Progress Area */}
@@ -2003,7 +2012,7 @@ export default function DashboardPage() {
                   </div>
 
                   <h4 className="font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-relaxed line-clamp-2">
-                    {room.title}
+                    {room.sms_message ? `INC-${room.id} | ${room.sms_message}` : room.title}
                   </h4>
                   {room.lastMsg && <p className="text-xs text-slate-400 truncate mb-3">{room.lastMsg}</p>}
 
@@ -2044,6 +2053,15 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Bottom Navigation */}
+      <BottomMenu 
+        currentPath="/dashboard" 
+        onWarRoomClick={() => {
+          fetchWarRooms();
+          setShowWarRoomPopup(true);
+        }} 
+      />
     </div>
   );
 }

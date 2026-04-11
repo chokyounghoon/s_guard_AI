@@ -45,10 +45,10 @@ export default function AssignmentsPage() {
           received_count: inc.received_count || 1,
           assignees: inc.assignees || '담당자 미지정',
           inc_id: inc.inc_id,
-          bgColor: inc.status === '미확인' ? 'bg-red-900/10' : 
-                   inc.status === '처리중' ? 'bg-orange-900/10' : 'bg-emerald-900/10',
-          borderColor: inc.status === '미확인' ? 'border-red-500/20' : 
-                       inc.status === '처리중' ? 'border-orange-500/20' : 'border-emerald-500/20',
+          bgColor: (inc.status === '미확인' || inc.status === '미처리' || inc.status === '대기') ? 'bg-red-900/10' : 
+                   (inc.status === '처리중' || inc.status === '진행중' || inc.status === 'IN_PROGRESS') ? 'bg-orange-900/10' : 'bg-emerald-900/10',
+          borderColor: (inc.status === '미확인' || inc.status === '미처리' || inc.status === '대기') ? 'border-red-500/20' : 
+                       (inc.status === '처리중' || inc.status === '진행중' || inc.status === 'IN_PROGRESS') ? 'border-orange-500/20' : 'border-emerald-500/20',
         }));
         setAssignments(mapped);
       })
@@ -122,9 +122,12 @@ export default function AssignmentsPage() {
         <div className="space-y-3 px-5 pt-2">
           {filteredAssignments.length > 0 ? (
             filteredAssignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                onClick={() => navigate(`/chat/${String(assignment.inc_id).replace('INC-', '')}`)}
+                <div
+                  key={assignment.id}
+                  onClick={(e) => {
+                    if (e.target.closest('button')) return;
+                    navigate(`/chat/${String(assignment.inc_id).replace('INC-', '')}`);
+                  }}
                 className={`p-6 rounded-3xl border ${assignment.borderColor} ${assignment.bgColor} relative overflow-hidden group transition-all duration-500 shadow-lg cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 active:scale-[0.98]`}
               >
                 {/* Header */}
@@ -185,7 +188,7 @@ export default function AssignmentsPage() {
                   </div>
                   {assignment.status === '처리완료' ? (
                     <button 
-                      onClick={(e) => { e.stopPropagation(); navigate('/ai-report'); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${assignment.id}`); }}
                       className="text-xs font-bold text-emerald-500 flex items-center space-x-1 hover:text-white transition-colors bg-emerald-500/5 px-3 py-1.5 rounded-lg border border-emerald-500/20"
                     >
                       <span>분석 리포트</span>

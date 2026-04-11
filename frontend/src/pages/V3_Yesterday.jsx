@@ -1330,8 +1330,16 @@ export default function DashboardPage() {
                   className={`${item.bgColor} p-4 rounded-2xl border ${item.borderColor} relative group hover:border-white/10 transition-colors cursor-pointer`}
                 >
                   <div className="flex items-start space-x-3">
-                    <div className={`${item.severity === 'CRITICAL' ? 'bg-red-500/10' : 'bg-blue-500/10'} p-2 rounded-full mt-0.5`}>
-                      <AlertCircle className={`w-5 h-5 ${item.severity === 'CRITICAL' ? 'text-red-500' : 'text-blue-500'}`} />
+                    <div className={`${
+                      (item.status === '미확인' || item.status === '대기' || item.status === '미처리') ? 'bg-red-500/10' : 
+                      (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/10' :
+                      'bg-emerald-500/10'
+                    } p-2 rounded-full mt-0.5`}>
+                      <AlertCircle className={`w-5 h-5 ${
+                        (item.status === '미확인' || item.status === '대기' || item.status === '미처리') ? 'text-red-500' : 
+                        (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'text-orange-500' :
+                        'text-emerald-500'
+                      }`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
@@ -1350,8 +1358,17 @@ export default function DashboardPage() {
                         발신: {item.sender}
                       </p>
                       <div className="flex items-center justify-between">
-                        <span className={`${item.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-blue-500/20 text-blue-500 border-blue-500/30'} text-[10px] font-bold px-2 py-0.5 rounded border`}>
-                          {item.severity}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1.5 ${
+                          (item.status === '미확인' || item.status === '대기' || item.status === '미처리') ? 'bg-red-500/20 text-red-500 border-red-500/30' : 
+                          (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/20 text-orange-500 border-orange-500/30 font-black' : 
+                          'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        }`}>
+                          <div className={`w-1 h-1 rounded-full ${
+                            (item.status === '미확인' || item.status === '대기' || item.status === '미처리') ? 'bg-red-400' : 
+                            (item.status === '처리중' || item.status || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-400' : 
+                            'bg-emerald-400'
+                          }`} />
+                          {item.status || item.severity}
                         </span>
                         <span className="text-[10px] text-slate-500">{item.code}</span>
                       </div>
@@ -1471,6 +1488,7 @@ export default function DashboardPage() {
       )}
 
       {/* Bottom Navigation */}
+      <BottomMenu 
         currentPath="/dashboard" 
         onWarRoomClick={() => {
           fetchWarRooms();
