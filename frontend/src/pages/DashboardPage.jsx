@@ -164,7 +164,7 @@ export default function DashboardPage() {
     return kstDate.toISOString().split('T')[0];
   };
 
-  const [hideCompletedSms, setHideCompletedSms] = useState(true);
+  const [hideCompletedSms, setHideCompletedSms] = useState(false);
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
@@ -416,15 +416,17 @@ export default function DashboardPage() {
   useEffect(() => {
     if (selectedSms) {
       setInsightSms(selectedSms);
-    } else if (smsMessages.length > 0) {
+    } else if (visibleSms.length > 0) {
       setInsightSms(prev => {
-        if (!prev || prev.inc_id !== smsMessages[0].inc_id) {
-          return smsMessages[0];
+        if (!prev || prev.inc_id !== visibleSms[0].inc_id) {
+          return visibleSms[0];
         }
         return prev;
       });
+    } else {
+      setInsightSms(null);
     }
-  }, [selectedSms, smsMessages]);
+  }, [selectedSms, visibleSms]);
 
   // Fetch War-Rooms & SMS periodically
   useEffect(() => {
@@ -1247,15 +1249,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div 
-                    onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
-                    className="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 cursor-pointer hover:bg-white/10 transition-all select-none"
-                  >
-                    <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${hideCompletedSms ? 'bg-blue-600' : 'bg-slate-700'}`}>
-                      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${hideCompletedSms ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                    </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">처리완료 숨기기</span>
-                  </div>
+
                   <button 
                     disabled={isRefreshing}
                     onClick={async (e) => { 
@@ -1317,7 +1311,7 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center gap-1.5">
                                   <h4 className={`font-black text-sm tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
-                                    {msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Auto-Detection'}
+                                    {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Auto-Detection'}
                                   </h4>
                                 </div>
                                 <div className="flex items-center gap-2 ml-auto select-none font-mono">
@@ -1387,6 +1381,7 @@ export default function DashboardPage() {
           )}
 
           {/* AI Autopilot Insight Panel (항상 최신 SMS만 분석하도록 insightSms 적용) */}
+          {visibleSms.length > 0 && (
           <div className="w-full">
             <AiInsightPanel 
                onLogReceived={handleLogReceived} 
@@ -1397,6 +1392,7 @@ export default function DashboardPage() {
                warRooms={warRooms}
             />
           </div>
+          )}
 
         </div>
 
@@ -1406,6 +1402,7 @@ export default function DashboardPage() {
 
 
         {/* Main Content Areas */}
+        {visibleSms.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Alerts List (Section 1) */}
           <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] p-6 rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
@@ -1423,12 +1420,14 @@ export default function DashboardPage() {
             </div>
             {!isLiveStreamCollapsed && (
             <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700/50 space-y-4">
-              {smsMessages.slice(0, 10).map((msg) => {
+              {visibleSms.slice(0, 10).map((msg) => {
                 let severity = 'info';
                 let title = 'System Report';
                 const lowerText = (msg.message || '').toLowerCase();
 
-                if (lowerText.includes('critical') || lowerText.includes('db') || lowerText.includes('데이터베이스')) {
+                if (msg.sender === 'Manual Entry' || msg.channel === 'MANUAL') {
+                  title = 'Manual Registration';
+                } else if (lowerText.includes('critical') || lowerText.includes('db') || lowerText.includes('데이터베이스')) {
                   severity = 'critical';
                   title = 'Critical Process Error';
                 } else if (lowerText.includes('err') || lowerText.includes('cpu') || lowerText.includes('메모리')) {
@@ -1471,7 +1470,7 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-                {smsMessages.length === 0 && (
+                {visibleSms.length === 0 && (
                   <div className="text-center text-slate-500 text-sm py-4">Waiting...</div>
                 )}
               </div>
@@ -1542,6 +1541,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        )}
 
 
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
@@ -1700,7 +1700,7 @@ export default function DashboardPage() {
                           {Number(item.received_count || 1) >= 2 && (
                              <div key={`rc-assign-${item.inc_id}`} className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-600/20 to-indigo-500/20 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)] backdrop-blur-sm group/badge hover:scale-105 transition-transform">
                                <span className="text-[10px] font-black font-mono text-blue-400 group-hover/badge:text-blue-300 transition-colors">
-                                 {Math.max(Number(item.received_count || 0), Number(item.occurrence_count || 0)) || 1}
+                                 {Number(item.occurrence_count) > 0 ? Number(item.occurrence_count) : (Number(item.received_count) || 1)}
                                </span>
                                <span className="text-[8px] font-bold text-blue-500/60 uppercase tracking-tighter">Event</span>
                              </div>

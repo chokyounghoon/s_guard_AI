@@ -12,7 +12,8 @@ import {
   Hash,
   Filter,
   MoreVertical,
-  Send
+  Send,
+  ArrowLeft
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -103,6 +104,12 @@ export default function InboxPage() {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-4">
+              <button 
+                onClick={() => navigate(-1)}
+                className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 text-slate-400 hover:text-white transition-all mr-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
               <div className="p-3 bg-blue-600/20 rounded-2xl border border-blue-500/30">
                 <Inbox className="w-8 h-8 text-blue-400" />
               </div>

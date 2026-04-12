@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Terminal, Brain, MessageSquare, AlertTriangle, CheckCircle2, Clock, Zap } from 'lucide-react';
+import { Copy, Check, Terminal, Brain, MessageSquare, AlertTriangle, CheckCircle2, Clock, Zap, Shield, Database, Server, Star } from 'lucide-react';
 
 const CodeBlock = ({ children, className }) => {
   const [copied, setCopied] = useState(false);
@@ -56,14 +56,30 @@ const MarkdownViewer = ({ text }) => {
             <h2 className="mb-4 mt-8 text-2xl font-bold text-white border-b border-white/10 pb-2">{children}</h2>
           ),
           h3: ({ children }) => {
-            const isInsight = String(children).includes('Insight');
-            const isWarRoom = String(children).includes('War-Room') || String(children).includes('Log');
+            const contentStr = String(children);
+            const isInsight = contentStr.includes('Insight');
+            const isWarRoom = contentStr.includes('War-Room') || contentStr.includes('Log');
+            
+            const isSecurity = contentStr.includes('Security') && (contentStr.includes('Agent') || contentStr.includes('AGENT'));
+            const isDB = contentStr.includes('DB') && (contentStr.includes('Agent') || contentStr.includes('AGENT'));
+            const isDevOps = contentStr.includes('DevOps') && (contentStr.includes('Agent') || contentStr.includes('AGENT'));
+            const isLeader = contentStr.includes('Leader') && (contentStr.includes('Agent') || contentStr.includes('AGENT'));
+            
+            let Icon = null;
+            let iconColor = '';
+            let textColor = 'text-white';
+            
+            if (isInsight) { Icon = Brain; iconColor = 'text-yellow-400'; textColor = 'text-yellow-400'; }
+            else if (isWarRoom) { Icon = MessageSquare; iconColor = 'text-blue-400'; textColor = 'text-blue-400'; }
+            else if (isSecurity) { Icon = Shield; iconColor = 'text-red-400'; textColor = 'text-red-400'; }
+            else if (isDB) { Icon = Database; iconColor = 'text-yellow-400'; textColor = 'text-yellow-400'; }
+            else if (isDevOps) { Icon = Server; iconColor = 'text-blue-400'; textColor = 'text-blue-400'; }
+            else if (isLeader) { Icon = Star; iconColor = 'text-purple-400'; textColor = 'text-purple-400'; }
             
             return (
               <div className="mb-4 mt-8 flex items-center gap-3 border-b border-gray-700/50 pb-2">
-                {isInsight && <Brain className="h-5 w-5 text-yellow-400" />}
-                {isWarRoom && <MessageSquare className="h-5 w-5 text-blue-400" />}
-                <h3 className={`text-xl font-bold !m-0 ${isInsight ? 'text-yellow-400' : isWarRoom ? 'text-blue-400' : 'text-white'}`}>
+                {Icon && <Icon className={`h-5 w-5 ${iconColor}`} />}
+                <h3 className={`text-xl font-bold !m-0 ${textColor}`}>
                   {children}
                 </h3>
               </div>
@@ -159,8 +175,21 @@ const MarkdownViewer = ({ text }) => {
             const isCritical = /CRITICAL|ERROR|장애|위험|9[0-9]%/.test(content);
             const isWarning = /WARNING|주의|8[0-9]%/.test(content);
             
+            const isSecurity = content.includes('Security') && (content.includes('Agent') || content.includes('AGENT'));
+            const isDB = content.includes('DB') && (content.includes('Agent') || content.includes('AGENT'));
+            const isDevOps = content.includes('DevOps') && (content.includes('Agent') || content.includes('AGENT'));
+            const isLeader = content.includes('Leader') && (content.includes('Agent') || content.includes('AGENT'));
+            
+            let colorCls = 'text-white';
+            if (isSecurity) colorCls = 'text-red-400';
+            else if (isDB) colorCls = 'text-yellow-400';
+            else if (isDevOps) colorCls = 'text-blue-400';
+            else if (isLeader) colorCls = 'text-purple-400';
+            else if (isCritical) colorCls = 'text-red-400 px-1 rounded bg-red-400/10';
+            else if (isWarning) colorCls = 'text-amber-400 px-1 rounded bg-amber-400/10';
+
             return (
-              <strong className={`font-black ${isCritical ? 'text-red-400 px-1 rounded bg-red-400/10' : isWarning ? 'text-amber-400 px-1 rounded bg-amber-400/10' : 'text-white'}`}>
+              <strong className={`font-black ${colorCls}`}>
                 {children}
               </strong>
             );

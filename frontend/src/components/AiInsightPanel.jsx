@@ -86,7 +86,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     setIsCritical(false);
     delayShownRef.current = false;
     setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
-    setSmsAnalysisTitle(`분석중입니다: "${selectedSms.sender}" 발신 SMS`);
+    const displaySender = selectedSms.sender === 'Manual Entry' ? 'Manual Entry' : `"${selectedSms.sender}" 발신 SMS`;
+    setSmsAnalysisTitle(`분석중입니다: ${displaySender}`);
 
     const analyze = async () => {
       try {

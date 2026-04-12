@@ -37,7 +37,7 @@ app.get('/debug/db-init', async (c) => {
   try {
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS inbox_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        folder TEXT DEFAULT 'INBOX',
         user_id TEXT NOT NULL,
         type TEXT NOT NULL,
         sender_id TEXT,
@@ -129,7 +129,7 @@ const generateEmbedding = async (text, env) => {
 const performBackgroundAiAnalysis = async (sms_id, env) => {
   const db = env.DB;
   const kv = env.SMS_STORAGE;
-  const api_key = env.DIFY_API_KEY_SUMMARIZER || env.DIFY_API_KEY || "app-owwPp3j2qAvVDZpW2UUiY8L3";
+  const api_key = env.DIFY_API_KEY_DASHBOARD || env.DIFY_API_KEY || "app-TSlqmp329iKOzpXUP90iC6Kw";
   const api_base = env.DIFY_API_BASE || 'https://api.dify.ai/v1';
 
   try {
@@ -797,6 +797,17 @@ app.post('/sms/convert-multimodal', async (c) => {
 // ==========================================
 // 3. SMS Interactions
 // ==========================================
+
+function extractOccurrence(occStr) {
+  if (!occStr) return 0;
+  const str = String(occStr);
+  // Match "22건" or "22 건"
+  const match = str.match(/(\d+)\s*건/);
+  if (match) return parseInt(match[1], 10);
+  // Fallback to stripping all non-digits if no "건" is found
+  return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+}
+
 app.post('/sms/receive', async (c) => {
   const body = await c.req.json()
   const { 
@@ -836,7 +847,7 @@ app.post('/sms/receive', async (c) => {
 
   if (existing) {
     const newCount = (existing.received_count || 1) + 1
-    const count = parseInt(String(occurrence_count || '0').replace(/[^0-9]/g, '')) || 0
+    const count = extractOccurrence(occurrence_count);
     await db.prepare(`
       UPDATE received_messages SET 
         received_count = ?, timestamp = ?, mod_dt = ?, employee_id = ?,
@@ -901,7 +912,7 @@ app.post('/sms/receive', async (c) => {
 
 
   const newIncId = generateIncId()
-  const parsedCount = parseInt(String(occurrence_count || '0').replace(/[^0-9]/g, '')) || 0
+  const parsedCount = extractOccurrence(occurrence_count);
   const initialCount = parsedCount > 0 ? parsedCount : 1
 
   await db.prepare(`
@@ -2510,27 +2521,46 @@ app.post('/ai/summarize-chat', async (c) => {
       const incident = await db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(incident_id).first();
       const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first();
       
+      const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료'];
+      const isFinal = finalStatuses.includes(incident?.status || 'Open');
+
       const isRaw = (val) => {
         if (!val) return false;
         const rawPatterns = [/\[analyst\]\s*\d+:/, /\[User\]\s*[^:]+:/, /employee_id:/];
         return rawPatterns.some(p => p.test(val));
       };
 
-      // Only serve cache if incident is finalized AND it's not a corrupt raw transcript.
-      if (cached && cached.summary && isFinal && !isRaw(cached.summary)) {
-        console.log(`[Cache Hit] Serving cached summary for finalized incident ${incident_id}`);
-        await writer.write(encode(`data: ${JSON.stringify({ status: '분석 이력이 존재합니다. 리포트를 불러오고 있습니다...' })}\n\n`));
-        const chars = Array.from(cached.summary);
-        for (let i = 0; i < chars.length; i += 50) {
-          await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+      // For finalized incidents, strictly serve from DB (Prevent Dify call)
+      if (isFinal) {
+        console.log(`[Re-Analysis Prevented] Incident ${incident_id} is final. Attempting DB read...`);
+        
+        // Priority 1: knowledge_base (finalized reports)
+        const kb = await db.prepare("SELECT content FROM knowledge_base WHERE inc_id = ? AND category = 'REPORT'").bind(incident_id).first();
+        if (kb && kb.content && !isRaw(kb.content)) {
+          console.log(`[Cache Hit] Serving finalized knowledge_base report for ${incident_id}`);
+          // Send immediately without typewriter delay or status message to avoid confusion
+          await writer.write(encode(`data: ${JSON.stringify({ answer: kb.content })}\n\n`));
+          await writer.write(encode('data: [DONE]\n\n'));
+          return;
         }
+
+        // Priority 2: chat_summaries
+        if (cached && cached.summary && !isRaw(cached.summary)) {
+          console.log(`[Cache Hit] Serving cached summary for finalized incident ${incident_id}`);
+          await writer.write(encode(`data: ${JSON.stringify({ answer: cached.summary })}\n\n`));
+          await writer.write(encode('data: [DONE]\n\n'));
+          return;
+        }
+
+        // If no valid text in DB, return empty message rather than hitting Dify
+        await writer.write(encode(`data: ${JSON.stringify({ answer: '데이터베이스에 저장된 요약 내역이 존재하지 않습니다.' })}\n\n`));
         await writer.write(encode('data: [DONE]\n\n'));
         return;
       }
 
       if (cached && cached.summary && !isFinal) {
         console.log(`[Re-Analysis] Incident ${incident_id} is still active. Bypassing cache to update summary...`);
-        await writer.write(encode(`data: ${JSON.stringify({ status: '새로운 대화 내용을 반영하여 리포트를 최신화하고 있습니다...' })}\n\n`));
+        await writer.write(encode(`data: ${JSON.stringify({ status: '대화 내용을 반영하여 리포트를 최신화하고 있습니다...' })}\n\n`));
       }
 
 
@@ -2643,7 +2673,7 @@ ${transcript.join('\n')}`
               const chunk = data.data?.text || "";
               fullContent += chunk;
               await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`))
-            } else if (data.event === 'workflow_finished' || data.event === 'node_finished') {
+            } else if (data.event === 'workflow_finished') {
               // Final Workflow Output or Node Output
               const outputs = data.data?.outputs;
               if (outputs) {
@@ -3175,6 +3205,12 @@ app.post('/ai/knowledge/save', async (c) => {
   const now = getKst()
   const user_id = body.user_id || 'SYSTEM'
   
+  // Guard clause against Dify Workflow default template injection (unmapped variables)
+  if ((body.title && body.title.includes('{{sys.')) || (body.content && body.content.includes('{{LLM.'))) {
+    console.log('[KnowledgeBase] Rejected malformed Dify bot update:', body.title);
+    return c.json({ error: 'Malformed workflow update ignored' }, 400)
+  }
+  
   // Generate embedding if content is provided
   let vector = null;
   if (body.content) {
@@ -3633,12 +3669,19 @@ app.get('/ai/incident/my-assignments', async (c) => {
       a.id, a.user_id, a.inc_id, a.assigned_at, a.updated_at,
       CASE 
         WHEN a.status = '처리완료' THEN '처리완료'
+        WHEN wl.status IN ('CLOSED', '최종완료', '처리완료', 'Completed', '완료') THEN '처리완료'
         WHEN chat_counts.cnt > 0 THEN '처리중'
         ELSE a.status
       END as status,
       COALESCE(chat_counts.cnt, 0) as chat_count,
-      m.sender, m.message, m.employee_id, m.timestamp as message_at, m.received_count,
-      u1.name as sender_name, u1.part as sender_part,
+      m.sender, m.message, m.employee_id, m.timestamp as message_at, m.received_count, m.occurrence_count,
+      CASE WHEN insight.inc_id IS NOT NULL THEN 1 ELSE 0 END as is_analyzed,
+      u1.name as sender_name, 
+      COALESCE(
+        (SELECT name FROM organizations WHERE code = u1.part),
+        (SELECT name FROM organizations WHERE code = u1.team),
+        u1.part
+      ) as sender_part,
       (SELECT GROUP_CONCAT(u2.name, ', ') 
        FROM incident_assignments a2 
        JOIN users u2 ON a2.user_id = u2.employee_id 
@@ -3646,6 +3689,8 @@ app.get('/ai/incident/my-assignments', async (c) => {
     FROM incident_assignments a
     LEFT JOIN received_messages m ON (a.inc_id = m.inc_id OR REPLACE(a.inc_id, 'INC-', '') = m.inc_id)
     LEFT JOIN users u1 ON m.employee_id = u1.employee_id
+    LEFT JOIN autopilot_insight insight ON (a.inc_id = insight.inc_id OR REPLACE(a.inc_id, 'INC-', '') = insight.inc_id)
+    LEFT JOIN warroom_list wl ON TRIM(REPLACE(a.inc_id, 'INC-', '')) = TRIM(REPLACE(wl.inc_id, 'INC-', ''))
     LEFT JOIN (
       SELECT inc_id, COUNT(*) as cnt
       FROM warroom_chats
@@ -4690,19 +4735,64 @@ app.post('/api/v1/reports/submit', async (c) => {
   try {
     const now = getKst()
     
+    const normId = String(incident_id).replace('INC-', '');
+    const incIdWithPrefix = `INC-${normId}`;
+
     // 1. Update Incident Status to '처리완료'
     await db.prepare(`
-      UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ?
-    `).bind(now, incident_id).run()
-    
-    // 2. Register Knowledge Base
+      UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ? OR inc_id = ?
+    `).bind(now, normId, incIdWithPrefix).run()
+
+    // 1-1. Update WarRoom Status to 'CLOSED'
     await db.prepare(`
-      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt, mod_dt)
-      VALUES (?, ?, ?, 'REPORT', ?, ?)
+      UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ? OR inc_id = ?
+    `).bind(now, normId, incIdWithPrefix).run()
+
+    // 1-2. Update All Assignees Status to '처리완료'
+    await db.prepare(`
+      UPDATE incident_assignments SET status = '처리완료' WHERE inc_id = ? OR inc_id = ?
+    `).bind(normId, incIdWithPrefix).run()
+    
+    // 2. Generate embedding for Vector Search
+    const ai = c.env.AI;
+    let vector = null;
+    let vectorArray = null;
+    if (content) {
+      try {
+        const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [content.substring(0, 3000)] });
+        vector = embeddings.data[0];
+        vectorArray = vector ? new Float32Array(vector) : null;
+      } catch (e) {
+        console.error("Report Embedding error:", e);
+      }
+    }
+
+    // 3. Register Knowledge Base
+    const kbResult = await db.prepare(`
+      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt, mod_dt, vector)
+      VALUES (?, ?, ?, 'REPORT', ?, ?, ?)
       ON CONFLICT(inc_id) DO UPDATE SET 
         content = excluded.content,
-        mod_dt = excluded.mod_dt
-    `).bind(incident_id, title, content, now, now).run()
+        mod_dt = excluded.mod_dt,
+        vector = excluded.vector
+      RETURNING id
+    `).bind(incident_id, title, content, now, now, vectorArray).first()
+
+    const knowledgeId = kbResult?.id;
+
+    // 4. Sync to Vectorize Index
+    const vectorIndex = c.env.WARROOM_INDEX;
+    if (vector && vectorIndex && knowledgeId) {
+      await vectorIndex.upsert([{
+        id: `kn-${knowledgeId}`,
+        values: vector,
+        metadata: {
+          title: title,
+          incident_id: incident_id || '',
+          category: 'REPORT'
+        }
+      }]);
+    }
 
     // 3. Find Reporting Lines (Superiors)
     const { results: superiors } = await db.prepare(

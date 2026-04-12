@@ -388,7 +388,7 @@ const IncidentPushPage = () => {
 
             // 3. Construct payload with precedence: Parsed > Manual Advanced > Manual Receivers
             const payload = { 
-                sender, 
+                sender: 'Manual Entry', 
                 message, 
                 employee_id: employeeId,
                 ...advanced,

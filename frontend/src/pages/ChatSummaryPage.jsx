@@ -40,6 +40,7 @@ export default function ChatSummaryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCopied, setIsCopied] = useState(false);
   const [error, setError] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [modalStep, setModalStep] = useState(null); // 'selection' or null
   const [selectedLines, setSelectedLines] = useState([]);
   const [additionalNotes, setAdditionalNotes] = useState('');
@@ -67,17 +68,19 @@ export default function ChatSummaryPage() {
   useEffect(() => {
     const fetchSummary = async () => {
       setIsLoading(true);
+      setIsStreaming(true);
       setError(null);
-      
+      setSummary('');
+      let currentController;
       try {
-        const controller = new AbortController();
-        abortControllerRef.current = controller;
+        currentController = new AbortController();
+        abortControllerRef.current = currentController;
 
         const response = await fetch(getApiUrl('/ai/summarize-chat'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ incident_id: incidentId }),
-          signal: controller.signal
+          signal: currentController.signal
         });
 
         if (!response.ok || !response.body) {
@@ -111,13 +114,8 @@ export default function ChatSummaryPage() {
                 if (data.answer) {
                   setSummary(prev => {
                     const newText = prev + data.answer;
-                    
-                    // 🛡️ ENHANCED LOADING PROTECTION
-                    // Only hide the overall loader IF we have received a valid summary structure
-                    // (either section headers ### or the Timeline summary marker ⏱️)
-                    const hasValidMarker = newText.includes('###') || newText.includes('⏱️') || newText.includes('장애 대응 타임라인');
-                    
-                    if (hasValidMarker && newText.length > 20 && isLoading) {
+                    // Auto-hide overall loader once we actually have some readable text!
+                    if (newText.length > 5 && isLoading) {
                       setIsLoading(false);
                     }
                     return newText;
@@ -138,7 +136,11 @@ export default function ChatSummaryPage() {
           setError('요약 생성 중 오류가 발생했습니다.');
         }
       } finally {
-        setIsLoading(false);
+        // Prevent aborted fetches in Strict Mode from resetting the active stream state
+        if (abortControllerRef.current === currentController) {
+          setIsLoading(false);
+          setIsStreaming(false);
+        }
       }
     };
 
@@ -203,30 +205,6 @@ export default function ChatSummaryPage() {
   // 🧪 Section Parser Logic
   const parseSections = (text) => {
     if (!text) return [];
-    
-    // 🛡️ REMOVED STRICT NOISE FILTER
-    // The new Dify workflow generates timeline summaries without ### headers but with [HH:MM:SS] markers.
-    // The previous filter mistakenly flagged this valid AI output as raw transcript and caused a blank screen.
-    const isRawTranscript = (val) => {
-      // 🛡️ RE-IMPLEMENTED NOISE FILTER
-      // Match common patterns of raw chat logs that should NEVER be rendered as a summary.
-      // E.g., "[analyst] 12345678:", "[User] Name:", "employee_id:"
-      const rawPatterns = [
-        /\[analyst\]\s*\d+:/,
-        /\[User\]\s*[^:]+:/,
-        /\[system\]/,
-        /employee_id:/,
-        /sender_name:/
-      ];
-      
-      // If it contains multiple of these patterns, it's definitely a raw transcript.
-      const matchCount = rawPatterns.filter(pattern => pattern.test(val)).length;
-      return matchCount >= 1; 
-    };
-
-    if (isRawTranscript(text)) {
-      return []; 
-    }
 
     // ✂️ Only start data from the "⏱️ 장애 대응 타임라인 요약" marker if it exists
     const marker = "⏱️ 장애 대응 타임라인 요약";
@@ -251,9 +229,6 @@ export default function ChatSummaryPage() {
     if (parts.length <= 1 && !cleanTextForParsing.includes('###')) {
       // Fallback if no sections are found - ONLY show if NO LONGER LOADING to avoid showing raw transcript
       if (isLoading) return []; 
-      
-      // Secondary check: Don't show the fallback if it still looks like raw logs
-      if (isRawTranscript(cleanTextForParsing)) return [];
 
       return [{ title: '인시던트 상세 요약', content: cleanTextForParsing, icon: FileText, color: 'from-blue-600 to-indigo-600' }];
     }
@@ -515,12 +490,12 @@ export default function ChatSummaryPage() {
           
           <button 
             onClick={handleGovernance}
-            disabled={isGoverning || isLoading || !summary || govSuccess || incidentStatus === '처리완료'}
+            disabled={isGoverning || isStreaming || isLoading || !summary || govSuccess || incidentStatus === '처리완료'}
             className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all border active:scale-95 shadow-xl ${
               (govSuccess || incidentStatus === '처리완료')
                 ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20 opacity-80 cursor-default' 
                 : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 border-indigo-400/30 text-white shadow-indigo-500/20 hover:scale-105 active:scale-95'
-            } disabled:opacity-50 group origin-right`}
+            } disabled:opacity-50 group origin-right disabled:hover:scale-100 disabled:cursor-not-allowed`}
           >
             {isGoverning ? (
               <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -533,6 +508,7 @@ export default function ChatSummaryPage() {
               <span>
                 {isGoverning 
                   ? (governanceStep === 'knowledge' ? '지식화(RAG) 등록 중...' : governanceStep === 'resolving' ? '인시던트 상태 업데이트 중...' : '분석 처리 중...') 
+                  : isStreaming ? `[분석중] ${loadingStatus}` 
                   : (govSuccess || incidentStatus === '처리완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}
               </span>
             </div>
@@ -663,7 +639,7 @@ export default function ChatSummaryPage() {
 
               {!isLoading && !error && summary && (
                 <div id="report-content" className="animate-in fade-in duration-1000 relative space-y-12">
-                  {parseSections(summary).map((section, idx) => (
+                   {parseSections(summary).map((section, idx) => (
                     <div 
                       key={idx} 
                       className="group relative bg-white/[0.02] border border-white/5 rounded-3xl p-8 md:p-10 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-500 animate-in slide-in-from-bottom-5 fade-in"
@@ -687,6 +663,18 @@ export default function ChatSummaryPage() {
                       <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-gradient-to-b ${section.color} opacity-0 group-hover:opacity-100 transition-all duration-500`} />
                     </div>
                   ))}
+
+                  {/* Streaming indicator shown while fetching data from Dify */}
+                  {isStreaming && (
+                    <div className="flex items-center justify-center space-x-3 mt-8 p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl animate-pulse">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+                      </div>
+                      <span className="text-sm font-bold text-indigo-300 tracking-wide">{loadingStatus || 'Dify AI가 실시간으로 분석 중입니다...'}</span>
+                    </div>
+                  )}
 
 
                 </div>

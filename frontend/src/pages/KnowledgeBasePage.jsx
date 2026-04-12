@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap } from 'lucide-react';
+import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutGrid, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -17,11 +17,11 @@ export default function KnowledgeBasePage() {
     title: '',
     content: '',
     category: 'GENERAL',
-    inc_id: '',
-    file_url: '',
-    file_type: 'text',
-    tags: ''
+    tags: '',
+    file: null
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
 
   const categories = ['all', 'SECURITY', 'DB', 'DEVOPS', 'INFRA', 'GENERAL'];
 
@@ -58,20 +58,106 @@ export default function KnowledgeBasePage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    
     try {
-      const res = await fetch(`${API_BASE}/ai/knowledge/save`, {
+      // DIFY GOVERNANCE KEY
+      const DIFY_API_KEY = "app-QHxJQTBSKJlTw2gVeGgTk915";
+      const DIFY_API_BASE = "https://api.dify.ai/v1";
+      const savedUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+      const userId = savedUser.employee_id || 'sguard-system';
+
+      let fileId = null;
+      let sguardcontent = [];
+
+      // 1. Upload file if exists
+      if (formData.file) {
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', formData.file);
+        formDataUpload.append('user', userId);
+        
+        const uploadRes = await fetch(`${DIFY_API_BASE}/files/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${DIFY_API_KEY}`
+          },
+          body: formDataUpload
+        });
+        
+        if (!uploadRes.ok) throw new Error('파일 업로드 실패 (Dify 연동)');
+        const uploadData = await uploadRes.json();
+        if (!uploadData.id) throw new Error('업로드 ID를 받을 수 없습니다.');
+        fileId = uploadData.id;
+        
+        const type = formData.file.type.startsWith('image/') ? 'image' : 'document';
+        sguardcontent = [{
+          type: type,
+          transfer_method: 'local_file',
+          upload_file_id: fileId
+        }];
+      }
+
+      // 2. Prepare sguardlog
+      const sguardlog = `[지식 제목]: ${formData.title}
+[카테고리]: ${formData.category}
+[태그]: ${formData.tags || '없음'}
+
+[상세 내용]:
+${formData.content}`;
+
+      // 3. Call Dify Workflow
+      const payload = {
+        inputs: {
+          sguardlog: sguardlog,
+          sguardcontent: sguardcontent
+        },
+        response_mode: 'blocking',
+        user: userId
+      };
+
+      const workflowRes = await fetch(`${DIFY_API_BASE}/workflows/run`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!workflowRes.ok) throw new Error('Dify 지식 등록 워크플로우 실패');
+      
+      const result = await workflowRes.json();
+      console.log('Dify Workflow Result:', result);
+      
+      // 4. Save to our own Local DB for proper title/content indexing 
+      // (This guarantees the exact Title and Content are inserted since Dify workflow might have mapping issues)
+      const localSaveRes = await fetch(`${API_BASE}/ai/knowledge/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingEntry ? { ...formData, id: editingEntry.id } : formData)
+        body: JSON.stringify({
+          ...formData, // Has title, content, category, tags
+          id: editingEntry ? editingEntry.id : undefined,
+          user_id: userId
+        })
       });
-      if (res.ok) {
-        setShowAddModal(false);
-        setEditingEntry(null);
-        setFormData({ title: '', content: '', category: 'GENERAL', inc_id: '', file_url: '', file_type: 'text', tags: '' });
-        fetchKnowledge();
+      if (!localSaveRes.ok) {
+        console.warn('Local save failed, but Dify might have succeeded');
       }
+
+      setShowAddModal(false);
+      setEditingEntry(null);
+      setFormData({ title: '', content: '', category: 'GENERAL', tags: '', file: null });
+      
+      alert('지식이 AI 데이터베이스에 성공적으로 등록되었습니다.');
+      // Refresh local list
+      fetchKnowledge();
+      
     } catch (err) {
       console.error("Save knowledge error:", err);
+      alert('등록 중 오류가 발생했습니다: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -116,7 +202,7 @@ export default function KnowledgeBasePage() {
         <button 
           onClick={() => {
             setEditingEntry(null);
-            setFormData({ title: '', content: '', category: 'GENERAL', inc_id: '', file_url: '', file_type: 'text', tags: '' });
+            setFormData({ title: '', content: '', category: 'GENERAL', tags: '', file: null });
             setShowAddModal(true);
           }}
           className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
@@ -162,16 +248,36 @@ export default function KnowledgeBasePage() {
             </button>
           ))}
         </div>
+
+        <div className="flex items-center gap-4 border-l border-white/5 pl-4 ml-4 hidden md:flex">
+          <div className="flex bg-[#0f1219] rounded-lg p-1 border border-white/5">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-white'}`}
+              title="리스트 보기"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-white'}`}
+              title="그리드 보기"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Knowledge List Grid */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Knowledge List Render */}
+      <div className={`max-w-7xl mx-auto ${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-4'}`}>
         {loading ? (
           Array(6).fill(0).map((_, i) => (
             <div key={i} className="h-64 bg-[#1a1f2e] rounded-2xl animate-pulse border border-white/5" />
           ))
         ) : filteredKnowledge.length > 0 ? (
           filteredKnowledge.map(item => (
+            viewMode === 'grid' ? (
             <div key={item.id} className="group bg-[#1a1f2e] border border-white/5 rounded-2xl overflow-hidden hover:border-blue-500/30 transition-all flex flex-col h-full shadow-lg">
               {/* Card Meta Header */}
               <div className="p-4 flex items-center justify-between border-b border-white/5">
@@ -182,7 +288,7 @@ export default function KnowledgeBasePage() {
                   <button 
                     onClick={() => {
                       setEditingEntry(item);
-                      setFormData({ ...item });
+                      setFormData({ ...item, file: null });
                       setShowAddModal(true);
                     }}
                     className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-blue-400 transition-all"
@@ -265,6 +371,74 @@ export default function KnowledgeBasePage() {
                 </div>
               </div>
             </div>
+            ) : (
+              // List View Card
+              <div key={item.id} className="group bg-[#1a1f2e] border border-white/5 rounded-2xl p-4 flex flex-col md:flex-row md:items-center gap-4 hover:border-blue-500/30 transition-all shadow-lg">
+                <div className="flex-1 min-w-0 flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="shrink-0 w-28">
+                    <span className="bg-blue-500/20 text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                      {item.category}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-base font-bold group-hover:text-blue-400 transition-colors truncate">
+                        {item.title}
+                      </h3>
+                      {item.score !== undefined && item.score !== null && !isNaN(item.score) && (
+                        <div className="shrink-0 bg-blue-500/20 border border-blue-500/30 rounded-md px-1.5 py-0.5 flex items-center gap-1">
+                          <Zap className="w-2.5 h-2.5 text-blue-400" />
+                          <span className="text-[9px] font-black text-blue-400">{Math.round(item.score * 100)}%</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-slate-400 text-xs truncate">
+                      {item.content}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-1 w-full md:w-48 mt-2 md:mt-0">
+                    {(item.tags || '').split(',').filter(t => t.trim()).slice(0, 3).map(tag => (
+                      <span key={tag} className="text-[9px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded truncate max-w-[80px]">
+                        {tag.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="shrink-0 flex items-center justify-between md:justify-end gap-4 md:border-l md:border-white/5 md:pl-6 min-w-0 md:min-w-[140px] mt-3 md:mt-0 pt-3 md:pt-0 border-t border-white/5 md:border-t-0">
+                  <div className="flex flex-col items-start md:items-end gap-1 text-[10px] text-slate-500">
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <Calendar className="w-3 h-3" />
+                      <span>{new Date(item.reg_dt).toLocaleDateString()}</span>
+                    </div>
+                    {item.file_url && (
+                      <div className="flex items-center gap-1.5 text-blue-400">
+                        <LinkIcon className="w-3 h-3" />
+                        <span>첨부됨</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button 
+                      onClick={() => {
+                        setEditingEntry(item);
+                        setFormData({ ...item, file: null });
+                        setShowAddModal(true);
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-blue-400 transition-all border border-white/5 bg-[#0f1219]"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(item.id)}
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-red-400 transition-all border border-white/5 bg-[#0f1219]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
           ))
         ) : (
           <div className="col-span-full py-20 flex flex-col items-center justify-center opacity-40">
@@ -333,42 +507,16 @@ export default function KnowledgeBasePage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 ml-1">파일 URL (Optional)</label>
-                  <input 
-                    type="text" 
-                    value={formData.file_url}
-                    onChange={(e) => setFormData({...formData, file_url: e.target.value})}
-                    placeholder="https://..."
-                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 ml-1">파일 형식</label>
-                  <select 
-                    value={formData.file_type}
-                    onChange={(e) => setFormData({...formData, file_type: e.target.value})}
-                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white appearance-none"
-                  >
-                    <option value="text">TEXT</option>
-                    <option value="image">IMAGE</option>
-                    <option value="pdf">PDF</option>
-                    <option value="pptx">PPTX/DOC</option>
-                    <option value="link">LINK</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 ml-1">관련 인시던트 ID</label>
-                  <input 
-                    type="text" 
-                    value={formData.inc_id}
-                    onChange={(e) => setFormData({...formData, inc_id: e.target.value})}
-                    placeholder="INC-..."
-                    className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
-                  />
+                <div className="space-y-1.5 flex flex-col justify-end">
+                  <label className="text-xs font-bold text-slate-400 ml-1">첨부 파일 (선택)</label>
+                  <label className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm hover:border-blue-500 transition-all text-slate-300 cursor-pointer flex items-center justify-between">
+                    <span className="truncate flex-1">{formData.file ? formData.file.name : '증적 자료 업로드 (이미지/문서)'}</span>
+                    <input 
+                      type="file" 
+                      className="hidden"
+                      onChange={(e) => setFormData({...formData, file: e.target.files[0]})}
+                    />
+                  </label>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-400 ml-1">태그 (콤마 구분)</label>
@@ -376,7 +524,7 @@ export default function KnowledgeBasePage() {
                     type="text" 
                     value={formData.tags}
                     onChange={(e) => setFormData({...formData, tags: e.target.value})}
-                    placeholder="db, manual, critical"
+                    placeholder="db, incident, manual"
                     className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
                   />
                 </div>
@@ -392,9 +540,10 @@ export default function KnowledgeBasePage() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                  disabled={isSubmitting}
+                  className={`flex-1 ${isSubmitting ? 'bg-blue-800 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'} text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]`}
                 >
-                  {editingEntry ? '수정 완료' : '등록 완료'}
+                  {isSubmitting ? '데이터를 전송하는 중...' : (editingEntry ? '수정 완료' : '등록 완료')}
                 </button>
               </div>
             </form>

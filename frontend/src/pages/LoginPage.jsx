@@ -374,8 +374,8 @@ export default function LoginPage() {
                         </div>
                         
                         <a 
-                            href="/sguard_bridge.apk" 
-                            download 
+                            href="/sguard-bridge_v1.0.apk" 
+                            download="sguard-bridge_v1.0.apk"
                             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 text-xs text-blue-400 font-medium hover:bg-blue-600/20 hover:border-blue-500/40 transition-all group shadow-lg shadow-blue-900/10"
                         >
                             <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />

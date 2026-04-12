@@ -71,7 +71,7 @@ export default function ChatPage() {
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
 
-  const isResolved = ['CLOSED', '최종완료'].includes(roomStatus);
+  const isResolved = ['CLOSED', '최종완료', '처리완료', 'Completed', '완료'].includes(roomStatus);
 
 
   // Main Chat State
@@ -991,36 +991,44 @@ export default function ChatPage() {
             <span className="text-slate-500 text-[10px]">장애 협업 채팅방 ({participants.length}명)</span>
           </div>
         </div>
-        <div className="flex items-center space-x-4 relative">
-          <button 
-            onClick={() => isResolved ? null : navigate(`/chat-summary/${incidentId}`)}
-            disabled={isResolved}
-            className={`flex items-center px-4 py-2 rounded-lg text-sm font-extrabold transition-all duration-300 ${
-              isResolved 
-                ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed opacity-60' 
-                : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.6)] hover:shadow-[0_0_25px_rgba(59,130,246,0.9)] hover:scale-105'
-            }`}
-          >
-            <Sparkles className={`w-4 h-4 mr-2 ${isResolved ? 'text-slate-600' : 'animate-pulse'}`} />
-            WAR-ROOM 분석
-          </button>
+        
+        {(() => {
+          const isAdmin = currentUser?.role && (currentUser.role.includes('관리자') || currentUser.role.toLowerCase().includes('admin'));
+          // WAR-ROOM 배정자가 아예 없거나(초기 상태), 배정자 중 본인이 포함되어 있거나, 관리자이거나
+          const isAssignedToMe = assignees.length === 0 || assignees.some(a => String(a.user_id) === String(currentUser.employee_id)) || isAdmin;
+          
+          return (
+            <div className="flex items-center space-x-4 relative">
+              <button 
+                onClick={() => isResolved || !isAssignedToMe ? null : navigate(`/chat-summary/${incidentId}`)}
+                disabled={isResolved || !isAssignedToMe}
+                title={isResolved ? "종료된 워룸입니다." : (!isAssignedToMe ? "권한 부족: 처리 중인 담당자만 분석할 수 있습니다." : "AI 엔진을 통해 이 워룸의 이슈와 타임라인을 분석합니다")}
+                className={`flex items-center px-4 py-2 rounded-lg text-sm font-extrabold transition-all duration-300 ${
+                  isResolved || !isAssignedToMe
+                    ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed opacity-60' 
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.6)] hover:shadow-[0_0_25px_rgba(59,130,246,0.9)] hover:scale-105'
+                }`}
+              >
+                <Sparkles className={`w-4 h-4 mr-2 ${(isResolved || !isAssignedToMe) ? 'text-slate-600' : 'animate-pulse'}`} />
+                WAR-ROOM 분석
+              </button>
 
-          {/* Moved Status Indicator */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span className="text-xs font-black tracking-tight text-emerald-400 uppercase">{roomStatus || 'Open'}</span>
-          </div>
-          <div className="relative">
-            <button 
-              className="p-2 rounded-full hover:bg-white/10 transition-colors relative flex items-center justify-center" 
-              onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
-              title="참여 사용자 목록"
-            >
-              <Users className="w-5 h-5 text-white" />
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold border border-[#0f1421]">
-                {participants.length}
-              </span>
-            </button>
+              {/* Moved Status Indicator */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-xs font-black tracking-tight text-emerald-400 uppercase">{roomStatus || 'Open'}</span>
+              </div>
+              <div className="relative">
+                <button 
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors relative flex items-center justify-center" 
+                  onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
+                  title="참여 사용자 목록"
+                >
+                  <Users className="w-5 h-5 text-white" />
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold border border-[#0f1421]">
+                    {participants.length}
+                  </span>
+                </button>
 
             {/* Participants Dropdown */}
             {showParticipantDropdown && (
@@ -1033,11 +1041,12 @@ export default function ChatPage() {
                   {/* Expert Team / Assignees first */}
                   {assignees.map((asgn, index) => {
                     const online = participants.some(p => p.employee_id === asgn.user_id || p.sender === asgn.name || p.name === asgn.name);
+                    const displayStatus = (isResolved && asgn.status === '처리중') ? '처리완료' : asgn.status;
                     return (
                       <div key={`asgn-${index}`} className="flex items-center space-x-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 relative group">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold border ${
-                          asgn.status === '처리완료' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 
-                          asgn.status === '미참여' ? 'bg-slate-800 text-slate-500 border-white/5 opacity-50' : 
+                          displayStatus === '처리완료' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 
+                          displayStatus === '미참여' ? 'bg-slate-800 text-slate-500 border-white/5 opacity-50' : 
                           'bg-orange-500/10 border-orange-500/20 text-orange-400'
                         }`}>
                           {asgn.name?.[0] || 'U'}
@@ -1049,19 +1058,19 @@ export default function ChatPage() {
                           <span className="text-[10px] text-slate-500 truncate text-left">{asgn.team_name || asgn.team || '신한DS'} / {asgn.part_name || asgn.role || '전문가'}</span>
                         </div>
                         <div className="shrink-0 flex items-center gap-1">
-                          {asgn.status === '처리중' && (
+                          {displayStatus === '처리중' && (
                             <div className="flex items-center gap-1 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
                               <Zap className="w-3 h-3 text-orange-400 animate-pulse" />
                               <span className="text-[9px] font-bold text-orange-400">처리중</span>
                             </div>
                           )}
-                          {asgn.status === '처리완료' && (
+                          {displayStatus === '처리완료' && (
                             <div className="flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                               <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                               <span className="text-[9px] font-bold text-emerald-500">완료</span>
                             </div>
                           )}
-                          {asgn.status === '미참여' && (
+                          {displayStatus === '미참여' && (
                             <div className="flex items-center gap-1 opacity-50 bg-slate-800 px-1.5 py-0.5 rounded border border-white/5">
                               <UserX className="w-3 h-3 text-slate-500" />
                               <span className="text-[9px] font-bold text-slate-500 italic">미참여</span>
@@ -1187,7 +1196,9 @@ export default function ChatPage() {
               </div>
             </div>
           )}
-        </div>
+            </div>
+          );
+        })()}
       </header>
 
       {/* Main Chat Area */}
