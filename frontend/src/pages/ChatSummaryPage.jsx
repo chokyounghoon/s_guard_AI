@@ -7,9 +7,16 @@ import {
   Share2, 
   Copy, 
   Check, 
+  CheckCircle,
   CheckCircle2,
-  Sparkles, 
-  Clock, 
+  RefreshCw,
+  Activity,
+  ListChecks,
+  PlusCircle,
+  TrendingUp,
+  Info,
+  Sparkles,
+  Clock,
   AlertCircle,
   Shield,
   Printer,
@@ -21,8 +28,7 @@ import {
   User,
   X,
   ChevronRight,
-  CheckCircle,
-  RefreshCw
+  Brain
 } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import html2pdf from 'html2pdf.js';
@@ -40,7 +46,7 @@ export default function ChatSummaryPage() {
   const [incidentStatus, setIncidentStatus] = useState('');
   
   const abortControllerRef = useRef(null);
-  const [loadingStatus, setLoadingStatus] = useState('인시던트 데이터 확인 중...');
+  const [loadingStatus, setLoadingStatus] = useState('Dify AI 엔진에 분석을 요청하고 있습니다...');
   const [governanceStep, setGovernanceStep] = useState(null); // null, 'knowledge', 'resolving', 'done'
 
   const [reportingLines, setReportingLines] = useState([]);
@@ -105,8 +111,16 @@ export default function ChatSummaryPage() {
                 if (data.answer) {
                   setSummary(prev => {
                     const newText = prev + data.answer;
-                    // Clean up the specific Dify optimization message if it appears
-                    return newText.replace(/🚀 고속 분석 엔진\(Dify\) 최적화 통신을 시작합니다\.\.\.\s*/g, "");
+                    
+                    // 🛡️ ENHANCED LOADING PROTECTION
+                    // Only hide the overall loader IF we have received a valid summary structure
+                    // (either section headers ### or the Timeline summary marker ⏱️)
+                    const hasValidMarker = newText.includes('###') || newText.includes('⏱️') || newText.includes('장애 대응 타임라인');
+                    
+                    if (hasValidMarker && newText.length > 20 && isLoading) {
+                      setIsLoading(false);
+                    }
+                    return newText;
                   });
                 }
                 if (data.error) {
@@ -185,6 +199,76 @@ export default function ChatSummaryPage() {
       }
     };
   }, [incidentId]);
+
+  // 🧪 Section Parser Logic
+  const parseSections = (text) => {
+    if (!text) return [];
+    
+    // 🛡️ REMOVED STRICT NOISE FILTER
+    // The new Dify workflow generates timeline summaries without ### headers but with [HH:MM:SS] markers.
+    // The previous filter mistakenly flagged this valid AI output as raw transcript and caused a blank screen.
+    const isRawTranscript = (val) => {
+      // 🛡️ RE-IMPLEMENTED NOISE FILTER
+      // Match common patterns of raw chat logs that should NEVER be rendered as a summary.
+      // E.g., "[analyst] 12345678:", "[User] Name:", "employee_id:"
+      const rawPatterns = [
+        /\[analyst\]\s*\d+:/,
+        /\[User\]\s*[^:]+:/,
+        /\[system\]/,
+        /employee_id:/,
+        /sender_name:/
+      ];
+      
+      // If it contains multiple of these patterns, it's definitely a raw transcript.
+      const matchCount = rawPatterns.filter(pattern => pattern.test(val)).length;
+      return matchCount >= 1; 
+    };
+
+    if (isRawTranscript(text)) {
+      return []; 
+    }
+
+    // ✂️ Only start data from the "⏱️ 장애 대응 타임라인 요약" marker if it exists
+    const marker = "⏱️ 장애 대응 타임라인 요약";
+    const markerIndex = text.indexOf(marker);
+    let cleanTextForParsing = text;
+    if (markerIndex !== -1) {
+      cleanTextForParsing = text.substring(markerIndex + marker.length).trim();
+    }
+
+    // Split by markdown headers like ### 1. Title or ### Title
+    const parts = cleanTextForParsing.split(/###\s*(?:\d+\.?)?\s*/).filter(p => p.trim());
+    
+    // Map of section titles to icons and colors
+    const sectionConfig = {
+      '장애 개요': { icon: Info, color: 'from-blue-600 to-blue-400' },
+      '주요 조치 사항': { icon: ListChecks, color: 'from-indigo-600 to-indigo-400' },
+      '최종 결과': { icon: CheckCircle, color: 'from-emerald-600 to-emerald-400' },
+      '향후 과제': { icon: TrendingUp, color: 'from-purple-600 to-purple-400' },
+      'Default': { icon: Zap, color: 'from-slate-600 to-slate-400' }
+    };
+
+    if (parts.length <= 1 && !cleanTextForParsing.includes('###')) {
+      // Fallback if no sections are found - ONLY show if NO LONGER LOADING to avoid showing raw transcript
+      if (isLoading) return []; 
+      
+      // Secondary check: Don't show the fallback if it still looks like raw logs
+      if (isRawTranscript(cleanTextForParsing)) return [];
+
+      return [{ title: '인시던트 상세 요약', content: cleanTextForParsing, icon: FileText, color: 'from-blue-600 to-indigo-600' }];
+    }
+
+    return parts.map(part => {
+      const lines = part.split('\n');
+      const title = lines[0].trim().replace(/^\d+\.?\s*/, '');
+      const content = lines.slice(1).join('\n').trim();
+      
+      // Try to find matching config or use default
+      const config = Object.entries(sectionConfig).find(([key]) => title.includes(key))?.[1] || sectionConfig.Default;
+      
+      return { title, content, ...config };
+    });
+  };
 
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -343,46 +427,51 @@ export default function ChatSummaryPage() {
       if (!isConfirmed) return;
     }
 
+    const savedUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+    if (!savedUser.employee_id) {
+      alert("로그인 정보가 없습니다. 다시 로그인해 주세요.");
+      return;
+    }
+
     setIsGoverning(true);
     setGovernanceStep('knowledge');
     
     const fullContent = `${summary}\n\n### [그외 처리 사항]\n${additionalNotes || '없음'}`;
 
     try {
-      // Step 1: Knowledge Base Registration (RAG Update)
-      const resGov = await fetch(getApiUrl('/ai/governance/approve'), {
+      // Step 1: Call Consolidated Submission & Distribution API
+      const response = await fetch(getApiUrl('/api/v1/reports/submit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           incident_id: incidentId,
-          title: `[KNOWLEDGE REG] ${incidentId}`,
-          content: fullContent
+          sender_id: savedUser.employee_id,
+          sender_name: savedUser.name || savedUser.employee_id,
+          title: `[인시던트 보고서] ${incidentId}: ${summary.split('\n')[0].substring(0, 50)}...`,
+          content: fullContent,
+          preview: `장애 대응 완료 보고서 (${incidentId})`
         })
       });
       
-      if (!resGov.ok) {
-        const err = await resGov.json();
-        throw new Error(err.error || '거버넌스 승인 실패');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || '보고서 제출 및 배부 실패');
       }
       
-      setGovernanceStep('resolving');
-      // Step 2: War-Room Status Resolution
-      const resRes = await fetch(getApiUrl('/warroom/resolve'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ incident_id: incidentId })
-      });
-
-      if (resRes.ok) {
-        setGovSuccess(true);
-        setGovernanceStep('done');
-        setIncidentStatus('처리완료');
-        alert("지식화 및 장애/보고 처리가 성공적으로 완료되었습니다.\n인시던트 상태가 '처리완료'로 업데이트되었습니다.");
-        // Final Step: Redirect to Dashboard
-        navigate('/dashboard');
-      } else {
-        throw new Error('장애 처리 상태 업데이트 실패');
-      }
+      setGovSuccess(true);
+      setGovernanceStep('done');
+      setIncidentStatus('처리완료');
+      
+      const supMsg = result.recipient_count > 0 
+        ? `\n\n[보고 전송 완료]: ${result.superiors.join(', ')}`
+        : "\n\n(설정된 보고 라인이 없어 전송되지 않았습니다.)";
+        
+      alert(`지식화 및 장애 처리가 성공적으로 완료되었습니다.${supMsg}\n\n인시던트 상태가 '처리완료'로 업데이트되었습니다.`);
+      
+      // Final Step: Redirect to Dashboard
+      navigate('/dashboard');
+      
     } catch (err) {
       console.error('Resolution error:', err);
       alert(`처리 중 오류가 발생했습니다: ${err.message}`);
@@ -443,7 +532,7 @@ export default function ChatSummaryPage() {
             <div className="flex flex-col items-start leading-none space-y-0.5">
               <span>
                 {isGoverning 
-                  ? (governanceStep === 'knowledge' ? '지식화(RAG) 등록 중...' : governanceStep === 'resolving' ? '인시던트 상태 업데이트 중...' : '분석 중입니다...') 
+                  ? (governanceStep === 'knowledge' ? '지식화(RAG) 등록 중...' : governanceStep === 'resolving' ? '인시던트 상태 업데이트 중...' : '분석 처리 중...') 
                   : (govSuccess || incidentStatus === '처리완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}
               </span>
             </div>
@@ -486,27 +575,26 @@ export default function ChatSummaryPage() {
             </div>
 
             {/* Metadata Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 p-6 bg-black/20 rounded-2xl border border-white/5 font-mono">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 px-8 py-6 bg-white/[0.02] border-b border-white/5 print:border-slate-200 print:bg-slate-50">
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Incident ID</div>
-                <div className="text-sm font-bold text-blue-300">{incidentId}</div>
+                <div className="text-sm font-black text-blue-400 font-mono tracking-tighter">#{incidentId}</div>
               </div>
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Summary Date</div>
-                <div className="text-sm">{new Date().toLocaleDateString('ko-KR')}</div>
+                <div className="text-sm font-bold text-white print:text-slate-900">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
               </div>
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Report Status</div>
                 <div className="flex items-center space-x-1.5">
-                  <span className={`text-sm font-bold ${isLoading ? 'text-orange-400' : 'text-emerald-400'}`}>
-                    {isLoading ? '분석중입니다' : 'Verified'}
+                  <span className={`text-sm font-bold ${isLoading ? 'text-orange-400 animate-pulse flex items-center gap-1.5' : 'text-emerald-400 flex items-center gap-1.5'}`}>
+                    {isLoading && <RefreshCw className="w-3 h-3 animate-spin" />}
+                    {isLoading ? 'AI 분석 처리중...' : 'Verified'}
                   </span>
                   {!isLoading && (
                     <button 
                       onClick={() => {
                         setSummary('');
-                        // Trigger re-fetch logic which is in useEffect but tied to incidentId
-                        // To trigger re-fetch, I can increment a refresh count
                         window.location.reload(); 
                       }}
                       className="p-1 rounded-full hover:bg-white/10 text-slate-500 hover:text-white transition-all ml-1"
@@ -521,52 +609,86 @@ export default function ChatSummaryPage() {
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Confidentiality</div>
                 <div className="flex items-center space-x-1.5">
                   <Shield className="w-3.5 h-3.5 text-amber-500/70" />
-                  <span className="text-sm text-amber-500/70 font-bold uppercase">Restricted</span>
+                  <span className="text-sm text-amber-500/70 font-bold uppercase tracking-tighter">Restricted</span>
                 </div>
               </div>
             </div>
 
             {/* Content Area */}
-            <div className="content-area min-h-[400px]">
-              {isLoading && !summary ? (
-                <div className="flex flex-col items-center justify-center py-20 space-y-6">
+            <div className="content-area min-h-[400px] p-8 md:p-12">
+              {isLoading && (
+                <div className="flex flex-col items-center justify-center py-20 space-y-8 animate-in fade-in zoom-in-95 duration-700">
                   <div className="relative">
-                    <div className="w-16 h-16 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin" />
-                    <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-blue-400 animate-pulse" />
+                    <div className="w-20 h-20 border-[6px] border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Brain className="w-8 h-8 text-indigo-400 animate-pulse" />
+                    </div>
                   </div>
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-slate-400 font-mono tracking-wide max-w-sm">
-                      {loadingStatus}
+                  <div className="text-center space-y-4">
+                    <div className="px-4 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 inline-block mb-2">
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">AI Agent Analysis in Progress</span>
+                    </div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+                      분석 중입니다...
+                    </h3>
+                    <p className="text-sm text-slate-400 font-mono tracking-wide max-w-sm mx-auto leading-relaxed">
+                      {loadingStatus || 'Dify AI 분석 엔진이 대응 내역을 정밀하게 분석하여 요약을 생성하고 있습니다.'}
                     </p>
-                    <div className="flex items-center justify-center space-x-1">
-                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" />
+                    <div className="flex items-center justify-center space-x-3 pt-4">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <div className="w-2 h-2 bg-indigo-300 rounded-full animate-bounce" />
                     </div>
                   </div>
                 </div>
-              ) : error ? (
-                <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl flex items-center space-x-4">
-                  <AlertCircle className="w-8 h-8 text-red-500" />
+              )}
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl flex items-center space-x-6 animate-in slide-in-from-top-4">
+                  <div className="p-4 bg-red-500/20 rounded-2xl">
+                    <AlertCircle className="w-8 h-8 text-red-500" />
+                  </div>
                   <div>
-                    <h4 className="text-red-400 font-bold">오류 발생</h4>
-                    <p className="text-sm text-red-300/70">{error}</p>
+                    <h4 className="text-red-400 text-lg font-black uppercase tracking-tight mb-1">오류 발생</h4>
+                    <p className="text-sm text-red-300/70 leading-relaxed">{error}</p>
+                    <button 
+                      onClick={() => window.location.reload()}
+                      className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-500/30 transition-all"
+                    >
+                      Retry Analysis
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div className="animate-in fade-in duration-1000 relative">
-                  <MarkdownViewer text={summary} />
-                  {isLoading && (
-                    <div className="flex items-center space-x-2 mt-6 text-xs text-blue-400 animate-pulse bg-blue-500/10 p-3 rounded-2xl border border-blue-500/20 inline-flex shadow-lg shadow-blue-500/10">
-                      <div className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              )}
+
+              {!isLoading && !error && summary && (
+                <div id="report-content" className="animate-in fade-in duration-1000 relative space-y-12">
+                  {parseSections(summary).map((section, idx) => (
+                    <div 
+                      key={idx} 
+                      className="group relative bg-white/[0.02] border border-white/5 rounded-3xl p-8 md:p-10 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-500 animate-in slide-in-from-bottom-5 fade-in"
+                      style={{ animationDelay: `${idx * 150}ms`, fillMode: 'both' }}
+                    >
+                      <div className="flex items-start space-x-8">
+                        <div className={`p-4 rounded-2xl bg-gradient-to-br ${section.color} shadow-xl shadow-black/20 group-hover:scale-110 transition-transform duration-500 ring-1 ring-white/10`}>
+                          <section.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1 space-y-6">
+                          <h3 className="text-xl font-black tracking-tight text-white group-hover:text-indigo-300 transition-colors uppercase">
+                            {section.title}
+                          </h3>
+                          <div className="prose prose-invert prose-sm max-w-none opacity-90 group-hover:opacity-100 transition-opacity leading-relaxed">
+                            <MarkdownViewer text={section.content} />
+                          </div>
+                        </div>
                       </div>
-                      <span className="font-black uppercase tracking-widest text-[10px]">
-                        AI {loadingStatus.includes('분석') ? '심층 분석 중' : '하이퍼 프로세싱'}: {loadingStatus}
-                      </span>
+                      
+                      {/* Subtle accent line mapping to color */}
+                      <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-gradient-to-b ${section.color} opacity-0 group-hover:opacity-100 transition-all duration-500`} />
                     </div>
-                  )}
+                  ))}
+
+
                 </div>
               )}
             </div>
@@ -696,14 +818,6 @@ export default function ChatSummaryPage() {
         </div>
       )}
 
-      {/* Floating Action Button for returning */}
-      <button 
-        onClick={() => navigate(-1)}
-        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800/80 hover:bg-slate-700 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center space-x-3 transition-all hover:scale-105 active:scale-95 shadow-2xl print:hidden"
-      >
-        <History className="w-4 h-4 text-blue-400" />
-        <span className="text-sm font-bold uppercase tracking-wider">Back to War-Room</span>
-      </button>
 
       <style dangerouslySetInnerHTML={{ __html: `
         #report-content {

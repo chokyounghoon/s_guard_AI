@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon, Shield, Server, User, Terminal, CheckCircle, Smile, Hash, Network, Megaphone, Star } from 'lucide-react';
+import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon, Shield, Server, User, Terminal, CheckCircle, CheckCircle2, Smile, Hash, Network, Megaphone, Star, UserX, Search, ChevronRight } from 'lucide-react';
 import AIChatBubble from '../components/AIChatBubble';
 import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
@@ -18,16 +18,20 @@ const agentColors = {
 const getApiUrl = (endpoint, isWs = false) => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   
-  // Decide base host
-  let baseHost = 'sguardai.khcho0421.workers.dev';
-  let protocol = isWs ? 'wss' : 'https';
-
-  if (isLocalDev && endpoint.startsWith('/ai/summarize-chat')) {
-    baseHost = '127.0.0.1:8000';
-    protocol = isWs ? 'ws' : 'http';
+  // 🚀 WebSocket connections should ALWAYS go directly to the Cloudflare Worker
+  // because the Durable Object state and real-time logic are hosted there.
+  if (isWs) {
+    const workerWsBase = 'wss://sguardai.khcho0421.workers.dev';
+    return `${workerWsBase}${endpoint}`;
   }
 
-  return `${protocol}://${baseHost}${endpoint}`;
+  // Regular API calls go to local FastAPI during development for DB-sync tasks
+  if (isLocalDev) {
+    return `http://127.0.0.1:8000${endpoint}`;
+  }
+
+  let baseHost = 'sguardai.khcho0421.workers.dev';
+  return `https://${baseHost}${endpoint}`;
 };
 
 // 한국 시간(KST) 포맷팅 헬퍼
@@ -67,7 +71,7 @@ export default function ChatPage() {
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
 
-  const isResolved = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료'].includes(roomStatus);
+  const isResolved = ['CLOSED', '최종완료'].includes(roomStatus);
 
 
   // Main Chat State
@@ -83,6 +87,7 @@ export default function ChatPage() {
     name: '이수민 매니저', 
     role: 'Manager' 
   });
+  const [assignees, setAssignees] = useState([]);
 
 
   useEffect(() => {
@@ -93,7 +98,9 @@ export default function ChatPage() {
         setCurrentUser({
           employee_id: user.employee_id || user.id || 'EMP-1234',
           name: user.name || '이수민 매니저',
-          role: user.role || 'Manager'
+          role: user.role || 'Manager',
+          org_code: user.org_code || user.team_code || user.honbu_code || null,
+          team_name: user.team_name || user.team || user.honbu || ''
         });
       } catch (e) { console.error("User parse error", e); }
     }
@@ -112,15 +119,18 @@ export default function ChatPage() {
         setRoomDescription(data.description || '');
         setRoomStatus(data.status || 'Open');
         
-        const loadedMessages = data.messages.map(msg => ({
-          id: `${msg.inc_id}_${msg.seq}`,
-          seq: msg.seq,
-          type: msg.type === 'me' || msg.sender === currentUser.name ? 'me' : 
-               (msg.type === 'system' ? 'system' : 
-               (msg.type === 'ai_analysis' ? 'ai_analysis' : 'other')),
-          sender: msg.sender,
-          role: msg.role,
-          initials: msg.sender ? msg.sender[0] : 'SY',
+        const loadedMessages = data.messages.map(msg => {
+          const displayName = msg.sender_name || msg.name || msg.sender;
+          return {
+            id: `${msg.inc_id}_${msg.seq}`,
+            seq: msg.seq,
+            type: msg.type === 'me' || msg.sender === currentUser.employee_id ? 'me' : 
+                 (msg.type === 'system' ? 'system' : 
+                 (msg.type === 'ai_analysis' ? 'ai_analysis' : 'other')),
+            sender: displayName,
+            sender_id: msg.sender,
+            role: msg.role,
+            initials: displayName ? displayName[0] : 'SY',
           color: msg.type === 'ai_analysis' ? 'bg-purple-600' : 'bg-slate-700',
           text: msg.text,
           time: formatKst(msg.timestamp),
@@ -132,8 +142,9 @@ export default function ChatPage() {
           })(),
           parent_seq: msg.parent_seq,
           is_key_event: !!msg.is_key_event,
-          icon: msg.type === 'system' ? Info : (msg.type === 'ai_analysis' ? Sparkles : null)
-        }));
+            icon: msg.type === 'system' ? Info : (msg.type === 'ai_analysis' ? Sparkles : null)
+          };
+        });
 
         setMainMessages(prev => {
           // Only update state if data actually changed to avoid unnecessary re-renders
@@ -151,13 +162,33 @@ export default function ChatPage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load chat history", err);
+      console.error("Failed to fetch chat history", err);
     } finally {
       if (!isAutoPoll) {
         setIsLoading(false);
       }
     }
-  }, [incidentId, currentUser.name]);
+  }, [incidentId, currentUser.employee_id, currentUser.name]);
+
+  const fetchWorkflowDetails = React.useCallback(async () => {
+    try {
+      const flowUrl = getApiUrl(`/ai/incident/workflow-details?inc_id=${incidentId}`);
+      const res = await fetch(flowUrl);
+      if (res.ok) {
+        const data = await res.json();
+        setAssignees(data.assignees || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch workflow details", err);
+    }
+  }, [incidentId]);
+
+  useEffect(() => {
+    fetchWorkflowDetails();
+    // Refresh workflow details every 30 seconds
+    const timer = setInterval(fetchWorkflowDetails, 30000);
+    return () => clearInterval(timer);
+  }, [fetchWorkflowDetails]);
 
   const fetchParticipants = React.useCallback(async () => {
     try {
@@ -213,8 +244,75 @@ export default function ChatPage() {
   const [pinnedMessage, setPinnedMessage] = useState(null);
   const [showPinned, setShowPinned] = useState(true);
   
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [orgTree, setOrgTree] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState(null);
+  const [inviteSearchQuery, setInviteSearchQuery] = useState('');
+  const [inviteSearchResults, setInviteSearchResults] = useState([]);
+  const [isInviting, setIsInviting] = useState(false);
+  
   const wsRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  const fetchOrgTree = async () => {
+    try {
+      const res = await fetch(getApiUrl('/org/tree'));
+      if (res.ok) {
+        const data = await res.json();
+        setOrgTree(data || []);
+      }
+    } catch (e) { console.error('Failed to fetch org tree', e); }
+  };
+
+  const searchUsers = async (q = '', orgCode = null) => {
+    try {
+      let url = getApiUrl('/users');
+      const params = new URLSearchParams();
+      if (q) params.append('q', q);
+      if (orgCode) params.append('orgCode', orgCode);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setInviteSearchResults(data || []);
+      }
+    } catch (e) { console.error('Failed to search users', e); }
+  };
+
+  const inviteUser = async (user) => {
+    setIsInviting(true);
+    try {
+      const res = await fetch(getApiUrl('/warroom/join'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          incident_id: incidentId, 
+          user_id: user.employee_id,
+          name: user.name 
+        })
+      });
+      if (res.ok) {
+        fetchParticipants();
+        fetchWorkflowDetails();
+        // Optional: show toast
+      }
+    } catch (e) { console.error('Invitation failed', e); }
+    finally { setIsInviting(false); }
+  };
+
+  useEffect(() => {
+    if (showInviteModal) {
+      fetchOrgTree();
+      // Ensure we have some results even if org_code is missing
+      if (currentUser.org_code) {
+        setSelectedOrgId(currentUser.org_code);
+        searchUsers('', currentUser.org_code);
+      } else {
+        searchUsers('', null);
+      }
+    }
+  }, [showInviteModal, currentUser.org_code]);
 
   // AI Assistant SSE streaming + typewriter
   // Post Chat Logic
@@ -286,7 +384,7 @@ export default function ChatPage() {
                   id: data.msg_id,
                   seq: data.seq,
                   type: data.sender === currentUser.employee_id || data.sender === currentUser.name ? 'me' : 'other',
-                  sender: data.sender_name || data.sender,
+                  sender: data.sender_name || data.name || data.sender,
                   role: data.role,
                   initials: (data.sender_name || data.sender)?.[0] || 'U',
                   color: 'bg-slate-700',
@@ -330,9 +428,9 @@ export default function ChatPage() {
             case 'REACTION_UPDATE':
               setMainMessages(prev => prev.map(m => (m.seq === data.seq) ? { ...m, reactions: data.reactions } : m));
               break;
-            case 'DM_NOTIFICATION':
               if (data.receiver_id === currentUser.employee_id) {
-                setNotifications(prev => [...prev, { id: Date.now(), type: 'DM', from: data.sender_name, message: data.message }]);
+                const fromName = data.sender_name || data.name || data.sender;
+                setNotifications(prev => [...prev, { id: Date.now(), type: 'DM', from: fromName, message: data.message }]);
                 if (showDMModal && dmTargetUser?.employee_id === data.sender_id) fetchDMHistory(data.sender_id);
               }
               break;
@@ -710,6 +808,33 @@ export default function ChatPage() {
     }
   };
 
+  const handleLeaveRoom = async () => {
+    if (!window.confirm('대화방을 나가시겠습니까? 참여자 목록에서 제외됩니다.')) return;
+    
+    try {
+      const res = await fetch(getApiUrl('/warroom/leave'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.employee_id,
+          inc_id: incidentId
+        })
+      });
+      
+      if (res.ok) {
+        navigate('/dashboard');
+      } else {
+        console.error("Failed to leave room");
+        // Still navigate away to not block the user, or show alert? 
+        // User just said "delete when leaving", so better satisfy the delete.
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      console.error("Leave room error:", err);
+      navigate('/dashboard');
+    }
+  };
+
   const handleResolveOnly = async () => {
     if (!window.confirm('보고서 생성 없이 장애를 즉시 완료 처리하시겠습니까? (통계에 반영됩니다)')) return;
     try {
@@ -859,9 +984,6 @@ export default function ChatPage() {
               <span className="font-bold text-lg">
                 {roomTitle || (incidentId?.startsWith('INC-') ? incidentId : `INC-${incidentId}`)}
               </span>
-              <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded border border-red-500/30 uppercase tracking-tighter">
-                CRITICAL
-              </span>
             </div>
             {roomDescription && (
               <span className="text-slate-400 text-[11px] truncate max-w-[200px]">{roomDescription}</span>
@@ -882,6 +1004,12 @@ export default function ChatPage() {
             <Sparkles className={`w-4 h-4 mr-2 ${isResolved ? 'text-slate-600' : 'animate-pulse'}`} />
             WAR-ROOM 분석
           </button>
+
+          {/* Moved Status Indicator */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-xs font-black tracking-tight text-emerald-400 uppercase">{roomStatus || 'Open'}</span>
+          </div>
           <div className="relative">
             <button 
               className="p-2 rounded-full hover:bg-white/10 transition-colors relative flex items-center justify-center" 
@@ -901,29 +1029,78 @@ export default function ChatPage() {
                   <span className="text-xs font-bold text-slate-300">현재 참여자 ({participants.length})</span>
                   <button onClick={() => setShowParticipantDropdown(false)}><X className="w-3 h-3 text-slate-500" /></button>
                 </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {participants.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-slate-500">참여자가 없습니다.</div>
-                  ) : (
-                    participants.map((person, index) => (
-                      <div key={index} className="flex items-center space-x-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                  {/* Expert Team / Assignees first */}
+                  {assignees.map((asgn, index) => {
+                    const online = participants.some(p => p.employee_id === asgn.user_id || p.sender === asgn.name || p.name === asgn.name);
+                    return (
+                      <div key={`asgn-${index}`} className="flex items-center space-x-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 relative group">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold border ${
+                          asgn.status === '처리완료' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 
+                          asgn.status === '미참여' ? 'bg-slate-800 text-slate-500 border-white/5 opacity-50' : 
+                          'bg-orange-500/10 border-orange-500/20 text-orange-400'
+                        }`}>
+                          {asgn.name?.[0] || 'U'}
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-left">
+                            <span className="text-sm font-bold text-white truncate">{asgn.name}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 truncate text-left">{asgn.team_name || asgn.team || '신한DS'} / {asgn.part_name || asgn.role || '전문가'}</span>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-1">
+                          {asgn.status === '처리중' && (
+                            <div className="flex items-center gap-1 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
+                              <Zap className="w-3 h-3 text-orange-400 animate-pulse" />
+                              <span className="text-[9px] font-bold text-orange-400">처리중</span>
+                            </div>
+                          )}
+                          {asgn.status === '처리완료' && (
+                            <div className="flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                              <span className="text-[9px] font-bold text-emerald-500">완료</span>
+                            </div>
+                          )}
+                          {asgn.status === '미참여' && (
+                            <div className="flex items-center gap-1 opacity-50 bg-slate-800 px-1.5 py-0.5 rounded border border-white/5">
+                              <UserX className="w-3 h-3 text-slate-500" />
+                              <span className="text-[9px] font-bold text-slate-500 italic">미참여</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* Pulse indicator for online status if participant exists */}
+                        {online && (
+                          <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]" />
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Other participants who are NOT in assignees */}
+                  {participants
+                    .filter(p => !assignees.some(a => a.user_id === p.employee_id || a.name === p.name || a.name === p.sender))
+                    .map((person, index) => (
+                      <div key={`other-${index}`} className="flex items-center space-x-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 opacity-80">
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xs font-bold border border-white/5">
                           {person.name?.[0] || 'U'}
                         </div>
-                        <div className="flex flex-col min-w-0">
+                        <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 text-left">
-                            <span className="text-sm font-bold text-white truncate">{person.name}</span>
-                            <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">{person.position || '담당'}</span>
+                            <span className="text-sm font-bold text-slate-200 truncate">{person.name}</span>
+                            <span className="text-[10px] bg-slate-500/10 text-slate-400 px-1.5 py-0.5 rounded border border-white/5">Guest</span>
                           </div>
-                          <span className="text-[10px] text-slate-500 truncate text-left">{person.company || '신한DS'} / {person.role || '협업자'}</span>
+                          <span className="text-[10px] text-slate-500 truncate text-left">{person.company || '신한DS'} / {person.role || '참여자'}</span>
                         </div>
                       </div>
-                    ))
+                    ))}
+
+                  {assignees.length === 0 && participants.length === 0 && (
+                    <div className="p-4 text-center text-xs text-slate-500 italic">참여 데이터가 없습니다.</div>
                   )}
                 </div>
                 <div className="p-2 bg-[#11141d] border-t border-white/5">
                   <button 
-                    onClick={() => isResolved ? null : alert('사용자 초대 대화상자가 열립니다.')}
+                    onClick={() => isResolved ? null : setShowInviteModal(true)}
                     disabled={isResolved}
                     className={`w-full py-2 rounded-lg text-[11px] font-bold transition-all shadow-lg ${
                       isResolved 
@@ -1002,7 +1179,7 @@ export default function ChatPage() {
                     <span className={`text-sm ${isResolved ? 'text-slate-500' : 'text-slate-200'}`}>초대하기 {isResolved && '(종료됨)'}</span>
                 </div>
               <div 
-                onClick={() => { if(confirm('대화방을 나가시겠습니까?')) navigate('/dashboard'); }}
+                onClick={handleLeaveRoom}
                 className="flex items-center space-x-3 p-3 hover:bg-red-500/10 cursor-pointer transition-colors"
               >
                 <LogOut className="w-4 h-4 text-red-400" />
@@ -1013,38 +1190,9 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Sidebar */}
-        <div className={`hidden lg:flex flex-col w-[380px] bg-[#0f1421] border-r border-white/5 transition-all duration-300 overflow-hidden shrink-0 ${!isLogExpanded ? 'w-0 border-none' : ''}`}>
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar relative">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-400" />
-                <span className="text-[10px] font-black text-slate-500 tracking-widest uppercase">Expert Panel</span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {participants.map((person, index) => (
-                <div key={index} className="flex items-center space-x-3 p-3 bg-white/5 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xs font-bold border border-white/5 group-hover:scale-105 transition-transform text-center">
-                    {person.name?.[0] || 'U'}
-                  </div>
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-left">
-                      <span className="text-sm font-bold text-white truncate">{person.name}</span>
-                      <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">{person.position || '담당'}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 truncate text-left">{person.company || '신한DS'} / {person.role || '협업자'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Main Chat Column */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-          
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <>
           {/* 성공 토스트 알림바 (Inside Chat Column) */}
           {resolveSuccess && (
             <div className="bg-gradient-to-r from-emerald-600/20 to-blue-600/20 border-b border-emerald-500/30 p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 shrink-0">
@@ -1064,8 +1212,10 @@ export default function ChatPage() {
             </div>
           )}
 
+
+
           {/* [S-AutoPilot Insight] Area */}
-          <div className="bg-[#0f1421]/95 border-b border-white/10 backdrop-blur-xl z-20 shadow-2xl shrink-0">
+          <div className="bg-[#0f1421]/95 border-b border-white/10 backdrop-blur-xl z-20 shadow-2xl shrink-0 max-h-[70vh] overflow-y-auto custom-scrollbar">
             <style>{`
               @keyframes sguard-twinkle {
                 0%, 100% { text-shadow: 0 0 4px rgba(59, 130, 246, 0.4); color: #fff; }
@@ -1097,34 +1247,6 @@ export default function ChatPage() {
                 
                 {isLogExpanded && (
                     <div className="mt-4 space-y-4 animate-in slide-in-from-top-4 duration-300">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1 group hover:border-blue-500/30 transition-all flex-1 text-center">
-                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">대응 전문가진</span>
-                            <div className="flex flex-wrap items-center justify-center gap-2">
-                              <User className="w-4 h-4 text-blue-400" />
-                              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                                {participants.length > 0 ? (
-                                    participants.map((p, i) => (
-                                        <span key={p.id || i} className="text-sm font-black animate-sguard-twinkle tracking-tighter">
-                                            {p.name}{i < participants.length - 1 ? ',' : ''}
-                                        </span>
-                                    ))
-                                ) : (
-                                    <span className="text-sm font-black animate-sguard-twinkle tracking-tighter">
-                                        {currentUser.name}
-                                    </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-1 text-center">
-                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider">현재 처리 상태</span>
-                            <div className="flex items-center gap-2 text-emerald-400 justify-center">
-                              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                              <span className="text-base font-black tracking-tight">{roomStatus || 'Open'}</span>
-                            </div>
-                          </div>
-                        </div>
 
                         <div className="bg-purple-900/10 border border-purple-500/30 rounded-[1.5rem] overflow-hidden shadow-xl shadow-purple-900/10">
                             <button 
@@ -1548,11 +1670,11 @@ export default function ChatPage() {
             })()}
           </div>
         ))}
-      </main>
+          </main>
     
-      <div className="px-4 pb-2 bg-[#0f1421]">
-        {/* Resolution buttons removed per user request */}
-      </div>
+          <div className="px-4 pb-2 bg-[#0f1421]">
+            {/* Resolution buttons removed per user request */}
+          </div>
 
           {/* Typing Indicator & Input Area (Now sticky/fixed at the bottom of the column) */}
           <div className="shrink-0 bg-[#0f1421] border-t border-white/5 pb-24 z-30">
@@ -1665,8 +1787,131 @@ export default function ChatPage() {
               )}
             </div>
           </div>
-        </div>
+        </>
       </div>
+
+      {/* Member Invitation Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowInviteModal(false)} />
+          <div className="bg-[#0f1421] w-full max-w-4xl rounded-[2.5rem] border border-white/10 shadow-3xl relative z-10 overflow-hidden flex flex-col h-[85vh] animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="p-8 border-b border-white/5 flex flex-col gap-6 bg-gradient-to-br from-blue-600/10 via-transparent to-purple-600/5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
+                    <UserPlus className="w-7 h-7 text-blue-500" />
+                    대응 팀원 초대하기
+                  </h2>
+                  <p className="text-sm text-slate-400 font-medium mt-1">분석 및 조치를 위해 관련 부서의 전문가를 워룸에 초대합니다.</p>
+                </div>
+                <button 
+                  onClick={() => setShowInviteModal(false)}
+                  className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/5"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative group">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                <input 
+                  type="text"
+                  placeholder="이름, 사번 또는 이메일로 검색..."
+                  value={inviteSearchQuery}
+                  onChange={(e) => {
+                    setInviteSearchQuery(e.target.value);
+                    searchUsers(e.target.value, selectedOrgId);
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white/10 transition-all text-sm font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left Column: Org Chart */}
+              <div className="w-72 border-r border-white/5 overflow-y-auto custom-scrollbar bg-[#0a0d14]/50 p-6">
+                <div className="flex items-center justify-between mb-4 px-2">
+                  <div className="flex items-center gap-2">
+                    <Network className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">조직도</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSelectedOrgId(null);
+                      searchUsers(inviteSearchQuery, null);
+                    }}
+                    className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${!selectedOrgId ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-blue-400 hover:bg-blue-600/10'}`}
+                  >
+                    전체보기
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  <OrgTreeNodes 
+                    nodes={orgTree} 
+                    onNodeClick={(node) => {
+                      setSelectedOrgId(node.code);
+                      searchUsers(inviteSearchQuery, node.code);
+                    }}
+                    selectedId={selectedOrgId}
+                  />
+                </div>
+              </div>
+
+               {/* Right Column: User List */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gradient-to-b from-transparent to-blue-900/5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {inviteSearchResults.length > 0 ? (
+                    inviteSearchResults
+                      .filter(u => !participants.some(p => p.employee_id === u.employee_id))
+                      .map(user => (
+                        <div 
+                          key={user.employee_id}
+                          className="p-5 bg-white/5 border border-white/5 rounded-3xl hover:bg-white/10 hover:border-blue-500/30 transition-all group relative overflow-hidden"
+                        >
+                          <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-900/30">
+                              {user.name?.[0] || 'U'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-base font-bold text-white truncate">{user.name}</h4>
+                              <p className="text-xs text-slate-500 font-medium truncate mt-0.5">{user.team_name || '부서정보 없음'} / {user.part_name || user.position || '직급정보 없음'}</p>
+                              <p className="text-[10px] text-blue-500/60 font-medium tracking-tighter mt-1">{user.employee_id}</p>
+                            </div>
+                            <button 
+                              disabled={isInviting}
+                              onClick={() => inviteUser(user)}
+                              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-blue-900/40"
+                            >
+                              {isInviting ? '...' : '초대'}
+                            </button>
+                          </div>
+                          <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all" />
+                        </div>
+                      ))
+                  ) : (
+                    <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                      <div className="w-16 h-16 rounded-3xl bg-white/5 flex items-center justify-center mb-4">
+                        <UserX className="w-8 h-8 text-slate-600" />
+                      </div>
+                      <h4 className="text-white font-bold">검색 결과가 없습니다</h4>
+                      <p className="text-slate-500 text-sm mt-1">이름이나 사번을 직접 입력하여 검색해 보세요.</p>
+                      <button 
+                        onClick={() => searchUsers('', null)}
+                        className="mt-6 text-blue-500 text-xs font-bold hover:underline"
+                      >
+                        전체 사용자 목록 보기
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Direct Message (Note) Modal */}
       {showDMModal && dmTargetUser && (
@@ -1728,10 +1973,93 @@ export default function ChatPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+           </div>
+         </div>
+       )}
 
     </div>
+  );
+}
+
+// Internal Orchart Node Component
+function OrgTreeNodes({ nodes, onNodeClick, selectedId, level = 0 }) {
+  const [expanded, setExpanded] = useState({});
+
+  // Helper to check if a node or its descendants match the selectedId
+  const containsSelected = useCallback((node, targetId) => {
+    if (node.code === targetId) return true;
+    if (node.children) {
+      return node.children.some(child => containsSelected(child, targetId));
+    }
+    return false;
+  }, []);
+
+  // Auto-expand parents of selected node
+  useEffect(() => {
+    if (selectedId && nodes) {
+      const newExpanded = { ...expanded };
+      let changed = false;
+      
+      nodes.forEach(node => {
+        if (node.children && node.children.length > 0) {
+          const hasSelectedChild = node.children.some(child => containsSelected(child, selectedId));
+          if (hasSelectedChild && !expanded[node.code]) {
+            newExpanded[node.code] = true;
+            changed = true;
+          }
+        }
+      });
+      
+      if (changed) setExpanded(newExpanded);
+    }
+  }, [selectedId, nodes, containsSelected]);
+
+  const toggleExpand = (code, e) => {
+    e.stopPropagation();
+    setExpanded(prev => ({ ...prev, [code]: !prev[code] }));
+  };
+
+  if (!nodes || nodes.length === 0) return null;
+
+  return (
+    <ul className={`space-y-1 ${level > 0 ? 'ml-4 border-l border-white/5 pl-2' : ''}`}>
+      {nodes.map(node => (
+        <li key={node.code}>
+          <div 
+            onClick={() => onNodeClick(node)}
+            className={`flex items-center gap-2 p-2 rounded-xl transition-all cursor-pointer group ${
+              selectedId === node.code ? 'bg-blue-600/20 text-blue-400' : 'hover:bg-white/5 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {node.children && node.children.length > 0 ? (
+              <button 
+                onClick={(e) => toggleExpand(node.code, e)}
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                {expanded[node.code] ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            ) : (
+              <div className="w-4 ml-2" />
+            )}
+            <span className={`text-[13px] truncate ${selectedId === node.code ? 'font-black' : 'font-medium'}`}>
+              {node.name}
+            </span>
+            {selectedId === node.code && <div className="w-2 h-2 rounded-full bg-blue-500 ml-auto shadow-lg shadow-blue-500/50" />}
+          </div>
+          {expanded[node.code] && node.children && (
+            <OrgTreeNodes 
+              nodes={node.children} 
+              onNodeClick={onNodeClick} 
+              selectedId={selectedId} 
+              level={level + 1} 
+            />
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -33,6 +33,35 @@ app.get('/debug/db-init', async (c) => {
     }
   }
   
+  // Add inbox_items table check
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS inbox_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        sender_id TEXT,
+        sender_name TEXT,
+        title TEXT NOT NULL,
+        content TEXT,
+        preview TEXT,
+        is_read INTEGER DEFAULT 0,
+        urgency TEXT DEFAULT 'NORMAL',
+        inc_id TEXT,
+        action_link TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        reg_id TEXT DEFAULT 'SYSTEM',
+        reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        mod_id TEXT DEFAULT 'SYSTEM',
+        mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(employee_id)
+      )
+    `).run();
+    results.push({ table: 'inbox_items', status: 'Created or verified' });
+  } catch (e) {
+    results.push({ table: 'inbox_items', status: 'Error', error: e.message });
+  }
+
   return c.json({ 
     message: 'Database structure check complete', 
     results,
@@ -53,6 +82,22 @@ const generateIncId = () => {
   const ss = String(kst.getSeconds()).padStart(2, '0');
   const random = Math.floor(100 + Math.random() * 900); // 3 digits
   return `${yyyy}${mm}${dd}${hh}${mi}${ss}${random}`;
+}
+
+// Utility to clean message for consistent similarity search (strip headers/timestamps)
+const cleanMessageForEmbedding = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/\[Web발신\]/g, '')
+    .replace(/\[Web\]/g, '')
+    .replace(/\[광고\]/g, '')
+    // Remove Date/Time patterns: MM/DD HH:mm(:ss), YYYY-MM-DD, etc.
+    .replace(/\b\d{1,2}\/\d{1,2}\s\d{1,2}:\d{1,2}(?::\d{1,2})?\b/g, '')
+    .replace(/\b\d{4}-\d{2}-\d{2}(\s\d{1,2}:\d{1,2}(?::\d{1,2})?)?\b/g, '')
+    .replace(/\b\d{2}:\d{2}(?::\d{2})?\b/g, '')
+    // Remove extra whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Utility for AI Embeddings
@@ -84,7 +129,7 @@ const generateEmbedding = async (text, env) => {
 const performBackgroundAiAnalysis = async (sms_id, env) => {
   const db = env.DB;
   const kv = env.SMS_STORAGE;
-  const api_key = env.DIFY_API_KEY_ASSISTANT || "app-ZDaVB8EWtA5vmTYJLmbysdQq";
+  const api_key = env.DIFY_API_KEY_SUMMARIZER || env.DIFY_API_KEY || "app-owwPp3j2qAvVDZpW2UUiY8L3";
   const api_base = env.DIFY_API_BASE || 'https://api.dify.ai/v1';
 
   try {
@@ -120,20 +165,26 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
 - 에러메시지: ${sms.error_message || 'N/A'}
 - 발생건수: ${sms.occurrence_count || '1'}
 - 발생서버/노드: ${sms.occurrence_node || 'N/A'}
-- 실제발생시각: ${sms.occurrence_time || 'N/A'}
+- 실제발생시각(문자 내 시간): ${sms.occurrence_time || 'N/A'}
+- 시스템 장애 접수 시각: ${sms.timestamp}
 `;
 
     const prompt = `당신은 S-GUARD 시스템의 핵심 오케스트레이터이자 지능형 관제 엔진입니다. 사용자가 입력하는 SMS 장애 메시지를 분석하여 실시간 인사이트 제공 및 전문가 에이전트들과 협업하여 최적의 조치 가이드를 도출합니다.
 
 🛠️ 핵심 관리 영역
 - S-Autopilot Insight: 수신 문자 분석, 자원 배분
-- AI War-Room Log: 워룸 기록
+- AI War-Room Log: 워룸 기록 (최초 접수 시각 포함)
 
-👥 전문가 에이전트
-- Security/DB/DevOps/Leader Agent: 각 영역별 진단
+👥 전문가 에이전트 그룹 (반드시 아래 4개 에이전트의 의견을 모두 포함할 것)
+- Security Agent: 보안 관점의 위협 및 접근 제어 진단
+- DB Agent: 데이터베이스, 배치 처리, 데이터 무결성 진단
+- DevOps Agent: 인프라, 자원(CPU/MEM), 배포 및 서비스 상태 진단
+- Leader Agent: 각 에이전트 의견 종합 및 최종 복구 전략 수립
 
-응답은 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 세 개 섹션으로 구성해 주세요.
-"⚠️ 중요: 전문가의 의견은 핵심만 2~3줄 이내로 간결하게 작성해."
+응답 형식 지침:
+1. [S-Autopilot Insight] 섹션은 핵심 요약을 제공하세요.
+2. [전문가별 심층 진단] 섹션에서는 각 에이전트별로 '### [Agent Name] Agent:' 헤더를 사용하여 독립된 의견을 작성하세요. (4명 모두 필수 포함)
+3. "⚠️ 중요: 전문가의 의견은 핵심만 2~3줄 이내로 간결하게 작성해. 또한 [AI War-Room Log] 섹션의 최초 타임라인 엔트리는 반드시 '시스템 장애 접수 시각'([YYYY-MM-DD HH:mm KST] 형식)을 기준으로 작성해 주세요."
 
 [장애 로그]
 발신자: ${sms.sender || 'Unknown'}
@@ -148,7 +199,8 @@ ${detailedInfo}`;
 
     if (env.WARROOM_INDEX && sms.message) {
       try {
-        const vector = await generateEmbedding(sms.message, env);
+        const cleanedMessage = cleanMessageForEmbedding(sms.message);
+        const vector = await generateEmbedding(cleanedMessage, env);
         if (vector) {
           const simResults = await env.WARROOM_INDEX.query(vector, { topK: 1 });
           if (simResults.matches && simResults.matches.length > 0) {
@@ -465,6 +517,10 @@ app.get('/users', async (c) => {
   if (orgCode) {
     query += " AND (u.company = ? OR u.honbu = ? OR u.team = ? OR u.part = ? OR u.subpart = ?)";
     params.push(orgCode, orgCode, orgCode, orgCode, orgCode);
+  } else if (c.req.query('q')) {
+    const q = `%${c.req.query('q')}%`;
+    query += " AND (u.name LIKE ? OR u.employee_id LIKE ? OR u.email LIKE ?)";
+    params.push(q, q, q);
   } else {
     if (company) { query += " AND u.company = ?"; params.push(company); }
     if (honbu) { query += " AND u.honbu = ?"; params.push(honbu); }
@@ -906,7 +962,7 @@ app.post('/sms/receive', async (c) => {
   // Eager Loading: Trigger background AI immediately for new insert
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
-  return c.json({ status: detected ? 'keyword_detected' : 'received', inc_id: newIncId })
+  return c.json({ status: detectedCount > 0 ? 'keyword_detected' : 'received', inc_id: newIncId })
 })
 
 // ==========================================
@@ -976,7 +1032,12 @@ app.get('/sms/recent', async (c) => {
   // JOIN with users to get proper name/team in the list
   const { results } = await db.prepare(`
     SELECT r.*, u.name, u.role, u.team, u.part,
-           (SELECT COUNT(1) FROM autopilot_insight ai WHERE TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed
+           (SELECT COUNT(1) FROM autopilot_insight ai WHERE TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed,
+           COALESCE(
+             (SELECT '처리완료' FROM warroom_list wl WHERE TRIM(REPLACE(wl.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) AND (wl.status = 'CLOSED' OR wl.status = '최종완료') LIMIT 1),
+             (SELECT status FROM incident_assignments ia WHERE TRIM(REPLACE(ia.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) ORDER BY updated_at DESC LIMIT 1),
+             '미처리'
+           ) as incident_status
     FROM received_messages r
     LEFT JOIN users u ON r.employee_id = u.employee_id
     ORDER BY r.timestamp DESC 
@@ -1006,6 +1067,7 @@ app.get('/sms/recent', async (c) => {
     occurrence_node: r.occurrence_node,
     error_message: r.error_message,
     occurrence_time: r.occurrence_time,
+    incident_status: r.incident_status || '미확인',
     receivers: [
       r.receiver_1, r.receiver_2, r.receiver_3, r.receiver_4, r.receiver_5,
       r.receiver_6, r.receiver_7, r.receiver_8, r.receiver_9, r.receiver_10,
@@ -1782,7 +1844,7 @@ app.post('/ai/chat', async (c) => {
 app.post('/ai/analyze-sms', async (c) => {
   const { sender, message, sms_id } = await c.req.json()
   const db = c.env.DB
-  const api_key = c.env.DIFY_API_KEY_DASHBOARD || c.env.DIFY_API_KEY
+  const api_key = c.env.DIFY_API_KEY_SUMMARIZER || c.env.DIFY_API_KEY || "app-owwPp3j2qAvVDZpW2UUiY8L3"
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!api_key) return c.json({ error: "DIFY_API_KEY_AGENT가 설정되지 않았습니다." }, 500)
@@ -1802,7 +1864,8 @@ app.post('/ai/analyze-sms', async (c) => {
 - 에러메시지: ${sms.error_message || 'N/A'}
 - 발생건수: ${sms.occurrence_count || '1'}
 - 발생서버/노드: ${sms.occurrence_node || 'N/A'}
-- 실제발생시각: ${sms.occurrence_time || 'N/A'}
+- 실제발생시각(문자 내 시간): ${sms.occurrence_time || 'N/A'}
+- 시스템 장애 접수 시각: ${sms.timestamp}
 `
     }
   }
@@ -1821,7 +1884,7 @@ app.post('/ai/analyze-sms', async (c) => {
 
 응답은 반드시 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 세 개 섹션으로 구성해 주세요.
 
-"⚠️ 중요: 응답 시간이 지연되지 않도록, 각 전문가의 의견은 핵심만 2~3줄 이내로 아주 짧고 간결하게 작성해."
+"⚠️ 중요: 응답 시간이 지연되지 않도록, 각 전문가의 의견은 핵심만 2~3줄 이내로 아주 짧고 간결하게 작성해. 또한 [AI War-Room Log] 섹션의 최초 타임라인 엔트리는 반드시 '시스템 장애 접수 시각'([YYYY-MM-DD HH:mm KST] 형식)을 기준으로 작성해 주세요."
 
 [장애 로그]
 발신자: ${sender}
@@ -1891,7 +1954,8 @@ ${detailedInfo}`
 
       if (c.env.WARROOM_INDEX && message) {
         try {
-          const vector = await generateEmbedding(message, c.env);
+          const cleanedMessage = cleanMessageForEmbedding(message);
+          const vector = await generateEmbedding(cleanedMessage, c.env);
           if (vector) {
             const simResults = await c.env.WARROOM_INDEX.query(vector, { topK: 1 });
             if (simResults.matches && simResults.matches.length > 0) {
@@ -2442,10 +2506,19 @@ app.post('/ai/summarize-chat', async (c) => {
 
   ;(async () => {
     try {
-      // 1. Check D1 Cache first
-      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first()
-      if (cached && cached.summary) {
-        console.log(`[Cache Hit] Serving cached summary for ${incident_id}`);
+      // 1. Check D1 Cache & Incident Status
+      const incident = await db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(incident_id).first();
+      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first();
+      
+      const isRaw = (val) => {
+        if (!val) return false;
+        const rawPatterns = [/\[analyst\]\s*\d+:/, /\[User\]\s*[^:]+:/, /employee_id:/];
+        return rawPatterns.some(p => p.test(val));
+      };
+
+      // Only serve cache if incident is finalized AND it's not a corrupt raw transcript.
+      if (cached && cached.summary && isFinal && !isRaw(cached.summary)) {
+        console.log(`[Cache Hit] Serving cached summary for finalized incident ${incident_id}`);
         await writer.write(encode(`data: ${JSON.stringify({ status: '분석 이력이 존재합니다. 리포트를 불러오고 있습니다...' })}\n\n`));
         const chars = Array.from(cached.summary);
         for (let i = 0; i < chars.length; i += 50) {
@@ -2454,6 +2527,12 @@ app.post('/ai/summarize-chat', async (c) => {
         await writer.write(encode('data: [DONE]\n\n'));
         return;
       }
+
+      if (cached && cached.summary && !isFinal) {
+        console.log(`[Re-Analysis] Incident ${incident_id} is still active. Bypassing cache to update summary...`);
+        await writer.write(encode(`data: ${JSON.stringify({ status: '새로운 대화 내용을 반영하여 리포트를 최신화하고 있습니다...' })}\n\n`));
+      }
+
 
       // 2. Concurrency Lock check (KV)
       const lockKey = `lock:summarize-chat:${incident_id}`;
@@ -2493,7 +2572,16 @@ app.post('/ai/summarize-chat', async (c) => {
         if (msg.text) transcript.push(`[${msg.role}] ${msg.sender}: ${msg.text}`)
       }
 
-      const prompt = `다음은 인시던트(${incident_id})에 대한 War-Room 채팅 내역입니다. 이 내용을 바탕으로 장애 대응 과정과 결과를 요약해줘.\n\n[채팅 내역]\n${transcript.join('\n')}\n\n[요약 요구사항]\n1. 장애 개요: 어떤 장애가 발생했는지 요약\n2. 주요 조치 사항: 타임라인별 주요 대응 내용\n3. 최종 결과: 현재 상태 및 조치 결과\n4. 향후 과제: 재발 방지를 위해 필요한 사항 (있을 경우)`
+      const prompt = `인시던트(${incident_id}) 대응 요약 리포트를 작성해줘. 
+채팅 내역을 정밀하게 분석하여 아래 4개의 섹션 헤더(###)를 반드시 포함하고 내용을 충실히 작성할 것:
+
+### 1. 장애 개요
+### 2. 주요 조치 사항
+### 3. 최종 결과
+### 4. 향후 과제
+
+[채팅 내역]
+${transcript.join('\n')}`
 
       await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
 
@@ -2536,27 +2624,50 @@ app.post('/ai/summarize-chat', async (c) => {
           
           try {
             const data = JSON.parse(dataStr)
+            
+            // 🚀 Support Both Chat Apps and Workflow Apps
             if (data.event === 'message' || data.event === 'agent_message') {
+              // Standard Chat App events
               if (firstChunk) {
                 await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 심층 분석 결과 수신 중...' })}\n\n`));
                 firstChunk = false;
               }
-              fullContent += data.answer;
+              fullContent += (data.answer || "");
               await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
             } else if (data.event === 'text_chunk') {
+              // Streaming LLM node in Workflow
               if (firstChunk) {
                 await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 결과 수신 중...' })}\n\n`));
                 firstChunk = false;
               }
-              fullContent += data.data.text;
-              await writer.write(encode(`data: ${JSON.stringify({ answer: data.data.text })}\n\n`))
+              const chunk = data.data?.text || "";
+              fullContent += chunk;
+              await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`))
+            } else if (data.event === 'workflow_finished' || data.event === 'node_finished') {
+              // Final Workflow Output or Node Output
+              const outputs = data.data?.outputs;
+              if (outputs) {
+                // Try to find the primary text output (result, text, output, etc.)
+                const workflowResult = outputs.text || outputs.result || outputs.output || 
+                                     (Object.values(outputs).find(v => typeof v === 'string') || "");
+                
+                // If we haven't received anything through text_chunks, or if this is the final summary
+                if (workflowResult && (!fullContent || !fullContent.includes(workflowResult.substring(0, 10)))) {
+                  if (firstChunk) {
+                    await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 데이터 정리 중...' })}\n\n`));
+                    firstChunk = false;
+                  }
+                  fullContent += workflowResult;
+                  await writer.write(encode(`data: ${JSON.stringify({ answer: workflowResult })}\n\n`))
+                }
+              }
             }
           } catch (e) { continue }
         }
       }
       
-      // Auto-save summary to DB
-      if (fullContent) {
+      // Auto-save summary to DB (only if it's a valid summary, not a raw transcript leak)
+      if (fullContent && !isRaw(fullContent)) {
         await db.prepare(`
           INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
           VALUES (?, ?, 'dify-workflow', CURRENT_TIMESTAMP)
@@ -2722,7 +2833,8 @@ app.get('/warroom/ai-search', async (c) => {
   if (!query) return c.json({ results: [] });
   
   try {
-    const queryVector = await generateEmbedding(query, c.env);
+    const cleanedQuery = cleanMessageForEmbedding(query);
+    const queryVector = await generateEmbedding(cleanedQuery, c.env);
     if (!queryVector) return c.json({ error: "Failed to generate embedding" }, 500);
 
     const index = c.env.WARROOM_INDEX;
@@ -2975,9 +3087,14 @@ app.get('/warroom/participants/:id', async (c) => {
   const db = c.env.DB
   const normId = String(id).replace('INC-', '')
   const { results } = await db.prepare(`
-    SELECT u.name, u.employee_id, u.role, u.company, u.position
+    SELECT 
+      u.name, u.employee_id, u.role, u.company, u.position,
+      COALESCE(ot.name, u.team) as team_name,
+      COALESCE(op.name, u.part) as part_name
     FROM user_warrooms uw
     JOIN users u ON (uw.user_id = u.employee_id OR uw.user_id = CAST(u.id AS TEXT))
+    LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+    LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
     WHERE uw.inc_id = ? OR uw.inc_id = ?
   `).bind(normId, id).all()
   return c.json({ participants: results || [] })
@@ -2995,6 +3112,14 @@ app.post('/warroom/join', async (c) => {
   const now = getKst()
   await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
     .bind(user_id, normId, now).run()
+
+  // 🚀 Sync to incident_assignments so they appear in both lists
+  await db.prepare(`
+    INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
+    VALUES (?, ?, '처리중', ?, ?, ?, ?)
+    ON CONFLICT(user_id, inc_id) 
+    DO UPDATE SET status = '처리중', updated_at = excluded.updated_at, mod_id = excluded.mod_id
+  `).bind(user_id, normId, now, now, user_id, user_id).run();
     
   return c.json({ status: 'joined' })
 })
@@ -3214,7 +3339,8 @@ app.post('/retrieval', async (c) => {
       return c.json({ records: [] });
     }
 
-    const vector = await generateEmbedding(query, c.env);
+    const cleanedQuery = cleanMessageForEmbedding(query);
+    const vector = await generateEmbedding(cleanedQuery, c.env);
     if (!vector) return c.json({ records: [] });
 
     const simResults = await vectorIndex.query(vector, { topK: top_k, returnMetadata: true });
@@ -3300,7 +3426,8 @@ app.post('/upsert', async (c) => {
     const vectorIndex = c.env.WARROOM_INDEX;
 
     // 1. Generate Embedding
-    const vector = await generateEmbedding(text, c.env);
+    const cleanedText = cleanMessageForEmbedding(text);
+    const vector = await generateEmbedding(cleanedText, c.env);
     if (!vector) throw new Error("Failed to generate embedding");
 
     // 2. Save to D1
@@ -3398,8 +3525,8 @@ app.post('/warroom/resolve-only', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
     .bind(user_id, now, normId).run();
   
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE (inc_id = ? OR inc_id = ?) AND user_id = ?")
-    .bind(now, now, user_id, normId, `INC-${normId}`, user_id).run();
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+    .bind(now, now, user_id, normId, `INC-${normId}`).run();
 
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '장애 완료', '보고서 없이 장애가 처리 완료되었습니다.', ?)")
     .bind(normId, normId, user_id, now).run();
@@ -3415,6 +3542,10 @@ app.post('/ai/warroom/close', async (c) => {
   const normId = String(inc_id).replace('INC-', '');
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
     .bind(now, normId).run()
+    
+  // Cascading update for all participants
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+    .bind(now, now, user_id || 'SYSTEM', normId, `INC-${normId}`).run();
     
   // Log termination
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '워룸 종료', '워룸이 종료되고 인시던트 처리가 완료되었습니다.', ?)")
@@ -3601,9 +3732,13 @@ app.get('/ai/incident/workflow-details', async (c) => {
         ia.status, 
         ia.assigned_at, 
         u.name,
+        COALESCE(ot.name, u.team) as team_name,
+        COALESCE(op.name, u.part) as part_name,
         (SELECT COUNT(*) FROM warroom_chats wc WHERE (wc.inc_id = ? OR wc.inc_id = ?) AND wc.sender = ia.user_id) as chat_count
       FROM incident_assignments ia
       LEFT JOIN users u ON ia.user_id = u.employee_id
+      LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+      LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
       WHERE ia.inc_id = ? OR ia.inc_id = ?
     `).bind(rawId, fullId, rawId, fullId).all();
 
@@ -3711,7 +3846,8 @@ app.get('/ai/knowledge/search', async (c) => {
   if (!query) return c.json({ results: [] })
   
   const db = c.env.DB
-  const queryVector = await generateEmbedding(query, c.env)
+  const cleanedQuery = cleanMessageForEmbedding(query);
+  const queryVector = await generateEmbedding(cleanedQuery, c.env)
   if (!queryVector) return c.json({ error: "Failed to generate query embedding" }, 500)
   
   // Since D1 native vector distance might not be available, we use a custom SQL logic or simple storage retrieval
@@ -3892,6 +4028,7 @@ app.get('/warroom/chat/:id', async (c) => {
     seq: r.seq,
     type: r.type || 'user',
     sender: r.sender,
+    sender_name: r.sender_name || r.sender,
     role: r.role,
     text: r.text,
     timestamp: r.timestamp,
@@ -4106,7 +4243,19 @@ app.post('/ai/send-report-email', async (c) => {
     return c.json({ error: `MailChannels Failed: ${errorText}` }, 500);
   }
 
-  return c.json({ success: true, message: 'PDF report sent to team leader successfully' });
+  // 3. Finalize Incident Status (Cascading)
+  const db = c.env.DB;
+  const normId = String(incident_id).replace('INC-', '');
+  await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
+    .bind(now, normId).run();
+    
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+    .bind(now, now, 'SYSTEM', normId, `INC-${normId}`).run();
+
+  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, 'SYSTEM', '인시던트 종료', '분석 보고서가 최종 전송되어 장애가 처리 완료되었습니다.', ?)")
+    .bind(normId, normId, now).run();
+
+  return c.json({ success: true, message: 'PDF report sent and incident finalized successfully' });
 });
 
 // Register Report to Knowledge Base (with Vectorization)
@@ -4305,6 +4454,38 @@ app.post('/ai/governance/approve', async (c) => {
     await db.prepare("UPDATE warroom_list SET status = '최종완료', mod_dt = ? WHERE inc_id = ? OR inc_id = ?")
       .bind(now, normId, `INC-${normId}`).run();
 
+    // 8. Auto-notify assigned users in their inbox
+    try {
+      const assignedUsers = await db.prepare("SELECT user_id FROM incident_assignments WHERE inc_id = ? OR inc_id = ?")
+        .bind(normId, `INC-${normId}`).all();
+      
+      if (assignedUsers.results && assignedUsers.results.length > 0) {
+        const inboxStmt = db.prepare(`
+          INSERT INTO inbox_items (
+            user_id, type, title, content, preview, urgency, 
+            inc_id, action_link, sender_name, created_at, 
+            reg_id, reg_dt, mod_id, mod_dt
+          ) VALUES (?, 'REPORT', ?, ?, ?, 'NORMAL', ?, ?, 'System', ?, 'SYSTEM', ?, 'SYSTEM', ?)
+        `);
+        
+        const inboxPromises = assignedUsers.results.map(u => 
+          inboxStmt.bind(
+            u.user_id,
+            `보고서 발행: ${incident_id}`,
+            `인시던트(${incident_id})에 대한 최종 분석 보고서가 승인 및 발행되었습니다.`,
+            `최종 보고서가 지식 베이스에 등록되었습니다.`,
+            incident_id,
+            `/ai-report/${incident_id}`,
+            now, now, now
+          ).run()
+        );
+        await Promise.all(inboxPromises);
+        console.log(`[Inbox] Notified ${assignedUsers.results.length} users about report ${incident_id}`);
+      }
+    } catch (e) {
+      console.error("[Inbox] Auto-notify error:", e);
+    }
+
     return c.json({ 
       success: true, 
       message: '거버넌스 최종 승인 및 RAG 데이터베이스 업데이트가 완료되었습니다.',
@@ -4471,6 +4652,151 @@ app.get('/warroom/dm/:user_id', async (c) => {
   `).bind(user_id, user_id, user_id).all()
   
   return c.json(results || [])
+})
+
+// ── Inbox Management ───────────────────────────────────────────────────────
+app.get('/inbox', async (c) => {
+  const db = c.env.DB
+  const user_id = c.req.query('user_id')
+  const folder = c.req.query('folder') || 'INBOX'
+  
+  if (!user_id) return c.json({ error: 'user_id is required' }, 400)
+
+  let query = "SELECT * FROM inbox_items WHERE user_id = ?"
+  const params = [user_id]
+  
+  if (folder) {
+    query += " AND folder = ?"
+    params.push(folder)
+  }
+  
+  query += " ORDER BY created_at DESC"
+
+  const { results } = await db.prepare(query).bind(...params).all()
+  return c.json(results || [])
+})
+
+// Unified Report Submission & Distribution
+app.post('/api/v1/reports/submit', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json()
+  const { 
+    incident_id, sender_id, sender_name,
+    title, content, preview, urgency = 'NORMAL'
+  } = body
+
+  if (!incident_id || !sender_id) return c.json({ error: 'incident_id and sender_id are required' }, 400)
+
+  try {
+    const now = getKst()
+    
+    // 1. Update Incident Status to '처리완료'
+    await db.prepare(`
+      UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ?
+    `).bind(now, incident_id).run()
+    
+    // 2. Register Knowledge Base
+    await db.prepare(`
+      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt, mod_dt)
+      VALUES (?, ?, ?, 'REPORT', ?, ?)
+      ON CONFLICT(inc_id) DO UPDATE SET 
+        content = excluded.content,
+        mod_dt = excluded.mod_dt
+    `).bind(incident_id, title, content, now, now).run()
+
+    // 3. Find Reporting Lines (Superiors)
+    const { results: superiors } = await db.prepare(
+      "SELECT user_id, user_name FROM report_lines WHERE owner_id = ? ORDER BY hierarchy_level ASC"
+    ).bind(sender_id).all()
+
+    // 4. Distribute to Superiors (INBOX)
+    for (const sup of superiors) {
+      await db.prepare(`
+        INSERT INTO inbox_items (
+          user_id, type, sender_id, sender_name, 
+          title, content, preview, urgency, 
+          inc_id, folder, created_at, reg_dt
+        ) VALUES (?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'INBOX', ?, ?)
+      `).bind(
+        sup.user_id, sender_id, sender_name, 
+        title, content, preview || content.substring(0, 100), urgency,
+        incident_id, now, now
+      ).run()
+    }
+
+    // 5. Save copy to Sender's SENT folder
+    await db.prepare(`
+      INSERT INTO inbox_items (
+        user_id, type, sender_id, sender_name, 
+        title, content, preview, urgency, 
+        inc_id, folder, created_at, reg_dt
+      ) VALUES (?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'SENT', ?, ?)
+    `).bind(
+      sender_id, sender_id, sender_name, 
+      title, content, preview || content.substring(0, 100), urgency,
+      incident_id, now, now
+    ).run()
+
+    return c.json({ 
+      success: true, 
+      recipient_count: superiors.length,
+      superiors: superiors.map(s => s.user_name)
+    })
+  } catch (err) {
+    console.error('Report submission failed:', err)
+    return c.json({ error: err.message }, 500)
+  }
+})
+
+app.post('/inbox', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json()
+  const { 
+    user_id, type, sender_id, sender_name, 
+    title, content, preview, urgency, 
+    inc_id, action_link, folder = 'INBOX'
+  } = body
+  const now = getKst()
+
+  if (!user_id || !type || !title) {
+    return c.json({ error: 'user_id, type, and title are required' }, 400)
+  }
+
+  const result = await db.prepare(`
+    INSERT INTO inbox_items (
+      user_id, type, sender_id, sender_name, 
+      title, content, preview, urgency, 
+      inc_id, action_link, created_at, 
+      reg_id, reg_dt, mod_id, mod_dt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    user_id, type, sender_id || null, sender_name || 'System',
+    title, content || null, preview || null, urgency || 'NORMAL',
+    inc_id || null, action_link || null, now,
+    'SYSTEM', now, 'SYSTEM', now
+  ).run()
+
+  return c.json({ status: 'success', id: result.meta.last_row_id })
+})
+
+app.patch('/inbox/:id/read', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const now = getKst()
+
+  await db.prepare("UPDATE inbox_items SET is_read = 1, mod_dt = ? WHERE id = ?")
+    .bind(now, id).run()
+    
+  return c.json({ status: 'success' })
+})
+
+app.delete('/inbox/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+
+  await db.prepare("DELETE FROM inbox_items WHERE id = ?").bind(id).run()
+  
+  return c.json({ status: 'success' })
 })
 
 // ── WebSocket & Durable Objects for Real-time Chat ───────────────────────────

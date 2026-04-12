@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Terminal, Brain, MessageSquare } from 'lucide-react';
+import { Copy, Check, Terminal, Brain, MessageSquare, AlertTriangle, CheckCircle2, Clock, Zap } from 'lucide-react';
 
 const CodeBlock = ({ children, className }) => {
   const [copied, setCopied] = useState(false);
@@ -38,6 +38,12 @@ const CodeBlock = ({ children, className }) => {
 const MarkdownViewer = ({ text }) => {
   if (!text) return null;
 
+  // 📝 Pre-process text to ensure Callout Sections are separated by newlines
+  // This ensures that even if Dify sends them in one paragraph, they are rendered as distinct blocks.
+  const processedText = text
+    .replace(/([^\n])\n?(💡 핵심 원인|Root Cause:)/g, '$1\n\n$2')
+    .replace(/([^\n])\n?(✅ 최종 조치 결과|Resolution:)/g, '$1\n\n$2');
+
   return (
     <div className="prose prose-invert max-w-none">
       <ReactMarkdown
@@ -65,18 +71,88 @@ const MarkdownViewer = ({ text }) => {
           },
           p: ({ children }) => {
             // Check if children contain any block-level components to avoid invalid nesting
-            const hasBlockElement = React.Children.toArray(children).some(child => {
+            const childrenArray = React.Children.toArray(children);
+            const hasBlockElement = childrenArray.some(child => {
               if (React.isValidElement(child)) {
-                // If it's a code block (rendered as CodeBlock) or has display: block traits
                 return typeof child.type !== 'string' || ['div', 'pre', 'table', 'blockquote', 'h1', 'h2', 'h3'].includes(child.type);
               }
               return false;
             });
 
-            if (hasBlockElement) {
-              return <div className="mb-4 text-gray-200 leading-relaxed text-sm antialiased">{children}</div>;
+            const contentStr = childrenArray.map(child => {
+              if (typeof child === 'string') return child;
+              if (React.isValidElement(child) && typeof child.props.children === 'string') return child.props.children;
+              return '';
+            }).join('');
+
+            // 💡 핵심 원인 (Root Cause) 특수 스타일 적용
+            if (contentStr.includes('💡 핵심 원인') || contentStr.includes('Root Cause:')) {
+              return (
+                <div className="my-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 shadow-xl shadow-amber-900/10 border-l-4 border-l-amber-500 animate-in fade-in slide-in-from-left-2 duration-500">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="bg-amber-500/20 p-1.5 rounded-lg">
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Root Cause Analysis</span>
+                  </div>
+                  <div className="text-amber-100/90 font-bold leading-relaxed text-[13px]">
+                    {children}
+                  </div>
+                </div>
+              );
             }
-            return <p className="mb-4 text-gray-200 leading-relaxed text-sm antialiased">{children}</p>;
+
+            // ✅ 최종 조치 결과 (Resolution) 특수 스타일 적용
+            if (contentStr.includes('✅ 최종 조치 결과') || contentStr.includes('Resolution:')) {
+              return (
+                <div className="my-6 p-6 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 shadow-xl shadow-emerald-900/10 border-l-4 border-l-emerald-500 animate-in fade-in slide-in-from-left-2 duration-500">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="bg-emerald-500/20 p-1.5 rounded-lg">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Final Resolution Confirmed</span>
+                  </div>
+                  <div className="text-emerald-50/90 font-bold leading-relaxed text-[13px]">
+                    {children}
+                  </div>
+                </div>
+              );
+            }
+
+            // Timestamp detection logic for paragraph starts
+            let timestampBadge = null;
+            let remainingChildren = children;
+
+            if (childrenArray.length > 0 && typeof childrenArray[0] === 'string') {
+              const firstChild = childrenArray[0];
+              const timestampMatch = firstChild.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?(?:\sKST)?)\]\s*/);
+              
+              if (timestampMatch) {
+                const timestamp = timestampMatch[1];
+                timestampBadge = (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 mr-2 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-black border border-indigo-500/30 shadow-lg shadow-indigo-500/10 uppercase tracking-tighter">
+                    <Clock className="w-3 h-3" />
+                    {timestamp}
+                  </span>
+                );
+                
+                // Remove the matched timestamp from the first text node
+                const cleanedText = firstChild.replace(timestampMatch[0], '');
+                remainingChildren = [cleanedText, ...childrenArray.slice(1)];
+              }
+            }
+
+            const content = (
+              <>
+                {timestampBadge}
+                {remainingChildren}
+              </>
+            );
+
+            if (hasBlockElement) {
+              return <div className="mb-4 text-gray-200 leading-relaxed text-sm antialiased">{content}</div>;
+            }
+            return <p className="mb-6 text-gray-200 leading-relaxed text-sm antialiased">{content}</p>;
           },
           strong: ({ children }) => {
             const content = String(children);
@@ -96,17 +172,44 @@ const MarkdownViewer = ({ text }) => {
           ),
           li: ({ children }) => {
             const content = String(children);
-            // Check if it starts with [HH:mm:ss] or similar
-            const hasTimestamp = /^\[\d{2}:\d{2}:\d{2}\]/.test(content);
+            // Enhanced timestamp regex to support:
+            // [18:12:10], [14:52 KST], [2024-03-28 14:52 KST]
+            const timestampMatch = content.match(/^\[((?:\d{4}-\d{2}-\d{2}\s)?\d{2}:\d{2}(?::\d{2})?(?:\sKST)?)\]/);
             
+            if (timestampMatch) {
+              const timestamp = timestampMatch[1];
+              const text = content.replace(timestampMatch[0], '').trim();
+              
+              return (
+                <li className="relative pl-12 pb-8 list-none group/item">
+                  {/* Timeline Line */}
+                  <div className="absolute left-[3px] top-4 bottom-0 w-[1.5px] bg-gradient-to-b from-blue-500/40 via-blue-500/10 to-transparent group-last/item:hidden" />
+                  
+                  {/* Timeline Dot */}
+                  <div className="absolute left-[-4px] top-1.5 z-10 h-4 w-4 rounded-full border-2 border-[#1a1f2e] bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover/item:scale-125 transition-transform duration-300" />
+                  
+                  {/* Content Card */}
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 transition-all duration-300 group-hover/item:bg-white/[0.05] group-hover/item:border-white/10 group-hover/item:translate-x-1 shadow-lg shadow-black/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono text-[10px] font-bold border border-blue-500/20">
+                        {timestamp}
+                      </span>
+                      <div className="h-px flex-1 bg-white/5" />
+                    </div>
+                    <div className="text-gray-200 text-sm leading-relaxed antialiased">
+                      <ReactMarkdown components={{ p: ({children}) => <span>{children}</span> }}>{text}</ReactMarkdown>
+                    </div>
+                  </div>
+                </li>
+              );
+            }
+
             return (
-              <li className={`relative pl-8 text-gray-300 text-sm leading-relaxed 
+              <li className={`relative pl-8 text-gray-300 text-sm leading-relaxed mb-4
                 before:absolute before:left-[-1px] before:top-1.5 before:z-10 before:h-2.5 before:w-2.5 before:rounded-full 
-                before:border-2 before:border-[#1a1f2e] before:bg-blue-500
+                before:border-2 before:border-[#1a1f2e] before:bg-slate-500
                 hover:text-white transition-all group`}>
-                <div className={`${hasTimestamp ? 'bg-blue-500/5 p-2 rounded-lg border border-blue-500/10 -ml-2' : ''}`}>
-                  {children}
-                </div>
+                {children}
               </li>
             );
           },
@@ -148,7 +251,7 @@ const MarkdownViewer = ({ text }) => {
           }
         }}
       >
-        {text}
+        {processedText}
       </ReactMarkdown>
     </div>
   );

@@ -105,6 +105,7 @@ export default function DashboardPage() {
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
 
+  const [hideCompletedSms, setHideCompletedSms] = useState(false);
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
@@ -1025,6 +1026,15 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  <div 
+                    onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
+                    className="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 cursor-pointer hover:bg-white/10 transition-all select-none"
+                  >
+                    <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${hideCompletedSms ? 'bg-blue-600' : 'bg-slate-700'}`}>
+                      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${hideCompletedSms ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">처리완료 숨기기</span>
+                  </div>
                   {selectedSms && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setSelectedSms(null); }}
@@ -1048,7 +1058,10 @@ export default function DashboardPage() {
 
               <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSmsPanelCollapsed ? 'max-h-0' : 'max-h-[1000px] border-t border-white/5'}`}>
                 <div className="p-6 space-y-4">
-                  {smsMessages.filter(msg => !deletedSmsIds.has(msg.inc_id)).map((msg) => {
+                  {smsMessages
+                    .filter(msg => !deletedSmsIds.has(msg.inc_id))
+                    .filter(msg => !hideCompletedSms || msg.incident_status !== '처리완료')
+                    .map((msg) => {
                     const isSelected = selectedSms?.inc_id === msg.inc_id;
                     return (
                       <div
@@ -1083,6 +1096,12 @@ export default function DashboardPage() {
                                 {msg.keyword_detected && (
                                   <span className="bg-yellow-400/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-400/30">
                                     키워드 감지
+                                  </span>
+                                )}
+                                {msg.incident_status === '처리완료' && (
+                                  <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1 shadow-sm">
+                                    <CheckCircle className="w-3 h-3" />
+                                    처리완료
                                   </span>
                                 )}
                                 {isSelected && (

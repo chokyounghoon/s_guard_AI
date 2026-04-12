@@ -358,3 +358,24 @@ CREATE INDEX IF NOT EXISTS idx_report_lines_owner ON report_lines(owner_id);
 
 -- Support for RAG Upsert
 CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_inc_id ON knowledge_base(inc_id);
+-- Inbox Management
+CREATE TABLE IF NOT EXISTS inbox_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,         -- Recipient employee_id
+    type TEXT NOT NULL,            -- 'MESSAGE', 'REPORT', 'SYSTEM'
+    sender_id TEXT,                -- Sender employee_id (optional)
+    sender_name TEXT,              -- Sender display name
+    title TEXT NOT NULL,           -- Message subject
+    content TEXT,                  -- Detailed content
+    preview TEXT,                  -- Short summary for list view
+    is_read INTEGER DEFAULT 0,     -- Read status (0: unread, 1: read)
+    urgency TEXT DEFAULT 'NORMAL', -- 'LOW', 'NORMAL', 'HIGH', 'CRITICAL'
+    inc_id TEXT,                   -- Associated incident ID (optional)
+    action_link TEXT,              -- URL/Route for navigation (optional)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(employee_id)
+);

@@ -23,6 +23,8 @@ from email.mime.multipart import MIMEMultipart
 import asyncio
 import base64
 import httpx
+import websockets
+import asyncio
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -54,7 +56,7 @@ class WorkerClient:
     @staticmethod
     async def post(path: str, data: dict):
         url = f"{WORKER_URL}{path}"
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             try:
                 response = await client.post(url, json=data)
                 response.raise_for_status()
@@ -66,7 +68,8 @@ class WorkerClient:
     @staticmethod
     async def get(path: str, params: dict = None):
         url = f"{WORKER_URL}{path}"
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        logger.info(f"WorkerClient.get: {url} params={params}")
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             try:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
@@ -78,7 +81,7 @@ class WorkerClient:
     @staticmethod
     async def patch(path: str, data: dict):
         url = f"{WORKER_URL}{path}"
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             try:
                 response = await client.patch(url, json=data)
                 response.raise_for_status()
@@ -90,7 +93,7 @@ class WorkerClient:
     @staticmethod
     async def post_multipart(path: str, data: dict, files: dict):
         url = f"{WORKER_URL}{path}"
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             try:
                 response = await client.post(url, data=data, files=files)
                 response.raise_for_status()
@@ -100,6 +103,18 @@ class WorkerClient:
                 return {"error": str(e)}
 
 
+
+class InboxItem(BaseModel):
+    user_id: str
+    type: str  # 'MESSAGE', 'REPORT', 'SYSTEM'
+    sender_id: Optional[str] = None
+    sender_name: Optional[str] = None
+    title: str
+    content: Optional[str] = None
+    preview: Optional[str] = None
+    urgency: Optional[str] = 'NORMAL'
+    inc_id: Optional[str] = None
+    action_link: Optional[str] = None
 
 # Dify API Configuration
 DIFY_API_KEY_DASHBOARD = os.getenv("DIFY_API_KEY_DASHBOARD", "app-TSlqmp329iKOzpXUP90iC6Kw")
@@ -510,6 +525,47 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+@app.websocket("/warroom/ws/{incident_id}")
+async def warroom_ws_proxy(websocket: WebSocket, incident_id: str):
+    """Proxy WebSocket connections to the Cloudflare Worker Durable Object"""
+    await websocket.accept()
+    # Convert https:// to wss:// for the worker URL
+    worker_ws_url = f"{WORKER_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/warroom/ws/{incident_id}"
+    
+    logger.info(f"Proxying WS for {incident_id} to {worker_ws_url}")
+    
+    try:
+        async with websockets.connect(worker_ws_url) as worker_ws:
+            # Transfer data from client to worker
+            async def client_to_worker():
+                try:
+                    while True:
+                        data = await websocket.receive_text()
+                        await worker_ws.send(data)
+                except Exception:
+                    pass
+
+            # Transfer data from worker to client
+            async def worker_to_client():
+                try:
+                    while True:
+                        data = await worker_ws.recv()
+                        await websocket.send_text(data)
+                except Exception:
+                    pass
+
+            # Run both tasks concurrently
+            await asyncio.gather(client_to_worker(), worker_to_client())
+            
+    except Exception as e:
+        logger.error(f"WebSocket Proxy error for {incident_id}: {e}")
+    finally:
+        try:
+            await websocket.close()
+            logger.info(f"WebSocket Proxy closed for {incident_id}")
+        except:
+            pass
 
 @app.post("/sms/receive")
 async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
@@ -1265,14 +1321,25 @@ async def join_warroom(
     incident_id: str,
     body: dict = {}
 ):
-    """Record joining a War-Room"""
+    """Record joining a War-Room (ID in path)"""
+    return await _process_join(incident_id, body)
+
+@app.post("/warroom/join")
+async def join_warroom_body(body: dict = {}):
+    """Record joining a War-Room (ID in body)"""
+    incident_id = body.get("incident_id")
+    if not incident_id:
+        raise HTTPException(status_code=400, detail="incident_id is required")
+    return await _process_join(incident_id, body)
+
+async def _process_join(incident_id: str, body: dict):
     # 1. Check if incident exists
     inc_res = await WorkerClient.get(f"/incidents/{incident_id}")
     if "error" in inc_res or not inc_res.get("title"):
         raise HTTPException(status_code=404, detail="War-Room not found")
         
     title = inc_res.get("title", incident_id)
-    user_name = body.get("user_name", "Unknown")
+    user_name = body.get("name", body.get("user_name", "Unknown"))
     
     # 2. Log system message for join event
     await WorkerClient.post("/warroom/chat", {
@@ -1344,6 +1411,33 @@ async def get_warroom_file(key: str):
 async def get_warroom_attachments(incident_id: str):
     """Get all attachments for a War-Room via Worker"""
     res = await WorkerClient.get(f"/warroom/attachments/{incident_id}")
+    return res
+
+@app.get("/warroom/participants/{incident_id}")
+async def get_warroom_participants(incident_id: str):
+    """Get all participants for a War-Room via Worker with ID normalization"""
+    res = await WorkerClient.get(f"/warroom/participants/{incident_id}")
+    
+    # Normalize participants list to ensure employee_id is present for frontend filtering
+    if isinstance(res, dict) and "participants" in res and isinstance(res["participants"], list):
+        for p in res["participants"]:
+            if "user_id" in p and "employee_id" not in p:
+                p["employee_id"] = p["user_id"]
+            elif "id" in p and "employee_id" not in p:
+                p["employee_id"] = p["id"]
+                
+    return res
+
+@app.get("/warroom/ai-search")
+async def ai_search_warroom(q: str):
+    """AI Search across messages via Worker"""
+    res = await WorkerClient.get("/warroom/ai-search", params={"q": q})
+    return res
+
+@app.get("/warroom/dm/{other_id}")
+async def get_dm_history_proxy(other_id: str, my_id: str):
+    """Retrieve DM history via Worker"""
+    res = await WorkerClient.get(f"/warroom/dm/{other_id}", params={"my_id": my_id})
     return res
 
 # ─── End War-Room Management Endpoints ──────────────────────────────────────
@@ -1548,9 +1642,78 @@ async def signup(req: SignupRequest):
     return res
 
 @app.get("/users")
-async def list_users():
-    res = await WorkerClient.get("/users")
-    return res
+async def list_users(q: Optional[str] = None, orgCode: Optional[str] = None):
+    """List users with local filtering for reliability"""
+    all_users = await WorkerClient.get("/users")
+    
+    # Handle both list and dict-wrapped responses (e.g., {"users": [...]})
+    user_list = []
+    if isinstance(all_users, list):
+        user_list = all_users
+    elif isinstance(all_users, dict):
+        user_list = all_users.get("users", all_users.get("data", []))
+        if not isinstance(user_list, list):
+            user_list = []
+            
+    if not user_list and all_users:
+        logger.error(f"Failed to parse users from worker response: {all_users}")
+    
+    logger.info(f"User search request: q={q}, orgCode={orgCode}. Found {len(user_list)} total users.")
+    
+    filtered = user_list
+    
+    # 1. Filter by Organization (Match Code or Name for robustness)
+    if orgCode:
+        org_lower = str(orgCode).lower()
+        filtered = [
+            u for u in filtered 
+            if str(u.get("org_code", "")).lower() == org_lower or
+               str(u.get("team_name", "")).lower() == org_lower or
+               str(u.get("honbu", "")).lower() == org_lower or
+               org_lower in str(u.get("team_name", "")).lower()
+        ]
+        
+    # 2. Filter by Search Query (Name or ID)
+    if q:
+        q_lower = q.lower()
+        filtered = [
+            u for u in filtered 
+            if q_lower in u.get("name", "").lower() or 
+               q_lower in str(u.get("employee_id", u.get("id", ""))).lower()
+        ]
+        
+    # If a specific orgCode was requested but found nothing, 
+    # and no search query was provided, let's return all users in that honbu if possible
+    # or just return the filtered list as is.
+    
+    # Ensure consistent ID mapping for frontend
+    for u in filtered:
+        if "id" in u and "employee_id" not in u:
+            u["employee_id"] = u["id"]
+            
+    return filtered
+
+# --- Inbox API Section ---
+
+@app.get("/inbox")
+async def get_inbox(user_id: str):
+    """Fetch inbox items for a user"""
+    return await WorkerClient.get("/inbox", params={"user_id": user_id})
+
+@app.post("/inbox/send")
+async def send_inbox_item(item: InboxItem):
+    """(System) Send an item to a user's inbox"""
+    return await WorkerClient.post("/inbox", item.dict())
+
+@app.patch("/inbox/{item_id}/read")
+async def mark_inbox_read(item_id: int):
+    """Mark an inbox item as read"""
+    return await WorkerClient.patch(f"/inbox/{item_id}/read", {})
+
+@app.delete("/inbox/{item_id}")
+async def delete_inbox_item(item_id: int):
+    """Delete an inbox item"""
+    return await WorkerClient.delete(f"/inbox/{item_id}")
 
 class UserResetPasswordRequest(BaseModel):
     new_password: str
@@ -1713,6 +1876,11 @@ async def create_incident(req: IncidentCreateRequest):
         raise HTTPException(status_code=500, detail=res["error"])
     return res
 
+@app.get("/incidents/{incident_id}")
+async def get_incident_detail(incident_id: str):
+    res = await WorkerClient.get(f"/incidents/{incident_id}")
+    return res
+
 @app.patch("/incidents/{incident_id}")
 async def update_incident(incident_id: str, req: IncidentUpdateRequest):
     res = await WorkerClient.patch(f"/incidents/{incident_id}", req.dict(exclude_unset=True))
@@ -1734,8 +1902,10 @@ class ActivityLogCreateRequest(BaseModel):
     report_type: Optional[str] = "AI 리포트"
 
 @app.get("/activity-logs")
-async def get_activity_logs(limit: int = 50):
-    res = await WorkerClient.get("/activity-logs", params={"limit": limit})
+async def get_activity_logs(inc_id: Optional[str] = None, limit: int = 50):
+    params = {"limit": limit}
+    if inc_id: params["inc_id"] = inc_id
+    res = await WorkerClient.get("/activity-logs", params=params)
     return {"total": len(res), "logs": res} if isinstance(res, list) else res
 
 @app.post("/activity-logs")
@@ -1818,6 +1988,12 @@ class ReportBroadcastRequest(BaseModel):
     report_content: str
     recipients: List[str]
     channels: List[str] = ["email", "app"]
+
+@app.get("/ai/incident/workflow-details")
+async def get_workflow_details(inc_id: str):
+    """Retrieve detailed workflow/assignee info via Worker"""
+    res = await WorkerClient.get("/ai/incident/workflow-details", params={"inc_id": inc_id})
+    return res
 
 @app.post("/ai/report/broadcast")
 async def broadcast_report(req: ReportBroadcastRequest, background_tasks: BackgroundTasks):

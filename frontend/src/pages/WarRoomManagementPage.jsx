@@ -149,7 +149,7 @@ export default function WarRoomManagementPage() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('active');
   const [sortBy, setSortBy] = useState('newest');
   const [joining, setJoining] = useState(null);
   const [joinSuccess, setJoinSuccess] = useState(null);

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
+import WarRoomChatPanel from '../components/WarRoomChatPanel';
 
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
@@ -78,6 +79,7 @@ export default function DashboardPage() {
   const [showAgentPanel, setShowAgentPanel] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
+  const [activeLogTab, setActiveLogTab] = useState('ai'); // 'ai' or 'human'
   const [agentMessages, setAgentMessages] = useState([]);
   const [systemStatus, setSystemStatus] = useState('normal'); 
   const [messages, setMessages] = useState([]); 
@@ -162,6 +164,7 @@ export default function DashboardPage() {
     return kstDate.toISOString().split('T')[0];
   };
 
+  const [hideCompletedSms, setHideCompletedSms] = useState(true);
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
@@ -179,6 +182,31 @@ export default function DashboardPage() {
       localStorage.removeItem('sguard_current_incident');
     }
   }, [selectedSms]);
+  
+  // 🚀 Derived State: Filtered SMS list based on visibility settings
+  const visibleSms = useMemo(() => {
+    return smsMessages
+      .filter(msg => !deletedSmsIds.has(msg.inc_id))
+      .filter(msg => !hideCompletedSms || msg.incident_status !== '처리완료');
+  }, [smsMessages, hideCompletedSms, deletedSmsIds]);
+
+  // 🚀 Auto-Reset: Clear other regions if no active incidents are visible
+  useEffect(() => {
+    if (visibleSms.length === 0) {
+      // Initialize/Reset all interactive regions if nothing is visible
+      if (selectedSms) setSelectedSms(null);
+      if (insightSms) setInsightSms(null);
+      if (showAgentPanel) setShowAgentPanel(false);
+      if (agentMessages.length > 0) setAgentMessages([]);
+      if (incidentWorkflowSteps.length > 0) setIncidentWorkflowSteps([]);
+    } else if (selectedSms && !visibleSms.some(m => m.inc_id === selectedSms.inc_id)) {
+      // If currently selected incident is hidden by filter, deselect it
+      setSelectedSms(null);
+      setShowAgentPanel(false);
+      setAgentMessages([]);
+      setIncidentWorkflowSteps([]);
+    }
+  }, [visibleSms, selectedSms, insightSms, showAgentPanel, agentMessages.length, incidentWorkflowSteps.length]);
 
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
@@ -734,8 +762,13 @@ export default function DashboardPage() {
       { name: 'Leader', keywords: ['Leader', '리더', '최종 조치', '조항 조치', '조치 가이드', '최종판단'] }
     ];
 
+    // Find the starting point of the diagnostic section
     let startIndex = text.indexOf('[전문가별 심층 진단]');
-    if (startIndex === -1) startIndex = 0; // Fallback to entire text if heading is missing
+    if (startIndex === -1) {
+        // Fallback: check for Agent keyword if main header is missing
+        const firstAgentIndex = text.search(/(Security|DB|DevOps|Leader|Agent|에이전트)/i);
+        startIndex = firstAgentIndex !== -1 ? firstAgentIndex : 0;
+    }
     
     const diagnosticsText = text.substring(startIndex);
     const lines = diagnosticsText.split('\n');
@@ -749,14 +782,21 @@ export default function DashboardPage() {
         
         let foundAgent = null;
         
-        // A line is considered an agent header if it's relatively short, contains a keyword, 
-        // AND looks like a heading or bold text, or ends with a colon.
-        const isHeaderFormat = /^(###?|\*\*|-|\d+\.|\[|[\uD800-\uDBFF][\uDC00-\uDFFF])/.test(trimmedLine) || /:\s*$/.test(trimmedLine);
+        // Robust Header Detection:
+        // 1. Starts with Markdown header prefixes (###, **, -)
+        // 2. OR ends with a colon
+        // 3. AND is compact (< 80 chars)
+        const isHeaderFormat = /^(###?|\*\*|-|\[|[\uD800-\uDBFF][\uDC00-\uDFFF])/.test(trimmedLine) || /:\s*$/.test(trimmedLine);
         
-        if (isHeaderFormat && trimmedLine.length < 100) {
+        if (isHeaderFormat && trimmedLine.length < 80) {
             const lowerLine = trimmedLine.toLowerCase();
             for (const decl of declarations) {
-                if (decl.keywords.some(k => lowerLine.includes(k.toLowerCase()))) {
+                // To prevent misidentifying "1. DB 조치" as a new agent if DB is already active,
+                // we prioritize lines containing "Agent" or "에이전트"
+                const hasAgentKeyword = lowerLine.includes('agent') || lowerLine.includes('에이전트') || lowerLine.includes('진단');
+                const hasRoleKeyword = decl.keywords.some(k => lowerLine.includes(k.toLowerCase()));
+                
+                if (hasRoleKeyword && (hasAgentKeyword || trimmedLine.startsWith('###') || trimmedLine.startsWith('**'))) {
                     foundAgent = decl.name;
                     break;
                 }
@@ -765,7 +805,7 @@ export default function DashboardPage() {
         
         if (foundAgent) {
             currentAgent = foundAgent;
-            continue; // Skip the header line itself
+            continue; 
         }
         
         if (currentAgent) {
@@ -775,15 +815,15 @@ export default function DashboardPage() {
     }
     
     return Array.from(msgsMap.entries()).map(([role, content]) => {
-      // Clean up markdown artifacts dynamically
+      // Deep cleanup of residual artifacts
       let cleanText = content
-          .replace(/^\*\*.*?\*\*\s*[:：]\s*/i, '') // Remove prefix like **DevOps**: 
-          .replace(/^[ \t\-\*\#\.,\:\u2022\u00b7]+\s*/gm, '') // Remove list bullets or extra artifacts at start of lines
+          .replace(/^(###?|\*\*)?\s*(Security|DB|DevOps|Leader|Agent|에이전트).*?[:：]\s*/i, '') 
+          .replace(/^[ \t\-\*\#\.,\:\u2022\u00b7]+\s*/gm, '') 
           .replace(/\n\n+/g, '\n\n')
           .trim();
           
       return { role: role, text: cleanText, delay: 0 };
-    }).filter(msg => msg.text.length > 5);
+    }).filter(msg => msg.text.length > 3);
   };
 
   // Callback called from AiInsightPanel
@@ -1207,6 +1247,15 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  <div 
+                    onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
+                    className="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 cursor-pointer hover:bg-white/10 transition-all select-none"
+                  >
+                    <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${hideCompletedSms ? 'bg-blue-600' : 'bg-slate-700'}`}>
+                      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${hideCompletedSms ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">처리완료 숨기기</span>
+                  </div>
                   <button 
                     disabled={isRefreshing}
                     onClick={async (e) => { 
@@ -1236,7 +1285,7 @@ export default function DashboardPage() {
 
               <div className={`transition-all duration-500 ease-in-out ${isSmsPanelCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[380px] border-t border-white/5'}`}>
                 <div className="p-6 space-y-4 overflow-y-auto max-h-[380px] scrollbar-thin">
-                  {smsMessages.filter(msg => !deletedSmsIds.has(msg.inc_id)).map((msg) => {
+                  {visibleSms.map((msg) => {
                     const isSelected = selectedSms?.inc_id === msg.inc_id;
                     return (
                       <div
@@ -1275,11 +1324,18 @@ export default function DashboardPage() {
                                   <span 
                                     translate="no"
                                     className={`text-[10px] font-black px-2 py-0.5 rounded-lg border flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
-                                    Number(msg.is_analyzed) >= 1 
-                                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 opacity-100' 
-                                      : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
+                                    msg.incident_status === '처리완료'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
+                                      : Number(msg.is_analyzed) >= 1 
+                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 opacity-100' 
+                                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
                                   }`}>
-                                    {Number(msg.is_analyzed) >= 1 ? (
+                                    {msg.incident_status === '처리완료' ? (
+                                      <span className="flex items-center gap-1.5">
+                                        <CheckCircle key={`comp-${msg.inc_id}`} className="w-3 h-3 text-emerald-500" />
+                                        <span>처리완료</span>
+                                      </span>
+                                    ) : Number(msg.is_analyzed) >= 1 ? (
                                       <span className="flex items-center gap-1.5">
                                         <CheckCircle2 key={`check-${msg.inc_id}`} className="w-3 h-3 text-blue-500" />
                                         <span>ANL_COMPLETE</span>
@@ -1432,7 +1488,15 @@ export default function DashboardPage() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                   </div>
-                  <h3 className="font-bold text-white text-[15px] tracking-tight">AI War-Room Situation Log</h3>
+                  <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 shadow-inner">
+                    <div className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] text-[11px] font-black flex items-center gap-2.5 border border-white/10 uppercase tracking-tighter">
+                      <div className="relative">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-200 animate-pulse" />
+                        <div className="absolute inset-0 blur-sm bg-white/30 animate-pulse" />
+                      </div>
+                      S-Autopilot Expert Advisor
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                    <button 
@@ -1447,16 +1511,26 @@ export default function DashboardPage() {
               {!isWarRoomCollapsed && (
                 <div className="flex-1 overflow-hidden">
                   {showAgentPanel || selectedSms ? (
-                    <AgentDiscussionPanel
-                      messages={agentMessages}
-                      isVisible={true}
-                      embedded={true}
-                      incident={selectedSms}
-                      onClose={() => {
-                        setShowAgentPanel(false);
-                        setSelectedSms(null);
-                      }}
-                    />
+                    <div className="h-full flex flex-col overflow-hidden">
+                      {activeLogTab === 'ai' ? (
+                        <AgentDiscussionPanel
+                          messages={agentMessages}
+                          isVisible={true}
+                          embedded={true}
+                          incident={selectedSms}
+                          onClose={() => {
+                            setShowAgentPanel(false);
+                            setSelectedSms(null);
+                          }}
+                        />
+                      ) : (
+                        <WarRoomChatPanel
+                          incidentId={selectedSms?.inc_id}
+                          currentUser={userProfile || {}}
+                          isVisible={true}
+                        />
+                      )}
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
                       <Brain className="w-10 h-10" />

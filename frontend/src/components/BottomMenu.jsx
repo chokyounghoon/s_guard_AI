@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true }) {
   const navigate = useNavigate();
@@ -43,6 +43,14 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
         >
           <FileText className={`w-6 h-6 ${currentPath.startsWith('/ai-report') ? 'fill-current' : ''}`} />
           <span className="text-[10px] font-medium">Report</span>
+        </div>
+
+        <div
+          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/inbox' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
+          onClick={() => navigate('/inbox')}
+        >
+          <Inbox className={`w-6 h-6 ${currentPath === '/inbox' ? 'fill-current' : ''}`} />
+          <span className="text-[10px] font-medium">메시지함</span>
         </div>
         
         <div

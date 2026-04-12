@@ -27,6 +27,7 @@ import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import WarRoomManagementPage from './pages/WarRoomManagementPage';
 import CodebookManagementPage from './pages/CodebookManagementPage';
 import WorkflowPage from './pages/WorkflowPage';
+import InboxPage from './pages/InboxPage';
 
 import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
@@ -114,7 +115,8 @@ function AppContent() {
         <Route path="/organization-management" element={<OrganizationManagementPage />} />
         <Route path="/warroom-management" element={<WarRoomManagementPage />} />
         <Route path="/codebook-management" element={<CodebookManagementPage />} />
-        <Route path="/workflow/:inc_id" element={<WorkflowPage />} />
+         <Route path="/workflow/:inc_id" element={<WorkflowPage />} />
+         <Route path="/inbox" element={<InboxPage />} />
       </Routes>
 
       {/* Global Bottom Navigation */}
