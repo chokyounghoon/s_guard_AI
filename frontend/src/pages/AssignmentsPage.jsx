@@ -62,11 +62,16 @@ export default function AssignmentsPage() {
     }
   }, [location.search]);
 
-  const tabs = ['전체', '미확인', '처리중', '처리완료'];
+  const tabs = [
+    { id: '전체', label: '전체' },
+    { id: '미확인', label: '미확인' },
+    { id: '처리중', label: '분석중입니다' },
+    { id: '처리완료', label: '처리완료' }
+  ];
 
   // 필터링 로직 (탭 선택 시)
   const filteredAssignments = assignments.filter(item => {
-    const cleanTab = activeTab.replace('상태: ', '');
+    const cleanTab = activeTab;
     if (cleanTab === '전체') return true;
     return item.status === cleanTab;
   });
@@ -106,14 +111,14 @@ export default function AssignmentsPage() {
         <div className="px-5 flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
           {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === tab
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === tab.id
                   ? 'bg-blue-600 text-white'
                   : 'bg-white/5 text-slate-400 hover:bg-white/10'
                 }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>

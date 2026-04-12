@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true }) {
   const navigate = useNavigate();
@@ -208,6 +208,22 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                   <div>
                     <span className="block font-bold text-slate-200 text-sm sm:text-base">사용자 활동 기록</span>
                     <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">System Activity Logs</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    navigate('/codebook-management');
+                  }}
+                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-yellow-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
+                >
+                  <div className="bg-yellow-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
+                    <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400" />
+                  </div>
+                  <div>
+                    <span className="block font-bold text-slate-200 text-sm sm:text-base">코드북 관리</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Common Codebook Admin</span>
                   </div>
                 </div>
               </div>

@@ -105,7 +105,7 @@ export default function SearchPage() {
             const st = inc.status || '대기';
             let cat = '미확인';
             if (st.includes('미확인') || st === '대기' || st === '발생') cat = '미확인';
-            else if (st.includes('처리') || st.includes('진행')) cat = '처리중';
+            else if (st.includes('처리') || st.includes('진행')) cat = '분석중입니다';
             if (st.includes('완료') || st === '정상' || st === 'GOVERNED') cat = '조치완료';
 
             const mainAssignee = inc.assignee_name || inc.assigned_to;
@@ -142,7 +142,7 @@ export default function SearchPage() {
          setStats({
            total: processed.length,
            unconfirmed: processed.filter(i => i.category === '미확인').length,
-           processing: processed.filter(i => i.category === '처리중').length,
+           processing: processed.filter(i => i.category === '분석중입니다').length,
            resolved: processed.filter(i => i.category === '조치완료').length
          });
       })
@@ -208,7 +208,7 @@ export default function SearchPage() {
          const st = inc.status || '대기';
          let cat = '미확인';
          if (st.includes('미확인') || st === '대기' || st === '발생') cat = '미확인';
-         else if (st.includes('처리') || st.includes('진행')) cat = '처리중';
+         else if (st.includes('처리') || st.includes('진행')) cat = '분석중입니다';
          if (st.includes('완료') || st === '정상' || st === 'GOVERNED') cat = '조치완료';
 
          const mainAssignee = inc.assignee_name || inc.assigned_to;
@@ -242,7 +242,7 @@ export default function SearchPage() {
       setStats({
         total: processed.length,
         unconfirmed: processed.filter(i => i.category === '미확인').length,
-        processing: processed.filter(i => i.category === '처리중').length,
+        processing: processed.filter(i => i.category === '분석중입니다').length,
         resolved: processed.filter(i => i.category === '조치완료').length
       });
       setActiveCategory(null);
@@ -368,7 +368,7 @@ export default function SearchPage() {
               {[
                 { id: 'all', label: '전체 건수', count: stats.total, icon: AlertTriangle, color: 'blue' },
                 { id: '미확인', label: '미확인', count: stats.unconfirmed, icon: AlertCircle, color: 'red' },
-                { id: '처리중', label: '처리중', count: stats.processing, icon: Clock, color: 'orange' },
+                { id: '분석중입니다', label: '분석중입니다', count: stats.processing, icon: Clock, color: 'orange' },
                 { id: '조치완료', label: '처리완료', count: stats.resolved, icon: CheckCircle, color: 'emerald' },
               ].map((stat) => (
                 <div key={stat.id} onClick={() => handleStatsClick(stat.id)} 
@@ -470,7 +470,7 @@ export default function SearchPage() {
                         </div>
                         <div className="flex items-center gap-2">
                            <span className="px-2 py-1 rounded-lg text-[10px] font-black border bg-slate-800 text-slate-300 border-slate-700 tracking-tight">
-                             {incident.status}
+                             <span>{incident.status === '분석중입니다' ? '분석중입니다...' : (incident.status === '조치완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}</span>
                            </span>
                         </div>
                       </div>

@@ -48,7 +48,7 @@ const AiSmsStatusPanel = () => {
       <div className="flex justify-between items-center mb-6 relative z-10">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <Activity className="w-5 h-5 text-blue-400" />
-          처리 진행 사항 (Handling Progress)
+          분석 진행 사항 (Analysis Progress)
         </h2>
         <div className="flex gap-2">
             <button 
@@ -106,7 +106,7 @@ const AiSmsStatusPanel = () => {
                 </div>
                 <div className="bg-[#11141d] p-3 rounded-xl border border-white/5 flex flex-col items-center group/item hover:bg-orange-500/5 transition-all cursor-pointer" onClick={() => setShowBriefing(true)}>
                     <PlayCircle className="w-4 h-4 text-orange-400 mb-1 group-hover/item:scale-110 transition-transform" />
-                    <span className="text-[10px] text-slate-500 font-medium">처리중</span>
+                    <span className="text-[10px] text-slate-500 font-medium">분석중입니다</span>
                     <span className="text-xl font-black text-white font-mono">{stats.processing}</span>
                 </div>
                 <div className="bg-[#11141d] p-3 rounded-xl border border-white/5 flex flex-col items-center group/item hover:bg-emerald-500/5 transition-all cursor-pointer" onClick={() => navigate('/warroom-management?status=처리완료')}>

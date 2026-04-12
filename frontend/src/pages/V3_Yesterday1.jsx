@@ -1289,7 +1289,7 @@ export default function DashboardPage() {
               onClick={() => navigate('/assignments?tab=상태: 처리중')}
               className="bg-[#11141d] p-5 rounded-2xl border border-white/5 relative cursor-pointer hover:bg-[#2e231a] transition-colors"
             >
-              <p className="text-xs text-slate-400 mb-2 font-medium">처리중</p>
+              <p className="text-xs text-slate-400 mb-2 font-medium">분석중입니다</p>
               <span className="text-4xl font-bold text-orange-400">2</span>
               <div className="absolute bottom-4 right-4 bg-orange-600/20 p-2 rounded-xl">
                 <RefreshCw className="w-5 h-5 text-orange-500" />

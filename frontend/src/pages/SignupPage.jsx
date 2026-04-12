@@ -5,6 +5,7 @@ import {
   X, ScrollText, FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useCodebook } from '../context/CodebookContext';
 
 // ── 데이터 ─────────────────────────────────────────
 const SHINHAN_COMPANIES = [
@@ -317,29 +318,18 @@ export default function SignupPage() {
         console.error('[SignupPage] Org tree fetch failed:', err);
         setErrorMsg('조직도 정보를 불러오지 못했습니다. 네트워크 상태를 확인해 주세요.');
       });
-
-    // ── 직책 코드북 페치 ──
-    console.log('[SignupPage] Fetching positions from:', `${API_BASE}/ai/codes/POSITION`);
-    fetch(`${API_BASE}/ai/codes/POSITION`)
-      .then(r => {
-        if (!r.ok) throw new Error('직책 정보를 불러오지 못했습니다.');
-        return r.json();
-      })
-      .then(data => {
-        console.log('[SignupPage] Loaded positions:', data.codes);
-        if (data.codes && data.codes.length > 0) {
-          setPositions(data.codes);
-          setFormData(prev => ({ ...prev, position: data.codes[0].code }));
-        } else {
-          // 데이터가 없거나 404인 경우 비상 데이터 사용
-          setPositions(FALLBACK_POSITIONS);
-        }
-      })
-      .catch(err => {
-        console.error('[SignupPage] Position codes fetch failed:', err);
-        setPositions(FALLBACK_POSITIONS);
-      });
   }, []);
+
+  const { getCodesByCategory } = useCodebook();
+
+  useEffect(() => {
+    const fetchedPositions = getCodesByCategory('POSITION');
+    if (fetchedPositions.length > 0) {
+      setPositions(fetchedPositions);
+    } else {
+      setPositions(FALLBACK_POSITIONS);
+    }
+  }, [getCodesByCategory]);
 
   // ── 데이터 로드 후 초기값 동기화 (부문 목록 등) ──
   useEffect(() => {

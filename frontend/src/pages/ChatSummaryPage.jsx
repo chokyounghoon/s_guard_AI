@@ -21,7 +21,8 @@ import {
   User,
   X,
   ChevronRight,
-  CheckCircle
+  CheckCircle,
+  RefreshCw
 } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import html2pdf from 'html2pdf.js';
@@ -39,6 +40,8 @@ export default function ChatSummaryPage() {
   const [incidentStatus, setIncidentStatus] = useState('');
   
   const abortControllerRef = useRef(null);
+  const [loadingStatus, setLoadingStatus] = useState('인시던트 데이터 확인 중...');
+  const [governanceStep, setGovernanceStep] = useState(null); // null, 'knowledge', 'resolving', 'done'
 
   const [reportingLines, setReportingLines] = useState([]);
 
@@ -96,6 +99,9 @@ export default function ChatSummaryPage() {
               
               try {
                 const data = JSON.parse(dataStr);
+                if (data.status) {
+                  setLoadingStatus(data.status);
+                }
                 if (data.answer) {
                   setSummary(prev => {
                     const newText = prev + data.answer;
@@ -338,6 +344,7 @@ export default function ChatSummaryPage() {
     }
 
     setIsGoverning(true);
+    setGovernanceStep('knowledge');
     
     const fullContent = `${summary}\n\n### [그외 처리 사항]\n${additionalNotes || '없음'}`;
 
@@ -357,7 +364,8 @@ export default function ChatSummaryPage() {
         const err = await resGov.json();
         throw new Error(err.error || '거버넌스 승인 실패');
       }
-
+      
+      setGovernanceStep('resolving');
       // Step 2: War-Room Status Resolution
       const resRes = await fetch(getApiUrl('/warroom/resolve'), {
         method: 'POST',
@@ -367,6 +375,7 @@ export default function ChatSummaryPage() {
 
       if (resRes.ok) {
         setGovSuccess(true);
+        setGovernanceStep('done');
         setIncidentStatus('처리완료');
         alert("지식화 및 장애/보고 처리가 성공적으로 완료되었습니다.\n인시던트 상태가 '처리완료'로 업데이트되었습니다.");
         // Final Step: Redirect to Dashboard
@@ -379,6 +388,7 @@ export default function ChatSummaryPage() {
       alert(`처리 중 오류가 발생했습니다: ${err.message}`);
     } finally {
       setIsGoverning(false);
+      if (incidentStatus !== '처리완료') setGovernanceStep(null);
     }
   };
 
@@ -431,8 +441,11 @@ export default function ChatSummaryPage() {
               <Shield className="w-4 h-4 text-indigo-200 group-hover:rotate-12 transition-transform" />
             )}
             <div className="flex flex-col items-start leading-none space-y-0.5">
-              <span className="text-[10px] opacity-70 font-mono tracking-widest uppercase">Closure</span>
-              <span>{isGoverning ? 'Processing Closure...' : (govSuccess || incidentStatus === '처리완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}</span>
+              <span>
+                {isGoverning 
+                  ? (governanceStep === 'knowledge' ? '지식화(RAG) 등록 중...' : governanceStep === 'resolving' ? '인시던트 상태 업데이트 중...' : '분석 중입니다...') 
+                  : (govSuccess || incidentStatus === '처리완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}
+              </span>
             </div>
           </button>
 
@@ -485,10 +498,23 @@ export default function ChatSummaryPage() {
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-500 font-bold uppercase">Report Status</div>
                 <div className="flex items-center space-x-1.5">
-                  <span className={`w-2 h-2 rounded-full animate-pulse ${isLoading ? 'bg-orange-500 box-shadow-glow-orange' : 'bg-emerald-500'}`} />
                   <span className={`text-sm font-bold ${isLoading ? 'text-orange-400' : 'text-emerald-400'}`}>
-                    {isLoading ? '처리중...' : 'Verified'}
+                    {isLoading ? '분석중입니다' : 'Verified'}
                   </span>
+                  {!isLoading && (
+                    <button 
+                      onClick={() => {
+                        setSummary('');
+                        // Trigger re-fetch logic which is in useEffect but tied to incidentId
+                        // To trigger re-fetch, I can increment a refresh count
+                        window.location.reload(); 
+                      }}
+                      className="p-1 rounded-full hover:bg-white/10 text-slate-500 hover:text-white transition-all ml-1"
+                      title="다시 분석하기"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="space-y-1">
@@ -503,12 +529,21 @@ export default function ChatSummaryPage() {
             {/* Content Area */}
             <div className="content-area min-h-[400px]">
               {isLoading && !summary ? (
-                <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                  <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-                  <p className="text-sm text-slate-400 animate-pulse font-mono tracking-wide">
-                    Dify AI 엔진을 통해 채팅 내역을 분석하여 리포트를 생성하고 있습니다. 잠시만 기다려 주세요...
-                  </p>
-                  <p className="text-xs text-blue-500 font-black animate-bounce tracking-widest uppercase">처리중입니다..</p>
+                <div className="flex flex-col items-center justify-center py-20 space-y-6">
+                  <div className="relative">
+                    <div className="w-16 h-16 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin" />
+                    <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-blue-400 animate-pulse" />
+                  </div>
+                  <div className="text-center space-y-2">
+                    <p className="text-sm text-slate-400 font-mono tracking-wide max-w-sm">
+                      {loadingStatus}
+                    </p>
+                    <div className="flex items-center justify-center space-x-1">
+                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" />
+                    </div>
+                  </div>
                 </div>
               ) : error ? (
                 <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl flex items-center space-x-4">
@@ -527,7 +562,9 @@ export default function ChatSummaryPage() {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                       </div>
-                      <span className="font-black uppercase tracking-widest text-[10px]">Dify AI Hyper-Processing: 처리중입니다..</span>
+                      <span className="font-black uppercase tracking-widest text-[10px]">
+                        AI {loadingStatus.includes('분석') ? '심층 분석 중' : '하이퍼 프로세싱'}: {loadingStatus}
+                      </span>
                     </div>
                   )}
                 </div>

@@ -9,23 +9,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
 
-
-
-// ── 데이터 ─────────────────────────────────────────
-const getApiUrl = (endpoint) => {
-  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  // 🚀 AI 에코시스템은 로컬 백엔드(Python)가 꺼져있을 경우를 대비해 배포된 Worker를 직접 호출한다.
-  // DB 관련 에코시스템만 FastAPI 백엔드 프록시를 통해 동기화 이점을 누린다 (로컬 한정)
-  if (isLocalDev && endpoint.startsWith('/db/')) {
-    return `http://127.0.0.1:8000${endpoint}`;
-  }
-  // 그 외 AI 운영 환경 및 고정 주소는 Cloudflare Worker API 직접 호출
-  return 'https://sguardai.khcho0421.workers.dev' + endpoint;
-};
-
-const API_BASE = getApiUrl('');
-
-// ── 셀렉트 + 기타 입력 컴포넌트 ───────────────────
+// ── 데이터 입력 서브 컴포넌트 ─────────────────────
 function SelectWithOther({ label, icon: Icon, options, value, onChange, required, disabled }) {
   const nonOther = options.filter(o => o !== '기타');
   const initialIsOther = !!value && !nonOther.includes(value);
@@ -82,22 +66,27 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
           onChange={handleOther}
           placeholder={`${label} 직접 입력`}
           className={`${inputClass} mt-2 pl-4`}
-
         />
       )}
     </div>
   );
 }
 
+// ── 메인 대시보드 컴포넌트 ───────────────────────
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [showAgentPanel, setShowAgentPanel] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [agentMessages, setAgentMessages] = useState([]);
-  const [systemStatus, setSystemStatus] = useState('normal'); // normal, critical, recovering
-  const [messages, setMessages] = useState([]); // For top-banner messages
-  const [allNotifications, setAllNotifications] = useState([]); // For notification drawer
+  const [systemStatus, setSystemStatus] = useState('normal'); 
+  const [messages, setMessages] = useState([]); 
+  const [allNotifications, setAllNotifications] = useState([]); 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // 🌐 API Configuration (Cloud Worker Only)
+  const apiBase = 'https://sguardai.khcho0421.workers.dev';
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
@@ -115,12 +104,11 @@ export default function DashboardPage() {
   const [selectedIncidentIdFlow, setSelectedIncidentIdFlow] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
+  const [totalSmsVolume, setTotalSmsVolume] = useState(0);
 
-  // MTTR Timer Effect
+  // MTTR 타이머 실시간 동기화
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -222,9 +210,8 @@ export default function DashboardPage() {
     }
 
     // 🚀 Concurrency Lock: Try to acquire lock before proceeding
-    const lockApiBase = 'https://sguardai.khcho0421.workers.dev';
     try {
-      const lockRes = await fetch(`${lockApiBase}/ai/warroom/lock/${incidentId}`, {
+      const lockRes = await fetch(`${apiBase}/ai/warroom/lock/${incidentId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_name: userProfile?.name || 'Unknown User' })
@@ -269,8 +256,6 @@ export default function DashboardPage() {
 
     // 2. Persist to DB
     try {
-      const apiBase = 'https://sguardai.khcho0421.workers.dev';
-      
       // Save to warroom_list
       const res = await fetch(`${apiBase}/ai/warroom/open`, {
         method: 'POST',
@@ -326,8 +311,7 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("Failed to open War-Room:", err);
       // Clean up lock on failure so others can try
-      const lockApiBase = 'https://sguardai.khcho0421.workers.dev';
-      fetch(`${lockApiBase}/ai/warroom/lock/${incidentId}`, { method: 'DELETE' }).catch(() => {});
+      fetch(`${apiBase}/ai/warroom/lock/${incidentId}`, { method: 'DELETE' }).catch(() => {});
     }
   };
 
@@ -349,7 +333,7 @@ export default function DashboardPage() {
       if (token) {
         try {
           const userId = token.replace('sguard-token-', '');
-          const res = await fetch(`${API_BASE}/users/${userId}`);
+          const res = await fetch(`${apiBase}/users/${userId}`);
           if (res.ok) {
             const user = await res.json();
             localStorage.setItem('sguard_user', JSON.stringify(user));
@@ -386,7 +370,7 @@ export default function DashboardPage() {
 
     const fetchWorkflow = async () => {
       try {
-        const res = await fetch(`${API_BASE}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`);
+        const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`);
         const data = await res.json();
         setIncidentWorkflowSteps(data.steps || []);
       } catch (e) {
@@ -428,7 +412,7 @@ export default function DashboardPage() {
     const historyInterval = setInterval(fetchUserActivityHistory, 15000);
 
     // 🚀 NEW: Real-time SMS Stream (SSE)
-    const sse = new EventSource(getApiUrl('/sms/notification-stream'));
+    const sse = new EventSource(`${apiBase}/sms/notification-stream`);
     sse.addEventListener('new_sms', (event) => {
       console.log('Real-time SMS Event:', event.data);
       // Immediately pull fresh data when a new SMS notification arrives
@@ -463,7 +447,6 @@ export default function DashboardPage() {
   const fetchWarRooms = async () => {
     if (!userProfile?.id) return;
     try {
-      const apiBase = 'https://sguardai.khcho0421.workers.dev';
       const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.id}`);
       if (res.ok) {
         const data = await res.json();
@@ -485,7 +468,6 @@ export default function DashboardPage() {
 
   const fetchActivityLogs = async () => {
     try {
-      const apiBase = 'https://sguardai.khcho0421.workers.dev';
       const res = await fetch(`${apiBase}/activity-logs`);
       if (res.ok) {
         const data = await res.json();
@@ -499,7 +481,7 @@ export default function DashboardPage() {
   const fetchMyAssignments = async () => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`);
+      const res = await fetch(`${apiBase}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`);
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
@@ -516,7 +498,7 @@ export default function DashboardPage() {
   const fetchUserActivityHistory = async () => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${API_BASE}/ai/user/activity-history?user_id=${userProfile.id}`);
+      const res = await fetch(`${apiBase}/ai/user/activity-history?user_id=${userProfile.id}`);
       if (res.ok) {
         const data = await res.json();
         setUserActivityHistory(data.history || []);
@@ -530,7 +512,7 @@ export default function DashboardPage() {
     e.stopPropagation();
     if (!userProfile?.id || !window.confirm('이 워룸에서 나가시겠습니까?')) return;
     try {
-      const res = await fetch(`${API_BASE}/ai/warroom/leave`, {
+      const res = await fetch(`${apiBase}/ai/warroom/leave`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userProfile.id, inc_id: inc_id })
@@ -546,7 +528,7 @@ export default function DashboardPage() {
   const updateAssignmentStatus = async (inc_id, newStatus) => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${API_BASE}/ai/incident/status`, {
+      const res = await fetch(`${apiBase}/ai/incident/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -565,7 +547,7 @@ export default function DashboardPage() {
 
   const fetchSMSMessages = async () => {
     try {
-      const response = await fetch(getApiUrl('/sms/recent?limit=20'));
+      const response = await fetch(`${apiBase}/sms/recent?limit=20`);
       if (response.ok) {
         const data = await response.json();
         const freshMsgs = (data.messages || []).filter(msg => {
@@ -601,9 +583,13 @@ export default function DashboardPage() {
             uniqueMap.set(msg.inc_id, msg);
           }
         });
+        
         const finalMsgs = Array.from(uniqueMap.values());
-
         setSmsMessages(finalMsgs);
+
+        // Calculate total SMS volume from the visible list
+        const totalVolume = finalMsgs.reduce((acc, m) => acc + (Number(m.received_count) || 1), 0);
+        setTotalSmsVolume(totalVolume);
 
         // --- 실시간 자동 분석 트리거 (New Arrival OR Update Automation) ---
         if (finalMsgs.length > 0) {
@@ -642,7 +628,7 @@ export default function DashboardPage() {
   const deleteSMSMessage = async (e, id) => {
     e.stopPropagation();
     try {
-      const response = await fetch(getApiUrl(`/sms/${id}`), { method: 'DELETE' });
+      const response = await fetch(`${apiBase}/sms/${id}`, { method: 'DELETE' });
       if (response.ok) {
         // 즉시 화면에서 제거하기 위한 로컬 상태 업데이트
         setDeletedSmsIds(prev => {
@@ -668,7 +654,8 @@ export default function DashboardPage() {
     { id: 'info', label: 'Info', val: 156, icon: Info, color: 'bg-blue-500/20', text: 'text-blue-400', bar: 'bg-blue-500', borderColor: 'border-blue-500/30' },
   ];
 
-  // Real-time metrics simulation
+
+
   const [metrics, setMetrics] = useState({
     cpu: 45,
     memory: 52,
@@ -816,8 +803,7 @@ export default function DashboardPage() {
       if (currentIncId) {
         console.log(`AI Analysis Done for ${currentIncId}. Saving to DB...`);
         // Save to DB
-        const baseUrl = 'https://sguardai.khcho0421.workers.dev';
-        fetch(`${baseUrl}/ai/chat-history/save`, {
+        fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -861,7 +847,7 @@ export default function DashboardPage() {
 
     // Trigger Assignment to the current user
     if (userProfile?.id) {
-      fetch(`${API_BASE}/ai/incident/assign`, {
+      fetch(`${apiBase}/ai/incident/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -877,11 +863,9 @@ export default function DashboardPage() {
 
 
     try {
-      // -------------------------------------------------------------
-      // UNIFIED STREAMING: AiInsightPanel에서 통합 수행하므로 중복 호출 제거.
       // Dashboard에서는 히스토리 존재 여부만 체크하고 패널을 열어준다.
       // -------------------------------------------------------------
-      const checkRes = await fetch(getApiUrl(`/ai/chat-history/${cleanIncId}`));
+      const checkRes = await fetch(`${apiBase}/ai/chat-history/${cleanIncId}`);
       if (checkRes.ok) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
@@ -923,9 +907,7 @@ export default function DashboardPage() {
         const reportTitle = "Agent Discussion Report " + new Date().toISOString().split('T')[0];
         const reportContent = agentMessages.map(m => `[${m.role}] ${m.text}`).join('\n');
 
-        const apiUrl = 'https://sguardai.khcho0421.workers.dev/ai/report/save';
-
-        const res = await fetch(apiUrl, {
+        const res = await fetch(`${apiBase}/ai/report/save`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1013,11 +995,12 @@ export default function DashboardPage() {
 
     return (
       <ProfileModalContent
+        apiBase={apiBase}
         profile={currentProfile}
         onClose={() => setShowProfileModal(false)}
         onSave={async (updated) => {
           try {
-            const res = await fetch(`${API_BASE}/auth/profile`, {
+            const res = await fetch(`${apiBase}/auth/profile`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1224,14 +1207,20 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {selectedSms && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSelectedSms(null); }}
-                      className="text-[10px] bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-2 py-1 rounded-full hover:bg-yellow-500/20 transition-colors"
-                    >
-                      분석 취소 ✕
-                    </button>
-                  )}
+                  <button 
+                    disabled={isRefreshing}
+                    onClick={async (e) => { 
+                      e.stopPropagation(); 
+                      setIsRefreshing(true);
+                      console.log("Manual Refresh Triggered - CURRENT API:", apiBase);
+                      await Promise.all([fetchSMSMessages(), fetchMyAssignments()]);
+                      setTimeout(() => setIsRefreshing(false), 1000);
+                    }}
+                    className={`text-[10px] ${isRefreshing ? 'bg-blue-600/30' : 'bg-blue-600/10'} border border-blue-500/30 text-blue-400 px-3 py-1.5 rounded-xl hover:bg-blue-600/20 transition-all font-black flex items-center gap-1.5 shadow-sm active:scale-95`}
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                  </button>
                   <div className="flex items-center space-x-2">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -1251,7 +1240,7 @@ export default function DashboardPage() {
                     const isSelected = selectedSms?.inc_id === msg.inc_id;
                     return (
                       <div
-                        key={msg.inc_id}
+                        key={`sms-${msg.inc_id}`}
                         onClick={() => {
                           const isSelected = selectedSms?.inc_id === msg.inc_id;
                           setSelectedSms(isSelected ? null : msg);
@@ -1277,21 +1266,32 @@ export default function DashboardPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center space-x-2">
-                                <h4 className={`font-bold text-sm ${isSelected ? 'text-yellow-300' : 'text-white'}`}>SMS 수신</h4>
-                                {msg.keyword_detected && (
-                                  <span className="bg-yellow-400/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-400/30">
-                                    키워드 감지
+                                <div className="flex items-center gap-1.5">
+                                  <h4 className={`font-black text-sm tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
+                                    {msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Auto-Detection'}
+                                  </h4>
+                                </div>
+                                <div className="flex items-center gap-2 ml-auto select-none font-mono">
+                                  <span 
+                                    translate="no"
+                                    className={`text-[10px] font-black px-2 py-0.5 rounded-lg border flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
+                                    Number(msg.is_analyzed) >= 1 
+                                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 opacity-100' 
+                                      : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
+                                  }`}>
+                                    {Number(msg.is_analyzed) >= 1 ? (
+                                      <span className="flex items-center gap-1.5">
+                                        <CheckCircle2 key={`check-${msg.inc_id}`} className="w-3 h-3 text-blue-500" />
+                                        <span>ANL_COMPLETE</span>
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1.5">
+                                        <Zap key={`zap-${msg.inc_id}`} className="w-3 h-3 text-yellow-500 animate-pulse" />
+                                        <span>ANALYZING...</span>
+                                      </span>
+                                    )}
                                   </span>
-                                )}
-                                {isSelected && (
-                                  <span className="bg-yellow-500/20 text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-500/30 animate-pulse">
-                                    ⚡ 분석 중
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 ml-auto">
-                                <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                                <span className="text-[10px] text-slate-400 font-black bg-white/5 px-2.5 py-0.5 rounded-lg border border-white/5 shadow-inner">
                                   {formatYYMMDD(msg.timestamp)}
                                 </span>
                               </div>
@@ -1300,22 +1300,17 @@ export default function DashboardPage() {
                               <p className="text-xs text-slate-400">발신: {msg.sender}</p>
                               {msg.employee_id && (
                                 <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-                                  사번: {msg.employee_id}
+                                  사번: {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
                                 </span>
                               )}
                             </div>
                              <div className="flex items-center justify-between gap-4">
                                <p className={`text-sm leading-snug flex-1 ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
-                               {msg.received_count >= 2 && (
-                                 <span className="text-[11px] font-black text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 whitespace-nowrap shadow-[0_0_15px_rgba(37,99,235,0.2)]">
-                                   수신건수 : {msg.received_count} 건
-                                 </span>
-                               )}
                                <button
                                  onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
                                  className="text-[10px] font-black text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all flex items-center gap-1 border border-white/5 shadow-sm"
                                >
-                                 상세 흐름 보기 <ExternalLink className="w-2.5 h-2.5" />
+                                 진행 상태 <ExternalLink className="w-2.5 h-2.5" />
                                </button>
                              </div>
                           </div>
@@ -1475,7 +1470,6 @@ export default function DashboardPage() {
         </div>
 
 
-        {/* Section 3: My Confirmation History & Recent List */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div className="flex items-center space-x-2">
@@ -1503,26 +1497,26 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Total */}
-            <div className="bg-[#11141d] p-6 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-white/20 transition-all" onClick={() => navigate('/assignments?tab=전체')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-slate-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-5 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-blue-500/40 transition-all shadow-lg" onClick={() => navigate('/assignments?tab=전체')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
               <p className="text-[10px] text-slate-500 mb-1 font-black uppercase tracking-widest">Total Incidents</p>
               <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-4xl font-black text-white ${totalAssignedCount > 0 ? 'underline underline-offset-8' : ''}`}>{totalAssignedCount}</span>
-                <span className="text-xs text-slate-600 font-bold">건</span>
+                <span className={`text-5xl font-black text-white font-mono tracking-tighter ${totalAssignedCount > 0 ? 'text-shadow-blue' : ''}`}>{totalAssignedCount}</span>
+                <span className="text-xs text-slate-600 font-black uppercase tracking-tighter">Idx</span>
               </div>
-              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-400 w-full transition-all duration-1000" />
+              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+                <div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 w-full transition-all duration-1000" />
               </div>
             </div>
 
-            {/* Unconfirmed (Red Gauge) - Pulse only if count > 0 */}
-            <div className={`bg-[#11141d] p-6 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-red-500/30 transition-all ${myAssignments.filter(a => a.status === '미확인').length > 0 ? 'border-red-500/20' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=상태: 미확인')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            {/* Unconfirmed (Red Gauge) */}
+            <div className={`bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-5 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-red-500/40 transition-all ${myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 ? 'border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=상태: 미확인')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
               <div className="flex justify-between items-start mb-1">
                 <p className="text-[10px] text-red-500/60 font-black uppercase tracking-widest">Unconfirmed</p>
-                {myAssignments.filter(a => a.status === '미확인').length > 0 && (
+                {myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 && (
                   <span className="flex h-2 w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></span>
@@ -1530,23 +1524,23 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-4xl font-black text-red-500 ${myAssignments.filter(a => a.status === '미확인').length > 0 ? 'underline underline-offset-8' : ''}`}>{myAssignments.filter(a => a.status === '미확인').length}</span>
-                <span className="text-xs text-red-900 font-bold">건</span>
+                <span className={`text-5xl font-black text-red-500 font-mono tracking-tighter ${myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 ? 'text-shadow-red' : ''}`}>{myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length}</span>
+                <span className="text-xs text-red-900 font-black uppercase tracking-tighter">New</span>
               </div>
-              <div className="h-1.5 w-full bg-red-950/30 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
                 <div 
-                  className="h-full bg-red-600 transition-all duration-1000" 
-                  style={{ width: `${(myAssignments.filter(a => a.status === '미확인').length / (totalAssignedCount || 1)) * 100}%` }} 
+                  className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-1000" 
+                  style={{ width: `${(myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length / (totalAssignedCount || 1)) * 100}%` }} 
                 />
               </div>
             </div>
 
             {/* Processing (Orange Gauge) - Pulse if count > 0 */}
-            <div className={`bg-[#11141d] p-6 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-orange-500/30 transition-all ${myAssignments.filter(a => a.status === '처리중').length > 0 ? 'border-orange-500/20' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=처리중')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className={`bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-6 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-orange-500/40 transition-all ${myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 ? 'border-orange-500/20 shadow-[0_0_30px_rgba(249,115,22,0.1)]' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=처리중')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
               <div className="flex justify-between items-start mb-1">
                 <p className="text-[10px] text-orange-500/60 font-black uppercase tracking-widest">In Progress</p>
-                {myAssignments.filter(a => a.status === '처리중').length > 0 && (
+                {myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 && (
                   <span className="flex h-2 w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]"></span>
@@ -1554,29 +1548,29 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-4xl font-black text-orange-500 ${myAssignments.filter(a => a.status === '처리중').length > 0 ? 'underline underline-offset-8' : ''}`}>{myAssignments.filter(a => a.status === '처리중').length}</span>
-                <span className="text-xs text-orange-900 font-bold">건</span>
+                <span className={`text-5xl font-black text-orange-500 font-mono tracking-tighter ${myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 ? 'text-shadow-orange' : ''}`}>{myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length}</span>
+                <span className="text-xs text-orange-950 font-black uppercase tracking-tighter">Inc</span>
               </div>
-              <div className="h-1.5 w-full bg-orange-950/30 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
                 <div 
-                  className="h-full bg-orange-600 transition-all duration-1000" 
-                  style={{ width: `${(myAssignments.filter(a => a.status === '처리중').length / (totalAssignedCount || 1)) * 100}%` }} 
+                  className="h-full bg-gradient-to-r from-orange-600 to-orange-400 transition-all duration-1000" 
+                  style={{ width: `${(myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length / (totalAssignedCount || 1)) * 100}%` }} 
                 />
               </div>
             </div>
 
             {/* Completed (Blue Gauge) */}
-            <div className="bg-[#11141d] p-6 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-blue-500/20 transition-all" onClick={() => navigate('/assignments?tab=처리완료')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <p className="text-[10px] text-blue-500/60 mb-1 font-black uppercase tracking-widest">Completed</p>
+            <div className="bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-5 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-emerald-500/40 transition-all shadow-lg" onClick={() => navigate('/assignments?tab=처리완료')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
+              <p className="text-[10px] text-emerald-500/60 mb-1 font-black uppercase tracking-widest">Completed</p>
               <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-4xl font-black text-blue-500 ${myAssignments.filter(a => a.status === '처리완료').length > 0 ? 'underline underline-offset-8' : ''}`}>{myAssignments.filter(a => a.status === '처리완료').length}</span>
-                <span className="text-xs text-blue-900 font-bold">건</span>
+                <span className={`text-5xl font-black text-emerald-500 font-mono tracking-tighter ${myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length > 0 ? 'text-shadow-emerald' : ''}`}>{myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length}</span>
+                <span className="text-xs text-emerald-900 font-black uppercase tracking-tighter">Fin</span>
               </div>
-              <div className="h-1.5 w-full bg-blue-950/30 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
                 <div 
-                  className="h-full bg-blue-600 transition-all duration-1000" 
-                  style={{ width: `${(myAssignments.filter(a => a.status === '처리완료').length / (totalAssignedCount || 1)) * 100}%` }} 
+                  className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000" 
+                  style={{ width: `${(myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length / (totalAssignedCount || 1)) * 100}%` }} 
                 />
               </div>
             </div>
@@ -1598,7 +1592,7 @@ export default function DashboardPage() {
             {myAssignments.length > 0 ? (
               myAssignments.slice(0, 5).map((item) => (
                 <div
-                  key={item.inc_id}
+                  key={`assign-${item.id || item.inc_id}`}
                   className={`p-4 rounded-2xl border relative group hover:border-white/10 transition-colors cursor-pointer
                     ${(item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/5 border-red-500/10' : 
                       (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/5 border-orange-500/10' : 
@@ -1629,6 +1623,49 @@ export default function DashboardPage() {
                             SMS
                           </span>
                           <h4 className="text-sm font-bold text-white truncate">{item.message || '상공 발생'}</h4>
+                          {Number(item.received_count || 1) >= 2 && (
+                             <div key={`rc-assign-${item.inc_id}`} className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-600/20 to-indigo-500/20 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)] backdrop-blur-sm group/badge hover:scale-105 transition-transform">
+                               <span className="text-[10px] font-black font-mono text-blue-400 group-hover/badge:text-blue-300 transition-colors">
+                                 {Math.max(Number(item.received_count || 0), Number(item.occurrence_count || 0)) || 1}
+                               </span>
+                               <span className="text-[8px] font-bold text-blue-500/60 uppercase tracking-tighter">Event</span>
+                             </div>
+                          )}
+                          {Number(item.keyword_detected || 0) > 0 && (
+                            <div className="flex items-center gap-1.5 flex-shrink-0 select-none">
+                              <span className="bg-yellow-400/20 text-yellow-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-yellow-400/30 flex items-center gap-1 shadow-[0_0_15px_rgba(250,204,21,0.2)] animate-pulse">
+                                <Zap key={`zap-assign-${item.inc_id}`} className="w-2.5 h-2.5" />
+                                키워드 감지 ({item.keyword_detected})
+                              </span>
+                                   <span 
+                            key={`status-assign-${item.inc_id}`} 
+                            translate="no"
+                            className={`text-[10px] font-black px-2 py-0.5 rounded border flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
+                            Number(item.is_analyzed) >= 1 
+                              ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' 
+                              : (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS')
+                                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 animate-pulse'
+                                : 'hidden'
+                          }`}>
+                            {Number(item.is_analyzed) >= 1 ? (
+                               <span className="flex items-center gap-1.5">
+                                 <CheckCircle2 key={`check-assign-${item.id || item.inc_id}`} className="w-3 h-3 text-blue-500" />
+                                 <span>ANL_COMPLETE</span>
+                               </span>
+                            ) : (
+                               <span className="flex items-center gap-1.5">
+                                 <Zap key={`zap-assign-${item.id || item.inc_id}`} className="w-3 h-3 text-yellow-500 animate-pulse" />
+                                 <span>분석 중</span>
+                               </span>
+                            )}
+                          </span>
+                              {item.response_message && (
+                                <span className="text-[9px] text-yellow-500/60 font-medium px-1 max-w-[100px] truncate" title={item.response_message}>
+                                  {item.response_message}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <div className={`text-[10px] font-bold px-3 py-1 rounded-full border shadow-sm transition-all duration-300 flex items-center gap-1.5
@@ -1658,7 +1695,7 @@ export default function DashboardPage() {
                               item.status === '처리중' ? 'bg-orange-400' : 
                               'bg-emerald-400'
                             }`} />
-                             {item.status}
+                             {item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS' ? '분석중입니다' : item.status}
                              {(item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') && (
                                <span className="text-[9px] opacity-70 ml-1 border-l border-orange-500/30 pl-1.5 flex items-center gap-1">
                                  <MessageSquare className="w-2.5 h-2.5" />
@@ -1678,13 +1715,17 @@ export default function DashboardPage() {
                             {item.sender_part || ''} {item.sender_name || item.employee_id}
                           </span>
                         )}
-                        {item.received_count > 1 && (
-                          <span className="text-blue-400/80 font-bold">({item.received_count}건 중복)</span>
-                        )}
                       </p>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/chat/${String(item.inc_id).replace('INC-', '')}`); }}
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (['미확인', '미처리', '대기'].includes(item.status)) {
+                          alert("해당 워룸이 존재하지 않습니다.");
+                          return;
+                        }
+                        navigate(`/chat/${String(item.inc_id).replace('INC-', '')}`); 
+                      }}
                       className="ml-4 p-2.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all group/flow"
                       title="해당 War-Room으로 즉시 이동"
                     >
@@ -2127,7 +2168,7 @@ function AlertItem({ title, time, severity, desc, isSelected }) {
   );
 }
 
-function ProfileModalContent({ profile, onClose, onSave, navigate }) {
+function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
   // ── 조직도 동적 상태 ──
   const [honbuList, setHonbuList] = useState([]);
   const [orgMapping, setOrgMapping] = useState({});
@@ -2135,7 +2176,7 @@ function ProfileModalContent({ profile, onClose, onSave, navigate }) {
   const [partMapping, setPartMapping] = useState({});
 
   useEffect(() => {
-    fetch(`${API_BASE}/org/tree`)
+    fetch(`${apiBase}/org/tree`)
       .then(r => r.json())
       .then(tree => {
         const hList = [];
@@ -2212,7 +2253,7 @@ function ProfileModalContent({ profile, onClose, onSave, navigate }) {
 
     setIsChangingPassword(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/change-password`, {
+      const res = await fetch(`${apiBase}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: profile.inc_id, new_password: newPassword }),

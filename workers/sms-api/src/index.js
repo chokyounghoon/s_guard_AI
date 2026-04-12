@@ -13,6 +13,33 @@ const getKst = () => {
   return new Date(now.getTime() + kstOffset).toISOString().replace('T', ' ').substring(0, 19)
 }
 
+// 🚀 Database One-time Migration Endpoint
+app.get('/debug/db-init', async (c) => {
+  const db = c.env.DB;
+  const results = [];
+  
+  const columns = [
+    { name: 'received_count', type: 'INTEGER DEFAULT 1' },
+    { name: 'keyword_detected', type: 'INTEGER DEFAULT 0' },
+    { name: 'response_message', type: 'TEXT' }
+  ];
+
+  for (const col of columns) {
+    try {
+      await db.prepare(`ALTER TABLE received_messages ADD COLUMN ${col.name} ${col.type}`).run();
+      results.push({ column: col.name, status: 'Added successfully' });
+    } catch (e) {
+      results.push({ column: col.name, status: 'Already exists or error', error: e.message });
+    }
+  }
+  
+  return c.json({ 
+    message: 'Database structure check complete', 
+    results,
+    timestamp: getKst()
+  });
+});
+
 // Utility to generate unique numeric string ID (YYYYMMDDHHMMSS + RRR)
 const generateIncId = () => {
   const now = new Date();
@@ -729,11 +756,27 @@ app.post('/sms/receive', async (c) => {
   const kstNow = new Date(now.getTime() + kstOffset)
   const timestamp = kstNow.toISOString().replace('T', ' ').substring(0, 19)
   
+  // 🚀 Enhanced Keyword Detection: Identify and count critical keywords (Case-Insensitive)
+  const { results: keywordList } = await db.prepare("SELECT keyword FROM alert_keywords").all()
+  const matchedKeywords = []
+  const lowerMessage = (message || "").toLowerCase()
+  
+  for (const k of keywordList) {
+    if (k.keyword && lowerMessage.includes(k.keyword.toLowerCase())) {
+      matchedKeywords.push(k.keyword)
+    }
+  }
+  const detectedCount = matchedKeywords.length
+  const response_msg = matchedKeywords.join(', ')
+
+  // Normalize sender phone number (remove dashes, spaces, etc.) for cross-device consistency
+  const normSender = String(sender || '').replace(/[^0-9]/g, '');
+
   // Daily Duplicate check (same sender and message within the current KST day)
   const todayStart = kstNow.toISOString().substring(0, 10) + ' 00:00:00'
   const existing = await db.prepare(
-    "SELECT inc_id, received_count FROM received_messages WHERE sender = ? AND message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
-  ).bind(sender, message, todayStart).first()
+    "SELECT inc_id, received_count FROM received_messages WHERE (sender = ? OR REPLACE(REPLACE(sender, '-', ''), ' ', '') = ?) AND message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
+  ).bind(sender, normSender, message, todayStart).first()
 
   if (existing) {
     const newCount = (existing.received_count || 1) + 1
@@ -741,6 +784,7 @@ app.post('/sms/receive', async (c) => {
     await db.prepare(`
       UPDATE received_messages SET 
         received_count = ?, timestamp = ?, mod_dt = ?, employee_id = ?,
+        keyword_detected = ?, response_message = ?,
         channel = ?, if_id = ?, service_code = ?, service_name = ?, 
         biz_system = ?, error_code = ?, occurrence_count = ?, 
         occurrence_node = ?, error_message = ?, occurrence_time = ?,
@@ -751,6 +795,7 @@ app.post('/sms/receive', async (c) => {
       WHERE inc_id = ?
     `).bind(
       newCount, timestamp, timestamp, employee_id || null,
+      detectedCount, response_msg || null,
       channel || null, if_id || null, service_code || null, service_name || null,
       biz_system || null, error_code || null, count,
       occurrence_node || null, error_message || null, finalOccurrenceTime || null,
@@ -798,21 +843,11 @@ app.post('/sms/receive', async (c) => {
     return c.json({ status: 'duplicate_incremented', inc_id: existing.inc_id, received_count: newCount })
   }
 
-  // Keyword detection from DB
-  const { results: keywordList } = await db.prepare("SELECT keyword, response FROM alert_keywords").all()
-  let response_msg = null
-  let detected = false
-  
-  for (const k of keywordList) {
-    if (message.includes(k.keyword)) {
-      detected = true
-      response_msg = k.response
-      break
-    }
-  }
 
   const newIncId = generateIncId()
   const parsedCount = parseInt(String(occurrence_count || '0').replace(/[^0-9]/g, '')) || 0
+  const initialCount = parsedCount > 0 ? parsedCount : 1
+
   await db.prepare(`
     INSERT INTO received_messages (
       inc_id, sender, message, employee_id, timestamp, keyword_detected, 
@@ -838,8 +873,8 @@ app.post('/sms/receive', async (c) => {
       ?, ?, ?, ?
     )
   `).bind(
-    newIncId, sender || null, message || null, employee_id || null, timestamp, detected ? 1 : 0, 
-    response_msg || null, 1,
+    newIncId, sender || null, message || null, employee_id || null, timestamp, detectedCount, 
+    response_msg || null, initialCount,
     channel || null, if_id || null, service_code || null, service_name || null,
     biz_system || null, error_code || null, parsedCount,
     occurrence_node || null, error_message || null, finalOccurrenceTime || null,
@@ -914,8 +949,9 @@ app.get('/sms/notification-stream', async (c) => {
               sender: latest.sender,
               message: latest.message,
               timestamp: latest.timestamp,
-              keyword_detected: latest.keyword_detected === 1 || latest.keyword_detected === true,
-              response_message: latest.response_message
+              keyword_detected: parseInt(String(latest.keyword_detected || '0')),
+              response_message: latest.response_message,
+              received_count: parseInt(String(latest.received_count || '1'))
             })
           })
         }
@@ -939,7 +975,8 @@ app.get('/sms/recent', async (c) => {
   
   // JOIN with users to get proper name/team in the list
   const { results } = await db.prepare(`
-    SELECT r.*, u.name, u.role, u.team, u.part
+    SELECT r.*, u.name, u.role, u.team, u.part,
+           (SELECT COUNT(1) FROM autopilot_insight ai WHERE TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed
     FROM received_messages r
     LEFT JOIN users u ON r.employee_id = u.employee_id
     ORDER BY r.timestamp DESC 
@@ -956,7 +993,9 @@ app.get('/sms/recent', async (c) => {
     message: r.message, 
     employee_id: r.employee_id,
     timestamp: r.timestamp, 
-    keyword_detected: r.keyword_detected,
+    keyword_detected: parseInt(String(r.keyword_detected || '0')),
+    response_message: r.response_message,
+    received_count: parseInt(String(r.received_count || '1')),
     channel: r.channel,
     if_id: r.if_id,
     service_code: r.service_code,
@@ -1290,6 +1329,72 @@ app.post('/sms/keywords/delete/:keyword', async (c) => {
   return c.json({ status: "success" })
 })
 
+// ==========================================
+// 🚀 NEW: Codebook (Common Code) APIs
+// ==========================================
+app.get('/sms/codebook', async (c) => {
+  const db = c.env.DB
+  const category = c.req.query('category')
+  let query = "SELECT * FROM code_book WHERE is_active = 1"
+  let params = []
+  
+  if (category) {
+    query += " AND category = ?"
+    params.push(category)
+  }
+  query += " ORDER BY category ASC, sort_order ASC"
+  
+  const { results } = await db.prepare(query).bind(...params).all()
+  return c.json({ codes: results })
+})
+
+app.post('/sms/codebook', async (c) => {
+  const data = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  
+  const res = await db.prepare(`
+    INSERT INTO code_book (
+      category, code, name, sort_order, is_active, description, 
+      reg_id, reg_dt, mod_id, mod_dt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.category, data.code, data.name, data.sort_order || 0, 
+    data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+    data.description || null,
+    data.reg_id || 'SYSTEM', now, data.mod_id || 'SYSTEM', now
+  ).run()
+  
+  return c.json({ status: "success", id: res.meta.last_row_id })
+})
+
+app.put('/sms/codebook/:id', async (c) => {
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+  
+  await db.prepare(`
+    UPDATE code_book SET 
+      category = ?, code = ?, name = ?, sort_order = ?, 
+      is_active = ?, description = ?, mod_dt = ?
+    WHERE id = ?
+  `).bind(
+    data.category, data.code, data.name, data.sort_order || 0,
+    data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+    data.description || null, now, id
+  ).run()
+  
+  return c.json({ status: "success" })
+})
+
+app.delete('/sms/codebook/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  await db.prepare("DELETE FROM code_book WHERE id = ?").bind(id).run()
+  return c.json({ status: "success" })
+})
+
 app.get('/incidents', async (c) => {
   const db = c.env.DB
   const { inc_id, keyword, startDate, endDate, orgCode, assignee } = c.req.query()
@@ -1307,18 +1412,21 @@ app.get('/incidents', async (c) => {
       r.employee_id as sender_employee_id,
       us.name as sender_name,
       r.received_count,
+      r.keyword_detected,
+      r.response_message,
       ua.name as assignee_name,
       GROUP_CONCAT(DISTINCT uaa.name) as assignment_list,
       COALESCE(ua.company, uaa.company) as company,
       COALESCE(ua.honbu, uaa.honbu) as honbu,
       COALESCE(ua.team, uaa.team) as team,
       COALESCE(ua.part, uaa.part) as part,
-      COALESCE(ua.subpart, uaa.subpart) as subpart
+      COALESCE(ua.subpart, uaa.subpart) as subpart,
+      (SELECT COUNT(1) FROM autopilot_insight ai WHERE REPLACE(ai.inc_id, 'INC-', '') = REPLACE(i.inc_id, 'INC-', '')) as is_analyzed
     FROM incidents i
     LEFT JOIN users ua ON i.assigned_to = ua.employee_id
     LEFT JOIN incident_assignments ia ON i.inc_id = ia.inc_id
     LEFT JOIN users uaa ON ia.user_id = uaa.employee_id
-    LEFT JOIN received_messages r ON (i.inc_id = r.inc_id OR i.source_sms_id = r.inc_id)
+    LEFT JOIN received_messages r ON (REPLACE(i.inc_id, 'INC-', '') = REPLACE(r.inc_id, 'INC-', '') OR REPLACE(i.source_sms_id, 'INC-', '') = REPLACE(r.inc_id, 'INC-', ''))
     LEFT JOIN users us ON (r.employee_id = us.employee_id OR r.sender = us.phone)
     WHERE 1=1
   `
@@ -1499,7 +1607,7 @@ app.get('/warroom/rooms', async (c) => {
       (SELECT COUNT(*) FROM warroom_chats wc WHERE wc.inc_id = w.inc_id)       AS message_count,
       (SELECT COUNT(*) FROM warroom_attachments wa WHERE wa.inc_id = w.inc_id) AS attachment_count,
       (SELECT wc2.text FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)     AS last_message,
-      (SELECT wc2.sender FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
+      (SELECT u_msg.name FROM warroom_chats wc2 LEFT JOIN users u_msg ON wc2.sender = u_msg.employee_id WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
       (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
     FROM warroom_list w
     LEFT JOIN received_messages r ON w.inc_id = r.inc_id
@@ -1968,7 +2076,7 @@ app.post('/ai/generate-report', async (c) => {
 
   const [{ results: agentLogs }, { results: chatLogs }, { results: attachments }] = await Promise.all([
     db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(rawId).all(),
-    db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(rawId).all(),
+    db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC").bind(rawId).all(),
     db.prepare("SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC").bind(rawId).all(),
   ])
 
@@ -2338,6 +2446,7 @@ app.post('/ai/summarize-chat', async (c) => {
       const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first()
       if (cached && cached.summary) {
         console.log(`[Cache Hit] Serving cached summary for ${incident_id}`);
+        await writer.write(encode(`data: ${JSON.stringify({ status: '분석 이력이 존재합니다. 리포트를 불러오고 있습니다...' })}\n\n`));
         const chars = Array.from(cached.summary);
         for (let i = 0; i < chars.length; i += 50) {
           await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
@@ -2352,6 +2461,7 @@ app.post('/ai/summarize-chat', async (c) => {
         let lock = await kv.get(lockKey);
         if (lock === 'processing') {
           console.log(`[Concurrency] Another user is summarizing chat for ${incident_id}. Waiting...`);
+          await writer.write(encode(`data: ${JSON.stringify({ status: '다른 사용자가 분석 중입니다. 대기 중...' })}\n\n`));
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(r => setTimeout(r, 1000));
             const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first();
@@ -2370,7 +2480,7 @@ app.post('/ai/summarize-chat', async (c) => {
       }
 
       // 3. Fetch ONLY user chat history (excluding AI and system messages)
-      const { results: wrResults } = await db.prepare("SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? AND type NOT IN ('system', 'ai_analysis') ORDER BY timestamp ASC").bind(incident_id).all()
+      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(incident_id).all()
       
       const transcript = []
       const combined = [
@@ -2384,6 +2494,8 @@ app.post('/ai/summarize-chat', async (c) => {
       }
 
       const prompt = `다음은 인시던트(${incident_id})에 대한 War-Room 채팅 내역입니다. 이 내용을 바탕으로 장애 대응 과정과 결과를 요약해줘.\n\n[채팅 내역]\n${transcript.join('\n')}\n\n[요약 요구사항]\n1. 장애 개요: 어떤 장애가 발생했는지 요약\n2. 주요 조치 사항: 타임라인별 주요 대응 내용\n3. 최종 결과: 현재 상태 및 조치 결과\n4. 향후 과제: 재발 방지를 위해 필요한 사항 (있을 경우)`
+
+      await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
 
       const difyRes = await fetch(`${api_base}/workflows/run`, {
         method: 'POST',
@@ -2405,6 +2517,7 @@ app.post('/ai/summarize-chat', async (c) => {
       const decoder = new TextDecoder()
       let lineBuffer = ""
       let fullContent = ""
+      let firstChunk = true;
       
       while (true) {
         const { done, value } = await reader.read()
@@ -2424,9 +2537,17 @@ app.post('/ai/summarize-chat', async (c) => {
           try {
             const data = JSON.parse(dataStr)
             if (data.event === 'message' || data.event === 'agent_message') {
+              if (firstChunk) {
+                await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 심층 분석 결과 수신 중...' })}\n\n`));
+                firstChunk = false;
+              }
               fullContent += data.answer;
               await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
             } else if (data.event === 'text_chunk') {
+              if (firstChunk) {
+                await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 결과 수신 중...' })}\n\n`));
+                firstChunk = false;
+              }
               fullContent += data.data.text;
               await writer.write(encode(`data: ${JSON.stringify({ answer: data.data.text })}\n\n`))
             }
@@ -2660,6 +2781,17 @@ app.post('/ai/warroom/open', async (c) => {
   if (creator_id) {
     await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
       .bind(creator_id, normId, now).run()
+      
+    // 🚀 NEW: Ensure creator is also in incident_assignments with status '처리중'
+    await db.prepare(`
+      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
+      VALUES (?, ?, '처리중', ?, ?, ?, ?)
+      ON CONFLICT(user_id, inc_id) 
+      DO UPDATE SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ?
+    `).bind(
+      creator_id, normId, now, now, creator_id, creator_id,
+      now, now, creator_id
+    ).run();
   }
 
   // Update assignment status to '처리중' for all assignees of this incident
@@ -2780,7 +2912,7 @@ app.get('/warroom/report/:id', async (c) => {
 
   // 4. War-Room chat history
   const { results: chatLogs } = await db.prepare(
-    "SELECT sender, role, type, text, timestamp FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC"
+    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
   ).bind(id).all()
 
   // 5. Attachments
@@ -3417,25 +3549,26 @@ app.get('/ai/incident/workflow-details', async (c) => {
   if (!inc_id_param) return c.json({ error: 'inc_id required' }, 400)
   const db = c.env.DB
 
-  const inc_id_str = String(inc_id_param);
-  const id = inc_id_str.startsWith('INC-') ? inc_id_str.slice(4) : inc_id_str;
+  const inc_id_str = String(inc_id_param).trim();
+  const rawId = inc_id_str.replace('INC-', '');
+  const fullId = `INC-${rawId}`;
 
   // Aggregate steps from various tables
   const steps = [];
 
   try {
     // 1. SMS 수신 (received_messages)
-    const sms = await db.prepare("SELECT timestamp FROM received_messages WHERE CAST(inc_id AS TEXT) = ?").bind(id).first();
+    const sms = await db.prepare("SELECT timestamp FROM received_messages WHERE inc_id = ? OR inc_id = ?").bind(rawId, fullId).first();
     if (sms) steps.push({ id: 'SMS', label: 'SMS 수신 및 장애 인지', timestamp: sms.timestamp, detail: '시스템에 장애 메시지가 수신되었습니다.' });
 
     // 2. RAG 분석 완료 (autopilot_insight)
-    const rag = await db.prepare("SELECT reg_dt FROM autopilot_insight WHERE inc_id = ?").bind(id).first();
+    const rag = await db.prepare("SELECT reg_dt FROM autopilot_insight WHERE inc_id = ? OR inc_id = ?").bind(rawId, fullId).first();
     if (rag) steps.push({ id: 'RAG', label: 'RAG 분석 완료', timestamp: rag.reg_dt, detail: 'AI 엔진이 과거 사례 및 지식베이스를 바탕으로 초기 분석을 마쳤습니다.' });
 
     // 3. AI AGENT 분석 완료 (same as RAG)
     if (rag) steps.push({ id: 'AGENT', label: 'AI AGENT 분석 완료', timestamp: rag.reg_dt, detail: '에이전트 그룹의 심층 분석이 완료되었습니다.' });
 
-    // 4. 워룸 생성 (warroom_list JOIN users with extreme robustness)
+    // 4. 워룸 생성 (warroom_list)
     const wr = await db.prepare(`
       SELECT 
         w.reg_dt, 
@@ -3443,43 +3576,50 @@ app.get('/ai/incident/workflow-details', async (c) => {
         w.status, 
         u.name as creator_name
       FROM warroom_list w
-      LEFT JOIN users u ON (
-        TRIM(CAST(w.creator_id AS TEXT)) = TRIM(CAST(u.employee_id AS TEXT)) OR
-        TRIM(CAST(w.creator_id AS TEXT)) = TRIM(REPLACE(REPLACE(CAST(u.employee_id AS TEXT), 'EMP-', ''), 'SH-', '')) OR
-        w.creator_id = u.id OR
-        w.creator_id = u.email
-      )
-      WHERE w.inc_id = ? OR REPLACE(w.inc_id, 'INC-', '') = ?
+      LEFT JOIN users u ON w.creator_id = u.employee_id
+      WHERE w.inc_id = ? OR w.inc_id = ?
       LIMIT 1
-    `).bind(id, id).first();
+    `).bind(rawId, fullId).first();
     
     if (wr) {
-      let dispName = wr.creator_name;
-      // Secondary fallback lookup if JOIN failed
-      if (!dispName && wr.creator_id) {
-        const uNode = await db.prepare("SELECT name FROM users WHERE employee_id = ? OR id = ? OR email = ?")
-          .bind(wr.creator_id, wr.creator_id, wr.creator_id).first();
-        if (uNode) dispName = uNode.name;
-      }
-      
       steps.push({ 
         id: 'WARROOM', 
         label: '워룸 생성', 
         timestamp: wr.reg_dt, 
-        detail: `${dispName || wr.creator_id || '시스템'}님에 의해 실시간 대응 워룸이 가동되었습니다.` 
+        detail: `${wr.creator_name || wr.creator_id || '시스템'}님에 의해 실시간 대응 워룸이 가동되었습니다.` 
       });
     }
 
     // 6. 지식화/장애/보고 처리완료 (knowledge_base)
-    const kn = await db.prepare("SELECT reg_dt FROM knowledge_base WHERE inc_id = ?").bind(id).first();
+    const kn = await db.prepare("SELECT reg_dt FROM knowledge_base WHERE inc_id = ? OR inc_id = ?").bind(rawId, fullId).first();
     if (kn) steps.push({ id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', timestamp: kn.reg_dt, detail: '인시던트 대응 지식이 지식베이스(RAG)에 저장되고 최종 보고 및 장애 처리가 완료되었습니다.' });
 
-    // Step 5 (REPORT) and Step 7 (CLOSE) removed per user request for a cleaner 4-step flow
+    // 7. Get all assignees from incident_assignments
+    const assigneesRes = await db.prepare(`
+      SELECT 
+        ia.user_id, 
+        ia.status, 
+        ia.assigned_at, 
+        u.name,
+        (SELECT COUNT(*) FROM warroom_chats wc WHERE (wc.inc_id = ? OR wc.inc_id = ?) AND wc.sender = ia.user_id) as chat_count
+      FROM incident_assignments ia
+      LEFT JOIN users u ON ia.user_id = u.employee_id
+      WHERE ia.inc_id = ? OR ia.inc_id = ?
+    `).bind(rawId, fullId, rawId, fullId).all();
 
-    // Use activity_logs as a fallback
-    const logs = await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_code = ? ORDER BY created_at ASC").bind(id).all();
+    const finalizedAssignees = (assigneesRes.results || []).map(a => {
+      if (a.status === '처리중' && Number(a.chat_count) === 0) {
+        return { ...a, status: '미참여' };
+      }
+      return a;
+    });
 
-    return c.json({ inc_id: inc_id_str, steps: steps.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)), all_logs: logs.results || [] });
+    return c.json({ 
+      inc_id: inc_id_str, 
+      steps: steps.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)), 
+      all_logs: (await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_code = ? OR incident_code = ?").bind(rawId, fullId).all()).results || [],
+      assignees: finalizedAssignees
+    });
   } catch (e) {
     console.error('Workflow API Error:', e);
     return c.json({ error: e.message, stack: e.stack }, 500);
@@ -3734,7 +3874,7 @@ app.get('/warroom/chat/:id', async (c) => {
 
   // Get messages
   const { results: aiResults } = await db.prepare("SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all()
-  const { results: wrResults } = await db.prepare("SELECT * FROM warroom_chats WHERE inc_id = ? ORDER BY timestamp ASC").bind(id).all()
+  const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC").bind(id).all()
 
   // Format AI messages
   const aiMessages = (aiResults || []).map(r => ({
@@ -3782,7 +3922,7 @@ app.post('/warroom/chat', async (c) => {
 
   await db.prepare(
     "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(incident_id, seq, senderId, role || senderId, type || 'user', text, now, senderId, now, senderId, now).run()
+  ).bind(incident_id, seq, senderId, role || 'user', type || 'user', text, now, senderId, now, senderId, now).run()
   
   return c.json({ status: 'saved' })
 })
@@ -4349,8 +4489,10 @@ export class WarRoom {
       return new Response("Expected Upgrade: websocket", { status: 426 });
     }
 
+    console.log(`[DO] WebSocket Upgrade: ${request.url}`);
     const [client, server] = new WebSocketPair();
-    await this.handleSession(server);
+    // Non-blocking handshake setup
+    this.handleSession(server);
 
     return new Response(null, {
       status: 101,
@@ -4360,6 +4502,7 @@ export class WarRoom {
 
   async handleSession(webSocket) {
     webSocket.accept();
+    console.log("[DO] WebSocket Accepted");
     
     // Initial session setup
     this.sessions.set(webSocket, { online: true });
@@ -4367,13 +4510,14 @@ export class WarRoom {
     webSocket.addEventListener("message", async (msg) => {
       try {
         if (typeof msg.data !== "string") {
-          console.warn("Received binary/non-string WebSocket message, ignoring.");
+          console.warn(`[DO] [${this.state.id.toString()}] Received binary/non-string message, ignoring.`);
           return;
         }
         const data = JSON.parse(msg.data);
+        console.log(`[DO] [${this.state.id.toString()}] Incoming event: ${data.type}`);
         await this.onMessage(webSocket, data);
       } catch (err) {
-        console.error("WebSocket Message Parse Error:", err.message, "Raw Content:", String(msg.data).slice(0, 500));
+        console.error(`[DO] [${this.state.id.toString()}] WebSocket Message Parse Error:`, err.message, "Raw Content:", String(msg.data).slice(0, 500));
         webSocket.send(JSON.stringify({ type: "ERROR", message: "Invalid JSON", raw: String(msg.data).slice(0, 100) }));
       }
     });
@@ -4397,6 +4541,29 @@ export class WarRoom {
       case "JOIN":
         session.user_id = data.user_id;
         session.name = data.name;
+        console.log(`[DO] [${this.state.id.toString()}] User JOIN: ${data.name} (${data.user_id})`);
+        
+        // 🚀 NEW: Auto-update status to '처리중' when a user joins the warroom
+        if (data.user_id && data.incident_id) {
+          this.state.waitUntil((async () => {
+            try {
+              const now = getKst();
+              await this.env.DB.prepare(`
+                INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
+                VALUES (?, ?, '처리중', ?, ?, ?, ?)
+                ON CONFLICT(user_id, inc_id) 
+                DO UPDATE SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ?
+              `).bind(
+                data.user_id, data.incident_id, now, now, data.user_id, data.user_id,
+                now, now, data.user_id
+              ).run();
+              console.log(`[DO] [${data.incident_id}] Status updated to '처리중' for joiner: ${data.user_id}`);
+            } catch (e) {
+              console.error("[DO] JOIN Status Update Error:", e);
+            }
+          })());
+        }
+
         this.broadcast({ type: "PRESENCE_IN", user_id: data.user_id, name: data.name });
         // Send current online list to the new joiner
         const onlineUsers = Array.from(this.sessions.values()).map(s => ({ user_id: s.user_id, name: s.name }));
@@ -4429,12 +4596,14 @@ export class WarRoom {
           seq: seq,
           incident_id: data.incident_id,
           sender: data.sender,
+          sender_name: data.name || data.sender,
           role: data.role,
           text: data.text,
           timestamp: now,
           parent_seq: data.reply_to || null,
           reactions: {}
         };
+        console.log(`[DO] [${this.state.id.toString()}] CHAT_SEND from ${data.sender}: ${data.text.slice(0, 50)}...`);
         this.broadcast(broadcastMsg);
 
         // 3. AI Indexing (Background task to avoid blocking)
@@ -4475,7 +4644,7 @@ export class WarRoom {
             const ai = this.env.AI;
             const db = this.env.DB;
             const chats = await db.prepare(
-              "SELECT sender, text FROM warroom_chats WHERE inc_id = ? ORDER BY seq DESC LIMIT 50"
+              "SELECT wc.sender, wc.text, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.seq DESC LIMIT 50"
             ).bind(data.incident_id).all();
             
             if (chats.results.length === 0) {
@@ -4483,7 +4652,7 @@ export class WarRoom {
               return;
             }
             
-            const chatLog = chats.results.reverse().map(c => `${c.sender}: ${c.text}`).join("\n");
+            const chatLog = chats.results.reverse().map(c => `${c.sender_name || c.sender}: ${c.text}`).join("\n");
             const prompt = `Below is a chat log from an incident war room. Please provide a concise summary (3-4 bullet points) in Korean of the current status, key observations, and any actions taken.\n\nChat Log:\n${chatLog}\n\nSummary (Korean):`;
             
             const response = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt });
@@ -4563,7 +4732,7 @@ export class WarRoom {
       case "TYPING_STOP":
         this.broadcast({ type: "TYPING", user_id: data.user_id, name: data.name, is_typing: false }, ws);
         break;
-
+      case "SET_ANNOUNCEMENT": {
         const nowAnnounce = getKst();
         this.announcement = {
           seq: data.seq,
@@ -4571,13 +4740,19 @@ export class WarRoom {
           text: data.text,
           timestamp: nowAnnounce
         };
+        console.log(`[DO] [${this.state.id.toString()}] SET_ANNOUNCEMENT by ${data.sender}: ${data.text.slice(0, 50)}...`);
         // Sync to D1 warroom_list (as leader_summary for now)
         this.state.waitUntil((async () => {
-          await this.env.DB.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
-            .bind(this.announcement.text, nowAnnounce, data.incident_id).run();
+          try {
+            await this.env.DB.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
+              .bind(this.announcement.text, nowAnnounce, data.incident_id).run();
+          } catch (e) {
+            console.error("[DO] Announcement Sync Error:", e);
+          }
         })());
         this.broadcast({ type: "ANNOUNCEMENT_UPDATE", announcement: this.announcement });
         break;
+      }
 
       case "TOGGLE_BOOKMARK":
         this.state.waitUntil((async () => {

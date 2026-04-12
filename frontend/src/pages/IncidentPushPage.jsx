@@ -8,7 +8,7 @@ const IncidentPushPage = () => {
     const [employeeId, setEmployeeId] = useState('');
     const [message, setMessage] = useState('');
     const [advanced, setAdvanced] = useState({
-        channel: '',
+        channel: 'MANUAL',
         if_id: '',
         service_code: '',
         service_name: '',

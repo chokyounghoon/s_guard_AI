@@ -1448,7 +1448,7 @@ export default function DashboardPage() {
             <div className={`bg-[#11141d] p-6 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-orange-500/30 transition-all ${myAssignments.filter(a => a.status === '처리중').length > 0 ? 'border-orange-500/20' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=처리중')}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="flex justify-between items-start mb-1">
-                <p className="text-[10px] text-orange-500/60 font-black uppercase tracking-widest">In Progress</p>
+                <p className="text-[10px] text-orange-500/60 font-black uppercase tracking-widest">분석중입니다</p>
                 {myAssignments.filter(a => a.status === '처리중').length > 0 && (
                   <span className="flex h-2 w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
@@ -1543,7 +1543,7 @@ export default function DashboardPage() {
                               item.status === '처리중' ? 'bg-orange-400 animate-ping' : 
                               'bg-emerald-400'
                             }`} />
-                            {item.status}
+                            {item.status === '처리중' ? '분석중입니다' : item.status}
                           </div>
                           <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
                             {formatYYMMDD(item.assigned_at)}

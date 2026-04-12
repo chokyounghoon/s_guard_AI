@@ -25,6 +25,7 @@ import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import UserManagementPage from './pages/UserManagementPage';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import WarRoomManagementPage from './pages/WarRoomManagementPage';
+import CodebookManagementPage from './pages/CodebookManagementPage';
 import WorkflowPage from './pages/WorkflowPage';
 
 import BottomMenu from './components/BottomMenu';
@@ -32,6 +33,8 @@ import AIAssistantPanel from './components/AIAssistantPanel';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, MessageSquare, FileText } from 'lucide-react';
+
+import { CodebookProvider } from './context/CodebookContext';
 
 function AppContent() {
   const location = useLocation();
@@ -110,6 +113,7 @@ function AppContent() {
         <Route path="/user-management" element={<UserManagementPage />} />
         <Route path="/organization-management" element={<OrganizationManagementPage />} />
         <Route path="/warroom-management" element={<WarRoomManagementPage />} />
+        <Route path="/codebook-management" element={<CodebookManagementPage />} />
         <Route path="/workflow/:inc_id" element={<WorkflowPage />} />
       </Routes>
 
@@ -228,7 +232,9 @@ function App() {
   return (
     <Router>
       <GoogleOAuthProvider clientId="368028308466-placeholder.apps.googleusercontent.com">
-        <AppContent />
+        <CodebookProvider>
+          <AppContent />
+        </CodebookProvider>
       </GoogleOAuthProvider>
     </Router>
   );

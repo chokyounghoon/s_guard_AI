@@ -14,12 +14,20 @@ const agentColors = {
 };
 
 // API URL helper: /ai/ endpoints go to local FastAPI, others to Cloudflare Worker
-const getApiUrl = (endpoint) => {
+// API URL helper: /ai/ endpoints go to local FastAPI (if dev), others to Cloudflare Worker
+const getApiUrl = (endpoint, isWs = false) => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
+  // Decide base host
+  let baseHost = 'sguardai.khcho0421.workers.dev';
+  let protocol = isWs ? 'wss' : 'https';
+
   if (isLocalDev && endpoint.startsWith('/ai/summarize-chat')) {
-    return `http://127.0.0.1:8000${endpoint}`;
+    baseHost = '127.0.0.1:8000';
+    protocol = isWs ? 'ws' : 'http';
   }
-  return 'https://sguardai.khcho0421.workers.dev' + endpoint;
+
+  return `${protocol}://${baseHost}${endpoint}`;
 };
 
 // 한국 시간(KST) 포맷팅 헬퍼
@@ -243,7 +251,8 @@ export default function ChatPage() {
     const connect = () => {
       if (!isMounted) return;
       
-      const wsUrl = `wss://sguardai.khcho0421.workers.dev/warroom/ws/${incidentId}`;
+      const wsUrl = getApiUrl(`/warroom/ws/${incidentId}`, true);
+      console.log(`Connecting to WebSocket: ${wsUrl}`);
       socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
@@ -257,7 +266,8 @@ export default function ChatPage() {
           socket.send(JSON.stringify({
             type: "JOIN",
             user_id: currentUser.employee_id,
-            name: currentUser.name
+            name: currentUser.name,
+            incident_id: incidentId
           }));
         }
       };
@@ -275,10 +285,10 @@ export default function ChatPage() {
                 const newMessage = {
                   id: data.msg_id,
                   seq: data.seq,
-                  type: data.sender === currentUser.name ? 'me' : 'other',
-                  sender: data.sender,
+                  type: data.sender === currentUser.employee_id || data.sender === currentUser.name ? 'me' : 'other',
+                  sender: data.sender_name || data.sender,
                   role: data.role,
-                  initials: data.sender ? data.sender[0] : 'U',
+                  initials: (data.sender_name || data.sender)?.[0] || 'U',
                   color: 'bg-slate-700',
                   text: data.text,
                   time: formatKst(data.timestamp),
@@ -359,7 +369,11 @@ export default function ChatPage() {
       };
 
       socket.onerror = (err) => {
-        console.error("WebSocket error:", err);
+        console.error("WebSocket error details:", {
+          url: wsUrl,
+          readyState: socket.readyState,
+          event: err
+        });
       };
     };
 
@@ -646,7 +660,8 @@ export default function ChatPage() {
               wsRef.current.send(JSON.stringify({
                 type: "CHAT_SEND",
                 incident_id: incidentId,
-                sender: currentUser.name,
+                sender: currentUser.employee_id,
+                name: currentUser.name,
                 role: currentUser.role,
                 msg_type: "file",
                 text: `[첨부파일] ${fileObj.file.name}|${uploadData.url}|${fileObj.file.type}`
@@ -662,7 +677,8 @@ export default function ChatPage() {
           wsRef.current.send(JSON.stringify({
             type: "CHAT_SEND",
             incident_id: incidentId,
-            sender: currentUser.name,
+            sender: currentUser.employee_id,
+            name: currentUser.name,
             role: currentUser.role,
             msg_type: "user",
             text: mainInput,

@@ -86,7 +86,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     setIsCritical(false);
     delayShownRef.current = false;
     setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
-    setSmsAnalysisTitle(`분석 중: "${selectedSms.sender}" 발신 SMS`);
+    setSmsAnalysisTitle(`분석중입니다: "${selectedSms.sender}" 발신 SMS`);
 
     const analyze = async () => {
       try {
@@ -244,7 +244,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   const elapsedMs = Date.now() - startedAt;
                   if (!showedWorkingHint && elapsedMs > 2500) {
                     showedWorkingHint = true;
-                    enqueueText('\n⏳ AI 분석 진행 중...\n');
+                    enqueueText('\n⏳ 분석중입니다...\n');
                   }
                 }
                 if (data.similarity_score !== undefined && data.similarity_score !== null) {
@@ -684,7 +684,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             : 'bg-yellow-500/5 border-yellow-500/20'}`}>
         <div className={`flex-1 text-xs ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || lockingUser) ? 'text-slate-400 animate-pulse' : isCritical ? 'text-red-300' : 'text-yellow-300'}`}>
           {(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30)
-            ? '⏳ AI 에이전트가 진단 정보를 통합 분석하고 있습니다. 분석 완료 후 개설 가능합니다...'
+            ? '⏳ AI 에이전트가 분석중입니다. 분석 완료 후 개설 가능합니다...'
             : lockingUser
               ? `⚠️ ${lockingUser} 매니저가 현재 War-Room 개설 작업을 진행 중입니다...`
               : warRoomExists 
