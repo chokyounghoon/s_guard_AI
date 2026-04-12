@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
@@ -9,6 +9,13 @@ import WarRoomChatPanel from '../components/WarRoomChatPanel';
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
+
+const SHINHAN_COMPANIES = [
+  '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
+  '신한캐피탈', '신한자산운용', '신한저축은행', '신한AI', '신한DS',
+  '제주은행', '신한벤처투자', '신한리츠운용', '신한대체투자운용',
+  '신한자산신탁', '신한펀드파트너스', '신한금융플러스', '신한큐브리스크컨설팅',
+];
 
 // ── 데이터 입력 서브 컴포넌트 ─────────────────────
 function SelectWithOther({ label, icon: Icon, options, value, onChange, required, disabled }) {
@@ -1033,7 +1040,7 @@ export default function DashboardPage() {
   const renderProfileModal = () => {
     if (!showProfileModal) return null;
 
-    const currentProfile = userProfile || { name: 'Guest User', email: 'guest@s-guard.ai', picture: null, dept: '', team: '' };
+    const currentProfile = userProfile || { name: 'Guest User', email: 'guest@s-guard.ai', profile_picture: null, dept: '', team: '' };
 
     return (
       <ProfileModalContent
@@ -1053,6 +1060,8 @@ export default function DashboardPage() {
                 honbu: updated.honbu,
                 team: updated.team,
                 part: updated.part,
+                subpart: updated.subpart,
+                profile_picture: updated.profile_picture,
               }),
             });
             const data = await res.json();
@@ -1103,8 +1112,8 @@ export default function DashboardPage() {
               </span>
             )}
             <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all">
-              {userProfile?.picture ? (
-                <img src={userProfile.picture} alt="Profile" className="w-full h-full object-cover" />
+              {userProfile?.profile_picture ? (
+                <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-5 h-5 text-slate-300 group-hover:text-blue-400" />
               )}
@@ -1482,19 +1491,24 @@ export default function DashboardPage() {
             <div className="bg-[#0a0c12] rounded-3xl border border-white/5 h-full overflow-hidden flex flex-col shadow-2xl">
               {/* Header (Matching Screenshot) */}
               <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                <div className="flex items-center gap-3.5">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.15)] relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <Sparkles className="w-4 h-4 text-indigo-300 relative z-10" />
                   </div>
-                  <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 shadow-inner">
-                    <div className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] text-[11px] font-black flex items-center gap-2.5 border border-white/10 uppercase tracking-tighter">
-                      <div className="relative">
-                        <Sparkles className="w-3.5 h-3.5 text-blue-200 animate-pulse" />
-                        <div className="absolute inset-0 blur-sm bg-white/30 animate-pulse" />
+                  <div className="flex flex-col justify-center">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-[14px] font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-200 to-slate-400 tracking-tight">
+                        S-Autopilot Expert Advisor
+                      </h3>
+                      <div className="relative flex h-1.5 w-1.5 mt-0.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                       </div>
-                      S-Autopilot Expert Advisor
                     </div>
+                    <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">
+                      Real-time AI Response Engine
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2290,7 +2304,12 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
     team: profile.team || '',
     part: profile.part || '',
     subpart: profile.subpart || '',
+    profile_picture: profile.profile_picture || null,
   });
+
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [profilePreview, setProfilePreview] = useState(profile.profile_picture || null);
 
   // ── 비밀번호 변경 상태 ──
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -2301,6 +2320,39 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
   const handleChange = (field) => (val) =>
     setFormData(prev => ({ ...prev, [field]: typeof val === 'string' ? val : val.target.value }));
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    setIsUploading(true);
+    const formDataObj = new FormData();
+    formDataObj.append('file', file);
+    formDataObj.append('uploaded_by', profile.name || profile.inc_id || '사용자');
+
+    try {
+      const res = await fetch(`${apiBase}/warroom/upload`, {
+        method: 'POST',
+        body: formDataObj
+      });
+      if (!res.ok) throw new Error('업로드 서버 오류');
+      const data = await res.json();
+      
+      setProfilePreview(data.url);
+      setFormData(prev => ({ ...prev, profile_picture: data.url }));
+    } catch (err) {
+      console.error(err);
+      alert('프로필 이미지 업로드에 실패했습니다.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleSave = () => {
     if (!formData.name.trim()) { alert('이름을 입력해 주세요.'); return; }
@@ -2375,12 +2427,32 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </button>
           </div>
 
-          <div className="flex items-center space-x-4 mb-8 bg-slate-900/40 p-4 rounded-2xl border border-white/5">
-            <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-blue-500/20 overflow-hidden shadow-lg shrink-0">
-              <div className="w-full h-full flex items-center justify-center">
-                <User className="w-8 h-8 text-slate-500" />
+          <div className="flex items-center space-x-4 mb-8 bg-slate-900/40 p-4 rounded-2xl border border-white/5 relative">
+            <div 
+              className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-amber-500 animate-pulse' : 'border-blue-500/30'} overflow-hidden shadow-lg shrink-0 group cursor-pointer`}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {profilePreview ? (
+                <img src={profilePreview} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <User className="w-8 h-8 text-slate-500" />
+                </div>
+              )}
+              {/* Hover Overlay */}
+              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="w-5 h-5 text-white/80" />
               </div>
             </div>
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+            />
+
             <div>
               <h3 className="text-lg font-bold text-white leading-tight">{formData.name}</h3>
               <p className="text-xs text-slate-400">{profile.email}</p>

@@ -419,39 +419,7 @@ export default function WorkflowPage() {
           </div>
         </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="mt-16 pb-24 grid grid-cols-1 md:grid-cols-2 gap-6"
-        >
-          <button 
-            onClick={() => window.print()}
-            className="group relative overflow-hidden flex items-center justify-center gap-4 p-8 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-[0_20px_40px_rgba(59,130,246,0.3)] hover:shadow-[0_30px_70px_rgba(59,130,246,0.5)] transition-all"
-          >
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
-              <Printer className="w-6 h-6" />
-            </div>
-            <div className="text-left">
-              <span className="block text-[10px] font-black uppercase tracking-[0.2em] opacity-70">Official Export</span>
-              <span className="block text-lg font-black tracking-tight">Generate Incident Report</span>
-            </div>
-          </button>
 
-          <button 
-            onClick={() => navigate('/chat-summary')}
-            className="group relative overflow-hidden flex items-center justify-center gap-4 p-8 rounded-[2rem] bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
-          >
-            <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
-              <BarChart3 className="w-6 h-6 text-blue-400" />
-            </div>
-            <div className="text-left">
-              <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Analytics Board</span>
-              <span className="block text-lg font-black tracking-tight">View Cross-Platform Matrix</span>
-            </div>
-          </button>
-        </motion.div>
       </main>
 
       <style>{`

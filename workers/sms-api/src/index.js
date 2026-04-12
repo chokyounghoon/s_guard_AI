@@ -369,6 +369,7 @@ app.post('/auth/login', async (c) => {
     employee_id: user.employee_id, position: user.position,
     is_admin: user.is_admin || 0,
     token: token,
+    profile_picture: user.profile_picture,
     numeric_id: user.id // keep original id as numeric_id if needed elsewhere
   })
 })
@@ -436,6 +437,7 @@ app.post('/auth/signup', async (c) => {
       phone: finalPhone,
       employee_id: cleanEmpId,
       position: position || 'POS_001',
+      profile_picture: null,
       is_admin: 0,
       numeric_id: userId
     }
@@ -503,6 +505,7 @@ app.get('/users', async (c) => {
       u.team as team_code,
       u.part as part_code,
       u.subpart as subpart_code,
+      u.profile_picture,
       u.is_active, u.is_admin 
     FROM users u
     LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
@@ -538,7 +541,7 @@ app.get('/users/:id', async (c) => {
   const id = c.req.param('id')
   const user = await db.prepare(`
     SELECT 
-      u.employee_id, u.email, u.name, u.role, u.phone, u.is_active, u.is_admin,
+      u.employee_id, u.email, u.name, u.role, u.phone, u.is_active, u.is_admin, u.profile_picture,
       COALESCE(oc.name, u.company) as company, 
       COALESCE(oh.name, u.honbu) as honbu, 
       COALESCE(ot.name, u.team) as team,
@@ -558,15 +561,15 @@ app.get('/users/:id', async (c) => {
 
 app.patch('/auth/profile', async (c) => {
   const db = c.env.DB
-  const { user_id, name, phone, company, honbu, team, part, subpart } = await c.req.json()
+  const { user_id, name, phone, company, honbu, team, part, subpart, profile_picture } = await c.req.json()
   const modDt = getKst()
   
   const empId = user_id // user_id is now already the employee_id
 
   await db.prepare(
-    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
-  ).bind(name, phone || null, company || null, honbu || null, team || null, part || null, subpart || null, modDt, empId, user_id).run()
-  const updated = await db.prepare("SELECT employee_id, email, name, role, company, honbu, team, part, subpart, phone, employee_id, position, is_admin FROM users WHERE employee_id = ?").bind(user_id).first()
+    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, profile_picture = COALESCE(?, profile_picture), mod_dt = ?, mod_id = ? WHERE employee_id = ?"
+  ).bind(name, phone || null, company || null, honbu || null, team || null, part || null, subpart || null, profile_picture !== undefined ? profile_picture : null, modDt, empId, user_id).run()
+  const updated = await db.prepare("SELECT employee_id, email, name, role, company, honbu, team, part, subpart, phone, employee_id, position, is_admin, profile_picture FROM users WHERE employee_id = ?").bind(user_id).first()
   return c.json({ status: "success", user: updated })
 })
 
@@ -3786,8 +3789,12 @@ app.get('/ai/incident/workflow-details', async (c) => {
       LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
       WHERE ia.inc_id = ? OR ia.inc_id = ?
     `).bind(rawId, fullId, rawId, fullId).all();
+    const isWarroomClosed = wr && ['CLOSED', '최종완료', '처리완료', 'Completed', '완료'].includes(wr.status);
 
     const finalizedAssignees = (assigneesRes.results || []).map(a => {
+      if (isWarroomClosed || kn) {
+        return { ...a, status: '처리완료' };
+      }
       if (a.status === '처리중' && Number(a.chat_count) === 0) {
         return { ...a, status: '미참여' };
       }
