@@ -28,6 +28,7 @@ import WarRoomManagementPage from './pages/WarRoomManagementPage';
 import CodebookManagementPage from './pages/CodebookManagementPage';
 import WorkflowPage from './pages/WorkflowPage';
 import InboxPage from './pages/InboxPage';
+import OrbitalCommandPage from './pages/OrbitalCommandPage';
 
 import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
@@ -117,6 +118,7 @@ function AppContent() {
         <Route path="/codebook-management" element={<CodebookManagementPage />} />
          <Route path="/workflow/:inc_id" element={<WorkflowPage />} />
          <Route path="/inbox" element={<InboxPage />} />
+         <Route path="/orbital-command" element={<OrbitalCommandPage />} />
       </Routes>
 
       {/* Global Bottom Navigation */}

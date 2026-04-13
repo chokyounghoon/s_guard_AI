@@ -272,6 +272,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     mod_id TEXT DEFAULT 'SYSTEM',
     mod_dt CURRENT_TIMESTAMP,
     vector F32_ARRAY(768),
+    UNIQUE(inc_id),
     FOREIGN KEY (inc_id) REFERENCES received_messages(inc_id)
 );
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true }) {
   const navigate = useNavigate();
@@ -95,6 +95,22 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
               <p className="text-xs text-slate-500 text-center mb-10 uppercase tracking-[4px]">System Operations</p>
 
               <div className="grid grid-cols-2 gap-4">
+                <div
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    navigate('/orbital-command');
+                  }}
+                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:border-cyan-400 hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4 relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="bg-cyan-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform border border-cyan-500/30">
+                    <Cpu className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
+                  </div>
+                  <div className="relative z-10">
+                    <span className="block font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-sm sm:text-base tracking-wide">오비탈 커맨드</span>
+                    <span className="text-[9px] sm:text-[10px] text-cyan-500/70 mt-1 block font-mono">Zero-G RAG Control</span>
+                  </div>
+                </div>
 
                 <div
                   onClick={() => {

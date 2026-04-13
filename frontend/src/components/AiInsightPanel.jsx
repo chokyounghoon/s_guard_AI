@@ -97,7 +97,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           if (checkRes.ok) {
             const data = await checkRes.json();
             if (data.content) {
-              setDisplayedText(data.content);
+              enqueueText(data.content, { reset: true });
               const critical = data.severity === 'CRITICAL';
               setIsCritical(critical);
               setAnalysisComplete(true);
@@ -341,7 +341,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json();
           if (data.current_log?.text) {
-            setDisplayedText(data.current_log.text);
+            enqueueText(data.current_log.text, { reset: true });
             setAnalysisComplete(true);
             if (data.prediction_counts) {
               setInsightData(prev => ({ ...prev, prediction_counts: data.prediction_counts }));

@@ -21,7 +21,8 @@ app.get('/debug/db-init', async (c) => {
   const columns = [
     { name: 'received_count', type: 'INTEGER DEFAULT 1' },
     { name: 'keyword_detected', type: 'INTEGER DEFAULT 0' },
-    { name: 'response_message', type: 'TEXT' }
+    { name: 'response_message', type: 'TEXT' },
+    { name: 'status', type: "TEXT DEFAULT 'PENDING'" }
   ];
 
   for (const col of columns) {
@@ -62,11 +63,84 @@ app.get('/debug/db-init', async (c) => {
     results.push({ table: 'inbox_items', status: 'Error', error: e.message });
   }
 
+  // Add knowledge_base UNIQUE constraint migration
+  try {
+    await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_inc_id ON knowledge_base(inc_id)`).run();
+    results.push({ index: 'idx_knowledge_inc_id', status: 'Created or verified' });
+  } catch (e) {
+    results.push({ index: 'idx_knowledge_inc_id', status: 'Error', error: e.message });
+  }
+
+  // 🚀 Trace: Create dify_debug_logs table
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS dify_debug_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inc_id TEXT,
+        api_endpoint TEXT,
+        request_payload TEXT,
+        response_payload TEXT,
+        status_code INTEGER,
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    results.push({ table: 'dify_debug_logs', status: 'Created or verified' });
+  } catch (e) {
+    results.push({ table: 'dify_debug_logs', status: 'Error', error: e.message });
+  }
+
   return c.json({ 
     message: 'Database structure check complete', 
     results,
     timestamp: getKst()
   });
+});
+
+// 🚀 Genesis Protocol: Seed Initial Data
+app.get('/debug/seed-initial-data', async (c) => {
+  const db = c.env.DB;
+  const now = getKst();
+  
+  // 1. Check if empty
+  const count = await db.prepare("SELECT COUNT(1) as total FROM received_messages").first('total');
+  
+  // 2. Insert Seed SMS
+  const seedIncId = generateIncId();
+  const seedMsg = "[S-GUARD] 04/13 21:00 신한은행(BANK_001) 차세대시스템 DB 응답지연(ORA-00600) 발생건수: 155건 노드: DB_NODE_04";
+  
+  await db.prepare(`
+    INSERT INTO received_messages (
+      inc_id, sender, message, employee_id, timestamp, status, received_count,
+      service_name, biz_system, error_code, error_message, channel
+    ) VALUES (?, '02-1234-5678', ?, 'SYSTEM', ?, 'PENDING', 1, '신한은행', '차세대시스템', 'ORA-00600', 'DB 응답지연', 'SMS')
+  `).bind(seedIncId, seedMsg, now).run();
+  
+  // 3. Trigger Background analysis & Vectorize Sync
+  c.executionCtx.waitUntil(performBackgroundAiAnalysis(seedIncId, c.env).catch(e => console.error(e)));
+  
+  return c.json({
+    message: 'Genesis Protocol Launched: Initial Data Seeded',
+    inc_id: seedIncId,
+    timestamp: now
+  });
+});
+
+// 🚀 Vectorize Health Check
+app.get('/debug/vectorize-stats', async (c) => {
+  if (!c.env.WARROOM_INDEX) return c.json({ error: 'WARROOM_INDEX binding missing' }, 500);
+  
+  try {
+    const stats = await c.env.WARROOM_INDEX.describe();
+    return c.json({
+      index: 'sguard-warroom-index',
+      dimensions: stats.dimensions,
+      count: stats.vectorCount,
+      timestamp: getKst()
+    });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
 });
 
 // Utility to generate unique numeric string ID (YYYYMMDDHHMMSS + RRR)
@@ -108,7 +182,7 @@ const generateEmbedding = async (text, env) => {
   }
   try {
     console.log('Generating embedding for text:', text.substring(0, 50));
-    const response = await env.AI.run('@cf/baai/bge-small-en-v1.5', {
+    const response = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
       text: [text]
     });
     if (!response || !response.data || !response.data[0]) {
@@ -141,6 +215,44 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
       await kv.put(lockKey, 'processing', { expirationTtl: 60 });
     }
 
+    // --- 🚀 Robust Fetching with Retry (D1 Consistency) ---
+    let sms = null;
+    let attempts = 0;
+    while (attempts < 3) {
+      sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(String(sms_id)).first();
+      if (sms) break;
+      attempts++;
+      console.log(`[Background] SMS ${sms_id} not found in D1, retrying... (Attempt ${attempts}/3)`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (!sms) {
+      console.error(`[Background] Abandoning analysis: SMS ${sms_id} not found after 3 attempts.`);
+      if (kv) await kv.delete(lockKey);
+      return;
+    }
+
+    let messageVector = null;
+    if (env.WARROOM_INDEX || env.AI) {
+      const cleanedMessage = cleanMessageForEmbedding(sms.message);
+      messageVector = await generateEmbedding(cleanedMessage, env);
+      
+      if (messageVector && messageVector.length === 768 && env.WARROOM_INDEX) {
+        await env.WARROOM_INDEX.upsert([{
+          id: `inc-${sms_id}`,
+          values: messageVector,
+          metadata: {
+            inc_id: String(sms_id),
+            sender: sms.sender || 'Unknown',
+            timestamp: sms.timestamp,
+            text: cleanedMessage.substring(0, 500),
+            type: 'raw_sms'
+          }
+        }]);
+        console.log(`[Vectorize] Successfully indexed ${sms_id} (768-dim)`);
+      }
+    }
+
     // 2. Cache check
     const cached = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
     if (cached && cached.content) {
@@ -148,12 +260,7 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
       return;
     }
 
-    // 3. Fetch SMS details for prompt
-    const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(sms_id).first();
-    if (!sms) {
-      if (kv) await kv.delete(lockKey);
-      return;
-    }
+    // 3. Reuse SMS details for prompt (Already fetched above)
 
     const detailedInfo = `
 [장애 상세 정보]
@@ -191,113 +298,250 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
 메시지: ${sms.message || 'N/A'}
 ${detailedInfo}`;
 
-    // 4. Vectorize similarity check
     let similarityScore = null;
     let matchedContent = null;
     let matchedTitle = null;
     let similarityReason = null;
 
-    if (env.WARROOM_INDEX && sms.message) {
+    // 4. Vectorize similarity check - Reuse the vector from above
+    if (env.WARROOM_INDEX && messageVector) {
       try {
-        const cleanedMessage = cleanMessageForEmbedding(sms.message);
-        const vector = await generateEmbedding(cleanedMessage, env);
-        if (vector) {
-          const simResults = await env.WARROOM_INDEX.query(vector, { topK: 1 });
-          if (simResults.matches && simResults.matches.length > 0) {
-            similarityScore = simResults.matches[0].score;
-            const matchId = simResults.matches[0].id;
+        const simResults = await env.WARROOM_INDEX.query(messageVector, { topK: 1 });
+        if (simResults.matches && simResults.matches.length > 0) {
+          similarityScore = simResults.matches[0].score;
+          const matchId = simResults.matches[0].id;
 
-            if (similarityScore >= 0.7) {
-              let querySql = "";
-              let queryParam = "";
-              if (matchId.startsWith('kn-')) {
-                querySql = "SELECT content, title FROM knowledge_base WHERE id = ?";
-                queryParam = matchId.replace('kn-', '');
-              } else {
-                const possibleId = matchId.split('_')[0];
-                querySql = "SELECT content, title FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?";
-                queryParam = possibleId;
-              }
+          if (similarityScore >= 0.7) {
+            let kbMatch;
+            if (matchId.startsWith('kn-')) {
+              const qp = matchId.replace('kn-', '');
+              kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE id = ?").bind(qp).first();
+            } else {
+              const possibleId = matchId.split('_')[0].replace('inc-', '').replace('gov-', '');
+              kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = TRIM(REPLACE(?, 'INC-', '')) OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
+            }
+            if (kbMatch) {
+              matchedContent = kbMatch.content;
+              matchedTitle = kbMatch.title;
+              
+              // Generate rationale - Using env.AI directly
+              if (env.AI) {
+                try {
+                  const rationalePrompt = `당신은 지능형 관제 전문가입니다. 아래 수신된 메시지[SMS]와 검색된 지식[Knowledge]을 비교하여, 왜 두 건이 유사한지 그 이유를 한 문장으로 아주 짧게 설명하세요.
+                  필요한 정보: 동일 에러코드, 유사 서비스 명칭, 동일 증상 등. (한글로 15자 이내)
+                  
+                  [SMS]: ${sms.message}
+                  [Knowledge Title]: ${matchedTitle}
+                  [Knowledge Content]: ${matchedContent.substring(0, 100)}...`;
 
-              const kbMatch = await db.prepare(querySql).bind(queryParam, queryParam).first();
-              if (kbMatch) {
-                matchedContent = kbMatch.content;
-                matchedTitle = kbMatch.title;
-                
-                // Generate rationale for background analysis
-                if (env.AI) {
-                  try {
-                    const rationalePrompt = `당신은 지능형 관제 전문가입니다. 아래 수신된 메시지[SMS]와 검색된 지식[Knowledge]을 비교하여, 왜 두 건이 유사한지 그 이유를 한 문장으로 아주 짧게 설명하세요.
-                    필요한 정보: 동일 에러코드, 유사 서비스 명칭, 동일 증상 등. (한글로 15자 이내)
-                    
-                    [SMS]: ${sms.message}
-                    [Knowledge Title]: ${matchedTitle}
-                    [Knowledge Content]: ${matchedContent.substring(0, 100)}...`;
-
-                    const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', { prompt: rationalePrompt });
-                    similarityReason = aiRes.response || aiRes;
-                  } catch (e) {
-                    console.error("BG Rationale generation error:", e);
-                  }
+                  const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', { prompt: rationalePrompt });
+                  similarityReason = aiRes.response || aiRes;
+                } catch (e) {
+                  console.error("BG Rationale generation error:", e);
                 }
               }
             }
           }
         }
       } catch (ve) {
-        console.error('Vectorize background error:', ve.message);
+        console.error('Vectorize background similarity error:', ve.message);
       }
     }
 
     let fullOutput = "";
     const now = getKst();
 
-    // 5. Decision: Cached match vs Dify Blocking Call
-    if (similarityScore >= 0.7 && matchedContent) {
-      fullOutput = `[지능형 지식 활용] 유사도(${(similarityScore * 100).toFixed(1)}%)가 매우 높음\n\n### ${matchedTitle}\n\n` + matchedContent;
+    let resultStatus = 0;
+    let resultData = null;
+
+    if (similarityScore !== undefined && similarityScore !== null) {
+      // 🚀 Dynamic Threshold Selection from DB
+      let technicalThreshold = 0.85;
+      let casualThreshold = 0.95;
       
-      await db.prepare(`
-        INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
-        VALUES (?, ?, 'INFO', 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
-        ON CONFLICT(inc_id) DO UPDATE SET 
-          content=excluded.content, 
-          mod_dt=excluded.mod_dt, 
-          similarity_score=excluded.similarity_score,
-          similarity_reason=excluded.similarity_reason
-      `).bind(String(sms_id), fullOutput, now, now, similarityScore, "지식 DB 고정 매칭").run();
+      try {
+        const configs = await db.prepare("SELECT config_key, config_value FROM system_config WHERE config_key IN ('similarity_threshold_technical', 'similarity_threshold_casual')").all();
+        configs.results.forEach(c => {
+          if (c.config_key === 'similarity_threshold_technical') technicalThreshold = parseFloat(c.config_value);
+          if (c.config_key === 'similarity_threshold_casual') casualThreshold = parseFloat(c.config_value);
+        });
+      } catch (ce) {
+        console.error("[Config] Failed to fetch live thresholds, using defaults.", ce);
+      }
+
+      // 🔍 Identify technical signals (Case-Insensitive)
+      const technicalPatterns = [/error/i, /fail/i, /critical/i, /timeout/i, /장애/i, /오류/i, /batch/i];
+      const isTechnicalSignal = technicalPatterns.some(pattern => pattern.test(sms.message));
       
+      const effectiveThreshold = isTechnicalSignal ? technicalThreshold : casualThreshold;
+
+      if (similarityScore >= effectiveThreshold && matchedContent) {
+        fullOutput = `[지능형 지식 활용] 유사도(${(similarityScore * 100).toFixed(1)}%)가 매우 높음\n\n### ${matchedTitle}\n\n` + matchedContent;
+        
+        const rationalePrefix = isTechnicalSignal ? "지능형 장애 지식 매칭" : "고정명 정합 매칭";
+        const reasonToSave = similarityReason || rationalePrefix;
+
+        await db.prepare(`
+          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
+          VALUES (?, ?, 'INFO', 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
+          ON CONFLICT(inc_id) DO UPDATE SET 
+            content=excluded.content, 
+            mod_dt=excluded.mod_dt, 
+            similarity_score=excluded.similarity_score,
+            similarity_reason=excluded.similarity_reason
+        `).bind(String(sms_id), fullOutput, now, now, similarityScore ?? 0, reasonToSave).run();
+        
+      } else {
+        resultStatus = 1; // Mark for Dify fallback
+      }
     } else {
-      const difyRes = await fetch(`${api_base}/chat-messages`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${api_key}`, 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          inputs: {}, 
-          query: prompt, 
-          response_mode: 'blocking', 
-          user: 'sguard-worker-bg' 
-        })
-      });
+      resultStatus = 1;
+    }
 
-      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`);
-      const resultData = await difyRes.json();
-      fullOutput = resultData.answer;
+    if (resultStatus === 1) {
+      // 🚀 Log ATTEMPT to trace
+      let logId = null;
+      try {
+        const logRes = await db.prepare(`
+          INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload)
+          VALUES (?, ?, ?)
+          RETURNING id
+        `).bind(String(sms_id), `${api_base}/chat-messages`, JSON.stringify({ query: prompt })).first();
+        logId = logRes?.id;
+      } catch (le) {}
 
+      // 1. Attempt Chat API with Timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 18000); // 18s safe limit
+
+      try {
+        const difyRes = await fetch(`${api_base}/chat-messages`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${api_key}`, 
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal,
+          body: JSON.stringify({ 
+            inputs: {}, 
+            query: prompt, 
+            response_mode: 'blocking', 
+            user: 'sguard-worker-bg' 
+          })
+        });
+
+        clearTimeout(timeoutId);
+        resultStatus = difyRes.status;
+
+        if (difyRes.ok) {
+          resultData = await difyRes.json();
+          // Dify completion output format might vary. Try multiple keys
+          fullOutput = resultData.answer || resultData.data?.outputs?.text || resultData.text || resultData.message || "";
+        } else {
+          // Fallback to Workflow
+          const wfController = new AbortController();
+          const wfTimeout = setTimeout(() => wfController.abort(), 8000); // 8s safe limit
+          
+          const wfRes = await fetch(`${api_base}/workflows/run`, {
+            method: 'POST',
+            headers: { 
+              'Authorization': `Bearer ${api_key}`, 
+              'Content-Type': 'application/json'
+            },
+            signal: wfController.signal,
+            body: JSON.stringify({ 
+               inputs: { query: prompt }, 
+               response_mode: 'blocking', 
+               user: 'sguard-worker-bg' 
+            })
+          });
+
+          clearTimeout(wfTimeout);
+          resultStatus = wfRes.status;
+          if (wfRes.ok) {
+            resultData = await wfRes.json();
+            const outputs = resultData.data?.outputs;
+            fullOutput = outputs?.text || outputs?.result || outputs?.output || 
+                         (Object.values(outputs || {}).find(v => typeof v === 'string') || "");
+          }
+        }
+      } catch (fe) {
+        console.error(`[Dify] Fetch error or timeout for ${sms_id}:`, fe.message);
+        resultStatus = fe.name === 'AbortError' ? 408 : 500;
+        clearTimeout(timeoutId);
+      }
+
+      // 🔍 Log Trace Update (Success or Failure)
+      if (logId) {
+        try {
+          await db.prepare(`
+            UPDATE dify_debug_logs SET 
+              response_payload = ?, 
+              status_code = ?,
+              error_message = ?
+            WHERE id = ?
+          `).bind(
+            resultData ? JSON.stringify(resultData) : null, 
+            resultStatus, 
+            resultStatus >= 400 ? `Dify API Failed with status ${resultStatus}` : null,
+            logId
+          ).run();
+        } catch (le) {}
+      }
+
+      // 💾 Persist Result to Insight (outside branch)
       if (fullOutput) {
         const severity = fullOutput.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
+        const difyReason = "S-Guard AI 자체 분석 (임계값 미달)";
+        
         await db.prepare(`
-          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
-          VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?)
-          ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
-        `).bind(String(sms_id), fullOutput, severity, now, now, similarityScore).run();
+          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
+          VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
+          ON CONFLICT(inc_id) DO UPDATE SET 
+            content=excluded.content, 
+            mod_dt=excluded.mod_dt, 
+            similarity_score=excluded.similarity_score,
+            similarity_reason=excluded.similarity_reason
+        `).bind(String(sms_id), fullOutput, severity, now, now, similarityScore ?? 0, difyReason).run();
+        
+        // Mark as analyzed successfully
+        await db.prepare("UPDATE received_messages SET status = 'ANALYZED' WHERE inc_id = ?").bind(String(sms_id)).run();
+      } else {
+        // Log Error as insight if Dify failed OR returned empty response
+        const isTimeoutOrError = resultStatus >= 400;
+        const errorMsg = isTimeoutOrError 
+          ? `분석 품질 향상을 위해 대기 시간(18초)이 초과되었습니다. 일상적인 대화나 모호한 문자는 분석이 생략될 수 있습니다. (장애 인지가 확실한 경우 전문가를 호출해 주세요)`
+          : `입력된 정보가 부족하거나 분석 가능한 기술적 내용이 포함되어 있지 않습니다. (장애 관련 키워드 확인이 필요합니다)`;
+          
+        const errorReason = isTimeoutOrError ? "분석 대기 시간 초과" : "분석 가능 내용 부족";
+        
+        await db.prepare(`
+          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
+          VALUES (?, ?, 'CRITICAL', 'SYSTEM', ?, 'SYSTEM', ?, 0, ?)
+          ON CONFLICT(inc_id) DO UPDATE SET 
+            content=excluded.content, 
+            mod_dt=excluded.mod_dt,
+            similarity_reason=excluded.similarity_reason
+        `).bind(String(sms_id), errorMsg, now, now, errorReason).run();
+        
+        // Ensure status gets updated so it doesn't hang in PENDING forever
+        await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
       }
     }
 
     if (kv) await kv.delete(lockKey);
   } catch (err) {
     console.error(`[Background] Error analyzing SMS ${sms_id}:`, err);
+    await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
+    
+    // Log fatal error to trace
+    try {
+      await db.prepare(`
+        INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
+        VALUES (?, 'BG_PROCESS_FATAL', 'CRITICAL_FAILURE', 500, ?)
+      `).bind(String(sms_id), err.message).run();
+    } catch (le) {}
+
     if (env.SMS_STORAGE) await env.SMS_STORAGE.delete(`lock:analyze:${sms_id}`);
   }
 };
@@ -921,7 +1165,7 @@ app.post('/sms/receive', async (c) => {
   await db.prepare(`
     INSERT INTO received_messages (
       inc_id, sender, message, employee_id, timestamp, keyword_detected, 
-      response_message, received_count, 
+      response_message, received_count, status,
       channel, if_id, service_code, service_name, 
       biz_system, error_code, occurrence_count, 
       occurrence_node, error_message, occurrence_time,
@@ -932,7 +1176,7 @@ app.post('/sms/receive', async (c) => {
       reg_id, reg_dt, mod_id, mod_dt
     ) VALUES (
       ?, ?, ?, ?, ?, ?, 
-      ?, ?, 
+      ?, ?, 'PENDING',
       ?, ?, ?, ?, 
       ?, ?, ?, 
       ?, ?, ?,
@@ -963,7 +1207,7 @@ app.post('/sms/receive', async (c) => {
              const { results: partUsers } = await db.prepare("SELECT employee_id FROM users WHERE part = ?").bind(senderUser.part).all();
              if (partUsers && partUsers.length > 0) {
                  for (const u of partUsers) {
-                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id) VALUES (?, ?, '미처리', ?, ?, ?, ?) ON CONFLICT DO NOTHING")
+                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id) VALUES (?, ?, '미처리', ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
                      .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', employee_id || 'SYSTEM').run();
                  }
              }
@@ -998,22 +1242,25 @@ app.get('/sms/notification-stream', async (c) => {
        if (latest) lastSeenKey = `${latest.inc_id}_${latest.timestamp}`;
     }
 
-    // Keep the connection alive with a heartbeat every 30 seconds
-    const heartbeatInterval = setInterval(async () => {
-      await stream.writeSSE({ event: 'ping', data: 'heartbeat' })
-    }, 30000)
+    let lastHeartbeat = Date.now()
 
     try {
       while (true) {
+        // Send heartbeat every 20 seconds
+        if (Date.now() - lastHeartbeat > 20000) {
+          await stream.writeSSE({ event: 'ping', data: 'heartbeat' })
+          lastHeartbeat = Date.now()
+        }
+
         // Check for new SMS every 3 seconds
         const latest = await db.prepare("SELECT * FROM received_messages ORDER BY timestamp DESC LIMIT 1").first()
         const currentKey = latest ? `${latest.inc_id}_${latest.timestamp}` : null;
         
         if (latest && currentKey !== lastSeenKey) {
-          console.log('New/Updated SMS detected in SSE stream:', latest.inc_id)
+          console.log('New SMS detected in SSE stream:', latest.inc_id)
           lastSeenKey = currentKey;
           await stream.writeSSE({
-            event: 'sms_received',
+            event: 'new_sms', // Synchronized with frontend listener
             data: JSON.stringify({
               inc_id: latest.inc_id,
               sender: latest.sender,
@@ -1026,27 +1273,57 @@ app.get('/sms/notification-stream', async (c) => {
           })
         }
         
-        // Wait for 3 seconds before next check
         await stream.sleep(3000)
       }
     } catch (e) {
       console.error('SSE Stream Error:', e)
-      clearInterval(heartbeatInterval)
     } finally {
-      clearInterval(heartbeatInterval)
       console.log('SSE Stream Disconnected')
     }
   })
 })
 
+app.get('/sms/stats', async (c) => {
+  const db = c.env.DB
+  const total = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first('c')
+  const unread = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE read = 0").first('c')
+  return c.json({ total, unread })
+})
+
+// 🚀 [NEW] Dynamic Configuration Endpoints
+app.get('/sms/settings', async (c) => {
+  const db = c.env.DB;
+  try {
+    const { results } = await db.prepare("SELECT config_key as key, config_value as value, description FROM system_config").all();
+    return c.json({ success: true, settings: results });
+  } catch (e) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+app.post('/sms/settings', async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const { key, value } = body;
+
+  try {
+    await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+             .bind(key, String(value)).run();
+    return c.json({ success: true, message: `Setting ${key} updated to ${value}` });
+  } catch (e) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
 app.get('/sms/recent', async (c) => {
   const limit = c.req.query('limit') || 10
   const db = c.env.DB
   
-  // JOIN with users to get proper name/team in the list
+  // JOIN with users to get proper name/team, and autopilot_insight for similarity info
   const { results } = await db.prepare(`
     SELECT r.*, u.name, u.role, u.team, u.part,
-           (SELECT COUNT(1) FROM autopilot_insight ai WHERE TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed,
+           ai.similarity_score, ai.similarity_reason,
+           (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE TRIM(REPLACE(ai2.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed,
            COALESCE(
              (SELECT '처리완료' FROM warroom_list wl WHERE TRIM(REPLACE(wl.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) AND (wl.status = 'CLOSED' OR wl.status = '최종완료') LIMIT 1),
              (SELECT status FROM incident_assignments ia WHERE TRIM(REPLACE(ia.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) ORDER BY updated_at DESC LIMIT 1),
@@ -1054,6 +1331,7 @@ app.get('/sms/recent', async (c) => {
            ) as incident_status
     FROM received_messages r
     LEFT JOIN users u ON r.employee_id = u.employee_id
+    LEFT JOIN autopilot_insight ai ON TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))
     ORDER BY r.timestamp DESC 
     LIMIT ?
   `).bind(limit).all()
@@ -1071,6 +1349,8 @@ app.get('/sms/recent', async (c) => {
     keyword_detected: parseInt(String(r.keyword_detected || '0')),
     response_message: r.response_message,
     received_count: parseInt(String(r.received_count || '1')),
+    similarity_score: r.similarity_score,
+    similarity_reason: r.similarity_reason,
     channel: r.channel,
     if_id: r.if_id,
     service_code: r.service_code,
@@ -1082,6 +1362,7 @@ app.get('/sms/recent', async (c) => {
     error_message: r.error_message,
     occurrence_time: r.occurrence_time,
     incident_status: r.incident_status || '미확인',
+    is_analyzed: r.is_analyzed,
     receivers: [
       r.receiver_1, r.receiver_2, r.receiver_3, r.receiver_4, r.receiver_5,
       r.receiver_6, r.receiver_7, r.receiver_8, r.receiver_9, r.receiver_10,
@@ -1735,6 +2016,7 @@ app.get('/ai/insight', async (c) => {
     if (insight) {
       insight_text = insight.content
     } else {
+      // 🚀 Only prefix if there is no official insight yet to prevent overlapping with error logs
       insight_text = `🔍 [Insight] SMS 분석 대기 중: '${recent_sms.message.substring(0,30)}...'`
     }
   }
@@ -1981,18 +2263,14 @@ ${detailedInfo}`
 
               // If similarity >= 0.7, fetch content from knowledge_base for high-confidence match
               if (similarityScore >= 0.7) {
-                let querySql = "";
-                let queryParam = "";
+                let kbMatch;
                 if (matchId.startsWith('kn-')) {
-                  querySql = "SELECT content, title FROM knowledge_base WHERE id = ?";
-                  queryParam = matchId.replace('kn-', '');
+                  const qp = matchId.replace('kn-', '');
+                  kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE id = ?").bind(qp).first();
                 } else {
-                  const possibleId = matchId.split('_')[0];
-                  querySql = "SELECT content, title FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?";
-                  queryParam = possibleId;
+                  const possibleId = matchId.split('_')[0].replace('inc-', '');
+                  kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
                 }
-
-                const kbMatch = await db.prepare(querySql).bind(queryParam, queryParam).first();
                 if (kbMatch) {
                   matchedContent = kbMatch.content;
                   matchedTitle = kbMatch.title;
@@ -2042,11 +2320,11 @@ ${detailedInfo}`
             INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
             VALUES (?, ?, 'INFO', 'SYSTEM', ?, 'SYSTEM', ?, ?)
             ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
-          `).bind(String(sms_id), fullOutput, now, now, similarityScore).run();
+          `).bind(String(sms_id), fullOutput, now, now, similarityScore ?? 0).run();
         }
       } else {
-        // Call Dify (Original logic)
-        const difyRes = await fetch(`${api_base}/chat-messages`, {
+        // 4. Call Dify (Original logic with Workflow Fallback)
+        let difyRes = await fetch(`${api_base}/chat-messages`, {
           method: 'POST',
           headers: { 
             'Authorization': `Bearer ${api_key}`, 
@@ -2060,6 +2338,23 @@ ${detailedInfo}`
             user: 'sguard-worker' 
           })
         })
+
+        if (!difyRes.ok) {
+          // 🚀 Fallback to Workflow if Chat API fails
+          difyRes = await fetch(`${api_base}/workflows/run`, {
+            method: 'POST',
+            headers: { 
+              'Authorization': `Bearer ${api_key}`, 
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream'
+            },
+            body: JSON.stringify({ 
+              inputs: { query: prompt }, 
+              response_mode: 'streaming', 
+              user: 'sguard-worker' 
+            })
+          })
+        }
 
         if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
         
@@ -2085,9 +2380,25 @@ ${detailedInfo}`
             
             try {
               const data = JSON.parse(dataStr)
+              // 🚀 Support Both Chat Apps and Workflow Apps
               if (data.event === 'message' || data.event === 'agent_message') {
-                fullContent += data.answer;
+                fullContent += (data.answer || "");
                 await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+              } else if (data.event === 'text_chunk') {
+                const chunk = data.data?.text || "";
+                fullContent += chunk;
+                await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`))
+              } else if (data.event === 'workflow_finished') {
+                const outputs = data.data?.outputs;
+                if (outputs) {
+                  const workflowResult = outputs.text || outputs.result || outputs.output || 
+                                       (Object.values(outputs).find(v => typeof v === 'string') || "");
+                  
+                  if (workflowResult && (!fullContent || !fullContent.includes(workflowResult.substring(0, 10)))) {
+                    fullContent += workflowResult;
+                    await writer.write(encode(`data: ${JSON.stringify({ answer: workflowResult })}\n\n`))
+                  }
+                }
               }
             } catch (e) {
               continue
@@ -2103,7 +2414,7 @@ ${detailedInfo}`
             INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
             VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?)
             ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
-          `).bind(String(sms_id), fullContent, severity, now, now, similarityScore).run();
+          `).bind(String(sms_id), fullContent, severity, now, now, similarityScore ?? 0).run();
         }
       }
 
@@ -2618,6 +2929,12 @@ ${transcript.join('\n')}`
 
       await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
 
+      // 🚀 Add AbortController for 20s timeout protection
+      const totalTimeoutController = new AbortController();
+      const totalTimeoutId = setTimeout(() => {
+        totalTimeoutController.abort();
+      }, 20000); // 20 seconds hard limit
+
       const difyRes = await fetch(`${api_base}/workflows/run`, {
         method: 'POST',
         headers: { 
@@ -2625,12 +2942,15 @@ ${transcript.join('\n')}`
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream'
         },
+        signal: totalTimeoutController.signal,
         body: JSON.stringify({ 
           inputs: { chat_log: transcript.join('\n'), incident_images: [] }, 
           response_mode: 'streaming', 
           user: 'sguard-worker' 
         })
       })
+
+      clearTimeout(totalTimeoutId);
 
       if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
       
@@ -2712,7 +3032,11 @@ ${transcript.join('\n')}`
       await writer.write(encode('data: [DONE]\n\n'))
     } catch (e) {
       console.error('Summarize-Chat error:', e)
-      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
+      const errorMsg = e.name === 'AbortError' 
+        ? '⚠️ 분석 품질 향상을 위해 대기 시간이 초과되었습니다. 현재 대화 내역이 충분하지 않거나 기술적인 이유로 요약이 지연되었습니다. 잠시 후 다시 시도해 주세요.'
+        : `⚠️ 분석 중 예기치 않은 오류가 발생했습니다: ${e.message}`;
+        
+      await writer.write(encode(`data: ${JSON.stringify({ error: errorMsg, status: '분석 중단됨' })}\n\n`))
     } finally {
       await writer.close()
     }
@@ -2916,7 +3240,7 @@ app.post('/ai/warroom/open', async (c) => {
     await db.prepare(`
       INSERT INTO user_warrooms (user_id, inc_id, joined_at)
       SELECT user_id, ?, ? FROM incident_assignments WHERE inc_id = ?
-      ON CONFLICT DO NOTHING
+      ON CONFLICT(user_id, inc_id) DO NOTHING
     `).bind(normId, now, normId).run();
   } catch (e) {
     console.error("Bulk join error:", e);
@@ -2924,7 +3248,7 @@ app.post('/ai/warroom/open', async (c) => {
 
   // Also ensure creator is joined (if not already listed in assignments)
   if (creator_id) {
-    await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
+    await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
       .bind(creator_id, normId, now).run()
       
     // 🚀 NEW: Ensure creator is also in incident_assignments with status '처리중'
@@ -2984,7 +3308,7 @@ app.post('/ai/report/save', async (c) => {
     try {
       // Clean content for embedding
       const sanitizedContent = content.replace(/\[메모\]\s*undefined/g, '').trim();
-      const res = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [sanitizedContent.substring(0, 3000)] });
+      const res = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [sanitizedContent.substring(0, 3000)] });
       if (res && res.data && res.data[0]) {
         vector = res.data[0];
         embeddingValue = new Float32Array(vector);
@@ -2995,35 +3319,49 @@ app.post('/ai/report/save', async (c) => {
   }
 
   // UPSERT Knowledge: Ensure exactly 1 row per inc_id
+  let status = 'PENDING';
+  let errorMsg = null;
+
+  if (vector && vectorIndex) {
+    try {
+      await vectorIndex.upsert([{
+        id: `kn-${normId}`, // 🚀 Changed from 'inc-' to 'kn-' to prevent overwriting raw SMS and count correctly
+        values: vector,
+        metadata: { title, type: 'knowledge', inc_id: normId }
+      }]);
+      status = 'SUCCESS';
+    } catch (e) {
+      console.error("Vectorize sync failed in report save:", e.message);
+      status = 'FAIL';
+      errorMsg = `Vectorize Error: ${e.message}`;
+    }
+  } else if (!vector) {
+    status = 'FAIL';
+    errorMsg = 'Embedding generation failed';
+  }
+
   await db.prepare(`
-    INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector)
-    VALUES (?, ?, ?, '장애 보고서', ?, ?, ?, ?, ?)
+    INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector, status, error_log)
+    VALUES (?, ?, ?, '장애 보고서', ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(inc_id) DO UPDATE SET
       title = excluded.title,
       content = excluded.content,
       mod_id = excluded.mod_id,
       mod_dt = excluded.mod_dt,
-      vector = excluded.vector
+      vector = excluded.vector,
+      status = excluded.status,
+      error_log = excluded.error_log
   `).bind(
     normId, 
     title || `Report: ${inc_id}`, 
     content, 
     empId, now, empId, now, 
-    embeddingValue
+    embeddingValue,
+    status,
+    errorMsg
   ).run()
 
-  // Sync to Vectorize Index
-  if (vector && vectorIndex) {
-    try {
-      await vectorIndex.upsert([{
-        id: `inc-${normId}`,
-        values: vector,
-        metadata: { title, type: 'report', inc_id: normId }
-      }]);
-    } catch (e) {
-      console.error("Vectorize sync failed in report save:", e.message);
-    }
-  }
+  // 4. Auto-update assignment status to '처리완료'
 
   // 4. Auto-update assignment status to '처리완료'
   if (normId && empId) {
@@ -3143,7 +3481,7 @@ app.post('/warroom/join', async (c) => {
   }
 
   const now = getKst()
-  await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
+  await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
     .bind(user_id, normId, now).run()
 
   // 🚀 Sync to incident_assignments so they appear in both lists
@@ -3157,6 +3495,126 @@ app.post('/warroom/join', async (c) => {
   return c.json({ status: 'joined' })
 })
 
+// RAG Zero-G System Config Endpoints
+// RAG Zero-G System Config Endpoints (Unified with D1 & KV)
+app.get('/api/v1/system/threshold', async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare("SELECT config_value FROM system_config WHERE config_key = ?").bind('similarity_threshold_technical').first();
+    return c.json({ threshold: res ? parseFloat(res.config_value) : 0.85 });
+  } catch (e) {
+    // Fallback to KV if D1 fails
+    const kv = c.env.SMS_STORAGE;
+    if (!kv) return c.json({ threshold: 0.85 });
+    const val = await kv.get('config:rag_threshold');
+    return c.json({ threshold: val ? parseFloat(val) : 0.85 });
+  }
+});
+
+app.post('/api/v1/system/threshold', async (c) => {
+  const { threshold } = await c.req.json();
+  const db = c.env.DB;
+  const kv = c.env.SMS_STORAGE;
+  
+  try {
+    // 🚀 Primary: Save to D1 for AI Engine
+    await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+             .bind('similarity_threshold_technical', String(threshold)).run();
+             
+    // 🛡️ Secondary: Save to KV for Legacy UI Compatibility
+    if (kv && threshold) {
+      await kv.put('config:rag_threshold', threshold.toString());
+    }
+    return c.json({ success: true, threshold });
+  } catch (e) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+// Status Endpoint for Orbital Command UI
+app.get('/ai/knowledge/sync-status', async (c) => {
+  const db = c.env.DB;
+  const vectorIndex = c.env.WARROOM_INDEX;
+
+  try {
+    // 🚀 Self-healing: Check PENDING items against Vectorize
+    const pendingItems = await db.prepare("SELECT id, inc_id FROM knowledge_base WHERE status = 'PENDING' LIMIT 10").all();
+    if (pendingItems.results && pendingItems.results.length > 0 && vectorIndex) {
+      for (const item of pendingItems.results) {
+        try {
+          const checkRes = await vectorIndex.get([`kn-${item.id}`, `kn-${item.inc_id}`, `inc-${item.inc_id}`]);
+          if (checkRes && checkRes.length > 0) {
+            await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(item.id).run();
+          }
+        } catch (e) {}
+      }
+    }
+
+    const totalRes = await db.prepare("SELECT COUNT(*) as count FROM knowledge_base").first('count');
+    const successRes = await db.prepare("SELECT COUNT(*) as count FROM knowledge_base WHERE status = 'SUCCESS'").first('count');
+    const pendingRes = await db.prepare("SELECT COUNT(*) as count FROM knowledge_base WHERE status IN ('PENDING', 'FAIL')").first('count');
+    
+    return c.json({
+      total: totalRes || 0,
+      success: successRes || 0,
+      pending: pendingRes || 0
+    });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+app.post('/ai/knowledge/sync-pending', async (c) => {
+  const db = c.env.DB;
+  const ai = c.env.AI;
+  const vectorIndex = c.env.WARROOM_INDEX;
+
+  if (!vectorIndex || !ai) return c.json({ error: "Required bindings missing" }, 500);
+
+  try {
+    const { results } = await db.prepare("SELECT id, title, content, inc_id, category FROM knowledge_base WHERE status = 'PENDING' OR status = 'FAIL' LIMIT 50").all();
+    
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const row of results) {
+      try {
+        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [row.content.substring(0, 3000)] });
+        const vector = embeddings.data[0];
+        
+        if (vector) {
+          await db.prepare("UPDATE knowledge_base SET vector = ?, status = 'SYNCING' WHERE id = ?")
+            .bind(new Float32Array(vector), row.id).run();
+
+          await vectorIndex.upsert([{
+            id: `kn-${row.id}`,
+            values: vector,
+            metadata: {
+              title: row.title,
+              incident_id: row.inc_id || '',
+              category: row.category || 'general'
+            }
+          }]);
+          
+          await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS', error_log = NULL WHERE id = ?").bind(row.id).run();
+          successCount++;
+        } else {
+          await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = 'Embedding failed' WHERE id = ?").bind(row.id).run();
+          failCount++;
+        }
+      } catch (e) {
+        console.error(`Sync error for ID ${row.id}:`, e.message);
+        await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = ? WHERE id = ?")
+          .bind(e.message, row.id).run();
+        failCount++;
+      }
+    }
+
+    return c.json({ success: true, processed: results.length, successCount, failCount });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // Knowledge Base CRUD
 // Knowledge Base CRUD (Semantic Search Enhanced)
 app.get('/ai/knowledge', async (c) => {
@@ -3168,7 +3626,7 @@ app.get('/ai/knowledge', async (c) => {
   // Semantic Search if query is provided
   if (query && vectorIndex) {
     try {
-      const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [query] });
+      const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [query] });
       const vector = embeddings.data[0];
       const simResults = await vectorIndex.query(vector, { topK: 15, returnMetadata: true });
       
@@ -3192,6 +3650,98 @@ app.get('/ai/knowledge', async (c) => {
   return c.json({ results })
 })
 
+// High-Precision RAG Search using Cloudflare Vectorize (Zero-G Retrieval)
+app.get('/ai/knowledge/search', async (c) => {
+  const query = c.req.query('q')
+  const reqThreshold = c.req.query('threshold')
+  if (!query) return c.json({ results: [] })
+  
+  const db = c.env.DB
+  const ai = c.env.AI
+  const vectorIndex = c.env.WARROOM_INDEX
+  const kv = c.env.SMS_STORAGE;
+
+  if (!vectorIndex || !ai) return c.json({ error: "Required AI/Vector bindings missing" }, 500);
+
+  // 1. Determine Threshold
+  let threshold = 0.80; // Default High-Precision
+  if (reqThreshold && !isNaN(parseFloat(reqThreshold))) {
+    threshold = parseFloat(reqThreshold);
+  } else if (kv) {
+    const kvThresh = await kv.get('config:rag_threshold');
+    if (kvThresh) threshold = parseFloat(kvThresh);
+  }
+
+  try {
+    // 2. Generate Embedding (768-dim)
+    const cleanedQuery = cleanMessageForEmbedding(query);
+    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [cleanedQuery] });
+    const vector = embeddings?.data?.[0];
+    
+    if (!vector) throw new Error("Failed to generate embedding");
+
+    // 3. Vectorize Query
+    const simResults = await vectorIndex.query(vector, { topK: 5, returnMetadata: true });
+    
+    // 4. Threshold Filtering
+    const filteredMatches = (simResults.matches || []).filter(m => m.score >= threshold);
+    if (filteredMatches.length === 0) {
+       return c.json({ results: [], threshold, message: "No matches found above threshold." });
+    }
+
+    // 5. Context Fetch from D1 (1:1 Mapping)
+    const ids = filteredMatches.map(m => {
+       if (m.id.startsWith('kn-')) return m.id.replace('kn-', '');
+       if (m.id.startsWith('inc-') || m.id.startsWith('gov-')) return null; // we lookup by inc_id later if needed, but 'kn-' is primary
+       return m.id; // fallback
+    }).filter(Boolean);
+
+    let dbRecords = [];
+    if (ids.length > 0) {
+      const placeholders = ids.map(() => '?').join(',');
+      const { results } = await db.prepare(`
+        SELECT id, inc_id, title, content, category, tags
+        FROM knowledge_base 
+        WHERE id IN (${placeholders}) OR inc_id IN (${placeholders})
+      `).bind(...ids, ...ids).all();
+      dbRecords = results || [];
+    }
+
+    // Map scores and reasons back to DB records
+    const scoredResults = filteredMatches.map(m => {
+      let dbRec = null;
+      if (m.id.startsWith('kn-')) {
+         dbRec = dbRecords.find(r => String(r.id) === m.id.replace('kn-', ''));
+      } else {
+         dbRec = dbRecords.find(r => String(r.inc_id) === m.id.replace('inc-', ''));
+      }
+      return dbRec ? {
+        ...dbRec,
+        score: m.score,
+        reason: ""
+      } : null;
+    }).filter(Boolean);
+
+    // AI Reasoning for Top 1 Result (Optional Speedup, limit to top 1)
+    if (scoredResults.length > 0) {
+       try {
+         const top1 = scoredResults[0];
+         const reasoningPrompt = `당신은 지능형 관제 시스템입니다. 주어진 쿼리와 이 과거 항목이 왜 연관성이 높은지 1개의 문장으로 설명하세요.\n\n[쿼리]: ${query}\n[항목]: ${top1.title}\n[내용]: ${top1.content?.substring(0, 100)}`;
+         const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: reasoningPrompt });
+         top1.reason = (aiResponse.response || aiResponse).replace(/\n/g, ' ').trim();
+       } catch (err) {
+         console.warn("Reason generation failed:", err.message);
+       }
+    }
+
+    return c.json({ results: scoredResults, threshold });
+
+  } catch (e) {
+    console.error('Vector search failed:', e);
+    return c.json({ error: e.message }, 500);
+  }
+})
+
 app.get('/ai/knowledge/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
@@ -3201,7 +3751,8 @@ app.get('/ai/knowledge/:id', async (c) => {
 })
 
 app.post('/ai/knowledge/save', async (c) => {
-  const body = await c.req.json()
+  try {
+    const body = await c.req.json()
   const db = c.env.DB
   const ai = c.env.AI
   const vectorIndex = c.env.WARROOM_INDEX
@@ -3218,7 +3769,7 @@ app.post('/ai/knowledge/save', async (c) => {
   let vector = null;
   if (body.content) {
     try {
-      const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [body.content.substring(0, 3000)] });
+      const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [body.content.substring(0, 3000)] });
       vector = embeddings.data[0];
     } catch (e) {
       console.error("Embedding error:", e);
@@ -3227,42 +3778,53 @@ app.post('/ai/knowledge/save', async (c) => {
   
   const embeddingValue = vector ? new Float32Array(vector) : null;
 
+  let status = vector ? 'PENDING' : 'FAIL';
+  let errorMsg = vector ? null : 'Embedding generation failed';
   let knowledgeId = body.id;
+
   if (body.id) {
     // Update
     await db.prepare(`
       UPDATE knowledge_base 
-      SET inc_id = ?, title = ?, content = ?, category = ?, file_url = ?, file_type = ?, tags = ?, mod_id = ?, mod_dt = ?, vector = ?
+      SET inc_id = ?, title = ?, content = ?, category = ?, file_url = ?, file_type = ?, tags = ?, mod_id = ?, mod_dt = ?, vector = ?, status = ?, error_log = ?
       WHERE id = ?
     `).bind(
       body.inc_id || null, body.title, body.content || null, body.category || null, 
       body.file_url || null, body.file_type || null, body.tags || null, 
-      user_id, now, embeddingValue, body.id
+      user_id, now, embeddingValue, status, errorMsg, body.id
     ).run()
   } else {
     // Create
     const result = await db.prepare(`
-      INSERT INTO knowledge_base (inc_id, title, content, category, file_url, file_type, tags, reg_id, reg_dt, mod_id, mod_dt, vector)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO knowledge_base (inc_id, title, content, category, file_url, file_type, tags, reg_id, reg_dt, mod_id, mod_dt, vector, status, error_log)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       body.inc_id || null, body.title, body.content || null, body.category || null, 
       body.file_url || null, body.file_type || null, body.tags || null, 
-      user_id, now, user_id, now, embeddingValue
+      user_id, now, user_id, now, embeddingValue, status, errorMsg
     ).run()
     knowledgeId = result.meta.last_row_id;
   }
 
   // Sync to Vectorize Index
   if (vector && vectorIndex) {
-    await vectorIndex.upsert([{
-      id: `kn-${knowledgeId}`,
-      values: vector,
-      metadata: {
-        title: body.title,
-        incident_id: body.inc_id || '',
-        category: body.category || 'general'
-      }
-    }]);
+    try {
+      await vectorIndex.upsert([{
+        id: `kn-${knowledgeId}`,
+        values: vector,
+        metadata: {
+          title: body.title,
+          incident_id: body.inc_id || '',
+          category: body.category || 'general'
+        }
+      }]);
+      // Update status to SUCCESS after successful vector upsert
+      await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(knowledgeId).run();
+    } catch (e) {
+      console.error("Vectorize sync failed in knowledge save:", e.message);
+      await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = ? WHERE id = ?")
+        .bind(`Vectorize Error: ${e.message}`, knowledgeId).run();
+    }
   }
 
   // Log activity
@@ -3276,7 +3838,11 @@ app.post('/ai/knowledge/save', async (c) => {
     } catch(e) {}
   }
 
-  return c.json({ status: body.id ? 'updated' : 'created', id: knowledgeId });
+    return c.json({ status: body.id ? 'updated' : 'created', id: knowledgeId });
+  } catch (err) {
+    console.error("Knowledge save error:", err.message, err.stack);
+    return c.json({ status: 'error', error: err.message, stack: err.stack }, 500);
+  }
 });
 
 // 🚀 NEW: Intelligent Related History Search (Robust Version)
@@ -3295,7 +3861,7 @@ app.get('/ai/related-history', async (c) => {
 
   try {
     const qText = String(query).substring(0, 500);
-    const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [qText] });
+    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [qText] });
     
     if (!embeddings || !embeddings.data || !embeddings.data[0]) {
       throw new Error("Embedding generation failed");
@@ -3368,7 +3934,17 @@ app.post('/retrieval', async (c) => {
     const query = body.query || "";
     const retrieval_setting = body.retrieval_setting;
     const top_k = retrieval_setting?.top_k || 5;
-    const score_threshold = retrieval_setting?.score_threshold || 0.0;
+    
+    // Fetch Global RAG Threshold if Dify sends 0.0 or undefined - Support 'threshold' key from custom nodes
+    // 🚀 Prefer 'threshold' (often dynamic variable) over fixed 'score_threshold'
+    let score_threshold = retrieval_setting?.threshold || retrieval_setting?.score_threshold || 0.0;
+    if (typeof score_threshold === 'string') score_threshold = parseFloat(score_threshold); // Handles {{variables}} values
+    
+    if (score_threshold === 0.0 && c.env.SMS_STORAGE) {
+       const kvThresh = await c.env.SMS_STORAGE.get('config:rag_threshold');
+       if (kvThresh) score_threshold = parseFloat(kvThresh);
+       else score_threshold = 0.80;
+    }
 
     const db = c.env.DB;
     const vectorIndex = c.env.WARROOM_INDEX;
@@ -3390,26 +3966,31 @@ app.post('/retrieval', async (c) => {
       
       for (const m of filteredMatches) {
         let kbResult = null;
-        let querySql = "";
-        let queryParam = "";
+        // 🚀 Robust ID Extraction: Strip ALL possible prefixes to get the raw numeric ID
+        const cleanId = m.id.replace(/^kn-|^inc-|^gov-|^INC-/, '').split('_')[0].trim();
+        const isLongId = cleanId.length > 10; // Likely a YYYYMMDD... timestamp inc_id
 
-        if (m.id.startsWith('kn-')) {
-          querySql = "SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE id = ?";
-          queryParam = m.id.replace('kn-', '');
-        } else if (m.id.startsWith('inc-')) {
-          querySql = "SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ?";
-          queryParam = m.id.replace('inc-', '');
-        } else if (m.id.startsWith('gov-')) {
-          querySql = "SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ?";
-          queryParam = m.id.replace('gov-', '');
+        // 1. Try Knowledge Base first
+        if (isLongId) {
+          // Priority match by inc_id
+          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = ?").bind(cleanId).first();
+        } else {
+          // Fallback match by primary key id
+          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE CAST(id AS TEXT) = ?").bind(cleanId).first();
         }
 
-        if (querySql) {
-          kbResult = await db.prepare(querySql).bind(queryParam).first();
-        } else {
-          // Fallback for legacy IDs (e.g. 20260401094557143_20)
-          const possibleId = m.id.split('_')[0];
-          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
+        // 2. Hybrid Fallback: Search received_messages if not found in knowledge_base
+        if (!kbResult && isLongId) {
+          const sms = await db.prepare("SELECT message, sender, timestamp FROM received_messages WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = ?").bind(cleanId).first();
+          if (sms) {
+            kbResult = {
+              content: sms.message,
+              title: `[실시간 장애로그] ${cleanId} (${sms.sender})`,
+              category: 'raw_sms',
+              tags: 'SMS,Realtime',
+              inc_id: cleanId
+            };
+          }
         }
 
         if (kbResult) {
@@ -3421,7 +4002,8 @@ app.post('/retrieval', async (c) => {
               category: kbResult.category,
               tags: kbResult.tags,
               incident_id: kbResult.inc_id,
-              origin_id: m.id
+              origin_id: m.id,
+              is_raw: kbResult.category === 'raw_sms'
             }
           });
         }
@@ -3474,23 +4056,30 @@ app.post('/upsert', async (c) => {
     const title = name || `Dify Import: ${new Date().toISOString()}`;
     
     const result = await db.prepare(`
-      INSERT INTO knowledge_base (title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector)
-      VALUES (?, ?, 'Dify 수집', 'DIFY_BOT', ?, 'DIFY_BOT', ?, ?)
+      INSERT INTO knowledge_base (title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector, status)
+      VALUES (?, ?, 'Dify 수집', 'DIFY_BOT', ?, 'DIFY_BOT', ?, ?, 'SYNCING')
     `).bind(title, text, now, now, new Float32Array(vector)).run();
 
     const insertId = result.meta.last_row_id;
 
     // 3. Upsert to Vectorize
     if (vectorIndex) {
-      await vectorIndex.upsert([{
-        id: `kn-${insertId}`,
-        values: vector,
-        metadata: {
-          title: title,
-          category: 'dify_import',
-          source: 'dify_workflow'
-        }
-      }]);
+      try {
+        await vectorIndex.upsert([{
+          id: `kn-${insertId}`,
+          values: vector,
+          metadata: {
+            title: title,
+            category: 'dify_import',
+            source: 'dify_workflow'
+          }
+        }]);
+        await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(insertId).run();
+      } catch (ve) {
+        console.error("Vectorize upsert failed:", ve);
+        await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = ? WHERE id = ?")
+          .bind(`Vectorize Error: ${ve.message}`, insertId).run();
+      }
     }
 
     return c.json({ 
@@ -3525,10 +4114,13 @@ app.post('/ai/knowledge/sync', async (c) => {
 
     for (const row of results) {
       try {
-        const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [row.content.substring(0, 3000)] });
+        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [row.content.substring(0, 3000)] });
         const vector = embeddings.data[0];
         
         if (vector) {
+          await db.prepare("UPDATE knowledge_base SET vector = ?, status = 'SYNCING' WHERE id = ?")
+            .bind(new Float32Array(vector), row.id).run();
+
           await vectorIndex.upsert([{
             id: `kn-${row.id}`,
             values: vector,
@@ -3538,12 +4130,17 @@ app.post('/ai/knowledge/sync', async (c) => {
               category: row.category || 'general'
             }
           }]);
+          
+          await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(row.id).run();
           successCount++;
         } else {
+          await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = 'Embedding failed' WHERE id = ?").bind(row.id).run();
           failCount++;
         }
       } catch (e) {
         console.error(`Sync error for ID ${row.id}:`, e.message);
+        await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = ? WHERE id = ?")
+          .bind(e.message, row.id).run();
         failCount++;
       }
     }
@@ -3870,7 +4467,7 @@ app.patch('/incidents/:id', async (c) => {
 app.post('/ai/warroom/invite', async (c) => {
   const { user_id, inc_id } = await c.req.json()
   const now = getKst()
-  await c.env.DB.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING")
+  await c.env.DB.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
     .bind(user_id, String(inc_id), now).run()
   return c.json({ status: 'invited', user_id, inc_id })
 })
@@ -3892,82 +4489,7 @@ app.get('/ai/user/activity-history', async (c) => {
 })
 
 
-// RAG Search using Vector Similarity
-app.get('/ai/knowledge/search', async (c) => {
-  const query = c.req.query('q')
-  if (!query) return c.json({ results: [] })
-  
-  const db = c.env.DB
-  const cleanedQuery = cleanMessageForEmbedding(query);
-  const queryVector = await generateEmbedding(cleanedQuery, c.env)
-  if (!queryVector) return c.json({ error: "Failed to generate query embedding" }, 500)
-  
-  // Since D1 native vector distance might not be available, we use a custom SQL logic or simple storage retrieval
-  // If native vector is enabled: "SELECT *, VECTOR_DISTANCE(vector, ?, 'cosine') as score FROM knowledge_base ORDER BY score ASC LIMIT 5"
-  // For now, we'll implement a robust retrieval that works with JSON storage or native if possible.
-  
-  try {
-    // Using native vector distance (Cosine similarity)
-    const { results } = await db.prepare(`
-      SELECT id, inc_id, title, content, category, tags,
-             VECTOR_DISTANCE(vector, ?, 'cosine') as distance
-      FROM knowledge_base 
-      WHERE vector IS NOT NULL 
-      ORDER BY distance ASC
-      LIMIT 10
-    `).bind(new Float32Array(queryVector)).all()
-    const scoredResults = results.map(r => ({
-      ...r,
-      score: 1 - r.distance,
-      reason: ""
-    }))
-    
-    // Generate AI Matching Reason for top 3 results
-    const ai = c.env.AI;
-    if (ai && scoredResults.length > 0) {
-      try {
-        const top3 = scoredResults.slice(0, 3);
-        const reasoningPrompt = `당신은 지능형 관제 시스템 전문가입니다. 아래 질문(Query)과 검색된 과거 지식 항목들을 비교하여, 왜 이 항목들이 유사한지 그 이유를 각각 '한 문장'으로 설명하세요. 
-        필요한 정보: 시스템명, 에러 코드, 장애 현상의 유사성 등. 답변은 한국어로 하세요.
 
-        [분석 요청 Query]: ${query}
-
-        ${top3.map((r, i) => `[항목 ${i+1}]: ${r.title}\n[내용]: ${r.content?.substring(0, 100)}...`).join('\n\n')}
-
-        답변 형식 (반드시 이 형식을 지키세요):
-        항목 1 이유: ...
-        항목 2 이유: ...
-        항목 3 이유: ...`;
-
-        const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: reasoningPrompt });
-        const reasoningText = aiResponse.response || aiResponse;
-
-        // Parse reasoning (Simple line-based extraction)
-        const lines = String(reasoningText).split('\n');
-        top3.forEach((r, i) => {
-          const reasonLine = lines.find(l => l.includes(`항목 ${i+1} 이유:`));
-          if (reasonLine) {
-            r.reason = reasonLine.split(`항목 ${i+1} 이유:`)[1].trim();
-          }
-        });
-      } catch (aiErr) {
-        console.error("Reasoning generation failed:", aiErr);
-      }
-    }
-    
-    return c.json({ results: scoredResults })
-  } catch (e) {
-    // Fallback if VECTOR_DISTANCE is not yet available in the environment
-    console.warn('Native vector search failed, falling back:', e.message);
-    const { results } = await db.prepare(`
-      SELECT id, inc_id, title, content, category, tags
-      FROM knowledge_base 
-      WHERE vector IS NOT NULL 
-      LIMIT 10
-    `).all()
-    return c.json({ results: results.map(r => ({ ...r, score: 0.99 })) })
-  }
-})
 
 // Consolidation: Moved to line 3147
 
@@ -4234,7 +4756,7 @@ app.post('/ai/send-report-email', async (c) => {
   }
 
   const formData = await c.req.formData();
-  const pdfFile = formData.get('pdf'); // PDF Blob from frontend
+  const pdfFile = formData.get('pdf');
   const incident_id = formData.get('incident_id');
   
   if (!pdfFile || !incident_id) {
@@ -4247,7 +4769,7 @@ app.post('/ai/send-report-email', async (c) => {
 
   // 1. Prepare Metadata
   const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-  const recipientEmail = 'khcho0421@gmail.com'; // Test Target fixed as per user request
+  const recipientEmail = 'khcho0421@gmail.com';
 
   // 2. Prepare MailChannels Request
   const mcRes = await fetch('https://api.mailchannels.net/tx/v1/send', {
@@ -4327,7 +4849,7 @@ app.post('/ai/register-knowledge', async (c) => {
     const sanitizedContent = content.replace(/🚀 고속 분석 엔진\(Dify\) 최적화 통신을 시작합니다\.\.\.\s*/g, "").trim();
 
     // 1. Generate Embeddings using Cloudflare AI
-    const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { 
+    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { 
       text: [sanitizedContent.substring(0, 3000)] // Limit for embedding stability
     });
     const vector = embeddings.data[0];
@@ -4340,8 +4862,8 @@ app.post('/ai/register-knowledge', async (c) => {
 
     const result = await db.prepare(`
       INSERT INTO knowledge_base (
-        inc_id, title, content, category, tags, reg_id, reg_dt, mod_id, mod_dt, vector
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        inc_id, title, content, category, tags, reg_id, reg_dt, mod_id, mod_dt, vector, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
     `).bind(
       incident_id || `manual-${Date.now()}`,
       title,
@@ -4358,7 +4880,7 @@ app.post('/ai/register-knowledge', async (c) => {
     const dbInsertId = result.meta.last_row_id;
 
     // 3. Upsert into Vectorize Index
-    if (vectorIndex) {
+    if (vectorIndex && vector) {
       await vectorIndex.upsert([{
         id: `kn-${dbInsertId}`,
         values: vector,
@@ -4368,6 +4890,8 @@ app.post('/ai/register-knowledge', async (c) => {
           category: category || 'report'
         }
       }]);
+      // Update status to SUCCESS after successful vector upsert
+      await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(dbInsertId).run();
     }
 
     return c.json({ 
@@ -4398,7 +4922,6 @@ app.post('/ai/governance/approve', async (c) => {
     // Clean content by removing the fixed Dify header message if it exists
     const cleanContent = (text) => {
       if (!text) return "";
-      // Remove the specific Dify optimization message and any leading newlines/spaces it leaves behind
       return text.replace(/🚀 고속 분석 엔진\(Dify\) 최적화 통신을 시작합니다\.\.\.\s*/g, "").trim();
     };
 
@@ -4430,7 +4953,7 @@ app.post('/ai/governance/approve', async (c) => {
     }
 
     // 2. Generate Embeddings for Vector DB
-    const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { 
+    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { 
       text: [sanitizedContent.substring(0, 3000)]
     });
     const vector = embeddings.data[0];
@@ -4456,7 +4979,7 @@ app.post('/ai/governance/approve', async (c) => {
     if (ai && sanitizedContent) {
       try {
         console.log(`[RAG] Generating embedding for ${incident_id}...`);
-        const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { 
+        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { 
           text: [sanitizedContent.substring(0, 3000)]
         });
         if (embeddings && embeddings.data && embeddings.data[0]) {
@@ -4472,15 +4995,17 @@ app.post('/ai/governance/approve', async (c) => {
 
     // UPSERT Knowledge: Ensure exactly 1 row per inc_id
     const actor = user_id || 'SYSTEM';
-    await db.prepare(`
-      INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector)
-      VALUES (?, ?, ?, '거버넌스 승인', ?, ?, ?, ?, ?)
+    const kbResult = await db.prepare(`
+      INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector, status)
+      VALUES (?, ?, ?, '거버넌스 승인', ?, ?, ?, ?, ?, 'PENDING')
       ON CONFLICT(inc_id) DO UPDATE SET
         title = excluded.title,
         content = excluded.content,
         mod_id = excluded.mod_id,
         mod_dt = excluded.mod_dt,
-        vector = excluded.vector
+        vector = excluded.vector,
+        status = 'PENDING'
+      RETURNING id
     `).bind(
       incident_id, 
       title || `Governance: ${incident_id}`, 
@@ -4490,7 +5015,28 @@ app.post('/ai/governance/approve', async (c) => {
       actor,
       now,
       embeddingValue
-    ).run();
+    ).first();
+
+    const dbInsertId = kbResult?.id;
+
+    // 🚀 NEW: Sync Governance Report to Vectorize
+    if (vectorIndex && embeddingValue && dbInsertId) {
+      try {
+        await vectorIndex.upsert([{
+          id: `kn-${dbInsertId}`,
+          values: Array.from(embeddingValue),
+          metadata: {
+            title: title || `Governance: ${incident_id}`,
+            incident_id: incident_id || '',
+            category: 'governance'
+          }
+        }]);
+        // Update to SUCCESS
+        await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(dbInsertId).run();
+      } catch (ve) {
+        console.error("[Governance] Vectorize sync failed:", ve.message);
+      }
+    }
 
     // 5. Update Incident Status to '처리완료'
     await db.prepare("UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ?")
@@ -4766,7 +5312,7 @@ app.post('/api/v1/reports/submit', async (c) => {
     let vectorArray = null;
     if (content) {
       try {
-        const embeddings = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [content.substring(0, 3000)] });
+        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [content.substring(0, 3000)] });
         vector = embeddings.data[0];
         vectorArray = vector ? new Float32Array(vector) : null;
       } catch (e) {
@@ -4776,12 +5322,13 @@ app.post('/api/v1/reports/submit', async (c) => {
 
     // 3. Register Knowledge Base
     const kbResult = await db.prepare(`
-      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt, mod_dt, vector)
-      VALUES (?, ?, ?, 'REPORT', ?, ?, ?)
+      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt, mod_dt, vector, status)
+      VALUES (?, ?, ?, 'REPORT', ?, ?, ?, 'PENDING')
       ON CONFLICT(inc_id) DO UPDATE SET 
         content = excluded.content,
         mod_dt = excluded.mod_dt,
-        vector = excluded.vector
+        vector = excluded.vector,
+        status = 'PENDING'
       RETURNING id
     `).bind(incident_id, title, content, now, now, vectorArray).first()
 
@@ -4799,6 +5346,8 @@ app.post('/api/v1/reports/submit', async (c) => {
           category: 'REPORT'
         }
       }]);
+      // Update status to SUCCESS
+      await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(knowledgeId).run();
     }
 
     // 3. Find Reporting Lines (Superiors)
@@ -5035,7 +5584,7 @@ export class WarRoom {
             const ai = this.env.AI;
             const index = this.env.WARROOM_INDEX;
             if (ai && index && data.text.length > 5) {
-              const { data: embeddings } = await ai.run('@cf/baai/bge-small-en-v1.5', { text: [data.text] });
+              const { data: embeddings } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [data.text] });
               await index.upsert([{
                 id: `${data.incident_id}_${seq}`,
                 values: embeddings[0],

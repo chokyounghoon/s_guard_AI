@@ -16,8 +16,6 @@ const agentColors = {
 // API URL helper: /ai/ endpoints go to local FastAPI, others to Cloudflare Worker
 // API URL helper: /ai/ endpoints go to local FastAPI (if dev), others to Cloudflare Worker
 const getApiUrl = (endpoint, isWs = false) => {
-  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  
   // 🚀 WebSocket connections should ALWAYS go directly to the Cloudflare Worker
   // because the Durable Object state and real-time logic are hosted there.
   if (isWs) {
@@ -25,7 +23,11 @@ const getApiUrl = (endpoint, isWs = false) => {
     return `${workerWsBase}${endpoint}`;
   }
 
-  // Regular API calls go to local FastAPI during development for DB-sync tasks
+  // Use the remote worker by default to ensure reliability across environments.
+  // Change to 'true' only if you are explicitly running the local python-api on port 8000.
+  const useLocalApi = false; 
+  const isLocalDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && useLocalApi;
+  
   if (isLocalDev) {
     return `http://127.0.0.1:8000${endpoint}`;
   }

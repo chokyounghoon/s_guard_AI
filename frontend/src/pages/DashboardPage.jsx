@@ -93,7 +93,7 @@ export default function DashboardPage() {
   const [allNotifications, setAllNotifications] = useState([]); 
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // 🌐 API Configuration (Cloud Worker Only)
+  // 🌐 API Configuration (Production Worker)
   const apiBase = 'https://sguardai.khcho0421.workers.dev';
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -106,6 +106,9 @@ export default function DashboardPage() {
   const [smsMessages, setSmsMessages] = useState([]);
   const [deletedSmsIds, setDeletedSmsIds] = useState(new Set());
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
+  const [showThresholdSettings, setShowThresholdSettings] = useState(false);
+  const [thresholds, setThresholds] = useState({ technical: 0.85, casual: 0.95 });
+  const [isSavingThreshold, setIsSavingThreshold] = useState(false);
   const [isLiveStreamCollapsed, setIsLiveStreamCollapsed] = useState(false);
   const [isWarRoomCollapsed, setIsWarRoomCollapsed] = useState(false);
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false);
@@ -421,15 +424,11 @@ export default function DashboardPage() {
   // 상단 S-Autopilot Insight 패널은 항상 최신 SMS만 분석하도록 고정
   // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
   useEffect(() => {
-    if (selectedSms) {
-      setInsightSms(selectedSms);
-    } else if (visibleSms.length > 0) {
-      setInsightSms(prev => {
-        if (!prev || prev.inc_id !== visibleSms[0].inc_id) {
-          return visibleSms[0];
-        }
-        return prev;
-      });
+    if (visibleSms.length > 0) {
+      if (!selectedSms) {
+        setSelectedSms(visibleSms[0]);
+      }
+      setInsightSms(selectedSms || visibleSms[0]);
     } else {
       setInsightSms(null);
     }
@@ -442,6 +441,7 @@ export default function DashboardPage() {
     fetchActivityLogs();
     fetchMyAssignments();
     fetchUserActivityHistory();
+    fetchSettings(); // 🚀 Load thresholds on start
     const smsInterval = setInterval(fetchSMSMessages, 5000);
     const wrInterval = setInterval(fetchWarRooms, 8000);
     const activityInterval = setInterval(fetchActivityLogs, 10000);
@@ -459,6 +459,8 @@ export default function DashboardPage() {
     sse.onerror = () => {
        console.warn('SMS SSE Connection failed, falling back to polling.');
        sse.close();
+       // Retry after 5 seconds to recover from transient network/worker issues
+       setTimeout(() => { fetchSMSMessages(); }, 5000);
     };
 
     return () => {
@@ -582,6 +584,40 @@ export default function DashboardPage() {
     }
   };
 
+
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch(`${apiBase}/sms/settings`);
+      if (response.ok) {
+        const data = await response.json();
+        const tech = data.settings.find(s => s.key === 'similarity_threshold_technical')?.value || 0.85;
+        const casual = data.settings.find(s => s.key === 'similarity_threshold_casual')?.value || 0.95;
+        setThresholds({ technical: parseFloat(tech), casual: parseFloat(casual) });
+      }
+    } catch (e) {
+      console.error("Fetch settings error:", e);
+    }
+  };
+
+  const updateThreshold = async (key, value) => {
+    setIsSavingThreshold(true);
+    try {
+      const response = await fetch(`${apiBase}/sms/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: String(value) })
+      });
+      if (response.ok) {
+        toast.success(`${key === 'similarity_threshold_technical' ? '기술' : '일상'} 임계값이 ${value}로 업데이트되었습니다.`);
+        fetchSettings();
+      }
+    } catch (e) {
+      toast.error("설정 업데이트 실패");
+    } finally {
+      setIsSavingThreshold(false);
+    }
+  };
+
   const fetchSMSMessages = async () => {
     try {
       const response = await fetch(`${apiBase}/sms/recent?limit=20`);
@@ -589,31 +625,9 @@ export default function DashboardPage() {
         const data = await response.json();
         const freshMsgs = (data.messages || []).filter(msg => {
           if (deletedSmsIds.has(msg.inc_id)) return false;
-          
-          // UI 깜박임(Flashing) 방지: 사용자 프로필이 로드되기 전에는 숨김 처리
-          if (!userProfile) return false;
-          
-          // 관리자 권한 예외: 모든 SMS 확인 가능
-          const role = userProfile.role || '';
-          if (role.includes('관리자') || role.toLowerCase().includes('admin') || role.includes('팀장')) {
-            return true;
-          }
-
-          // 수신자가 아예 지정되지 않은 메시지(브로드캐스트/공용/테스트)는 대시보드에 전체 공개
-          const isPublicBroadcast = (!msg.receivers || msg.receivers.length === 0);
-          if (isPublicBroadcast) return true;
-
-          // 🚀 Governance Filter: 본인이 발신했거나 수신자로 지정된 경우만 표시
-          const isAssigned = (msg.receivers || []).some(r => 
-            (userProfile.name && r.includes(userProfile.name)) || 
-            (userProfile.employee_id && String(r).includes(String(userProfile.employee_id)))
-          );
-          const isSender = msg.employee_id && String(msg.employee_id) === String(userProfile.employee_id || userProfile.id);
-          
-          return isAssigned || isSender;
+          return true;
         });
 
-        // 🚀 Duplicate Prevention: Ensure unique inc_id in the list
         const uniqueMap = new Map();
         freshMsgs.forEach(msg => {
           if (!uniqueMap.has(msg.inc_id)) {
@@ -624,29 +638,25 @@ export default function DashboardPage() {
         const finalMsgs = Array.from(uniqueMap.values());
         setSmsMessages(finalMsgs);
 
-        // Calculate total SMS volume from the visible list
         const totalVolume = finalMsgs.reduce((acc, m) => acc + (Number(m.received_count) || 1), 0);
         setTotalSmsVolume(totalVolume);
 
-        // --- 실시간 자동 분석 트리거 (New Arrival OR Update Automation) ---
         if (finalMsgs.length > 0) {
           const latestMsg = finalMsgs[0];
           const latestKey = `${latestMsg.inc_id}_${latestMsg.timestamp}`;
           
           if (latestKey !== lastAutoTriggeredKeyRef.current) {
             lastAutoTriggeredKeyRef.current = latestKey;
-            setLastAutoTriggeredKey(latestKey);
+            setLastAutoTriggeredKey(latestMsg.inc_id);
             setSelectedSms(latestMsg);
-
-            // ⚡ One-View Automation: Expand all relevant panels on arrival/update
+            
+            // Auto-expand and start analysis
             setIsSmsPanelCollapsed(false);       
             setIsLiveStreamCollapsed(false);    
             setIsWarRoomCollapsed(false);       
             setIsAssignmentsCollapsed(false);    
             setIsFlowCollapsed(false);
             setShowAgentPanel(true);             
-            
-            // Trigger AI analysis / History fetch
             startLiveScenario(latestMsg);
           }
         }
@@ -1080,6 +1090,43 @@ export default function DashboardPage() {
     );
   };
 
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    
+    const msgId = `refresh-${Date.now()}`;
+    setMessages(prev => [...prev, { id: msgId, type: 'info', text: '데이터를 최신화하는 중입니다...' }]);
+    
+    try {
+      await Promise.all([
+        fetchSMSMessages(),
+        fetchWarRooms(),
+        fetchMyAssignments(),
+        fetchActivityLogs(),
+        // Trigger backend self-healing
+        fetch(`${apiBase}/ai/knowledge/sync-status`).catch(e => console.warn("Sync status trigger failed:", e))
+      ]);
+      
+      // Remove loading message
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+      
+      // Show success message
+      const successId = `success-${Date.now()}`;
+      setMessages(prev => [...prev, { id: successId, type: 'success', text: '모든 데이터가 성공적으로 새로고침되었습니다.' }]);
+      
+      // Auto dismiss success after 3s
+      setTimeout(() => {
+        setMessages(prev => prev.filter(m => m.id !== successId));
+      }, 3000);
+    } catch (err) {
+      console.error("Manual refresh error:", err);
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+      setMessages(prev => [...prev, { id: `err-${Date.now()}`, type: 'error', text: '데이터 새로고침 중 오류가 발생했습니다.' }]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0f1421] text-white font-sans overflow-x-hidden relative">
       {/* Top Navigation */}
@@ -1092,6 +1139,14 @@ export default function DashboardPage() {
           <span className="text-lg font-bold tracking-tight group-hover:text-blue-400 transition-colors">S-Guard <span className="text-blue-500">AI</span></span>
         </div>
         <div className="flex items-center space-x-4">
+          <div 
+            className={`p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group ${isRefreshing ? 'opacity-50' : ''}`}
+            onClick={handleManualRefresh}
+            title="데이터 새로고침"
+          >
+            <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </div>
+
           {/* Search Button removed per user request */}
           <div className="relative group">
             <Bell
@@ -1258,6 +1313,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
+                    className={`p-2 rounded-xl border transition-all ${showThresholdSettings ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'}`}
+                    title="유사도 임계값 설정"
+                  >
+                    <Settings className={`w-4 h-4 ${isSavingThreshold ? 'animate-spin' : ''}`} />
+                  </button>
 
                   <button 
                     disabled={isRefreshing}
@@ -1282,6 +1344,47 @@ export default function DashboardPage() {
                   </div>
                   <div className={`transition-transform duration-300 ${isSmsPanelCollapsed ? '' : 'rotate-180'}`}>
                     <ChevronRight className="w-5 h-5 text-slate-400 rotate-90" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 🛠️ similarity Threshold Control Panel */}
+              <div className={`transition-all duration-500 ease-in-out bg-blue-600/5 border-y border-white/5 ${showThresholdSettings ? 'max-h-64 opacity-100 p-6' : 'max-h-0 opacity-0 overflow-hidden py-0'}`}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm font-bold text-white uppercase tracking-wider">Technical threshold</span>
+                      </div>
+                      <span className="text-xs font-mono font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">{(thresholds.technical * 100).toFixed(0)}%</span>
+                    </div>
+                    <input 
+                      type="range" min="0.5" max="1.0" step="0.01" 
+                      value={thresholds.technical}
+                      onChange={(e) => setThresholds(prev => ({ ...prev, technical: parseFloat(e.target.value) }))}
+                      onMouseUp={() => updateThreshold('similarity_threshold_technical', thresholds.technical)}
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                    <p className="text-[10px] text-slate-500 leading-relaxed italic">장애 키워드가 포함된 문자의 지식베이스 매칭 강도를 조절합니다.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-purple-400" />
+                        <span className="text-sm font-bold text-white uppercase tracking-wider">Casual Match Strictness</span>
+                      </div>
+                      <span className="text-xs font-mono font-black text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">{(thresholds.casual * 100).toFixed(0)}%</span>
+                    </div>
+                    <input 
+                      type="range" min="0.7" max="1.0" step="0.01" 
+                      value={thresholds.casual}
+                      onChange={(e) => setThresholds(prev => ({ ...prev, casual: parseFloat(e.target.value) }))}
+                      onMouseUp={() => updateThreshold('similarity_threshold_casual', thresholds.casual)}
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    />
+                    <p className="text-[10px] text-slate-500 leading-relaxed italic">일상적인 대화(키워드 없음)가 지식베이스와 오탐지되는 것을 방지합니다.</p>
                   </div>
                 </div>
               </div>
@@ -1350,29 +1453,48 @@ export default function DashboardPage() {
                                       </span>
                                     )}
                                   </span>
-                                <span className="text-[10px] text-slate-400 font-black bg-white/5 px-2.5 py-0.5 rounded-lg border border-white/5 shadow-inner">
-                                  {formatYYMMDD(msg.timestamp)}
-                                </span>
+                                  <span className="text-[10px] text-slate-400 font-black bg-white/5 px-2.5 py-0.5 rounded-lg border border-white/5 shadow-inner">
+                                    {formatYYMMDD(msg.timestamp)}
+                                  </span>
+                                </div>
                               </div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="text-xs text-slate-400">발신: {msg.sender}</p>
+                                {msg.employee_id && (
+                                  <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                                    사번: {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
+                                  </span>
+                                )}
+                              </div>
+                               <div className="flex items-start justify-between gap-4">
+                                 <div className="flex-1 min-w-0">
+                                   <p className={`text-sm leading-snug ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
+                                   
+                                   {/* 🚀 AI Matching Rationale: 유사도 점수 및 산출 근거 표시 */}
+                                   {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
+                                     <div className="mt-2.5 flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-700">
+                                       <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-tighter shadow-sm ${
+                                         msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                       }`}>
+                                         <Zap className="w-2.5 h-2.5" />
+                                         AI Match {(msg.similarity_score * 100).toFixed(1)}%
+                                       </div>
+                                       {msg.similarity_reason && (
+                                         <span className="text-[10px] text-slate-500 italic leading-snug">
+                                           "{msg.similarity_reason}"
+                                         </span>
+                                       )}
+                                     </div>
+                                   )}
+                                 </div>
+                                 <button
+                                   onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
+                                   className="text-[10px] font-black text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all flex items-center gap-1 border border-white/5 shadow-sm shrink-0 mt-1"
+                                 >
+                                   진행 상태 <ExternalLink className="w-2.5 h-2.5" />
+                                 </button>
+                               </div>
                             </div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-xs text-slate-400">발신: {msg.sender}</p>
-                              {msg.employee_id && (
-                                <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-                                  사번: {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
-                                </span>
-                              )}
-                            </div>
-                             <div className="flex items-center justify-between gap-4">
-                               <p className={`text-sm leading-snug flex-1 ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
-                               <button
-                                 onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                                 className="text-[10px] font-black text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all flex items-center gap-1 border border-white/5 shadow-sm"
-                               >
-                                 진행 상태 <ExternalLink className="w-2.5 h-2.5" />
-                               </button>
-                             </div>
-                          </div>
                           <button
                             onClick={(e) => deleteSMSMessage(e, msg.inc_id)}
                             className="ml-2 p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
@@ -1390,7 +1512,6 @@ export default function DashboardPage() {
           )}
 
           {/* AI Autopilot Insight Panel (항상 최신 SMS만 분석하도록 insightSms 적용) */}
-          {visibleSms.length > 0 && (
           <div className="w-full">
             <AiInsightPanel 
                onLogReceived={handleLogReceived} 
@@ -1401,7 +1522,6 @@ export default function DashboardPage() {
                warRooms={warRooms}
             />
           </div>
-          )}
 
         </div>
 
@@ -1410,8 +1530,8 @@ export default function DashboardPage() {
 
 
 
+
         {/* Main Content Areas */}
-        {visibleSms.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Alerts List (Section 1) */}
           <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] p-6 rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
@@ -1429,60 +1549,59 @@ export default function DashboardPage() {
             </div>
             {!isLiveStreamCollapsed && (
             <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700/50 space-y-4">
-              {visibleSms.slice(0, 10).map((msg) => {
-                let severity = 'info';
-                let title = 'System Report';
-                const lowerText = (msg.message || '').toLowerCase();
+              {visibleSms.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50 py-10">
+                  <Activity className="w-8 h-8 mb-2" />
+                  <p className="text-xs font-bold uppercase tracking-widest">No recent incidents detected</p>
+                </div>
+              ) : (
+                visibleSms.slice(0, 10).map((msg) => {
+                  let severity = 'info';
+                  let title = 'System Report';
+                  const lowerText = (msg.message || '').toLowerCase();
 
-                if (msg.sender === 'Manual Entry' || msg.channel === 'MANUAL') {
-                  title = 'Manual Registration';
-                } else if (lowerText.includes('critical') || lowerText.includes('db') || lowerText.includes('데이터베이스')) {
-                  severity = 'critical';
-                  title = 'Critical Process Error';
-                } else if (lowerText.includes('err') || lowerText.includes('cpu') || lowerText.includes('메모리')) {
-                  severity = 'warning';
-                  title = 'System Overload Warning';
-                }
+                  if (msg.sender === 'Manual Entry' || msg.channel === 'MANUAL') {
+                    title = 'Manual Registration';
+                  } else if (lowerText.includes('critical') || lowerText.includes('db') || lowerText.includes('데이터베이스')) {
+                    severity = 'critical';
+                    title = 'Critical Process Error';
+                  } else if (lowerText.includes('err') || lowerText.includes('cpu') || lowerText.includes('메모리')) {
+                    severity = 'warning';
+                    title = 'System Overload Warning';
+                  }
 
-                // 방금 들어온(최근 15분) 항목인지 체크 (UI 하이라이트용)
-                const isRecent = (new Date() - new Date(msg.timestamp)) < 15 * 60 * 1000;
+                  const isRecent = (new Date() - new Date(msg.timestamp)) < 15 * 60 * 1000;
 
-                return (
-                  <div
-                    key={msg.inc_id}
-                    onClick={(e) => { 
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const isSame = selectedSms?.inc_id === msg.inc_id;
-                      setSelectedSms(isSame ? null : msg); 
-                      // 좌측 인시던트 스트림 클릭 시에만 에이전트 토론 시작
-                      if (!isSame) {
-                        startLiveScenario(msg);
-                      } else {
-                        setShowAgentPanel(false);
-                        setAgentMessages([]);
-                      }
-                    }}
-                    className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99] relative"
-                  >
-
-                    {/* 반짝이는 표시기 */}
-                    {isRecent && <div className={`absolute top-2 right-2 w-2 h-2 rounded-full animate-ping z-10 ${selectedSms?.inc_id === msg.inc_id ? 'bg-yellow-400' : 'bg-blue-500'}`} />}
-
-                    <AlertItem
-                      title={title}
-                      time={formatYYMMDD(msg.timestamp)}
-                      severity={severity}
-                      desc={msg.message}
-                      isSelected={selectedSms?.inc_id === msg.inc_id}
-                    />
-                  </div>
-                );
-              })}
-                {visibleSms.length === 0 && (
-                  <div className="text-center text-slate-500 text-sm py-4">Waiting...</div>
-                )}
-              </div>
+                  return (
+                    <div 
+                      key={msg.inc_id}
+                      onClick={(e) => { 
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const isSame = selectedSms?.inc_id === msg.inc_id;
+                        setSelectedSms(isSame ? null : msg); 
+                        if (!isSame) {
+                          startLiveScenario(msg);
+                        } else {
+                          setShowAgentPanel(false);
+                          setAgentMessages([]);
+                        }
+                      }}
+                      className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99] relative"
+                    >
+                      {isRecent && <div className={`absolute top-2 right-2 w-2 h-2 rounded-full animate-ping z-10 ${selectedSms?.inc_id === msg.inc_id ? 'bg-yellow-400' : 'bg-blue-500'}`} />}
+                      <AlertItem
+                        title={title}
+                        time={formatYYMMDD(msg.timestamp)}
+                        severity={severity}
+                        desc={msg.message}
+                        isSelected={selectedSms?.inc_id === msg.inc_id}
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
             )}
           </div>
 
@@ -1555,7 +1674,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-        )}
 
 
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
@@ -2089,7 +2207,7 @@ export default function DashboardPage() {
       />
       */}
 
-      {renderProfileModal()}
+        {renderProfileModal()}
       {/* <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} /> */}
 
       {/* War Room Chat List Popup */}
