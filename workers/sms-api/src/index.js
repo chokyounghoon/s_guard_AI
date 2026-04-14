@@ -4,7 +4,13 @@ import { streamSSE } from 'hono/streaming'
 
 const app = new Hono()
 
-app.use('*', cors())
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  exposeHeaders: ['Set-Cookie'],
+  maxAge: 86400,
+}))
 
 // Utility for KST Timestamp
 const getKst = () => {
@@ -212,7 +218,7 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
     if (kv) {
       let lock = await kv.get(lockKey);
       if (lock === 'processing') return;
-      await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+      await kv.put(lockKey, 'processing', { expirationTtl: 120 });
     }
 
     // --- 🚀 Robust Fetching with Retry (D1 Consistency) ---
@@ -412,7 +418,7 @@ ${detailedInfo}`;
 
       // 1. Attempt Chat API with Timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 18000); // 18s safe limit
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s safe limit
 
       try {
         const difyRes = await fetch(`${api_base}/chat-messages`, {
@@ -440,7 +446,7 @@ ${detailedInfo}`;
         } else {
           // Fallback to Workflow
           const wfController = new AbortController();
-          const wfTimeout = setTimeout(() => wfController.abort(), 8000); // 8s safe limit
+          const wfTimeout = setTimeout(() => wfController.abort(), 20000); // 20s safe limit
           
           const wfRes = await fetch(`${api_base}/workflows/run`, {
             method: 'POST',
@@ -510,7 +516,7 @@ ${detailedInfo}`;
         // Log Error as insight if Dify failed OR returned empty response
         const isTimeoutOrError = resultStatus >= 400;
         const errorMsg = isTimeoutOrError 
-          ? `분석 품질 향상을 위해 대기 시간(18초)이 초과되었습니다. 일상적인 대화나 모호한 문자는 분석이 생략될 수 있습니다. (장애 인지가 확실한 경우 전문가를 호출해 주세요)`
+          ? `분석 품질 향상을 위해 대기 시간(60초)이 초과되었습니다. 일상적인 대화나 모호한 문자는 분석이 생략될 수 있습니다. (장애 인지가 확실한 경우 전문가를 호출해 주세요)`
           : `입력된 정보가 부족하거나 분석 가능한 기술적 내용이 포함되어 있지 않습니다. (장애 관련 키워드 확인이 필요합니다)`;
           
         const errorReason = isTimeoutOrError ? "분석 대기 시간 초과" : "분석 가능 내용 부족";
@@ -576,27 +582,393 @@ const verifyPassword = async (password, storedHash) => {
 // ==========================================
 // 1. Auth & Users
 // ==========================================
+
+// ──────────────────────────────────────────
+// POST /auth/init
+// 통합 인증 초기화: 사번 확인 + OTP 발송
+// ──────────────────────────────────────────
+app.post('/auth/init', async (c) => {
+  const { employee_id } = await c.req.json();
+  const db  = c.env.DB;
+  const kv  = c.env.SMS_STORAGE;
+
+  // 1. 사번 유효성 검증
+  if (!employee_id || String(employee_id).trim() === '') {
+    return c.json({ detail: '사번을 입력해 주세요.' }, 400);
+  }
+
+  const empId = String(employee_id).trim();
+
+  // 2. D1 사용자 조회
+  const user = await db
+    .prepare("SELECT employee_id, email, name, status FROM users WHERE employee_id = ?")
+    .bind(empId)
+    .first();
+
+  if (!user) {
+    return c.json({ detail: '등록되지 않은 사번입니다. 관리자에게 문의하세요.', code: 'NOT_FOUND' }, 404);
+  }
+
+  if (user.status === 'SUSPENDED') {
+    return c.json({ detail: '사용이 중지된 계정입니다. 관리자에게 문의하세요.', code: 'SUSPENDED' }, 403);
+  }
+
+  // 3. status 판별
+  const isNew  = user.status === 'PRE_REGISTERED';   // 신규 (최초 등록)
+  const mode   = isNew ? 'PRE_REGISTERED' : 'ACTIVE'; // 응답 모드
+
+  // 4. 이메일 마스킹 (프론트 표시용: ab***@gmail.com)
+  const email = user.email || '';
+  const atIdx = email.indexOf('@');
+  const maskedEmail = atIdx > 2
+    ? email.slice(0, 2) + '***' + email.slice(atIdx)
+    : '***@***';
+
+  // 5. 6자리 OTP 생성
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // 6. Resend API로 OTP 메일 발송
+  const mailFrom    = 'noreply@chokerslab.store';
+  const mailFromName = 'S-Guard AI 보안팀';
+  const subject     = isNew
+    ? '[S-Guard] 최초 로그인 인증 코드'
+    : '[S-Guard] 로그인 인증 코드';
+  const htmlBody    = `
+    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
+      <h2 style="color:#38bdf8;margin-bottom:8px;">🛡️ S-Guard AI</h2>
+      <p style="margin-bottom:24px;">${user.name || empId}님, ${isNew ? '최초 등록을 위한 인증번호입니다.' : '로그인 인증번호입니다.'}</p>
+      <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
+        <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${otp}</span>
+      </div>
+      <p style="margin-top:20px;font-size:13px;color:#94a3b8;">유효 시간: <strong>5분</strong> / 타인에게 절대 공유하지 마세요.</p>
+    </div>
+  `;
+
+  let mailSent = false;
+  let mailError = null;
+
+  const resendApiKey = c.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    return c.json({ detail: '메일 발송 설정이 누락되었습니다. 관리자에게 문의하세요.', code: 'CONFIG_ERROR' }, 500);
+  }
+
+  try {
+    const rsRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: `${mailFromName} <${mailFrom}>`,
+        to: [user.email],
+        subject,
+        html: htmlBody
+      })
+    });
+
+    if (rsRes.ok) {
+      mailSent = true;
+    } else {
+      const errText = await rsRes.text().catch(() => 'unknown');
+      mailError = `Resend HTTP ${rsRes.status}: ${errText}`;
+      console.error('[auth/init] Resend error:', mailError);
+    }
+  } catch (e) {
+    mailError = e.message;
+    console.error('[auth/init] Resend fetch error:', e.message);
+  }
+
+  // 7. 발송 성공 시에만 KV 저장 (5분 TTL)
+  if (mailSent && kv) {
+    const kvKey = `otp:${empId}`;
+    await kv.put(kvKey, otp, { expirationTtl: 300 }); // 300초 = 5분
+  }
+
+  // 8. 응답 (메일 발송 실패 시 503 반환)
+  if (!mailSent) {
+    return c.json({
+      detail: '인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+      code: 'MAIL_FAILED',
+      error: mailError
+    }, 503);
+  }
+
+  return c.json({
+    code: 'OTP_SENT',
+    mode,                      // 'PRE_REGISTERED' | 'ACTIVE'
+    masked_email: maskedEmail, // 화면 표시용 마스킹 이메일
+    employee_id: empId,
+    message: `${maskedEmail} 으로 인증번호가 발송되었습니다. (5분 이내 입력)`
+  });
+});
+
+// ──────────────────────────────────────────
+// POST /auth/verify-otp
+// OTP 검증 (KV에 저장된 코드와 비교)
+// ──────────────────────────────────────────
+app.post('/auth/verify-otp', async (c) => {
+  const { employee_id, otp } = await c.req.json();
+  const kv = c.env.SMS_STORAGE;
+
+  if (!employee_id || !otp) {
+    return c.json({ detail: '사번과 인증번호를 모두 입력해 주세요.' }, 400);
+  }
+
+  const empId  = String(employee_id).trim();
+  const kvKey  = `otp:${empId}`;
+  const stored = kv ? await kv.get(kvKey) : null;
+
+  if (!stored) {
+    return c.json({ detail: '인증번호가 만료되었거나 요청된 적이 없습니다.', code: 'OTP_EXPIRED' }, 400);
+  }
+
+  if (stored !== String(otp).trim()) {
+    return c.json({ detail: '인증번호가 올바르지 않습니다.', code: 'OTP_MISMATCH' }, 400);
+  }
+
+  // 검증 성공 → KV 즉시 삭제 (재사용 방지)
+  if (kv) await kv.delete(kvKey);
+
+  // D1에서 mode 확인 후 응답
+  const db   = c.env.DB;
+  const user = await db
+    .prepare("SELECT employee_id, status FROM users WHERE employee_id = ?")
+    .bind(empId)
+    .first();
+
+  const mode = user?.status === 'PRE_REGISTERED' ? 'PRE_REGISTERED' : 'ACTIVE';
+
+  return c.json({
+    code: 'OTP_VERIFIED',
+    mode,
+    employee_id: empId,
+    message: '인증이 완료되었습니다.'
+  });
+});
+
+// ──────────────────────────────────────────
+// ==========================================
+// JWT 유틸 (HMAC-SHA256, CF Workers 호환)
+// ==========================================
+const generateJWT = async (payload, secret, expirySeconds = 28800) => {
+  // UTF-8 안전 base64url 인코딩 (한글 등 멀티바이트 문자 지원)
+  const encode = (obj) => {
+    const json  = JSON.stringify(obj);
+    const bytes = new TextEncoder().encode(json);
+    return btoa(String.fromCharCode(...bytes))
+      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  };
+
+  const header  = { alg: 'HS256', typ: 'JWT' };
+  const now     = Math.floor(Date.now() / 1000);
+  const body    = { ...payload, iat: now, exp: now + expirySeconds };
+  const input   = `${encode(header)}.${encode(body)}`;
+
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(input));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  return `${input}.${sigB64}`;
+};
+
+// ──────────────────────────────────────────
+// POST /auth/verify
+// 통합 인증 완료: OTP 검증 + 비밀번호 처리 + JWT 발급
+// Body: { employee_id, otp, password, mode }
+// ──────────────────────────────────────────
+app.post('/auth/verify', async (c) => {
+  const { employee_id, otp, password, mode } = await c.req.json();
+  const db  = c.env.DB;
+  const kv  = c.env.SMS_STORAGE;
+  const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+
+  if (!employee_id || !otp) {
+    return c.json({ detail: '사번과 인증번호는 필수입니다.' }, 400);
+  }
+  const empId = String(employee_id).trim();
+
+  // 1. OTP 검증
+  const kvKey = `otp:${empId}`;
+  const stored = kv ? await kv.get(kvKey) : null;
+  if (!stored) {
+    return c.json({ detail: '인증번호가 만료되었습니다. 다시 요청해 주세요.', code: 'OTP_EXPIRED' }, 400);
+  }
+  if (stored !== String(otp).trim()) {
+    return c.json({ detail: '인증번호가 올바르지 않습니다.', code: 'OTP_MISMATCH' }, 400);
+  }
+  // OTP 즉시 삭제 (재사용 방지)
+  if (kv) await kv.delete(kvKey);
+
+  // 2. 사용자 조회
+  const user = await db
+    .prepare("SELECT * FROM users WHERE employee_id = ?")
+    .bind(empId).first();
+  if (!user) {
+    return c.json({ detail: '사용자를 찾을 수 없습니다.', code: 'NOT_FOUND' }, 404);
+  }
+  if (user.status === 'SUSPENDED') {
+    return c.json({ detail: '사용이 중지된 계정입니다.', code: 'SUSPENDED' }, 403);
+  }
+
+  const now   = getKst();
+  const token = `sguard-token-${empId}`;
+
+  // 3. 신규 사용자 — 비밀번호 설정 + ACTIVE 전환
+  if (user.status === 'PRE_REGISTERED') {
+    if (!password || password.length < 8) {
+      return c.json({ detail: '비밀번호는 8자 이상이어야 합니다.' }, 400);
+    }
+    const hashed = await hashPassword(password);
+    await db.prepare(`
+      UPDATE users SET password_hash=?, status='ACTIVE', token=?,
+        last_login_at=?, failed_attempts=0, mod_dt=?, mod_id=?
+      WHERE employee_id=?
+    `).bind(hashed, token, now, now, empId, empId).run();
+  }
+  // 4. 기존 사용자 — 비밀번호 검증
+  else {
+    if (!password) {
+      return c.json({ detail: '비밀번호를 입력해 주세요.' }, 400);
+    }
+    const ok = await verifyPassword(password, user.password_hash);
+    if (!ok) {
+      await db.prepare("UPDATE users SET failed_attempts=failed_attempts+1 WHERE employee_id=?").bind(empId).run();
+      return c.json({ detail: '비밀번호가 올바르지 않습니다.', code: 'WRONG_PASSWORD' }, 401);
+    }
+    await db.prepare(`
+      UPDATE users SET token=?, last_login_at=?, failed_attempts=0, mod_dt=?, mod_id=?
+      WHERE employee_id=?
+    `).bind(token, now, now, empId, empId).run();
+  }
+
+  // 5. 최신 사용자 정보 조회
+  const updated = await db.prepare("SELECT * FROM users WHERE employee_id=?").bind(empId).first();
+
+  // 6. JWT 생성 (8시간)
+  const jwt = await generateJWT({
+    sub:         empId,
+    name:        updated.name,
+    role:        updated.role,
+    is_admin:    updated.is_admin || 0,
+    company:     updated.company,
+    honbu:       updated.honbu,
+    team:        updated.team,
+  }, jwtSecret, 28800);
+
+  // 7. HttpOnly 쿠키 설정 + 사용자 정보 반환
+  const isProd = (c.env.ENVIRONMENT || '') === 'production';
+  c.header('Set-Cookie',
+    `sguard_jwt=${jwt}; HttpOnly; Path=/; Max-Age=28800; SameSite=Lax${isProd ? '; Secure' : ''}`
+  );
+
+  return c.json({
+    ok: true,
+    token,                          // 하위 호환: localStorage 저장용
+    id:              empId,
+    employee_id:     empId,
+    email:           updated.email,
+    name:            updated.name,
+    role:            updated.role,
+    company:         updated.company,
+    honbu:           updated.honbu,
+    team:            updated.team,
+    position:        updated.position,
+    is_admin:        updated.is_admin || 0,
+    status:          updated.status,
+    profile_picture: updated.profile_picture,
+  });
+});
+
+// POST /auth/set-password
+// 신규 사용자(PRE_REGISTERED) 최초 비밀번호 설정
+// OTP 검증 완료 후 호출
+// ──────────────────────────────────────────
+app.post('/auth/set-password', async (c) => {
+  const { employee_id, password } = await c.req.json();
+  const db = c.env.DB;
+
+  if (!employee_id || !password) {
+    return c.json({ detail: '사번과 비밀번호를 모두 입력해 주세요.' }, 400);
+  }
+  if (password.length < 8) {
+    return c.json({ detail: '비밀번호는 8자 이상이어야 합니다.' }, 400);
+  }
+
+  const empId = String(employee_id).trim();
+  const user = await db
+    .prepare("SELECT * FROM users WHERE employee_id = ? AND status = 'PRE_REGISTERED'")
+    .bind(empId)
+    .first();
+
+  if (!user) {
+    return c.json({ detail: '신규 등록 상태의 계정을 찾을 수 없습니다.', code: 'NOT_FOUND' }, 404);
+  }
+
+  const hashedPassword = await hashPassword(password);
+  const now = getKst();
+  const token = `sguard-token-${empId}`;
+
+  await db.prepare(`
+    UPDATE users
+    SET password_hash = ?, status = 'ACTIVE', token = ?, last_login_at = ?,
+        failed_attempts = 0, mod_dt = ?, mod_id = ?
+    WHERE employee_id = ?
+  `).bind(hashedPassword, token, now, now, empId, empId).run();
+
+  const updated = await db
+    .prepare("SELECT * FROM users WHERE employee_id = ?")
+    .bind(empId)
+    .first();
+
+  return c.json({
+    token,
+    id: empId,
+    employee_id: empId,
+    email: updated.email,
+    name: updated.name,
+    role: updated.role,
+    company: updated.company,
+    honbu: updated.honbu,
+    team: updated.team,
+    position: updated.position,
+    is_admin: updated.is_admin || 0,
+    status: 'ACTIVE',
+    profile_picture: updated.profile_picture
+  });
+});
+
 app.post('/auth/login', async (c) => {
   const { email, password } = await c.req.json()
   const db = c.env.DB
   
   // Find user by email or employee_id
-  const user = await db.prepare("SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND is_active = 1")
+  const user = await db.prepare("SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND status != 'SUSPENDED'")
     .bind(email, email)
     .first()
 
-  if (!user || !user.password_hash || !(await verifyPassword(password, user.password_hash))) {
+  if (!user) {
     return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다." }, 401)
   }
 
-  // Token is just email for mock auth as per earlier JWT replacements
-  const token = `sguard-token-${user.id}`
+  if (!user.password_hash || !(await verifyPassword(password, user.password_hash))) {
+    // Record failed attempt
+    await db.prepare("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE employee_id = ?").bind(user.employee_id).run()
+    return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다." }, 401)
+  }
+
+  // Token is just employee_id for mock auth
+  const token = `sguard-token-${user.employee_id}`
   const now = getKst()
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || 'unknown'
   const ua = c.req.header('user-agent') || 'unknown'
 
-  await db.prepare("UPDATE users SET token = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
-    .bind(token, now, user.employee_id || 'SYSTEM', user.employee_id)
+  await db.prepare("UPDATE users SET token = ?, last_login_at = ?, failed_attempts = 0, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
+    .bind(token, now, now, user.employee_id || 'SYSTEM', user.employee_id)
     .run()
 
   await db.prepare(`
@@ -607,14 +979,14 @@ app.post('/auth/login', async (c) => {
     .run()
 
   return c.json({
-    id: user.employee_id, // Return employee_id as the primary id
+    id: user.employee_id, 
     email: user.email, name: user.name, role: user.role,
     company: user.company, honbu: user.honbu, team: user.team,
     employee_id: user.employee_id, position: user.position,
     is_admin: user.is_admin || 0,
+    status: user.status,
     token: token,
-    profile_picture: user.profile_picture,
-    numeric_id: user.id // keep original id as numeric_id if needed elsewhere
+    profile_picture: user.profile_picture
   })
 })
 
@@ -629,7 +1001,7 @@ app.post('/auth/signup', async (c) => {
     return c.json({ detail: "사번(Employee ID)은 필수 입력 항목입니다." }, 400)
   }
 
-  const existing = await db.prepare("SELECT id FROM users WHERE email = ? OR employee_id = ?").bind(email, employee_id).first()
+  const existing = await db.prepare("SELECT employee_id FROM users WHERE email = ? OR employee_id = ?").bind(email, employee_id).first()
   if (existing) {
     return c.json({ detail: "이미 등록된 이메일 또는 사번입니다." }, 400)
   }
@@ -639,25 +1011,19 @@ app.post('/auth/signup', async (c) => {
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
   
   // ── 사번(Employee ID) 정제: 'EMP-' 등 접두사 강제 제거 (Type-safe) ──
-  // 사용자가 어떤 입력을 주더라도 문자열로 변환 후 접두사를 제거합니다.
   const cleanEmpId = String(employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
   
-  console.log('[Signup Debug] Original ID:', employee_id, '-> Cleaned ID:', cleanEmpId);
-  console.log('[Signup Debug] Phone from body:', phone);
-  
   const finalPhone = (phone || '').trim();
-  
-  console.log('[Signup Prepare] Inserting user with cleanEmpId:', cleanEmpId, 'token:', token);
   
   const res = await db.prepare(
     `INSERT INTO users (
       email, password_hash, name, company, honbu, team, part, subpart, phone,
-      employee_id, position, role, is_active, is_admin, token, 
+      employee_id, position, role, is_active, is_admin, token, status,
       reg_id, reg_dt, mod_id, mod_dt, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', finalPhone,
-    cleanEmpId, position || 'POS_001', 'user', 1, 0, token, 
+    cleanEmpId, position || 'POS_001', 'user', 1, 0, token, 'ACTIVE',
     cleanEmpId, regDt, cleanEmpId, regDt, regDt
   ).run()
 
@@ -738,7 +1104,7 @@ app.get('/users', async (c) => {
   
   let query = `
     SELECT 
-      u.id, u.employee_id, u.email, u.name, u.role, u.phone,
+      u.employee_id as id, u.employee_id, u.email, u.name, u.role, u.phone,
       COALESCE(oc.name, u.company) as company_name, 
       COALESCE(oh.name, u.honbu) as honbu_name, 
       COALESCE(ot.name, u.team) as team_name,
@@ -750,7 +1116,7 @@ app.get('/users', async (c) => {
       u.part as part_code,
       u.subpart as subpart_code,
       u.profile_picture,
-      u.is_active, u.is_admin 
+      u.status, u.is_active, u.is_admin , u.last_login_at
     FROM users u
     LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
     LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
@@ -2933,7 +3299,7 @@ ${transcript.join('\n')}`
       const totalTimeoutController = new AbortController();
       const totalTimeoutId = setTimeout(() => {
         totalTimeoutController.abort();
-      }, 20000); // 20 seconds hard limit
+      }, 60000); // 60 seconds hard limit
 
       const difyRes = await fetch(`${api_base}/workflows/run`, {
         method: 'POST',
@@ -3830,7 +4196,7 @@ app.post('/ai/knowledge/save', async (c) => {
   // Log activity
   if (body.inc_id) {
     try {
-      const user = await db.prepare("SELECT employee_id FROM users WHERE id = ? OR employee_id = ?").bind(user_id, String(user_id)).first()
+      const user = await db.prepare("SELECT employee_id FROM users WHERE employee_id = ?").bind(String(user_id)).first()
       const empId = user ? user.employee_id : user_id
       await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
       .bind(String(body.inc_id).replace('INC-', ''), String(body.inc_id).replace('INC-', ''), empId, getKst())

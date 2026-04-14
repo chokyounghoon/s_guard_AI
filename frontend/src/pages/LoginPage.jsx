@@ -1,527 +1,450 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Eye, EyeOff, AtSign, LogIn, UserPlus, AlertCircle, Save, KeyRound, Copy, CheckCircle, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Shield, AlertCircle, ArrowRight, RotateCcw,
+  CheckCircle, Eye, EyeOff, Mail, KeyRound, UserCheck, Download
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// ────────────────────────────────────────────────
-// Validation helpers
-// ────────────────────────────────────────────────
-const isValidEmailOrId = (v) => {
-    const s = v.trim();
-    if (!s) return false;
-    // 이메일 형식 또는 사번 형식 (일반적으로 숫자/문자 조합)
-    // 여기서는 단순히 값이 있는지만 체크하거나, 사번의 특정 규칙이 있다면 추가 가능
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) || /^[0-9a-zA-Z-]{4,}$/.test(s);
-};
+const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
-function validate(email, password) {
-    const errors = {};
-    if (!email.trim()) {
-        errors.email = '이메일 또는 사번을 입력해 주세요.';
-    } else if (!isValidEmailOrId(email)) {
-        errors.email = '올바른 형식(이메일 또는 사번)이 아닙니다.';
-    }
-    if (!password) {
-        errors.password = '비밀번호를 입력해 주세요.';
-    } else if (password.length < 4) {
-        errors.password = '비밀번호는 4자 이상이어야 합니다.';
-    }
-    return errors;
+// ─────────────────────────────────────────────
+// 상태 정의
+// A  : 사번 입력 (auth/init 호출)
+// B  : 신규(PRE_REGISTERED) — OTP + 비밀번호 설정 (auth/verify)
+// C1 : 기존(ACTIVE) — 비밀번호 입력
+// C2 : 기존(ACTIVE) — OTP 입력 후 최종 인증 (auth/verify)
+// ─────────────────────────────────────────────
+const S = { A: 'A', B: 'B', C1: 'C1', C2: 'C2' };
+
+// ── OTP 6칸 입력 ──
+function OtpBoxes({ value, onChange, disabled }) {
+  const refs = useRef([]);
+  const pad  = (value + '      ').slice(0, 6).split('');
+
+  const set = (i, ch) => {
+    const arr = pad.map(d => d.trim());
+    arr[i] = ch.replace(/\D/g, '').slice(-1);
+    onChange(arr.join('').replace(/ /g, ''));
+  };
+
+  return (
+    <div className="flex gap-2 justify-center"
+      onPaste={e => {
+        const p = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        onChange(p);
+        refs.current[Math.min(p.length, 5)]?.focus();
+        e.preventDefault();
+      }}>
+      {[0,1,2,3,4,5].map(i => (
+        <input key={i} ref={el => refs.current[i] = el}
+          type="text" inputMode="numeric" maxLength={1}
+          value={pad[i].trim()} disabled={disabled}
+          onChange={e => {
+            const digit = e.target.value.replace(/\D/g, '').slice(-1);
+            set(i, digit);
+            if (digit && i < 5) refs.current[i + 1]?.focus();
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Backspace' && !pad[i].trim() && i > 0) refs.current[i - 1]?.focus();
+          }}
+          className="w-11 h-13 text-center text-xl font-bold bg-[#1a1f2e] border-2 border-blue-500/30 rounded-xl text-blue-300 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all disabled:opacity-50 caret-transparent"
+          style={{ height: '52px' }}
+        />
+      ))}
+    </div>
+  );
 }
 
+// ── 카운트다운 타이머 ──
+function Timer({ timerKey, secs, onExpire }) {
+  const [left, setLeft] = useState(secs);
+  useEffect(() => {
+    setLeft(secs);
+    const t = setInterval(() => setLeft(p => {
+      if (p <= 1) { clearInterval(t); onExpire(); return 0; }
+      return p - 1;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [timerKey, secs]);
+  const m = String(Math.floor(left / 60)).padStart(2,'0');
+  const s = String(left % 60).padStart(2,'0');
+  return <span className={`font-mono font-bold text-sm ${left < 60 ? 'text-red-400' : 'text-sky-400'}`}>{m}:{s}</span>;
+}
+
+// ── 비밀번호 강도 바 ──
+function PwStrength({ pw }) {
+  if (!pw) return null;
+  const scores = [pw.length >= 8, /[A-Z]/.test(pw), /[0-9]/.test(pw), /[^A-Za-z0-9]/.test(pw)];
+  const n = scores.filter(Boolean).length;
+  const colors = ['bg-red-500','bg-orange-400','bg-yellow-400','bg-emerald-400'];
+  const labels = ['약함','보통','좋음','강함'];
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-1">
+        {scores.map((ok, i) => (
+          <div key={i} className={`flex-1 h-1 rounded-full transition-all duration-500 ${ok ? colors[n-1] : 'bg-slate-700'}`} />
+        ))}
+      </div>
+      <p className="text-xs text-slate-500">강도: <span className={`font-semibold ${n < 2 ? 'text-red-400' : n < 4 ? 'text-yellow-400' : 'text-emerald-400'}`}>{labels[n-1]||labels[0]}</span></p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// 메인 로그인 컴포넌트
+// ─────────────────────────────────────────────
 export default function LoginPage() {
-    const navigate = useNavigate();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [saveId, setSaveId] = useState(false);
-    const [showPw, setShowPw] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [fieldErrors, setFieldErrors] = useState({});
-    const [serverError, setServerError] = useState('');
-    const [userNotFound, setUserNotFound] = useState(false);
+  const navigate = useNavigate();
 
-    // ── 비밀번호 찾기 상태 ──
-    const [showReset, setShowReset] = useState(false);
-    const [resetStep, setResetStep] = useState('INIT'); // INIT, VERIFY, RESULT
-    const [resetEmail, setResetEmail] = useState('');
-    const [resetEmployeeId, setResetEmployeeId] = useState('');
-    const [resetCode, setResetCode] = useState('');
-    const [resetLoading, setResetLoading] = useState(false);
-    const [resetResult, setResetResult] = useState(null); // { temp_password, name, email }
-    const [resetError, setResetError] = useState('');
-    const [copied, setCopied] = useState(false);
+  // 공통 상태
+  const [state, setState]           = useState(S.A);
+  const [employeeId, setEmployeeId] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
 
-    const handleResetRequest = async () => {
-        if (!resetEmail.trim()) { setResetError('이메일을 입력해 주세요.'); return; }
-        if (!resetEmployeeId.trim()) { setResetError('사번을 입력해 주세요.'); return; }
-        setResetLoading(true);
-        setResetError('');
-        try {
-            const res = await fetch(`${API_BASE}/auth/request-reset-code`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    email: resetEmail.trim(), 
-                    employee_id: resetEmployeeId.trim() 
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok) { setResetError(data.detail || '실패했습니다.'); return; }
-            alert(data.message); // DEMO 용: 코드를 화면에 보여줌
-            setResetStep('VERIFY');
-        } catch {
-            setResetError('서버에 연결할 수 없습니다.');
-        } finally {
-            setResetLoading(false);
-        }
-    };
+  // OTP
+  const [otp, setOtp]               = useState('');
+  const [otpExpired, setOtpExpired] = useState(false);
+  const [resendCnt, setResendCnt]   = useState(0);
+  const [timerKey, setTimerKey]     = useState(0);
 
-    const handleVerifyCode = async () => {
-        if (!resetCode.trim()) { setResetError('인증 코드를 입력해 주세요.'); return; }
-        setResetLoading(true);
-        setResetError('');
-        try {
-            const res = await fetch(`${API_BASE}/auth/verify-reset-code`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    email: resetEmail.trim(), 
-                    employee_id: resetEmployeeId.trim(),
-                    code: resetCode.trim()
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok) { setResetError(data.detail || '인증에 실패했습니다.'); return; }
-            setResetResult(data);
-            setResetStep('RESULT');
-        } catch {
-            setResetError('서버에 연결할 수 없습니다.');
-        } finally {
-            setResetLoading(false);
-        }
-    };
+  // 비밀번호
+  const [pw, setPw]         = useState('');
+  const [pwConf, setPwConf] = useState('');
+  const [showPw, setShowPw] = useState(false);
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(resetResult.temp_password);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
+  // 사번 자동 복원
+  useEffect(() => {
+    const saved = localStorage.getItem('sguard_saved_empid');
+    if (saved) setEmployeeId(saved);
+  }, []);
 
-    const closeReset = () => {
-        setShowReset(false);
-        setResetStep('INIT');
-        setResetEmail('');
-        setResetEmployeeId('');
-        setResetCode('');
-        setResetResult(null);
-        setResetError('');
-    };
+  const clearErr = () => setError('');
 
-    // 저장된 아이디 복원
-    useEffect(() => {
-        const saved = localStorage.getItem('sguard_saved_email');
-        if (saved) {
-            setEmail(saved);
-            setSaveId(true);
-        }
-    }, []);
+  const inputCls = `w-full bg-[#1a1f2e] border border-blue-500/30 rounded-xl py-4 pl-5 pr-12
+    text-sm placeholder-slate-500 focus:outline-none focus:border-blue-400
+    focus:ring-1 focus:ring-blue-400/40 transition-all text-white`;
 
-    const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+  // ─── STEP A: 사번 입력 → POST /auth/init ───
+  const handleInit = async (e) => {
+    e?.preventDefault();
+    if (!employeeId.trim()) { setError('사번을 입력해 주세요.'); return; }
+    setLoading(true); clearErr();
+    try {
+      const res  = await fetch(`${API_BASE}/auth/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_id: employeeId.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.detail || '오류가 발생했습니다.'); return; }
 
-    // ── real-time validation on blur ──
-    const handleEmailBlur = () => {
-        if (email && !isValidEmailOrId(email)) {
-            setFieldErrors(prev => ({ ...prev, email: '올바른 형식(이메일 또는 사번)이 아닙니다.' }));
-        } else {
-            setFieldErrors(prev => { const e = { ...prev }; delete e.email; return e; });
-        }
-    };
+      setMaskedEmail(data.masked_email);
+      setOtpExpired(false); setOtp(''); setResendCnt(0); setTimerKey(k => k + 1);
+      localStorage.setItem('sguard_saved_empid', employeeId.trim());
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setServerError('');
-        setUserNotFound(false);
+      // 신규(PRE_REGISTERED) → B, 기존(ACTIVE) → C1
+      setState(data.mode === 'PRE_REGISTERED' ? S.B : S.C1);
+    } catch {
+      setError('서버에 연결할 수 없습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        // ── client-side validation ──
-        const errors = validate(email, password);
-        if (Object.keys(errors).length > 0) {
-            setFieldErrors(errors);
-            return;
-        }
-        setFieldErrors({});
-        setLoading(true);
+  // ─── STEP C1: 비밀번호 입력 후 OTP 화면으로 ───
+  const handlePasswordNext = (e) => {
+    e?.preventDefault();
+    if (!pw) { setError('비밀번호를 입력해 주세요.'); return; }
+    clearErr();
+    setState(S.C2);
+  };
 
-        try {
-            const res = await fetch(`${API_BASE}/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email.trim(), password }),
-            });
-            const data = await res.json();
+  // ─── OTP 재발송 ───
+  const handleResend = async () => {
+    if (resendCnt >= 3) { setError('재발송 횟수(3회)를 초과했습니다.'); return; }
+    setLoading(true); clearErr();
+    try {
+      const res = await fetch(`${API_BASE}/auth/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_id: employeeId.trim() }),
+      });
+      if (res.ok) {
+        setOtpExpired(false); setOtp('');
+        setResendCnt(p => p + 1); setTimerKey(k => k + 1);
+      } else {
+        setError('재발송에 실패했습니다.');
+      }
+    } catch {
+      setError('서버에 연결할 수 없습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            if (res.status === 401) {
-                // Wrong password – server message
-                setServerError(data.detail || '이메일(사번) 또는 비밀번호가 올바르지 않습니다.');
-                return;
-            }
-            if (res.status === 404 || (data.detail && data.detail.includes('등록'))) {
-                // User does not exist → guide to signup
-                setUserNotFound(true);
-                return;
-            }
-            if (!res.ok) {
-                setServerError(data.detail || '로그인 중 오류가 발생했습니다.');
-                return;
-            }
+  // ─── STEP B / C2 → POST /auth/verify ───
+  // Body: { employee_id, otp, password, mode }
+  // 성공 시 서버가 8시간 JWT HttpOnly 쿠키 설정 + 사용자 정보 JSON 반환
+  const handleVerify = async (e) => {
+    e?.preventDefault();
+    if (otp.length < 6) { setError('6자리 인증번호를 모두 입력해 주세요.'); return; }
 
-            // 아이디 저장 처리
-            if (saveId) {
-                localStorage.setItem('sguard_saved_email', email.trim());
-            } else {
-                localStorage.removeItem('sguard_saved_email');
-            }
+    // 신규: 비밀번호 유효성
+    if (state === S.B) {
+      if (pw.length < 8) { setError('비밀번호는 8자 이상이어야 합니다.'); return; }
+      if (pw !== pwConf) { setError('비밀번호가 일치하지 않습니다.'); return; }
+    }
 
-            localStorage.setItem('sguard_token', data.token);
-            localStorage.setItem('sguard_user', JSON.stringify(data));
-            navigate('/dashboard');
-        } catch {
-            setServerError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
-        } finally {
-            setLoading(false);
-        }
-    };
+    setLoading(true); clearErr();
+    try {
+      const res  = await fetch(`${API_BASE}/auth/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: employeeId.trim(),
+          otp,
+          password: pw,
+          mode: state === S.B ? 'PRE_REGISTERED' : 'ACTIVE',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === 'OTP_EXPIRED')     setError('인증번호가 만료되었습니다. 재발송해 주세요.');
+        else if (data.code === 'OTP_MISMATCH')   setError('인증번호가 올바르지 않습니다.');
+        else if (data.code === 'WRONG_PASSWORD') setError('비밀번호가 올바르지 않습니다. 다시 확인해 주세요.');
+        else setError(data.detail || '인증에 실패했습니다.');
+        return;
+      }
+      // 로컬 스토리지 저장 (하위 호환 토큰 + 전체 사용자 정보)
+      localStorage.setItem('sguard_token', data.token);
+      localStorage.setItem('sguard_user',  JSON.stringify(data));
+      navigate('/dashboard');
+    } catch {
+      setError('서버에 연결할 수 없습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const inputBase = (hasError) =>
-        `w-full bg-[#1a1f2e] border rounded-xl py-4 pl-5 pr-12 text-sm placeholder-slate-500 focus:outline-none transition-all text-white shadow-inner ${hasError
-            ? 'border-red-500/70 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-            : 'border-blue-500/30 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
-        }`;
+  // ─────────────────────────────────────────────
+  // 공통 UI 컴포넌트
+  // ─────────────────────────────────────────────
+  const ErrorBox = ({ msg }) => msg ? (
+    <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+      <p className="text-red-400 text-sm">{msg}</p>
+    </div>
+  ) : null;
 
-    return (
-        <div className="min-h-screen font-sans flex flex-col bg-[#0f111a] text-white relative overflow-hidden">
+  const BackBtn = ({ to, label = '이전' }) => (
+    <button type="button"
+      onClick={() => { setState(to); clearErr(); setPw(''); setOtp(''); }}
+      className="text-sm text-slate-400 hover:text-slate-300 flex items-center gap-1 transition-colors mt-1">
+      <ArrowRight className="w-4 h-4 rotate-180" />{label}
+    </button>
+  );
 
-            {/* Background Pattern */}
-            <div className="absolute inset-0 z-0 opacity-20"
-                style={{ backgroundImage: 'radial-gradient(circle, #3b82f6 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-blue-900/10 via-transparent to-blue-900/20 pointer-events-none" />
-            <div className="absolute -top-[20%] -left-[20%] w-[70%] h-[70%] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
-
-            {/* Top Bar */}
-            <div className="relative z-10 p-6 flex items-center">
-                <button onClick={() => navigate('/')} className="flex items-center hover:opacity-80 transition-opacity">
-                    <div className="bg-blue-600 p-1.5 rounded-lg mr-3 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
-                        <Shield className="w-4 h-4 text-white fill-current" />
-                    </div>
-                    <span className="font-bold text-lg tracking-wide">S-Guard AI</span>
-                </button>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10 w-full max-w-md mx-auto">
-
-                {/* Icon */}
-                <div className="mb-8 relative">
-                    <div className="w-24 h-24 bg-blue-900/20 rounded-3xl flex items-center justify-center border border-blue-500/20 shadow-[0_0_30px_rgba(37,99,235,0.1)]">
-                        <Shield className="w-10 h-10 text-blue-500 fill-blue-500/20" />
-                    </div>
-                    <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full -z-10" />
-                </div>
-
-                {/* Headline */}
-                <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold mb-3 text-white tracking-tight">Secure Login</h1>
-                    <p className="text-slate-400 text-sm">AI Agent 기반 지능형 장애 예방 및 통합 관리 시스템</p>
-                </div>
-
-                {/* ── User Not Found Banner ── */}
-                {userNotFound && (
-                    <div className="w-full mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col gap-3">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
-                            <div>
-                                <p className="text-amber-300 font-semibold text-sm">등록된 사용자가 없습니다</p>
-                                <p className="text-amber-400/80 text-xs mt-0.5">
-                                    <span className="font-medium">{email}</span> 로 등록된 계정을 찾을 수 없습니다.<br />
-                                    회원가입을 진행해 주세요.
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => navigate('/signup')}
-                            className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-bold py-3 rounded-xl transition-all text-sm active:scale-[0.98]"
-                        >
-                            <UserPlus className="w-4 h-4" />
-                            회원가입 하러 가기
-                        </button>
-                        <button
-                            onClick={() => setUserNotFound(false)}
-                            className="text-xs text-slate-500 hover:text-slate-300 transition-colors text-center"
-                        >
-                            다른 계정으로 로그인
-                        </button>
-                    </div>
-                )}
-
-                {/* ── Form ── */}
-                {!userNotFound && (
-                    <form onSubmit={handleLogin} className="w-full space-y-5" noValidate>
-
-                        {/* Email or ID */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-slate-300 ml-1">이메일 또는 사번</label>
-                            <div className="relative group">
-                                <input
-                                    type="text"
-                                    value={email}
-                                    onChange={(e) => { setEmail(e.target.value); setFieldErrors(prev => { const x = { ...prev }; delete x.email; return x; }); }}
-                                    onBlur={handleEmailBlur}
-                                    placeholder="이메일 주소 또는 사번 입력"
-                                    autoComplete="username"
-                                    className={inputBase(!!fieldErrors.email)}
-                                />
-                                <LogIn className={`absolute right-4 top-4 w-5 h-5 transition-colors ${fieldErrors.email ? 'text-red-400' : 'text-slate-500 group-focus-within:text-blue-400'}`} />
-                            </div>
-                            {fieldErrors.email && (
-                                <p className="text-red-400 text-xs ml-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />{fieldErrors.email}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Password */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-slate-300 ml-1">비밀번호 (Password)</label>
-                            <div className="relative group">
-                                <input
-                                    type={showPw ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => { setPassword(e.target.value); setFieldErrors(prev => { const x = { ...prev }; delete x.password; return x; }); }}
-                                    placeholder="비밀번호를 입력하세요"
-                                    autoComplete="current-password"
-                                    className={inputBase(!!fieldErrors.password)}
-                                />
-                                <button
-                                    type="button"
-                                    tabIndex={-1}
-                                    onClick={() => setShowPw(!showPw)}
-                                    className={`absolute right-4 top-4 transition-colors ${fieldErrors.password ? 'text-red-400 hover:text-red-300' : 'text-slate-500 hover:text-white'}`}
-                                >
-                                    {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                </button>
-                            </div>
-                            {fieldErrors.password && (
-                                <p className="text-red-400 text-xs ml-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />{fieldErrors.password}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* 아이디 저장 + 비밀번호 찾기 */}
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center gap-2 cursor-pointer select-none group">
-                                <div
-                                    onClick={() => setSaveId(!saveId)}
-                                    className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${saveId
-                                        ? 'bg-blue-600 border-blue-600'
-                                        : 'border-slate-500 group-hover:border-blue-400'
-                                        }`}
-                                >
-                                    {saveId && (
-                                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8">
-                                            <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                    )}
-                                </div>
-                                <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">아이디 저장</span>
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setShowReset(true)}
-                                className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
-                            >
-                                <KeyRound className="w-3 h-3" />
-                                비밀번호를 잊으셨나요?
-                            </button>
-                        </div>
-
-                        {serverError && (
-                            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-                                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                                <p className="text-red-400 text-sm">{serverError}</p>
-                            </div>
-                        )}
-
-                        {/* Submit */}
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold py-4 rounded-xl flex items-center justify-center space-x-2 shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:shadow-[0_6px_25px_rgba(37,99,235,0.5)] transition-all transform active:scale-[0.98] mt-2"
-                        >
-                            {loading
-                                ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />인증 중...</span>
-                                : <><span>로그인</span><LogIn className="w-5 h-5 ml-1" /></>
-                            }
-                        </button>
-                    </form>
-                )}
-
-                {/* Sign up link & Download */}
-                {!userNotFound && (
-                    <div className="mt-8 flex flex-col items-center gap-4">
-                        <div className="text-sm text-slate-400">
-                            계정이 없으신가요?{' '}
-                            <span onClick={() => navigate('/signup')} className="text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors">
-                                회원가입
-                            </span>
-                        </div>
-                        
-                        <a 
-                            href="/sguard-bridge_v1.0.apk" 
-                            download="sguard-bridge_v1.0.apk"
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 text-xs text-blue-400 font-medium hover:bg-blue-600/20 hover:border-blue-500/40 transition-all group shadow-lg shadow-blue-900/10"
-                        >
-                            <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
-                            <span>S-Guard Android APK 다운로드</span>
-                        </a>
-                    </div>
-                )}
-
-            </div>
-
-            <div className="relative z-10 py-8 w-full flex items-center justify-center opacity-40">
-                <div className="h-[1px] w-12 bg-slate-500" />
-                <span className="mx-4 text-[10px] tracking-[0.2em] font-medium text-slate-400 uppercase">End-to-End Encryption</span>
-                <div className="h-[1px] w-12 bg-slate-500" />
-            </div>
-
-            {/* ── 비밀번호 찾기 모달 ── */}
-            {showReset && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!resetResult ? closeReset : undefined} />
-                    <div className="relative z-10 w-full max-w-md bg-gradient-to-b from-[#1a1f2e] to-[#0f111a] border border-white/10 rounded-3xl shadow-2xl p-6 animate-scale-up">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-cyan-400 rounded-t-3xl" />
-
-                        <div className="flex items-center justify-between mb-5">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-blue-600/20 p-2 rounded-xl border border-blue-500/20">
-                                    <KeyRound className="w-5 h-5 text-blue-400" />
-                                </div>
-                                <h2 className="text-white font-bold text-lg">비밀번호 초기화</h2>
-                            </div>
-                            <button onClick={closeReset} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-white">
-                                ×
-                            </button>
-                        </div>
-
-                        {resetStep === 'INIT' && (
-                            <>
-                                <p className="text-slate-400 text-sm mb-4">본인 확인을 위해 등록하신 이메일과 사번을 인증해 주세요.</p>
-                                <div className="space-y-3 mb-4">
-                                    <input
-                                        type="email"
-                                        value={resetEmail}
-                                        onChange={e => { setResetEmail(e.target.value); setResetError(''); }}
-                                        placeholder="이메일 주소 입력"
-                                        className="w-full bg-[#0f111a] border border-blue-500/20 rounded-xl py-3.5 px-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={resetEmployeeId}
-                                        onChange={e => { setResetEmployeeId(e.target.value); setResetError(''); }}
-                                        onKeyDown={e => e.key === 'Enter' && handleResetRequest()}
-                                        placeholder="사번(Employee ID) 입력"
-                                        className="w-full bg-[#0f111a] border border-blue-500/20 rounded-xl py-3.5 px-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                    />
-                                </div>
-                                {resetError && (
-                                    <p className="text-red-400 text-xs mb-3 flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3" />{resetError}
-                                    </p>
-                                )}
-                                <button
-                                    onClick={handleResetRequest}
-                                    disabled={resetLoading}
-                                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2"
-                                >
-                                    {resetLoading
-                                        ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        : <><KeyRound className="w-4 h-4" />인증 코드 발송 요청</>}
-                                </button>
-                            </>
-                        )}
-
-                        {resetStep === 'VERIFY' && (
-                            <>
-                                <p className="text-slate-400 text-sm mb-4">입력하신 이메일로 발송된 6자리 인증 코드를 입력해 주세요.</p>
-                                <input
-                                    type="text"
-                                    maxLength={6}
-                                    value={resetCode}
-                                    onChange={e => { setResetCode(e.target.value); setResetError(''); }}
-                                    onKeyDown={e => e.key === 'Enter' && handleVerifyCode()}
-                                    placeholder="인증 코드 6자리"
-                                    className="w-full bg-[#0f111a] border border-blue-500/20 rounded-xl py-4 px-4 text-center text-lg tracking-[0.5em] font-bold text-blue-400 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 mb-4"
-                                />
-                                {resetError && (
-                                    <p className="text-red-400 text-xs mb-3 flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3" />{resetError}
-                                    </p>
-                                )}
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setResetStep('INIT')}
-                                        className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-3.5 rounded-xl transition-all"
-                                    >
-                                        이전으로
-                                    </button>
-                                    <button
-                                        onClick={handleVerifyCode}
-                                        disabled={resetLoading}
-                                        className="flex-[2] bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2"
-                                    >
-                                        {resetLoading
-                                            ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            : <span>인증 확인</span>}
-                                    </button>
-                                </div>
-                            </>
-                        )}
-
-                        {resetStep === 'RESULT' && (
-                            <>
-                                <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-4 mb-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <CheckCircle className="w-4 h-4 text-green-400" />
-                                        <span className="text-green-400 font-semibold text-sm">임시 비밀번호 발급 완료</span>
-                                    </div>
-                                    <p className="text-slate-300 text-sm mb-1">
-                                        <span className="font-semibold text-white">{resetResult.name}</span>님의 임시 비밀번호:
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <code className="flex-1 bg-[#0f111a] border border-slate-700 rounded-lg px-3 py-2 text-blue-300 font-mono text-sm tracking-wider">
-                                            {resetResult.temp_password}
-                                        </code>
-                                        <button
-                                            onClick={handleCopy}
-                                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
-                                            title="복사"
-                                        >
-                                            {copied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-slate-300" />}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 mb-4">
-                                    <p className="text-amber-400 text-xs">⚠️ 위 임시 비밀번호로 로그인 후 대시보드에서 새 비밀번호로 다시 설정해 주세요.</p>
-                                </div>
-                                <button
-                                    onClick={closeReset}
-                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl transition-all"
-                                >
-                                    로그인 화면으로
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
+  // OTP 섹션 (B, C2 공통)
+  const OtpSection = ({ isNew }) => (
+    <div className="space-y-5">
+      <div className="text-center">
+        <div className="inline-flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-full px-3 py-1.5 mb-3">
+          <Mail className="w-3.5 h-3.5 text-sky-400" />
+          <span className="text-sky-300 text-xs font-medium">{maskedEmail} 으로 발송됨</span>
         </div>
-    );
+        <p className="text-slate-400 text-sm">이메일로 받은 6자리 인증번호를 입력해 주세요.</p>
+      </div>
+      <OtpBoxes value={otp} onChange={v => { setOtp(v); clearErr(); }} disabled={loading || otpExpired} />
+      <div className="flex items-center justify-between px-1">
+        <span className="text-slate-500 text-sm">남은 시간</span>
+        {otpExpired
+          ? <span className="text-red-400 text-sm font-semibold">만료됨</span>
+          : <Timer timerKey={timerKey} secs={300} onExpire={() => setOtpExpired(true)} />
+        }
+      </div>
+      <div className="flex justify-between items-center">
+        <BackBtn to={isNew ? S.A : S.C1} label={isNew ? '사번 재입력' : '비밀번호 재입력'} />
+        <button type="button" onClick={handleResend} disabled={loading || resendCnt >= 3}
+          className="text-sm text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors disabled:opacity-40">
+          <RotateCcw className="w-3.5 h-3.5" />재발송 {resendCnt > 0 && `(${resendCnt}/3)`}
+        </button>
+      </div>
+    </div>
+  );
+
+  const SubmitBtn = ({ label, color = 'blue', disabled: dis }) => (
+    <button type="submit" disabled={loading || dis}
+      className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2
+        transition-all active:scale-[0.98] disabled:opacity-50
+        ${color === 'emerald'
+          ? 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_4px_20px_rgba(5,150,105,0.4)]'
+          : 'bg-blue-600 hover:bg-blue-500 shadow-[0_4px_20px_rgba(37,99,235,0.4)]'
+        } text-white`}>
+      {loading
+        ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>처리 중...</span></>
+        : <span>{label}</span>
+      }
+    </button>
+  );
+
+  // ─────────────────────────────────────────────
+  // 렌더
+  // ─────────────────────────────────────────────
+  return (
+    <div className="min-h-screen flex flex-col bg-[#0f111a] text-white relative overflow-hidden font-sans">
+
+      {/* 배경 그리드 + 광선 */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{ backgroundImage: 'radial-gradient(circle, #3b82f6 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+      <div className="absolute -top-1/4 -left-1/4 w-3/4 h-3/4 bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute -bottom-1/6 -right-1/6 w-1/2 h-1/2 bg-cyan-600/5 blur-[100px] rounded-full pointer-events-none" />
+
+      {/* 로고 */}
+      <div className="relative z-10 p-6">
+        <div className="flex items-center">
+          <div className="bg-blue-600 p-1.5 rounded-lg mr-3 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+            <Shield className="w-4 h-4 text-white fill-current" />
+          </div>
+          <span className="font-bold text-lg tracking-wide">S-Guard AI</span>
+        </div>
+      </div>
+
+      {/* 카드 영역 */}
+      <div className="flex-1 flex items-center justify-center px-5 relative z-10 pb-10">
+        <div className="w-full max-w-sm">
+
+          {/* 아이콘 + 타이틀 */}
+          <div className="flex flex-col items-center mb-8">
+            <div className="relative mb-4">
+              <div className="w-20 h-20 bg-blue-900/20 rounded-3xl flex items-center justify-center border border-blue-500/20 shadow-[0_0_40px_rgba(37,99,235,0.12)] transition-all duration-500">
+                {state === S.A  && <Shield className="w-9 h-9 text-blue-400 fill-blue-400/20" />}
+                {state === S.B  && <UserCheck className="w-9 h-9 text-emerald-400" />}
+                {state === S.C1 && <KeyRound className="w-9 h-9 text-blue-400" />}
+                {state === S.C2 && <Mail className="w-9 h-9 text-sky-400" />}
+              </div>
+              <div className="absolute inset-0 bg-blue-500/10 blur-2xl rounded-full -z-10" />
+            </div>
+
+            <h1 className="text-2xl font-bold text-white text-center transition-all duration-300">
+              {state === S.A  && 'S-Guard AI 로그인'}
+              {state === S.B  && '최초 접속 인증'}
+              {state === S.C1 && '비밀번호 입력'}
+              {state === S.C2 && 'OTP 최종 인증'}
+            </h1>
+            <p className="text-slate-400 text-sm text-center mt-1.5">
+              {state === S.A  && 'AI Agent 기반 지능형 장애 통합 관리'}
+              {state === S.B  && `${maskedEmail} 으로 인증번호가 발송되었습니다.`}
+              {state === S.C1 && (
+                <><span className="font-medium text-white">{maskedEmail}</span> 으로 OTP 발송 완료 — 비밀번호를 입력해 주세요.</>
+              )}
+              {state === S.C2 && '비밀번호 확인 완료 — OTP로 최종 인증합니다.'}
+            </p>
+          </div>
+
+          {/* ── 상태 A: 사번 입력 ── */}
+          {state === S.A && (
+            <form onSubmit={handleInit} className="space-y-4">
+              <div className="relative">
+                <input
+                  id="employee-id-input"
+                  type="text" value={employeeId} autoFocus autoComplete="username"
+                  onChange={e => { setEmployeeId(e.target.value); clearErr(); }}
+                  placeholder="사번 입력 (예: S01838)"
+                  className={inputCls}
+                />
+                <Shield className="absolute right-4 top-4 w-5 h-5 text-slate-500" />
+              </div>
+              <ErrorBox msg={error} />
+              <SubmitBtn label="인증번호 받기" disabled={!employeeId.trim()} />
+              <div className="pt-2 flex justify-center">
+                <a href="/sguard-bridge_v1.0.apk" download
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600/10 border border-blue-500/20 text-xs text-blue-400 hover:bg-blue-600/20 transition-all">
+                  <Download className="w-3.5 h-3.5" />S-Guard Android APK
+                </a>
+              </div>
+            </form>
+          )}
+
+          {/* ── 상태 B: 신규(PRE_REGISTERED) — OTP + 비밀번호 설정 ── */}
+          {state === S.B && (
+            <form onSubmit={handleVerify} className="space-y-5">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+                <p className="text-emerald-400 text-xs font-medium">🎉 최초 로그인입니다. OTP 인증 후 비밀번호를 설정해 주세요.</p>
+              </div>
+
+              <OtpSection isNew={true} />
+
+              <div className="border-t border-white/5 pt-4 space-y-3">
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">신규 비밀번호 설정</p>
+                <div className="relative">
+                  <input type={showPw ? 'text' : 'password'} value={pw}
+                    onChange={e => { setPw(e.target.value); clearErr(); }}
+                    placeholder="비밀번호 (8자 이상)" className={inputCls} />
+                  <button type="button" tabIndex={-1}
+                    onClick={() => setShowPw(p => !p)}
+                    className="absolute right-4 top-4 text-slate-500 hover:text-white transition-colors">
+                    {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <PwStrength pw={pw} />
+                <input type={showPw ? 'text' : 'password'} value={pwConf}
+                  onChange={e => { setPwConf(e.target.value); clearErr(); }}
+                  placeholder="비밀번호 확인" className={inputCls} />
+                {pwConf && pw !== pwConf && <p className="text-red-400 text-xs">비밀번호가 일치하지 않습니다.</p>}
+              </div>
+
+              <ErrorBox msg={error} />
+              <SubmitBtn label="인증 완료 및 로그인" color="emerald"
+                disabled={otp.length < 6 || pw.length < 8 || pw !== pwConf || otpExpired} />
+            </form>
+          )}
+
+          {/* ── 상태 C1: 기존(ACTIVE) — 비밀번호 먼저 입력 ── */}
+          {state === S.C1 && (
+            <form onSubmit={handlePasswordNext} className="space-y-4">
+              <div className="relative">
+                <input type={showPw ? 'text' : 'password'} value={pw} autoFocus
+                  onChange={e => { setPw(e.target.value); clearErr(); }}
+                  placeholder="비밀번호를 입력하세요"
+                  autoComplete="current-password" className={inputCls} />
+                <button type="button" tabIndex={-1}
+                  onClick={() => setShowPw(p => !p)}
+                  className="absolute right-4 top-4 text-slate-500 hover:text-white transition-colors">
+                  {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <ErrorBox msg={error} />
+              <SubmitBtn label="다음 — OTP 확인" disabled={!pw} />
+              <BackBtn to={S.A} label="사번 재입력" />
+            </form>
+          )}
+
+          {/* ── 상태 C2: 기존(ACTIVE) — OTP 최종 인증 ── */}
+          {state === S.C2 && (
+            <form onSubmit={handleVerify} className="space-y-5">
+              <div className="bg-slate-800/60 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+                <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                <p className="text-slate-300 text-sm">비밀번호 확인 완료. OTP로 최종 인증해 주세요.</p>
+              </div>
+
+              <OtpSection isNew={false} />
+
+              <ErrorBox msg={error} />
+              <SubmitBtn label="로그인" disabled={otp.length < 6 || otpExpired} />
+            </form>
+          )}
+
+        </div>
+      </div>
+
+      {/* 하단 암호화 뱃지 */}
+      <div className="relative z-10 py-6 flex items-center justify-center opacity-25">
+        <div className="h-px w-8 bg-slate-500" />
+        <span className="mx-3 text-[9px] tracking-[0.2em] text-slate-400 uppercase">End-to-End Encryption</span>
+        <div className="h-px w-8 bg-slate-500" />
+      </div>
+    </div>
+  );
 }
