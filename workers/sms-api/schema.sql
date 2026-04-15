@@ -375,6 +375,7 @@ CREATE TABLE IF NOT EXISTS inbox_items (
     is_read INTEGER DEFAULT 0,     -- Read status (0: unread, 1: read)
     urgency TEXT DEFAULT 'NORMAL', -- 'LOW', 'NORMAL', 'HIGH', 'CRITICAL'
     inc_id TEXT,                   -- Associated incident ID (optional)
+    folder TEXT DEFAULT 'INBOX',   -- 'INBOX' or 'SENT'
     action_link TEXT,              -- URL/Route for navigation (optional)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     reg_id TEXT DEFAULT 'SYSTEM',

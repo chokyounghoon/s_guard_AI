@@ -6239,33 +6239,43 @@ app.post('/api/v1/reports/submit', async (c) => {
       "SELECT user_id, user_name FROM report_lines WHERE owner_id = ? ORDER BY hierarchy_level ASC"
     ).bind(sender_id).all()
 
-    // 4. Distribute to Superiors (INBOX)
+    // 4. Distribute to Superiors (INBOX) - ONLY if they exist in users table
     for (const sup of superiors) {
+      try {
+        await db.prepare(`
+          INSERT INTO inbox_items (
+            user_id, type, sender_id, sender_name, 
+            title, content, preview, urgency, 
+            inc_id, folder, created_at, reg_dt
+          ) SELECT ?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'INBOX', ?, ?
+          WHERE EXISTS (SELECT 1 FROM users WHERE employee_id = ?)
+        `).bind(
+          sup.user_id, sender_id, sender_name, 
+          title, content, preview || content.substring(0, 100), urgency,
+          incident_id, now, now, sup.user_id
+        ).run()
+      } catch (e) {
+        console.warn(`[Submit-Warn] Failed to distribute to superior ${sup.user_id}:`, e.message);
+      }
+    }
+
+    // 5. Save copy to Sender's SENT folder - ONLY if sender exists in users table
+    try {
       await db.prepare(`
         INSERT INTO inbox_items (
           user_id, type, sender_id, sender_name, 
           title, content, preview, urgency, 
           inc_id, folder, created_at, reg_dt
-        ) VALUES (?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'INBOX', ?, ?)
+        ) SELECT ?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'SENT', ?, ?
+        WHERE EXISTS (SELECT 1 FROM users WHERE employee_id = ?)
       `).bind(
-        sup.user_id, sender_id, sender_name, 
+        sender_id, sender_id, sender_name, 
         title, content, preview || content.substring(0, 100), urgency,
-        incident_id, now, now
+        incident_id, now, now, sender_id
       ).run()
+    } catch (e) {
+      console.warn(`[Submit-Warn] Failed to save copy to sender ${sender_id}:`, e.message);
     }
-
-    // 5. Save copy to Sender's SENT folder
-    await db.prepare(`
-      INSERT INTO inbox_items (
-        user_id, type, sender_id, sender_name, 
-        title, content, preview, urgency, 
-        inc_id, folder, created_at, reg_dt
-      ) VALUES (?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'SENT', ?, ?)
-    `).bind(
-      sender_id, sender_id, sender_name, 
-      title, content, preview || content.substring(0, 100), urgency,
-      incident_id, now, now
-    ).run()
 
     return c.json({ 
       success: true, 
@@ -6298,12 +6308,14 @@ app.post('/inbox', async (c) => {
       title, content, preview, urgency, 
       inc_id, action_link, created_at, 
       reg_id, reg_dt, mod_id, mod_dt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    WHERE EXISTS (SELECT 1 FROM users WHERE employee_id = ?)
   `).bind(
     user_id, type, sender_id || null, sender_name || 'System',
     title, content || null, preview || null, urgency || 'NORMAL',
     inc_id || null, action_link || null, now,
-    'SYSTEM', now, 'SYSTEM', now
+    'SYSTEM', now, 'SYSTEM', now,
+    user_id
   ).run()
 
   return c.json({ status: 'success', id: result.meta.last_row_id })
