@@ -21,7 +21,14 @@ export const CodebookProvider = ({ children }) => {
   const fetchCodes = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/sms/codebook`);
+      const savedUser = localStorage.getItem('sguard_user');
+      const token = savedUser ? JSON.parse(savedUser).token : null;
+      
+      const response = await fetch(`${API_BASE}/sms/codebook`, {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch codebook');
       
       const data = await response.json();
@@ -48,7 +55,21 @@ export const CodebookProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    fetchCodes();
+    const savedUser = localStorage.getItem('sguard_user');
+    let token = localStorage.getItem('sguard_jwt');
+    
+    if (!token && savedUser) {
+      try {
+        const userObj = JSON.parse(savedUser);
+        token = userObj.jwt || userObj.token;
+      } catch (e) {}
+    }
+    
+    if (token) {
+      fetchCodes();
+    } else {
+      setIsLoading(false);
+    }
   }, [fetchCodes]);
 
   const getCodesByCategory = (category) => {

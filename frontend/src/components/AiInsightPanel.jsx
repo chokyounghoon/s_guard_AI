@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 
 const getApiUrl = (endpoint) => {
@@ -13,6 +13,29 @@ const getApiUrl = (endpoint) => {
 };
 
 const API_BASE_URL = getApiUrl('');
+
+const isCriticalAnalysis = (analysisText, message) => {
+  const combined = ((analysisText || '') + (message || '')).toLowerCase();
+  return combined.includes('critical') || combined.includes('escalation') ||
+         combined.includes('에스컬레이션') || combined.includes('war-room') ||
+         combined.includes('워룸') || combined.includes('db') ||
+         combined.includes('데이터베이스') || combined.includes('서버 다운') ||
+         combined.includes('down');
+};
+
+const getCategoryFromAnalysis = (analysisText, message) => {
+  const combined = ((analysisText || '') + (message || '')).toLowerCase();
+  if (combined.includes('security') || combined.includes('보안') || combined.includes('접속 시도') || combined.includes('로그인')) {
+    return 'security';
+  }
+  if (combined.includes('critical') || combined.includes('긴급') || combined.includes('장애')) {
+    return 'critical';
+  }
+  if (combined.includes('server') || combined.includes('서버') || combined.includes('cpu') || combined.includes('memory')) {
+    return 'server';
+  }
+  return 'report';
+};
 
 export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms }) {
 
@@ -37,16 +60,27 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const typingTimerRef = useRef(null);
   const abortRef = useRef(null);
   const delayShownRef = useRef(false);
+  const onLogReceivedRef = useRef(onLogReceived);
+  const onAgentContentRef = useRef(onAgentContent);
 
-  const stopTypewriter = () => {
+  // Sync props to refs to ensure runAnalysis stays stable
+  useEffect(() => {
+    onLogReceivedRef.current = onLogReceived;
+  }, [onLogReceived]);
+
+  useEffect(() => {
+    onAgentContentRef.current = onAgentContent;
+  }, [onAgentContent]);
+
+  const stopTypewriter = useCallback(() => {
     if (typingTimerRef.current) {
       clearInterval(typingTimerRef.current);
       typingTimerRef.current = null;
     }
     typingQueueRef.current = '';
-  };
+  }, []);
 
-  const enqueueText = (text, { reset = false, onDone } = {}) => {
+  const enqueueText = useCallback((text, { reset = false, onDone } = {}) => {
     if (reset) {
       stopTypewriter();
       setDisplayedText('');
@@ -66,11 +100,223 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       typingQueueRef.current = typingQueueRef.current.slice(1);
       setDisplayedText(prev => prev + nextChar);
     }, 18);
+  }, [stopTypewriter]);
+
+  // 🚀 Core Analysis Function (Force-able)
+  const runAnalysis = useCallback(async (force = false) => {
+    if (!selectedSms) return;
+
+    setIsAnalyzingSms(true);
+    setAnalysisComplete(false);
+    setIsCritical(false);
+    delayShownRef.current = false;
+    setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
+    
+    const displaySender = selectedSms.sender === 'Manual Entry' ? 'Manual Entry' : `"${selectedSms.sender}" 발신 SMS`;
+    setSmsAnalysisTitle(force ? `Manual Recovery: ${displaySender}` : `분석중입니다: ${displaySender}`);
+
+    try {
+      // ① Check DB cache FIRST (unless forced)
+      if (!force) {
+        try {
+          const token = localStorage.getItem('sguard_jwt');
+          const checkRes = await fetch(`${API_BASE_URL}/ai/insight/${selectedSms.inc_id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (checkRes.ok) {
+            const data = await checkRes.json();
+            if (data.content) {
+              enqueueText(data.content, { reset: true });
+              const critical = data.severity === 'CRITICAL';
+               setIsCritical(critical);
+               setAnalysisComplete(true);
+               setInsightTimestamp(data.reg_dt);
+               setIsAnalyzingSms(false);
+              
+               if (onLogReceivedRef.current) {
+                  onLogReceivedRef.current({
+                    title: `SMS 장애 분석: ${selectedSms.sender}`,
+                    text: data.content,
+                    message: data.content,
+                    severity: data.severity,
+                    category: data.category
+                  });
+                }
+                if (onAgentContentRef.current) {
+                  onAgentContentRef.current(data.content, true);
+                }
+               if (data.similarity_score !== undefined && data.similarity_score !== null) {
+                 setInsightData(prev => ({ 
+                   ...prev, 
+                   similarity_score: data.similarity_score,
+                   similarity_reason: data.similarity_reason 
+                 }));
+               }
+               return; // Exit if cache found
+            }
+          }
+        } catch (e) {
+          console.error("Check insight err:", e);
+        }
+      }
+
+      // ② No cached data (or forced) → clear old text and start streaming
+      setDisplayedText('');
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const token = localStorage.getItem('sguard_jwt');
+
+      const res = await fetch(`${API_BASE_URL}/ai/analyze-sms`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          sender: selectedSms.sender, 
+          message: selectedSms.message,
+          sms_id: selectedSms.inc_id,
+          force: force
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) throw new Error('Network response was not ok');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalText = '';
+      let showedWorkingHint = false;
+      const startedAt = Date.now();
+      // Define showDelayOnce OUTSIDE try so catch can also use it
+      const showDelayOnce = () => {
+        if (delayShownRef.current) return;
+        delayShownRef.current = true;
+        stopTypewriter();
+        setDisplayedText(prev => {
+          const base = (prev || '').trimEnd();
+          return (base ? base + '\n' : '');
+        });
+      };
+
+      let lastSimilarityScore = null;
+      let lastSimilarityReason = null;
+
+      const delayNoticeId = setTimeout(() => {
+        if (finalText) return;
+        showDelayOnce();
+      }, 20000);
+
+      const hardAbortId = setTimeout(() => {
+        if (finalText) return;
+        showDelayOnce();
+        try { controller.abort(); } catch {}
+      }, 180000);
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const evt of events) {
+          const lines = evt.split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const dataStr = line.slice(5).trim();
+            if (!dataStr) continue;
+            if (dataStr === '[DONE]') {
+              const critical = isCriticalAnalysis(finalText, selectedSms.message);
+              setIsCritical(critical);
+              setAnalysisComplete(true);
+              setIsAnalyzingSms(false);
+              
+              const category = getCategoryFromAnalysis(finalText, selectedSms.message);
+              const userData = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+              fetch(`${API_BASE_URL}/ai/insight/save`, {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  incident_id: String(selectedSms.inc_id),
+                  content: finalText,
+                  severity: critical ? 'CRITICAL' : 'INFO',
+                  category: category,
+                  user_id: String(userData.inc_id || 'SYSTEM'),
+                  similarity_score: lastSimilarityScore,
+                  similarity_reason: lastSimilarityReason
+                })
+              }).catch(console.error);
+
+                if (onLogReceivedRef.current) {
+                  onLogReceivedRef.current({
+                    title: `SMS 장애 분석: ${selectedSms.sender}`,
+                    text: finalText,
+                    message: finalText,
+                    severity: critical ? 'CRITICAL' : 'INFO',
+                    category: category
+                  });
+                }
+                if (onAgentContentRef.current) {
+                  onAgentContentRef.current(finalText, true);
+                }
+              return;
+            }
+
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.error) {
+                showDelayOnce();
+                return;
+              }
+              if (data.status === 'searching' || data.status === 'analyzing') {
+                const statusMsg = data.message || (data.status === 'searching' ? '🔍 유사 장애 사례 검색 중...' : '🤖 AI 심층 진단 분석 중...');
+                enqueueText(`\n${statusMsg}\n`, { reset: false });
+                setSmsAnalysisTitle(statusMsg);
+                continue;
+              }
+              if (data.similarity_score !== undefined && data.similarity_score !== null) {
+                lastSimilarityScore = data.similarity_score;
+                lastSimilarityReason = data.similarity_reason;
+                setInsightData(prev => ({ 
+                  ...prev, 
+                  similarity_score: data.similarity_score,
+                  similarity_reason: data.similarity_reason || prev.similarity_reason
+                }));
+              }
+              if (data.answer) {
+                try { clearTimeout(delayNoticeId); } catch {}
+                try { clearTimeout(hardAbortId); } catch {}
+                finalText += data.answer;
+                enqueueText(data.answer);
+                if (onAgentContentRef.current) onAgentContentRef.current(finalText, false);
+              }
+            } catch (e) {}
+          }
+        }
+      }
+      clearTimeout(delayNoticeId);
+      clearTimeout(hardAbortId);
+    } catch (err) {
+        if (err.name === 'AbortError') return;
+        setIsCritical(false);
+        setIsAnalyzingSms(false);
+        showDelayOnce();
+    }
+  }, [selectedSms, API_BASE_URL, enqueueText]);
+
+  const handleManualAnalyze = () => {
+    if (isAnalyzingSms) return;
+    runAnalysis(true);
   };
 
-  // SMS 선택 시 분석 모드로 전환
   useEffect(() => {
-
     if (!selectedSms) {
       setIsAnalyzingSms(false);
       setAnalysisComplete(false);
@@ -80,247 +326,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
       return;
     }
+    runAnalysis(false);
+  }, [selectedSms, runAnalysis]);
 
-    setIsAnalyzingSms(true);
-    setAnalysisComplete(false);
-    setIsCritical(false);
-    delayShownRef.current = false;
-    setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
-    const displaySender = selectedSms.sender === 'Manual Entry' ? 'Manual Entry' : `"${selectedSms.sender}" 발신 SMS`;
-    setSmsAnalysisTitle(`분석중입니다: ${displaySender}`);
 
-    const analyze = async () => {
-      try {
-        // ① Check DB cache FIRST (before aborting anything, no signal needed)
-        try {
-          const checkRes = await fetch(`${API_BASE_URL}/ai/insight/${selectedSms.inc_id}`);
-          if (checkRes.ok) {
-            const data = await checkRes.json();
-            if (data.content) {
-              enqueueText(data.content, { reset: true });
-              const critical = data.severity === 'CRITICAL';
-              setIsCritical(critical);
-              setAnalysisComplete(true);
-              setInsightTimestamp(data.reg_dt);
-              setIsAnalyzingSms(false); // DB 캐시 로드 시 LIVE 애니메이션 비활성화
-              if (onLogReceived) {
-                onLogReceived({
-                  title: `SMS 장애 분석: ${selectedSms.sender}`,
-                  text: data.content,
-                  message: data.content,
-                  severity: data.severity,
-                  category: data.category
-                });
-              }
-              // 🚀 NEW: Ensure the AI War-Room Log is populated with cached data
-              if (onAgentContent) {
-                onAgentContent(data.content, true);
-              }
-              if (data.similarity_score !== undefined && data.similarity_score !== null) {
-                console.log("Loading cached similarity score:", data.similarity_score);
-                setInsightData(prev => ({ 
-                  ...prev, 
-                  similarity_score: data.similarity_score,
-                  similarity_reason: data.similarity_reason 
-                }));
-              }
-              return; // Skip Dify streaming
-            }
-          }
-        } catch (e) {
-          console.error("Check insight err:", e);
-        }
-
-        // ② No cached data → clear old text, abort previous stream, and start new one
-        setDisplayedText('');
-        if (abortRef.current) abortRef.current.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
-
-        const res = await fetch(`${API_BASE_URL}/ai/analyze-sms`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            sender: selectedSms.sender, 
-            message: selectedSms.message,
-            sms_id: selectedSms.inc_id 
-          }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok || !res.body) throw new Error('Network response was not ok');
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let finalText = '';
-        let showedWorkingHint = false;
-        const startedAt = Date.now();
-
-        const showDelayOnce = () => {
-          if (delayShownRef.current) return;
-          delayShownRef.current = true;
-          stopTypewriter();
-          setDisplayedText(prev => {
-            const base = (prev || '').trimEnd();
-            return (base ? base + '\n' : '');
-          });
-        };
-
-        // Soft delay notice (do NOT abort; allow late answers to arrive)
-        const delayNoticeId = setTimeout(() => {
-          if (finalText) return;
-          showDelayOnce();
-        }, 20000);
-
-        // Hard cap: eventually abort to avoid infinite hanging connections
-        const hardAbortId = setTimeout(() => {
-          if (finalText) return;
-          showDelayOnce();
-          try { controller.abort(); } catch {}
-        }, 180000); // 3 minutes
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const events = buffer.split('\n\n');
-          buffer = events.pop() || '';
-
-          for (const evt of events) {
-            const lines = evt.split('\n');
-            for (const line of lines) {
-              if (!line.startsWith('data:')) continue;
-              const dataStr = line.slice(5).trim();
-              if (!dataStr) continue;
-              if (dataStr === '[DONE]') {
-                const critical = isCriticalAnalysis(finalText, selectedSms.message);
-                setIsCritical(critical);
-                setAnalysisComplete(true);
-                setIsAnalyzingSms(false); // 🚀 FIX: Unlock UI since stream finished
-                
-                // Save insight to DB
-                try {
-                  const category = getCategoryFromAnalysis(finalText, selectedSms.message);
-                  const userData = JSON.parse(localStorage.getItem('sguard_user') || '{}');
-                  fetch(`${API_BASE_URL}/ai/insight/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      incident_id: String(selectedSms.inc_id),
-                      content: finalText,
-                      severity: critical ? 'CRITICAL' : 'INFO',
-                      category: category,
-                      user_id: String(userData.inc_id || 'SYSTEM'),
-                      similarity_score: insightData.similarity_score,
-                      similarity_reason: insightData.similarity_reason
-                    })
-                  }).catch(console.error);
-                } catch (e) {
-                  console.error("Save insight err:", e);
-                }
-
-                if (onLogReceived) {
-                  onLogReceived({
-                    title: `SMS 장애 분석: ${selectedSms.sender}`,
-                    text: finalText,
-                    message: finalText,
-                    severity: critical ? 'CRITICAL' : 'INFO',
-                    category: getCategoryFromAnalysis(finalText, selectedSms.message)
-                  });
-                }
-                if (onAgentContent) {
-                  onAgentContent(finalText, true);
-                }
-                return;
-              }
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.error) {
-                  showDelayOnce();
-                  return;
-                }
-                // keep-alive/status from backend while waiting Dify
-                if ((data.status === 'connected' || data.status === 'working') && !finalText) {
-                  const elapsedMs = Date.now() - startedAt;
-                  if (!showedWorkingHint && elapsedMs > 2500) {
-                    showedWorkingHint = true;
-                    enqueueText('\n⏳ 분석중입니다...\n');
-                  }
-                }
-                if (data.similarity_score !== undefined && data.similarity_score !== null) {
-                  console.log("Received streaming similarity score:", data.similarity_score);
-                  setInsightData(prev => ({ 
-                    ...prev, 
-                    similarity_score: data.similarity_score,
-                    similarity_reason: data.similarity_reason !== undefined ? data.similarity_reason : prev.similarity_reason
-                  }));
-                }
-                if (data.answer) {
-                  // if we got real content, cancel delay timers
-                  try { clearTimeout(delayNoticeId); } catch {}
-                  try { clearTimeout(hardAbortId); } catch {}
-                  finalText += data.answer;
-                  enqueueText(data.answer);
-                  
-                  // Push to parent for War-Room Log
-                  if (onAgentContent) {
-                    onAgentContent(finalText, false);
-                  }
-                }
-              } catch (e) {}
-            }
-          }
-        }
-
-        clearTimeout(delayNoticeId);
-        clearTimeout(hardAbortId);
-
-        // Stream ended but no answer ever arrived → show graceful delay message.
-        if (!finalText) {
-          showDelayOnce();
-        }
-      } catch {
-        setIsCritical(false);
-        if (!delayShownRef.current) {
-          delayShownRef.current = true;
-          stopTypewriter();
-          setDisplayedText(prev => {
-            const base = (prev || '').trimEnd();
-            return (base ? base + '\n' : '');
-          });
-          setAnalysisComplete(true);
-        }
-      } finally {
-        setIsAnalyzingSms(false); // 🚀 FIX: Unlock regardless of success or failure
-      }
-    };
-
-    analyze();
-  }, [selectedSms]);
-
-  const isCriticalAnalysis = (analysisText, message) => {
-    const combined = ((analysisText || '') + (message || '')).toLowerCase();
-    return combined.includes('critical') || combined.includes('escalation') ||
-           combined.includes('에스컬레이션') || combined.includes('war-room') ||
-           combined.includes('워룸') || combined.includes('db') ||
-           combined.includes('데이터베이스') || combined.includes('서버 다운') ||
-           combined.includes('down');
-  };
-
-  const getCategoryFromAnalysis = (analysisText, message) => {
-    const combined = ((analysisText || '') + (message || '')).toLowerCase();
-    if (combined.includes('security') || combined.includes('보안') || combined.includes('접속 시도') || combined.includes('로그인')) {
-      return 'security';
-    }
-    if (combined.includes('critical') || combined.includes('긴급') || combined.includes('장애')) {
-      return 'critical';
-    }
-    if (combined.includes('server') || combined.includes('서버') || combined.includes('cpu') || combined.includes('memory')) {
-      return 'server';
-    }
-    return 'report';
-  };
 
   // 기본 폴링 루프 (SMS 미선택 시)
   useEffect(() => {
@@ -343,10 +352,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           if (data.current_log?.text) {
             enqueueText(data.current_log.text, { reset: true });
             setAnalysisComplete(true);
-            if (data.prediction_counts) {
-              setInsightData(prev => ({ ...prev, prediction_counts: data.prediction_counts }));
-              if (onLogReceived) onLogReceived({ type: 'info' }, data.prediction_counts);
-            }
+              if (data.prediction_counts) {
+                setInsightData(prev => ({ ...prev, prediction_counts: data.prediction_counts }));
+                if (onLogReceivedRef.current) onLogReceivedRef.current({ type: 'info' }, data.prediction_counts);
+              }
           }
           return;
         }
@@ -542,6 +551,18 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               LIVE
             </span>
           </div>
+          <button
+            onClick={handleManualAnalyze}
+            disabled={isAnalyzingSms}
+            className={`px-3 py-1.5 rounded-lg border transition-all duration-300 flex items-center space-x-2 
+              ${isAnalyzingSms 
+                ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed opacity-50' 
+                : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 active:scale-95'}`}
+            title="AI 재분석 (수동)"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${isAnalyzingSms ? 'animate-spin' : ''}`} />
+            <span className="text-xs font-bold whitespace-nowrap">재분석</span>
+          </button>
           <button 
              onClick={() => setIsCollapsed(!isCollapsed)}
              className="px-2 py-1.5 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors text-slate-400"

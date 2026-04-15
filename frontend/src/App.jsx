@@ -2,7 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
+
 import DashboardPage from './pages/DashboardPage';
 import AiReportPage from './pages/AiReportPage';
 import AiProcessReportPage from './pages/AiProcessReportPage';
@@ -29,6 +29,8 @@ import CodebookManagementPage from './pages/CodebookManagementPage';
 import WorkflowPage from './pages/WorkflowPage';
 import InboxPage from './pages/InboxPage';
 import OrbitalCommandPage from './pages/OrbitalCommandPage';
+import SecurityLogPage from './pages/SecurityLogPage';
+import ProcessingFlowPage from './pages/ProcessingFlowPage';
 
 import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
@@ -38,11 +40,28 @@ import { X, MessageSquare, FileText } from 'lucide-react';
 
 import { CodebookProvider } from './context/CodebookContext';
 
+import { Navigate } from 'react-router-dom';
+
+// 🔒 인증된 사용자만 접근할 수 있도록 보호하는 컴포넌트 (Navigation Guard)
+function ProtectedRoute({ children }) {
+  const savedUser = localStorage.getItem('sguard_user');
+  const jwt = localStorage.getItem('sguard_jwt');
+  
+  if (!savedUser || !jwt || savedUser === 'undefined' || savedUser === 'null') {
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
+}
+
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const isAuthPage = ['/', '/signup'].includes(location.pathname);
+  const isAuthPage = location.pathname === '/';
+  
+  // 🌐 API Configuration
+  const apiBase = 'https://sguardai.khcho0421.workers.dev';
   
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
@@ -50,21 +69,42 @@ function AppContent() {
   const [warRooms, setWarRooms] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
 
-  // Load user profile
+  // Load user profile & 실시간 세션 검증 (Navigation Guard 고도화)
   useEffect(() => {
-    const savedUser = localStorage.getItem('sguard_user');
-    if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
+    const checkSession = async () => {
+      const savedUser = localStorage.getItem('sguard_user');
+      const jwt = localStorage.getItem('sguard_jwt');
+      
+      if (!savedUser || !jwt) return;
+
       try {
-        setUserProfile(JSON.parse(savedUser));
+        const res = await fetch(`${apiBase}/auth/check`);
+        if (!res.ok) {
+          // 서버에서 세션이 무효화됨 (DB 상태 변경 등)
+          console.warn('[Session] Invalid or expired session. Logging out...');
+          localStorage.removeItem('sguard_user');
+          localStorage.removeItem('sguard_jwt');
+          navigate('/', { replace: true });
+          return;
+        }
+        
+        const data = await res.json();
+        if (data.ok && data.user) {
+          setUserProfile(data.user);
+          // 로컬 스토리지 정보 업데이트 (DB 최신 정보 반영)
+          localStorage.setItem('sguard_user', JSON.stringify(data.user));
+        }
       } catch (e) {
-        console.error("User profile parse error", e);
+        console.error("Session check failed", e);
       }
-    }
-  }, []);
+    };
+
+    checkSession();
+  }, [location.pathname]); // 페이지 이동 시마다 체크
 
   const fetchWarRooms = async () => {
     try {
-      const res = await fetch('https://sguardai.khcho0421.workers.dev/warroom/rooms');
+      const res = await fetch(`${apiBase}/warroom/rooms`);
       if (res.ok) {
         const data = await res.json();
         setWarRooms(data.rooms || []);
@@ -89,45 +129,49 @@ function AppContent() {
   const currentIncidentId = (pathParts[1] === 'chat' && pathParts[2]) ? pathParts[2] : null;
 
   return (
-    <>
-      <SMSNotification />
+    <CodebookProvider>
+      {!isAuthPage && <SMSNotification />}
       
       <Routes>
         <Route path="/" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-        <Route path="/ai-report/:incidentId?" element={<AiReportPage />} />
-        <Route path="/assignment-detail" element={<AssignmentDetailPage />} />
-        <Route path="/chat/:incidentId?" element={<ChatPage />} />
-        <Route path="/chat-summary/:incidentId" element={<ChatSummaryPage />} />
-        <Route path="/ai-process-report" element={<AiProcessReportPage />} />
-        <Route path="/report-publish" element={<ReportPublishPage />} />
-        <Route path="/activity" element={<ActivityPage />} />
-        <Route path="/activity-detail" element={<ActivityDetailPage />} />
-        <Route path="/assignments" element={<AssignmentsPage />} />
-        <Route path="/overall-status" element={<OverallStatusPage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/incident-list" element={<IncidentListPage />} />
-        <Route path="/keyword-management" element={<KeywordManagementPage />} />
-        <Route path="/report-line-management" element={<ReportLineManagementPage />} />
-        <Route path="/incident-push" element={<IncidentPushPage />} />
-        <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-        <Route path="/user-management" element={<UserManagementPage />} />
-        <Route path="/organization-management" element={<OrganizationManagementPage />} />
-        <Route path="/warroom-management" element={<WarRoomManagementPage />} />
-        <Route path="/codebook-management" element={<CodebookManagementPage />} />
-         <Route path="/workflow/:inc_id" element={<WorkflowPage />} />
-         <Route path="/inbox" element={<InboxPage />} />
-         <Route path="/orbital-command" element={<OrbitalCommandPage />} />
+
+        {/* 🔒 Protected Routes: 인증 필수 */}
+        <Route path="/dashboard" element={<ProtectedRoute><ErrorBoundary><DashboardPage /></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/ai-report/:incidentId?" element={<ProtectedRoute><AiReportPage /></ProtectedRoute>} />
+        <Route path="/assignment-detail" element={<ProtectedRoute><AssignmentDetailPage /></ProtectedRoute>} />
+        <Route path="/chat/:incidentId?" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/chat-summary/:incidentId" element={<ProtectedRoute><ChatSummaryPage /></ProtectedRoute>} />
+        <Route path="/ai-process-report" element={<ProtectedRoute><AiProcessReportPage /></ProtectedRoute>} />
+        <Route path="/report-publish" element={<ProtectedRoute><ReportPublishPage /></ProtectedRoute>} />
+        <Route path="/activity" element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
+        <Route path="/activity-detail" element={<ProtectedRoute><ActivityDetailPage /></ProtectedRoute>} />
+        <Route path="/assignments" element={<ProtectedRoute><AssignmentsPage /></ProtectedRoute>} />
+        <Route path="/overall-status" element={<ProtectedRoute><OverallStatusPage /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+        <Route path="/incident-list" element={<ProtectedRoute><IncidentListPage /></ProtectedRoute>} />
+        <Route path="/keyword-management" element={<ProtectedRoute><KeywordManagementPage /></ProtectedRoute>} />
+        <Route path="/report-line-management" element={<ProtectedRoute><ReportLineManagementPage /></ProtectedRoute>} />
+        <Route path="/incident-push" element={<ProtectedRoute><IncidentPushPage /></ProtectedRoute>} />
+        <Route path="/security-logs" element={<ProtectedRoute><SecurityLogPage /></ProtectedRoute>} />
+        <Route path="/processing-flow" element={<ProtectedRoute><ProcessingFlowPage /></ProtectedRoute>} />
+        <Route path="/knowledge-base" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
+        <Route path="/user-management" element={<ProtectedRoute><UserManagementPage /></ProtectedRoute>} />
+        <Route path="/organization-management" element={<ProtectedRoute><OrganizationManagementPage /></ProtectedRoute>} />
+        <Route path="/warroom-management" element={<ProtectedRoute><WarRoomManagementPage /></ProtectedRoute>} />
+        <Route path="/codebook-management" element={<ProtectedRoute><CodebookManagementPage /></ProtectedRoute>} />
+        <Route path="/workflow/:inc_id" element={<ProtectedRoute><WorkflowPage /></ProtectedRoute>} />
+        <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+        <Route path="/orbital-command" element={<ProtectedRoute><OrbitalCommandPage /></ProtectedRoute>} />
       </Routes>
 
       {/* Global Bottom Navigation */}
       {!isAuthPage && (
         <BottomMenu 
-          currentPath={location.pathname.startsWith('/chat') ? '/chat' : location.pathname} 
+          currentPath={location.pathname} 
           onWarRoomClick={handleWarRoomClick}
           onReportClick={handleReportClick}
           onAiClick={() => setShowAIAssistant(true)}
+          user={userProfile}
         />
       )}
 
@@ -180,9 +224,9 @@ function AppContent() {
         <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReportPopup(false)} />
           <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-emerald-600/10 to-transparent">
-              <div className="flex items-center space-x-3">
-                <div className="bg-emerald-600/20 p-2.5 rounded-xl border border-emerald-500/30">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-500/20 rounded-2xl">
                   <FileText className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
@@ -227,7 +271,7 @@ function AppContent() {
           userProfile={userProfile}
         />
       )}
-    </>
+    </CodebookProvider>
   );
 }
 
@@ -236,9 +280,7 @@ function App() {
   return (
     <Router>
       <GoogleOAuthProvider clientId="368028308466-placeholder.apps.googleusercontent.com">
-        <CodebookProvider>
-          <AppContent />
-        </CodebookProvider>
+        <AppContent />
       </GoogleOAuthProvider>
     </Router>
   );

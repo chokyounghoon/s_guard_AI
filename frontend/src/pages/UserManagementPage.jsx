@@ -4,7 +4,7 @@ import {
   ArrowLeft, Search, User, Shield, RefreshCw,
   Trash2, Mail, Phone, Building2,
   ChevronRight, Key, MoreHorizontal, UserCheck, UserX,
-  LayoutGrid, List as ListIcon
+  LayoutGrid, List as ListIcon, X
 } from 'lucide-react';
 
 export default function UserManagementPage() {
@@ -19,6 +19,13 @@ export default function UserManagementPage() {
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [tempOrgs, setTempOrgs] = useState({ org1: '', org2: '', org3: '', org4: '', org5: '' });
+  
+  // New User Registration State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newUser, setNewUser] = useState({
+    name: '', employee_id: '', email: '', phone: '', role: 'viewer', password: '',
+    org1: '', org2: '', org3: '', org4: '', org5: ''
+  });
 
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -59,11 +66,19 @@ export default function UserManagementPage() {
   };
 
   const handleToggleStatus = async (user) => {
+    // 🛡️ 상태 머신 연동: ACTIVE ↔ SUSPENDED 전환
+    const nextStatus = user.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+    const confirmMsg = nextStatus === 'SUSPENDED' 
+      ? `[보안경고] ${user.name}님의 계정을 차단(SUSPENDED)하시겠습니까?\n차단 즉시 모든 시스템 접근이 거부됩니다.`
+      : `${user.name}님의 계정을 다시 활성화(ACTIVE)하시겠습니까?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
     try {
       const res = await fetch(`${API_BASE}/users/${user.employee_id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: user.is_active ? 0 : 1 })
+        body: JSON.stringify({ status: nextStatus })
       });
       if (res.ok) {
         fetchUsers();
@@ -184,6 +199,77 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!newUser.name || !newUser.employee_id || !newUser.email) {
+      alert('이름, 사번, 이메일은 필수 입력 항목입니다.');
+      return;
+    }
+
+    const payload = {
+      name: newUser.name,
+      employee_id: newUser.employee_id,
+      email: newUser.email,
+      phone: newUser.phone,
+      role: newUser.role,
+      password: newUser.password || null,
+      company: newUser.org1 || null,
+      honbu: newUser.org2 || null,
+      team: newUser.org3 || null,
+      part: newUser.org4 || null,
+      subpart: newUser.org5 || null
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setIsAddModalOpen(false);
+        setNewUser({
+          name: '', employee_id: '', email: '', phone: '', role: 'viewer', password: '',
+          org1: '', org2: '', org3: '', org4: '', org5: ''
+        });
+        fetchUsers();
+        alert('사용자가 등록되었습니다.');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`등록 실패: ${err.detail || '서버 오류가 발생했습니다.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteUser = async (user) => {
+    if (user.employee_id === 'admin') {
+      alert('기본 관리자 계정은 삭제할 수 없습니다.');
+      return;
+    }
+
+    if (!window.confirm(`[영구 삭제 경고] ${user.name}님의 모든 계정 정보가 시스템에서 영구적으로 삭제됩니다.\n정말로 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/users/${user.employee_id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchUsers();
+        alert('사용자가 삭제되었습니다.');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`삭제 실패: ${err.detail || '서버 오류가 발생했습니다.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('오류가 발생했습니다.');
+    }
+  };
+
   // Depth-independent node filtering for cascading dropdowns
   const getSubNodes = (childDepth, parentCode) => {
     if (childDepth === 1) return orgTree;
@@ -235,12 +321,19 @@ export default function UserManagementPage() {
                   <span><ListIcon className="w-4 h-4" /></span>
                 </button>
              </div>
-             <button
-               onClick={fetchUsers}
-               className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-slate-400"
-             >
-                <span><RefreshCw className="w-5 h-5" /></span>
-             </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/20 active:scale-95 border border-blue-400/30"
+              >
+                 <UserCheck className="w-4 h-4" />
+                 <span>사용자 등록</span>
+              </button>
+              <button
+                onClick={fetchUsers}
+                className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-slate-400"
+              >
+                 <span><RefreshCw className="w-5 h-5" /></span>
+              </button>
           </div>
         </div>
       </header>
@@ -306,6 +399,14 @@ export default function UserManagementPage() {
                     <div className={`flex items-center gap-2 mt-1 ${viewMode === 'grid' ? 'justify-center' : ''}`}>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${user.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
                          <span>{user.role?.toUpperCase() || 'USER'}</span>
+                      </span>
+                      {/* 🛡️ 계정 상태 배지 (State Machine UI) */}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        user.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        user.status === 'PRE_REGISTERED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                        'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      }`}>
+                         {user.status === 'ACTIVE' ? '정상' : user.status === 'PRE_REGISTERED' ? '가입대기' : '사용중지'}
                       </span>
                       {user.employee_id && <span className="text-[10px] text-slate-500 font-mono">#<span>{user.employee_id}</span></span>}
                     </div>
@@ -380,13 +481,20 @@ export default function UserManagementPage() {
                        >
                          <span><Key className="w-3.5 h-3.5" /></span> PW 초기화
                        </button>
+                       <button
+                         onClick={() => handleDeleteUser(user)}
+                         className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-red-500/20 hover:text-red-500 transition-all text-slate-500"
+                         title="계정 영구 삭제"
+                       >
+                         <span><Trash2 className="w-3.5 h-3.5" /></span>
+                       </button>
                     </div>
                     <button
                       onClick={() => handleToggleStatus(user)}
-                      className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-[11px] font-bold border ${user.is_active ? 'bg-red-500/5 border-red-500/10 hover:border-red-500/30 text-red-500' : 'bg-green-500/5 border-green-500/10 hover:border-green-500/30 text-green-500'}`}
+                      className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-[11px] font-bold border ${user.status === 'ACTIVE' || user.status === 'PRE_REGISTERED' ? 'bg-red-500/5 border-red-500/10 hover:border-red-500/30 text-red-500' : 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30 text-emerald-500'}`}
                     >
-                      <span>{user.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}</span>
-                      <span>{user.is_active ? '계정 비활성화' : '계정 활성화'}</span>
+                      <span>{user.status === 'ACTIVE' || user.status === 'PRE_REGISTERED' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}</span>
+                      <span>{user.status === 'ACTIVE' || user.status === 'PRE_REGISTERED' ? '계정 차단(SUSPEND)' : '차단 해제(ACTIVE)'}</span>
                     </button>
                   </div>
                 </div>
@@ -481,6 +589,86 @@ export default function UserManagementPage() {
            </div>
         </div>
       )}
+ 
+      {/* User Registration Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+           <div className="absolute inset-0 bg-[#05070a]/90 backdrop-blur-md" onClick={() => setIsAddModalOpen(false)} />
+           <div className="relative w-full max-w-2xl bg-[#11141d] border border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="h-2 bg-gradient-to-r from-blue-600 via-blue-400 to-emerald-500" />
+              <div className="p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                 <div className="mb-8 flex justify-between items-start">
+                    <div>
+                       <h2 className="text-3xl font-bold text-white tracking-tight">신규 사용자 등록</h2>
+                       <p className="text-slate-500 text-sm mt-2">시스템 접근 권한을 가진 신규 사용자를 생성합니다.</p>
+                    </div>
+                    <button onClick={() => setIsAddModalOpen(false)} className="p-2 rounded-full hover:bg-white/5 text-slate-500"><X /></button>
+                 </div>
+ 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-white/5">
+                    <div className="space-y-4">
+                       <h3 className="text-xs font-bold text-blue-400 uppercase tracking-[0.2em] mb-4">기본 정보</h3>
+                       <Input label="이름" value={newUser.name} onChange={(v) => setNewUser({...newUser, name: v})} placeholder="홍길동" required />
+                       <Input label="사번 (ID)" value={newUser.employee_id} onChange={(v) => setNewUser({...newUser, employee_id: v})} placeholder="240001" required />
+                       <Input label="이메일" value={newUser.email} onChange={(v) => setNewUser({...newUser, email: v})} placeholder="gdhong@shinhan.com" required />
+                       <Input label="전화번호" value={newUser.phone} onChange={(v) => setNewUser({...newUser, phone: v})} placeholder="010-1234-5678" />
+                    </div>
+                    <div className="space-y-4">
+                       <h3 className="text-xs font-bold text-purple-400 uppercase tracking-[0.2em] mb-4">계정 및 권한</h3>
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-500 font-bold ml-2 uppercase">권한 설정</label>
+                          <select 
+                            value={newUser.role}
+                            onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                            className="w-full bg-[#0a0e17] border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-slate-200"
+                          >
+                             <option value="viewer">VIEWER (조회 전용)</option>
+                             <option value="analyst">ANALYST (분석가)</option>
+                             <option value="admin">ADMIN (관리자)</option>
+                          </select>
+                       </div>
+                       <Input 
+                         label="초기 비밀번호" 
+                         type="password"
+                         value={newUser.password} 
+                         onChange={(v) => setNewUser({...newUser, password: v})} 
+                         placeholder="미입력 시 가입대기 상태로 생성됨" 
+                       />
+                       <p className="text-[10px] text-slate-600 px-2 leading-relaxed">
+                          * 비밀번호 미입력 시, 해당 사용자는 첫 로그인 시 '사번 인증 및 OTP' 절차를 거쳐 직접 비밀번호를 설정해야 합니다.
+                       </p>
+                    </div>
+                 </div>
+ 
+                 <div className="mt-8 space-y-6">
+                    <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-[0.2em]">소속 정보 선택</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <Dropdown label="회사" value={newUser.org1} options={orgTree} onChange={(v) => setNewUser({...newUser, org1: v, org2: '', org3: '', org4: '', org5: ''})} />
+                       <Dropdown label="부문/실" value={newUser.org2} options={getSubNodes(2, newUser.org1)} disabled={!newUser.org1} onChange={(v) => setNewUser({...newUser, org2: v, org3: '', org4: '', org5: ''})} />
+                       <Dropdown label="본부" value={newUser.org3} options={getSubNodes(3, newUser.org2)} disabled={!newUser.org2} onChange={(v) => setNewUser({...newUser, org3: v, org4: '', org5: ''})} />
+                       <Dropdown label="팀" value={newUser.org4} options={getSubNodes(4, newUser.org3)} disabled={!newUser.org3} onChange={(v) => setNewUser({...newUser, org4: v, org5: ''})} />
+                       <Dropdown label="파트" value={newUser.org5} options={getSubNodes(5, newUser.org4)} disabled={!newUser.org4} onChange={(v) => setNewUser({...newUser, org5: v})} />
+                    </div>
+                 </div>
+ 
+                 <div className="mt-12 flex gap-4">
+                    <button 
+                      onClick={() => setIsAddModalOpen(false)}
+                      className="flex-1 py-4 rounded-2xl bg-white/5 text-slate-400 font-bold hover:bg-white/10 transition-all border border-white/5"
+                    >
+                      취소
+                    </button>
+                    <button 
+                      onClick={handleCreateUser}
+                      className="flex-[2] py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:shadow-lg hover:shadow-blue-600/30 transition-all active:scale-95"
+                    >
+                      사용자 생성 완료
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -503,6 +691,23 @@ function Dropdown({ label, value, options, onChange, disabled }) {
            </option>
          ))}
        </select>
+    </div>
+  );
+}
+ 
+function Input({ label, value, onChange, placeholder, type = 'text', required }) {
+  return (
+    <div className="space-y-1.5">
+       <label className="text-[10px] text-slate-500 font-bold ml-2 uppercase">
+          {label} {required && <span className="text-red-500">*</span>}
+       </label>
+       <input
+         type={type}
+         value={value}
+         onChange={(e) => onChange(e.target.value)}
+         placeholder={placeholder}
+         className="w-full bg-[#0a0e17] border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all"
+       />
     </div>
   );
 }

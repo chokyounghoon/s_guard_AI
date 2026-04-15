@@ -8,8 +8,11 @@ export default function SMSNotification() {
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
-    // Server-Sent Events (SSE) 연결
-    const eventSource = new EventSource(`${API_BASE}/sms/notification-stream`);
+    const token = localStorage.getItem('sguard_jwt') || localStorage.getItem('sguard_token');
+    if (!token) return;
+
+    let isMounted = true;
+    const eventSource = new EventSource(`${API_BASE}/sms/notification-stream?token=${token}`);
 
     eventSource.onopen = () => {
       console.log('SSE 스트림 연결됨');
@@ -47,6 +50,7 @@ export default function SMSNotification() {
     };
 
     return () => {
+      isMounted = false;
       console.log('SSE 스트림 연결 종료');
       eventSource.close();
     };

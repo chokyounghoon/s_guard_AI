@@ -1,0 +1,232 @@
+{
+  "wallTime": 0,
+  "cpuTime": 0,
+  "truncated": false,
+  "executionModel": "stateless",
+  "outcome": "ok",
+  "scriptVersion": {
+    "id": "f825f746-6bbc-49d8-bef7-be6ea59f1fb1"
+  },
+  "scriptName": "sguardai",
+  "diagnosticsChannelEvents": [],
+  "exceptions": [],
+  "logs": [],
+  "eventTimestamp": 1776263312536,
+  "event": {
+    "request": {
+      "url": "https://sguardai.khcho0421.workers.dev/ai/warroom/lock/20260415214509420",
+      "method": "GET",
+      "headers": {
+        "accept": "*/*",
+        "accept-encoding": "gzip, br",
+        "accept-language": "ko",
+        "cf-connecting-ip": "121.142.139.188",
+        "cf-ipcountry": "KR",
+        "cf-ray": "9ecba3274a64cbab",
+        "cf-visitor": "{\"scheme\":\"https\"}",
+        "connection": "Keep-Alive",
+        "host": "sguardai.khcho0421.workers.dev",
+        "origin": "https://sguard-frontend.pages.dev",
+        "priority": "u=1, i",
+        "referer": "https://sguard-frontend.pages.dev/",
+        "sec-ch-ua": "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+        "x-forwarded-proto": "https",
+        "x-real-ip": "121.142.139.188"
+      },
+      "cf": {
+        "httpProtocol": "HTTP/3",
+        "clientAcceptEncoding": "gzip, deflate, br",
+        "requestPriority": "",
+        "edgeRequestKeepAliveStatus": 1,
+        "requestHeaderNames": {},
+        "clientTcpRtt": 0,
+        "clientQuicRtt": 295,
+        "colo": "LAX",
+        "asn": 4766,
+        "asOrganization": "KT",
+        "country": "KR",
+        "isEUCountry": false,
+        "city": "Incheon",
+        "continent": "AS",
+        "region": "Incheon",
+        "regionCode": "28",
+        "timezone": "Asia/Seoul",
+        "longitude": "126.70515",
+        "latitude": "37.45646",
+        "postalCode": "21505",
+        "tlsVersion": "TLSv1.3",
+        "tlsCipher": "AEAD-AES128-GCM-SHA256",
+        "tlsClientRandom": "RgVNX9yYIEU7DgYCwCvuAgnjq2V/L3YODclcOrX8sVk=",
+        "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+        "tlsClientExtensionsSha1": "L1b3YLa/EQ2hiDJZbXkjcJTpQXY=",
+        "tlsClientExtensionsSha1Le": "+m0G3RS6wwPlO7pC3TklOB/EMAM=",
+        "tlsClientHelloLength": "1747",
+        "tlsClientAuth": {
+          "certPresented": "0",
+          "certVerified": "NONE",
+          "certRevoked": "0",
+          "certIssuerDN": "",
+          "certSubjectDN": "",
+          "certIssuerDNRFC2253": "",
+          "certSubjectDNRFC2253": "",
+          "certIssuerDNLegacy": "",
+          "certSubjectDNLegacy": "",
+          "certSerial": "",
+          "certIssuerSerial": "",
+          "certSKI": "",
+          "certIssuerSKI": "",
+          "certFingerprintSHA1": "",
+          "certFingerprintSHA256": "",
+          "certNotBefore": "",
+          "certNotAfter": "",
+          "certRFC9440": "",
+          "certRFC9440TooLarge": false,
+          "certChainRFC9440": "",
+          "certChainRFC9440TooLarge": false
+        },
+        "verifiedBotCategory": "",
+        "edgeL4": {
+          "deliveryRate": 4966
+        }
+      }
+    },
+    "response": {
+      "status": 401
+    }
+  }
+}
+{
+  "wallTime": 1040,
+  "cpuTime": 3,
+  "truncated": false,
+  "executionModel": "stateless",
+  "outcome": "ok",
+  "scriptVersion": {
+    "id": "f825f746-6bbc-49d8-bef7-be6ea59f1fb1"
+  },
+  "scriptName": "sguardai",
+  "diagnosticsChannelEvents": [],
+  "exceptions": [],
+  "logs": [
+    {
+      "message": [
+        "[auth/init] Sending email to: klisy2@naver.com (EmpId: 18121021)"
+      ],
+      "level": "log",
+      "timestamp": 1776263316923
+    },
+    {
+      "message": [
+        "[auth/init] API Key Presence: true"
+      ],
+      "level": "log",
+      "timestamp": 1776263316923
+    },
+    {
+      "message": [
+        "[auth/init] Email Success: {\"id\":\"0e8736b7-be3b-4fd4-b016-1c82d28a5a14\"}"
+      ],
+      "level": "log",
+      "timestamp": 1776263317260
+    },
+    {
+      "message": [
+        "[Auth/Init] OTP Created for 18121021: 489011"
+      ],
+      "level": "log",
+      "timestamp": 1776263317478
+    }
+  ],
+  "eventTimestamp": 1776263316449,
+  "event": {
+    "request": {
+      "url": "https://sguardai.khcho0421.workers.dev/auth/init",
+      "method": "POST",
+      "headers": {
+        "accept": "*/*",
+        "accept-encoding": "gzip, br",
+        "cf-connecting-ip": "121.142.139.188",
+        "cf-ipcountry": "KR",
+        "cf-ray": "9ecba33fc8746d31",
+        "cf-visitor": "{\"scheme\":\"https\"}",
+        "connection": "Keep-Alive",
+        "content-length": "27",
+        "content-type": "application/json",
+        "host": "sguardai.khcho0421.workers.dev",
+        "user-agent": "curl/8.7.1",
+        "x-forwarded-proto": "https",
+        "x-real-ip": "121.142.139.188"
+      },
+      "cf": {
+        "httpProtocol": "HTTP/2",
+        "requestPriority": "weight=16;exclusive=0;group=0;group-weight=0",
+        "edgeRequestKeepAliveStatus": 1,
+        "requestHeaderNames": {},
+        "clientTcpRtt": 165,
+        "clientQuicRtt": 0,
+        "colo": "LAX",
+        "asn": 4766,
+        "asOrganization": "KT",
+        "country": "KR",
+        "isEUCountry": false,
+        "city": "Incheon",
+        "continent": "AS",
+        "region": "Incheon",
+        "regionCode": "28",
+        "timezone": "Asia/Seoul",
+        "longitude": "126.70515",
+        "latitude": "37.45646",
+        "postalCode": "21505",
+        "tlsVersion": "TLSv1.3",
+        "tlsCipher": "AEAD-CHACHA20-POLY1305-SHA256",
+        "tlsClientRandom": "+ZQ9d5s6f6XMxI5KXimBh5LTU5BiSH69onWOtBXV2uQ=",
+        "tlsClientCiphersSha1": "eDGmD1H99AwNYzOR+7eoGLo6eLU=",
+        "tlsClientExtensionsSha1": "Ub+nUmIm1U57hdNSUph0R+kx9Gc=",
+        "tlsClientExtensionsSha1Le": "NMNf2YIpLBhtroOEBooGFi+jtJ8=",
+        "tlsExportedAuthenticator": {
+          "clientHandshake": "f95fe48f92c102bd8b012849dba9f67d4dffee807bdf8f4c608c99d1de1e7f80",
+          "serverHandshake": "56cd6c34a555e7289fdd3e1c19f596ad9cc7f549d66a5d08964a83f231bb32bd",
+          "clientFinished": "513bb80d9e55fc8c03bef005c650b860e48ab9a7254b754c944f474735a9de0e",
+          "serverFinished": "78bff320f22cf81f01adf366f14edd3ee96df01b8cd9126bb694ed04a0317c79"
+        },
+        "tlsClientHelloLength": "331",
+        "tlsClientAuth": {
+          "certPresented": "0",
+          "certVerified": "NONE",
+          "certRevoked": "0",
+          "certIssuerDN": "",
+          "certSubjectDN": "",
+          "certIssuerDNRFC2253": "",
+          "certSubjectDNRFC2253": "",
+          "certIssuerDNLegacy": "",
+          "certSubjectDNLegacy": "",
+          "certSerial": "",
+          "certIssuerSerial": "",
+          "certSKI": "",
+          "certIssuerSKI": "",
+          "certFingerprintSHA1": "",
+          "certFingerprintSHA256": "",
+          "certNotBefore": "",
+          "certNotAfter": "",
+          "certRFC9440": "",
+          "certRFC9440TooLarge": false,
+          "certChainRFC9440": "",
+          "certChainRFC9440TooLarge": false
+        },
+        "verifiedBotCategory": "",
+        "edgeL4": {
+          "deliveryRate": 11386
+        }
+      }
+    },
+    "response": {
+      "status": 200
+    }
+  }
+}

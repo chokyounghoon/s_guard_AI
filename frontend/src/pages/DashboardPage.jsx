@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
@@ -108,6 +108,24 @@ export default function DashboardPage() {
   const [isSmsPanelCollapsed, setIsSmsPanelCollapsed] = useState(false);
   const [showThresholdSettings, setShowThresholdSettings] = useState(false);
   const [thresholds, setThresholds] = useState({ technical: 0.85, casual: 0.95 });
+
+  const getAuthHeaders = useCallback(() => {
+    // 🔑 Use the real JWT, NOT the legacy session ID
+    let jwt = localStorage.getItem('sguard_jwt');
+    if (!jwt || jwt.split('.').length !== 3) {
+      const savedUser = localStorage.getItem('sguard_user');
+      if (savedUser) {
+        try {
+          const userObj = JSON.parse(savedUser);
+          jwt = userObj.jwt || null; // Only accept real JWTs
+        } catch (e) {}
+      }
+    }
+    return {
+      'Content-Type': 'application/json',
+      ...(jwt ? { 'Authorization': `Bearer ${jwt}` } : {})
+    };
+  }, []);
   const [isSavingThreshold, setIsSavingThreshold] = useState(false);
   const [isLiveStreamCollapsed, setIsLiveStreamCollapsed] = useState(false);
   const [isWarRoomCollapsed, setIsWarRoomCollapsed] = useState(false);
@@ -448,8 +466,9 @@ export default function DashboardPage() {
     const assignmentInterval = setInterval(fetchMyAssignments, 10000);
     const historyInterval = setInterval(fetchUserActivityHistory, 15000);
 
-    // 🚀 NEW: Real-time SMS Stream (SSE)
-    const sse = new EventSource(`${apiBase}/sms/notification-stream`);
+    // 🚀 NEW: Real-time SMS Stream (SSE) — use real JWT for query param auth
+    const token = localStorage.getItem('sguard_jwt');
+    const sse = new EventSource(`${apiBase}/sms/notification-stream${token ? `?token=${token}` : ''}`);
     sse.addEventListener('new_sms', (event) => {
       console.log('Real-time SMS Event:', event.data);
       // Immediately pull fresh data when a new SMS notification arrives
@@ -486,7 +505,9 @@ export default function DashboardPage() {
   const fetchWarRooms = async () => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.id}`);
+      const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.id}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.rooms || []).map(room => ({
@@ -507,7 +528,9 @@ export default function DashboardPage() {
 
   const fetchActivityLogs = async () => {
     try {
-      const res = await fetch(`${apiBase}/activity-logs`);
+      const res = await fetch(`${apiBase}/activity-logs`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(data.logs || []);
@@ -520,7 +543,9 @@ export default function DashboardPage() {
   const fetchMyAssignments = async () => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${apiBase}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`);
+      const res = await fetch(`${apiBase}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
@@ -537,7 +562,9 @@ export default function DashboardPage() {
   const fetchUserActivityHistory = async () => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${apiBase}/ai/user/activity-history?user_id=${userProfile.id}`);
+      const res = await fetch(`${apiBase}/ai/user/activity-history?user_id=${userProfile.id}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setUserActivityHistory(data.history || []);
@@ -587,7 +614,9 @@ export default function DashboardPage() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${apiBase}/sms/settings`);
+      const response = await fetch(`${apiBase}/sms/settings`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         const tech = data.settings.find(s => s.key === 'similarity_threshold_technical')?.value || 0.85;
@@ -620,7 +649,9 @@ export default function DashboardPage() {
 
   const fetchSMSMessages = async () => {
     try {
-      const response = await fetch(`${apiBase}/sms/recent?limit=20`);
+      const response = await fetch(`${apiBase}/sms/recent?limit=20`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         const freshMsgs = (data.messages || []).filter(msg => {

@@ -27,10 +27,12 @@ new_sqlite_classes = ["WarRoom"]
 [[kv_namespaces]]
 binding = "SMS_STORAGE"
 id = "2b426805a38f4403ac1e4f8a03c22d00"
+preview_id = "2b426805a38f4403ac1e4f8a03c22d00"
 
 [[r2_buckets]]
 binding = "WARROOM_ASSETS"
 bucket_name = "sguard-warroom-assets"
+preview_bucket_name = "sguard-warroom-assets"
 
 [[vectorize]]
 binding = "WARROOM_INDEX"
@@ -40,3 +42,4 @@ index_name = "sguard-warroom-index"
 binding = "DB"
 database_name = "sguard-db"
 database_id = "cec6c7cc-5bce-4fdf-a500-e1976b1fb66f"
+preview_database_id = "cec6c7cc-5bce-4fdf-a500-e1976b1fb66f"

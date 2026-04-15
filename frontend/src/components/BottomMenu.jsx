@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers } from 'lucide-react';
 
-export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true }) {
+export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user }) {
   const navigate = useNavigate();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
@@ -158,6 +158,25 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                     <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Account & Security Admin</span>
                   </div>
                 </div>
+
+                {/* 🛡️ 보안 접속 로그 (관리자 전용) */}
+                {(user?.is_admin === 1 || user?.role === 'admin') && (
+                  <div
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      navigate('/security-logs');
+                    }}
+                    className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:border-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
+                  >
+                    <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform border border-blue-500/30">
+                      <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+                    </div>
+                    <div>
+                      <span className="block font-bold text-blue-200 text-sm sm:text-base">보안 접속 로그</span>
+                      <span className="text-[9px] sm:text-[10px] text-blue-500/70 mt-1 block font-mono">Access Audit Trails</span>
+                    </div>
+                  </div>
+                )}
                 <div
                   onClick={() => {
                     setShowMoreMenu(false);
@@ -250,6 +269,26 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                     <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Common Codebook Admin</span>
                   </div>
                 </div>
+
+                {/* 📊 데이터 처리 명세서 (관리자 전용) */}
+                {(user?.is_admin === 1 || user?.role === 'admin') && (
+                  <div
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      navigate('/processing-flow');
+                    }}
+                    className="bg-[#0f111a] p-4 sm:p-6 rounded-3xl border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:border-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4 relative overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform border border-blue-500/30">
+                      <Layers className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+                    </div>
+                    <div>
+                      <span className="block font-bold text-blue-200 text-sm sm:text-base">데이터 처리 명세서</span>
+                      <span className="text-[9px] sm:text-[10px] text-blue-500/70 mt-1 block font-mono">Technical Logic DFD</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

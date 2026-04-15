@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    employee_id TEXT UNIQUE NOT NULL,
+    employee_id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     password_hash TEXT,
@@ -13,6 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
     part TEXT,
     subpart TEXT,
     token TEXT,
+    status TEXT DEFAULT 'ACTIVE' CHECK (status IN ('PRE_REGISTERED', 'ACTIVE', 'SUSPENDED')),
+    failed_attempts INTEGER DEFAULT 0,
+    last_login_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT 1,
     is_admin INTEGER DEFAULT 0,
@@ -20,7 +22,8 @@ CREATE TABLE IF NOT EXISTS users (
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
     mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    position TEXT DEFAULT 'POS_001'
+    position TEXT DEFAULT 'POS_001',
+    profile_picture TEXT
 );
 
 CREATE TABLE IF NOT EXISTS organizations (

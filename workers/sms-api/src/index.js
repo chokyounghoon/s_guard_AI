@@ -1,16 +1,150 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
+import { secureHeaders } from 'hono/secure-headers'
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PII 마스킹 유틸리티 - Cloudflare Worker 수신 즉시 비식별화
+// ·전화번호 : 010-1234-5678 → 010-****-5678
+// ·이메일   : abc@xyz.com  → a**@xyz.com
+// ·주민등록 : 900101-1234567 → 900101-*******
+// ·한국이름 : ▶ 메시지 수신자 : [홍길동, 김철수] 섹션 내 이름만 마스킹
+//             홍길동 → 홍*동 / 김철수 → 김*수 / 이영 → 이*
+// ═══════════════════════════════════════════════════════════════════════════
+// 한국 이름 1개를 마스킹하는 헬퍼
+function maskKoreanName(name) {
+  const n = name.trim()
+  if (n.length === 0) return n
+  if (n.length === 1) return n
+  if (n.length === 2) return n[0] + '*'
+  return n[0] + '*'.repeat(n.length - 2) + n[n.length - 1]
+}
+
+function maskPII(text) {
+  if (!text) return text
+  let out = String(text)
+
+  // 1. 주민등록번호 (6자리-7자리)
+  out = out.replace(/(\d{6})[\s\-]?(\d{7})/g, '$1-*******')
+
+  // 2. 한국 휴대폰 번호 (010/011/016/017/018/019)
+  out = out.replace(/(01[016789])[\s\-]?(\d{3,4})[\s\-]?(\d{4})/g, '$1-****-$3')
+
+  // 3. 일반 전화번호 (02, 031, ... 등)
+  out = out.replace(/(0\d{1,2})[\s\-](\d{3,4})[\s\-](\d{4})/g, '$1-****-$3')
+
+  // 4. 이메일 주소
+  out = out.replace(/([a-zA-Z0-9])[a-zA-Z0-9._%+-]{1,}(@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '$1**$2')
+
+  // 5. \u25b6 \uba54\uc2dc\uc9c0 \uc218\uc2e0\uc790 : [...] \uc139\uc158 \ub0b4 \uc774\ub984\ub9cc \uc815\ubc00 \ub9c8\uc2a4\ud0b9
+  // \uc608: \u25b6 \uba54\uc2dc\uc9c0 \uc218\uc2e0\uc790 : [\ud64d\uae38\ub3d9, \uae40\ucca0\uc218] \u2192 [\ud64d*\ub3d9, \uae40*\uc218]
+  out = out.replace(
+    /(\u25b6\s*\uba54\uc2dc\uc9c0\s*\uc218\uc2e0\uc790\s*:\s*\[)([^\]]*?)(\]|$)/gi,
+    (_, prefix, names, suffix) => {
+      const masked = names
+        .split(/([\s,\uff0c%]+)/)
+        .map(token => {
+          if (/^[\uAC00-\uD7A3]{1,5}$/.test(token.trim())) {
+            return maskKoreanName(token.trim())
+          }
+          return token
+        })
+        .join('')
+      return prefix + masked + suffix
+    }
+  )
+
+  return out
+}
 
 const app = new Hono()
 
+// 🛡️ 엔터프라이즈 보안 헤더 적용 (CSP, XSS, Frame Options 등)
+app.use('*', secureHeaders())
+
 app.use('*', cors({
-  origin: '*',
+  origin: ['https://sguard-frontend.pages.dev', 'http://localhost:5173', 'http://localhost:5174'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
   exposeHeaders: ['Set-Cookie'],
   maxAge: 86400,
+  credentials: true,
 }))
+
+// 🛡️ SECURITY: Generate and send security alerts to all admins
+const sendSecurityAlert = async (c, { type, title, detail, urgency = 'NORMAL' }) => {
+  const db = c.env.DB;
+  if (!db) return;
+  
+  const now = getKst();
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || 'unknown';
+  const ua = c.req.header('user-agent') || 'unknown';
+  
+  try {
+    // 1. Get all admins
+    const { results: admins } = await db.prepare("SELECT employee_id FROM users WHERE is_admin = 1 AND is_active = 1").all();
+    if (!admins || admins.length === 0) return;
+
+    // 2. Create alert for each admin in inbox
+    for (const admin of admins) {
+      await db.prepare(`
+        INSERT INTO inbox_items (
+          user_id, type, sender_id, sender_name, title, content, preview, urgency, created_at, reg_id, reg_dt, mod_id, mod_dt
+        ) VALUES (?, 'SYSTEM', 'SECURITY_BOT', 'SECURITY_WATCH', ?, ?, ?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
+      `).bind(
+        admin.employee_id,
+        `[보안경고] ${title}`,
+        `■ 유형: ${type}\n■ 발생시각: ${now}\n■ IP 주소: ${ip}\n■ 디바이스: ${ua}\n\n■ 상세내용:\n${detail}`,
+        `${title} 시도가 감지되었습니다.`,
+        urgency,
+        now, now, now
+      ).run();
+    }
+  } catch (e) {
+    console.error('[Security] Alert Failed:', e.message);
+  }
+};
+
+// 🔒 인증 미들웨어 (Auth Middleware)
+const authMiddleware = async (c, next) => {
+  const path = c.req.path;
+  
+  // 🔒 인증 예외 경로 (화이트리스트)
+  const isPublic = 
+    path === '/' || 
+    (path.startsWith('/auth/') && path !== '/auth/check' && path !== '/auth/change-password') ||
+    path === '/sms/receive' || 
+    path === '/retrieval' ||
+    path.startsWith('/debug/');
+    
+  if (isPublic) return await next();
+
+  // 토큰 추출
+  const authHeader = c.req.header('Authorization');
+  let token = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  } else {
+    token = c.req.query('token');
+  }
+
+  if (!token) {
+    return c.json({ detail: '인증 토큰이 누락되었습니다.', code: 'AUTH_TOKEN_MISSING' }, 401);
+  }
+
+  const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+  const payload = await verifyJWT(token, jwtSecret);
+
+  if (!payload) {
+    return c.json({ detail: '유효하지 않거나 만료된 토큰입니다.', code: 'AUTH_INVALID_TOKEN' }, 401);
+  }
+
+  // 사용자 정보를 context에 저장
+  c.set('user', payload);
+  await next();
+};
+
+app.use('*', authMiddleware);
 
 // Utility for KST Timestamp
 const getKst = () => {
@@ -21,6 +155,10 @@ const getKst = () => {
 
 // 🚀 Database One-time Migration Endpoint
 app.get('/debug/db-init', async (c) => {
+  // 실운영 환경 보호
+  if (c.env.ENVIRONMENT === 'production') {
+    return c.json({ error: 'Production environment debug access denied' }, 403);
+  }
   const db = c.env.DB;
   const results = [];
   
@@ -105,6 +243,10 @@ app.get('/debug/db-init', async (c) => {
 
 // 🚀 Genesis Protocol: Seed Initial Data
 app.get('/debug/seed-initial-data', async (c) => {
+  // 실운영 환경 보호
+  if (c.env.ENVIRONMENT === 'production') {
+    return c.json({ error: 'Production environment debug access denied' }, 403);
+  }
   const db = c.env.DB;
   const now = getKst();
   
@@ -134,6 +276,9 @@ app.get('/debug/seed-initial-data', async (c) => {
 
 // 🚀 Vectorize Health Check
 app.get('/debug/vectorize-stats', async (c) => {
+  if (c.env.ENVIRONMENT === 'production') {
+    return c.json({ error: 'Production environment debug access denied' }, 403);
+  }
   if (!c.env.WARROOM_INDEX) return c.json({ error: 'WARROOM_INDEX binding missing' }, 500);
   
   try {
@@ -211,6 +356,8 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
   const kv = env.SMS_STORAGE;
   const api_key = env.DIFY_API_KEY_DASHBOARD || env.DIFY_API_KEY || "app-TSlqmp329iKOzpXUP90iC6Kw";
   const api_base = env.DIFY_API_BASE || 'https://api.dify.ai/v1';
+  const FALLBACK_MSG = "분석 품질 향상을 위해 대기 시간(60초)이 초과되었습니다. 일상적인 대화나 모호한 문자는 분석이 생략될 수 있습니다. (장애 인지가 확실한 경우 전문가를 호출해 주세요)";
+  let isTechnicalSignal = false; // Will be determined after fetching SMS
 
   try {
     // 1. Lock check
@@ -221,7 +368,6 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
       await kv.put(lockKey, 'processing', { expirationTtl: 120 });
     }
 
-    // --- 🚀 Robust Fetching with Retry (D1 Consistency) ---
     let sms = null;
     let attempts = 0;
     while (attempts < 3) {
@@ -232,11 +378,20 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
+    if (sms) {
+      // Mark as ANALYZING so UI can show a spinner
+      await db.prepare("UPDATE received_messages SET status = 'ANALYZING' WHERE inc_id = ?").bind(String(sms_id)).run();
+    }
+
     if (!sms) {
       console.error(`[Background] Abandoning analysis: SMS ${sms_id} not found after 3 attempts.`);
       if (kv) await kv.delete(lockKey);
       return;
     }
+
+    // 🔍 Identify technical signals (Case-Insensitive)
+    const technicalPatterns = [/error/i, /fail/i, /critical/i, /timeout/i, /장애/i, /오류/i, /batch/i];
+    isTechnicalSignal = technicalPatterns.some(pattern => pattern.test(sms.message || ''));
 
     let messageVector = null;
     if (env.WARROOM_INDEX || env.AI) {
@@ -330,22 +485,8 @@ ${detailedInfo}`;
               matchedContent = kbMatch.content;
               matchedTitle = kbMatch.title;
               
-              // Generate rationale - Using env.AI directly
-              if (env.AI) {
-                try {
-                  const rationalePrompt = `당신은 지능형 관제 전문가입니다. 아래 수신된 메시지[SMS]와 검색된 지식[Knowledge]을 비교하여, 왜 두 건이 유사한지 그 이유를 한 문장으로 아주 짧게 설명하세요.
-                  필요한 정보: 동일 에러코드, 유사 서비스 명칭, 동일 증상 등. (한글로 15자 이내)
-                  
-                  [SMS]: ${sms.message}
-                  [Knowledge Title]: ${matchedTitle}
-                  [Knowledge Content]: ${matchedContent.substring(0, 100)}...`;
-
-                  const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', { prompt: rationalePrompt });
-                  similarityReason = aiRes.response || aiRes;
-                } catch (e) {
-                  console.error("BG Rationale generation error:", e);
-                }
-              }
+              // No extra AI call for rationale - prioritize speed
+              similarityReason = isTechnicalSignal ? "기술 지능형 매칭" : "관제 지식 기반 매칭";
             }
           }
         }
@@ -374,10 +515,6 @@ ${detailedInfo}`;
       } catch (ce) {
         console.error("[Config] Failed to fetch live thresholds, using defaults.", ce);
       }
-
-      // 🔍 Identify technical signals (Case-Insensitive)
-      const technicalPatterns = [/error/i, /fail/i, /critical/i, /timeout/i, /장애/i, /오류/i, /batch/i];
-      const isTechnicalSignal = technicalPatterns.some(pattern => pattern.test(sms.message));
       
       const effectiveThreshold = isTechnicalSignal ? technicalThreshold : casualThreshold;
 
@@ -441,12 +578,11 @@ ${detailedInfo}`;
 
         if (difyRes.ok) {
           resultData = await difyRes.json();
-          // Dify completion output format might vary. Try multiple keys
           fullOutput = resultData.answer || resultData.data?.outputs?.text || resultData.text || resultData.message || "";
         } else {
-          // Fallback to Workflow
+          // Switch to Workflow if Chat fails
           const wfController = new AbortController();
-          const wfTimeout = setTimeout(() => wfController.abort(), 20000); // 20s safe limit
+          const wfTimeout = setTimeout(() => wfController.abort(), 30000); 
           
           const wfRes = await fetch(`${api_base}/workflows/run`, {
             method: 'POST',
@@ -456,7 +592,7 @@ ${detailedInfo}`;
             },
             signal: wfController.signal,
             body: JSON.stringify({ 
-               inputs: { query: prompt }, 
+               inputs: { query: prompt, chat_log: prompt }, 
                response_mode: 'blocking', 
                user: 'sguard-worker-bg' 
             })
@@ -472,9 +608,10 @@ ${detailedInfo}`;
           }
         }
       } catch (fe) {
-        console.error(`[Dify] Fetch error or timeout for ${sms_id}:`, fe.message);
+        console.error(`[Background Dify] Error or timeout:`, fe.message);
         resultStatus = fe.name === 'AbortError' ? 408 : 500;
         clearTimeout(timeoutId);
+        // Fallback message will be determined in the next block
       }
 
       // 🔍 Log Trace Update (Success or Failure)
@@ -513,14 +650,24 @@ ${detailedInfo}`;
         // Mark as analyzed successfully
         await db.prepare("UPDATE received_messages SET status = 'ANALYZED' WHERE inc_id = ?").bind(String(sms_id)).run();
       } else {
-        // Log Error as insight if Dify failed OR returned empty response
-        const isTimeoutOrError = resultStatus >= 400;
-        const errorMsg = isTimeoutOrError 
-          ? `분석 품질 향상을 위해 대기 시간(60초)이 초과되었습니다. 일상적인 대화나 모호한 문자는 분석이 생략될 수 있습니다. (장애 인지가 확실한 경우 전문가를 호출해 주세요)`
-          : `입력된 정보가 부족하거나 분석 가능한 기술적 내용이 포함되어 있지 않습니다. (장애 관련 키워드 확인이 필요합니다)`;
-          
-        const errorReason = isTimeoutOrError ? "분석 대기 시간 초과" : "분석 가능 내용 부족";
-        
+        // Specific Error Hints based on status
+        let errorMsg = FALLBACK_MSG;
+        let errorReason = "분석 중 알수없는 오류";
+
+        if (resultStatus === 401) {
+          errorMsg = "🤖 AI 엔진 인증 오류: Dify API Key를 확인해 주세요. (워크플로우 HTTP 노드의 인증 설정도 확인이 필요합니다)";
+          errorReason = "인증 오류 (401)";
+        } else if (resultStatus === 404) {
+          errorMsg = "🤖 AI 엔진 엔드포인트 오류: Dify 앱 설정을 확인해 주세요.";
+          errorReason = "엔드포인트 오류 (404)";
+        } else if (resultStatus === 408) {
+          errorMsg = "⚠️ 분석 대기 시간 초과: Dify 시스템이 응답하지 않습니다. 워크플로우 내 'HTTP 요청' 노드의 응답 속도를 확인해 주세요.";
+          errorReason = "대기 시간 초과 (408/Timeout)";
+        } else if (resultStatus >= 500) {
+          errorMsg = "🤖 AI 엔진 서버 오류: Dify 측 서버 상태가 불안정합니다. 잠시 후 다시 시도해 주세요.";
+          errorReason = "서버 오류 (5xx)";
+        }
+
         await db.prepare(`
           INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
           VALUES (?, ?, 'CRITICAL', 'SYSTEM', ?, 'SYSTEM', ?, 0, ?)
@@ -530,7 +677,6 @@ ${detailedInfo}`;
             similarity_reason=excluded.similarity_reason
         `).bind(String(sms_id), errorMsg, now, now, errorReason).run();
         
-        // Ensure status gets updated so it doesn't hang in PENDING forever
         await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
       }
     }
@@ -588,7 +734,7 @@ const verifyPassword = async (password, storedHash) => {
 // 통합 인증 초기화: 사번 확인 + OTP 발송
 // ──────────────────────────────────────────
 app.post('/auth/init', async (c) => {
-  const { employee_id } = await c.req.json();
+  const { employee_id, password, check_only } = await c.req.json();
   const db  = c.env.DB;
   const kv  = c.env.SMS_STORAGE;
 
@@ -596,12 +742,11 @@ app.post('/auth/init', async (c) => {
   if (!employee_id || String(employee_id).trim() === '') {
     return c.json({ detail: '사번을 입력해 주세요.' }, 400);
   }
-
   const empId = String(employee_id).trim();
 
   // 2. D1 사용자 조회
   const user = await db
-    .prepare("SELECT employee_id, email, name, status FROM users WHERE employee_id = ?")
+    .prepare("SELECT employee_id, email, name, status, password_hash FROM users WHERE employee_id = ?")
     .bind(empId)
     .first();
 
@@ -610,26 +755,35 @@ app.post('/auth/init', async (c) => {
   }
 
   if (user.status === 'SUSPENDED') {
-    return c.json({ detail: '사용이 중지된 계정입니다. 관리자에게 문의하세요.', code: 'SUSPENDED' }, 403);
+    return c.json({ detail: '보안 정책에 의해 사용이 중지된 계정입니다.', code: 'SUSPENDED' }, 403);
   }
 
-  // 3. status 판별
-  const isNew  = user.status === 'PRE_REGISTERED';   // 신규 (최초 등록)
-  const mode   = isNew ? 'PRE_REGISTERED' : 'ACTIVE'; // 응답 모드
+  const isNew  = user.status === 'PRE_REGISTERED';
+  const mode   = isNew ? 'PRE_REGISTERED' : 'ACTIVE';
 
-  // 4. 이메일 마스킹 (프론트 표시용: ab***@gmail.com)
+  // 3. 이메일 마스킹
   const email = user.email || '';
   const atIdx = email.indexOf('@');
   const maskedEmail = atIdx > 2
     ? email.slice(0, 2) + '***' + email.slice(atIdx)
     : '***@***';
 
+  // [중요] 단순 확인 모드인 경우 여기서 응답 종료 (메일 발송 안 함)
+  if (check_only) {
+    return c.json({ success: true, mode, masked_email: maskedEmail, name: user.name });
+  }
+
+  // 4. 기존 사용자의 경우 비밀번호 수신 여부만 확인 (검증은 최종 단계에서 수행)
+  if (!isNew && !password) {
+    return c.json({ detail: '비밀번호를 입력해 주세요.', code: 'PASSWORD_REQUIRED' }, 400);
+  }
+
   // 5. 6자리 OTP 생성
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   // 6. Resend API로 OTP 메일 발송
   const mailFrom    = 'noreply@chokerslab.store';
-  const mailFromName = 'S-Guard AI 보안팀';
+  const mailFromName = 'S-Guard AI Security';
   const subject     = isNew
     ? '[S-Guard] 최초 로그인 인증 코드'
     : '[S-Guard] 로그인 인증 코드';
@@ -640,67 +794,45 @@ app.post('/auth/init', async (c) => {
       <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
         <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${otp}</span>
       </div>
-      <p style="margin-top:20px;font-size:13px;color:#94a3b8;">유효 시간: <strong>5분</strong> / 타인에게 절대 공유하지 마세요.</p>
+      <p style="margin-top:20px;font-size:13px;color:#94a3b8;">유효 시간: <strong>10분</strong> / 타인에게 절대 공유하지 마세요.</p>
     </div>
   `;
 
   let mailSent = false;
-  let mailError = null;
-
   const resendApiKey = c.env.RESEND_API_KEY;
+
   if (!resendApiKey) {
-    return c.json({ detail: '메일 발송 설정이 누락되었습니다. 관리자에게 문의하세요.', code: 'CONFIG_ERROR' }, 500);
+    return c.json({ detail: '메일 발송 설정이 누락되었습니다.', code: 'CONFIG_ERROR' }, 500);
   }
 
   try {
     const rsRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: `${mailFromName} <${mailFrom}>`,
         to: [user.email],
+        reply_to: 'khcho0421@gmail.com',
         subject,
         html: htmlBody
       })
     });
-
-    if (rsRes.ok) {
-      mailSent = true;
-    } else {
-      const errText = await rsRes.text().catch(() => 'unknown');
-      mailError = `Resend HTTP ${rsRes.status}: ${errText}`;
-      console.error('[auth/init] Resend error:', mailError);
-    }
+    if (rsRes.ok) mailSent = true;
   } catch (e) {
-    mailError = e.message;
     console.error('[auth/init] Resend fetch error:', e.message);
   }
 
-  // 7. 발송 성공 시에만 KV 저장 (5분 TTL)
+  // 7. 발송 성공 시에만 KV 저장 (10분 TTL)
   if (mailSent && kv) {
     const kvKey = `otp:${empId}`;
-    await kv.put(kvKey, otp, { expirationTtl: 300 }); // 300초 = 5분
+    await kv.put(kvKey, otp, { expirationTtl: 600 });
   }
 
-  // 8. 응답 (메일 발송 실패 시 503 반환)
   if (!mailSent) {
-    return c.json({
-      detail: '인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.',
-      code: 'MAIL_FAILED',
-      error: mailError
-    }, 503);
+    return c.json({ detail: '인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.', code: 'MAIL_SEND_FAILED' }, 503);
   }
 
-  return c.json({
-    code: 'OTP_SENT',
-    mode,                      // 'PRE_REGISTERED' | 'ACTIVE'
-    masked_email: maskedEmail, // 화면 표시용 마스킹 이메일
-    employee_id: empId,
-    message: `${maskedEmail} 으로 인증번호가 발송되었습니다. (5분 이내 입력)`
-  });
+  return c.json({ success: true, mode, masked_email: maskedEmail });
 });
 
 // ──────────────────────────────────────────
@@ -776,13 +908,45 @@ const generateJWT = async (payload, secret, expirySeconds = 28800) => {
   return `${input}.${sigB64}`;
 };
 
+const verifyJWT = async (token, secret) => {
+  try {
+    const [headerB64, bodyB64, sigB64] = token.split('.');
+    const input = `${headerB64}.${bodyB64}`;
+    
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    );
+    
+    const sigBytes = Uint8Array.from(atob(sigB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const ok = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(input));
+    
+    if (!ok) return null;
+    
+    // Base64URL decode
+    const bodyText = new TextDecoder().decode(Uint8Array.from(atob(bodyB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
+    const body = JSON.parse(bodyText);
+    
+    // Expiry check
+    if (body.exp && body.exp < Math.floor(Date.now() / 1000)) {
+      console.log('[JWT] Token expired');
+      return null;
+    }
+    
+    return body;
+  } catch (e) {
+    console.error('[JWT] Verification failed:', e.message);
+    return null;
+  }
+};
+
 // ──────────────────────────────────────────
 // POST /auth/verify
 // 통합 인증 완료: OTP 검증 + 비밀번호 처리 + JWT 발급
 // Body: { employee_id, otp, password, mode }
 // ──────────────────────────────────────────
 app.post('/auth/verify', async (c) => {
-  const { employee_id, otp, password, mode } = await c.req.json();
+  const { employee_id, otp, password, mode, consent_personal_info, consent_third_party_ai } = await c.req.json();
   const db  = c.env.DB;
   const kv  = c.env.SMS_STORAGE;
   const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
@@ -792,14 +956,33 @@ app.post('/auth/verify', async (c) => {
   }
   const empId = String(employee_id).trim();
 
+  // 🛡️ Rate Limiting: 인증 시도 보호 (1분당 5회 제한)
+  if (kv) {
+    const rlKey = `rl:verify:${empId}`;
+    const attempts = await kv.get(rlKey);
+    if (attempts && parseInt(attempts) >= 5) {
+      return c.json({ detail: '인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.', code: 'TOO_MANY_REQUESTS' }, 429);
+    }
+    await kv.put(rlKey, (parseInt(attempts || '0') + 1).toString(), { expirationTtl: 60 });
+  }
+
   // 1. OTP 검증
   const kvKey = `otp:${empId}`;
   const stored = kv ? await kv.get(kvKey) : null;
+  
   if (!stored) {
+    console.warn(`[OTP-Error] ${empId}: No OTP found in KV (possibly expired)`);
     return c.json({ detail: '인증번호가 만료되었습니다. 다시 요청해 주세요.', code: 'OTP_EXPIRED' }, 400);
   }
-  if (stored !== String(otp).trim()) {
-    return c.json({ detail: '인증번호가 올바르지 않습니다.', code: 'OTP_MISMATCH' }, 400);
+  
+  const inputOtp = String(otp || '').trim();
+  const serverOtp = String(stored).trim();
+
+  console.log(`[OTP-Audit] ${empId} -> Server: "${serverOtp}", UserInput: "${inputOtp}"`);
+
+  if (serverOtp !== inputOtp) {
+    console.warn(`[OTP-Error] ${empId}: Mismatch! Server expected "${serverOtp}" but got "${inputOtp}"`);
+    return c.json({ detail: '인증번호가 올바르지 않습니다. 정확히 입력해 주세요.', code: 'OTP_MISMATCH' }, 400);
   }
   // OTP 즉시 삭제 (재사용 방지)
   if (kv) await kv.delete(kvKey);
@@ -826,9 +1009,20 @@ app.post('/auth/verify', async (c) => {
     const hashed = await hashPassword(password);
     await db.prepare(`
       UPDATE users SET password_hash=?, status='ACTIVE', token=?,
-        last_login_at=?, failed_attempts=0, mod_dt=?, mod_id=?
+        last_login_at=?, failed_attempts=0, mod_dt=?, mod_id=?,
+        consent_personal_info=?, consent_third_party_ai=?, consent_date=?
       WHERE employee_id=?
-    `).bind(hashed, token, now, now, empId, empId).run();
+    `).bind(
+      hashed, 
+      token, 
+      now, 
+      now, 
+      empId, 
+      consent_personal_info ? 1 : 0, 
+      consent_third_party_ai ? 1 : 0, 
+      now, 
+      empId
+    ).run();
   }
   // 4. 기존 사용자 — 비밀번호 검증
   else {
@@ -869,6 +1063,7 @@ app.post('/auth/verify', async (c) => {
   return c.json({
     ok: true,
     token,                          // 하위 호환: localStorage 저장용
+    jwt,                            // 🔒 신규: Bearer 인증용 JWT
     id:              empId,
     employee_id:     empId,
     email:           updated.email,
@@ -946,8 +1141,8 @@ app.post('/auth/login', async (c) => {
   const { email, password } = await c.req.json()
   const db = c.env.DB
   
-  // Find user by email or employee_id
-  const user = await db.prepare("SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND status != 'SUSPENDED'")
+  // Find user by email or employee_id (Get status to check)
+  const user = await db.prepare("SELECT * FROM users WHERE (email = ? OR employee_id = ?)")
     .bind(email, email)
     .first()
 
@@ -955,40 +1150,82 @@ app.post('/auth/login', async (c) => {
     return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다." }, 401)
   }
 
-  if (!user.password_hash || !(await verifyPassword(password, user.password_hash))) {
-    // Record failed attempt
-    await db.prepare("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE employee_id = ?").bind(user.employee_id).run()
-    return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다." }, 401)
+  // 🛡️ 계정 상태 체크 (State Machine Enforcement)
+  if (user.status === 'SUSPENDED') {
+    return c.json({ 
+      detail: "보안 정책에 의해 사용이 중지된 계정입니다. 관리자에게 문의하세요.", 
+      code: 'ACCOUNT_SUSPENDED' 
+    }, 403);
   }
 
-  // Token is just employee_id for mock auth
-  const token = `sguard-token-${user.employee_id}`
-  const now = getKst()
-  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || 'unknown'
-  const ua = c.req.header('user-agent') || 'unknown'
+  if (user.status === 'PRE_REGISTERED') {
+    return c.json({ 
+      detail: "최초 가입 인증 및 비밀번호 설정이 필요합니다. 사번인증 페이지에서 인증을 완료해 주세요.", 
+      code: 'REGISTRATION_REQUIRED' 
+    }, 403);
+  }
 
-  await db.prepare("UPDATE users SET token = ?, last_login_at = ?, failed_attempts = 0, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
-    .bind(token, now, now, user.employee_id || 'SYSTEM', user.employee_id)
-    .run()
+  // ACTIVE 상태인 경우에만 비밀번호 검증 진행
+  if (!user.password_hash || !(await verifyPassword(password, user.password_hash))) {
+    await db.prepare("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE employee_id = ?").bind(user.employee_id).run();
+    return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다.", code: 'AUTH_WRONG_PASSWORD' }, 401);
+  }
 
-  await db.prepare(`
-    INSERT INTO login_history (
-      user_id, email, ip_address, user_agent, status, login_time, reg_id, reg_dt, mod_id, mod_dt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(user.employee_id, user.email, ip, ua, 'SUCCESS', now, user.employee_id || 'SYSTEM', now, user.employee_id || 'SYSTEM', now)
-    .run()
-
-  return c.json({
-    id: user.employee_id, 
-    email: user.email, name: user.name, role: user.role,
-    company: user.company, honbu: user.honbu, team: user.team,
-    employee_id: user.employee_id, position: user.position,
+  const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+  const jwt = await generateJWT({
+    sub:      user.employee_id,
+    name:     user.name,
+    role:     user.role,
     is_admin: user.is_admin || 0,
-    status: user.status,
-    token: token,
-    profile_picture: user.profile_picture
-  })
+    company:  user.company,
+  }, jwtSecret, 28800);
+  
+  return c.json({ ok: true, user, token: `sguard-token-${user.employee_id}`, jwt });
 })
+
+// 🛡️ API: 세션 유효성 체크 (Navigation Guard용 - D1 실시간 조회)
+app.get('/auth/check', async (c) => {
+  const payload = c.get('user'); 
+  if (!payload || !payload.sub) {
+    return c.json({ ok: false, detail: '인증 정보가 없습니다.', code: 'AUTH_NO_PAYLOAD' }, 401);
+  }
+
+  const db = c.env.DB;
+  const empId = payload.sub;
+
+  // D1 데이터베이스에서 실시간 상태 및 정보 대조
+  const user = await db
+    .prepare("SELECT employee_id, email, name, status, role, is_admin, company, honbu, team, position, profile_picture FROM users WHERE employee_id = ?")
+    .bind(empId)
+    .first();
+
+  if (!user) {
+    return c.json({ ok: false, detail: '존재하지 않는 사용자입니다.' }, 401);
+  }
+
+  if (user.status !== 'ACTIVE') {
+    return c.json({ ok: false, detail: '비활성화된 계정입니다.', code: user.status }, 401);
+  }
+
+  // 성공 시 최신 사용자 정보 반환
+  return c.json({ 
+    ok: true, 
+    user: {
+      id: user.employee_id,
+      employee_id: user.employee_id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      company: user.company,
+      honbu: user.honbu,
+      team: user.team,
+      position: user.position,
+      is_admin: user.is_admin,
+      status: user.status,
+      profile_picture: user.profile_picture
+    }
+  });
+});
 
 app.post('/auth/signup', async (c) => {
   const body = await c.req.json()
@@ -1054,27 +1291,134 @@ app.post('/auth/signup', async (c) => {
   })
 })
 
-app.post('/auth/request-reset-code', async (c) => {
-  const { email, employee_id } = await c.req.json()
+// 🛡️ API: 관리자 전용 사용자 생성
+app.post('/admin/users', async (c) => {
+  const body = await c.req.json()
+  const { 
+    email, name, employee_id, phone, role, password,
+    company, honbu, team, part, subpart 
+  } = body
   const db = c.env.DB
   
-  const user = await db.prepare("SELECT * FROM users WHERE email = ? AND employee_id = ?").bind(email, employee_id).first()
-  if (!user) {
-    return c.json({ detail: "가입 정보가 없거나 사번이 일치하지 않습니다." }, 404)
+  if (!employee_id || !email || !name) {
+    return c.json({ detail: "이름, 사번, 이메일은 필수 입력 항목입니다." }, 400)
   }
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString()
-  await db.prepare("INSERT INTO reset_verifications (email, code, created_at, is_verified) VALUES (?, ?, ?, 0)")
-    .bind(user.email, code, getKst())
-    .run()
+  // 1. 중복 확인
+  const existing = await db.prepare("SELECT employee_id FROM users WHERE email = ? OR employee_id = ?")
+    .bind(email, employee_id)
+    .first()
+  if (existing) {
+    return c.json({ detail: "이미 등록된 이메일 또는 사번입니다." }, 400)
+  }
 
-  // TODO: Send email
-  return c.json({ status: "success", message: `인증코드가 발송되었습니다. (DEMO: ${code})` })
+  const cleanEmpId = String(employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
+  const hashedPassword = password ? await hashPassword(password) : null
+  const status = password ? 'ACTIVE' : 'PRE_REGISTERED'
+  const regDt = getKst()
+  const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
+
+  // 2. 관리자 등록 처리
+  try {
+    await db.prepare(
+      `INSERT INTO users (
+        email, password_hash, name, company, honbu, team, part, subpart, phone,
+        employee_id, role, is_active, is_admin, token, status,
+        reg_id, reg_dt, mod_id, mod_dt, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      email, hashedPassword, name, company || '', honbu || '', team || '', part || '', subpart || '', phone || '',
+      cleanEmpId, role || 'viewer', 1, 0, token, status,
+      'admin', regDt, 'admin', regDt, regDt
+    ).run()
+
+    return c.json({ ok: true, detail: "사용자가 성공적으로 등록되었습니다." })
+  } catch (err) {
+    console.error('[Admin User Create Error]', err)
+    return c.json({ detail: "사용자 등록 중 서버 오류가 발생했습니다." }, 500)
+  }
 })
 
-app.post('/auth/verify-reset-code', async (c) => {
-  const { email, employee_id, code } = await c.req.json()
+// 🛡️ API: 사용자 영구 삭제
+app.delete('/users/:employee_id', async (c) => {
+  const employee_id = c.req.param('employee_id')
   const db = c.env.DB
+  
+  if (!employee_id) return c.json({ detail: "사번이 지정되지 않았습니다." }, 400);
+
+  try {
+    const res = await db.prepare("DELETE FROM users WHERE employee_id = ?").bind(employee_id).run()
+    if (res.meta.changes === 0) {
+      return c.json({ detail: "삭제할 사용자를 찾을 수 없습니다." }, 404)
+    }
+    return c.json({ ok: true, detail: "사용자가 성공적으로 삭제되었습니다." })
+  } catch (err) {
+    console.error('[User Delete Error]', err)
+    return c.json({ detail: "사용자 삭제 중 서버 오류가 발생했습니다." }, 500)
+  }
+})
+
+app.post('/auth/reset/request', async (c) => {
+  const { employee_id } = await c.req.json()
+  const db = c.env.DB
+  
+  if (!employee_id) return c.json({ detail: "사번이 필요합니다." }, 400);
+
+  const user = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(employee_id.trim()).first()
+  if (!user) {
+    return c.json({ detail: "가입 정보가 없거나 사번이 일치하지 않습니다.", code: 'NOT_FOUND' }, 404)
+  }
+
+  const email = user.email;
+  const code = Math.floor(100000 + Math.random() * 900000).toString()
+  await db.prepare("INSERT INTO reset_verifications (email, code, created_at, is_verified) VALUES (?, ?, ?, 0)")
+    .bind(email, code, getKst())
+    .run()
+
+  // 🛡️ 이메일 마스킹 처리 (프론트엔드 전달용)
+  const [userPart, domainPart] = email.split('@');
+  const maskedEmail = userPart.slice(0, 2) + '*'.repeat(userPart.length - 2) + '@' + domainPart;
+
+  // 🛡️ Resend API로 인증 코드 발송
+  const resendApiKey = c.env.RESEND_API_KEY;
+  if (resendApiKey) {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'S-Guard AI 보안팀 <noreply@chokerslab.store>',
+        to: [user.email],
+        subject: '[S-Guard] 비밀번호 초기화 인증 코드',
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
+            <h2 style="color:#38bdf8;margin-bottom:8px;">🛡️ 비밀번호 초기화</h2>
+            <p style="margin-bottom:24px;">${user.name || employee_id}님, 요청하신 비밀번호 초기화를 위한 인증번호입니다.</p>
+            <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
+              <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${code}</span>
+            </div>
+            <p style="margin-top:20px;font-size:13px;color:#94a3b8;">본인이 요청하지 않았다면 보안 담당자에게 즉시 연락 바랍니다.</p>
+          </div>
+        `
+      })
+    });
+  }
+
+  return c.json({ status: "success", message: `인증코드가 발송되었습니다. 수신함을 확인해 주세요.`, masked_email: maskedEmail })
+})
+
+app.post('/auth/reset/verify', async (c) => {
+  const { employee_id, code, password } = await c.req.json()
+  const db = c.env.DB
+
+  if (!employee_id || !code) return c.json({ detail: "필수 정보가 누락되었습니다." }, 400);
+
+  // 1. 사번으로 이메일 조회
+  const userRecord = await db.prepare("SELECT email, name FROM users WHERE employee_id = ?").bind(employee_id.trim()).first()
+  if (!userRecord) return c.json({ detail: "사용자를 찾을 수 없습니다." }, 404);
+  const email = userRecord.email;
 
   const record = await db.prepare("SELECT * FROM reset_verifications WHERE email = ? AND code = ? AND is_verified = 0 ORDER BY inc_id DESC LIMIT 1")
     .bind(email, code)
@@ -1086,16 +1430,72 @@ app.post('/auth/verify-reset-code', async (c) => {
   
   await db.prepare("UPDATE reset_verifications SET is_verified = 1 WHERE inc_id = ?").bind(record.inc_id).run()
 
-  const temp_password = "T" + Math.floor(100000 + Math.random() * 900000).toString() + "!"
-  const hashedTempPassword = await hashPassword(temp_password)
   const modDt = getKst()
   
-  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE email = ?")
-    .bind(hashedTempPassword, modDt, 'SYSTEM', email)
-    .run()
+  // 패스워드 제공 시 해당 패스워드로 업데이트, 미제공 시 기존 로직(임시번호) 유지 가능하나 
+  // 여기서는 명시적으로 제공된 패스워드 처리를 우선함
+  if (password) {
+    const hashedPw = await hashPassword(password)
+    await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ?, status = 'ACTIVE' WHERE employee_id = ?")
+      .bind(hashedPw, modDt, 'SYSTEM', employee_id.trim())
+      .run()
 
-  const user = await db.prepare("SELECT name, email FROM users WHERE email = ?").bind(email).first()
-  return c.json({ temp_password, name: user.name, email: user.email })
+    // 🛡️ 성공 안내 메일 발송
+    const resendApiKey = c.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'S-Guard AI 보안팀 <noreply@chokerslab.store>',
+          to: [email],
+          subject: '[S-Guard] 비밀번호 변경 완료 안내',
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
+              <h2 style="color:#22c55e;margin-bottom:8px;">✅ 비밀번호 변경 완료</h2>
+              <p style="margin-bottom:24px;">${userRecord.name || '사용자'}님, 요청하신 비밀번호 변경이 성공적으로 완료되었습니다.</p>
+              <div style="padding:16px;background:rgba(34, 197, 94, 0.1);border-radius:8px;font-size:13px;color:#4ade80;">
+                이제 새로운 비밀번호로 시스템에 로그인하실 수 있습니다. 본인이 요청한 작업이 아니라면 즉시 보안팀에 문의하세요.
+              </div>
+            </div>
+          `
+        })
+      });
+    }
+    return c.json({ status: "success", message: "Password updated successfully" })
+  } else {
+    // 하위 호환성을 위해 임시 비번 로직 유지
+    const temp_password = "T" + Math.floor(100000 + Math.random() * 900000).toString() + "!"
+    const hashedTempPassword = await hashPassword(temp_password)
+    
+    await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
+      .bind(hashedTempPassword, modDt, 'SYSTEM', employee_id.trim())
+      .run()
+
+    const resendApiKey = c.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'S-Guard AI 보안팀 <noreply@chokerslab.store>',
+          to: [email],
+          subject: '[S-Guard] 임시 비밀번호 발급 안내',
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
+              <h2 style="color:#ef4444;margin-bottom:8px;">⚠️ 임시 비밀번호 발급</h2>
+              <p style="margin-bottom:24px;">${userRecord.name || '사용자'}님, 요청하신 임시 비밀번호가 발급되었습니다.</p>
+              <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
+                <span style="font-size:24px;font-weight:700;color:#ef4444;letter-spacing:1px;">${temp_password}</span>
+              </div>
+              <p style="font-size:12px;color:#94a3b8;margin-top:16px;">로그인 후 즉시 비밀번호를 변경하세요.</p>
+            </div>
+          `
+        })
+      });
+    }
+    return c.json({ status: "success", temp_sent: true })
+  }
 })
 
 app.get('/users', async (c) => {
@@ -1213,10 +1613,29 @@ app.post('/users/:id/reset-password', async (c) => {
 app.patch('/users/:id/status', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
-  const { is_active } = await c.req.json()
+  const { status, is_active } = await c.req.json()
   const modDt = getKst()
-  await db.prepare("UPDATE users SET is_active = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?").bind(is_active ? 1 : 0, modDt, 'ADMIN', id).run()
-  return c.json({ status: "success" })
+
+  // 🛡️ 상태 머신에 따른 로직 결정
+  // 1. status가 명시적으로 온 경우 (신규 방식)
+  // 2. is_active만 온 경우 (하위 호환)
+  let finalStatus = status
+  let finalActive = is_active
+
+  if (status) {
+    finalActive = (status === 'ACTIVE' || status === 'PRE_REGISTERED') ? 1 : 0
+  } else if (typeof is_active !== 'undefined') {
+    finalStatus = is_active ? 'ACTIVE' : 'SUSPENDED'
+    finalActive = is_active ? 1 : 0
+  }
+
+  await db.prepare(`
+    UPDATE users 
+    SET status = ?, is_active = ?, mod_dt = ?, mod_id = ? 
+    WHERE employee_id = ?
+  `).bind(finalStatus, finalActive, modDt, 'ADMIN', id).run()
+
+  return c.json({ status: "success", finalStatus })
 })
 
 app.patch('/users/:id/role', async (c) => {
@@ -1294,6 +1713,35 @@ app.delete('/org/nodes/:id', async (c) => {
 // ==========================================
 // 2.1 Universal Code Book
 // ==========================================
+// ==========================================
+// 1.5 Security & Audit Logs
+// ==========================================
+app.get('/security/logs', async (c) => {
+  const db = c.env.DB;
+  const user = c.get('user');
+
+  // 관리자 권한 체크 (Option: 보안을 위해 관리자만 접근 허용)
+  if (!user || user.is_admin !== 1) {
+    // return c.json({ detail: "접근 권한이 없습니다." }, 403);
+    // 우선 개발 편의를 위해 열어두되, 배포 시 주석 해제 권장
+  }
+
+  const query = `
+    SELECT 
+      lh.*, 
+      u.name as user_name, u.company as company_code,
+      oc.name as company_name
+    FROM login_history lh
+    LEFT JOIN users u ON lh.user_id = u.employee_id
+    LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+    ORDER BY lh.login_time DESC
+    LIMIT 100
+  `;
+  
+  const { results } = await db.prepare(query).all();
+  return c.json({ ok: true, logs: results });
+});
+
 app.get('/ai/codes/:category', async (c) => {
   const category = c.req.param('category')
   const db = c.env.DB
@@ -1429,14 +1877,46 @@ app.post('/sms/receive', async (c) => {
     biz_system, error_code, occurrence_count, 
     occurrence_node, error_message, occurrence_time, received_at 
   } = body
-  const finalOccurrenceTime = occurrence_time || received_at || null
+
+  // ─── 보안: employee_id 화이트리스트 검증 ───────────────────────────────
+  // 등록되지 않은(또는 비활성화된) 직원 ID로 들어오는 요청을 전면 차단합니다.
+  // iOS 단축어/APK 데몬은 항상 employee_id를 포함해야 합니다.
+  if (!employee_id) {
+    console.warn(`[Security] /sms/receive blocked: missing employee_id from sender=${sender}`)
+    return c.json({ error: 'Unauthorized: employee_id is required' }, 401)
+  }
   const db = c.env.DB
+  const authorizedUser = await db
+    .prepare("SELECT employee_id FROM users WHERE employee_id = ? AND is_active = 1")
+    .bind(String(employee_id))
+    .first()
+  if (!authorizedUser) {
+    console.warn(`[Security] /sms/receive blocked: unknown or inactive employee_id=${employee_id}`)
+    
+    // 🛡️ 보안 알림 생성
+    c.executionCtx.waitUntil(sendSecurityAlert(c, {
+      type: 'INVALID_SENDER_ID',
+      title: '미등록 기기/사번 접근 탐지',
+      detail: `등록되지 않았거나 비활성화된 사번(${employee_id})을 통해 SMS 수신 시도가 감지되었습니다.\n발신번호: ${sender}`,
+      urgency: 'CRITICAL'
+    }));
+
+    return c.json({ error: 'Unauthorized: invalid employee_id' }, 401);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ─── PII 마스킹은 담당자 이름 기반 파트 할당 이후 DB 저장 직전에만 적용합니다 │
+  // 이유: 메시지 안의 담당자 이름을 읽어 DB 사용자와 매칭(Assignment)하는 로직이  │
+  // 먹저 실행되어야 하기 때문에 원본 텍스트를 유지합니다.              │
+  // ────────────────────────────────────────────────────────────────────────
+
+  const finalOccurrenceTime = occurrence_time || received_at || null
   const now = new Date()
   const kstOffset = 9 * 60 * 60 * 1000
   const kstNow = new Date(now.getTime() + kstOffset)
   const timestamp = kstNow.toISOString().replace('T', ' ').substring(0, 19)
   
-  // 🚀 Enhanced Keyword Detection: Identify and count critical keywords (Case-Insensitive)
+  // 🚀 Enhanced Keyword Detection (원본 message 사용 - 키워드 검색은 실제 내용 기준)
   const { results: keywordList } = await db.prepare("SELECT keyword FROM alert_keywords").all()
   const matchedKeywords = []
   const lowerMessage = (message || "").toLowerCase()
@@ -1452,11 +1932,11 @@ app.post('/sms/receive', async (c) => {
   // Normalize sender phone number (remove dashes, spaces, etc.) for cross-device consistency
   const normSender = String(sender || '').replace(/[^0-9]/g, '');
 
-  // Daily Duplicate check (same sender and message within the current KST day)
-  const todayStart = kstNow.toISOString().substring(0, 10) + ' 00:00:00'
+  // Duplicate check: Merge identical messages if they arrive within a 10-minute window
+  const tenMinsAgo = new Date(kstNow.getTime() - 10 * 60 * 1000).toISOString().replace('T', ' ').substring(0, 19)
   const existing = await db.prepare(
     "SELECT inc_id, received_count FROM received_messages WHERE (sender = ? OR REPLACE(REPLACE(sender, '-', ''), ' ', '') = ?) AND message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
-  ).bind(sender, normSender, message, todayStart).first()
+  ).bind(sender, normSender, message, tenMinsAgo).first()
 
   if (existing) {
     const newCount = (existing.received_count || 1) + 1
@@ -1500,14 +1980,14 @@ app.post('/sms/receive', async (c) => {
             const placeholders = normalizedReceivers.map(() => '?').join(',');
             try {
                 const result = await db.prepare(`
-                    INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
-                    SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?, ?, ?
+                    INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+                    SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?, ?, ?, ?, ?
                     FROM users u_source
                     JOIN users u_target ON u_source.company = u_target.company AND u_source.team = u_target.team
                     WHERE u_source.is_active = 1
                       AND u_target.is_active = 1
                       AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
-                `).bind(existing.inc_id, timestamp, timestamp, employee_id || 'SYSTEM', employee_id || 'SYSTEM', ...normalizedReceivers, ...normalizedReceivers).run();
+                `).bind(existing.inc_id, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp, ...normalizedReceivers, ...normalizedReceivers).run();
                 console.log(`[Assignment] Bulk assignment completed for ${existing.inc_id}. Changes: ${result.meta.changes}`);
             } catch (assignError) {
                 console.error(`[Assignment] Error in bulk assignment for ${existing.inc_id}:`, assignError);
@@ -1527,6 +2007,14 @@ app.post('/sms/receive', async (c) => {
   const newIncId = generateIncId()
   const parsedCount = extractOccurrence(occurrence_count);
   const initialCount = parsedCount > 0 ? parsedCount : 1
+
+  // \u2500\u2500\u2500 PII \ub9c8\uc2a4\ud0b9: \uc218\uc2e0\uc790 \uc774\ub984 \uae30\ubc18 \ud30c\ud2b8 \ud560\ub2f9 \uc644\ub8cc \ud6c4, DB INSERT \uc9c1\uc804 \uc801\uc6a9 \u2500\u2500\u2500
+  // \ud560\ub2f9 \ub85c\uc9c1\uc740 \uc6d0\ubcf8 message/sender/receiver \ub370\uc774\ud130\ub97c \uc0ac\uc6a9\ud588\uc73c\uba74\uc73c\ub85c,
+  // \uc774\uc81c\ubd80\ud130 D1\uc5d0\ub294 \ube44\uc2dd\ubcc4\ud558\ub41c \ub370\uc774\ud130\ub9cc \uc800\uc7a5\ud569\ub2c8\ub2e4.
+  const maskedMessage = maskPII(message)
+  const maskedSender  = maskPII(sender)
+  console.log(`[PII] Applied masking before D1 INSERT for employee_id=${employee_id}`)
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   await db.prepare(`
     INSERT INTO received_messages (
@@ -1553,7 +2041,7 @@ app.post('/sms/receive', async (c) => {
       ?, ?, ?, ?
     )
   `).bind(
-    newIncId, sender || null, message || null, employee_id || null, timestamp, detectedCount, 
+    newIncId, maskedSender || null, maskedMessage || null, employee_id || null, timestamp, detectedCount, 
     response_msg || null, initialCount,
     channel || null, if_id || null, service_code || null, service_name || null,
     biz_system || null, error_code || null, parsedCount,
@@ -1573,8 +2061,8 @@ app.post('/sms/receive', async (c) => {
              const { results: partUsers } = await db.prepare("SELECT employee_id FROM users WHERE part = ?").bind(senderUser.part).all();
              if (partUsers && partUsers.length > 0) {
                  for (const u of partUsers) {
-                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id) VALUES (?, ?, '미처리', ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
-                     .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', employee_id || 'SYSTEM').run();
+                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, '미처리', ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
+                      .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp).run();
                  }
              }
          }
@@ -2504,7 +2992,7 @@ app.post('/ai/chat', async (c) => {
 })
 
 app.post('/ai/analyze-sms', async (c) => {
-  const { sender, message, sms_id } = await c.req.json()
+  const { sender, message, sms_id, force } = await c.req.json()
   const db = c.env.DB
   const api_key = c.env.DIFY_API_KEY_SUMMARIZER || c.env.DIFY_API_KEY || "app-owwPp3j2qAvVDZpW2UUiY8L3"
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
@@ -2559,8 +3047,8 @@ ${detailedInfo}`
 
   ;(async () => {
     try {
-      // 1. Check D1 cache first
-      if (sms_id) {
+      // 1. Check D1 cache first (unless forced)
+      if (sms_id && !force) {
         const cached = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
         if (cached && cached.content) {
           console.log(`[Cache Hit] Serving cached insight for ${sms_id}`);
@@ -2616,6 +3104,9 @@ ${detailedInfo}`
 
       if (c.env.WARROOM_INDEX && message) {
         try {
+          // Send Progress Status
+          await writer.write(encode(`data: ${JSON.stringify({ status: 'searching', message: '🔍 유사 장애 사례 검색 중...' })}\n\n`));
+          
           const cleanedMessage = cleanMessageForEmbedding(message);
           const vector = await generateEmbedding(cleanedMessage, c.env);
           if (vector) {
@@ -2689,37 +3180,48 @@ ${detailedInfo}`
           `).bind(String(sms_id), fullOutput, now, now, similarityScore ?? 0).run();
         }
       } else {
-        // 4. Call Dify (Original logic with Workflow Fallback)
-        let difyRes = await fetch(`${api_base}/chat-messages`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${api_key}`, 
-            'Content-Type': 'application/json',
-            'Accept': 'text/event-stream'
-          },
-          body: JSON.stringify({ 
-            inputs: {}, 
-            query: prompt, 
-            response_mode: 'streaming', 
-            user: 'sguard-worker' 
-          })
-        })
+        // Send Progress Status for Dify Call
+        await writer.write(encode(`data: ${JSON.stringify({ status: 'analyzing', message: '🤖 AI 심층 진단 분석 중...' })}\n\n`));
 
-        if (!difyRes.ok) {
-          // 🚀 Fallback to Workflow if Chat API fails
-          difyRes = await fetch(`${api_base}/workflows/run`, {
+        // 4. Call Dify (Improved with Dual-Mode Detection)
+        const effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
+        
+        // Helper to perform Dify call
+        const fetchDify = async (mode, key) => {
+          const endpoint = mode === 'workflow' ? `${api_base}/workflows/run` : `${api_base}/chat-messages`;
+          const payload = mode === 'workflow' 
+            ? { inputs: { query: prompt, chat_log: prompt }, response_mode: 'streaming', user: 'sguard-worker' }
+            : { inputs: {}, query: prompt, response_mode: 'streaming', user: 'sguard-worker' };
+            
+          return await fetch(endpoint, {
             method: 'POST',
             headers: { 
-              'Authorization': `Bearer ${api_key}`, 
+              'Authorization': `Bearer ${key}`, 
               'Content-Type': 'application/json',
               'Accept': 'text/event-stream'
             },
-            body: JSON.stringify({ 
-              inputs: { query: prompt }, 
-              response_mode: 'streaming', 
-              user: 'sguard-worker' 
-            })
-          })
+            body: JSON.stringify(payload)
+          });
+        };
+
+        let difyRes = await fetchDify('chat', effectiveKey);
+
+        if (!difyRes.ok) {
+          const status = difyRes.status;
+          console.warn(`[AI Analyze] Chat API failed (Status: ${status}), trying Workflow...`);
+          
+          // Switch to Workflow if Chat fails (typical for mixed app types)
+          difyRes = await fetchDify('workflow', api_key);
+          
+          if (!difyRes.ok) {
+            const finalStatus = difyRes.status;
+            let errorMsg = `Dify API 오류 (${finalStatus})`;
+            if (finalStatus === 401) errorMsg = "🤖 AI 엔진 인증 오류 (Dify API Key를 확인해 주세요)";
+            if (finalStatus === 404) errorMsg = "🤖 AI 엔진 엔드포인트 오류 (Dify 설정을 확인해 주세요)";
+            
+            await writer.write(encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`));
+            throw new Error(errorMsg);
+          }
         }
 
         if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
@@ -3466,13 +3968,25 @@ app.delete('/api/v1/user/chat-sessions/:id', async (c) => {
 app.get('/ai/chat-history/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
-  // Try aichat_history first
+  
+  // 1. Try aichat_history (Agent Chat) first
   const { results: aiResults } = await db.prepare("SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all()
   if (aiResults && aiResults.length > 0) {
     return c.json({ messages: aiResults.map(r => ({ role: r.agent_role, text: r.content })) })
   }
   
-  // Only return AI agent chat history. Do not fallback to warroom_chats as they belong to different domains.
+  // 2. Fallback to autopilot_insight (Initial Analysis or Error Message)
+  const insight = await db.prepare("SELECT content, severity FROM autopilot_insight WHERE inc_id = ?").bind(id).first()
+  if (insight) {
+    return c.json({ 
+      messages: [{ 
+        role: 'AI분석', 
+        text: insight.content,
+        severity: insight.severity
+      }] 
+    })
+  }
+
   return c.json({ messages: [] })
 })
 
@@ -3619,12 +4133,12 @@ app.post('/ai/warroom/open', async (c) => {
       
     // 🚀 NEW: Ensure creator is also in incident_assignments with status '처리중'
     await db.prepare(`
-      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
-      VALUES (?, ?, '처리중', ?, ?, ?, ?)
+      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+      VALUES (?, ?, '처리중', ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id, inc_id) 
       DO UPDATE SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ?
     `).bind(
-      creator_id, normId, now, now, creator_id, creator_id,
+      creator_id, normId, now, now, creator_id, now, creator_id, now,
       now, now, creator_id
     ).run();
   }
@@ -3829,7 +4343,7 @@ app.get('/warroom/participants/:id', async (c) => {
       COALESCE(ot.name, u.team) as team_name,
       COALESCE(op.name, u.part) as part_name
     FROM user_warrooms uw
-    JOIN users u ON (uw.user_id = u.employee_id OR uw.user_id = CAST(u.id AS TEXT))
+    JOIN users u ON uw.user_id = u.employee_id
     LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
     LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
     WHERE uw.inc_id = ? OR uw.inc_id = ?
@@ -3852,11 +4366,11 @@ app.post('/warroom/join', async (c) => {
 
   // 🚀 Sync to incident_assignments so they appear in both lists
   await db.prepare(`
-    INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
-    VALUES (?, ?, '처리중', ?, ?, ?, ?)
+    INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+    VALUES (?, ?, '처리중', ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, inc_id) 
-    DO UPDATE SET status = '처리중', updated_at = excluded.updated_at, mod_id = excluded.mod_id
-  `).bind(user_id, normId, now, now, user_id, user_id).run();
+    DO UPDATE SET status = '처리중', updated_at = excluded.updated_at, mod_dt = excluded.mod_dt, mod_id = excluded.mod_id
+  `).bind(user_id, normId, now, now, user_id, now, user_id, now).run();
     
   return c.json({ status: 'joined' })
 })
@@ -4283,8 +4797,12 @@ app.post('/retrieval', async (c) => {
     ];
     
     if (token !== envKey && !allowedTokens.includes(token)) {
-      console.error(`[Dify] Unauthorized. Expected: ${envKey} or Dataset Key, Got: ${token}`);
-      return c.json({ error: "401 Unauthorized" }, 401);
+      console.warn(`[Dify Retrieval] Unauthorized access attempt. Received Token: "${token}" (Prefix: ${token?.substring(0, 10)}...)`);
+      return c.json({ 
+        error: "401 Unauthorized", 
+        message: "API Key가 일치하지 않습니다. Dify의 HTTP 요청 노드에서 'Authorization' 헤더에 'Bearer <DIFY_TOOL_KEY>'를 정확히 입력했는지 확인해 주세요.",
+        hint: `Received: ${token ? 'Invalid Token' : 'Empty Token'}`
+      }, 401);
     }
 
     let body = {};
@@ -4582,10 +5100,10 @@ app.post('/ai/incident/assign', async (c) => {
 
     // 2. Perform Assignment
     await db.prepare(`
-      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
-      VALUES (?, ?, '미확인', ?, ?, 'SYSTEM', 'SYSTEM')
+      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+      VALUES (?, ?, '미확인', ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
       ON CONFLICT(user_id, inc_id) DO NOTHING
-    `).bind(empId, normId, now, now).run()
+    `).bind(empId, normId, now, now, now, now).run()
 
     // 3. Log activity with INSERT OR IGNORE to prevent PK collision
     await db.prepare(`
@@ -4846,10 +5364,10 @@ app.get('/ai/user/activity-history', async (c) => {
     SELECT l.*, date(l.created_at) as log_date 
     FROM activity_logs l
     LEFT JOIN users u ON l.user_id = u.employee_id
-    WHERE l.user_id = ? OR u.id = ?
+    WHERE l.user_id = ?
     ORDER BY l.created_at DESC 
     LIMIT 100
-  `).bind(user_id, user_id).all()
+  `).bind(user_id).all()
 
   return c.json({ history: results })
 })
@@ -5887,12 +6405,12 @@ export class WarRoom {
             try {
               const now = getKst();
               await this.env.DB.prepare(`
-                INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, mod_id)
-                VALUES (?, ?, '처리중', ?, ?, ?, ?)
+                INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+                VALUES (?, ?, '처리중', ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, inc_id) 
                 DO UPDATE SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ?
               `).bind(
-                data.user_id, data.incident_id, now, now, data.user_id, data.user_id,
+                data.user_id, data.incident_id, now, now, data.user_id, now, data.user_id, now,
                 now, now, data.user_id
               ).run();
               console.log(`[DO] [${data.incident_id}] Status updated to '처리중' for joiner: ${data.user_id}`);

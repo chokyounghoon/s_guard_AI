@@ -388,7 +388,7 @@ const IncidentPushPage = () => {
 
             // 3. Construct payload with precedence: Parsed > Manual Advanced > Manual Receivers
             const payload = { 
-                sender: 'Manual Entry', 
+                sender: sender || '',  // 실제 등록 전화번호 사용 (channel='MANUAL'로 대시보드 구분)
                 message, 
                 employee_id: employeeId,
                 ...advanced,

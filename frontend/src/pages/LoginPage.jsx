@@ -1,450 +1,836 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Shield, AlertCircle, ArrowRight, RotateCcw,
-  CheckCircle, Eye, EyeOff, Mail, KeyRound, UserCheck, Download
+  AlertCircle, ArrowLeft, RotateCcw,
+  CheckCircle, Check, Eye, EyeOff, Mail, KeyRound, UserCheck, Download, Lock, ChevronRight, BookOpen, X, ShieldAlert, Apple
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
-// ─────────────────────────────────────────────
-// 상태 정의
-// A  : 사번 입력 (auth/init 호출)
-// B  : 신규(PRE_REGISTERED) — OTP + 비밀번호 설정 (auth/verify)
-// C1 : 기존(ACTIVE) — 비밀번호 입력
-// C2 : 기존(ACTIVE) — OTP 입력 후 최종 인증 (auth/verify)
-// ─────────────────────────────────────────────
-const S = { A: 'A', B: 'B', C1: 'C1', C2: 'C2' };
+const S = { A: 'A', B: 'B', C1: 'C1', C2: 'C2', RESET_A: 'RESET_A', RESET_B: 'RESET_B' };
 
-// ── OTP 6칸 입력 ──
+/* ── OTP 6칸 ── */
 function OtpBoxes({ value, onChange, disabled }) {
   const refs = useRef([]);
-  const pad  = (value + '      ').slice(0, 6).split('');
+  const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? '');
 
-  const set = (i, ch) => {
-    const arr = pad.map(d => d.trim());
-    arr[i] = ch.replace(/\D/g, '').slice(-1);
-    onChange(arr.join('').replace(/ /g, ''));
+  const focusAt = (i) => {
+    const el = refs.current[Math.max(0, Math.min(5, i))];
+    el?.focus();
+    setTimeout(() => el?.setSelectionRange(el.value.length, el.value.length), 0);
+  };
+
+  const updateAt = (i, ch) => {
+    const arr = [...digits];
+    arr[i] = ch;
+    onChange(arr.join(''));
+  };
+
+  /* 모바일에서 onChange로 입력된 가장 마지막 숫자를 타겟 칸에 세팅하고 다음 칸으로 이동 */
+  const handleChange = (i, e) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    if (!raw) return;
+    const ch = raw.slice(-1); // 마지막 숫자만 사용
+    updateAt(i, ch);
+    if (i < 5) focusAt(i + 1);
+  };
+
+  const handleKeyDown = (i, e) => {
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); focusAt(i - 1); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); focusAt(i + 1); return; }
+    if (e.key === 'Tab') return;
+
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      if (digits[i]) {
+        updateAt(i, '');
+      } else if (i > 0) {
+        updateAt(i - 1, '');
+        focusAt(i - 1);
+      }
+      return;
+    }
+
+    if (e.key === 'Delete') { e.preventDefault(); updateAt(i, ''); return; }
+
+    const digit = e.key.replace(/\D/g, '');
+    if (digit.length === 1) {
+      e.preventDefault();
+      updateAt(i, digit);
+      if (i < 5) focusAt(i + 1);
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+    const arr = Array.from({ length: 6 }, (_, i) => pasted[i] ?? '');
+    onChange(arr.join(''));
+    focusAt(Math.min(pasted.length, 5));
   };
 
   return (
-    <div className="flex gap-2 justify-center"
-      onPaste={e => {
-        const p = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-        onChange(p);
-        refs.current[Math.min(p.length, 5)]?.focus();
-        e.preventDefault();
-      }}>
+    <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
       {[0,1,2,3,4,5].map(i => (
-        <input key={i} ref={el => refs.current[i] = el}
-          type="text" inputMode="numeric" maxLength={1}
-          value={pad[i].trim()} disabled={disabled}
-          onChange={e => {
-            const digit = e.target.value.replace(/\D/g, '').slice(-1);
-            set(i, digit);
-            if (digit && i < 5) refs.current[i + 1]?.focus();
+        <input
+          key={i}
+          ref={el => refs.current[i] = el}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={1}
+          value={digits[i]}
+          disabled={disabled}
+          onKeyDown={e => handleKeyDown(i, e)}
+          onChange={e => handleChange(i, e)}
+          onPaste={handlePaste}
+          onClick={() => focusAt(i)}
+          style={{
+            width:44, height:52, textAlign:'center',
+            fontSize:'1.4rem', fontWeight:700,
+            background: digits[i] ? 'rgba(0,70,255,0.15)' : 'rgba(0,70,255,0.06)',
+            border: digits[i] ? '2px solid rgba(0,70,255,0.55)' : '2px solid rgba(0,70,255,0.2)',
+            borderRadius:12,
+            color: digits[i] ? '#60a5fa' : 'rgba(255,255,255,0.2)',
+            outline:'none', caretColor:'transparent',
+            fontFamily:'inherit', transition:'background .15s, border-color .15s',
+            opacity: disabled ? 0.45 : 1,
+            cursor: disabled ? 'not-allowed' : 'text',
+            userSelect:'none',
           }}
-          onKeyDown={e => {
-            if (e.key === 'Backspace' && !pad[i].trim() && i > 0) refs.current[i - 1]?.focus();
-          }}
-          className="w-11 h-13 text-center text-xl font-bold bg-[#1a1f2e] border-2 border-blue-500/30 rounded-xl text-blue-300 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all disabled:opacity-50 caret-transparent"
-          style={{ height: '52px' }}
+          onFocus={e => { e.target.style.borderColor='#0046FF'; e.target.style.boxShadow='0 0 0 3px rgba(0,70,255,0.2)'; }}
+          onBlur={e  => { e.target.style.borderColor=digits[i]?'rgba(0,70,255,0.55)':'rgba(0,70,255,0.2)'; e.target.style.boxShadow='none'; }}
         />
       ))}
     </div>
   );
 }
 
-// ── 카운트다운 타이머 ──
+
+/* ── 타이머 ── */
 function Timer({ timerKey, secs, onExpire }) {
   const [left, setLeft] = useState(secs);
   useEffect(() => {
     setLeft(secs);
-    const t = setInterval(() => setLeft(p => {
-      if (p <= 1) { clearInterval(t); onExpire(); return 0; }
-      return p - 1;
-    }), 1000);
+    const t = setInterval(() => setLeft(p => { if(p<=1){clearInterval(t);onExpire();return 0;} return p-1; }), 1000);
     return () => clearInterval(t);
   }, [timerKey, secs]);
-  const m = String(Math.floor(left / 60)).padStart(2,'0');
-  const s = String(left % 60).padStart(2,'0');
-  return <span className={`font-mono font-bold text-sm ${left < 60 ? 'text-red-400' : 'text-sky-400'}`}>{m}:{s}</span>;
+  const m = String(Math.floor(left/60)).padStart(2,'0');
+  const s = String(left%60).padStart(2,'0');
+  return <span style={{ fontFamily:'monospace', fontWeight:700, fontSize:14, color: left<60?'#f87171':'#3b82f6' }}>{m}:{s}</span>;
 }
 
-// ── 비밀번호 강도 바 ──
+/* ── 비밀번호 강도 ── */
 function PwStrength({ pw }) {
-  if (!pw) return null;
-  const scores = [pw.length >= 8, /[A-Z]/.test(pw), /[0-9]/.test(pw), /[^A-Za-z0-9]/.test(pw)];
+  if(!pw) return null;
+  const scores = [pw.length>=8, /[A-Z]/.test(pw), /[0-9]/.test(pw), /[^A-Za-z0-9]/.test(pw)];
   const n = scores.filter(Boolean).length;
-  const colors = ['bg-red-500','bg-orange-400','bg-yellow-400','bg-emerald-400'];
+  const cols = ['#ef4444','#f97316','#eab308','#22c55e'];
   const labels = ['약함','보통','좋음','강함'];
   return (
-    <div className="space-y-1">
-      <div className="flex gap-1">
-        {scores.map((ok, i) => (
-          <div key={i} className={`flex-1 h-1 rounded-full transition-all duration-500 ${ok ? colors[n-1] : 'bg-slate-700'}`} />
-        ))}
+    <div style={{ marginTop:4 }}>
+      <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+        {scores.map((ok,i) => <div key={i} style={{ flex:1, height:3, borderRadius:9999, background: ok?cols[n-1]:'rgba(255,255,255,0.08)', transition:'all .4s' }} />)}
       </div>
-      <p className="text-xs text-slate-500">강도: <span className={`font-semibold ${n < 2 ? 'text-red-400' : n < 4 ? 'text-yellow-400' : 'text-emerald-400'}`}>{labels[n-1]||labels[0]}</span></p>
+      <p style={{ fontSize:11, color:'rgba(255,255,255,0.35)' }}>강도: <span style={{ fontWeight:600, color: n<2?'#ef4444':n<4?'#eab308':'#22c55e' }}>{labels[n-1]||labels[0]}</span></p>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
-// 메인 로그인 컴포넌트
-// ─────────────────────────────────────────────
 export default function LoginPage() {
   const navigate = useNavigate();
 
-  // 공통 상태
-  const [state, setState]           = useState(S.A);
-  const [employeeId, setEmployeeId] = useState('');
+  const [state, setState]             = useState(S.A);
+  const [employeeId, setEmployeeId]   = useState('');
   const [maskedEmail, setMaskedEmail] = useState('');
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [otp, setOtp]                 = useState('');
+  const [otpExpired, setOtpExpired]   = useState(false);
+  const [resendCnt, setResendCnt]     = useState(0);
+  const [timerKey, setTimerKey]       = useState(0);
+  const [pw, setPw]                   = useState('');
+  const [pwConf, setPwConf]           = useState('');
+  const [showPw, setShowPw]           = useState(false);
+  const [showManual, setShowManual]   = useState(false);
+  const [isNewUser, setIsNewUser]     = useState(false);
+  const [consent1, setConsent1]       = useState(false); // 개인정보 수집 및 이용 동의
+  const [consent2, setConsent2]       = useState(false); // 개인정보 제3자 제공 동의 (AI)
+  const [showLegal, setShowLegal]     = useState(null);  // 'p1' or 'ai'
 
-  // OTP
-  const [otp, setOtp]               = useState('');
-  const [otpExpired, setOtpExpired] = useState(false);
-  const [resendCnt, setResendCnt]   = useState(0);
-  const [timerKey, setTimerKey]     = useState(0);
-
-  // 비밀번호
-  const [pw, setPw]         = useState('');
-  const [pwConf, setPwConf] = useState('');
-  const [showPw, setShowPw] = useState(false);
-
-  // 사번 자동 복원
   useEffect(() => {
     const saved = localStorage.getItem('sguard_saved_empid');
-    if (saved) setEmployeeId(saved);
+    if(saved) setEmployeeId(saved);
   }, []);
 
   const clearErr = () => setError('');
 
-  const inputCls = `w-full bg-[#1a1f2e] border border-blue-500/30 rounded-xl py-4 pl-5 pr-12
-    text-sm placeholder-slate-500 focus:outline-none focus:border-blue-400
-    focus:ring-1 focus:ring-blue-400/40 transition-all text-white`;
-
-  // ─── STEP A: 사번 입력 → POST /auth/init ───
+  /* ── API ── */
   const handleInit = async (e) => {
     e?.preventDefault();
-    if (!employeeId.trim()) { setError('사번을 입력해 주세요.'); return; }
-    setLoading(true); clearErr();
+    if(!employeeId.trim()){ setError('사번을 입력해 주세요.'); return; }
+    setLoading(true); clearErr(); setPw(''); setPwConf(''); setOtp('');
     try {
-      const res  = await fetch(`${API_BASE}/auth/init`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employee_id: employeeId.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.detail || '오류가 발생했습니다.'); return; }
-
-      setMaskedEmail(data.masked_email);
-      setOtpExpired(false); setOtp(''); setResendCnt(0); setTimerKey(k => k + 1);
-      localStorage.setItem('sguard_saved_empid', employeeId.trim());
-
-      // 신규(PRE_REGISTERED) → B, 기존(ACTIVE) → C1
-      setState(data.mode === 'PRE_REGISTERED' ? S.B : S.C1);
-    } catch {
-      setError('서버에 연결할 수 없습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ─── STEP C1: 비밀번호 입력 후 OTP 화면으로 ───
-  const handlePasswordNext = (e) => {
-    e?.preventDefault();
-    if (!pw) { setError('비밀번호를 입력해 주세요.'); return; }
-    clearErr();
-    setState(S.C2);
-  };
-
-  // ─── OTP 재발송 ───
-  const handleResend = async () => {
-    if (resendCnt >= 3) { setError('재발송 횟수(3회)를 초과했습니다.'); return; }
-    setLoading(true); clearErr();
-    try {
-      const res = await fetch(`${API_BASE}/auth/init`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employee_id: employeeId.trim() }),
-      });
-      if (res.ok) {
-        setOtpExpired(false); setOtp('');
-        setResendCnt(p => p + 1); setTimerKey(k => k + 1);
-      } else {
-        setError('재발송에 실패했습니다.');
-      }
-    } catch {
-      setError('서버에 연결할 수 없습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ─── STEP B / C2 → POST /auth/verify ───
-  // Body: { employee_id, otp, password, mode }
-  // 성공 시 서버가 8시간 JWT HttpOnly 쿠키 설정 + 사용자 정보 JSON 반환
-  const handleVerify = async (e) => {
-    e?.preventDefault();
-    if (otp.length < 6) { setError('6자리 인증번호를 모두 입력해 주세요.'); return; }
-
-    // 신규: 비밀번호 유효성
-    if (state === S.B) {
-      if (pw.length < 8) { setError('비밀번호는 8자 이상이어야 합니다.'); return; }
-      if (pw !== pwConf) { setError('비밀번호가 일치하지 않습니다.'); return; }
-    }
-
-    setLoading(true); clearErr();
-    try {
-      const res  = await fetch(`${API_BASE}/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res  = await fetch(`${API_BASE}/auth/init`, { 
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body:JSON.stringify({ 
           employee_id: employeeId.trim(),
-          otp,
-          password: pw,
-          mode: state === S.B ? 'PRE_REGISTERED' : 'ACTIVE',
-        }),
+          check_only: true // 1단계에서는 확인만 진행
+        }) 
       });
       const data = await res.json();
-      if (!res.ok) {
-        if (data.code === 'OTP_EXPIRED')     setError('인증번호가 만료되었습니다. 재발송해 주세요.');
-        else if (data.code === 'OTP_MISMATCH')   setError('인증번호가 올바르지 않습니다.');
-        else if (data.code === 'WRONG_PASSWORD') setError('비밀번호가 올바르지 않습니다. 다시 확인해 주세요.');
-        else setError(data.detail || '인증에 실패했습니다.');
+      if(!res.ok){ setError(data.detail||'오류가 발생했습니다.'); return; }
+      setMaskedEmail(data.masked_email);
+      const isNew = data.mode==='PRE_REGISTERED';
+      setIsNewUser(isNew);
+      
+      localStorage.setItem('sguard_saved_empid', employeeId.trim());
+      setState(isNew ? S.B : S.C1);
+    } catch { setError('서버에 연결할 수 없습니다.'); }
+    finally { setLoading(false); }
+  };
+
+  const handleRequestReset = async () => {
+    if(!employeeId.trim()){ setError('사번을 입력해 주세요.'); return; }
+    setLoading(true); clearErr();
+    try {
+      const res = await fetch(`${API_BASE}/auth/reset/request`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ employee_id: employeeId.trim() }) });
+      const data = await res.json();
+      if(!res.ok) {
+        setError(data.detail || '요청에 실패했습니다.');
+        setLoading(false);
         return;
       }
-      // 로컬 스토리지 저장 (하위 호환 토큰 + 전체 사용자 정보)
-      localStorage.setItem('sguard_token', data.token);
-      localStorage.setItem('sguard_user',  JSON.stringify(data));
-      navigate('/dashboard');
-    } catch {
-      setError('서버에 연결할 수 없습니다.');
-    } finally {
-      setLoading(false);
+      setMaskedEmail(data.masked_email);
+      setState(S.RESET_B);
+    } catch { setError('서버 연결 실패'); }
+    finally { setLoading(false); }
+  };
+
+  const handleVerifyReset = async () => {
+    if(otp.length < 6){ setError('인증번호를 입력하세요.'); return; }
+    if(pw.length < 8){ setError('비밀번호는 8자 이상이어야 합니다.'); return; }
+    if(pw !== pwConf){ setError('비밀번호가 일치하지 않습니다.'); return; }
+    
+    setLoading(true); clearErr();
+    try {
+      const res = await fetch(`${API_BASE}/auth/reset/verify`, { 
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body:JSON.stringify({ 
+          employee_id: employeeId.trim(), 
+          code: otp,
+          password: pw 
+        }) 
+      });
+      const data = await res.json();
+      if(!res.ok){ setError(data.detail || '인증 실패'); return; }
+      
+      alert('비밀번호가 성공적으로 변경되었습니다.');
+      // 리셋 성공시 자동 로그인 처리 (백엔드에서 토큰을 준다면 가능, 현재는 다시 로그인으로 보냄)
+      if (data.token) {
+        localStorage.setItem('sguard_token', data.token);
+        if (data.jwt) localStorage.setItem('sguard_jwt', data.jwt);
+        localStorage.setItem('sguard_user', JSON.stringify(data.user || data));
+        navigate('/dashboard');
+      } else {
+        setState(S.A);
+      }
+    } catch { setError('서버 연결 실패'); }
+    finally { setLoading(false); }
+  };
+
+  const handlePasswordNext = async (e) => {
+    e?.preventDefault();
+    if(!pw){ setError('비밀번호를 입력해 주세요.'); return; }
+    
+    setLoading(true); clearErr();
+    try {
+      // 2단계에서 실제 비밀번호를 검증하고 OTP 메일을 발송하도록 변경
+      const res = await fetch(`${API_BASE}/auth/init`, { 
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body:JSON.stringify({ 
+          employee_id: employeeId.trim(),
+          password: pw,
+          check_only: false // 실제 OTP 발송 요청
+        }) 
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.detail || '인증번호 발송에 실패했습니다.');
+        return;
+      }
+      
+      // 메일 발송 성공 시 타이머 시작 및 3단계 진입
+      setMaskedEmail(data.masked_email);
+      setOtpExpired(false); setOtp(''); setResendCnt(0); setTimerKey(k=>k+1);
+      setState(S.C2);
+    } catch { 
+      setError('서버 연결 실패'); 
+    } finally { 
+      setLoading(false); 
     }
   };
 
-  // ─────────────────────────────────────────────
-  // 공통 UI 컴포넌트
-  // ─────────────────────────────────────────────
-  const ErrorBox = ({ msg }) => msg ? (
-    <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-      <p className="text-red-400 text-sm">{msg}</p>
-    </div>
-  ) : null;
+  const handleResend = async () => {
+    if(resendCnt>=3){ setError('재발송 횟수(3회)를 초과했습니다.'); return; }
+    setLoading(true); clearErr();
+    try {
+      const res = await fetch(`${API_BASE}/auth/init`, { 
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body:JSON.stringify({ 
+          employee_id: employeeId.trim(),
+          password: !state?.startsWith?.('RESET') ? pw : undefined,
+          check_only: false
+        }) 
+      });
+      if(res.ok){ setOtpExpired(false); setOtp(''); setResendCnt(p=>p+1); setTimerKey(k=>k+1); }
+      else {
+        const data = await res.json();
+        setError(data.detail || '재발송에 실패했습니다.');
+      }
+    } catch { setError('서버에 연결할 수 없습니다.'); }
+    finally { setLoading(false); }
+  };
 
-  const BackBtn = ({ to, label = '이전' }) => (
+  const handleVerify = async (e) => {
+    e?.preventDefault();
+    if(otp.length<6){ setError('6자리 인증번호를 모두 입력해 주세요.'); return; }
+    if(state===S.B){ if(pw.length<8){ setError('비밀번호는 8자 이상이어야 합니다.'); return; } if(pw!==pwConf){ setError('비밀번호가 일치하지 않습니다.'); return; } }
+    setLoading(true); clearErr();
+    try {
+      const res  = await fetch(`${API_BASE}/auth/verify`, { 
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body:JSON.stringify({ 
+          employee_id: employeeId.trim(), 
+          otp, 
+          password:pw, 
+          mode: isNewUser ? 'PRE_REGISTERED' : 'ACTIVE',
+          consent_personal_info: consent1,
+          consent_third_party_ai: consent2
+        }) 
+      });
+      const data = await res.json();
+      if(!res.ok){
+        if (data.code === 'SUSPENDED' || data.code === 'ACCOUNT_SUSPENDED') {
+          setError('보안 정책에 의해 사용이 중지된 계정입니다. 관리자에게 문의하세요.');
+        } else if (data.code === 'REGISTRATION_REQUIRED' || (res.status === 403 && data.code === 'PRE_REGISTERED')) {
+          setError('최초 가입 인증이 필요합니다. 사번 인증부터 다시 진행해 주세요.');
+          setTimeout(() => setState(S.A), 2000);
+        } else if(data.code==='OTP_EXPIRED') {
+          setError('인증번호가 만료되었습니다. 재발송해 주세요.');
+        } else if(data.code==='OTP_MISMATCH') {
+          setError('인증번호가 올바르지 않습니다.');
+        } else if(data.code==='WRONG_PASSWORD') {
+          setError('비밀번호가 올바르지 않습니다.');
+        } else {
+          setError(data.detail||'인증에 실패했습니다.');
+        }
+        return;
+      }
+      localStorage.clear(); // 🧹 Clean Slate: Prevent legacy token pollution
+      localStorage.setItem('sguard_token', data.token);
+      if (data.jwt) {
+        localStorage.setItem('sguard_jwt', data.jwt);
+      }
+      localStorage.setItem('sguard_user',  JSON.stringify(data));
+      navigate('/dashboard');
+    } catch { setError('서버에 연결할 수 없습니다.'); }
+    finally { setLoading(false); }
+  };
+
+  const inputStyle = {
+    width:'100%', padding:'14px 48px 14px 16px',
+    background:'rgba(255,255,255,0.05)',
+    border:'1.5px solid rgba(255,255,255,0.12)',
+    borderRadius:12, color:'white', fontSize:15,
+    fontFamily:'inherit', outline:'none', boxSizing:'border-box',
+    transition:'border-color .2s, box-shadow .2s',
+  };
+
+  const primaryBtn = {
+    width:'100%', padding:'15px',
+    background: loading ? 'rgba(0,70,255,0.5)' : 'linear-gradient(135deg,#0046FF 0%,#1a5aff 100%)',
+    border:'none', borderRadius:14, color:'white',
+    fontSize:15, fontWeight:700, fontFamily:'inherit',
+    cursor: loading ? 'not-allowed' : 'pointer',
+    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+    boxShadow:'0 4px 20px rgba(0,70,255,0.4)',
+    transition:'all .2s', letterSpacing:'0.01em',
+  };
+
+  const emeraldBtn = {
+    ...primaryBtn,
+    background: loading ? 'rgba(5,150,105,0.5)' : 'linear-gradient(135deg,#059669 0%,#10b981 100%)',
+    boxShadow:'0 4px 20px rgba(5,150,105,0.4)',
+  };
+
+  const ErrorBox = ({ msg }) => !msg ? null : (
+    <div style={{ display:'flex', gap:8, alignItems:'flex-start', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:12, padding:'12px 14px' }}>
+      <AlertCircle size={15} color="#f87171" style={{ flexShrink:0, marginTop:1 }} />
+      <p style={{ color:'#f87171', fontSize:13, margin:0, lineHeight:1.5 }}>{msg}</p>
+    </div>
+  );
+
+  const BackBtn = ({ to, label='이전' }) => (
     <button type="button"
-      onClick={() => { setState(to); clearErr(); setPw(''); setOtp(''); }}
-      className="text-sm text-slate-400 hover:text-slate-300 flex items-center gap-1 transition-colors mt-1">
-      <ArrowRight className="w-4 h-4 rotate-180" />{label}
+      onClick={() => { 
+        setState(to); clearErr(); setPw(''); setPwConf(''); setOtp(''); 
+        setConsent1(false); setConsent2(false);
+      }}
+      style={{ display:'flex', alignItems:'center', gap:4, color:'rgba(255,255,255,0.4)', fontSize:13, background:'none', border:'none', cursor:'pointer', padding:'4px 0', fontFamily:'inherit' }}>
+      <ArrowLeft size={14} />{label}
     </button>
   );
 
-  // OTP 섹션 (B, C2 공통)
   const OtpSection = ({ isNew }) => (
-    <div className="space-y-5">
-      <div className="text-center">
-        <div className="inline-flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-full px-3 py-1.5 mb-3">
-          <Mail className="w-3.5 h-3.5 text-sky-400" />
-          <span className="text-sky-300 text-xs font-medium">{maskedEmail} 으로 발송됨</span>
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      <div style={{ textAlign:'center', background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.15)', borderRadius:12, padding:'12px 16px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:4 }}>
+          <Mail size={13} color="#60a5fa" />
+          <span style={{ color:'#93c5fd', fontSize:12, fontWeight:600 }}>{maskedEmail}</span>
         </div>
-        <p className="text-slate-400 text-sm">이메일로 받은 6자리 인증번호를 입력해 주세요.</p>
+        <p style={{ color:'rgba(255,255,255,0.45)', fontSize:12, margin:0 }}>위 이메일로 발송된 6자리 인증번호를 입력해 주세요.</p>
       </div>
-      <OtpBoxes value={otp} onChange={v => { setOtp(v); clearErr(); }} disabled={loading || otpExpired} />
-      <div className="flex items-center justify-between px-1">
-        <span className="text-slate-500 text-sm">남은 시간</span>
-        {otpExpired
-          ? <span className="text-red-400 text-sm font-semibold">만료됨</span>
-          : <Timer timerKey={timerKey} secs={300} onExpire={() => setOtpExpired(true)} />
-        }
-      </div>
-      <div className="flex justify-between items-center">
-        <BackBtn to={isNew ? S.A : S.C1} label={isNew ? '사번 재입력' : '비밀번호 재입력'} />
-        <button type="button" onClick={handleResend} disabled={loading || resendCnt >= 3}
-          className="text-sm text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors disabled:opacity-40">
-          <RotateCcw className="w-3.5 h-3.5" />재발송 {resendCnt > 0 && `(${resendCnt}/3)`}
+      <OtpBoxes value={otp} onChange={v=>{ setOtp(v); clearErr(); }} disabled={loading||otpExpired} />
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ color:'rgba(255,255,255,0.35)', fontSize:12 }}>유효시간</span>
+          {otpExpired
+            ? <span style={{ color:'#f87171', fontSize:13, fontWeight:700 }}>만료됨</span>
+            : <Timer timerKey={timerKey} secs={600} onExpire={()=>setOtpExpired(true)} />
+          }
+        </div>
+        <button type="button" onClick={state?.startsWith?.('RESET') ? handleRequestReset : handleResend} disabled={loading||resendCnt>=3}
+          style={{ display:'flex', alignItems:'center', gap:4, color: resendCnt>=3?'rgba(255,255,255,0.2)':'#60a5fa', fontSize:12, background:'none', border:'none', cursor: resendCnt>=3?'not-allowed':'pointer', fontFamily:'inherit', fontWeight:500 }}>
+          <RotateCcw size={12} />재발송{resendCnt>0&&` (${resendCnt}/3)`}
         </button>
       </div>
+      <BackBtn 
+        to={state?.startsWith?.('RESET') ? S.RESET_A : (isNewUser ? S.B : S.C1)} 
+        label={state?.startsWith?.('RESET') || isNewUser ? '비밀번호 재설정' : '비밀번호 재입력'} 
+      />
     </div>
   );
 
-  const SubmitBtn = ({ label, color = 'blue', disabled: dis }) => (
-    <button type="submit" disabled={loading || dis}
-      className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2
-        transition-all active:scale-[0.98] disabled:opacity-50
-        ${color === 'emerald'
-          ? 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_4px_20px_rgba(5,150,105,0.4)]'
-          : 'bg-blue-600 hover:bg-blue-500 shadow-[0_4px_20px_rgba(37,99,235,0.4)]'
-        } text-white`}>
+  const LegalModal = ({ type, onClose }) => {
+    const content = type === 'p1' ? {
+      title: '개인정보 수집 및 이용 동의',
+      body: `신한금융그룹 S-Guard AI 플랫폼은 원활한 서비스 제공을 위해 아래와 같이 개인정보를 수집 및 이용합니다.\n\n1. 수집 항목: 성명, 사원번호, 소속 부서, 회사 메일 주소, 시스템 접속 로그\n2. 수집 및 이용 목적: 사용자 식별 및 권한 관리, 보안 정책 준수 확인, 맞춤형 AI 서비스 제공\n3. 보유 및 이용 기간: 사용자 퇴직 시 또는 서비스 종료 시까지 (관계 법령에 따라 보관이 필요한 경우 해당 기간까지 보관)\n4. 동의 거부 권리: 본 동의를 거부하실 수 있으나, 거부 시 시스템 이용이 제한됩니다.`
+    } : {
+      title: '개인정보 제3자 제공 동의 (AI 서비스)',
+      body: `AI 가속 분석 및 고도화된 보안 인사이트 제공을 위해 아래와 같이 외부 전문 서비스에 데이터를 제공합니다.\n\n1. 제공받는 자: Dify.ai, OpenAI, Inc.\n2. 제공 목적: 침해사고 데이터의 AI 분석, 보안 리포트 자동 생성 및 요약\n3. 제공 항목: 사용자가 입력한 프롬프트(질의), 업로드한 파일 내용, 분석 대상 사고 정보\n4. 보유 및 이용 기간: 목적 달성 후 즉시 파기 또는 해당 서비스의 데이터 처리 정책에 따름\n5. 주의사항: 입력된 데이터는 비식별화 과정을 거치거나 보안 전용 API를 통해 처리되나, 중요한 민감 정보 입력 시 주의가 필요합니다.`
+    };
+
+    return (
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:20 }} onClick={onClose}>
+        <div style={{ background:'#0f172a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, maxWidth:480, width:'100%', padding:28, animation:'fadeUp .3s ease', position:'relative' }} onClick={e=>e.stopPropagation()}>
+          <button onClick={onClose} style={{ position:'absolute', top:20, right:20, background:'none', border:'none', color:'rgba(255,255,255,0.4)', cursor:'pointer' }}><X size={20}/></button>
+          <h3 style={{ color:'white', fontSize:18, fontWeight:700, marginBottom:16 }}>{content.title}</h3>
+          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.7, whiteSpace:'pre-wrap', maxHeight:400, overflowY:'auto', paddingRight:8 }}>
+            {content.body}
+          </div>
+          <button onClick={onClose} style={{ width:'100%', marginTop:24, padding:14, borderRadius:12, background:'rgba(255,255,255,0.06)', border:'none', color:'white', fontWeight:600, cursor:'pointer' }}>확인</button>
+        </div>
+      </div>
+    );
+  };
+
+  const SubmitBtn = ({ label, color='blue', disabled:dis }) => (
+    <button type="submit" disabled={loading||dis}
+      style={{ ...(color==='emerald'?emeraldBtn:primaryBtn), opacity: dis&&!loading?0.5:1 }}>
       {loading
-        ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>처리 중...</span></>
-        : <span>{label}</span>
+        ? <><span style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', display:'inline-block', animation:'spin .7s linear infinite' }} /><span>처리 중...</span></>
+        : <><span>{label}</span>{!loading&&<ChevronRight size={16}/>}</>
       }
     </button>
   );
 
-  // ─────────────────────────────────────────────
-  // 렌더
-  // ─────────────────────────────────────────────
+  const stepInfo = state===S.A ? 0 : (state===S.B || state===S.C1) ? 1 : 2;
+  const stepLabels = ['사번 확인','비밀번호','OTP 인증'];
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#0f111a] text-white relative overflow-hidden font-sans">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+        * { box-sizing: border-box; margin:0; padding:0; }
+        body { margin:0; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes fadeUp {
+          from { opacity:0; transform:translateY(18px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        .header-section {
+          background: linear-gradient(160deg, #001550 0%, #0030cc 40%, #0046FF 70%, #1a5aff 100%);
+          padding: 0 0 52px;
+          position: relative;
+          overflow: hidden;
+          flex-shrink: 0;
+          text-align: center;
+        }
+        .header-section::before {
+          content:'';
+          position:absolute; inset:0;
+          background-image:
+            radial-gradient(ellipse at 75% 15%, rgba(255,255,255,0.12) 0%, transparent 55%),
+            radial-gradient(ellipse at 15% 85%, rgba(0,0,0,0.2) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 110%, rgba(0,0,60,0.3) 0%, transparent 60%);
+        }
+        .header-section::after {
+          content:'';
+          position:absolute; bottom:-1px; left:0; right:0;
+          height:44px;
+          background:#05091a;
+          border-radius: 36px 36px 0 0;
+        }
+        .header-nav {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 20px;
+          border-bottom: 1px solid rgba(255,255,255,0.07);
+          margin-bottom: 24px;
+        }
+        .card-section {
+          flex:1;
+          padding: 0 20px 40px;
+          display: flex;
+          flex-direction: column;
+          max-width: 480px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        .step-bar {
+          display:flex;
+          align-items:center;
+          margin-bottom: 28px;
+        }
+        .step-item {
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          gap:4px;
+          flex:1;
+        }
+        .step-circle {
+          width:28px; height:28px;
+          border-radius:50%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-size:11px;
+          font-weight:700;
+          transition: all .3s;
+        }
+        .step-connector {
+          flex:1;
+          height:2px;
+          background: rgba(255,255,255,0.08);
+          margin-bottom:14px;
+          transition: background .3s;
+        }
+        .step-connector.done { background: rgba(0,70,255,0.5); }
+        .form-section-label {
+          font-size:11px;
+          font-weight:600;
+          letter-spacing:0.1em;
+          text-transform:uppercase;
+          color:rgba(255,255,255,0.3);
+          margin-bottom:10px;
+        }
+        .input-wrap { position:relative; }
+        .input-icon { position:absolute; right:14px; top:50%; transform:translateY(-50%); }
+        .login-bg {
+          min-height: 100vh;
+          background: #05091a;
+          font-family: 'Inter','Noto Sans KR',sans-serif;
+          display: flex;
+          flex-direction: column;
+        }
+      `}</style>
 
-      {/* 배경 그리드 + 광선 */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none"
-        style={{ backgroundImage: 'radial-gradient(circle, #3b82f6 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-      <div className="absolute -top-1/4 -left-1/4 w-3/4 h-3/4 bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute -bottom-1/6 -right-1/6 w-1/2 h-1/2 bg-cyan-600/5 blur-[100px] rounded-full pointer-events-none" />
-
-      {/* 로고 */}
-      <div className="relative z-10 p-6">
-        <div className="flex items-center">
-          <div className="bg-blue-600 p-1.5 rounded-lg mr-3 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
-            <Shield className="w-4 h-4 text-white fill-current" />
-          </div>
-          <span className="font-bold text-lg tracking-wide">S-Guard AI</span>
-        </div>
-      </div>
-
-      {/* 카드 영역 */}
-      <div className="flex-1 flex items-center justify-center px-5 relative z-10 pb-10">
-        <div className="w-full max-w-sm">
-
-          {/* 아이콘 + 타이틀 */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="relative mb-4">
-              <div className="w-20 h-20 bg-blue-900/20 rounded-3xl flex items-center justify-center border border-blue-500/20 shadow-[0_0_40px_rgba(37,99,235,0.12)] transition-all duration-500">
-                {state === S.A  && <Shield className="w-9 h-9 text-blue-400 fill-blue-400/20" />}
-                {state === S.B  && <UserCheck className="w-9 h-9 text-emerald-400" />}
-                {state === S.C1 && <KeyRound className="w-9 h-9 text-blue-400" />}
-                {state === S.C2 && <Mail className="w-9 h-9 text-sky-400" />}
+      <div className="login-bg">
+        <div className="header-section">
+          <div className="header-nav" style={{ position:'relative', zIndex:2 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+              <div style={{ width:36, height:36, borderRadius:'50%', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 2px 8px rgba(0,0,0,0.25)' }}>
+                <img src="/shinhan_logo.png" alt="신한금융그룹 로고" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
               </div>
-              <div className="absolute inset-0 bg-blue-500/10 blur-2xl rounded-full -z-10" />
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', justifyContent:'center' }}>
+                <span style={{ color:'white', fontSize:15, fontWeight:700, letterSpacing:'-0.02em', lineHeight:1.1, textShadow:'0 1px 4px rgba(0,0,0,0.2)', fontFamily:"'OneShinhan', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif", display:'block', marginBottom:2 }}>신한금융그룹</span>
+                <span style={{ color:'rgba(255,255,255,0.75)', fontSize:8.5, fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase', fontFamily:"'OneShinhan', 'Inter', sans-serif", display:'block' }}>SHINHAN FINANCIAL GROUP</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ position:'relative', zIndex:1, paddingBottom:4 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:4, marginBottom:10 }}>
+              <div style={{ width: 72, height: 86, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ position:'absolute', width:'100%', height:'100%', filter:'drop-shadow(0 6px 16px rgba(0,0,0,0.4))' }}>
+                  <path d="M20 2L4 10V24C4 35 12 44 20 48C28 44 36 35 36 24V10L20 2Z" fill="rgba(255,255,255,0.06)" stroke="url(#glassOutline)" strokeWidth="1.2" strokeLinejoin="round" />
+                  <path d="M20 2L4 10V24C4 35 12 44 20 48V2Z" fill="rgba(255,255,255,0.05)" />
+                  <defs>
+                    <linearGradient id="glassOutline" x1="20" y1="0" x2="20" y2="48" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
+                      <stop offset="40%" stopColor="rgba(255,255,255,0.1)" />
+                      <stop offset="100%" stopColor="rgba(255,255,255,0.6)" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <span style={{ color:'white', fontSize:54, fontWeight:900, fontFamily:"'Inter', 'OneShinhan', sans-serif", position:'relative', zIndex:3, marginTop:-6, textShadow:'0 4px 8px rgba(0,0,0,0.6)' }}>S</span>
+              </div>
+              <h1 style={{ color: '#ffffff', fontSize: 54, fontWeight: 900, letterSpacing: '0.07em', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.4), 0 0 40px rgba(255,255,255,0.2)', fontFamily: "'Inter', sans-serif" }}>GUARD</h1>
             </div>
 
-            <h1 className="text-2xl font-bold text-white text-center transition-all duration-300">
-              {state === S.A  && 'S-Guard AI 로그인'}
-              {state === S.B  && '최초 접속 인증'}
-              {state === S.C1 && '비밀번호 입력'}
-              {state === S.C2 && 'OTP 최종 인증'}
-            </h1>
-            <p className="text-slate-400 text-sm text-center mt-1.5">
-              {state === S.A  && 'AI Agent 기반 지능형 장애 통합 관리'}
-              {state === S.B  && `${maskedEmail} 으로 인증번호가 발송되었습니다.`}
-              {state === S.C1 && (
-                <><span className="font-medium text-white">{maskedEmail}</span> 으로 OTP 발송 완료 — 비밀번호를 입력해 주세요.</>
-              )}
-              {state === S.C2 && '비밀번호 확인 완료 — OTP로 최종 인증합니다.'}
+            {/* 🛡️ 복구된 상단 슬로건 및 키워드 */}
+            <p style={{ color:'rgba(255,255,255,0.65)', fontSize:12, fontWeight:400, letterSpacing:'0.04em', marginBottom:12, fontStyle:'italic' }}>
+              Beyond Management, Toward Prediction
             </p>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:0 }}>
+              {['PREDICT','DEFEND','RESOLVE'].map((w, i) => (
+                <React.Fragment key={w}>
+                  {i > 0 && <span style={{ color:'#93c5fd', fontSize:9, margin:'0 7px' }}>·</span>}
+                  <span style={{ fontSize:9.5, fontWeight:800, letterSpacing:'0.16em', color: '#93c5fd' }}>{w}</span>
+                </React.Fragment>
+              ))}
+            </div>
           </div>
+        </div>
 
-          {/* ── 상태 A: 사번 입력 ── */}
+        <div className="card-section">
+          {state !== S.B && state !== S.RESET_A && state !== S.RESET_B && (
+            <div className="step-bar" style={{ animation:'fadeUp .3s ease' }}>
+              {stepLabels.map((label,idx) => (
+                <React.Fragment key={idx}>
+                  {idx>0 && <div className={`step-connector ${stepInfo>=idx?'done':''}`} />}
+                  <div className="step-item">
+                    <div className="step-circle" style={{
+                      background: stepInfo>idx ? 'rgba(0,70,255,0.25)' : stepInfo===idx ? '#0046FF' : 'rgba(255,255,255,0.06)',
+                      color: stepInfo>idx ? '#60a5fa' : stepInfo===idx ? 'white' : 'rgba(255,255,255,0.2)',
+                      border: stepInfo===idx ? '2px solid #0046FF' : stepInfo>idx ? '1px solid rgba(0,70,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: stepInfo===idx ? '0 0 0 4px rgba(0,70,255,0.15)' : 'none',
+                    }}>
+                      {stepInfo>idx ? '✓' : idx+1}
+                    </div>
+                    <span style={{ fontSize:10, color: stepInfo>=idx?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.2)', textAlign:'center' }}>{label}</span>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+
           {state === S.A && (
-            <form onSubmit={handleInit} className="space-y-4">
-              <div className="relative">
-                <input
-                  id="employee-id-input"
-                  type="text" value={employeeId} autoFocus autoComplete="username"
-                  onChange={e => { setEmployeeId(e.target.value); clearErr(); }}
-                  placeholder="사번 입력 (예: S01838)"
-                  className={inputCls}
-                />
-                <Shield className="absolute right-4 top-4 w-5 h-5 text-slate-500" />
+            <form onSubmit={handleInit} style={{ display:'flex', flexDirection:'column', gap:14, animation:'fadeUp .3s ease' }}>
+              <div>
+                <p className="form-section-label">사원번호</p>
+                <div className="input-wrap">
+                  <input
+                    type="text" value={employeeId} autoFocus
+                    onChange={e => { setEmployeeId(e.target.value); clearErr(); }}
+                    placeholder="사원번호를 입력하세요"
+                    className="login-field"
+                    style={inputStyle}
+                  />
+                  <div className="input-icon">
+                    <UserCheck size={17} color="rgba(255,255,255,0.2)" />
+                  </div>
+                </div>
               </div>
               <ErrorBox msg={error} />
-              <SubmitBtn label="인증번호 받기" disabled={!employeeId.trim()} />
-              <div className="pt-2 flex justify-center">
-                <a href="/sguard-bridge_v1.0.apk" download
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600/10 border border-blue-500/20 text-xs text-blue-400 hover:bg-blue-600/20 transition-all">
-                  <Download className="w-3.5 h-3.5" />S-Guard Android APK
-                </a>
+              <SubmitBtn label="로그인" />
+              
+              <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                <button type="button" onClick={() => window.open('/sguard-bridge_v1.0.apk')}
+                  style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
+                  <Download size={12} />Android APK
+                </button>
+                <button type="button" onClick={() => window.alert('iOS 단축어 배포 준비 중입니다.')}
+                  style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
+                  <Apple size={12} />iOS 단축어
+                </button>
               </div>
+
+              <div style={{ marginTop:4, padding:'12px 14px', background:'rgba(0,70,255,0.05)', border:'1px solid rgba(0,70,255,0.12)', borderRadius:12 }}>
+                <p style={{ display:'flex', alignItems:'center', gap:6, color:'rgba(255,255,255,0.25)', fontSize:10.5, lineHeight:1.5 }}>
+                  <Lock size={10} style={{ flexShrink:0 }} />
+                  본 시스템은 신한임직원및 협력사 전용입니다. 보안 수칙을 준수해 주세요.
+                </p>
+              </div>
+
+              <button type="button" onClick={() => setState(S.RESET_A)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:12, textDecoration:'underline', cursor:'pointer', marginTop:8 }}>비밀번호를 분실하셨나요?</button>
             </form>
           )}
 
-          {/* ── 상태 B: 신규(PRE_REGISTERED) — OTP + 비밀번호 설정 ── */}
           {state === S.B && (
-            <form onSubmit={handleVerify} className="space-y-5">
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
-                <p className="text-emerald-400 text-xs font-medium">🎉 최초 로그인입니다. OTP 인증 후 비밀번호를 설정해 주세요.</p>
+            <form onSubmit={handlePasswordNext} style={{ display:'flex', flexDirection:'column', gap:16, animation:'fadeUp .3s ease' }}>
+              <div style={{ textAlign:'center', marginBottom:4 }}>
+                <h2 style={{ color:'white', fontSize:18, fontWeight:700, marginBottom:4 }}>비밀번호 설정</h2>
+                <p style={{ color:'rgba(255,255,255,0.4)', fontSize:13 }}>신규 사용자를 위한 비밀번호를 설정해 주세요.</p>
               </div>
-
-              <OtpSection isNew={true} />
-
-              <div className="border-t border-white/5 pt-4 space-y-3">
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">신규 비밀번호 설정</p>
-                <div className="relative">
-                  <input type={showPw ? 'text' : 'password'} value={pw}
-                    onChange={e => { setPw(e.target.value); clearErr(); }}
-                    placeholder="비밀번호 (8자 이상)" className={inputCls} />
-                  <button type="button" tabIndex={-1}
-                    onClick={() => setShowPw(p => !p)}
-                    className="absolute right-4 top-4 text-slate-500 hover:text-white transition-colors">
-                    {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <p className="form-section-label">신규 비밀번호 설정</p>
+                <div className="input-wrap">
+                  <input type={showPw?'text':'password'} value={pw} autoFocus
+                    onChange={e=>{ setPw(e.target.value); clearErr(); }}
+                    placeholder="비밀번호 (8자 이상)" className="login-field" style={inputStyle} />
+                  <button type="button" tabIndex={-1} className="input-icon"
+                    onClick={()=>setShowPw(p=>!p)}
+                    style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)' }}>
+                    {showPw?<EyeOff size={17}/>:<Eye size={17}/>}
                   </button>
                 </div>
                 <PwStrength pw={pw} />
-                <input type={showPw ? 'text' : 'password'} value={pwConf}
-                  onChange={e => { setPwConf(e.target.value); clearErr(); }}
-                  placeholder="비밀번호 확인" className={inputCls} />
-                {pwConf && pw !== pwConf && <p className="text-red-400 text-xs">비밀번호가 일치하지 않습니다.</p>}
+                <div className="input-wrap">
+                  <input type={showPw?'text':'password'} value={pwConf}
+                    onChange={e=>{ setPwConf(e.target.value); clearErr(); }}
+                    placeholder="비밀번호 확인" className="login-field" style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ padding:'14px', background:'rgba(255,255,255,0.03)', borderRadius:12, border:'1px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:10 }}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                  <div style={{ width:18, height:18, borderRadius:4, border:'1.5px solid #3b82f6', background: consent1?'#3b82f6':'none', display:'flex', alignItems:'center', justifyContent:'center', marginTop:2, transition:'all .2s', cursor:'pointer' }} onClick={() => setConsent1(!consent1)}>
+                    {consent1 && <Check size={12} color="white" strokeWidth={4} />}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <p style={{ color:'rgba(255,255,255,0.8)', fontSize:12, fontWeight:500, margin:0 }}>[필수] 개인정보 수집 및 이용 동의</p>
+                      <button type="button" onClick={()=>setShowLegal('p1')} style={{ background:'none', border:'none', color:'#60a5fa', fontSize:11, cursor:'pointer', padding:0 }}>전문보기</button>
+                    </div>
+                    <p style={{ color:'rgba(255,255,255,0.4)', fontSize:11, marginTop:2 }}>성명, 사번, 이메일 주소의 수집 및 이용에 동의합니다.</p>
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                  <div style={{ width:18, height:18, borderRadius:4, border:'1.5px solid #3b82f6', background: consent2?'#3b82f6':'none', display:'flex', alignItems:'center', justifyContent:'center', marginTop:2, transition:'all .2s', cursor:'pointer' }} onClick={() => setConsent2(!consent2)}>
+                    {consent2 && <Check size={12} color="white" strokeWidth={4} />}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <p style={{ color:'rgba(255,255,255,0.8)', fontSize:12, fontWeight:500, margin:0 }}>[필수] 개인정보 제3자 제공 동의 (AI)</p>
+                      <button type="button" onClick={()=>setShowLegal('ai')} style={{ background:'none', border:'none', color:'#60a5fa', fontSize:11, cursor:'pointer', padding:0 }}>전문보기</button>
+                    </div>
+                    <p style={{ color:'rgba(255,255,255,0.4)', fontSize:11, marginTop:2 }}>입력한 데이터가 분석을 위해 외부 AI 서비스(OpenAI/Dify)로 전송됨에 동의합니다.</p>
+                  </div>
+                </div>
               </div>
 
               <ErrorBox msg={error} />
-              <SubmitBtn label="인증 완료 및 로그인" color="emerald"
-                disabled={otp.length < 6 || pw.length < 8 || pw !== pwConf || otpExpired} />
-            </form>
-          )}
-
-          {/* ── 상태 C1: 기존(ACTIVE) — 비밀번호 먼저 입력 ── */}
-          {state === S.C1 && (
-            <form onSubmit={handlePasswordNext} className="space-y-4">
-              <div className="relative">
-                <input type={showPw ? 'text' : 'password'} value={pw} autoFocus
-                  onChange={e => { setPw(e.target.value); clearErr(); }}
-                  placeholder="비밀번호를 입력하세요"
-                  autoComplete="current-password" className={inputCls} />
-                <button type="button" tabIndex={-1}
-                  onClick={() => setShowPw(p => !p)}
-                  className="absolute right-4 top-4 text-slate-500 hover:text-white transition-colors">
-                  {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              <ErrorBox msg={error} />
-              <SubmitBtn label="다음 — OTP 확인" disabled={!pw} />
+              <SubmitBtn label="인증번호 받기" color="emerald" disabled={pw.length<8||pw!==pwConf||!consent1||!consent2} />
               <BackBtn to={S.A} label="사번 재입력" />
             </form>
           )}
 
-          {/* ── 상태 C2: 기존(ACTIVE) — OTP 최종 인증 ── */}
-          {state === S.C2 && (
-            <form onSubmit={handleVerify} className="space-y-5">
-              <div className="bg-slate-800/60 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
-                <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-                <p className="text-slate-300 text-sm">비밀번호 확인 완료. OTP로 최종 인증해 주세요.</p>
+          {state === S.C1 && (
+            <form onSubmit={handlePasswordNext} style={{ display:'flex', flexDirection:'column', gap:16, animation:'fadeUp .3s ease' }}>
+              <div style={{ textAlign:'center', marginBottom:4 }}>
+                <h2 style={{ color:'white', fontSize:18, fontWeight:700, marginBottom:4 }}>비밀번호 확인</h2>
+                <p style={{ color:'rgba(255,255,255,0.4)', fontSize:13 }}>{maskedEmail}으로 OTP가 발송됩니다.</p>
               </div>
-
-              <OtpSection isNew={false} />
-
+              <div>
+                <p className="form-section-label">비밀번호</p>
+                <div className="input-wrap">
+                  <input type={showPw?'text':'password'} value={pw} autoFocus
+                    onChange={e=>{ setPw(e.target.value); clearErr(); }}
+                    placeholder="비밀번호를 입력하세요" className="login-field" style={inputStyle} />
+                  <button type="button" tabIndex={-1} className="input-icon"
+                    onClick={()=>setShowPw(p=>!p)}
+                    style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)' }}>
+                    {showPw?<EyeOff size={17}/>:<Eye size={17}/>}
+                  </button>
+                </div>
+              </div>
               <ErrorBox msg={error} />
-              <SubmitBtn label="로그인" disabled={otp.length < 6 || otpExpired} />
+              <SubmitBtn label="인증번호 받기" />
+              <BackBtn to={S.A} label="사번 재입력" />
             </form>
           )}
 
+          {state === S.C2 && (
+            <form onSubmit={handleVerify} style={{ display:'flex', flexDirection:'column', gap:14, animation:'fadeUp .3s ease' }}>
+              <div style={{ textAlign:'center', marginBottom:4 }}>
+                <h2 style={{ color:'white', fontSize:18, fontWeight:700, marginBottom:4 }}>OTP 최종 인증</h2>
+              </div>
+              <OtpSection isNew={false} />
+              <div style={{ display:'flex', justifyContent:'flex-end', padding:'0 4px', marginTop:-4 }}>
+                <button type="button" onClick={() => { setState(S.RESET_A); clearErr(); setOtp(''); setPw(''); setPwConf(''); }}
+                  style={{ background:'none', border:'none', color:'#f87171', fontSize:12, fontWeight:600, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:4 }}>
+                  비밀번호 초기화
+                </button>
+              </div>
+              <ErrorBox msg={error} />
+              <SubmitBtn label="로그인" disabled={otp.length<6||otpExpired} />
+            </form>
+          )}
+
+          {state === S.RESET_A && (
+            <div style={{ animation:'fadeUp .3s ease' }}>
+              <h2 style={{ color:'white', fontSize:18, fontWeight:700, marginBottom:12 }}>비밀번호 초기화</h2>
+              <p style={{ color:'rgba(255,255,255,0.4)', fontSize:13, marginBottom:16 }}>가입 시 등록된 메일로 임시 비밀번호를 발송합니다.</p>
+              <input type="text" placeholder="사번을 입력해 주세요" value={employeeId} onChange={e=>setEmployeeId(e.target.value)} className="login-field" style={{...inputStyle, marginBottom:12}} />
+              <ErrorBox msg={error} />
+              <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                <button onClick={()=>setState(S.A)} style={{ flex:1, padding:14, borderRadius:12, background:'rgba(255,255,255,0.05)', border:'none', color:'white', cursor:'pointer' }}>취소</button>
+                <button onClick={handleRequestReset} disabled={loading} style={{ flex:2, padding:14, borderRadius:12, background:'linear-gradient(135deg, #059669 0%, #10b981 100%)', border:'none', color:'white', cursor:'pointer', fontWeight:600 }}>인증코드 발송</button>
+              </div>
+            </div>
+          )}
+
+          {state === S.RESET_B && (
+            <div style={{ animation:'fadeUp .3s ease', display:'flex', flexDirection:'column', gap:16 }}>
+              <div style={{ textAlign:'center' }}>
+                <h2 style={{ color:'white', fontSize:20, fontWeight:700, marginBottom:8 }}>본인 확인 및 비밀번호 재설정</h2>
+              </div>
+              <OtpSection />
+              
+              <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
+                <p className="form-section-label">새 비밀번호 설정</p>
+                <div className="input-wrap">
+                  <input type={showPw?'text':'password'} value={pw}
+                    onChange={e=>{ setPw(e.target.value); clearErr(); }}
+                    placeholder="신규 비밀번호 (8자 이상)" className="login-field" style={inputStyle} />
+                  <button type="button" tabIndex={-1} className="input-icon"
+                    onClick={()=>setShowPw(p=>!p)}
+                    style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)' }}>
+                    {showPw?<EyeOff size={17}/>:<Eye size={17}/>}
+                  </button>
+                </div>
+                <PwStrength pw={pw} />
+                <div className="input-wrap">
+                  <input type={showPw?'text':'password'} value={pwConf}
+                    onChange={e=>{ setPwConf(e.target.value); clearErr(); }}
+                    placeholder="비밀번호 확인" className="login-field" style={inputStyle} />
+                </div>
+              </div>
+
+              <ErrorBox msg={error} />
+              <button onClick={handleVerifyReset} disabled={loading||otpExpired||otp.length<6||pw.length<8||pw!==pwConf} 
+                style={{ 
+                  width:'100%', padding:14, borderRadius:12, 
+                  background:(loading||otpExpired||otp.length<6||pw.length<8||pw!==pwConf)? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                  border:'none', color:'white', cursor:'pointer', fontWeight:600, marginTop:8,
+                  transition:'all 0.3s ease'
+                }}>
+                {loading ? '처리 중...' : '비밀번호 변경 및 완료'}
+              </button>
+            </div>
+          )}
+
+          <div style={{ marginTop:'auto', paddingTop:32, textAlign:'center' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, marginBottom:6 }}>
+              <div style={{ width:18, height:18, borderRadius:'50%', overflow:'hidden', flexShrink:0 }}>
+                <img src="/shinhan_logo.png" alt="신한DS" style={{ width:18, height:18, objectFit:'cover', display:'block', opacity:0.35 }} />
+              </div>
+              <span style={{ color:'rgba(255,255,255,0.22)', fontSize:11, fontWeight:600, letterSpacing:'0.05em' }}>신한DS</span>
+            </div>
+            <p style={{ color:'rgba(255,255,255,0.13)', fontSize:10, letterSpacing:'0.04em' }}>© 2026 Shinhan DS Corp. · S-GUARD AI Security Operations</p>
+          </div>
         </div>
       </div>
-
-      {/* 하단 암호화 뱃지 */}
-      <div className="relative z-10 py-6 flex items-center justify-center opacity-25">
-        <div className="h-px w-8 bg-slate-500" />
-        <span className="mx-3 text-[9px] tracking-[0.2em] text-slate-400 uppercase">End-to-End Encryption</span>
-        <div className="h-px w-8 bg-slate-500" />
-      </div>
-    </div>
+      {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+    </>
   );
 }
