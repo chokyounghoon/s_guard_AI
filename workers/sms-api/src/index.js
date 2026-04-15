@@ -1052,12 +1052,12 @@ app.post('/auth/verify', async (c) => {
     company:     updated.company,
     honbu:       updated.honbu,
     team:        updated.team,
-  }, jwtSecret, 28800);
+  }, jwtSecret, 2592000); // 30 days (2592000)
 
   // 7. HttpOnly 쿠키 설정 + 사용자 정보 반환
   const isProd = (c.env.ENVIRONMENT || '') === 'production';
   c.header('Set-Cookie',
-    `sguard_jwt=${jwt}; HttpOnly; Path=/; Max-Age=28800; SameSite=Lax${isProd ? '; Secure' : ''}`
+    `sguard_jwt=${jwt}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${isProd ? '; Secure' : ''}`
   );
 
   return c.json({
