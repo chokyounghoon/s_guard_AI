@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { getAccessToken } from '../lib/authStore';
 
 const CodebookContext = createContext();
 
@@ -19,14 +20,17 @@ export const CodebookProvider = ({ children }) => {
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   const fetchCodes = useCallback(async () => {
+    const token = getAccessToken();
+    // 🚫 Don't fetch without auth — prevents 401 on codebook endpoint
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const savedUser = localStorage.getItem('sguard_user');
-      const token = savedUser ? JSON.parse(savedUser).token : null;
-      
       const response = await fetch(`${API_BASE}/sms/codebook`, {
         headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          'Authorization': `Bearer ${token}`
         }
       });
       if (!response.ok) throw new Error('Failed to fetch codebook');
@@ -55,15 +59,7 @@ export const CodebookProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('sguard_user');
-    let token = localStorage.getItem('sguard_jwt');
-    
-    if (!token && savedUser) {
-      try {
-        const userObj = JSON.parse(savedUser);
-        token = userObj.jwt || userObj.token;
-      } catch (e) {}
-    }
+    const token = getAccessToken();
     
     if (token) {
       fetchCodes();

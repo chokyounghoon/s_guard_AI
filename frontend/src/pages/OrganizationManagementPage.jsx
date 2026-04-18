@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Plus, Edit3, Trash2, Building2, GitMerge, Users, Save, X, Network, Search, Command, User
 } from 'lucide-react';
+import { getAccessToken } from '../lib/authStore';
 
 export default function OrganizationManagementPage() {
   const navigate = useNavigate();
@@ -29,10 +30,16 @@ export default function OrganizationManagementPage() {
 
   const fetchTree = () => {
     setLoading(true);
-    fetch(`${API_BASE}/org/tree`)
-      .then(r => r.json())
+    const token = getAccessToken();
+    fetch(`${API_BASE}/org/tree`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error('조직도 데이터를 불러오지 못했습니다.');
+        return r.json();
+      })
       .then(data => {
-        setTree(data);
+        setTree(Array.isArray(data) ? data : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -72,9 +79,15 @@ export default function OrganizationManagementPage() {
     }
 
     // Use the robust 'orgCode' generic filter that matches any column
-    fetch(`${API_BASE}/users?orgCode=${encodeURIComponent(node.code)}`)
-      .then(r => r.json())
-      .then(data => setPartUsers(data))
+    const token = getAccessToken();
+    fetch(`${API_BASE}/users?orgCode=${encodeURIComponent(node.code)}`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error('인원 정보를 불러오지 못했습니다.');
+        return r.json();
+      })
+      .then(data => setPartUsers(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoadingUsers(false));
   }, [selectedDepth1, selectedDepth2, selectedDepth3, selectedDepth4, selectedDepth5, tree]);
@@ -99,9 +112,13 @@ export default function OrganizationManagementPage() {
 
     try {
       if (modalMode === 'add') {
+        const token = getAccessToken();
         const res = await fetch(`${API_BASE}/org/nodes`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({
             name: modalData.name,
             code: modalData.code,
@@ -110,14 +127,30 @@ export default function OrganizationManagementPage() {
             sort_order: 0
           })
         });
-        if (res.ok) fetchTree();
+        if (res.ok) {
+          alert('새 조직이 추가되었습니다.');
+          fetchTree();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(`실패: ${err.detail || '서버 오류'}`);
+        }
       } else {
+        const token = getAccessToken();
         const res = await fetch(`${API_BASE}/org/nodes/${modalData.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({ name: modalData.name, code: modalData.code })
         });
-        if (res.ok) fetchTree();
+        if (res.ok) {
+          alert('변경 내용이 저장되었습니다.');
+          fetchTree();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(`실패: ${err.detail || '서버 오류'}`);
+        }
       }
       setIsModalOpen(false);
     } catch (e) { console.error(e); }
@@ -126,7 +159,11 @@ export default function OrganizationManagementPage() {
   const handleDeleteNode = async (nodeId) => {
     if (!window.confirm('정말 삭제하시겠습니까? 하위 조직이 모두 삭제됩니다.')) return;
     try {
-      const res = await fetch(`${API_BASE}/org/nodes/${nodeId}`, { method: 'DELETE' });
+      const token = getAccessToken();
+      const res = await fetch(`${API_BASE}/org/nodes/${nodeId}`, { 
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       if (res.ok) {
         const resetAll = () => {
           setSelectedDepth1(null);

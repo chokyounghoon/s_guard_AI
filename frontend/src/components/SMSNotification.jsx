@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getAccessToken } from '../lib/authStore';
 import { X, AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 export default function SMSNotification() {
@@ -8,7 +9,7 @@ export default function SMSNotification() {
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
-    const token = localStorage.getItem('sguard_jwt') || localStorage.getItem('sguard_token');
+    const token = getAccessToken();
     if (!token) return;
 
     let isMounted = true;

@@ -9,6 +9,8 @@ import WarRoomChatPanel from '../components/WarRoomChatPanel';
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
+import { useCodebook } from '../context/CodebookContext';
+import { getAccessToken, clearSession } from '../lib/authStore';
 
 const SHINHAN_COMPANIES = [
   '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
@@ -19,10 +21,29 @@ const SHINHAN_COMPANIES = [
 
 // ── 데이터 입력 서브 컴포넌트 ─────────────────────
 function SelectWithOther({ label, icon: Icon, options, value, onChange, required, disabled }) {
-  const nonOther = options.filter(o => o !== '기타');
-  const initialIsOther = !!value && !nonOther.includes(value);
-  const [isOther, setIsOther] = useState(initialIsOther);
-  const [otherText, setOtherText] = useState(initialIsOther ? value : '');
+  // options can be a list of strings or list of { name, code }
+  const getCode = (o) => typeof o === 'object' ? o.code : o;
+  const getName = (o) => typeof o === 'object' ? o.name : o;
+
+  const nonOther = options.filter(o => getName(o) !== '기타');
+  
+  // ⚠️ isOther는 useState 초기값이 아닌 useEffect로 계산 — options가 비동기 로드되기 때문
+  const isInOptions = !!value && nonOther.find(o => getCode(o) === value);
+  const [isOther, setIsOther] = useState(false);
+  const [otherText, setOtherText] = useState('');
+
+  // options 또는 value가 변할 때마다 재계산
+  useEffect(() => {
+    if (!value) { setIsOther(false); setOtherText(''); return; }
+    const found = nonOther.find(o => getCode(o) === value);
+    if (found) {
+      setIsOther(false); // 옵션에서 찾음 → 정상 선택
+    } else if (options.length > 0) {
+      setIsOther(true);  // 옵션이 있는데 못 찾음 → 기타
+      setOtherText(value);
+    }
+    // options.length === 0 이면 아직 로딩 중 — isOther 변경 안 함
+  }, [options, value]);
 
   const selectVal = isOther ? '기타' : (value || '');
 
@@ -30,7 +51,7 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
     const v = e.target.value;
     if (v === '기타') {
       setIsOther(true);
-      onChange(otherText);
+      onChange('');
     } else {
       setIsOther(false);
       setOtherText('');
@@ -61,7 +82,7 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
         >
           <option value="" disabled className="bg-[#1a1f2e] text-slate-500">{disabled ? '해당없음' : `${label} 선택`}</option>
           {options.map(o => (
-            <option key={o} value={o} className="bg-[#1a1f2e] text-white">{o}</option>
+            <option key={getCode(o)} value={getCode(o)} className="bg-[#1a1f2e] text-white">{getName(o)}</option>
           ))}
         </select>
         <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -92,6 +113,7 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState([]); 
   const [allNotifications, setAllNotifications] = useState([]); 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { refreshCodes } = useCodebook();
   
   // 🌐 API Configuration (Production Worker)
   const apiBase = 'https://sguardai.khcho0421.workers.dev';
@@ -110,20 +132,11 @@ export default function DashboardPage() {
   const [thresholds, setThresholds] = useState({ technical: 0.85, casual: 0.95 });
 
   const getAuthHeaders = useCallback(() => {
-    // 🔑 Use the real JWT, NOT the legacy session ID
-    let jwt = localStorage.getItem('sguard_jwt');
-    if (!jwt || jwt.split('.').length !== 3) {
-      const savedUser = localStorage.getItem('sguard_user');
-      if (savedUser) {
-        try {
-          const userObj = JSON.parse(savedUser);
-          jwt = userObj.jwt || null; // Only accept real JWTs
-        } catch (e) {}
-      }
-    }
+    // 🔑 Use the new memory-only access token
+    const token = getAccessToken();
     return {
       'Content-Type': 'application/json',
-      ...(jwt ? { 'Authorization': `Bearer ${jwt}` } : {})
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     };
   }, []);
   const [isSavingThreshold, setIsSavingThreshold] = useState(false);
@@ -141,6 +154,11 @@ export default function DashboardPage() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // 🚀 Dashboard Entry: Fetch latest codebook data
+  useEffect(() => {
+    refreshCodes();
+  }, [refreshCodes]);
 
   const FLOW_STEPS = [
     { id: 'SMS', label: 'SMS 수신 및 장애 인지' },
@@ -385,19 +403,12 @@ export default function DashboardPage() {
       }
 
       // Try to restore from token
-      const token = localStorage.getItem('sguard_token');
+      const token = getAccessToken();
       if (token) {
         try {
-          const userId = token.replace('sguard-token-', '');
-          const res = await fetch(`${apiBase}/users/${userId}`);
-          if (res.ok) {
-            const user = await res.json();
-            localStorage.setItem('sguard_user', JSON.stringify(user));
-            setUserProfile(user);
-            return;
-          }
+          // In some cases we might still want to fetch fresh user data if needed
         } catch {
-          // ignore, fall through to modal
+          // ignore
         }
       }
 
@@ -467,7 +478,7 @@ export default function DashboardPage() {
     const historyInterval = setInterval(fetchUserActivityHistory, 15000);
 
     // 🚀 NEW: Real-time SMS Stream (SSE) — use real JWT for query param auth
-    const token = localStorage.getItem('sguard_jwt');
+    const token = getAccessToken();
     const sse = new EventSource(`${apiBase}/sms/notification-stream${token ? `?token=${token}` : ''}`);
     sse.addEventListener('new_sms', (event) => {
       console.log('Real-time SMS Event:', event.data);
@@ -527,6 +538,7 @@ export default function DashboardPage() {
   };
 
   const fetchActivityLogs = async () => {
+    if (!userProfile?.id) return;
     try {
       const res = await fetch(`${apiBase}/activity-logs`, {
         headers: getAuthHeaders()
@@ -648,6 +660,8 @@ export default function DashboardPage() {
   };
 
   const fetchSMSMessages = async () => {
+    // 🚫 Don't poll if not authenticated — prevents 401 loop
+    if (!getAccessToken() && !localStorage.getItem('sguard_ghost')) return;
     try {
       const response = await fetch(`${apiBase}/sms/recent?limit=20`, {
         headers: getAuthHeaders()
@@ -1090,9 +1104,13 @@ export default function DashboardPage() {
         onClose={() => setShowProfileModal(false)}
         onSave={async (updated) => {
           try {
+            const token = getAccessToken();
             const res = await fetch(`${apiBase}/auth/profile`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
               body: JSON.stringify({
                 user_id: updated.id,
                 name: updated.name,
@@ -2406,46 +2424,101 @@ function AlertItem({ title, time, severity, desc, isSelected }) {
 }
 
 function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
-  // ── 조직도 동적 상태 ──
-  const [honbuList, setHonbuList] = useState([]);
-  const [orgMapping, setOrgMapping] = useState({});
-  const [teamMapping, setTeamMapping] = useState({});
-  const [partMapping, setPartMapping] = useState({});
+  // ── 조직도 전체 트리 상태 (depth 기반 올바른 매핑) ──
+  // depth1: 회사(company), depth2: 부문(honbu), depth3: 본부(team), depth4: 팀(part), depth5: 파트(subpart)
+  const [companyList, setCompanyList]   = useState([]); // depth1
+  const [honbuMap, setHonbuMap]         = useState({}); // company.code → depth2[]
+  const [teamMap, setTeamMap]           = useState({}); // honbu.code   → depth3[]
+  const [partMap, setPartMap]           = useState({}); // team.code    → depth4[]
+  const [subpartMap, setSubpartMap]     = useState({}); // part.code    → depth5[]
 
   useEffect(() => {
-    fetch(`${apiBase}/org/tree`)
+    const token = getAccessToken();
+    fetch(`${apiBase}/org/tree`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    })
       .then(r => r.json())
       .then(tree => {
-        const hList = [];
-        const oMap = {};
-        const tMap = {};
-        const pMap = {};
-        tree.forEach(d1 => {
-          hList.push(d1.name);
-          if (d1.children && d1.children.length > 0) {
-            oMap[d1.name] = d1.children.map(d2 => d2.name);
-            d1.children.forEach(d2 => {
-              if (d2.children && d2.children.length > 0) {
-                tMap[d2.name] = d2.children.map(d3 => d3.name);
-                d2.children.forEach(d3 => {
-                  if (d3.children && d3.children.length > 0) {
-                    pMap[d3.name] = d3.children.map(d4 => d4.name);
-                  }
+        const cList = [];
+        const hMap  = {};
+        const tMap  = {};
+        const pMap  = {};
+        const sMap  = {};
+
+        (tree || []).forEach(d1 => {
+          // depth1 = 회사
+          cList.push({ name: d1.name, code: d1.code || d1.name });
+          const hList = [];
+
+          (d1.children || []).forEach(d2 => {
+            // depth2 = 부문(honbu)
+            hList.push({ name: d2.name, code: d2.code || d2.name });
+            const tList = [];
+
+            (d2.children || []).forEach(d3 => {
+              // depth3 = 본부(team)
+              tList.push({ name: d3.name, code: d3.code || d3.name });
+              const pList = [];
+
+              (d3.children || []).forEach(d4 => {
+                // depth4 = 팀(part)
+                pList.push({ name: d4.name, code: d4.code || d4.name });
+                const sList = [];
+
+                (d4.children || []).forEach(d5 => {
+                  // depth5 = 파트(subpart)
+                  sList.push({ name: d5.name, code: d5.code || d5.name });
                 });
-              }
+                if (sList.length > 0) sMap[d4.code || d4.name] = sList;
+              });
+              if (pList.length > 0) pMap[d3.code || d3.name] = pList;
             });
-          }
+            if (tList.length > 0) tMap[d2.code || d2.name] = tList;
+          });
+          if (hList.length > 0) hMap[d1.code || d1.name] = hList;
         });
-        setHonbuList(hList);
-        setOrgMapping(oMap);
-        setTeamMapping(tMap);
-        setPartMapping(pMap);
+
+        setCompanyList(cList);
+        setHonbuMap(hMap);
+        setTeamMap(tMap);
+        setPartMap(pMap);
+        setSubpartMap(sMap);
+
+        // 각 레벨 전체 코드 목록 (이름↔코드 양방향 조회용)
+        const allItems = { company: cList, honbu: [], team: [], part: [], subpart: [] };
+        Object.values(hMap).forEach(arr => allItems.honbu.push(...arr));
+        Object.values(tMap).forEach(arr => allItems.team.push(...arr));
+        Object.values(pMap).forEach(arr => allItems.part.push(...arr));
+        Object.values(sMap).forEach(arr => allItems.subpart.push(...arr));
+
+        // 저장된 값이 코드인지 이름인지 멘저 조회 맞추기
+        const resolve = (stored, candidates) => {
+          if (!stored) return stored;
+          const byCode = candidates.find(c => c.code === stored);
+          if (byCode) return byCode.code; // 코드가 일치
+          const byName = candidates.find(c => c.name === stored);
+          if (byName) return byName.code; // 이름으로 코드 추캜
+          return stored; // 일치 없으면 원래값 유지
+        };
+
+        // formData의 회사를 코드로 정리한 후 연쁨마다 resolve
+        setFormData(prev => ({
+          ...prev,
+          company: resolve(prev.company, cList),
+          honbu:   resolve(prev.honbu,   allItems.honbu),
+          team:    resolve(prev.team,    allItems.team),
+          part:    resolve(prev.part,    allItems.part),
+          subpart: resolve(prev.subpart, allItems.subpart),
+        }));
       })
-      .catch(err => console.error('Org tree fetch failed:', err));
+      .catch(err => {
+        console.error('Org tree fetch failed:', err);
+        // org tree 실패해도 기존 formData 코드값 유지 — 화면에 코드가 보일 수 있지만 데이터는 보존됨
+      });
   }, []);
 
   const [formData, setFormData] = useState({
-    id: profile.inc_id,
+    id: profile.id || profile.employee_id || profile.inc_id,
     name: profile.name || '',
     phone: profile.phone || '',
     company: profile.company || '',
@@ -2462,6 +2535,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
   // ── 비밀번호 변경 상태 ──
   const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');  // 현재 비밀번호
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -2469,6 +2543,18 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
   const handleChange = (field) => (val) =>
     setFormData(prev => ({ ...prev, [field]: typeof val === 'string' ? val : val.target.value }));
+
+  // 전화번호 자동 포맷: 숫자만 추출 → XXX-XXXX-XXXX
+  const handlePhoneChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+    let formatted = digits;
+    if (digits.length > 3 && digits.length <= 7) {
+      formatted = `${digits.slice(0,3)}-${digits.slice(3)}`;
+    } else if (digits.length > 7) {
+      formatted = `${digits.slice(0,3)}-${digits.slice(3,7)}-${digits.slice(7)}`;
+    }
+    setFormData(prev => ({ ...prev, phone: formatted }));
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -2482,21 +2568,26 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
     setIsUploading(true);
     const formDataObj = new FormData();
     formDataObj.append('file', file);
-    formDataObj.append('uploaded_by', profile.name || profile.inc_id || '사용자');
+    // 사번(employee_id)을 키로 사용 — incident_id 불필요
+    formDataObj.append('employee_id', formData.id || profile.employee_id || profile.id || '');
+    formDataObj.append('uploaded_by', profile.name || profile.employee_id || '사용자');
 
     try {
       const res = await fetch(`${apiBase}/warroom/upload`, {
         method: 'POST',
         body: formDataObj
       });
-      if (!res.ok) throw new Error('업로드 서버 오류');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || '업로드 서버 오류');
+      }
       const data = await res.json();
       
       setProfilePreview(data.url);
       setFormData(prev => ({ ...prev, profile_picture: data.url }));
     } catch (err) {
       console.error(err);
-      alert('프로필 이미지 업로드에 실패했습니다.');
+      alert(`프로필 이미지 업로드에 실패했습니다: ${err.message}`);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -2505,38 +2596,33 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
   const handleSave = () => {
     if (!formData.name.trim()) { alert('이름을 입력해 주세요.'); return; }
-    if (!formData.company) { alert('회사소속을 선택해 주세요.'); return; }
-    if (!formData.honbu) { alert('부문을 선택해 주세요.'); return; }
-
-    // Conditional validation using LIVE org mapping
-    const teamOptions = orgMapping[formData.honbu] || [];
-    if (teamOptions.length > 0 && !formData.team) { alert('본부를 선택해 주세요.'); return; }
-
-    const partOptions = teamMapping[formData.team] || [];
-    if (partOptions.length > 0 && !formData.part) { alert('팀을 선택해 주세요.'); return; }
-
-    const subpartOptions = partMapping[formData.part] || [];
-    if (subpartOptions.length > 0 && !formData.subpart) { alert('파트를 선택해 주세요.'); return; }
-
     onSave(formData);
   };
 
   const handlePasswordChange = async () => {
+    if (!currentPassword) { alert('현재 비밀번호를 입력해 주세요.'); return; }
     if (!newPassword) { alert('새 비밀번호를 입력해 주세요.'); return; }
     if (newPassword !== confirmPassword) { alert('비밀번호가 일치하지 않습니다.'); return; }
     if (newPassword.length < 4) { alert('비밀번호는 4자 이상이어야 합니다.'); return; }
+    if (currentPassword === newPassword) { alert('새 비밀번호가 현재 비밀번호와 동일합니다.'); return; }
 
     setIsChangingPassword(true);
     try {
       const res = await fetch(`${apiBase}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.inc_id, new_password: newPassword }),
+        // old_password로 자체 검증 — JWT 불필요
+        body: JSON.stringify({
+          user_id: formData.id,
+          old_password: currentPassword,
+          new_password: newPassword,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         alert('비밀번호가 성공적으로 변경되었습니다.');
         setShowPasswordChange(false);
+        setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
@@ -2549,10 +2635,21 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
-      localStorage.removeItem('sguard_user');
-      navigate('/');
+      try {
+        // 1. 백엔드에 로그아웃 요청 — HttpOnly 쿠키(세션) 삭제
+        await fetch(`${apiBase}/auth/logout`, {
+          method: 'POST',
+          credentials: 'include'
+        }).catch(() => {});
+      } finally {
+        // 2. 프론트 모든 인증 정보 제거 (Ghost Token, User Cache 등)
+        clearSession();
+        // 3. checkSession의 localStorage 복원을 차단하는 플래그 설정
+        sessionStorage.setItem('s_logged_out', '1');
+        navigate('/', { replace: true });
+      }
     }
   };
 
@@ -2623,24 +2720,29 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">핸드폰 번호</label>
               <div className="relative">
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type="tel" value={formData.phone} onChange={handleChange('phone')} placeholder="010-0000-0000" className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white" />
+                <input type="tel" value={formData.phone || ''} onChange={handlePhoneChange} placeholder="010-0000-0000" maxLength={13} className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white" />
               </div>
             </div>
 
             {/* 회사소속 */}
             <div>
-              <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">회사소속 *</label>
+              <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">회사소속</label>
               <div className="relative">
                 <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <select
-                  required
                   value={formData.company}
-                  onChange={handleChange('company')}
-                  className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-10 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white appearance-none"
+                  onChange={e => {
+                    handleChange('company')(e.target.value);
+                    handleChange('honbu')('');
+                    handleChange('team')('');
+                    handleChange('part')('');
+                    handleChange('subpart')('');
+                  }}
+                  className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-10 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white appearance-none"
                 >
-                  <option value="" disabled>회사를 선택하세요</option>
-                  {SHINHAN_COMPANIES.map(c => (
-                    <option key={c} value={c} className="bg-[#1a1f2e] text-white">{c}</option>
+                  <option value="">회사를 선택하세요</option>
+                  {companyList.map(c => (
+                    <option key={c.code} value={c.code} className="bg-[#1a1f2e] text-white">{c.name}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -2648,55 +2750,56 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              {/* 부문 (honbu) = depth2, company 하위 */}
               <SelectWithOther
                 label="부문"
                 icon={Building2}
-                options={honbuList}
+                options={honbuMap[formData.company] || []}
                 value={formData.honbu}
+                disabled={!formData.company || !(honbuMap[formData.company] || []).length}
                 onChange={(val) => {
                   handleChange('honbu')(val);
                   handleChange('team')('');
                   handleChange('part')('');
                   handleChange('subpart')('');
                 }}
-                required
               />
+              {/* 본부 (team) = depth3, honbu 하위 */}
               <SelectWithOther
                 label="본부"
                 icon={Building2}
-                options={orgMapping[formData.honbu] || []}
+                options={teamMap[formData.honbu] || []}
                 value={formData.team}
+                disabled={!formData.honbu || !(teamMap[formData.honbu] || []).length}
                 onChange={(val) => {
                   handleChange('team')(val);
                   handleChange('part')('');
                   handleChange('subpart')('');
                 }}
-                required={(orgMapping[formData.honbu] || []).length > 0}
-                disabled={!(orgMapping[formData.honbu] || []).length > 0}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-3">
+              {/* 팀 (part) = depth4, team 하위 */}
               <SelectWithOther
                 label="팀"
                 icon={Building2}
-                options={teamMapping[formData.team] || []}
+                options={partMap[formData.team] || []}
                 value={formData.part}
+                disabled={!formData.team || !(partMap[formData.team] || []).length}
                 onChange={(val) => {
                   handleChange('part')(val);
                   handleChange('subpart')('');
                 }}
-                required={(teamMapping[formData.team] || []).length > 0}
-                disabled={!(teamMapping[formData.team] || []).length > 0}
               />
+              {/* 파트 (subpart) = depth5, part 하위 */}
               <SelectWithOther
                 label="파트"
                 icon={Building2}
-                options={partMapping[formData.part] || []}
+                options={subpartMap[formData.part] || []}
                 value={formData.subpart}
+                disabled={!formData.part || !(subpartMap[formData.part] || []).length}
                 onChange={handleChange('subpart')}
-                required={(partMapping[formData.part] || []).length > 0}
-                disabled={!(partMapping[formData.part] || []).length > 0}
               />
             </div>
             </div>
@@ -2713,31 +2816,46 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
               {showPasswordChange && (
                 <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/5 animate-slide-down">
+                  {/* 현재 비밀번호 */}
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500" />
                     <input 
                       type={showPw ? 'text' : 'password'} 
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="새 비밀번호 입력" 
-                      className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="현재 비밀번호" 
+                      className="w-full bg-[#1a1f2e] border border-amber-500/30 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all"
                     />
-                    <button
-                      onClick={() => setShowPw(!showPw)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                    >
-                      {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
-                  <div className="relative">
-                    <CheckCircle2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input 
-                      type={showPw ? 'text' : 'password'} 
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="새 비밀번호 확인" 
-                      className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                    />
+                  <div className="border-t border-white/5 pt-3">
+                    {/* 새 비밀번호 */}
+                    <div className="relative mb-3">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input 
+                        type={showPw ? 'text' : 'password'} 
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="새 비밀번호 입력" 
+                        className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                      />
+                      <button
+                        onClick={() => setShowPw(!showPw)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                      >
+                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {/* 새 비밀번호 확인 */}
+                    <div className="relative">
+                      <CheckCircle2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input 
+                        type={showPw ? 'text' : 'password'} 
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="새 비밀번호 확인" 
+                        className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                      />
+                    </div>
                   </div>
                   <button
                     onClick={handlePasswordChange}

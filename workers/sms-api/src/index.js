@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
 import { secureHeaders } from 'hono/secure-headers'
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PII 마스킹 유틸리티 - Cloudflare Worker 수신 즉시 비식별화
@@ -57,19 +58,81 @@ function maskPII(text) {
   return out
 }
 
+// 🛡️ SECURITY: 기기 지문(Device Fingerprint) 생성 - UA + IP C-Class 해싱
+async function generateDeviceHash(c) {
+  const ua = c.req.header('user-agent') || 'unknown';
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || '127.0.0.1';
+  
+  // 유동 IP 대응을 위해 C-Class 대역까지만 사용
+  const ipPrefix = ip.split('.').slice(0, 3).join('.');
+  const data = `${ua}|${ipPrefix}`;
+  
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// 🛡️ SECURITY: 세션 생성 및 Refresh Token 저장 (D1)
+async function createAndStoreSession(c, userId) {
+  const db = c.env.DB;
+  if (!db) return null;
+
+  const refreshToken = crypto.randomUUID();
+  const deviceHash = await generateDeviceHash(c);
+  // 만료 시간: 1년 (365일)
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').substring(0, 19);
+
+  try {
+    await db.prepare(`
+      INSERT INTO user_sessions (id, user_id, refresh_token, device_hash, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(crypto.randomUUID(), userId, refreshToken, deviceHash, expiresAt).run();
+    
+    return refreshToken;
+  } catch (e) {
+    console.error(`[Session-Error] Failed to store session for user ${userId}:`, e.message);
+    return null;
+  }
+}
+
 const app = new Hono()
 
 // 🛡️ 엔터프라이즈 보안 헤더 적용 (CSP, XSS, Frame Options 등)
-app.use('*', secureHeaders())
+// crossOriginResourcePolicy: false — /warroom/asset/* 경로에서 수동으로 cross-origin 설정
+app.use('*', secureHeaders({ crossOriginResourcePolicy: false }))
 
 app.use('*', cors({
-  origin: ['https://sguard-frontend.pages.dev', 'http://localhost:5173', 'http://localhost:5174'],
+  origin: (origin, c) => {
+    if (!origin) return null;
+    const url = new URL(origin);
+    if (
+      url.hostname === 'sguard-frontend.pages.dev' || 
+      url.hostname.endsWith('.pages.dev') || 
+      url.hostname.endsWith('.workers.dev') ||
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1'
+    ) {
+      return origin;
+    }
+    return 'https://sguard-frontend.pages.dev';
+  },
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
   exposeHeaders: ['Set-Cookie'],
   maxAge: 86400,
   credentials: true,
 }))
+
+// ⚡ R2 에셋 경로: secureHeaders()의 same-origin CORP를 cross-origin으로 강제 오버라이드
+// (await next() 이후에 실행되므로 secureHeaders보다 나중에 적용됨)
+app.use('/warroom/asset/*', async (c, next) => {
+  await next();
+  c.res.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  c.res.headers.set('Access-Control-Allow-Origin', '*');
+  c.res.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+})
 
 // 🛡️ SECURITY: Generate and send security alerts to all admins
 const sendSecurityAlert = async (c, { type, title, detail, urgency = 'NORMAL' }) => {
@@ -112,12 +175,27 @@ const authMiddleware = async (c, next) => {
   // 🔒 인증 예외 경로 (화이트리스트)
   const isPublic = 
     path === '/' || 
-    (path.startsWith('/auth/') && path !== '/auth/check' && path !== '/auth/change-password') ||
+    path === '/auth/login' ||             // 로그인은 자체 검증
+    path === '/auth/refresh' ||            // ⚡ Ghost Token 복구 경로 — 자체 토큰 추출 로직 사용
+    path === '/auth/logout' ||             // ⚡ 로귰아웃 — 쿠키 삭제 (JWT 불필요)
+    path === '/auth/change-password' ||   // ⚡ 기존 비밀번호로 자체 검증 — JWT 불필요
+    path === '/auth/verify' || 
+    path === '/auth/init' ||
+    path === '/auth/signup' ||
+    path === '/auth/reset/request' ||
+    path === '/auth/reset/verify' || 
+    path === '/auth/agree-terms' || 
     path === '/sms/receive' || 
     path === '/retrieval' ||
-    path.startsWith('/debug/');
+    path.startsWith('/warroom/asset/') ||  // ⚡ R2 파일 서빙 — <img src> 직접 접근이므로 JWT 불가
+    path.startsWith('/debug/') ||
+    path === '/org/tree' ||                // 조직도 공개 참조 데이터 (프로필 편집용)
+    path.startsWith('/codebook');          // 코드북 공개 참조 데이터
     
-  if (isPublic) return await next();
+  if (isPublic) {
+    console.log(`[Auth-Pass] Public access to: ${path}`);
+    return await next();
+  }
 
   // 토큰 추출
   const authHeader = c.req.header('Authorization');
@@ -153,11 +231,13 @@ const getKst = () => {
   return new Date(now.getTime() + kstOffset).toISOString().replace('T', ' ').substring(0, 19)
 }
 
-// 🚀 Database One-time Migration Endpoint
+// 🚀 Database One-time Migration Endpoint (Phase 4: Governance & Bypass)
 app.get('/debug/db-init', async (c) => {
-  // 실운영 환경 보호
-  if (c.env.ENVIRONMENT === 'production') {
-    return c.json({ error: 'Production environment debug access denied' }, 403);
+  const pass = c.req.query('pass');
+  
+  // 실운영 환경 보호 (특수 암호 pass=verify 가 없을 경우에만 차단)
+  if (c.env.ENVIRONMENT === 'production' && pass !== 'verify') {
+    return c.json({ error: 'Production environment debug access denied. Use ?pass=verify high-privilege code.' }, 403);
   }
   const db = c.env.DB;
   const results = [];
@@ -172,10 +252,103 @@ app.get('/debug/db-init', async (c) => {
   for (const col of columns) {
     try {
       await db.prepare(`ALTER TABLE received_messages ADD COLUMN ${col.name} ${col.type}`).run();
-      results.push({ column: col.name, status: 'Added successfully' });
+      results.push({ column: `received_messages.${col.name}`, status: 'Added successfully' });
     } catch (e) {
-      results.push({ column: col.name, status: 'Already exists or error', error: e.message });
+      results.push({ column: `received_messages.${col.name}`, status: 'Already exists or skip', error: e.message });
     }
+  }
+
+  // users 테이블 확장 (Phase 19: Consent & Governance)
+  const userColumns = [
+    { name: 'reputation_score', type: 'REAL DEFAULT 100.0' },
+    { name: 's_point', type: 'REAL DEFAULT 0.0' },
+    { name: 'rank_status', type: "TEXT DEFAULT 'Iron Guard'" },
+    { name: 'terms_agreed_at', type: 'TEXT' },
+    { name: 'terms_agreed_ip', type: 'TEXT' },
+    { name: 'terms_version', type: "TEXT DEFAULT 'v1.0'" }
+  ];
+  for (const col of userColumns) {
+    try {
+      await db.prepare(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`).run();
+      results.push({ column: `users.${col.name}`, status: 'Added successfully' });
+    } catch (e) { results.push({ column: `users.${col.name}`, status: 'Already exists' }); }
+  }
+
+  // knowledge_base 테이블 확장 (Phase 7 & 15 통합 거버넌스)
+  const kbColumns = [
+    { name: 'status', type: "TEXT DEFAULT 'VERIFIED'" },
+    { name: 'vote_count', type: "INTEGER DEFAULT 1" },
+    { name: 'tags', type: 'TEXT' },
+    { name: 'category', type: 'TEXT' },
+    { name: 'version', type: 'INTEGER DEFAULT 1' },
+    { name: 'vector', type: 'TEXT' },
+    { name: 'fail_count', type: 'INTEGER DEFAULT 0' },
+    { name: 'priority_flag', type: 'INTEGER DEFAULT 0' },
+    { name: 'priority_score', type: 'REAL DEFAULT 0.0' }
+  ];
+  for (const col of kbColumns) {
+    try {
+      await db.prepare(`ALTER TABLE knowledge_base ADD COLUMN ${col.name} ${col.type}`).run();
+      results.push({ column: `knowledge_base.${col.name}`, status: 'Added successfully' });
+    } catch (e) { results.push({ column: `knowledge_base.${col.name}`, status: 'Already exists' }); }
+  }
+
+  // ai_feedback 신규 가버넌스 컬럼 확장 (Phase 15 고도화)
+  const feedbackColumns = [
+    // 기존 컬럼
+    { name: 'status',         type: "TEXT DEFAULT 'PENDING'" },
+    { name: 'is_golden',      type: 'INTEGER DEFAULT 0' },
+    { name: 'admin_comment',  type: 'TEXT' },
+    { name: 'voter_count',    type: 'INTEGER DEFAULT 0' },
+    { name: 'audit_log',      type: 'TEXT' },
+    // 누락 컬럼 (기존 DB에 없어서 INSERT 시 오류 발생)
+    { name: 'inc_id',           type: 'TEXT' },
+    { name: 'vector_id',        type: 'TEXT' },
+    { name: 'error_category',   type: 'TEXT' },
+    { name: 'user_correction',  type: 'TEXT' },
+    { name: 'reason',           type: 'TEXT' },
+    { name: 'context',          type: 'TEXT' },
+    { name: 'point_awarded',    type: 'BOOLEAN DEFAULT FALSE' },
+    { name: 'reg_id',           type: "TEXT DEFAULT 'SYSTEM'" },
+    { name: 'reg_dt',           type: 'DATETIME' },
+    { name: 'mod_id',           type: "TEXT DEFAULT 'SYSTEM'" },
+    { name: 'mod_dt',           type: 'DATETIME' },
+  ];
+
+  for (const col of feedbackColumns) {
+    try {
+      await db.prepare(`ALTER TABLE ai_feedback ADD COLUMN ${col.name} ${col.type}`).run();
+      results.push({ column: `ai_feedback.${col.name}`, status: 'Added successfully' });
+    } catch (e) { results.push({ column: `ai_feedback.${col.name}`, status: 'Already exists' }); }
+  }
+
+  // received_messages 중요도 가중치 컬럼 확장 (Phase 10/10.1)
+  try {
+    await db.prepare("ALTER TABLE received_messages ADD COLUMN priority_flag INTEGER DEFAULT 0").run();
+    results.push({ column: "received_messages.priority_flag", status: "Added successfully" });
+  } catch (e) {
+    results.push({ column: "received_messages.priority_flag", status: "Already exists or skip", error: e.message });
+  }
+  
+  try {
+    await db.prepare("ALTER TABLE received_messages ADD COLUMN priority_score REAL DEFAULT 0.0").run();
+    results.push({ column: "received_messages.priority_score", status: "Added successfully" });
+  } catch (e) {
+    results.push({ column: "received_messages.priority_score", status: "Already exists or skip", error: e.message });
+  }
+
+  try {
+    await db.prepare("ALTER TABLE received_messages ADD COLUMN tags TEXT").run();
+    results.push({ column: "received_messages.tags", status: "Added successfully" });
+  } catch (e) {
+    results.push({ column: "received_messages.tags", status: "Already exists or skip", error: e.message });
+  }
+
+  try {
+    await db.prepare("ALTER TABLE received_messages ADD COLUMN category TEXT").run();
+    results.push({ column: "received_messages.category", status: "Added successfully" });
+  } catch (e) {
+    results.push({ column: "received_messages.category", status: "Already exists or skip", error: e.message });
   }
   
   // Add inbox_items table check
@@ -234,8 +407,76 @@ app.get('/debug/db-init', async (c) => {
     results.push({ table: 'dify_debug_logs', status: 'Error', error: e.message });
   }
 
+  // 🚀 Feedback: Create ai_feedback table
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS ai_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        inc_id TEXT,
+        vector_id TEXT,
+        query TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        context TEXT,
+        feedback_type TEXT NOT NULL,
+        reason TEXT,
+        user_correction TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'PENDING',
+        is_golden INTEGER DEFAULT 0,
+        admin_comment TEXT,
+        error_category TEXT,
+        reg_id TEXT DEFAULT 'SYSTEM',
+        reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        mod_id TEXT DEFAULT 'SYSTEM',
+        mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(employee_id)
+      )
+    `).run();
+    results.push({ table: 'ai_feedback', status: 'Created or verified' });
+  } catch (e) {
+    results.push({ table: 'ai_feedback', status: 'Error', error: e.message });
+  }
+
+  // 🚀 Knowledge History: Create knowledge_history table (Phase 5)
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS knowledge_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kb_id INTEGER NOT NULL,
+        previous_content TEXT NOT NULL,
+        new_content TEXT NOT NULL,
+        admin_id TEXT,
+        change_reason TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(kb_id) REFERENCES knowledge_base(id)
+      )
+    `).run();
+    results.push({ table: 'knowledge_history', status: 'Created or verified' });
+  } catch (e) {
+    results.push({ table: 'knowledge_history', status: 'Error', error: e.message });
+  }
+
+  // 🚀 Phase 18: Infrastructure Hero Leaderboard (user_stats)
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS user_stats (
+        user_id TEXT PRIMARY KEY,
+        user_name TEXT,
+        s_point INTEGER DEFAULT 0,
+        contribution_count INTEGER DEFAULT 0,
+        rank_level TEXT DEFAULT 'IRON',
+        last_active_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    results.push({ table: 'user_stats', status: 'Created or verified' });
+  } catch (e) { results.push({ table: 'user_stats', status: 'Error', error: e.message }); }
+
+  // knowledge_feedback 컬럼 확장
+  try { await db.prepare("ALTER TABLE ai_feedback ADD COLUMN point_awarded BOOLEAN DEFAULT FALSE").run(); } catch(e) {}
+
   return c.json({ 
-    message: 'Database structure check complete', 
+    message: 'Phase 18 Leadboard Infrastructure Ready', 
     results,
     timestamp: getKst()
   });
@@ -243,9 +484,9 @@ app.get('/debug/db-init', async (c) => {
 
 // 🚀 Genesis Protocol: Seed Initial Data
 app.get('/debug/seed-initial-data', async (c) => {
-  // 실운영 환경 보호
-  if (c.env.ENVIRONMENT === 'production') {
-    return c.json({ error: 'Production environment debug access denied' }, 403);
+  const pass = c.req.query('pass');
+  if (c.env.ENVIRONMENT === 'production' && pass !== 'verify') {
+    return c.json({ error: 'Production environment debug access denied. Use ?pass=verify high-privilege code.' }, 403);
   }
   const db = c.env.DB;
   const now = getKst();
@@ -276,8 +517,9 @@ app.get('/debug/seed-initial-data', async (c) => {
 
 // 🚀 Vectorize Health Check
 app.get('/debug/vectorize-stats', async (c) => {
-  if (c.env.ENVIRONMENT === 'production') {
-    return c.json({ error: 'Production environment debug access denied' }, 403);
+  const pass = c.req.query('pass');
+  if (c.env.ENVIRONMENT === 'production' && pass !== 'verify') {
+    return c.json({ error: 'Production environment debug access denied. Use ?pass=verify high-privilege code.' }, 403);
   }
   if (!c.env.WARROOM_INDEX) return c.json({ error: 'WARROOM_INDEX binding missing' }, 500);
   
@@ -294,6 +536,32 @@ app.get('/debug/vectorize-stats', async (c) => {
   }
 });
 
+// Utility to clean message for consistent similarity search (strip headers/timestamps)
+const cleanMessageForEmbedding = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/\[Web발신\]/g, '')
+    .replace(/\[Web\]/g, '')
+    .replace(/\[광고\]/g, '')
+    .replace(/\b\d{1,2}\/\d{1,2}\s\d{1,2}:\d{1,2}(?::\d{1,2})?\b/g, '')
+    .replace(/\b\d{4}-\d{2}-\d{2}(\s\d{1,2}:\d{1,2}(?::\d{1,2})?)?\b/g, '')
+    .replace(/\b\d{2}:\d{2}(?::\d{2})?\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Utility for AI Embeddings
+const generateEmbedding = async (text, env) => {
+  if (!text || !env.AI) return null;
+  try {
+    const response = await env.AI.run('@cf/baai/bge-base-en-v1.5', { text: [text] });
+    return response?.data?.[0] || null;
+  } catch (e) {
+    console.error('Embedding error:', e.message);
+    return null;
+  }
+}
+
 // Utility to generate unique numeric string ID (YYYYMMDDHHMMSS + RRR)
 const generateIncId = () => {
   const now = new Date();
@@ -309,44 +577,49 @@ const generateIncId = () => {
   return `${yyyy}${mm}${dd}${hh}${mi}${ss}${random}`;
 }
 
-// Utility to clean message for consistent similarity search (strip headers/timestamps)
-const cleanMessageForEmbedding = (text) => {
-  if (!text) return '';
-  return text
-    .replace(/\[Web발신\]/g, '')
-    .replace(/\[Web\]/g, '')
-    .replace(/\[광고\]/g, '')
-    // Remove Date/Time patterns: MM/DD HH:mm(:ss), YYYY-MM-DD, etc.
-    .replace(/\b\d{1,2}\/\d{1,2}\s\d{1,2}:\d{1,2}(?::\d{1,2})?\b/g, '')
-    .replace(/\b\d{4}-\d{2}-\d{2}(\s\d{1,2}:\d{1,2}(?::\d{1,2})?)?\b/g, '')
-    .replace(/\b\d{2}:\d{2}(?::\d{2})?\b/g, '')
-    // Remove extra whitespace
-    .replace(/\s+/g, ' ')
-    .trim();
+// Utility to extract metadata from natural language for Hybrid Search (Phase 4)
+const extractSearchMetadata = (text) => {
+  if (!text) return {};
+  const metadata = {};
+  
+  // 1. Extract Phone Number (Sender)
+  const phoneMatch = text.match(/01[016789][\s\-]?\d{3,4}[\s\-]?\d{4}/);
+  if (phoneMatch) metadata.sender = phoneMatch[0].replace(/[\s\-]/g, '');
+
+  // 2. Extract Error Code (e.g., Error 500, ERR_404, etc.)
+  const errorMatch = text.match(/(?:Error|ERR|에러|오류|코드)\s?[:\-]?\s?(\d{3,}|[A-Z0-9_]{3,})/i);
+  if (errorMatch) metadata.error_code = errorMatch[1].toUpperCase();
+
+  // 3. Extract Date Patterns (어제, 오늘, YYYY-MM-DD)
+  const now = new Date();
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const today = new Date(now.getTime() + kstOffset);
+  
+  if (text.includes('오늘')) {
+    metadata.start_date = today.toISOString().split('T')[0] + ' 00:00:00';
+    metadata.end_date = today.toISOString().split('T')[0] + ' 23:59:59';
+  } else if (text.includes('어제')) {
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    metadata.start_date = yesterday.toISOString().split('T')[0] + ' 00:00:00';
+    metadata.end_date = yesterday.toISOString().split('T')[0] + ' 23:59:59';
+  }
+
+  // 4. Extract Target System (Keywords)
+  const systems = ['A-System', 'B-System', 'Billing', 'Auth', 'S-Auth'];
+  for (const sys of systems) {
+    if (text.toLowerCase().includes(sys.toLowerCase())) {
+      metadata.target_system = sys;
+      break;
+    }
+  }
+
+  // 5. Extract Search Keywords for Title Matching (Phase 6)
+  const cleanedText = text.replace(/[^\w\sㄱ-ㅎㅏ-ㅣ가-힣]/g, ' ');
+  metadata.keywords = cleanedText.split(/\s+/).filter(w => w.length >= 2);
+
+  return metadata;
 }
 
-// Utility for AI Embeddings
-const generateEmbedding = async (text, env) => {
-  if (!text || !env.AI) {
-    console.error('Text or env.AI is missing');
-    return null;
-  }
-  try {
-    console.log('Generating embedding for text:', text.substring(0, 50));
-    const response = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
-      text: [text]
-    });
-    if (!response || !response.data || !response.data[0]) {
-      console.error('Invalid AI response:', JSON.stringify(response));
-      return null;
-    }
-    console.log('Embedding generated successfully, dimensions:', response.data[0].length);
-    return response.data[0];
-  } catch (e) {
-    console.error('Embedding error detail:', e.message, e.stack);
-    return null;
-  }
-}
 
 // ==========================================
 // AI Background Analysis (Eager Loading)
@@ -414,9 +687,18 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
       }
     }
 
-    // 2. Cache check
+    // 2. Cache check — PENDING/ANALYZING 상태면 캐시 무시하고 강제 재분석
     const cached = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
     if (cached && cached.content) {
+      // 캐시가 있어도 SMS가 여전히 PENDING/ANALYZING이면 분석 완료 처리만 하고 스킵
+      const smsStatus = await db.prepare("SELECT status FROM received_messages WHERE inc_id = ?").bind(String(sms_id)).first();
+      if (!smsStatus || (smsStatus.status !== 'PENDING' && smsStatus.status !== 'ANALYZING')) {
+        console.log(`[Background] inc_id=${sms_id} already ANALYZED with cache — skipping.`);
+        if (kv) await kv.delete(lockKey);
+        return;
+      }
+      // PENDING/ANALYZING인데 캐시가 있으면 → 상태만 ANALYZED로 업데이트하고 종료
+      await db.prepare("UPDATE received_messages SET status = 'ANALYZED' WHERE inc_id = ?").bind(String(sms_id)).run();
       if (kv) await kv.delete(lockKey);
       return;
     }
@@ -1043,7 +1325,7 @@ app.post('/auth/verify', async (c) => {
   // 5. 최신 사용자 정보 조회
   const updated = await db.prepare("SELECT * FROM users WHERE employee_id=?").bind(empId).first();
 
-  // 6. JWT 생성 (8시간)
+  // 6. Access Token 생성 (단기: 15분)
   const jwt = await generateJWT({
     sub:         empId,
     name:        updated.name,
@@ -1052,18 +1334,29 @@ app.post('/auth/verify', async (c) => {
     company:     updated.company,
     honbu:       updated.honbu,
     team:        updated.team,
-  }, jwtSecret, 2592000); // 30 days (2592000)
+  }, jwtSecret, 1800); // ⚡ Increased to 30 minutes (1800s) for smoother experience
 
-  // 7. HttpOnly 쿠키 설정 + 사용자 정보 반환
-  const isProd = (c.env.ENVIRONMENT || '') === 'production';
-  c.header('Set-Cookie',
-    `sguard_jwt=${jwt}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${isProd ? '; Secure' : ''}`
-  );
+  // 7. Refresh Token 생성 및 D1 저장 (장기: 1년)
+  const refreshToken = await createAndStoreSession(c, empId);
+
+  // 8. HttpOnly 쿠키 설정 (hono/cookie 사용으로 호환성 극대화)
+  if (refreshToken) {
+    setCookie(c, 'sguard_refresh', refreshToken, {
+      path: '/',
+      httpOnly: true,
+      maxAge: 2592000,
+      sameSite: 'None',
+      secure: true,
+    });
+  } else {
+    console.warn('[Session-Warning] Proceeding without refresh token due to DB error.');
+  }
 
   return c.json({
     ok: true,
-    token,                          // 하위 호환: localStorage 저장용
-    jwt,                            // 🔒 신규: Bearer 인증용 JWT
+    token,                          // 하위 호환성 유지
+    access_token:    jwt,           // 🔒 신규: 메모리 저장용 Access Token
+    ghost_token:     refreshToken,  // 👻 신규: 장기 세션용
     id:              empId,
     employee_id:     empId,
     email:           updated.email,
@@ -1076,6 +1369,7 @@ app.post('/auth/verify', async (c) => {
     is_admin:        updated.is_admin || 0,
     status:          updated.status,
     profile_picture: updated.profile_picture,
+    terms_agreed_at: updated.terms_agreed_at, // ⚖️ Phase 19 fix
   });
 });
 
@@ -1133,7 +1427,8 @@ app.post('/auth/set-password', async (c) => {
     position: updated.position,
     is_admin: updated.is_admin || 0,
     status: 'ACTIVE',
-    profile_picture: updated.profile_picture
+    profile_picture: updated.profile_picture,
+    terms_agreed_at: updated.terms_agreed_at // ⚖️ Phase 19 fix
   });
 });
 
@@ -1142,7 +1437,22 @@ app.post('/auth/login', async (c) => {
   const db = c.env.DB
   
   // Find user by email or employee_id (Get status to check)
-  const user = await db.prepare("SELECT * FROM users WHERE (email = ? OR employee_id = ?)")
+  const user = await db.prepare(`
+    SELECT 
+      u.*,
+      COALESCE(oc.name, u.company) as company_name, 
+      COALESCE(oh.name, u.honbu) as honbu_name, 
+      COALESCE(ot.name, u.team) as team_name,
+      COALESCE(op.name, u.part) as part_name,
+      COALESCE(os.name, u.subpart) as subpart_name
+    FROM users u
+    LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+    LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+    LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+    LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+    LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+    WHERE (u.email = ? OR u.employee_id = ?)
+  `)
     .bind(email, email)
     .first()
 
@@ -1172,16 +1482,155 @@ app.post('/auth/login', async (c) => {
   }
 
   const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+  
+  // 1. Access Token 생성 (15분)
   const jwt = await generateJWT({
     sub:      user.employee_id,
     name:     user.name,
     role:     user.role,
     is_admin: user.is_admin || 0,
     company:  user.company,
-  }, jwtSecret, 28800);
+  }, jwtSecret, 1800); // ⚡ Increased to 30 minutes (1800s)
   
-  return c.json({ ok: true, user, token: `sguard-token-${user.employee_id}`, jwt });
+  // 2. Refresh Token 생성 및 저장
+  const refreshToken = await createAndStoreSession(c, user.employee_id);
+  
+  // 3. 쿠키 설정 (hono/cookie 사용으로 호환성 극대화)
+  if (refreshToken) {
+    setCookie(c, 'sguard_refresh', refreshToken, {
+      path: '/',
+      httpOnly: true,
+      maxAge: 2592000,
+      sameSite: 'None',
+      secure: true,
+    });
+  }
+
+  return c.json({ 
+    ok: true, 
+    user, 
+    token: `sguard-token-${user.employee_id}`, 
+    access_token: jwt,
+    ghost_token: refreshToken // 👻 Ghost Token for localhost fallback
+  });
 })
+
+app.get('/auth/refresh', async (c) => {
+  console.log('[Auth-Debug] Refresh Request Headers:', JSON.stringify(Object.fromEntries(c.req.raw.headers)));
+  
+  let refreshToken = getCookie(c, 'sguard_refresh');
+  
+  // 👻 Ghost Token Fallback (Authorization Header)
+  if (!refreshToken) {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader) {
+      const match = authHeader.match(/^Bearer\s+(.+)$/i);
+      if (match) {
+        refreshToken = match[1];
+        console.log('[Auth-Debug] Ghost Token extracted from header');
+      }
+    }
+  }
+
+  console.log('[Auth-Debug] Final Refresh Token:', refreshToken ? 'PRESENT' : 'MISSING');
+
+  if (!refreshToken) {
+    return c.json({ 
+        error: 'No refresh token', 
+        code: 'COOKIE_MISSING',
+        hint: 'Ghost Token fallback failed too'
+    }, 401);
+  }
+
+  const db = c.env.DB;
+  const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+
+  try {
+    // 1. 세션 조회 및 만료 체크
+    const session = await db.prepare(`
+      SELECT * FROM user_sessions WHERE refresh_token = ? AND expires_at > DATETIME('now')
+    `).bind(refreshToken).first();
+
+    if (!session) {
+      console.warn('[Auth-Refresh] Session not found or expired in DB');
+      return c.json({ error: 'Invalid or expired session', code: 'SESSION_EXPIRED' }, 401);
+    }
+
+    // 2. 🛡️ SECURITY Core: 기기 정보 대조 (소프트 검증 - Ghost Token 호환)
+    // Ghost Token 복구 경로에서 헤더/IP 차이로 인한 세션 강제 파기를 방지하기 위해
+    // 불일치 시 세션 삭제 대신 경고 로그만 기록합니다.
+    const currentDeviceHash = await generateDeviceHash(c);
+    if (session.device_hash !== currentDeviceHash) {
+      console.warn(`[Security-Soft] Device hash mismatch for user ${session.user_id}. Allowing refresh (Ghost Token compatibility mode).`);
+      // NOTE: 강화된 보안이 필요한 경우 아래 주석을 해제하세요 (Ghost Token 비활성화 필요)
+      // await db.prepare('DELETE FROM user_sessions WHERE refresh_token = ?').bind(refreshToken).run();
+      // deleteCookie(c, 'sguard_refresh', { path: '/', sameSite: 'None', secure: true });
+      // return c.json({ error: 'Device changed or unauthorized access detect.', code: 'DEVICE_MISMATCH' }, 403);
+    }
+
+    // 3. 사용자 정보 재조회 (최신 상태 및 조직명 매핑 보장)
+    const user = await db.prepare(`
+      SELECT 
+        u.*,
+        COALESCE(oc.name, u.company) as company_name, 
+        COALESCE(oh.name, u.honbu) as honbu_name, 
+        COALESCE(ot.name, u.team) as team_name,
+        COALESCE(op.name, u.part) as part_name,
+        COALESCE(os.name, u.subpart) as subpart_name
+      FROM users u
+      LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+      LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+      LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+      LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+      LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+      WHERE u.employee_id = ?
+    `).bind(session.user_id).first();
+
+    if (!user || user.status !== 'ACTIVE') {
+      return c.json({ error: 'User inactive or not found', code: 'USER_INACTIVE' }, 403);
+    }
+
+    // 4. 새 Access Token 발급
+    const newAccessToken = await generateJWT({
+      sub:      user.employee_id,
+      name:     user.name,
+      role:     user.role,
+      is_admin: user.is_admin || 0,
+      company:  user.company,
+    }, jwtSecret, 1800);
+
+    // 👻 Ghost Token 유지 (기존 리프레시 토큰 재사용 또는 신규 발급)
+    // 여기서는 기존 리프레시 토큰을 그대로 ghost_token으로 반환하여 세션 유지
+    return c.json({ 
+      ok: true, 
+      access_token: newAccessToken, 
+      ghost_token: refreshToken, 
+      user 
+    });
+
+  } catch (err) {
+    console.error('[Auth-Refresh-Fatal]', err.message);
+    return c.json({ error: 'Internal server error during refresh', code: 'REFRESH_ERROR' }, 500);
+  }
+});
+
+// ──────────────────────────────────────────
+// POST /auth/logout
+// 세션 파기 및 쿠키 삭제
+// ──────────────────────────────────────────
+app.post('/auth/logout', async (c) => {
+  const cookieHeader = c.req.header('Cookie') || '';
+  const cookies = Object.fromEntries(cookieHeader.split(';').map(v => v.trim().split('=')));
+  const refreshToken = cookies['sguard_refresh'];
+  const db = c.env.DB;
+
+  if (refreshToken) {
+    await db.prepare('DELETE FROM user_sessions WHERE refresh_token = ?').bind(refreshToken).run();
+  }
+
+  c.header('Set-Cookie', 'sguard_refresh=; HttpOnly; Path=/; Max-Age=0; SameSite=None; Secure');
+  return c.json({ ok: true, message: 'Logged out' });
+});
 
 // 🛡️ API: 세션 유효성 체크 (Navigation Guard용 - D1 실시간 조회)
 app.get('/auth/check', async (c) => {
@@ -1195,7 +1644,7 @@ app.get('/auth/check', async (c) => {
 
   // D1 데이터베이스에서 실시간 상태 및 정보 대조
   const user = await db
-    .prepare("SELECT employee_id, email, name, status, role, is_admin, company, honbu, team, position, profile_picture FROM users WHERE employee_id = ?")
+    .prepare("SELECT employee_id, email, name, status, role, is_admin, company, honbu, team, position, profile_picture, s_point, rank_status, terms_agreed_at FROM users WHERE employee_id = ?")
     .bind(empId)
     .first();
 
@@ -1221,6 +1670,9 @@ app.get('/auth/check', async (c) => {
       team: user.team,
       position: user.position,
       is_admin: user.is_admin,
+      s_point: user.s_point || 0,
+      rank_status: user.rank_status || 'IRON',
+      terms_agreed_at: user.terms_agreed_at, // ⚖️ Phase 19 fix
       status: user.status,
       profile_picture: user.profile_picture
     }
@@ -1286,6 +1738,7 @@ app.post('/auth/signup', async (c) => {
       position: position || 'POS_001',
       profile_picture: null,
       is_admin: 0,
+      terms_agreed_at: null, // ⚖️ New signup: Always null
       numeric_id: userId
     }
   })
@@ -1505,16 +1958,16 @@ app.get('/users', async (c) => {
   let query = `
     SELECT 
       u.employee_id as id, u.employee_id, u.email, u.name, u.role, u.phone,
+      u.company, 
       COALESCE(oc.name, u.company) as company_name, 
+      u.honbu,
       COALESCE(oh.name, u.honbu) as honbu_name, 
+      u.team,
       COALESCE(ot.name, u.team) as team_name,
+      u.part,
       COALESCE(op.name, u.part) as part_name,
+      u.subpart,
       COALESCE(os.name, u.subpart) as subpart_name,
-      u.company as company_code,
-      u.honbu as honbu_code,
-      u.team as team_code,
-      u.part as part_code,
-      u.subpart as subpart_code,
       u.profile_picture,
       u.status, u.is_active, u.is_admin , u.last_login_at
     FROM users u
@@ -1552,11 +2005,16 @@ app.get('/users/:id', async (c) => {
   const user = await db.prepare(`
     SELECT 
       u.employee_id, u.email, u.name, u.role, u.phone, u.is_active, u.is_admin, u.profile_picture,
-      COALESCE(oc.name, u.company) as company, 
-      COALESCE(oh.name, u.honbu) as honbu, 
-      COALESCE(ot.name, u.team) as team,
-      COALESCE(op.name, u.part) as part,
-      COALESCE(os.name, u.subpart) as subpart
+      u.company,
+      COALESCE(oc.name, u.company) as company_name, 
+      u.honbu,
+      COALESCE(oh.name, u.honbu) as honbu_name, 
+      u.team,
+      COALESCE(ot.name, u.team) as team_name,
+      u.part,
+      COALESCE(op.name, u.part) as part_name,
+      u.subpart,
+      COALESCE(os.name, u.subpart) as subpart_name
     FROM users u
     LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
     LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
@@ -1579,7 +2037,23 @@ app.patch('/auth/profile', async (c) => {
   await db.prepare(
     "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, profile_picture = COALESCE(?, profile_picture), mod_dt = ?, mod_id = ? WHERE employee_id = ?"
   ).bind(name, phone || null, company || null, honbu || null, team || null, part || null, subpart || null, profile_picture !== undefined ? profile_picture : null, modDt, empId, user_id).run()
-  const updated = await db.prepare("SELECT employee_id, email, name, role, company, honbu, team, part, subpart, phone, employee_id, position, is_admin, profile_picture FROM users WHERE employee_id = ?").bind(user_id).first()
+  
+  const updated = await db.prepare(`
+    SELECT 
+      u.*,
+      COALESCE(oc.name, u.company) as company_name, 
+      COALESCE(oh.name, u.honbu) as honbu_name, 
+      COALESCE(ot.name, u.team) as team_name,
+      COALESCE(op.name, u.part) as part_name,
+      COALESCE(os.name, u.subpart) as subpart_name
+    FROM users u
+    LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+    LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+    LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+    LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+    LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+    WHERE u.employee_id = ?
+  `).bind(user_id).first()
   return c.json({ status: "success", user: updated })
 })
 
@@ -1873,10 +2347,69 @@ app.post('/sms/receive', async (c) => {
   const body = await c.req.json()
   const { 
     sender, message, employee_id, 
-    channel, if_id, service_code, service_name, 
-    biz_system, error_code, occurrence_count, 
-    occurrence_node, error_message, occurrence_time, received_at 
+    channel: bodyChannel, if_id: bodyIfId, service_code: bodyServiceCode, service_name: bodyServiceName, 
+    biz_system: bodyBizSystem, error_code: bodyErrorCode, occurrence_count: bodyOccurrenceCount, 
+    occurrence_node: bodyOccurrenceNode, error_message: bodyErrorMessage, occurrence_time: bodyOccurrenceTime, received_at 
   } = body
+
+  // 🚀 Phase 14: Universal Entity Extraction (MCI / Batch / Generic)
+  const uniqueIdPatterns = [
+    /[A-Z]+[0-9]{3,}[A-Z0-9_]*/g,     // EGRT0096, FAN00200, BIDS...
+    /[A-Z]{3,}_[A-Z0-9_]+/g,          // BIDS_D_RE07...
+    /[A-Z]+-[A-Z]+[0-9]+/g            // SIN-MCI1...
+  ];
+
+  const mciPattern = {
+    channel: message.match(/▶ 채널\s*:\s*\[(.*?)\]/),
+    if_id: message.match(/▶ IF아이디\s*:\s*\[(.*?)\]/),
+    service_code: message.match(/▶ 서비스코드\s*:\s*\[(.*?)\]/),
+    service_name: message.match(/▶ 서비스명\s*:\s*\[(.*?)\]/),
+    occurrence_count: message.match(/▶ 발생건수\s*:\s*\[(.*?)\]/),
+    occurrence_node: message.match(/▶ 발생노드\s*:\s*\[(.*?)\]/),
+    error_message: message.match(/▶ 에러메시지\s*:\s*\[(.*?)\]/),
+    occurrence_time: message.match(/▶ 발생시각\s*:\s*\[(.*?)\]/)
+  }
+
+  const contextKeywords = ['AIA', '효성', '신한', 'FAN', 'FRC', 'MCI', 'JOBMIND', 'BATCH', 'UI'];
+  const timelinePatterns = [
+    /\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}(?::\d{2})?/, // YYYY-MM-DD HH:MM
+    /\d{1,2}\/\d{1,2}\s\d{1,2}:\d{1,2}/,         // MM/DD HH:MM
+    /최근\s*(\d+\s*분) 동안/,                     // 최근 2분 동안
+    /총\s*(\d+\s*건)/                             // 총 16건
+  ];
+
+  // 📦 Extracting Unique IDs
+  const foundIds = new Set();
+  uniqueIdPatterns.forEach(p => {
+    const matches = message.match(p);
+    if (matches) matches.forEach(m => foundIds.add(m));
+  });
+
+  // 📦 Extracting Context
+  const foundContext = contextKeywords.filter(k => message.includes(k));
+
+  // 📦 Extracting Timeline Info
+  const foundTimeline = [];
+  timelinePatterns.forEach(p => {
+    const match = message.match(p);
+    if (match) foundTimeline.push(match[0]);
+  });
+
+  // 🔗 Map results to existing fields
+  const channel = bodyChannel || (mciPattern.channel ? mciPattern.channel[1] : null);
+  const if_id = bodyIfId || (mciPattern.if_id ? mciPattern.if_id[1] : null);
+  const service_code = bodyServiceCode || (mciPattern.service_code ? mciPattern.service_code[1] : null);
+  const service_name = bodyServiceName || (mciPattern.service_name ? mciPattern.service_name[1] : null);
+  const biz_system = bodyBizSystem || foundContext.find(c => ['FRC', 'FAN', 'MCI', 'JOBMIND'].includes(c)) || null;
+  const error_code = bodyErrorCode || Array.from(foundIds).find(id => id.length > 5) || (mciPattern.error_code ? mciPattern.error_code[1] : null);
+  const error_message = bodyErrorMessage || (mciPattern.error_message ? mciPattern.error_message[1] : null);
+  const occurrence_count = bodyOccurrenceCount || (mciPattern.occurrence_count ? mciPattern.occurrence_count[1] : null);
+  const occurrence_node = bodyOccurrenceNode || (mciPattern.occurrence_node ? mciPattern.occurrence_node[1] : null);
+  const occurrence_time = bodyOccurrenceTime || (mciPattern.occurrence_time ? mciPattern.occurrence_time[1] : null);
+
+  const tags = [...foundIds, ...foundContext].join(', ');
+  const category = (message.includes('BATCH') || message.includes('JOBMIND')) ? 'BATCH_ALARM_SMS' : 'INFRA_ALARM_SMS';
+  const occurrence_summary = foundTimeline.join(' | ');
 
   // ─── 보안: employee_id 화이트리스트 검증 ───────────────────────────────
   // 등록되지 않은(또는 비활성화된) 직원 ID로 들어오는 요청을 전면 차단합니다.
@@ -1951,7 +2484,8 @@ app.post('/sms/receive', async (c) => {
         receiver_1 = ?, receiver_2 = ?, receiver_3 = ?, receiver_4 = ?, receiver_5 = ?,
         receiver_6 = ?, receiver_7 = ?, receiver_8 = ?, receiver_9 = ?, receiver_10 = ?,
         receiver_11 = ?, receiver_12 = ?, receiver_13 = ?, receiver_14 = ?, receiver_15 = ?,
-        receiver_16 = ?, receiver_17 = ?, receiver_18 = ?, receiver_19 = ?, receiver_20 = ?
+        receiver_16 = ?, receiver_17 = ?, receiver_18 = ?, receiver_19 = ?, receiver_20 = ?,
+        tags = ?, category = ?
       WHERE inc_id = ?
     `).bind(
       newCount, timestamp, timestamp, employee_id || null,
@@ -1963,6 +2497,7 @@ app.post('/sms/receive', async (c) => {
       body.receiver_6 || null, body.receiver_7 || null, body.receiver_8 || null, body.receiver_9 || null, body.receiver_10 || null,
       body.receiver_11 || null, body.receiver_12 || null, body.receiver_13 || null, body.receiver_14 || null, body.receiver_15 || null,
       body.receiver_16 || null, body.receiver_17 || null, body.receiver_18 || null, body.receiver_19 || null, body.receiver_20 || null,
+      tags, category,
       existing.inc_id
     ).run()
 
@@ -2014,7 +2549,7 @@ app.post('/sms/receive', async (c) => {
   const maskedMessage = maskPII(message)
   const maskedSender  = maskPII(sender)
   console.log(`[PII] Applied masking before D1 INSERT for employee_id=${employee_id}`)
-  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   await db.prepare(`
     INSERT INTO received_messages (
@@ -2027,7 +2562,7 @@ app.post('/sms/receive', async (c) => {
       receiver_6, receiver_7, receiver_8, receiver_9, receiver_10,
       receiver_11, receiver_12, receiver_13, receiver_14, receiver_15,
       receiver_16, receiver_17, receiver_18, receiver_19, receiver_20,
-      reg_id, reg_dt, mod_id, mod_dt
+      reg_id, reg_dt, mod_id, mod_dt, tags, category
     ) VALUES (
       ?, ?, ?, ?, ?, ?, 
       ?, ?, 'PENDING',
@@ -2038,7 +2573,7 @@ app.post('/sms/receive', async (c) => {
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
-      ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?
     )
   `).bind(
     newIncId, maskedSender || null, maskedMessage || null, employee_id || null, timestamp, detectedCount, 
@@ -2050,7 +2585,8 @@ app.post('/sms/receive', async (c) => {
     body.receiver_6 || null, body.receiver_7 || null, body.receiver_8 || null, body.receiver_9 || null, body.receiver_10 || null,
     body.receiver_11 || null, body.receiver_12 || null, body.receiver_13 || null, body.receiver_14 || null, body.receiver_15 || null,
     body.receiver_16 || null, body.receiver_17 || null, body.receiver_18 || null, body.receiver_19 || null, body.receiver_20 || null,
-    employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp
+    employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp,
+    tags, category
   ).run()
 
   // --- 🚀 NEW: Automatic Assignment by Sender's Part (New Path) ---
@@ -2779,6 +3315,285 @@ app.post('/incident-history', async (c) => {
   return c.json({ status: "success", id: res.meta.last_row_id })
 })
 
+// [CREATE] 피드백 저장 (Phase 3: 거버넌스 및 자동 카테고리화 적용)
+app.post('/ai/feedback', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json()
+  const db = c.env.DB
+
+  const {
+    inc_id,
+    vector_id,
+    query,
+    answer,
+    context,
+    feedback_type,
+    reason,
+    user_correction,
+    error_category
+  } = body
+
+  if (!query || !answer || !feedback_type) {
+    return c.json({ detail: '필수 피드백 정보가 누락되었습니다.' }, 400)
+  }
+
+  const now = getKst()
+  // JWT payload = { sub: employee_id, ... } → user.sub가 실제 사번
+  // body.user_id는 클라이언트가 직접 전달하는 fallback
+  const empId = user?.sub || user?.employee_id || user?.inc_id || body.user_id || null
+  const finalCategory = error_category || (context?.sms?.category) || 'GENERAL'
+
+  try {
+    // empId가 없으면 인증 오류
+    if (!empId) {
+      return c.json({ detail: '사용자 인증 정보가 없습니다. 다시 로그인해 주세요.' }, 401)
+    }
+
+    // FK 제약 방지: employee_id가 users 테이블에 실제로 있는지 확인
+    const userExists = await db.prepare("SELECT 1 FROM users WHERE employee_id = ?").bind(empId).first()
+    const safeEmpId = userExists ? empId : 'SYSTEM'
+
+    const res = await db.prepare(`
+      INSERT INTO ai_feedback (
+        user_id, inc_id, vector_id, query, answer, context, 
+        feedback_type, reason, user_correction, error_category,
+        created_at, reg_id, reg_dt, mod_id, mod_dt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      safeEmpId,
+      inc_id || null,
+      vector_id || null,
+      query,
+      answer,
+      context ? (typeof context === 'object' ? JSON.stringify(context) : context) : null,
+      feedback_type,
+      reason || null,
+      user_correction || null,
+      finalCategory,
+      now, safeEmpId, now, safeEmpId, now
+    ).run()
+    
+    const feedbackId = res.meta?.last_row_id || Date.now()
+
+    // 🚀 [Phase 7/9] Self-Healing Trigger: Real-time Re-learning (Full Automation)
+    if (feedback_type === 'DOWN' && vector_id?.startsWith('kn-')) {
+      const kbId = vector_id.replace('kn-', '')
+      
+      // Execute Real-time Re-learning / Isolation in background
+      c.executionCtx.waitUntil((async () => {
+        try {
+          const now = getKst()
+          const kbEntry = await db.prepare("SELECT content, title, version, fail_count FROM knowledge_base WHERE id = ?").bind(kbId).first()
+          
+          if (kbEntry) {
+            if (user_correction) {
+              // A. [HEALING] Expert provided a correction -> Apply and Reset Fail Count
+              console.log(`[Self-Healing] Real-time healing for KB-${kbId}...`);
+              
+              const vector = await generateEmbedding(user_correction, c.env)
+              if (!vector) throw new Error("Embedding generation failed");
+
+              await db.prepare(`
+                INSERT INTO knowledge_history (kb_id, previous_content, new_content, admin_id, change_reason)
+                VALUES (?, ?, ?, ?, ?)
+              `).bind(kbId, kbEntry.content, user_correction, empId, 'Real-time Self-Healing (Expert Feedback)').run()
+
+              const nextVersion = (kbEntry.version || 1) + 1
+              await db.prepare("UPDATE knowledge_base SET content = ?, status = ?, version = ?, vector = ?, fail_count = 0, priority_flag = 1, priority_score = 0.8, mod_dt = ? WHERE id = ?")
+                .bind(user_correction, 'VERIFIED', nextVersion, JSON.stringify(vector), now, kbId).run()
+
+              if (c.env.WARROOM_INDEX) {
+                await c.env.WARROOM_INDEX.upsert([{
+                  id: vector_id,
+                  values: vector,
+                  metadata: { type: 'knowledge', title: kbEntry.title, updated_at: now, version: nextVersion, priority: 0.8 }
+                }])
+              }
+              console.log(`[Self-Healing-Strong] KB-${kbId} upgraded to v${nextVersion} (Priority Score: 0.8)`);
+            } else {
+              // ...
+            }
+          }
+          
+          // Cross-Reference: Strong boost for SMS incident
+          if (vector_id?.startsWith('inc-') && user_correction) {
+            const incId = vector_id.split('_')[0].replace('inc-', '');
+            await db.prepare("UPDATE received_messages SET priority_flag = 1, priority_score = 0.8 WHERE inc_id = ? OR CAST(id AS TEXT) = ?")
+              .bind(incId, incId).run();
+            console.log(`[Boosting-Strong] SMS Incident ${incId} marked as high-reliability reference (0.8).`);
+          }
+        } catch (err) {
+          console.error(`[Self-Healing-Error] KB-${kbId} failed:`, err.message);
+        }
+      })());
+    }
+
+    // 🚀 [Phase 2.4] Dynamic Few-shot: Vectorize user correction
+    if (feedback_type === 'DOWN' && user_correction && c.env.WARROOM_INDEX) {
+      c.executionCtx.waitUntil((async () => {
+        try {
+          const cleaned = query.replace(/[^\w\sㄱ-ㅎㅏ-ㅣ가-힣]/g, ' ').substring(0, 1000);
+          const vector = await generateEmbedding(cleaned, c.env);
+          if (vector) {
+            await c.env.WARROOM_INDEX.upsert([{
+              id: `fb-${feedbackId}`,
+              values: vector,
+              metadata: { type: 'feedback', query: query.substring(0, 100), correction: user_correction.substring(0, 100) }
+            }]);
+            console.log(`[Few-shot] Vectorized feedback fb-${feedbackId}`);
+          }
+        } catch (ve) {
+          console.error("[Few-shot] Vectorization failed:", ve.message);
+        }
+      })());
+    }
+
+    return c.json({ message: '피드백이 성공적으로 등록되었습니다.', success: true, id: feedbackId })
+  } catch (e) {
+    console.error('[AI Feedback] Create Error:', e.message)
+    return c.json({ detail: '피드백 등록에 실패했습니다.', error: e.message }, 500)
+  }
+})
+
+// [PATCH] 피드백 수정 및 지식 동기화 (Phase 7: Self-Healing RAG Advanced)
+app.patch('/ai/feedback/:id', async (c) => {
+  const id = c.req.param('id')
+  const user = c.get('user')
+  const { status, is_golden, admin_comment, error_category } = await c.req.json()
+  const db = c.env.DB
+  const now = getKst()
+
+  // 1. Basic Update (Feedback Table)
+  const feedback = await db.prepare("SELECT * FROM ai_feedback WHERE id = ?").bind(id).first()
+  if (!feedback) return c.json({ error: "피드백을 찾을 수 없습니다." }, 404)
+
+  const updateFields = []
+  const params = []
+  if (status !== undefined) { updateFields.push("status = ?"); params.push(status); }
+  if (is_golden !== undefined) { updateFields.push("is_golden = ?"); params.push(is_golden); }
+  if (admin_comment !== undefined) { updateFields.push("admin_comment = ?"); params.push(admin_comment); }
+  if (error_category !== undefined) { updateFields.push("error_category = ?"); params.push(error_category); }
+  
+  updateFields.push("mod_dt = ?"); params.push(now);
+  params.push(id)
+
+  await db.prepare(`UPDATE ai_feedback SET ${updateFields.join(", ")} WHERE id = ?`).bind(...params).run()
+
+  // 1-1. 🚀 Automated Isolation (Threshold Logic)
+  if (feedback.vector_id?.startsWith('kn-')) {
+    const kbId = feedback.vector_id.replace('kn-', '')
+    if (status === 'DOWN' || feedback.feedback_type === 'DOWN') {
+      try {
+        await db.prepare("UPDATE knowledge_base SET fail_count = fail_count + 1 WHERE id = ?").bind(kbId).run()
+        const kb = await db.prepare("SELECT fail_count FROM knowledge_base WHERE id = ?").bind(kbId).first()
+        if (kb && kb.fail_count >= 3) {
+          await db.prepare("UPDATE knowledge_base SET status = 'FAIL' WHERE id = ?").bind(kbId).run()
+          console.log(`[Isolation] KB-${kbId} isolated due to high fail count (${kb.fail_count})`);
+        }
+      } catch (e) {
+        console.error("[Isolation] Update failed:", e.message);
+      }
+    }
+  }
+
+  // 2. 🚀 Knowledge Sync (Governance/Manual Override)
+  // Even in Full Automation, Admin can manually trigger sync or re-apply correction
+  if (status === 'APPLIED' && feedback.user_correction && feedback.vector_id) {
+    const vid = feedback.vector_id
+    
+    // Process Knowledge Base Sync (kn- prefix)
+    if (vid.startsWith('kn-')) {
+      const kbId = vid.replace('kn-', '')
+      const kbEntry = await db.prepare("SELECT content, title, version FROM knowledge_base WHERE id = ?").bind(kbId).first()
+      
+      if (kbEntry) {
+        // A. Backup to History (If content changed)
+        if (kbEntry.content !== feedback.user_correction) {
+          await db.prepare(`
+            INSERT INTO knowledge_history (kb_id, previous_content, new_content, admin_id, change_reason)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(kbId, kbEntry.content, feedback.user_correction, user.employee_id || 'ADMIN', admin_comment || 'Manual Governance Sync').run()
+        }
+
+        // B. Update D1 Knowledge Base (Ensure VERIFIED and latest content)
+        const nextVersion = (kbEntry.version || 1) + 1
+        const pScore = is_golden ? 1.0 : (kbEntry.priority_score || 0.5); // Boost to 1.0 if golden
+        
+        // Generate Vector (Required for sync)
+        let vector = null
+        if (c.env.AI) {
+          try {
+            vector = await generateEmbedding(feedback.user_correction, c.env)
+          } catch (ve) { console.error("[Governance] Embedding failed:", ve.message); }
+        }
+
+        await db.prepare("UPDATE knowledge_base SET content = ?, status = ?, version = ?, vector = ?, priority_score = ?, mod_dt = ? WHERE id = ?")
+          .bind(feedback.user_correction, 'VERIFIED', nextVersion, vector ? JSON.stringify(vector) : null, pScore, now, kbId).run()
+
+        // C. Sync to Vectorize
+        if (c.env.WARROOM_INDEX && vector) {
+          try {
+            await c.env.WARROOM_INDEX.upsert([{
+              id: vid,
+              values: vector,
+              metadata: { type: 'knowledge', title: kbEntry.title, updated_at: now, version: nextVersion, priority: pScore }
+            }])
+            console.log(`[Governance] Manual sync complete for ${vid} (v${nextVersion}, Score: ${pScore})`);
+          } catch (e) {
+            console.error(`[Governance-Error] Vectorize failed:`, e.message);
+          }
+        }
+      }
+    }
+  }
+
+  return c.json({ status: "success", message: `피드백 상태가 변경되었습니다. ${status === 'APPLIED' ? '(수동 동기화 완료)' : ''}` })
+})
+
+// [READ] 피드백 목록 조회 (필터링 보강)
+app.get('/ai/feedback', async (c) => {
+  const db = c.env.DB
+  const incId = c.req.query('inc_id')
+  const status = c.req.query('status')
+  const isGolden = c.req.query('is_golden')
+
+  try {
+    let sql = "SELECT * FROM ai_feedback WHERE 1=1"
+    let params = []
+
+    if (incId) { sql += " AND inc_id = ?"; params.push(incId); }
+    if (status) { sql += " AND status = ?"; params.push(status); }
+    if (isGolden !== undefined) { sql += " AND is_golden = ?"; params.push(Number(isGolden)); }
+
+    sql += " ORDER BY created_at DESC"
+    const { results } = await db.prepare(sql).bind(...params).all()
+    return c.json({ success: true, results })
+  } catch (e) {
+    return c.json({ detail: '조회 실패', error: e.message }, 500)
+  }
+})
+
+// [ANALYZE] 피드백 통계 분석
+app.get('/ai/feedback/stats', async (c) => {
+  const db = c.env.DB
+  try {
+    const categoryStats = await db.prepare(`
+      SELECT error_category, COUNT(*) as total,
+             SUM(CASE WHEN feedback_type = 'UP' THEN 1 ELSE 0 END) as up_count,
+             SUM(CASE WHEN feedback_type = 'DOWN' THEN 1 ELSE 0 END) as down_count
+      FROM ai_feedback GROUP BY error_category
+    `).all()
+
+    const overallStats = await db.prepare(`
+      SELECT feedback_type, COUNT(*) as count FROM ai_feedback GROUP BY feedback_type
+    `).all()
+
+    return c.json({ success: true, stats: { by_category: categoryStats.results, overall: overallStats.results } })
+  } catch (e) {
+    return c.json({ detail: '통계 산출 실패', error: e.message }, 500)
+  }
+})
+
 app.post('/activity-logs', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
@@ -2833,6 +3648,144 @@ app.get('/warroom/rooms', async (c) => {
   const { results } = await stmt.bind(...params).all()
   return c.json({ rooms: results || [] })
 })
+
+// Global Search Helper for Hybrid RAG (v2: Rich & Broad Search)
+const performHybridSearch = async (query, env, db, topK = 20) => {
+  const metadata = extractSearchMetadata(query);
+  const results = [];
+  const seenIds = new Set();
+  
+  // 1. Path A: SQL Structured Search (High Precision)
+  try {
+    // A-1. Knowledge Base Exact Match (Reputation Weighted)
+    if (metadata.error_code || metadata.target_system) {
+      let kbSql = `
+        SELECT k.id, k.title, k.content, k.priority_score, k.tags, u.reputation_score 
+        FROM knowledge_base k
+        LEFT JOIN users u ON k.reg_id = u.employee_id
+        WHERE (k.error_code = ? OR k.system_name = ?) AND k.status != 'FAIL'
+      `;
+      const kbParams = [metadata.error_code || null, metadata.target_system || null];
+      
+      const { results: kbMatches } = await db.prepare(kbSql).bind(...kbParams).all();
+      kbMatches?.forEach(m => {
+        const mid = `kn-${m.id}`;
+        if (!seenIds.has(mid)) {
+          // ⭐ Phase 15 Reputation-Weighted Boost
+          const repFactor = (m.reputation_score || 100.0) / 100.0;
+          let boost = (m.priority_score || 0) * 0.3 * repFactor;
+          
+          // 🏆 Phase 17 Master Bonus for Gold/Legendary Guards
+          if (m.rank_status === 'Gold Guard' || m.rank_status === 'Legendary Guard') boost += 0.1;
+
+          if (m.tags && metadata.error_code && m.tags.includes(metadata.error_code)) boost += 0.2;
+          
+          const finalScore = Math.min(1.0, 1.0 + boost);
+          results.push({ id: mid, score: finalScore, type: 'kb_sql_exact', content: m.content, title: m.title });
+          seenIds.add(mid);
+        }
+      });
+    }
+
+    // A-2. Knowledge Base Title Keyword Match (Reputation Weighted)
+    if (metadata.keywords && metadata.keywords.length > 0) {
+      const kwSql = `
+        SELECT k.id, k.title, k.content, k.priority_score, k.tags, u.reputation_score 
+        FROM knowledge_base k
+        LEFT JOIN users u ON k.reg_id = u.employee_id
+        WHERE (${metadata.keywords.map(() => "k.title LIKE ?").join(" OR ")}) AND k.status != 'FAIL' LIMIT 5
+      `;
+      const kwParams = metadata.keywords.map(k => `%${k}%`);
+      const { results: kwMatches } = await db.prepare(kwSql).bind(...kwParams).all();
+      kwMatches?.forEach(m => {
+        const mid = `kn-${m.id}`;
+        if (!seenIds.has(mid)) {
+          const repFactor = (m.reputation_score || 100.0) / 100.0;
+          let boost = (m.priority_score || 0) * 0.3 * repFactor;
+          
+          if (m.tags && metadata.keywords.some(k => m.tags.includes(k))) boost += 0.2;
+
+          const finalScore = Math.min(1.0, 0.9 + boost);
+          results.push({ id: mid, score: finalScore, type: 'kb_title_match', content: m.content, title: m.title });
+          seenIds.add(mid);
+        }
+      });
+    }
+
+    // A-3. Incident History SQL Match (Reputation Weighted)
+    if (metadata.sender || metadata.error_code || metadata.target_system) {
+      let smsSql = `
+        SELECT m.inc_id, m.message, m.priority_score, m.tags, u.reputation_score 
+        FROM received_messages m
+        LEFT JOIN users u ON m.employee_id = u.employee_id
+        WHERE 1=1
+      `;
+      const smsParams = [];
+      if (metadata.sender) { smsSql += " AND m.sender = ?"; smsParams.push(metadata.sender); }
+      if (metadata.error_code) { smsSql += " AND m.message LIKE ?"; smsParams.push(`%${metadata.error_code}%`); }
+      if (metadata.target_system) { smsSql += " AND m.target_system = ?"; smsParams.push(metadata.target_system); }
+      
+      smsSql += " ORDER BY m.reg_dt DESC LIMIT 10";
+      const { results: smsMatches } = await db.prepare(smsSql).bind(...smsParams).all();
+      smsMatches?.forEach(m => {
+        const mid = `inc-${m.inc_id}`;
+        if (!seenIds.has(mid)) {
+          const repFactor = (m.reputation_score || 100.0) / 100.0;
+          let boost = (m.priority_score || 0) * 0.3 * repFactor;
+          
+          if (m.tags && metadata.error_code && m.tags.includes(metadata.error_code)) boost += 0.2;
+
+          const finalScore = Math.min(1.0, 0.8 + boost);
+          results.push({ id: mid, score: finalScore, type: 'sms_sql_match', content: m.message });
+          seenIds.add(mid);
+        }
+      });
+    }
+  } catch (e) { console.error("[Hybrid] SQL Path Error:", e.message); }
+
+  // 2. Path B: Vector Semantic Search
+  if (env.WARROOM_INDEX) {
+    const cleaned = cleanMessageForEmbedding(query);
+    const vector = await generateEmbedding(cleaned, env);
+    if (vector) {
+      const simResults = await env.WARROOM_INDEX.query(vector, { topK: topK, returnMetadata: true });
+      if (simResults.matches) {
+        for (const m of simResults.matches) {
+          if (!seenIds.has(m.id)) {
+            let pScore = m.metadata?.priority || 0;
+            let tags = m.metadata?.tags || "";
+            
+            // Check D1 for latest score/tags if needed
+            if (m.id.startsWith('inc-')) {
+              const possibleId = m.id.split('_')[0].replace('inc-', '');
+              const msg = await db.prepare("SELECT priority_score, tags FROM received_messages WHERE inc_id = ? OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
+              if (msg) {
+                pScore = msg.priority_score || 0;
+                tags = msg.tags || "";
+              }
+            } else if (m.id.startsWith('kn-')) {
+              const kb = await db.prepare("SELECT priority_score, tags FROM knowledge_base WHERE id = ?").bind(m.id.replace('kn-', '')).first();
+              if (kb) {
+                pScore = kb.priority_score || 0;
+                tags = kb.tags || "";
+              }
+            }
+
+            let boost = pScore * 0.3;
+            // 🏷️ Tag Bonus (+0.2)
+            if (tags && metadata.error_code && tags.includes(metadata.error_code)) boost += 0.2;
+
+            const scaledScore = Math.min(1.0, (m.score * 0.7) + boost);
+            results.push({ id: m.id, score: scaledScore, type: 'vector_match', content: m.metadata?.content || "", title: m.metadata?.title || "유사 사례" });
+            seenIds.add(m.id);
+          }
+        }
+      }
+    }
+  }
+
+  return { results: results.sort((a, b) => b.score - a.score), metadata };
+}
 
 // ==========================================
 // 5. AI Dify Integration
@@ -2991,6 +3944,21 @@ app.post('/ai/chat', async (c) => {
   }
 })
 
+// [DELETE] 피드백 삭제
+app.delete('/ai/feedback/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+
+  try {
+    const { success } = await db.prepare("DELETE FROM ai_feedback WHERE id = ?").bind(id).run()
+    if (!success) return c.json({ detail: '삭제할 데이터를 찾지 못했습니다.' }, 404)
+    return c.json({ success: true, message: '피드백이 삭제되었습니다.' })
+  } catch (e) {
+    return c.json({ detail: '피드백 삭제에 실패했습니다.', error: e.message }, 500)
+  }
+})
+
+
 app.post('/ai/analyze-sms', async (c) => {
   const { sender, message, sms_id, force } = await c.req.json()
   const db = c.env.DB
@@ -3019,6 +3987,32 @@ app.post('/ai/analyze-sms', async (c) => {
 `
     }
   }
+  // 🚀 [Phase 2.2] Few-shot Feedback Context Retrieval
+  let feedbackContext = "";
+  try {
+    const smsInfo = await db.prepare("SELECT error_code, service_name FROM received_messages WHERE inc_id = ?").bind(String(sms_id)).first();
+    let fbQuery = "SELECT query, user_correction FROM ai_feedback WHERE feedback_type = 'DOWN' AND user_correction IS NOT NULL ORDER BY created_at DESC LIMIT 3";
+    let fbParams = [];
+
+    if (smsInfo && (smsInfo.error_code || smsInfo.service_name)) {
+      fbQuery = `
+        SELECT query, user_correction FROM ai_feedback 
+        WHERE feedback_type = 'DOWN' AND user_correction IS NOT NULL 
+        AND (query LIKE ? OR query LIKE ? OR answer LIKE ?)
+        ORDER BY created_at DESC LIMIT 3
+      `;
+      const kw = smsInfo.error_code || smsInfo.service_name || 'NEVER_MATCH';
+      fbParams = [`%${kw}%`, `%${smsInfo.service_name || kw}%`, `%${kw}%` ];
+    }
+    const { results: pastFeedbacks } = await db.prepare(fbQuery).bind(...fbParams).all();
+    if (pastFeedbacks?.length > 0) {
+      feedbackContext = "\n\n[💡 과거 관제사 정정 사례 (Few-shot)]\n이번 분석 시 다음 정정 사례를 필수 참고하세요:\n";
+      pastFeedbacks.forEach((fb, i) => {
+        feedbackContext += `${i+1}. 질문: ${fb.query}\n   교정: ${fb.user_correction}\n`;
+      });
+      feedbackContext += "--------------------------------------\n";
+    }
+  } catch (e) { console.error("[Few-shot] Error:", e.message); }
 
   const prompt = `당신은 S-GUARD 시스템의 핵심 오케스트레이터이자 지능형 관제 엔진입니다. 사용자가 입력하는 SMS 장애 메시지를 분석하여 실시간 인사이트를 제공하고, 전문가 에이전트들과 협업하여 최적의 조치 가이드를 도출합니다.
 
@@ -3039,7 +4033,8 @@ app.post('/ai/analyze-sms', async (c) => {
 [장애 로그]
 발신자: ${sender}
 메시지: ${message}
-${detailedInfo}`
+${detailedInfo}
+${feedbackContext}`
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -3097,93 +4092,92 @@ ${detailedInfo}`
         await kv.put(lockKey, 'processing', { expirationTtl: 60 });
       }
 
-      // 3. Vectorize similarity check (Dynamic Score)
+      // 3. Hybrid Search: SQL Metadata + Vectorize (Rich Context: Top-K 20)
       let similarityScore = null;
       let matchedContent = null;
       let matchedTitle = null;
+      let matches = [];
 
-      if (c.env.WARROOM_INDEX && message) {
+      if (message) {
         try {
-          // Send Progress Status
-          await writer.write(encode(`data: ${JSON.stringify({ status: 'searching', message: '🔍 유사 장애 사례 검색 중...' })}\n\n`));
+          await writer.write(encode(`data: ${JSON.stringify({ status: 'searching', message: '🔍 지능형 하이브리드 검색 중(SQL+Vector)...' })}\n\n`));
           
-          const cleanedMessage = cleanMessageForEmbedding(message);
-          const vector = await generateEmbedding(cleanedMessage, c.env);
-          if (vector) {
-            const simResults = await c.env.WARROOM_INDEX.query(vector, { topK: 1 });
-            if (simResults.matches && simResults.matches.length > 0) {
-              similarityScore = simResults.matches[0].score;
-              const matchId = simResults.matches[0].id;
-              
-              // Send score to frontend immediately
-              await writer.write(encode(`data: ${JSON.stringify({ similarity_score: similarityScore })}\n\n`));
+          const hybrid = await performHybridSearch(message, c.env, db, 20);
+          matches = hybrid.results;
 
-              // If similarity >= 0.7, fetch content from knowledge_base for high-confidence match
-              if (similarityScore >= 0.7) {
-                let kbMatch;
-                if (matchId.startsWith('kn-')) {
-                  const qp = matchId.replace('kn-', '');
-                  kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE id = ?").bind(qp).first();
-                } else {
-                  const possibleId = matchId.split('_')[0].replace('inc-', '');
-                  kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
-                }
-                if (kbMatch) {
-                  matchedContent = kbMatch.content;
-                  matchedTitle = kbMatch.title;
-                  
-                  // Generate rationale
-                  const ai = c.env.AI;
-                  if (ai) {
-                    try {
-                      const rationalePrompt = `당신은 지능형 관제 전문가입니다. 아래 수신된 메시지[SMS]와 검색된 지식[Knowledge]을 비교하여, 왜 두 건이 유사한지 그 이유를 한 문장으로 아주 짧게 설명하세요.
-                      필요한 정보: 동일 에러코드, 유사 서비스 명칭, 동일 증상 등. (한글로 15자 이내)
-                      
-                      [SMS]: ${message}
-                      [Knowledge Title]: ${matchedTitle}
-                      [Knowledge Content]: ${matchedContent.substring(0, 100)}...`;
+          if (matches.length > 0) {
+            similarityScore = matches[0].score;
+            await writer.write(encode(`data: ${JSON.stringify({ similarity_score: similarityScore, vector_id: matches[0].id, hybrid_metadata: hybrid.metadata })}\n\n`));
 
-                      const aiRes = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: rationalePrompt });
-                      const similarityReason = aiRes.response || aiRes;
-                      
-                      // Stream rationale to frontend
-                      await writer.write(encode(`data: ${JSON.stringify({ similarity_reason: String(similarityReason).trim() })}\n\n`));
-                    } catch (aiErr) {
-                      console.error("Rationale generation error:", aiErr);
-                    }
-                  }
-                }
+            // 🚀 [Phase 8] Context Tiering: Separate Verified(KB) vs Reference(SMS)
+            const verifiedKB = [];
+            const references = [];
+
+            for (const match of matches) {
+              const mid = match.id;
+              const score = match.score;
+
+              if (mid.startsWith('kn-')) {
+                const kb = await db.prepare("SELECT title, content, version FROM knowledge_base WHERE id = ?").bind(mid.replace('kn-', '')).first();
+                if (kb) verifiedKB.push({ ...kb, score });
+              } else if (mid.startsWith('fb-')) {
+                // Past feedback is handled in feedbackContext already (Rich Few-shot)
+              } else {
+                // Past SMS or others
+                references.push({ content: match.content || match.metadata?.content || mid, score });
               }
+            }
+
+            if (verifiedKB.length > 0) {
+              detailedInfo += "\n\n[🛡️ Verified Knowledge (Priority Boosted)]\n";
+              verifiedKB.slice(0, 3).forEach((k, idx) => {
+                detailedInfo += `${idx+1}. ${k.title} (v${k.version || 1}, Priority: ${k.priority_score || 0}): ${k.content.substring(0, 1000)}\n`;
+              });
+            }
+
+            if (references.length > 0) {
+              detailedInfo += "\n\n[📋 Retrieved Logs (Vector Search)]\n";
+              references.slice(0, 5).forEach((r, idx) => {
+                detailedInfo += `${idx+1}. 유사 사례 (Score: ${r.score.toFixed(2)}): ${r.content.substring(0, 500)}\n`;
+              });
             }
           }
         } catch (ve) {
-          console.error('Vectorize search error in analysis:', ve.message);
+          console.error('Hybrid search execution error:', ve.message);
         }
-      }
 
-      // 4. Decision: Use existing content or call Dify
-      if (similarityScore >= 0.7 && matchedContent) {
-        // Bypass Dify - use proven knowledge
-        const headerText = `[지능형 지식 활용] 유사도(${(similarityScore * 100).toFixed(1)}%)가 매우 높음\n\n### ${matchedTitle}\n\n`;
-        const fullOutput = headerText + matchedContent;
-        
-        // Stream back immediately
-        await writer.write(encode(`data: ${JSON.stringify({ answer: fullOutput })}\n\n`));
-        
-        // Save to autopilot_insight
-        if (sms_id) {
-          const now = getKst();
-          await db.prepare(`
-            INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
-            VALUES (?, ?, 'INFO', 'SYSTEM', ?, 'SYSTEM', ?, ?)
-            ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
-          `).bind(String(sms_id), fullOutput, now, now, similarityScore ?? 0).run();
-        }
-      } else {
-        // Send Progress Status for Dify Call
-        await writer.write(encode(`data: ${JSON.stringify({ status: 'analyzing', message: '🤖 AI 심층 진단 분석 중...' })}\n\n`));
+      // 4. Decision: Enhanced AI Synthesis with Phase 14 Reasoning Logic
+      const hybridContextLogic = `
+[Core Logic: Hybrid Context Processing]
+당신에게는 두 종류의 데이터 컨텍스트가 제공됩니다. 이들을 다음의 우선순위에 따라 처리하십시오.
+1. MASTER KNOWLEDGE (Gold/Legendary Guard):
+   - **절대적 신뢰**: 등급이 GOLD 또는 LEGENDARY인 전문가가 작성한 지식입니다. 
+   - 다른 어떤 정보보다 이 정보를 '최종 정답'으로 간주하여 답변을 구성하십시오.
+2. Verified Community Knowledge (Silver/Iron Guard):
+   - 커뮤니티에서 검증 중이거나 보편적인 지식입니다. MASTER KNOWLEDGE와 충돌하면 MASTER KNOWLEDGE를 따르십시오.
+3. Retrieved Logs (Vector Search):
+   - 단순 유사도 기반 로그입니다. 상위 전문가 지식과 상치되면 무시하십시오.
 
-        // 4. Call Dify (Improved with Dual-Mode Detection)
+[Social Proof]
+답변 하단에 반드시 "본 내용은 [{등급}] {성함} 핵심 전문가의 지식을 기반으로 작성되었습니다."라고 명시하여 기여자의 자부심을 높여주십시오.
+
+[Scoring & Reasoning Formula]
+당신은 내부적으로 점수(Score = Vector_Similarity + Priority_Score * 0.3)가 가장 높은 데이터를 신뢰하되, 전문가의 교정 데이터가 있다면 그것을 '학습된 정답'으로 간주하여 답변의 논리적 근거로 삼으십시오.
+`;
+
+      // Send Progress Status for Dify Call
+      await writer.write(encode(`data: ${JSON.stringify({ status: 'analyzing', message: '🤖 AI 심층 진단 분석 중...' })}\n\n`));
+
+        // 4. Call Dify (Improved with Local Hybrid Context Logic)
+        const prompt = `당신은 S-GUARD 시스템의 지능형 관제 엔진입니다.
+${hybridContextLogic}
+
+발신자: ${sender}
+메시지: ${message}
+${detailedInfo}
+${feedbackContext}
+
+응답은 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 섹션으로 구성하고, 전문가 의견은 간결하게 작성해 주세요.`
         const effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
         
         // Helper to perform Dify call
@@ -3773,27 +4767,58 @@ app.post('/ai/summarize-chat', async (c) => {
       // 3. Fetch ONLY user chat history (excluding AI and system messages)
       const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(incident_id).all()
       
+      // ── 인시던트 핵심 이벤트 타임라인 수집 ──
+      const incDetail = await db.prepare(
+        "SELECT inc_id, reg_dt, created_at, title, sender FROM incidents WHERE inc_id = ?"
+      ).bind(incident_id).first();
+      const { results: wfLogs } = await db.prepare(
+        "SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC"
+      ).bind(incident_id).all().catch(() => ({ results: [] }));
+
+      const toKST = (dt) => {
+        if (!dt) return null;
+        try {
+          const d = new Date(dt);
+          return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        } catch { return null; }
+      };
+
+      const timelineCtx = [];
+      if (incDetail?.reg_dt || incDetail?.created_at) {
+        const t = toKST(incDetail.reg_dt || incDetail.created_at);
+        if (t) timelineCtx.push(`[${t}] SMS 수신 및 장애 인지`);
+      }
+      for (const wf of (wfLogs || [])) {
+        const t = toKST(wf.completed_at);
+        const label = wf.step_id === 'RAG' || wf.step_id === 'AGENT' ? 'AI 분석 완료'
+          : wf.step_id === 'WARROOM' ? '워룸 생성 및 담당자 배정'
+          : wf.step_id === 'KNOWLEDGE' ? '지식화 및 장애 처리 완료'
+          : wf.step_id;
+        if (t) timelineCtx.push(`[${t}] ${label}`);
+      }
+
       const transcript = []
       const combined = [
-        ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender, text: r.text, timestamp: r.timestamp }))
+        ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender_name || r.sender, text: r.text, timestamp: r.timestamp }))
       ]
       
       combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
 
       for (const msg of combined) {
-        if (msg.text) transcript.push(`[${msg.role}] ${msg.sender}: ${msg.text}`)
+        if (msg.text) {
+          const ts = toKST(msg.timestamp);
+          transcript.push(`[${ts || '--:--:--'}] [${msg.role}] ${msg.sender}: ${msg.text}`);
+        }
       }
 
-      const prompt = `인시던트(${incident_id}) 대응 요약 리포트를 작성해줘. 
-채팅 내역을 정밀하게 분석하여 아래 4개의 섹션 헤더(###)를 반드시 포함하고 내용을 충실히 작성할 것:
-
-### 1. 장애 개요
-### 2. 주요 조치 사항
-### 3. 최종 결과
-### 4. 향후 과제
-
-[채팅 내역]
-${transcript.join('\n')}`
+      // Dify에 전달할 최종 컨텍스트: 인시던트 타임라인 + 채팅 로그
+      const chatLogForDify = [
+        timelineCtx.length > 0 ? `=== 인시던트 이벤트 타임라인 ===
+${timelineCtx.join('\n')}
+` : '',
+        `=== 워룸 채팅 내역 ===`,
+        ...transcript
+      ].filter(Boolean).join('\n');
 
       await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
 
@@ -3812,7 +4837,7 @@ ${transcript.join('\n')}`
         },
         signal: totalTimeoutController.signal,
         body: JSON.stringify({ 
-          inputs: { chat_log: transcript.join('\n'), incident_images: [] }, 
+          inputs: { chat_log: chatLogForDify, incident_images: [] }, 
           response_mode: 'streaming', 
           user: 'sguard-worker' 
         })
@@ -4172,7 +5197,7 @@ app.post('/ai/report/save', async (c) => {
   const empId = user_id || 'SYSTEM'
   
   // 1. Log activity
-  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, report_type, created_at) VALUES (?, ?, ?, '보고서 생성', ?, 'AI 리포트', ?)")
+  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '보고서 생성', ?, 'AI 리포트', ?)")
     .bind(normId, normId, empId, `리포트 생성됨: ${title}`, now)
     .run()
 
@@ -4820,10 +5845,6 @@ app.post('/retrieval', async (c) => {
     const top_k = retrieval_setting?.top_k || 5;
     
     // Fetch Global RAG Threshold if Dify sends 0.0 or undefined - Support 'threshold' key from custom nodes
-    // 🚀 Prefer 'threshold' (often dynamic variable) over fixed 'score_threshold'
-    let score_threshold = retrieval_setting?.threshold || retrieval_setting?.score_threshold || 0.0;
-    if (typeof score_threshold === 'string') score_threshold = parseFloat(score_threshold); // Handles {{variables}} values
-    
     if (score_threshold === 0.0 && c.env.SMS_STORAGE) {
        const kvThresh = await c.env.SMS_STORAGE.get('config:rag_threshold');
        if (kvThresh) score_threshold = parseFloat(kvThresh);
@@ -4833,7 +5854,6 @@ app.post('/retrieval', async (c) => {
     const db = c.env.DB;
     const vectorIndex = c.env.WARROOM_INDEX;
     
-    // For Dify connectivity test (empty query), return empty records but 200 OK
     if (!query || !vectorIndex) {
       return c.json({ records: [] });
     }
@@ -4850,20 +5870,15 @@ app.post('/retrieval', async (c) => {
       
       for (const m of filteredMatches) {
         let kbResult = null;
-        // 🚀 Robust ID Extraction: Strip ALL possible prefixes to get the raw numeric ID
         const cleanId = m.id.replace(/^kn-|^inc-|^gov-|^INC-/, '').split('_')[0].trim();
-        const isLongId = cleanId.length > 10; // Likely a YYYYMMDD... timestamp inc_id
+        const isLongId = cleanId.length > 10;
 
-        // 1. Try Knowledge Base first
         if (isLongId) {
-          // Priority match by inc_id
           kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = ?").bind(cleanId).first();
         } else {
-          // Fallback match by primary key id
           kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE CAST(id AS TEXT) = ?").bind(cleanId).first();
         }
 
-        // 2. Hybrid Fallback: Search received_messages if not found in knowledge_base
         if (!kbResult && isLongId) {
           const sms = await db.prepare("SELECT message, sender, timestamp FROM received_messages WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = ?").bind(cleanId).first();
           if (sms) {
@@ -5390,15 +6405,162 @@ app.post('/warroom/reset', async (c) => {
 })
 
 app.post('/warroom/feedback', async (c) => {
-  const { incident_id, resolution_text, commandsUsed, feedback, user_id } = await c.req.json()
+  const { incident_id, resolution_text, commandsUsed, feedback, user_id, feedback_type } = await c.req.json()
   const db = c.env.DB
+  const ai = c.env.AI
   const nowFeedback = getKst()
+
+  // 🛡️ Phase 16: Abuse Protection (1-vote per user per incident)
+  const existingVote = await db.prepare("SELECT id FROM resolution_feedback WHERE inc_id = ? AND reg_id = ?").bind(incident_id, user_id).first();
+  if (existingVote) {
+      return c.json({ status: "rejected", message: "이미 이 인시던트에 대해 피드백을 제출하셨습니다. (1인 1표 제한)" }, 403);
+  }
+
+  // 🛡️ Phase 15: AI Guardian (Immediate Rejection)
+  if (ai) {
+    try {
+      const auditResult = await ai.run('@cf/meta/llama-3-8b-instruct', {
+        messages: [
+          { role: 'system', content: 'You are an S-Guard AI Auditor. Evaluate if the provided feedback for an incident resolution is meaningful and professional. If it is nonsense, aggressive, or empty, respond with "REJECT". Otherwise, respond with "PASS".' },
+          { role: 'user', content: `Feedback: ${feedback || resolution_text}` }
+        ]
+      });
+      const decision = String(auditResult.response || auditResult.text || '').toUpperCase();
+      if (decision.includes('REJECT')) {
+        return c.json({ status: "rejected", message: "부적절하거나 무의미한 피드백은 AI 가디언에 의해 즉시 반려되었습니다. (AI Audit Rejection)" }, 400);
+      }
+    } catch (ae) {
+      console.error("AI Audit Error:", ae);
+    }
+  }
+
   const res = await db.prepare(`
-    INSERT INTO resolution_feedback (inc_id, resolution_text, commandsUsed, feedback, reg_id, reg_dt)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(incident_id, resolution_text, JSON.stringify(commandsUsed), feedback, user_id, nowFeedback).run()
-  return c.json({ status: "success" })
+    INSERT INTO resolution_feedback (inc_id, resolution_text, commandsUsed, feedback, feedback_type, reg_id, reg_dt)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).bind(incident_id, resolution_text, JSON.stringify(commandsUsed), feedback, feedback_type || 'good', user_id, nowFeedback).run()
+
+  // 📈 Reputation & S-Point Reward (Phase 17/18: user_stats Sync)
+  await db.prepare("UPDATE users SET s_point = s_point + 1.0 WHERE employee_id = ?").bind(user_id).run();
+  
+  // Update user_stats (Phase 18 Structure)
+  await db.prepare(`
+    INSERT INTO user_stats (user_id, user_name, s_point, contribution_count, rank_level, last_active_dt)
+    VALUES (?, (SELECT name FROM users WHERE employee_id = ?), 1, 1, 'IRON', ?)
+    ON CONFLICT(user_id) DO UPDATE SET 
+      s_point = s_point + 1,
+      contribution_count = contribution_count + 1,
+      last_active_dt = ?
+  `).bind(user_id, user_id, nowFeedback, nowFeedback).run();
+
+  // Auto-Rank Update Logic (Thresholds: Iron 0, Silver 100, Gold 500)
+  await db.prepare(`
+    UPDATE users SET rank_status = CASE 
+      WHEN s_point >= 500 THEN 'Gold Guard'
+      WHEN s_point >= 100 THEN 'Silver Guard'
+      ELSE 'Iron Guard'
+    END
+    WHERE employee_id = ? AND rank_status != 'Legendary Guard'
+  `).bind(user_id).run();
+
+  if (feedback_type === 'bad') {
+      // Find the original author and penalize
+      const originalAuth = await db.prepare("SELECT reg_id FROM knowledge_base WHERE inc_id = ?").bind(incident_id).first();
+      if (originalAuth) {
+          await db.prepare("UPDATE users SET s_point = s_point - 1.0 WHERE employee_id = ?").bind(originalAuth.reg_id).run();
+      }
+  }
+
+  // 🏛️ Consensus Engine (Majority Rule Implementation)
+  const similarFeedbacks = await db.prepare("SELECT resolution_text, reg_id FROM resolution_feedback WHERE inc_id = ?").bind(incident_id).all();
+  if (similarFeedbacks.results && similarFeedbacks.results.length >= 3) {
+      const topResolution = similarFeedbacks.results[0].resolution_text;
+      await db.prepare("UPDATE knowledge_base SET content = ?, status = 'VERIFIED', vote_count = vote_count + 1 WHERE inc_id = ?").bind(topResolution, incident_id).run();
+  }
+
+  return c.json({ status: "success", message: "피드백이 저장되었으며 평판 및 합의 로직이 반영되었습니다." })
 })
+
+// 📊 Phase 16: Vulnerability Analysis API (Dynamic Ratio-based)
+app.get('/ai/governance/vulnerability-stats', async (c) => {
+  const db = c.env.DB;
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const dateStr = thirtyDaysAgo.toISOString().replace('T', ' ').substring(0, 19);
+
+  const statsSql = `
+    SELECT 
+      k.error_code, 
+      COUNT(f.id) as total_feedback,
+      SUM(CASE WHEN f.feedback_type = 'bad' THEN 1 ELSE 0 END) as bad_count,
+      ROUND(CAST(SUM(CASE WHEN f.feedback_type = 'bad' THEN 1 ELSE 0 END) AS REAL) / COUNT(f.id) * 100, 1) as vulnerability_ratio
+    FROM knowledge_base k
+    JOIN resolution_feedback f ON k.inc_id = f.inc_id
+    WHERE f.reg_dt > ?
+    GROUP BY k.error_code
+    HAVING total_feedback >= 3
+    ORDER BY vulnerability_ratio DESC
+    LIMIT 10
+  `;
+
+  try {
+    const { results } = await db.prepare(statsSql).bind(dateStr).all();
+    return c.json({ 
+      period: "Last 30 Days",
+      metrics: "Bad/Total Ratio (%)",
+      results: results || []
+    });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 🏆 Phase 18: Infrastructure Hero Leaderboard API
+app.get('/ai/governance/leaderboard', async (c) => {
+  const db = c.env.DB;
+  try {
+    const topHeroes = await db.prepare(`
+      SELECT user_id, user_name, s_point, contribution_count, rank_level
+      FROM user_stats
+      ORDER BY s_point DESC, contribution_count DESC
+      LIMIT 10
+    `).all();
+
+    return c.json({
+      title: "S-Guard Infrastructure Heroes (Leaderboard)",
+      updated_at: getKst(),
+      heroes: topHeroes.results || []
+    });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ⚖️ Phase 19: Agree Terms API (Enhanced with IP & Version tracking)
+app.post('/auth/agree-terms', async (c) => {
+  const { employee_id, version } = await c.req.json();
+  const db = c.env.DB;
+  const now = getKst();
+  
+  // 🛡️ Audit Proof: Extract IP and Timestamp
+  const userIp = c.req.header('CF-Connecting-IP') || '0.0.0.0';
+  
+  try {
+    await db.prepare(`
+      UPDATE users 
+      SET terms_agreed_at = ?, terms_agreed_ip = ?, terms_version = ? 
+      WHERE employee_id = ?
+    `).bind(now, userIp, version || 'v1.0', employee_id).run();
+
+    return c.json({ 
+      status: 'success', 
+      message: 'Terms agreement recorded with audit audit proof', 
+      agreed_at: now,
+      ip: userIp
+    });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
 
 // Incidents create
 app.post('/incidents', async (c) => {
@@ -5527,7 +6689,6 @@ app.post('/warroom/chat', async (c) => {
 // ==========================================
 app.post('/warroom/upload', async (c) => {
   const db = c.env.DB
-  const kv = c.env.SMS_STORAGE
   const now = getKst()
 
   let formData
@@ -5537,48 +6698,53 @@ app.post('/warroom/upload', async (c) => {
     return c.json({ error: 'Invalid form data' }, 400)
   }
 
-  const file = formData.get('file')
-  const incident_id = formData.get('incident_id')
-  const uploaded_by = formData.get('uploaded_by') || 'Unknown'
+  const file        = formData.get('file')
+  const incident_id = formData.get('incident_id')  // 워룸 첨부: 필수 | 프로필: 없음
+  const employee_id = formData.get('employee_id')  // 프로필 업로드 시 사번
+  const uploaded_by = formData.get('uploaded_by') || employee_id || 'Unknown'
 
-  if (!file || !incident_id) {
-    return c.json({ error: 'file and incident_id are required' }, 400)
+  if (!file) {
+    return c.json({ error: 'file is required' }, 400)
   }
 
-  // Calculate next seq for this inc_id
+  const fileName  = file.name || `file_${Date.now()}`
+  const fileBuffer = await file.arrayBuffer()
+
+  // ── 프로필 사진 업로드 (incident_id 없음) ──────────────────────────────
+  if (!incident_id) {
+    const key = `profile/${employee_id || uploaded_by}/${Date.now()}_${fileName}`
+    await c.env.WARROOM_ASSETS.put(key, fileBuffer, {
+      httpMetadata: { contentType: file.type || 'image/jpeg' }
+    })
+    const fileUrl = `${new URL(c.req.url).origin}/warroom/asset/${encodeURIComponent(key)}`
+    return c.json({ status: 'uploaded', url: fileUrl, filename: fileName })
+  }
+
+  // ── 워룸 첨부 업로드 (incident_id 있음) ───────────────────────────────
   const lastRow = await db.prepare(
     "SELECT MAX(seq) as max_seq FROM warroom_attachments WHERE inc_id = ?"
   ).bind(incident_id).first()
   const seq = (lastRow && lastRow.max_seq != null) ? lastRow.max_seq + 1 : 1
 
-  // Store file in R2 for better scaling and binary support
-  const fileName = file.name || `file_${Date.now()}`
   const fileKey = `warroom/${incident_id}/${seq}/${fileName}`
-  const fileBuffer = await file.arrayBuffer()
-  
-  // Upload to R2 bucket
   await c.env.WARROOM_ASSETS.put(fileKey, fileBuffer, {
     httpMetadata: { contentType: file.type || 'application/octet-stream' }
   })
 
-  // Construct a public URL using the worker's own base
-  const fileUrl = `/warroom/asset/${encodeURIComponent(fileKey)}`
+  const fileUrl  = `/warroom/asset/${encodeURIComponent(fileKey)}`
   const fileType = file.type || 'application/octet-stream'
 
-  // 1. Save metadata to warroom_attachments
   await db.prepare(`
     INSERT INTO warroom_attachments (inc_id, seq, filename, original_name, file_type, url, uploaded_by, timestamp, reg_id, reg_dt, mod_id, mod_dt)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     incident_id, seq, fileKey, fileName,
-    fileType,
-    fileUrl, uploaded_by,
+    fileType, fileUrl, uploaded_by,
     now, uploaded_by, now, uploaded_by, now
   ).run()
 
-  // 2. IMPORTANT: ALSO insert into warroom_chats to unify the stream
   const lastChat = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(incident_id).first()
-  const chatSeq = (lastChat && lastChat.max_seq) ? lastChat.max_seq + 1 : 1
+  const chatSeq  = (lastChat && lastChat.max_seq) ? lastChat.max_seq + 1 : 1
   const chatText = `[첨부파일]${fileName}|${fileUrl}|${fileType}`
 
   await db.prepare(
@@ -5597,7 +6763,10 @@ app.get('/warroom/asset/:key', async (c) => {
   const headers = new Headers()
   object.writeHttpMetadata(headers)
   headers.set('etag', object.httpEtag)
+  // ⚡ Cross-Origin 이미지 임베드 허용 (secureHeaders()의 same-origin 정책 오버라이드)
   headers.set('Access-Control-Allow-Origin', '*')
+  headers.set('Cross-Origin-Resource-Policy', 'cross-origin')
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable')
   
   return new Response(object.body, { headers })
 })

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw } from 'lucide-react';
+import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw, ThumbsUp, ThumbsDown, CheckCircle, AlertCircle, X, ChevronRight } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
+import { getAccessToken } from '../lib/authStore';
 
 const getApiUrl = (endpoint) => {
   const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -44,7 +45,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     current_log: { type: 'info', text: 'AI 엔진 연결 중...' },
     prediction_counts: { critical: 0, server: 0, security: 0, report: 0 },
     similarity_score: null,
-    similarity_reason: null
+    similarity_reason: null,
+    vector_id: null
   });
   const [displayedText, setDisplayedText] = useState('');
   const [isAnalyzingSms, setIsAnalyzingSms] = useState(false);
@@ -54,6 +56,13 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [insightTimestamp, setInsightTimestamp] = useState(null);
   const [lockingUser, setLockingUser] = useState(null);
+
+  // Feedback States
+  const [feedback, setFeedback] = useState(null); // 'UP', 'DOWN'
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [downReason, setDownReason] = useState('');
+  const [correction, setCorrection] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Streaming typewriter (SSE chunk -> queue -> char-by-char)
   const typingQueueRef = useRef('');
@@ -119,14 +128,16 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       // ① Check DB cache FIRST (unless forced)
       if (!force) {
         try {
-          const token = localStorage.getItem('sguard_jwt');
+          const token = getAccessToken();
           const checkRes = await fetch(`${API_BASE_URL}/ai/insight/${selectedSms.inc_id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (checkRes.ok) {
             const data = await checkRes.json();
             if (data.content) {
-              enqueueText(data.content, { reset: true });
+              // ⚡ DB 캐시 히트 — 타자기 효과 없이 즉시 전체 렌더링 (시간이 생명)
+              stopTypewriter();
+              setDisplayedText(data.content);
               const critical = data.severity === 'CRITICAL';
                setIsCritical(critical);
                setAnalysisComplete(true);
@@ -166,7 +177,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const token = localStorage.getItem('sguard_jwt');
+      const token = getAccessToken();
 
       const res = await fetch(`${API_BASE_URL}/ai/analyze-sms`, {
         method: 'POST',
@@ -284,10 +295,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               if (data.similarity_score !== undefined && data.similarity_score !== null) {
                 lastSimilarityScore = data.similarity_score;
                 lastSimilarityReason = data.similarity_reason;
+                const vectorId = data.vector_id || null;
                 setInsightData(prev => ({ 
                   ...prev, 
                   similarity_score: data.similarity_score,
-                  similarity_reason: data.similarity_reason || prev.similarity_reason
+                  similarity_reason: data.similarity_reason || prev.similarity_reason,
+                  vector_id: vectorId || prev.vector_id
                 }));
               }
               if (data.answer) {
@@ -310,6 +323,53 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         showDelayOnce();
     }
   }, [selectedSms, API_BASE_URL, enqueueText]);
+
+  const handleFeedback = async (type, detail = null) => {
+    if (!selectedSms || !displayedText) return;
+    
+    setFeedback(type);
+    if (type === 'DOWN' && !detail) {
+      setShowFeedbackModal(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`${API_BASE_URL}/ai/feedback`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          inc_id: selectedSms.inc_id,
+          vector_id: insightData.vector_id,
+          query: selectedSms.message,
+          answer: displayedText,
+          context: {
+            sms: selectedSms,
+            similarity: {
+              score: insightData.similarity_score,
+              reason: insightData.similarity_reason
+            }
+          },
+          feedback_type: type,
+          reason: detail?.reason || null,
+          user_correction: detail?.correction || null,
+          user_id: (() => { try { return JSON.parse(localStorage.getItem('sguard_user') || '{}').employee_id || ''; } catch { return ''; } })()
+        })
+      });
+      if (res.ok) {
+        if (type === 'UP') alert('분석 결과에 대한 긍정적인 피드백 감사합니다!');
+      }
+    } catch (e) {
+      console.error("Insight Feedback failed", e);
+    } finally {
+      setIsSubmitting(false);
+      setShowFeedbackModal(false);
+    }
+  };
 
   const handleManualAnalyze = () => {
     if (isAnalyzingSms) return;
@@ -343,7 +403,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setDisplayedText('');
       
       try {
-        const response = await fetch(`${API_BASE_URL}/ai/insight`);
+        const controller = new AbortController();
+        const response = await fetch(`${API_BASE_URL}/ai/insight`, { signal: controller.signal });
         if (!response.ok) throw new Error('Network response was not ok');
         
         const contentType = response.headers.get('content-type');
@@ -367,7 +428,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
         while (true) {
           const { value, done } = await reader.read();
-          if (done || isCancelled) break;
+          if (done || isCancelled) {
+             if (reader) reader.releaseLock();
+             break;
+          }
           
           buffer += decoder.decode(value, { stream: true });
           const events = buffer.split('\n\n');
@@ -381,7 +445,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               if (dataStr === '[DONE]') {
                 setAnalysisComplete(true);
                 // After completion, wait 10 seconds before starting a new stream to avoid hammer
-                if (!isCancelled) setTimeout(startStreaming, 10000);
+                if (!isCancelled) {
+                   const timer = setTimeout(startStreaming, 10000);
+                   return timer;
+                }
                 return;
               }
               
@@ -696,8 +763,37 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       </div>
 
-      {/* War-Room 개설 버튼 */}
-      {/* War-Room 개설 버튼 (항상 표시하며, 상태에 따라 disabled 처리) */}
+      {/* Feedback & War-Room Section */}
+      <div className="mt-4 flex flex-col space-y-3 relative z-10">
+        
+        {/* Feedback Buttons (👍/👎) */}
+        {analysisComplete && displayedText && (
+          <div className="flex items-center justify-end px-1 animate-in fade-in slide-in-from-right-2 duration-500">
+             <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1.5 space-x-2">
+                <span className="text-[10px] text-slate-500 font-bold px-2 border-r border-white/10 uppercase tracking-tighter">AI 분석이 정확한가요?</span>
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => handleFeedback('UP')}
+                    disabled={feedback === 'UP'}
+                    className={`p-1.5 rounded-lg transition-all ${feedback === 'UP' ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30' : 'text-slate-500 hover:text-blue-400 hover:bg-white/10 border border-transparent'}`}
+                    title="정확한 분석입니다"
+                  >
+                    <ThumbsUp className={`w-3.5 h-3.5 ${feedback === 'UP' ? 'fill-current' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => handleFeedback('DOWN')}
+                    disabled={feedback === 'DOWN' && !showFeedbackModal}
+                    className={`p-1.5 rounded-lg transition-all ${feedback === 'DOWN' ? 'text-red-400 bg-red-500/10 border border-red-500/30' : 'text-slate-500 hover:text-red-400 hover:bg-white/10 border border-transparent'}`}
+                    title="분석 결과 교정하기"
+                  >
+                    <ThumbsDown className={`w-3.5 h-3.5 ${feedback === 'DOWN' ? 'fill-current' : ''}`} />
+                  </button>
+                </div>
+             </div>
+          </div>
+        )}
+
+        {/* War-Room 개설 버튼 (항상 표시하며, 상태에 따라 disabled 처리) */}
       <div className={`mt-4 flex items-center gap-3 p-4 rounded-2xl border transition-all duration-500
         ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30) 
           ? 'bg-slate-800/50 border-slate-700/50' 
@@ -731,6 +827,62 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           {lockingUser && !warRoomExists ? '다른 사용자 처리 중' : warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}
         </button>
       </div>
+      </div>
+
+      {/* Detailed Feedback Modal (Popup) */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#1a1f2e] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-slate-900/40">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-red-400" />
+                <h3 className="text-sm font-bold text-white">무엇이 잘못되었나요?</h3>
+              </div>
+              <button onClick={() => setShowFeedbackModal(false)} className="text-slate-500 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 gap-2">
+                {['정보가 오래됨', 'SMS 내역과 불일치', '관련 없는 답변', '기타 (직접 입력)'].map(reason => (
+                  <button
+                    key={reason}
+                    onClick={() => setDownReason(reason)}
+                    className={`text-left px-3 py-2.5 rounded-xl text-xs transition-all border ${downReason === reason ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' : 'bg-white/5 border-transparent text-slate-400 hover:bg-white/10'}`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">교정 내용 (직접 수정)</label>
+                <textarea
+                  value={correction}
+                  onChange={(e) => setCorrection(e.target.value)}
+                  placeholder="올바른 정답이나 수정 사항을 입력해 주세요..."
+                  className="w-full h-24 bg-black/20 border border-white/10 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-blue-500/50 transition-all resize-none"
+                />
+              </div>
+
+              <button
+                onClick={() => handleFeedback('DOWN', { reason: downReason, correction })}
+                disabled={!downReason || isSubmitting}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center space-x-2"
+              >
+                {isSubmitting ? <span>제출 중...</span> : (
+                  <>
+                    <span>인사이트 교정 제출하기</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
 
     </div>

@@ -4,8 +4,9 @@ import {
   ArrowLeft, Search, User, Shield, RefreshCw,
   Trash2, Mail, Phone, Building2,
   ChevronRight, Key, MoreHorizontal, UserCheck, UserX,
-  LayoutGrid, List as ListIcon, X
+  LayoutGrid, List as ListIcon, X, Star, Edit3, CheckCircle2
 } from 'lucide-react';
+import { getAccessToken, getUserProfile } from '../lib/authStore';
 
 export default function UserManagementPage() {
   const navigate = useNavigate();
@@ -14,6 +15,10 @@ export default function UserManagementPage() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   
+  // My Profile State
+  const [myProfile, setMyProfile] = useState(null);
+  const [myProfileLoading, setMyProfileLoading] = useState(true);
+
   // Organization Edit State
   const [orgTree, setOrgTree] = useState([]);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
@@ -29,20 +34,65 @@ export default function UserManagementPage() {
 
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
+  // 🔑 내 프로필 불러오기 (authStore → API 순서로 조회)
+  const fetchMyProfile = async () => {
+    setMyProfileLoading(true);
+    try {
+      const token = getAccessToken();
+      const stored = getUserProfile();
+      
+      // authStore에서 먼저 읽기
+      if (stored?.employee_id) {
+        setMyProfile(stored);
+      }
+      
+      // API로 최신 정보 가져오기
+      if (stored?.employee_id && token) {
+        const res = await fetch(`${API_BASE}/users/${stored.employee_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMyProfile(data.user || data);
+        }
+      }
+    } catch (e) {
+      console.error('[MyProfile] Fetch failed:', e);
+    } finally {
+      setMyProfileLoading(false);
+    }
+  };
+
   const fetchUsers = () => {
     setLoading(true);
-    fetch(`${API_BASE}/users`)
-      .then(r => r.json())
-      .then(data => setUsers(data))
-      .catch(console.error)
+    const token = getAccessToken();
+    fetch(`${API_BASE}/users`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error('데이터를 불러오지 못했습니다.');
+        return r.json();
+      })
+      .then(data => setUsers(Array.isArray(data) ? data : []))
+      .catch(err => {
+        console.error(err);
+        setUsers([]);
+      })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
+    fetchMyProfile();
     fetchUsers();
-    fetch(`${API_BASE}/org/tree`)
-      .then(r => r.json())
-      .then(data => setOrgTree(data))
+    const token = getAccessToken();
+    fetch(`${API_BASE}/org/tree`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error('조직도 데이터를 불러오지 못했습니다.');
+        return r.json();
+      })
+      .then(data => setOrgTree(data || []))
       .catch(console.error);
   }, []);
 
@@ -51,17 +101,24 @@ export default function UserManagementPage() {
     if (!newPass) return;
 
     try {
+      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${userId}/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ new_password: newPass })
       });
       if (!res.ok) {
-        const error = await res.json();
-        console.error(`실패: ${error.detail}`);
+        const error = await res.json().catch(() => ({}));
+        alert(`비밀번호 초기화 실패: ${error.detail || '서버 오류'}`);
+      } else {
+        alert('비밀번호가 초기화되었습니다.');
       }
     } catch (e) {
       console.error(e);
+      alert('비밀번호 초기화 중 오류가 발생했습니다.');
     }
   };
 
@@ -75,15 +132,21 @@ export default function UserManagementPage() {
     if (!window.confirm(confirmMsg)) return;
 
     try {
+      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${user.employee_id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ status: nextStatus })
       });
       if (res.ok) {
+        alert(`${nextStatus === 'SUSPENDED' ? '차단' : '활성화'} 처리가 완료되었습니다.`);
         fetchUsers();
       } else {
-        console.error('상태 변경 처리에 실패했습니다.');
+        const error = await res.json().catch(() => ({}));
+        alert(`상태 변경 실패: ${error.detail || '서버 오류'}`);
       }
     } catch (e) {
       console.error(e);
@@ -92,15 +155,21 @@ export default function UserManagementPage() {
 
   const handleUpdateRole = async (userId, newRole) => {
     try {
+      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${userId}/role`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ role: newRole })
       });
       if (res.ok) {
+        alert(`권한이 ${newRole.toUpperCase()}(으)로 변경되었습니다.`);
         fetchUsers();
       } else {
-        console.error('권한 변경에 실패했습니다.');
+        const error = await res.json().catch(() => ({}));
+        alert(`권한 변경 실패: ${error.detail || '서버 오류'}`);
       }
     } catch (e) { console.error(e); }
   };
@@ -181,14 +250,19 @@ export default function UserManagementPage() {
     };
 
     try {
+      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${editingUser.employee_id}/org`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
         setIsOrgModalOpen(false);
         fetchUsers();
+        alert('소속 정보가 성공적으로 변경되었습니다.');
       } else {
         const err = await res.json().catch(() => ({}));
         alert(`소속 변경 실패: ${err.detail || '서버 오류가 발생했습니다.'}`);
@@ -220,9 +294,13 @@ export default function UserManagementPage() {
     };
 
     try {
+      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/admin/users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -254,8 +332,12 @@ export default function UserManagementPage() {
     }
 
     try {
+      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${user.employee_id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
       });
       if (res.ok) {
         fetchUsers();

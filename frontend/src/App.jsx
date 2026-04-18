@@ -31,6 +31,7 @@ import InboxPage from './pages/InboxPage';
 import OrbitalCommandPage from './pages/OrbitalCommandPage';
 import SecurityLogPage from './pages/SecurityLogPage';
 import ProcessingFlowPage from './pages/ProcessingFlowPage';
+import ConsentModal from './components/ConsentModal';
 
 import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
@@ -41,13 +42,21 @@ import { X, MessageSquare, FileText } from 'lucide-react';
 import { CodebookProvider } from './context/CodebookContext';
 
 import { Navigate } from 'react-router-dom';
+import { setAccessToken, getAccessToken, setUserProfile as setStoreUserProfile, getUserProfile, addAuthListener, getGhostToken, setGhostToken } from './lib/authStore';
 
 // 🔒 인증된 사용자만 접근할 수 있도록 보호하는 컴포넌트 (Navigation Guard)
-function ProtectedRoute({ children }) {
-  const savedUser = localStorage.getItem('sguard_user');
-  const jwt = localStorage.getItem('sguard_jwt');
+// 🔒 Protected Route: Waits for session refresh to complete before redirecting
+function ProtectedRoute({ children, isRefreshing, userProfile }) {
+  const accessToken = getAccessToken();
   
-  if (!savedUser || !jwt || savedUser === 'undefined' || savedUser === 'null') {
+  // Show nothing or a loading spinner while the app is attempting silent refresh
+  if (isRefreshing) {
+    return null; // or <div className="loading-screen" />
+  }
+
+  // After refresh check is done, verify if we have a valid session
+  if (!userProfile && !accessToken) {
+    console.log('[Auth] Protected route blocked - No valid session found.');
     return <Navigate to="/" replace />;
   }
   
@@ -62,45 +71,150 @@ function AppContent() {
   
   // 🌐 API Configuration
   const apiBase = 'https://sguardai.khcho0421.workers.dev';
-  
+
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [showReportPopup, setShowReportPopup] = useState(false);
   const [warRooms, setWarRooms] = useState([]);
-  const [userProfile, setUserProfile] = useState(null);
+  const [userProfile, setUserProfile] = useState(() => getUserProfile() || JSON.parse(localStorage.getItem('sguard_user') || 'null'));
+  const [isRefreshing, setIsRefreshing] = useState(true);
 
-  // Load user profile & 실시간 세션 검증 (Navigation Guard 고도화)
+  // 🛡️ Sync with Auth Store
+  useEffect(() => {
+    const removeListener = addAuthListener(({ userProfile: newUser }) => {
+      setUserProfile(newUser);
+    });
+    return () => removeListener();
+  }, []);
+
+  // Load user profile & 실시간 세션 검증 + 🔄 Silent Refresh
   useEffect(() => {
     const checkSession = async () => {
-      const savedUser = localStorage.getItem('sguard_user');
-      const jwt = localStorage.getItem('sguard_jwt');
-      
-      if (!savedUser || !jwt) return;
+      // 🚫 로그아웃 직후 → 세션 복원 건너뜀 (Ghost Token / localStorage 재복원 방지)
+      if (sessionStorage.getItem('s_logged_out') === '1') {
+        console.log('[Auth] Logged out flag detected — skipping session restore.');
+        setIsRefreshing(false);
+        return;
+      }
 
+      console.log('[Auth-Debug] Browser Cookie Enabled:', navigator.cookieEnabled);
       try {
-        const res = await fetch(`${apiBase}/auth/check`);
-        if (!res.ok) {
-          // 서버에서 세션이 무효화됨 (DB 상태 변경 등)
-          console.warn('[Session] Invalid or expired session. Logging out...');
-          localStorage.removeItem('sguard_user');
-          localStorage.removeItem('sguard_jwt');
-          navigate('/', { replace: true });
+        // 1. Silent Refresh 먼저 시도 (HttpOnly 쿠키 사용)
+        const refreshRes = await fetch(`${apiBase}/auth/refresh`, {
+          method: 'GET',
+          credentials: 'include' // 🛡️ 보안: Cross-Origin 요청 시 쿠키 전송 필수
+        });
+
+        // 🔑 응답 body를 미리 파싱하여 중복 소비 방지
+        let refreshData = null;
+        try { refreshData = await refreshRes.json(); } catch (_) {}
+
+        if (refreshRes.ok && refreshData?.access_token) {
+          setAccessToken(refreshData.access_token);
+          setStoreUserProfile(refreshData.user);
+          if (refreshData.ghost_token) setGhostToken(refreshData.ghost_token);
+          setIsRefreshing(false);
           return;
         }
+
+        // 👻 Fallback 1: Ghost Token Strategy (LocalStorage)
+        const ghostToken = getGhostToken();
+        console.log('[Auth-Debug] Local Ghost Token Found:', ghostToken ? 'YES' : 'NO');
+        console.log('[Auth-Debug] Cookie Refresh Failed:', refreshData?.code || 'UNKNOWN');
         
-        const data = await res.json();
-        if (data.ok && data.user) {
-          setUserProfile(data.user);
-          // 로컬 스토리지 정보 업데이트 (DB 최신 정보 반영)
-          localStorage.setItem('sguard_user', JSON.stringify(data.user));
+        if (ghostToken) {
+          console.log('[Auth] Attempting Ghost Token recovery...');
+          const ghostRes = await fetch(`${apiBase}/auth/refresh`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${ghostToken}`
+            }
+          });
+
+          let ghostData = null;
+          try { ghostData = await ghostRes.json(); } catch (_) {}
+
+          if (ghostRes.ok && ghostData?.access_token) {
+            console.log('[Auth] Ghost Token recovery successful!');
+            setAccessToken(ghostData.access_token);
+            setStoreUserProfile(ghostData.user);
+            if (ghostData.ghost_token) setGhostToken(ghostData.ghost_token);
+            setIsRefreshing(false);
+            return;
+          } else {
+            console.warn('[Auth] Ghost Token recovery failed:', ghostData?.code || 'UNKNOWN');
+          }
+        }
+
+        // 👻 Fallback 2: localStorage 캐시 사용 (새로고침 시 세션 유지)
+        // Ghost Token / Cookie 모두 실패해도, 로컬 캐시가 있으면 임시 세션 유지
+        // (Access Token은 없지만 사용자는 인증된 상태로 간주 — API 호출 시 재인증 처리)
+        const cachedUser = localStorage.getItem('sguard_user');
+        if (cachedUser && cachedUser !== 'null' && cachedUser !== 'undefined') {
+          try {
+            const parsedUser = JSON.parse(cachedUser);
+            if (parsedUser?.employee_id) {
+              console.warn('[Auth] Using localStorage cache to maintain session. Ghost Token expired or missing.');
+              setStoreUserProfile(parsedUser);
+              // Access token is null — interceptor's short-circuit will handle re-auth gracefully
+              setIsRefreshing(false);
+              return;
+            }
+          } catch (_) {
+            localStorage.removeItem('sguard_user');
+          }
+        }
+
+        // 3. 완전히 세션 정보가 없을 때만 로그인으로 이동
+        setAccessToken(null);
+        setStoreUserProfile(null);
+        
+        if (!isAuthPage) {
+          const errCode = refreshData?.code || 'UNKNOWN_ERROR';
+          console.warn('[Auth] Session restoration failed completely. Redirecting to login:', errCode);
+          navigate('/', { replace: true });
         }
       } catch (e) {
-        console.error("Session check failed", e);
+        console.error('Session check failed', e);
+        // 네트워크 오류 등 예외 상황에서도 캐시로 복원 시도
+        const cachedUser = localStorage.getItem('sguard_user');
+        if (cachedUser && cachedUser !== 'null') {
+          try {
+            const parsedUser = JSON.parse(cachedUser);
+            if (parsedUser?.employee_id) {
+              setStoreUserProfile(parsedUser);
+              setIsRefreshing(false);
+              return;
+            }
+          } catch (_) {}
+        }
+        setStoreUserProfile(null);
+        setAccessToken(null);
+      } finally {
+        setIsRefreshing(false);
       }
     };
 
+    // Cleanup legacy tokens if any
+    localStorage.removeItem('sguard_jwt');
+
     checkSession();
-  }, [location.pathname]); // 페이지 이동 시마다 체크
+  }, []); // Run only once on app mount
+
+  // 🛡️ Debug: Governance Guard Status
+  useEffect(() => {
+    if (userProfile && !isAuthPage) {
+      console.log(`[Governance-Debug] Page: ${location.pathname}, Terms Agreed At: "${userProfile.terms_agreed_at}", Should Show Modal: ${(!userProfile.terms_agreed_at && !isAuthPage)}`);
+    }
+  }, [userProfile, location.pathname, isAuthPage]);
+
+  // 🔄 Authenticated User Auto-Redirect: 로그인된 상태에서 로그인 페이지 접근 시 대시보드로 이동
+  useEffect(() => {
+    if (!isRefreshing && userProfile && isAuthPage) {
+      console.log('[Auth] Authenticated user detected on login page. Redirecting to dashboard.');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isRefreshing, userProfile, isAuthPage, navigate]);
 
   const fetchWarRooms = async () => {
     try {
@@ -128,6 +242,24 @@ function AppContent() {
   const pathParts = location.pathname.split('/');
   const currentIncidentId = (pathParts[1] === 'chat' && pathParts[2]) ? pathParts[2] : null;
 
+  // 🔒 Initialization Lock: Do not render UI until session check is complete
+  if (isRefreshing) {
+    return (
+      <div className="min-h-screen bg-[#0a0e17] flex flex-col items-center justify-center space-y-6">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-8 h-8 bg-blue-500/10 rounded-full animate-pulse" />
+          </div>
+        </div>
+        <div className="text-center animate-pulse">
+          <p className="text-blue-400 font-bold tracking-widest text-sm uppercase">S-GUARD AI</p>
+          <p className="text-slate-500 text-[10px] mt-1 font-mono uppercase">Restoring Secure Session...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <CodebookProvider>
       {!isAuthPage && <SMSNotification />}
@@ -136,33 +268,52 @@ function AppContent() {
         <Route path="/" element={<LoginPage />} />
 
         {/* 🔒 Protected Routes: 인증 필수 */}
-        <Route path="/dashboard" element={<ProtectedRoute><ErrorBoundary><DashboardPage /></ErrorBoundary></ProtectedRoute>} />
-        <Route path="/ai-report/:incidentId?" element={<ProtectedRoute><AiReportPage /></ProtectedRoute>} />
-        <Route path="/assignment-detail" element={<ProtectedRoute><AssignmentDetailPage /></ProtectedRoute>} />
-        <Route path="/chat/:incidentId?" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-        <Route path="/chat-summary/:incidentId" element={<ProtectedRoute><ChatSummaryPage /></ProtectedRoute>} />
-        <Route path="/ai-process-report" element={<ProtectedRoute><AiProcessReportPage /></ProtectedRoute>} />
-        <Route path="/report-publish" element={<ProtectedRoute><ReportPublishPage /></ProtectedRoute>} />
-        <Route path="/activity" element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
-        <Route path="/activity-detail" element={<ProtectedRoute><ActivityDetailPage /></ProtectedRoute>} />
-        <Route path="/assignments" element={<ProtectedRoute><AssignmentsPage /></ProtectedRoute>} />
-        <Route path="/overall-status" element={<ProtectedRoute><OverallStatusPage /></ProtectedRoute>} />
-        <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-        <Route path="/incident-list" element={<ProtectedRoute><IncidentListPage /></ProtectedRoute>} />
-        <Route path="/keyword-management" element={<ProtectedRoute><KeywordManagementPage /></ProtectedRoute>} />
-        <Route path="/report-line-management" element={<ProtectedRoute><ReportLineManagementPage /></ProtectedRoute>} />
-        <Route path="/incident-push" element={<ProtectedRoute><IncidentPushPage /></ProtectedRoute>} />
-        <Route path="/security-logs" element={<ProtectedRoute><SecurityLogPage /></ProtectedRoute>} />
-        <Route path="/processing-flow" element={<ProtectedRoute><ProcessingFlowPage /></ProtectedRoute>} />
-        <Route path="/knowledge-base" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
-        <Route path="/user-management" element={<ProtectedRoute><UserManagementPage /></ProtectedRoute>} />
-        <Route path="/organization-management" element={<ProtectedRoute><OrganizationManagementPage /></ProtectedRoute>} />
-        <Route path="/warroom-management" element={<ProtectedRoute><WarRoomManagementPage /></ProtectedRoute>} />
-        <Route path="/codebook-management" element={<ProtectedRoute><CodebookManagementPage /></ProtectedRoute>} />
-        <Route path="/workflow/:inc_id" element={<ProtectedRoute><WorkflowPage /></ProtectedRoute>} />
-        <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
-        <Route path="/orbital-command" element={<ProtectedRoute><OrbitalCommandPage /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage /></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/ai-report/:incidentId?" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiReportPage /></ProtectedRoute>} />
+        <Route path="/assignment-detail" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentDetailPage /></ProtectedRoute>} />
+        <Route path="/chat/:incidentId?" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ChatPage /></ProtectedRoute>} />
+        <Route path="/chat-summary/:incidentId" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ChatSummaryPage /></ProtectedRoute>} />
+        <Route path="/ai-process-report" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiProcessReportPage /></ProtectedRoute>} />
+        <Route path="/report-publish" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportPublishPage /></ProtectedRoute>} />
+        <Route path="/activity" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ActivityPage /></ProtectedRoute>} />
+        <Route path="/activity-detail" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ActivityDetailPage /></ProtectedRoute>} />
+        <Route path="/assignments" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
+        <Route path="/overall-status" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OverallStatusPage /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
+        <Route path="/incident-list" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentListPage /></ProtectedRoute>} />
+        <Route path="/keyword-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KeywordManagementPage /></ProtectedRoute>} />
+        <Route path="/report-line-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportLineManagementPage /></ProtectedRoute>} />
+        <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentPushPage /></ProtectedRoute>} />
+        <Route path="/security-logs" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SecurityLogPage /></ProtectedRoute>} />
+        <Route path="/processing-flow" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ProcessingFlowPage /></ProtectedRoute>} />
+        <Route path="/knowledge-base" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KnowledgeBasePage /></ProtectedRoute>} />
+        <Route path="/user-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><UserManagementPage /></ProtectedRoute>} />
+        <Route path="/organization-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrganizationManagementPage /></ProtectedRoute>} />
+        <Route path="/warroom-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WarRoomManagementPage /></ProtectedRoute>} />
+        <Route path="/codebook-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><CodebookManagementPage /></ProtectedRoute>} />
+        <Route path="/workflow/:inc_id" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WorkflowPage /></ProtectedRoute>} />
+        <Route path="/inbox" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><InboxPage /></ProtectedRoute>} />
+        <Route path="/orbital-command" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrbitalCommandPage /></ProtectedRoute>} />
       </Routes>
+
+      {/* ⚖️ Governance & Mandatory Consent Guard */}
+      {userProfile && (userProfile.terms_agreed_at === null || userProfile.terms_agreed_at === undefined || userProfile.terms_agreed_at === '') && !isAuthPage && (
+        <ConsentModal userProfile={userProfile} setUserProfile={setUserProfile} />
+      )}
+
+      {/* ⚖️ Phase 19: Global Disclaimer & Legal Footer */}
+      {!isAuthPage && (
+        <div className="fixed bottom-[88px] left-0 right-0 px-6 py-2 z-[40]">
+          <div className="max-w-xl mx-auto py-2 px-4 bg-slate-900/40 backdrop-blur-md rounded-2xl border border-white/5 flex flex-col items-center justify-center space-y-0.5 shadow-lg">
+            <p className="text-[9px] text-slate-500 font-medium text-center leading-tight">
+              S-Guard AI 응답은 데이터 기반 참고용이며, 최종 의사결정과 실행 책임은 작업자 본인에게 있습니다.
+            </p>
+            <p className="text-[8px] text-slate-700 font-mono tracking-tighter">
+              PURPOSE: SYSTEM OPTIMIZATION ONLY | EMPLOYEE MONITORING STRICTLY PROHIBITED
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Global Bottom Navigation */}
       {!isAuthPage && (

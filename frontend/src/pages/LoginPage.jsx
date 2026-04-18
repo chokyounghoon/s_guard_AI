@@ -4,6 +4,7 @@ import {
   CheckCircle, Check, Eye, EyeOff, Mail, KeyRound, UserCheck, Download, Lock, ChevronRight, BookOpen, X, ShieldAlert, Apple
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { setAccessToken, setUserProfile as setStoreUserProfile, setGhostToken } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -230,10 +231,12 @@ export default function LoginPage() {
       
       alert('비밀번호가 성공적으로 변경되었습니다.');
       // 리셋 성공시 자동 로그인 처리 (백엔드에서 토큰을 준다면 가능, 현재는 다시 로그인으로 보냄)
-      if (data.token) {
-        localStorage.setItem('sguard_token', data.token);
-        if (data.jwt) localStorage.setItem('sguard_jwt', data.jwt);
-        localStorage.setItem('sguard_user', JSON.stringify(data.user || data));
+      if (data.access_token) {
+        setAccessToken(data.access_token);
+        setStoreUserProfile(data.user);
+        setGhostToken(data.ghost_token); // 👻 Ghost Token 저장
+        
+        console.log('[Login] Success - Tokens stored. Redirecting...');
         navigate('/dashboard');
       } else {
         setState(S.A);
@@ -334,12 +337,27 @@ export default function LoginPage() {
         }
         return;
       }
-      localStorage.clear(); // 🧹 Clean Slate: Prevent legacy token pollution
-      localStorage.setItem('sguard_token', data.token);
-      if (data.jwt) {
-        localStorage.setItem('sguard_jwt', data.jwt);
+      // 🧹 Clean Slate: Prevent legacy token pollution
+      // NOTE: ghost_token을 먼저 저장한 후 clear하면 안 되므로 clear는 최소화
+      localStorage.removeItem('sguard_jwt');
+      localStorage.removeItem('sguard_legacy_token');
+      
+      // 🔒 JWT Access Token 저장 (access_token 우선 — data.token은 레거시 평문이라 JWT 검증 실패)
+      const jwt = data.access_token || data.token;
+      if (jwt) {
+        setAccessToken(jwt);
+        console.log('[Auth-Debug] Access Token (JWT) stored:', jwt.startsWith('eyJ') ? 'Valid JWT ✅' : '⚠️ Not a JWT — may fail validation');
       }
-      localStorage.setItem('sguard_user',  JSON.stringify(data));
+      
+      // 👻 Ghost Token (Refresh Token) 저장
+      if (data.ghost_token) {
+        console.log('[Auth-Debug] Ghost Token Received:', data.ghost_token.substring(0, 8) + '...');
+        setGhostToken(data.ghost_token);
+      } else {
+        console.warn('[Auth-Debug] Ghost Token NOT received from server. Refresh might fail.');
+      }
+      
+      setStoreUserProfile(data.user || data);
       navigate('/dashboard');
     } catch { setError('서버에 연결할 수 없습니다.'); }
     finally { setLoading(false); }
@@ -442,6 +460,76 @@ export default function LoginPage() {
     );
   };
 
+  const ManualModal = ({ onClose }) => (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', backdropFilter:'blur(12px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:20 }} onClick={onClose}>
+      <div style={{ 
+        background:'#0f172a', border:'1px solid rgba(59,130,246,0.3)', borderRadius:28, maxWidth:480, width:'100%', 
+        padding:32, animation:'fadeUp .3s ease', position:'relative',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 40px rgba(59, 130, 246, 0.1)'
+      }} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} style={{ position:'absolute', top:24, right:24, background:'none', border:'none', color:'rgba(255,255,255,0.4)', cursor:'pointer' }}><X size={20}/></button>
+        
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:24 }}>
+          <div style={{ background:'rgba(59,130,246,0.2)', padding:10, borderRadius:12 }}>
+            <Download size={22} color="#60a5fa" />
+          </div>
+          <h3 style={{ color:'white', fontSize:22, fontWeight:800, margin:0 }}>Android 설치 매뉴얼</h3>
+        </div>
+
+        <div style={{ maxHeight:'60vh', overflowY:'auto', paddingRight:8, display:'flex', flexDirection:'column', gap:28 }}>
+          <div>
+            <h4 style={{ color:'#60a5fa', fontSize:14, fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ background:'#60a5fa', color:'#0f172a', width:18, height:18, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>1</span>
+              Play 프로텍트 설정 진입
+            </h4>
+            <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
+              <li>Google Play 스토어 앱을 실행합니다.</li>
+              <li>우측 상단의 <span style={{ color:'white', fontWeight:600 }}>프로필 아이콘(내 계정)</span>을 탭합니다.</li>
+              <li>메뉴 목록 중 <span style={{ color:'white', fontWeight:600 }}>Play 프로텍트</span>를 선택합니다.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 style={{ color:'#60a5fa', fontSize:14, fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ background:'#60a5fa', color:'#0f172a', width:18, height:18, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>2</span>
+              실시간 검사 비활성화
+            </h4>
+            <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
+              <li>화면 우측 상단의 <span style={{ color:'white', fontWeight:600 }}>톱니바퀴(설정)</span> 아이콘을 클릭합니다.</li>
+              <li><span style={{ color:'#f87171', fontWeight:600 }}>Play 프로텍트로 앱 검사</span> 스위치를 끕니다.</li>
+              <li>확인 팝업 창에서 <span style={{ color:'white', fontWeight:600 }}>종료</span> 버튼을 누릅니다.</li>
+              <li style={{ fontSize:12, color:'rgba(255,255,255,0.45)' }}>* 유해 앱 감지 기능 개선 항목도 함께 비활성화를 권장합니다.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 style={{ color:'#10b981', fontSize:14, fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ background:'#10b981', color:'#0f172a', width:18, height:18, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>3</span>
+              앱 설치 및 복구
+            </h4>
+            <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
+              <li>하단의 <span style={{ color:'white', fontWeight:600 }}>APK 다운로드 시작</span> 버튼을 클릭하여 설치합니다.</li>
+              <li>설치 완료 후 반드시 다시 Play 프로텍트 설정으로 돌아가 <span style={{ color:'#10b981', fontWeight:600 }}>앱 검사</span>를 활성화(켜기) 상태로 되돌려 주세요.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style={{ marginTop:32 }}>
+          <button 
+            onClick={() => { window.location.href = '/sguard-bridge_v1.0.apk'; onClose(); }}
+            style={{ ...primaryBtn, padding:'16px' }}
+          >
+            <Download size={18} />
+            <span>APK 다운로드 시작</span>
+          </button>
+          <p style={{ textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11, marginTop:16 }}>
+            보안 정책에 따라 설치 파일은 사내 네트워크에서만 다운로드 가능할 수 있습니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   const SubmitBtn = ({ label, color='blue', disabled:dis }) => (
     <button type="submit" disabled={loading||dis}
       style={{ ...(color==='emerald'?emeraldBtn:primaryBtn), opacity: dis&&!loading?0.5:1 }}>
@@ -465,6 +553,53 @@ export default function LoginPage() {
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(18px); }
           to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes shimmerLoop {
+          0% { background-position: -150% center; }
+          100% { background-position: 150% center; }
+        }
+        @keyframes glowPulse {
+          0%, 100% { filter: drop-shadow(0 0 2px rgba(96,165,250,0.3)); opacity: 0.8; }
+          50% { filter: drop-shadow(0 0 8px rgba(96,165,250,0.6)); opacity: 1; }
+        }
+        .keyword-loop-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0;
+          background: linear-gradient(90deg, 
+            rgba(0,70,255,0.05) 0%, 
+            rgba(0,70,255,0.15) 25%, 
+            rgba(0,70,255,0.05) 50%, 
+            rgba(0,70,255,0.15) 75%, 
+            rgba(0,70,255,0.05) 100%
+          );
+          background-size: 200% auto;
+          padding: 8px 18px;
+          border-radius: 20px;
+          width: fit-content;
+          margin: 0 auto;
+          border: 1px solid rgba(147,197,253,0.15);
+          animation: shimmerLoop 4s linear infinite;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+          backdrop-filter: blur(4px);
+        }
+        .keyword-item {
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 0.18em;
+          color: #93c5fd;
+          text-shadow: 0 0 10px rgba(0,70,255,0.2);
+          transition: all 0.3s ease;
+        }
+        .keyword-arrow {
+          color: #60a5fa;
+          font-size: 10px;
+          margin: 0 10px;
+          display: flex;
+          align-items: center;
+          font-weight: 900;
+          animation: glowPulse 2s ease-in-out infinite;
         }
         .header-section {
           background: linear-gradient(160deg, #001550 0%, #0030cc 40%, #0046FF 70%, #1a5aff 100%);
@@ -498,13 +633,15 @@ export default function LoginPage() {
           margin-bottom: 24px;
         }
         .card-section {
-          flex:1;
-          padding: 0 20px 40px;
+          flex: 1;
           display: flex;
           flex-direction: column;
+          justify-content: center;
+          padding: 20px 20px 60px;
           max-width: 480px;
           margin: 0 auto;
           width: 100%;
+          min-height: calc(100vh - 200px);
         }
         .step-bar {
           display:flex;
@@ -557,17 +694,6 @@ export default function LoginPage() {
 
       <div className="login-bg">
         <div className="header-section">
-          <div className="header-nav" style={{ position:'relative', zIndex:2 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-              <div style={{ width:36, height:36, borderRadius:'50%', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 2px 8px rgba(0,0,0,0.25)' }}>
-                <img src="/shinhan_logo.png" alt="신한금융그룹 로고" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', justifyContent:'center' }}>
-                <span style={{ color:'white', fontSize:15, fontWeight:700, letterSpacing:'-0.02em', lineHeight:1.1, textShadow:'0 1px 4px rgba(0,0,0,0.2)', fontFamily:"'OneShinhan', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif", display:'block', marginBottom:2 }}>신한금융그룹</span>
-                <span style={{ color:'rgba(255,255,255,0.75)', fontSize:8.5, fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase', fontFamily:"'OneShinhan', 'Inter', sans-serif", display:'block' }}>SHINHAN FINANCIAL GROUP</span>
-              </div>
-            </div>
-          </div>
           <div style={{ position:'relative', zIndex:1, paddingBottom:4 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:4, marginBottom:10 }}>
               <div style={{ width: 72, height: 86, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -587,15 +713,17 @@ export default function LoginPage() {
               <h1 style={{ color: '#ffffff', fontSize: 54, fontWeight: 900, letterSpacing: '0.07em', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.4), 0 0 40px rgba(255,255,255,0.2)', fontFamily: "'Inter', sans-serif" }}>GUARD</h1>
             </div>
 
-            {/* 🛡️ 복구된 상단 슬로건 및 키워드 */}
-            <p style={{ color:'rgba(255,255,255,0.65)', fontSize:12, fontWeight:400, letterSpacing:'0.04em', marginBottom:12, fontStyle:'italic' }}>
-              Beyond Management, Toward Prediction
+            {/* 🛡️ 다이내믹 피드백 루프 (DETECTION → DIAGNOSIS → MITIGATION → FORESIGHT) */}
+            <p style={{ color:'rgba(255,255,255,0.8)', fontSize:12, fontWeight:500, letterSpacing:'0.02em', marginBottom:14, fontStyle:'italic', textShadow:'0 2px 10px rgba(0,70,255,0.3)' }}>
+              "Knowledge Today, Foresight Tomorrow"
             </p>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:0 }}>
-              {['PREDICT','DEFEND','RESOLVE'].map((w, i) => (
+            <div className="keyword-loop-container">
+              {['DETECTION','DIAGNOSIS','MITIGATION','FORESIGHT'].map((w, i) => (
                 <React.Fragment key={w}>
-                  {i > 0 && <span style={{ color:'#93c5fd', fontSize:9, margin:'0 7px' }}>·</span>}
-                  <span style={{ fontSize:9.5, fontWeight:800, letterSpacing:'0.16em', color: '#93c5fd' }}>{w}</span>
+                  {i > 0 && (
+                    <span className="keyword-arrow">→</span>
+                  )}
+                  <span className="keyword-item">{w}</span>
                 </React.Fragment>
               ))}
             </div>
@@ -645,7 +773,7 @@ export default function LoginPage() {
               <SubmitBtn label="로그인" />
               
               <div style={{ display:'flex', gap:8, marginTop:8 }}>
-                <button type="button" onClick={() => window.open('/sguard-bridge_v1.0.apk')}
+                <button type="button" onClick={() => setShowManual(true)}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
                   <Download size={12} />Android APK
                 </button>
@@ -831,6 +959,7 @@ export default function LoginPage() {
         </div>
       </div>
       {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+      {showManual && <ManualModal onClose={() => setShowManual(false)} />}
     </>
   );
 }

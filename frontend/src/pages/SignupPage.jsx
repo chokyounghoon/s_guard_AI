@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCodebook } from '../context/CodebookContext';
+import { setAccessToken, setUserProfile as setStoreUserProfile } from '../lib/authStore';
 
 // ── 데이터 ─────────────────────────────────────────
 const SHINHAN_COMPANIES = [
@@ -411,8 +412,15 @@ export default function SignupPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || '회원가입 실패');
-      localStorage.setItem('sguard_token', data.token);
-      localStorage.setItem('sguard_user', JSON.stringify(data.user));
+      
+      if (data.token || data.access_token) {
+        setAccessToken(data.token || data.access_token);
+      }
+      if (data.ghost_token) {
+        setGhostToken(data.ghost_token);
+      }
+      
+      setStoreUserProfile(data.user || data);
       navigate('/dashboard');
     } catch (err) {
       setErrorMsg(err.message);

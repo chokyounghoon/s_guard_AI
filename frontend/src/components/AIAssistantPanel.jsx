@@ -3,6 +3,7 @@ import { Sparkles, Bot, Send, X, Star, Zap, FileText, AlertTriangle, MessageSqua
 import AIChatBubble from './AIChatBubble';
 import AIThinkingIndicator from './AIThinkingIndicator';
 import ServerStatusChart from './chat/ServerStatusChart';
+import { getAccessToken } from '../lib/authStore';
 
 // API URL helper: /ai/ endpoints go to local FastAPI, others to Cloudflare Worker
 const getApiUrl = (endpoint) => {
@@ -68,9 +69,16 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
   // 1. 초기 렌더링 시 로컬 스토리지에서 세션 불러오기
   useEffect(() => {
     const fetchSessions = async () => {
-      const userId = userProfile?.employee_id || 'anonymous';
+      const userId = userProfile?.employee_id;
+      if (!userId || userId === 'anonymous') return;
+      
       try {
-        const res = await fetch(getApiUrl(`/api/v1/user/chat-sessions/${userId}`));
+        const token = getAccessToken();
+        const res = await fetch(getApiUrl(`/api/v1/user/chat-sessions/${userId}`), {
+          headers: {
+             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.sessions && data.sessions.length > 0) {
@@ -133,7 +141,13 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
   // 4. 세션 삭제
   const deleteSession = (e, id) => {
     e.stopPropagation(); // 카드 클릭 스위치 방지
-    fetch(getApiUrl(`/api/v1/user/chat-sessions/${id}`), { method: 'DELETE' }).catch(console.error);
+    const token = getAccessToken();
+    fetch(getApiUrl(`/api/v1/user/chat-sessions/${id}`), { 
+      method: 'DELETE',
+      headers: {
+         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    }).catch(console.error);
     setChatSessions(prev => {
       const filtered = prev.filter(s => s.id !== id);
       // 삭제하는 세션이 현재 활성 상태면 첫번째로 전환, 없으면 새거 생성
@@ -171,13 +185,17 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
 
         // 비동기로 DB에 Session Upsert 요청
         const updatedSession = next.find(s => s.id === activeSessionId);
-        if (updatedSession) {
+        if (updatedSession && userProfile?.employee_id) {
+          const token = getAccessToken();
           fetch(getApiUrl('/api/v1/user/chat-sessions'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({
                id: updatedSession.id,
-               user_id: userProfile?.employee_id || 'anonymous',
+               user_id: userProfile.employee_id,
                title: updatedSession.title,
                messages: updatedSession.messages,
                updated_at: updatedSession.updatedAt
@@ -235,9 +253,13 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
       const aiMsgId = Date.now() + Math.random();
       setAiMessages(prev => [...prev, { id: aiMsgId, type: 'ai', text: '', timestamp: new Date() }]);
 
+      const token = getAccessToken();
       const apiResponse = await fetch(getApiUrl('/ai/chat'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ query: message + hiddenPrompt + contextPrompt, incident_id: incidentId }),
         signal: controller.signal,
       });
@@ -536,6 +558,8 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
                     <>
                       <AIChatBubble 
                         message={msg}
+                        query={index > 0 ? aiMessages[index - 1].text : ""}
+                        incidentId={incidentId || (msg.context ? msg.context.id : null)}
                         onCopy={handleCopyMessage}
                         onShare={handleShare}
                       />
