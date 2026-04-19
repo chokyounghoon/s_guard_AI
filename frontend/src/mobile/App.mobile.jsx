@@ -220,7 +220,7 @@ function AppContent() {
         {/* ── 대시보드: PC DashboardPage 그대로 사용 ── */}
         <Route path="/dashboard"   element={<PR><DashboardPage /></PR>} />
         <Route path="/activity"    element={<PR><MobileActivity user={userProfile} /></PR>} />
-        <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} /></PR>} />
+        <Route path="/inbox"       element={<PR><InboxPage /></PR>} />
         <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} /></PR>} />
         <Route path="/chat/:incidentId?" element={<PR><ChatPage /></PR>} />
 
