@@ -72,7 +72,8 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
 
     const connect = () => {
       if (!isMounted) return;
-      const wsUrl = getApiUrl(`/warroom/ws/${incidentId}`, true);
+      const token = getAccessToken();
+      const wsUrl = getApiUrl(`/warroom/ws/${incidentId}${token ? `?token=${token}` : ''}`, true);
       socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 

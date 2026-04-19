@@ -70,7 +70,8 @@ export default function MobileChat({ user }) {
     const connect = () => {
       if (!isMounted.current) return;
       try {
-        const ws = new WebSocket(`wss://sguardai.khcho0421.workers.dev/warroom/ws/${normId}`);
+        const token = getAccessToken();
+        const ws = new WebSocket(`wss://sguardai.khcho0421.workers.dev/warroom/ws/${normId}${token ? `?token=${token}` : ''}`);
         wsRef.current = ws;
 
         ws.onopen = () => {
