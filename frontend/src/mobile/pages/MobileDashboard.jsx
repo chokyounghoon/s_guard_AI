@@ -33,12 +33,12 @@ export default function MobileDashboard({ user }) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/activity-logs?limit=50`, { 
+      const res = await fetch(`${API_BASE}/sms/recent?limit=50`, { 
         headers: getAuthHeaders() 
       });
       if (!res.ok) throw new Error('데이터 로드 실패');
       const data = await res.json();
-      const list = data.messages || data.items || [];
+      const list = data.messages || [];
 
       setIncidents(list);
       setStats({
