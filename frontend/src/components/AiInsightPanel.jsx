@@ -39,6 +39,18 @@ const getCategoryFromAnalysis = (analysisText, message) => {
 };
 
 export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms }) {
+  
+  const formatYYMMDD = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+  };
 
   const [insightData, setInsightData] = useState({
     status: 'active',
@@ -693,7 +705,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">장애 상세 정보 (Detailed Incident Info)</span>
                 {selectedSms.occurrence_time && (
-                  <span className="text-[10px] text-blue-400 font-mono">발생: {selectedSms.occurrence_time}</span>
+                  <span className="text-[10px] text-blue-400 font-mono">발생: {formatYYMMDD(selectedSms.occurrence_time)}</span>
                 )}
               </div>
               <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
