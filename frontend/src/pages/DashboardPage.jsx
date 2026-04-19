@@ -1729,37 +1729,37 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-8">
             {/* Total */}
-            <div className="bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-5 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-blue-500/40 transition-all shadow-lg" onClick={() => navigate('/assignments?tab=전체')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
-              <p className="text-[10px] text-slate-500 mb-1 font-black uppercase tracking-widest">Total Incidents</p>
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-5xl font-black text-white font-mono tracking-tighter ${totalAssignedCount > 0 ? 'text-shadow-blue' : ''}`}>{totalAssignedCount}</span>
-                <span className="text-xs text-slate-600 font-black uppercase tracking-tighter">Idx</span>
+            <div className="bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-blue-500/40 transition-all shadow-lg" onClick={() => navigate('/assignments?tab=전체')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700 hidden sm:block" />
+              <p className="text-[7px] sm:text-[10px] text-slate-500 mb-1 font-black uppercase tracking-widest truncate">Total</p>
+              <div className="flex items-baseline gap-1 sm:gap-2 mb-1 sm:mb-4">
+                <span className={`text-xl sm:text-5xl font-black text-white font-mono tracking-tighter ${totalAssignedCount > 0 ? 'text-shadow-blue' : ''}`}>{totalAssignedCount}</span>
+                <span className="text-[8px] sm:text-xs text-slate-600 font-black uppercase tracking-tighter shrink-0">Idx</span>
               </div>
-              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+              <div className="h-1 sm:h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm hidden sm:block">
                 <div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 w-full transition-all duration-1000" />
               </div>
             </div>
 
             {/* Unconfirmed (Red Gauge) */}
-            <div className={`bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-5 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-red-500/40 transition-all ${myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 ? 'border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=상태: 미확인')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
+            <div className={`bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-3 sm:p-5 rounded-2xl sm:rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-red-500/40 transition-all ${myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 ? 'border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=상태: 미확인')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700 hidden sm:block" />
               <div className="flex justify-between items-start mb-1">
-                <p className="text-[10px] text-red-500/60 font-black uppercase tracking-widest">Unconfirmed</p>
+                <p className="text-[7px] sm:text-[10px] text-red-500/60 font-black uppercase tracking-widest truncate">New</p>
                 {myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 && (
-                  <span className="flex h-2 w-2 relative">
+                  <span className="flex h-1.5 w-1.5 sm:h-2 sm:w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></span>
                   </span>
                 )}
               </div>
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-5xl font-black text-red-500 font-mono tracking-tighter ${myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 ? 'text-shadow-red' : ''}`}>{myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length}</span>
-                <span className="text-xs text-red-900 font-black uppercase tracking-tighter">New</span>
+              <div className="flex items-baseline gap-1 sm:gap-2 mb-1 sm:mb-4">
+                <span className={`text-xl sm:text-5xl font-black text-red-500 font-mono tracking-tighter ${myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length > 0 ? 'text-shadow-red' : ''}`}>{myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length}</span>
+                <span className="text-[8px] sm:text-xs text-red-900 font-black uppercase tracking-tighter shrink-0">New</span>
               </div>
-              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+              <div className="h-1 sm:h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm hidden sm:block">
                 <div 
                   className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-1000" 
                   style={{ width: `${(myAssignments.filter(a => ['미확인', '미처리', '대기'].includes(a.status)).length / (totalAssignedCount || 1)) * 100}%` }} 
@@ -1768,22 +1768,22 @@ export default function DashboardPage() {
             </div>
 
             {/* Processing (Orange Gauge) - Pulse if count > 0 */}
-            <div className={`bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-6 rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-orange-500/40 transition-all ${myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 ? 'border-orange-500/20 shadow-[0_0_30px_rgba(249,115,22,0.1)]' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=처리중')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
+            <div className={`bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-3 sm:p-5 rounded-2xl sm:rounded-3xl border relative overflow-hidden group cursor-pointer hover:border-orange-500/40 transition-all ${myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 ? 'border-orange-500/20 shadow-[0_0_30px_rgba(249,115,22,0.1)]' : 'border-white/5'}`} onClick={() => navigate('/assignments?tab=처리중')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700 hidden sm:block" />
               <div className="flex justify-between items-start mb-1">
-                <p className="text-[10px] text-orange-500/60 font-black uppercase tracking-widest">In Progress</p>
+                <p className="text-[7px] sm:text-[10px] text-orange-500/60 font-black uppercase tracking-widest truncate">Active</p>
                 {myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 && (
-                  <span className="flex h-2 w-2 relative">
+                  <span className="flex h-1.5 w-1.5 sm:h-2 sm:w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]"></span>
                   </span>
                 )}
               </div>
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-5xl font-black text-orange-500 font-mono tracking-tighter ${myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 ? 'text-shadow-orange' : ''}`}>{myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length}</span>
-                <span className="text-xs text-orange-950 font-black uppercase tracking-tighter">Inc</span>
+              <div className="flex items-baseline gap-1 sm:gap-2 mb-1 sm:mb-4">
+                <span className={`text-xl sm:text-5xl font-black text-orange-500 font-mono tracking-tighter ${myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length > 0 ? 'text-shadow-orange' : ''}`}>{myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length}</span>
+                <span className="text-[8px] sm:text-xs text-orange-950 font-black uppercase tracking-tighter shrink-0">Inc</span>
               </div>
-              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+              <div className="h-1 sm:h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm hidden sm:block">
                 <div 
                   className="h-full bg-gradient-to-r from-orange-600 to-orange-400 transition-all duration-1000" 
                   style={{ width: `${(myAssignments.filter(a => ['처리중', '진행중', 'IN_PROGRESS'].includes(a.status)).length / (totalAssignedCount || 1)) * 100}%` }} 
@@ -1792,14 +1792,14 @@ export default function DashboardPage() {
             </div>
 
             {/* Completed (Blue Gauge) */}
-            <div className="bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-5 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-emerald-500/40 transition-all shadow-lg" onClick={() => navigate('/assignments?tab=처리완료')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
-              <p className="text-[10px] text-emerald-500/60 mb-1 font-black uppercase tracking-widest">Completed</p>
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-5xl font-black text-emerald-500 font-mono tracking-tighter ${myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length > 0 ? 'text-shadow-emerald' : ''}`}>{myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length}</span>
-                <span className="text-xs text-emerald-900 font-black uppercase tracking-tighter">Fin</span>
+            <div className="bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-emerald-500/40 transition-all shadow-lg" onClick={() => navigate('/assignments?tab=처리완료')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700 hidden sm:block" />
+              <p className="text-[7px] sm:text-[10px] text-emerald-500/60 mb-1 font-black uppercase tracking-widest truncate">Done</p>
+              <div className="flex items-baseline gap-1 sm:gap-2 mb-1 sm:mb-4">
+                <span className={`text-xl sm:text-5xl font-black text-emerald-500 font-mono tracking-tighter ${myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length > 0 ? 'text-shadow-emerald' : ''}`}>{myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length}</span>
+                <span className="text-[8px] sm:text-xs text-emerald-900 font-black uppercase tracking-tighter shrink-0">Fin</span>
               </div>
-              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+              <div className="h-1 sm:h-2 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm hidden sm:block">
                 <div 
                   className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000" 
                   style={{ width: `${(myAssignments.filter(a => ['처리완료', '종료', 'CLOSED'].includes(a.status)).length / (totalAssignedCount || 1)) * 100}%` }} 
