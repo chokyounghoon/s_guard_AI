@@ -1459,99 +1459,76 @@ export default function DashboardPage() {
                             ? 'bg-yellow-500/5 border-yellow-500/40 ring-1 ring-yellow-500/30 shadow-lg shadow-yellow-500/10'
                             : 'bg-[#11141d] border-white/5 hover:border-blue-500/30'}`}
                       >
-                        <div className="flex items-start space-x-2 sm:space-x-3 flex-1">
-                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
-                            {msg.keyword_detected ? (
-                              <AlertCircle className={`w-5 h-5 sm:w-6 sm:h-6 ${isSelected ? 'text-yellow-300' : 'text-yellow-300'}`} />
-                            ) : (
-                              <Info className={`w-5 h-5 sm:w-6 sm:h-6 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-1.5 sm:gap-3 mb-2">
-                                <div className="flex flex-col min-w-0 flex-1 justify-start">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <h4 className={`font-black text-sm sm:text-[15px] leading-tight tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'} break-all`}>
-                                      {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Reg' : 'SMS Detected'}
-                                    </h4>
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1.5">
-                                    <p className="text-[11px] text-slate-400 font-medium">발신: {msg.sender}</p>
-                                    {msg.employee_id && (
-                                      <span className="text-[10px] text-blue-400 font-mono font-bold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
-                                        사번: {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-2 ml-2 select-none font-mono shrink-0 justify-center">
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                                      className="text-[10px] font-black text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/25 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 border border-blue-500/20 shadow-sm"
-                                    >
-                                      진행 상태 <ExternalLink className="w-2.5 h-2.5" />
-                                    </button>
-                                    <span 
-                                      translate="no"
-                                      className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg border flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
-                                      msg.incident_status === '처리완료'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
-                                        : Number(msg.is_analyzed) >= 1 
-                                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 opacity-100' 
-                                          : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
-                                    }`}>
-                                      {msg.incident_status === '처리완료' ? (
-                                        <span className="flex items-center gap-1">
-                                          <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
-                                          <span>완료</span>
-                                        </span>
-                                      ) : Number(msg.is_analyzed) >= 1 ? (
-                                        <span className="flex items-center gap-1">
-                                          <CheckCircle2 className="w-2.5 h-2.5 text-blue-500" />
-                                          <span>ANL</span>
-                                        </span>
-                                      ) : (
-                                        <Zap className="w-2.5 h-2.5 text-yellow-500 animate-pulse" />
-                                      )}
+                        <div className="flex flex-col w-full flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-3 mb-3 w-full">
+                            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
+                                {msg.keyword_detected ? (
+                                  <AlertCircle className={`w-4 h-4 ${isSelected ? 'text-yellow-300' : 'text-yellow-300'}`} />
+                                ) : (
+                                  <Info className={`w-4 h-4 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
+                                )}
+                              </div>
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <h4 className={`font-black text-sm sm:text-[15px] leading-tight tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'} truncate`}>
+                                  {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Reg' : 'SMS Detected'}
+                                </h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">발신: {msg.sender}</p>
+                                  {msg.employee_id && (
+                                    <span className="text-[9px] text-blue-400 font-mono font-bold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 truncate">
+                                      {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
                                     </span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-400 font-bold bg-white/5 px-2.5 py-1 rounded-lg border border-white/5 shadow-inner">
-                                    {formatYYMMDD(msg.timestamp)}
-                                  </span>
+                                  )}
                                 </div>
                               </div>
-                               <div className="flex flex-col gap-2 text-left">
-                                 <div className="w-full text-left">
-                                   <p className={`text-[13px] leading-relaxed text-left ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
-                                   
-                                   {/* 🚀 AI Matching Rationale: 유사도 점수 및 산출 근거 표시 */}
-                                   {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
-                                     <div className="mt-2.5 flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-700">
-                                       <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-tighter shadow-sm ${
-                                         msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                       }`}>
-                                         <Zap className="w-2.5 h-2.5" />
-                                         AI Match {(msg.similarity_score * 100).toFixed(1)}%
-                                       </div>
-                                       {msg.similarity_reason && (
-                                         <span className="text-[10px] text-slate-500 italic leading-snug">
-                                           "{msg.similarity_reason}"
-                                         </span>
-                                       )}
-                                     </div>
-                                   )}
-                                 </div>
-                               </div>
                             </div>
-                          <button
-                            onClick={(e) => deleteSMSMessage(e, msg.inc_id)}
-                            className="ml-2 p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                            title="삭제"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                            <div className="flex flex-col items-end gap-1.5 shrink-0">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
+                                  className="text-[9px] font-black text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/25 px-2 py-1 rounded-lg transition-all flex items-center gap-1 border border-blue-500/20 shadow-sm"
+                                >
+                                  진행 <ExternalLink className="w-2.5 h-2.5" />
+                                </button>
+                                <span 
+                                  translate="no"
+                                  className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg border flex items-center gap-1 shadow-sm transition-all duration-300 ${
+                                  msg.incident_status === '처리완료'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                    : Number(msg.is_analyzed) >= 1 
+                                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+                                      : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
+                                }`}>
+                                  {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL' : 'ANALYZING'}
+                                </span>
+                              </div>
+                              <span className="text-[9px] text-slate-500 font-bold font-mono">
+                                {formatYYMMDD(msg.timestamp).split(' ')[1]}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="w-full text-left">
+                            <p className={`text-[13px] leading-relaxed text-left ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
+                            
+                            {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[8px] font-black uppercase tracking-tighter ${
+                                  msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                }`}>
+                                  <Zap className="w-2 h-2" />
+                                  Match {(msg.similarity_score * 100).toFixed(1)}%
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        <button
+                          onClick={(e) => deleteSMSMessage(e, msg.inc_id)}
+                          className="ml-1 p-1 rounded-full hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     );
                   })}
