@@ -1454,7 +1454,7 @@ export default function DashboardPage() {
                             setAgentMessages([]);
                           }
                         }}
-                        className={`rounded-2xl py-4 px-2.5 border flex items-start justify-between group transition-all cursor-pointer
+                        className={`rounded-2xl py-4 px-3 border flex items-start justify-between group transition-all cursor-pointer
                           ${isSelected
                             ? 'bg-yellow-500/5 border-yellow-500/40 ring-1 ring-yellow-500/30 shadow-lg shadow-yellow-500/10'
                             : 'bg-[#11141d] border-white/5 hover:border-blue-500/30'}`}
@@ -1525,7 +1525,7 @@ export default function DashboardPage() {
                         </div>
                         <button
                           onClick={(e) => deleteSMSMessage(e, msg.inc_id)}
-                          className="ml-1 p-1 rounded-full hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                          className="ml-1 p-1 rounded-full hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors shrink-0 hidden group-hover:block"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>

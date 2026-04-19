@@ -222,7 +222,7 @@ function AppContent() {
         <Route path="/activity"    element={<PR><MobileActivity user={userProfile} /></PR>} />
         <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} /></PR>} />
         <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} /></PR>} />
-        <Route path="/chat/:incidentId?" element={<PR><MobileChat user={userProfile} /></PR>} />
+        <Route path="/chat/:incidentId?" element={<PR><ChatPage /></PR>} />
 
         {/* ── PC 페이지 재사용 (나머지 라우트) ── */}
         <Route path="/ai-report/:incidentId?"  element={<PR><AiReportPage /></PR>} />
