@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Bell, ChevronRight, Shield, Zap,
-  CheckCircle2, Loader2, Wifi, Activity, Settings, RefreshCw
+  CheckCircle2, Loader2, Wifi, Activity, Settings, RefreshCw,
+  LayoutGrid, Clock
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import { PushManager } from '../../lib/pushManager';
