@@ -1,0 +1,200 @@
+/*
+ * 📱 S-Guard AI — Mobile PWA Overrides
+ * DashboardPage를 모바일에 맞게 재구성 (JSX 수정 없음, CSS만으로 대응)
+ * 최대 너비 768px 이하 모바일 환경에서만 적용됩니다.
+ */
+
+/* ── 기본 모바일 리셋 ─────────────────────────────────── */
+html, body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#mobile-root {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/*  모바일 전용 오버라이드 (max-width: 768px)             */
+/* ══════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* ── 네비게이션 바 ──────────────────────────────────── */
+  nav.sticky {
+    padding: 10px 14px !important;
+  }
+
+  /* 유저 이름 숨김 (공간 절약) */
+  nav .hidden.sm\:inline-block {
+    display: none !important;
+  }
+
+  /* ── 메인 컨테이너 ─────────────────────────────────── */
+  .p-6.max-w-7xl {
+    padding: 12px 12px 100px !important;
+    max-width: 100% !important;
+  }
+
+  /* ── 모든 패널 카드 ────────────────────────────────── */
+  .bg-\[\#1a1f2e\].rounded-3xl,
+  .bg-\[\#11141d\].rounded-3xl,
+  .bg-\[\#1a1f2e\].rounded-2xl {
+    border-radius: 16px !important;
+  }
+
+  /* ── SMS 패널 헤더 ─────────────────────────────────── */
+  .p-6.flex.justify-between.items-center.cursor-pointer {
+    padding: 14px 14px !important;
+  }
+
+  /* h3 폰트 사이즈 축소 */
+  .p-6 h3.font-bold.text-white.text-lg,
+  .p-5 h3.font-bold.text-white.text-lg {
+    font-size: 14px !important;
+  }
+
+  /* ── 인시던트 카드 내부 패딩 ───────────────────────── */
+  .p-5 {
+    padding: 12px !important;
+  }
+
+  /* ── 2컬럼 grid → 1컬럼으로 ───────────────────────── */
+  .grid.grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .grid.md\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── flex 가로 배치 → 세로 스택 ───────────────────── */
+  .flex.gap-4:not(nav):not(.flex-col):not(.items-center) {
+    flex-direction: column !important;
+  }
+
+  /* ── AI 에이전트 패널 (AgentDiscussionPanel) ─────── */
+  .fixed.inset-0.z-\[90\] {
+    /* 모달 패널을 전체화면으로 */
+  }
+
+  /* ── 텍스트 크기 조정 ─────────────────────────────── */
+  .text-lg {
+    font-size: 15px !important;
+  }
+
+  .text-xl {
+    font-size: 16px !important;
+  }
+
+  .text-2xl {
+    font-size: 18px !important;
+  }
+
+  /* ── 버튼 터치 영역 확장 ───────────────────────────── */
+  button {
+    min-height: 36px;
+  }
+
+  /* ── 인시던트 아이템 카드 ──────────────────────────── */
+  .rounded-2xl.border.cursor-pointer.group {
+    padding: 14px !important;
+  }
+
+  /* ── SMS 상세 패널 (오른쪽 슬라이드인 패널) ─────────── */
+  .w-full.max-w-sm.bg-\[\#1a1f2e\].h-full {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* ── 알림 드로어 ───────────────────────────────────── */
+  .w-full.max-w-sm.bg-\[\#1a1f2e\].h-full.shadow-2xl {
+    max-width: 100% !important;
+  }
+
+  /* ── AiInsightPanel 모바일 ─────────────────────────── */
+  .bg-\[\#131927\].rounded-3xl {
+    border-radius: 16px !important;
+  }
+
+  /* ── Live Incident Stream 박스 ─────────────────────── */
+  .flex.flex-col.gap-6 > div {
+    margin-bottom: 0 !important;
+  }
+
+  /* ── 하단 BottomMenu 높이 보정 ─────────────────────── */
+  .pb-24 {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 80px) !important;
+  }
+
+  /* ── 스크롤바 숨김 ─────────────────────────────────── */
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
+
+  /* ── 인시던트 카드 메시지 말줄임 ──────────────────── */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ── WarRoom / 채팅 패널 높이 ─────────────────────── */
+  .h-\[400px\], .h-\[500px\], .max-h-\[400px\] {
+    height: 300px !important;
+    max-height: 300px !important;
+  }
+
+  /* ── 상단 Nav LIVE dot + badge ─────────────────────── */
+  .hidden.sm\:flex,
+  .hidden.sm\:block {
+    display: none !important;
+  }
+
+  /* ── 패널 내부 padding 최적화 ─────────────────────── */
+  .p-4 {
+    padding: 10px !important;
+  }
+
+  /* 중첩 p-6은 그보다 강하게 */
+  .space-y-6 > * {
+    margin-top: 10px !important;
+  }
+
+  .gap-6 {
+    gap: 10px !important;
+  }
+
+  .gap-4 {
+    gap: 8px !important;
+  }
+
+  /* ── 인시던트 상세 textarea ──────────────────────── */
+  textarea {
+    font-size: 14px !important;
+  }
+
+  /* ── 폼 input ─────────────────────────────────────── */
+  input[type="text"],
+  input[type="password"],
+  select {
+    font-size: 14px !important;
+    padding: 10px 14px !important;
+  }
+
+  /* ── 프로파일 모달 전체화면 ──────────────────────── */
+  .fixed.inset-0.z-\[200\] > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* ── 네비게이션 항목 사이즈 ──────────────────────── */
+  nav.fixed.bottom-0 span.text-\[10px\] {
+    font-size: 9px !important;
+  }
+}
