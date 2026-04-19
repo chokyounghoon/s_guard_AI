@@ -1471,7 +1471,7 @@ export default function DashboardPage() {
                               </div>
                               <div className="flex flex-col min-w-0 flex-1">
                                 <h4 className={`font-black text-sm sm:text-[15px] leading-tight tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'} truncate`}>
-                                  {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Reg' : 'SMS Detected'}
+                                  {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
                                 </h4>
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">발신: {msg.sender}</p>
@@ -1489,22 +1489,22 @@ export default function DashboardPage() {
                                   onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
                                   className="text-[9px] font-black text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/25 px-2 py-1 rounded-lg transition-all flex items-center gap-1 border border-blue-500/20 shadow-sm"
                                 >
-                                  진행 <ExternalLink className="w-2.5 h-2.5" />
+                                  진행상태 <ExternalLink className="w-2.5 h-2.5" />
                                 </button>
                                 <span 
                                   translate="no"
-                                  className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg border flex items-center gap-1 shadow-sm transition-all duration-300 ${
+                                  className={`text-[9px] font-black px-2 py-1 rounded-lg border flex items-center gap-1 shadow-sm transition-all duration-300 ${
                                   msg.incident_status === '처리완료'
                                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                     : Number(msg.is_analyzed) >= 1 
                                       ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
                                       : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
                                 }`}>
-                                  {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL' : 'ANALYZING'}
+                                  {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
                                 </span>
                               </div>
                               <span className="text-[9px] text-slate-500 font-bold font-mono">
-                                {formatYYMMDD(msg.timestamp).split(' ')[1]}
+                                {formatYYMMDD(msg.timestamp)}
                               </span>
                             </div>
                           </div>
