@@ -43,7 +43,7 @@ export default function MobileChat({ user }) {
 
     Promise.all([
       fetch(`${API_BASE}/sms/${normId}`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_BASE}/warroom/history/${normId}`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : { messages: [] }).catch(() => ({ messages: [] })),
+      fetch(`${API_BASE}/warroom/chat/${normId}`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : { messages: [] }).catch(() => ({ messages: [] })),
     ]).then(([inc, chat]) => {
       if (!isMounted.current) return;
       setIncidentInfo(inc);

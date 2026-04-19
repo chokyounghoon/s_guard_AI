@@ -37,7 +37,7 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
     const fetchData = async () => {
       try {
         const [historyRes, partRes] = await Promise.all([
-          fetch(`${API_BASE}/warroom/history/${incidentId}`),
+          fetch(`${API_BASE}/warroom/chat/${incidentId}`),
           fetch(`${API_BASE}/warroom/participants/${incidentId}`)
         ]);
 

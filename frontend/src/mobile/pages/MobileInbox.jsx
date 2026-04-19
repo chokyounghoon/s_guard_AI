@@ -32,12 +32,15 @@ export default function MobileInbox({ user }) {
     try {
       const token = getAccessToken();
       const userId = user?.employee_id || user?.id;
-      if (!token || !userId) { setLoading(false); return; }
+      // user가 없더라도 일단 호출 (인터셉터가 JWT로 처리하므로 백엔드에서 user_id를 주입함)
+      const url = userId 
+        ? `${API_BASE}/inbox?user_id=${userId}`
+        : `${API_BASE}/inbox`;
 
-      const res = await fetch(`${API_BASE}/inbox?user_id=${userId}`, {
+      const res = await fetch(url, {
         headers: getAuthHeaders(),
       });
-      if (!res.ok) throw new Error('인박스 로드 실패');
+      if (!res.ok) throw new Error(`인박스 로드 실패: ${res.status}`);
 
       // API는 배열을 직접 반환
       const data = await res.json();
