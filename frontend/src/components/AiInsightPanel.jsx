@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw, ThumbsUp, ThumbsDown, CheckCircle, AlertCircle, X, ChevronRight } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
-import { getAccessToken } from '../lib/authStore';
+import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 
 const getApiUrl = (endpoint) => {
   const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -404,7 +404,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       
       try {
         const controller = new AbortController();
-        const response = await fetch(`${API_BASE_URL}/ai/insight`, { signal: controller.signal });
+        const response = await fetch(`${API_BASE_URL}/ai/insight`, { 
+          signal: controller.signal,
+          headers: getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Network response was not ok');
         
         const contentType = response.headers.get('content-type');
@@ -508,7 +511,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
     const checkLock = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/ai/warroom/lock/${selectedSms.inc_id}`);
+        const res = await fetch(`${API_BASE_URL}/ai/warroom/lock/${selectedSms.inc_id}`, {
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           const data = await res.json();
           setLockingUser(data.locked ? data.owner : null);

@@ -10,7 +10,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
 import { useCodebook } from '../context/CodebookContext';
-import { getAccessToken, clearSession } from '../lib/authStore';
+import { getAccessToken, clearSession, getAuthHeaders } from '../lib/authStore';
 
 const SHINHAN_COMPANIES = [
   '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
@@ -131,14 +131,6 @@ export default function DashboardPage() {
   const [showThresholdSettings, setShowThresholdSettings] = useState(false);
   const [thresholds, setThresholds] = useState({ technical: 0.85, casual: 0.95 });
 
-  const getAuthHeaders = useCallback(() => {
-    // 🔑 Use the new memory-only access token
-    const token = getAccessToken();
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    };
-  }, []);
   const [isSavingThreshold, setIsSavingThreshold] = useState(false);
   const [isLiveStreamCollapsed, setIsLiveStreamCollapsed] = useState(false);
   const [isWarRoomCollapsed, setIsWarRoomCollapsed] = useState(false);
@@ -287,7 +279,7 @@ export default function DashboardPage() {
     try {
       const lockRes = await fetch(`${apiBase}/ai/warroom/lock/${incidentId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ user_name: userProfile?.name || 'Unknown User' })
       });
       const lockData = await lockRes.json();
@@ -333,7 +325,7 @@ export default function DashboardPage() {
       // Save to warroom_list
       const res = await fetch(`${apiBase}/ai/warroom/open`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           inc_id: incidentId,
           title: smsTitle,
@@ -349,7 +341,7 @@ export default function DashboardPage() {
       // Legacy incidents metadata (using UPSERT logic on backend to update description safely)
       await fetch(`${apiBase}/incidents`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           inc_id: String(incidentId).replace('INC-', ''),
           title: smsTitle,
@@ -385,7 +377,10 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("Failed to open War-Room:", err);
       // Clean up lock on failure so others can try
-      fetch(`${apiBase}/ai/warroom/lock/${incidentId}`, { method: 'DELETE' }).catch(() => {});
+      fetch(`${apiBase}/ai/warroom/lock/${incidentId}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      }).catch(() => {});
     }
   };
 
@@ -437,7 +432,9 @@ export default function DashboardPage() {
 
     const fetchWorkflow = async () => {
       try {
-        const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`);
+        const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`, {
+          headers: getAuthHeaders()
+        });
         const data = await res.json();
         setIncidentWorkflowSteps(data.steps || []);
       } catch (e) {
@@ -592,7 +589,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${apiBase}/ai/warroom/leave`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ user_id: userProfile.id, inc_id: inc_id })
       });
       if (res.ok) {
@@ -608,7 +605,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${apiBase}/ai/incident/status`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           user_id: userProfile.id,
           inc_id: inc_id,
@@ -645,7 +642,7 @@ export default function DashboardPage() {
     try {
       const response = await fetch(`${apiBase}/sms/settings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ key, value: String(value) })
       });
       if (response.ok) {
@@ -720,7 +717,10 @@ export default function DashboardPage() {
   const deleteSMSMessage = async (e, id) => {
     e.stopPropagation();
     try {
-      const response = await fetch(`${apiBase}/sms/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${apiBase}/sms/${id}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         // 즉시 화면에서 제거하기 위한 로컬 상태 업데이트
         setDeletedSmsIds(prev => {
@@ -909,7 +909,7 @@ export default function DashboardPage() {
         // Save to DB
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             incident_id: String(currentIncId),
             messages: currentMsgs

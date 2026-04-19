@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar,
          ChevronRight, ChevronDown, User, Clock, Terminal, Printer,
          LayoutGrid, UserX, MessageSquare } from 'lucide-react';
+import { getAuthHeaders } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -88,8 +89,8 @@ export default function WorkflowPage() {
       setLoading(true);
       try {
         const normId = inc_id.replace('INC-', '');
-        let r = await fetch(`${API_BASE}/ai/incident/${normId}`);
-        if (!r.ok) r = await fetch(`${API_BASE}/sms/${normId}`);
+        let r = await fetch(`${API_BASE}/ai/incident/${normId}`, { headers: getAuthHeaders() });
+        if (!r.ok) r = await fetch(`${API_BASE}/sms/${normId}`, { headers: getAuthHeaders() });
         if (r.ok) {
           const data = await r.json();
           const d = data.incident || data;
@@ -117,7 +118,9 @@ export default function WorkflowPage() {
             threshold:        p['오류율임계치'] || null,
           });
         }
-        const fr = await fetch(`${API_BASE}/ai/incident/workflow-details?inc_id=${inc_id}`);
+        const fr = await fetch(`${API_BASE}/ai/incident/workflow-details?inc_id=${inc_id}`, {
+          headers: getAuthHeaders()
+        });
         if (fr.ok) {
           const fd = await fr.json();
           setWorkflowLogs(fd.steps || []);

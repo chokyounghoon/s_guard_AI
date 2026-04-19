@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon, Shield, Server, User, Terminal, CheckCircle, CheckCircle2, Smile, Hash, Network, Megaphone, Star, UserX, Search, ChevronRight } from 'lucide-react';
 import AIChatBubble from '../components/AIChatBubble';
 import AIThinkingIndicator from '../components/AIThinkingIndicator';
+import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
 import MarkdownViewer from '../components/MarkdownViewer';
 
@@ -114,7 +115,9 @@ export default function ChatPage() {
   const fetchChatHistory = React.useCallback(async (isAutoPoll = false) => {
     if (!isAutoPoll) setIsLoading(true);
     try {
-      const res = await fetch(getApiUrl(`/warroom/chat/${incidentId}`));
+      const res = await fetch(getApiUrl(`/warroom/chat/${incidentId}`), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setRoomTitle(data.title || incidentId);
@@ -175,7 +178,9 @@ export default function ChatPage() {
   const fetchWorkflowDetails = React.useCallback(async () => {
     try {
       const flowUrl = getApiUrl(`/ai/incident/workflow-details?inc_id=${incidentId}`);
-      const res = await fetch(flowUrl);
+      const res = await fetch(flowUrl, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setAssignees(data.assignees || []);
@@ -194,7 +199,9 @@ export default function ChatPage() {
 
   const fetchParticipants = React.useCallback(async () => {
     try {
-      const res = await fetch(getApiUrl(`/warroom/participants/${incidentId}`));
+      const res = await fetch(getApiUrl(`/warroom/participants/${incidentId}`), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setParticipants(data.participants || []);
@@ -206,7 +213,9 @@ export default function ChatPage() {
 
   const fetchActivityLogs = React.useCallback(async () => {
     try {
-      const res = await fetch(getApiUrl(`/activity-logs?inc_id=${incidentId}`));
+      const res = await fetch(getApiUrl(`/activity-logs?inc_id=${incidentId}`), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(data.logs || []);
@@ -218,7 +227,9 @@ export default function ChatPage() {
 
   const fetchAnalysisSummary = React.useCallback(async () => {
     try {
-      const res = await fetch(getApiUrl(`/incidents/${incidentId}`));
+      const res = await fetch(getApiUrl(`/incidents/${incidentId}`), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setAnalysisSummary(data.ai_insight || '');
@@ -258,7 +269,9 @@ export default function ChatPage() {
 
   const fetchOrgTree = async () => {
     try {
-      const res = await fetch(getApiUrl('/org/tree'));
+      const res = await fetch(getApiUrl('/org/tree'), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setOrgTree(data || []);
@@ -274,7 +287,9 @@ export default function ChatPage() {
       if (orgCode) params.append('orgCode', orgCode);
       if (params.toString()) url += `?${params.toString()}`;
       
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setInviteSearchResults(data || []);
@@ -287,7 +302,7 @@ export default function ChatPage() {
     try {
       const res = await fetch(getApiUrl('/warroom/join'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ 
           incident_id: incidentId, 
           user_id: user.employee_id,
@@ -518,7 +533,9 @@ export default function ChatPage() {
     if (!query.trim()) return;
     setIsSearching(true);
     try {
-      const res = await fetch(getApiUrl(`/warroom/ai-search?q=${encodeURIComponent(query)}`));
+      const res = await fetch(getApiUrl(`/warroom/ai-search?q=${encodeURIComponent(query)}`), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setSearchResults(data.results || []);
@@ -581,7 +598,7 @@ export default function ChatPage() {
     try {
       const res = await fetch(getApiUrl('/warroom/chat'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(messageData)
       });
       if (res.ok) {
@@ -753,7 +770,11 @@ export default function ChatPage() {
           formData.append('file', fileObj.file);
           formData.append('incident_id', incidentId);
           formData.append('uploaded_by', currentUser.name || '익명');
-          const uploadRes = await fetch(`${apiBase}/warroom/upload`, { method: 'POST', body: formData });
+          const uploadRes = await fetch(`${apiBase}/warroom/upload`, { 
+            method: 'POST', 
+            headers: getAuthHeaders({}), // Empty literal to avoid default JSON content-type if multipart is used
+            body: formData 
+          });
           if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

@@ -1,6 +1,7 @@
 name = "sguardai"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
+compatibility_flags = [ "nodejs_compat" ]
 
 [vars]
 ENVIRONMENT = "production"
@@ -11,6 +12,7 @@ DIFY_API_KEY_SUMMARIZER = "app-owwPp3j2qAvVDZpW2UUiY8L3"
 DIFY_API_KEY_GOVERNANCE = "app-QHxJQTBSKJlTw2gVeGgTk915"
 DIFY_API_BASE = "https://api.dify.ai/v1"
 DIFY_TOOL_KEY = "!QweAsd1018"
+VAPID_PUBLIC_KEY = "BAFX-LAHfh9ID0bcR2XkOsqxUsSXIC-sIPD2w13aGF7QtI7wnVRfUPQenpEdsF768NkQbMxvrH8sW4pEW017w5I"
 
 [ai]
 binding = "AI"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Bell, Search, SlidersHorizontal, Clock, User, ChevronRight, AlertCircle } from 'lucide-react';
+import { getAuthHeaders } from '../lib/authStore';
 
 export default function AssignmentsPage() {
   const navigate = useNavigate();
@@ -29,13 +30,8 @@ export default function AssignmentsPage() {
     const toDate = new Date().toISOString().split('T')[0];
     const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const savedUser = localStorage.getItem('sguard_user');
-    const token = savedUser ? JSON.parse(savedUser).token : null;
-
     fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${fromDate}&to=${toDate}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: getAuthHeaders()
     })
       .then(r => r.json())
       .then(data => {

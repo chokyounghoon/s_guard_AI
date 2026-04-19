@@ -7,6 +7,7 @@ import AiInsightPanel from '../components/AiInsightPanel';
 
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
+import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 
 
 
@@ -213,7 +214,7 @@ export default function DashboardPage() {
       // Save to warroom_list
       const res = await fetch(`${apiBase}/ai/warroom/open`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           inc_id: incidentId,
           title: smsTitle,
@@ -229,7 +230,7 @@ export default function DashboardPage() {
       // Legacy incidents metadata (using UPSERT logic on backend to update description safely)
       await fetch(`${apiBase}/incidents`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           inc_id: String(incidentId).replace('INC-', ''),
           title: smsTitle,
@@ -244,7 +245,7 @@ export default function DashboardPage() {
       if (analysisText) {
         await fetch(`${apiBase}/warroom/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             incident_id: incidentId,
             sender: 'AI Autopilot',
@@ -259,7 +260,7 @@ export default function DashboardPage() {
       if (openData.status !== 'exists') {
         await fetch(`${apiBase}/warroom/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             incident_id: incidentId,
             sender: '시스템',
@@ -271,7 +272,7 @@ export default function DashboardPage() {
         
         await fetch(`${apiBase}/warroom/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             incident_id: incidentId,
             sender: '시스템',
@@ -308,7 +309,9 @@ export default function DashboardPage() {
       if (token) {
         try {
           const userId = token.replace('sguard-token-', '');
-          const res = await fetch(`${API_BASE}/users/${userId}`);
+          const res = await fetch(`${API_BASE}/users/${userId}`, {
+            headers: getAuthHeaders()
+          });
           if (res.ok) {
             const user = await res.json();
             localStorage.setItem('sguard_user', JSON.stringify(user));
@@ -345,7 +348,9 @@ export default function DashboardPage() {
 
     const fetchWorkflow = async () => {
       try {
-        const res = await fetch(`${API_BASE}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`);
+        const res = await fetch(`${API_BASE}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`, {
+          headers: getAuthHeaders()
+        });
         const data = await res.json();
         setIncidentWorkflowSteps(data.steps || []);
       } catch (e) {
@@ -406,7 +411,9 @@ export default function DashboardPage() {
     if (!userProfile?.id) return;
     try {
       const apiBase = 'https://sguardai.khcho0421.workers.dev';
-      const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.id}`);
+      const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.id}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.rooms || []).map(room => ({
@@ -428,7 +435,9 @@ export default function DashboardPage() {
   const fetchActivityLogs = async () => {
     try {
       const apiBase = 'https://sguardai.khcho0421.workers.dev';
-      const res = await fetch(`${apiBase}/activity-logs`);
+      const res = await fetch(`${apiBase}/activity-logs`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(data.logs || []);
@@ -441,7 +450,9 @@ export default function DashboardPage() {
   const fetchMyAssignments = async () => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`);
+      const res = await fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
@@ -458,7 +469,9 @@ export default function DashboardPage() {
   const fetchUserActivityHistory = async () => {
     if (!userProfile?.id) return;
     try {
-      const res = await fetch(`${API_BASE}/ai/user/activity-history?user_id=${userProfile.id}`);
+      const res = await fetch(`${API_BASE}/ai/user/activity-history?user_id=${userProfile.id}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setUserActivityHistory(data.history || []);
@@ -474,7 +487,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${API_BASE}/ai/warroom/leave`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ user_id: userProfile.id, inc_id: inc_id })
       });
       if (res.ok) {
@@ -490,7 +503,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${API_BASE}/ai/incident/status`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           user_id: userProfile.id,
           inc_id: inc_id,
@@ -510,7 +523,9 @@ export default function DashboardPage() {
       // Cloudflare Workers API 사용
       const apiUrl = 'https://sguardai.khcho0421.workers.dev/sms/recent?limit=20';
 
-      const response = await fetch(apiUrl);
+      const response = await fetch(apiUrl, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         // 삭제된 항목은 필터링하여 상태 업데이트
@@ -534,7 +549,10 @@ export default function DashboardPage() {
         ? `https://sguardai.khcho0421.workers.dev/sms/${id}`
         : `https://sguardai.khcho0421.workers.dev/sms/${id}`;
 
-      const response = await fetch(apiUrl, { method: 'DELETE' });
+      const response = await fetch(apiUrl, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         // 즉시 화면에서 제거하기 위한 로컬 상태 업데이트
         setDeletedSmsIds(prev => {
@@ -698,7 +716,7 @@ export default function DashboardPage() {
         const baseUrl = 'https://sguardai.khcho0421.workers.dev';
         fetch(`${baseUrl}/ai/chat-history/save`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             incident_id: String(currentIncId),
             messages: currentMsgs
@@ -730,7 +748,7 @@ export default function DashboardPage() {
     if (userProfile?.id) {
       fetch(`${API_BASE}/ai/incident/assign`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           user_id: userProfile.id,
           login_id: userProfile.email,
@@ -744,7 +762,9 @@ export default function DashboardPage() {
 
     try {
       const baseUrl = 'https://sguardai.khcho0421.workers.dev';
-      const checkRes = await fetch(`${baseUrl}/ai/chat-history/${smsMessage.inc_id}`);
+      const checkRes = await fetch(`${baseUrl}/ai/chat-history/${smsMessage.inc_id}`, {
+        headers: getAuthHeaders()
+      });
       if (checkRes.ok) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
@@ -761,7 +781,7 @@ export default function DashboardPage() {
       // -------------------------------------------------------------
       const streamRes = await fetch(`${baseUrl}/ai/analyze-sms`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ 
           sender: smsMessage.sender, 
           message: smsMessage.message, 
@@ -796,7 +816,7 @@ export default function DashboardPage() {
                // Save to DB
                fetch(`${baseUrl}/ai/chat-history/save`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getAuthHeaders(),
                   body: JSON.stringify({
                     incident_id: String(smsMessage.inc_id),
                     messages: finalMsgs

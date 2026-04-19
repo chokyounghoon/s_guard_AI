@@ -8,6 +8,7 @@ import AiSmsStatusPanel from '../components/AiSmsStatusPanel';
 
 import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
+import { getAuthHeaders } from '../lib/authStore';
 
 
 
@@ -601,7 +602,7 @@ export default function DashboardPage() {
         const baseUrl = 'https://sguardai.khcho0421.workers.dev';
         fetch(`${baseUrl}/ai/chat-history/save`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             incident_id: String(currentIncId),
             messages: currentMsgs
@@ -684,7 +685,7 @@ export default function DashboardPage() {
                // Save to DB
                fetch(`${baseUrl}/ai/chat-history/save`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
                   body: JSON.stringify({
                     incident_id: String(smsMessage.inc_id),
                     messages: finalMsgs

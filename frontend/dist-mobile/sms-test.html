@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Guard AI SMS 통합 테스트</title>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        
+        body {
+            font-family: 'Pretendard', sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0f1421;
+            color: white;
+            line-height: 1.6;
+        }
+        .container {
+            background: #1a1f2e;
+            padding: 25px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        h1 { color: #3b82f6; font-size: 24px; margin-bottom: 8px; text-align: center; }
+        .description { color: #8892b0; font-size: 14px; margin-bottom: 25px; text-align: center; }
+        
+        .section {
+            background: #111827;
+            padding: 18px;
+            border-radius: 18px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        h3 { margin-top: 0; font-size: 15px; color: #60a5fa; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        
+        .input-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: block; margin-left: 4px; }
+        
+        input, textarea {
+            width: 100%;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 12px;
+            outline: none;
+            box-sizing: border-box;
+            font-family: inherit;
+            margin-bottom: 15px;
+            transition: border-color 0.2s;
+        }
+        textarea { height: 120px; resize: none; }
+        input:focus, textarea:focus { border-color: #3b82f6; background: #1e293b; }
+        
+        button {
+            width: 100%;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        button:active { transform: scale(0.98); }
+        
+        .presets {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .preset-btn {
+            background: #334155;
+            font-size: 12px;
+            padding: 10px;
+            box-shadow: none;
+        }
+        
+        .log-container {
+            margin-top: 25px;
+        }
+        .log-header { font-size: 13px; color: #94a3b8; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .log-box {
+            background: #000;
+            padding: 12px;
+            border-radius: 12px;
+            font-family: 'Cascadia Code', monospace;
+            font-size: 11px;
+            max-height: 120px;
+            overflow-y: auto;
+            color: #d1d5db;
+            border: 1px solid #334155;
+        }
+        .log-entry { margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 4px; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #0ea5e9;
+            color: white;
+            border-radius: 100px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>S-Guard AI</h1>
+        <p class="description">휴대폰 SMS 발송 테스트 도구</p>
+        
+        <div class="section">
+            <h3>📱 커스텀 문자 전송</h3>
+            
+            <label class="input-label">발신자 (번호 또는 이름)</label>
+            <input type="text" id="custom-sender" placeholder="예: 010-1234-5678" value="1544-7001">
+            
+            <label class="input-label">문자 내용 (Message Content)</label>
+            <textarea id="custom-message" placeholder="이곳에 메시지나 장애내용을 입력하세요..">
+            </textarea>
+            
+            <button onclick="sendManualSMS()">대시보드로 전송하기</button>
+        </div>
+
+        <div class="section">
+            <h3 style="color: #94a3b8;">⚡ 빠른 테스트 (프리셋)</h3>
+            <div class="presets">
+                <button class="preset-btn" onclick="quickSend('CRITICAL: 시스템 마비 발생!!')">긴급 장애</button>
+                <button class="preset-btn" onclick="quickSend('장애 알림: DB 응답 지연')">일반 장애</button>
+                <button class="preset-btn" onclick="quickSend('DOWN: 서버 접속 불가')">서버 다운</button>
+                <button class="preset-btn" onclick="quickSend('정상: 복구 완료되었습니다.')">복구 완료</button>
+            </div>
+        </div>
+
+        <div class="log-container">
+            <div class="log-header">
+                <span>실시간 전송 로그</span>
+                <span class="badge">Cloudflare Live</span>
+            </div>
+            <div id="log-container" class="log-box">
+                <div class="log-entry">준비됨. 메시지를 전송해 보세요.</div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="https://s-guard-app.pages.dev/dashboard" style="color: #3b82f6; font-size: 13px; text-decoration: none; font-weight: 500;">
+                내 대시보드 확인하러 가기 →
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://api.chokerslab.store/sms/receive';
+        const logBox = document.getElementById('log-container');
+
+        function addLog(message, isError = false) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${isError ? 'error' : 'success'}`;
+            entry.innerHTML = `<span style="color: #64748b">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+            logBox.insertBefore(entry, logBox.firstChild);
+        }
+
+        async function sendSMS(sender, message) {
+            if (!message) return alert('메시지 내용을 입력해 주세요!');
+            
+            addLog(`전송 시도 중...`);
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sender, message })
+                });
+                
+                const result = await response.json();
+                addLog(`성공: 대시보드에 반영되었습니다!`);
+                
+                // 전송 성공 시 진동 피드백 (휴대폰 전용)
+                if (window.navigator.vibrate) window.navigator.vibrate(50);
+                
+                return result;
+            } catch (error) {
+                addLog(`실패: ${error.message}`, true);
+            }
+        }
+
+        function sendManualSMS() {
+            const sender = document.getElementById('custom-sender').value;
+            const message = document.getElementById('custom-message').value;
+            sendSMS(sender, message);
+            document.getElementById('custom-message').value = '';
+        }
+
+        function quickSend(msg) {
+            const sender = document.getElementById('custom-sender').value;
+            sendSMS(sender, msg);
+        }
+    </script>
+</body>
+</html>

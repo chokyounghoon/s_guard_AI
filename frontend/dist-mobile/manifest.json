@@ -1,0 +1,49 @@
+{
+  "name": "S-Guard AI",
+  "short_name": "S-Guard",
+  "description": "AI 기반 장애관제 시스템",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "categories": ["productivity", "utilities"],
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/mobile-dashboard.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "S-Guard AI 모바일 대시보드"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "장애 접수",
+      "short_name": "접수",
+      "url": "/#/incident-push",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "받은사건함",
+      "short_name": "인박스",
+      "url": "/#/inbox",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

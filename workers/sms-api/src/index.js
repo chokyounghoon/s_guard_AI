@@ -3,6 +3,11 @@ import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
 import { secureHeaders } from 'hono/secure-headers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { 
+  buildPushPayload, 
+  encryptNotification, 
+  vapidHeaders 
+} from '@block65/webcrypto-web-push'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PII 마스킹 유틸리티 - Cloudflare Worker 수신 즉시 비식별화
@@ -224,12 +229,121 @@ const authMiddleware = async (c, next) => {
 
 app.use('*', authMiddleware);
 
+// 🔔 PUSH: Web Push Subscription Routes
+app.get('/auth/push-vapid-public', (c) => {
+  return c.json({ publicKey: c.env.VAPID_PUBLIC_KEY || '' });
+});
+
+app.post('/auth/push-subscribe', async (c) => {
+  const user = c.get('user');
+  const db = c.env.DB;
+  const { subscription } = await c.req.json();
+
+  if (!subscription || !subscription.endpoint) {
+    return c.json({ error: 'Invalid subscription object' }, 400);
+  }
+
+  try {
+    await db.prepare(`
+      INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(endpoint) DO UPDATE SET
+        user_id = excluded.user_id,
+        p256dh = excluded.p256dh,
+        auth = excluded.auth,
+        mod_dt = CURRENT_TIMESTAMP
+    `).bind(
+      subscription.endpoint,
+      user.employee_id,
+      subscription.keys.p256dh,
+      subscription.keys.auth
+    ).run();
+
+    return c.json({ success: true, message: 'Push subscription saved' });
+  } catch (e) {
+    console.error('[Push-Subscribe] Error:', e.message);
+    return c.json({ error: 'Failed to save subscription' }, 500);
+  }
+});
+
+app.post('/auth/push-unsubscribe', async (c) => {
+  const db = c.env.DB;
+  const { endpoint } = await c.req.json();
+
+  try {
+    await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(endpoint).run();
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Utility for KST Timestamp
 const getKst = () => {
   const now = new Date()
   const kstOffset = 9 * 60 * 60 * 1000
   return new Date(now.getTime() + kstOffset).toISOString().replace('T', ' ').substring(0, 19)
 }
+
+// 🔔 PUSH: Web Push Notification Helper
+const sendPushNotification = async (c, userId, payload) => {
+  const db = c.env.DB;
+  if (!db) return;
+
+  const vapidPublicKey = c.env.VAPID_PUBLIC_KEY;
+  const vapidPrivateKey = c.env.VAPID_PRIVATE_KEY;
+  const vapidSubject = 'mailto:admin@chokerslab.store';
+
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    console.error('[Push] VAPID keys missing in environment secrets.');
+    return;
+  }
+
+  try {
+    // 1. Get user's active subscriptions
+    const subscriptions = await db.prepare("SELECT * FROM push_subscriptions WHERE user_id = ?").bind(userId).all();
+    
+    if (!subscriptions.results || subscriptions.results.length === 0) return;
+
+    for (const sub of subscriptions.results) {
+      try {
+        const subscription = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.p256dh,
+            auth: sub.auth
+          }
+        };
+
+        const pushPayload = await buildPushPayload(
+          JSON.stringify(payload),
+          subscription,
+          {
+            subject: vapidSubject,
+            publicKey: vapidPublicKey,
+            privateKey: vapidPrivateKey
+          }
+        );
+
+        const response = await fetch(sub.endpoint, {
+          method: 'POST',
+          headers: pushPayload.headers,
+          body: pushPayload.body
+        });
+
+        if (response.status === 410 || response.status === 404) {
+          // Subscription expired or invalid -> Remove from DB
+          await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(sub.endpoint).run();
+          console.log(`[Push] Removed expired subscription: ${sub.endpoint}`);
+        }
+      } catch (err) {
+        console.error(`[Push] Failed to send to ${sub.endpoint}:`, err.message);
+      }
+    }
+  } catch (e) {
+    console.error('[Push] Database error:', e.message);
+  }
+};
 
 // 🚀 Database One-time Migration Endpoint (Phase 4: Governance & Bypass)
 app.get('/debug/db-init', async (c) => {
@@ -961,6 +1075,46 @@ ${detailedInfo}`;
         
         await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
       }
+    }
+
+    // 🔔 🚀 PUSH TRIGGER: Notify Team and Assignees
+    try {
+      const smsData = await db.prepare("SELECT sender, message, employee_id, biz_system, service_name FROM received_messages WHERE inc_id = ?").bind(String(sms_id)).first();
+      if (smsData) {
+        // 1. Get recipients: Team members + Explicit Assignees
+        // Priority Score Logic: Include in payload for SW vibration logic
+        const pushPayload = {
+          title: `[S-Guard] 장애 알림: ${smsData.service_name || smsData.biz_system || '신규 사건'}`,
+          body: smsData.message ? (smsData.message.length > 50 ? smsData.message.substring(0, 50) + '...' : smsData.message) : '새로운 장애가 접수되었습니다.',
+          inc_id: String(sms_id),
+          priority: similarityScore || 0, // Using similarity/priority score
+          url: `/mobile/incident/${sms_id}`
+        };
+
+        // Fetch users in the same team as the sender
+        const { results: teamMembers } = await db.prepare(`
+          SELECT employee_id FROM users 
+          WHERE part = (SELECT part FROM users WHERE employee_id = ?) 
+          AND is_active = 1
+        `).bind(smsData.employee_id).all();
+
+        // Fetch explicitly assigned users
+        const { results: assignees } = await db.prepare(`
+          SELECT user_id as employee_id FROM incident_assignments 
+          WHERE inc_id = ? OR inc_id = ?
+        `).bind(String(sms_id), String(sms_id).replace('INC-', '')).all();
+
+        const allRecipients = new Set([
+          ...teamMembers.map(u => u.employee_id),
+          ...assignees.map(u => u.employee_id)
+        ]);
+
+        for (const recipientId of allRecipients) {
+          c.executionCtx.waitUntil(sendPushNotification(c, recipientId, pushPayload));
+        }
+      }
+    } catch (pushErr) {
+      console.error('[Push-Trigger] Failed to send notifications:', pushErr.message);
     }
 
     if (kv) await kv.delete(lockKey);
@@ -7541,8 +7695,8 @@ export class WarRoom {
     webSocket.accept();
     console.log("[DO] WebSocket Accepted");
     
-    // Initial session setup
-    this.sessions.set(webSocket, { online: true });
+    // Initial session setup - track visibility (assume visible on connect)
+    this.sessions.set(webSocket, { online: true, visible: true });
 
     webSocket.addEventListener("message", async (msg) => {
       try {
@@ -7578,6 +7732,8 @@ export class WarRoom {
       case "JOIN":
         session.user_id = data.user_id;
         session.name = data.name;
+        session.incident_id = data.incident_id; // Track which room
+        session.visible = true;                 // Assume visible on join
         console.log(`[DO] [${this.state.id.toString()}] User JOIN: ${data.name} (${data.user_id})`);
         
         // 🚀 NEW: Auto-update status to '처리중' when a user joins the warroom
@@ -7643,7 +7799,66 @@ export class WarRoom {
         console.log(`[DO] [${this.state.id.toString()}] CHAT_SEND from ${data.sender}: ${data.text.slice(0, 50)}...`);
         this.broadcast(broadcastMsg);
 
-        // 3. AI Indexing (Background task to avoid blocking)
+        // 3. Web Push: Send to warroom members who are NOT currently present
+        this.state.waitUntil((async () => {
+          try {
+            const db = this.env.DB;
+            const incId = data.incident_id;
+            
+            // Get all active user_ids in this DO session (visible in room)
+            const onlineVisibleUserIds = Array.from(this.sessions.values())
+              .filter(s => s.user_id && s.visible)
+              .map(s => s.user_id);
+            
+            // Get all room members from D1 (incident_assignments)
+            const { results: members } = await db.prepare(`
+              SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ? OR inc_id = ?
+            `).bind(String(incId), String(incId).replace('INC-', '')).all();
+            
+            // Get all push subscriptions for members NOT currently in the room
+            const absentUserIds = members
+              .map(m => m.user_id)
+              .filter(uid => uid !== data.sender && !onlineVisibleUserIds.includes(uid));
+
+            if (absentUserIds.length > 0) {
+              const placeholders = absentUserIds.map(() => '?').join(',');
+              const { results: subs } = await db.prepare(`
+                SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})
+              `).bind(...absentUserIds).all();
+
+              const pushPayload = {
+                title: data.name || data.sender,
+                body: data.text.length > 60 ? data.text.substring(0, 60) + '...' : data.text,
+                inc_id: String(incId),
+                tag: `chat-${incId}`, // Kakao-style: replaces previous notification
+                priority: 0,           // Chat messages have default priority
+                url: `/warroom/${incId}`
+              };
+
+              for (const sub of subs) {
+                try {
+                  const { buildPushPayload } = await import('@block65/webcrypto-web-push');
+                  const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
+                  const pp = await buildPushPayload(JSON.stringify(pushPayload), subscription, {
+                    subject: 'mailto:admin@chokerslab.store',
+                    publicKey: this.env.VAPID_PUBLIC_KEY,
+                    privateKey: this.env.VAPID_PRIVATE_KEY
+                  });
+                  const resp = await fetch(sub.endpoint, { method: 'POST', headers: pp.headers, body: pp.body });
+                  if (resp.status === 410 || resp.status === 404) {
+                    await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+                  }
+                } catch (pe) {
+                  console.error('[DO-Push] Chat push failed:', pe.message);
+                }
+              }
+            }
+          } catch (e) {
+            console.error('[DO] Chat push trigger error:', e.message);
+          }
+        })());
+
+        // 4. AI Indexing (Background task to avoid blocking)
         this.state.waitUntil((async () => {
           try {
             const ai = this.env.AI;
@@ -7769,6 +7984,16 @@ export class WarRoom {
       case "TYPING_STOP":
         this.broadcast({ type: "TYPING", user_id: data.user_id, name: data.name, is_typing: false }, ws);
         break;
+      
+      // 🗨️ PRESENCE: Page Visibility API integration
+      case "PAGE_VISIBLE":
+        session.visible = true;
+        break;
+
+      case "PAGE_HIDDEN":
+        session.visible = false;
+        break;
+
       case "SET_ANNOUNCEMENT": {
         const nowAnnounce = getKst();
         this.announcement = {

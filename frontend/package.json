@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "dev:mobile": "vite --config vite.config.mobile.js",
+    "build:mobile": "vite build --config vite.config.mobile.js && cp dist-mobile/index.mobile.html dist-mobile/index.html",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:mobile": "vite preview --config vite.config.mobile.js --outDir dist-mobile"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.4",

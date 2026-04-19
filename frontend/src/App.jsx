@@ -301,19 +301,6 @@ function AppContent() {
         <ConsentModal userProfile={userProfile} setUserProfile={setUserProfile} />
       )}
 
-      {/* ⚖️ Phase 19: Global Disclaimer & Legal Footer */}
-      {!isAuthPage && (
-        <div className="fixed bottom-[88px] left-0 right-0 px-6 py-2 z-[40]">
-          <div className="max-w-xl mx-auto py-2 px-4 bg-slate-900/40 backdrop-blur-md rounded-2xl border border-white/5 flex flex-col items-center justify-center space-y-0.5 shadow-lg">
-            <p className="text-[9px] text-slate-500 font-medium text-center leading-tight">
-              S-Guard AI 응답은 데이터 기반 참고용이며, 최종 의사결정과 실행 책임은 작업자 본인에게 있습니다.
-            </p>
-            <p className="text-[8px] text-slate-700 font-mono tracking-tighter">
-              PURPOSE: SYSTEM OPTIMIZATION ONLY | EMPLOYEE MONITORING STRICTLY PROHIBITED
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Global Bottom Navigation */}
       {!isAuthPage && (

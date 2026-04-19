@@ -603,7 +603,7 @@ export default function LoginPage() {
         }
         .header-section {
           background: linear-gradient(160deg, #001550 0%, #0030cc 40%, #0046FF 70%, #1a5aff 100%);
-          padding: 0 0 52px;
+          padding: 56px 0 56px;
           position: relative;
           overflow: hidden;
           flex-shrink: 0;
@@ -636,12 +636,11 @@ export default function LoginPage() {
           flex: 1;
           display: flex;
           flex-direction: column;
-          justify-content: center;
-          padding: 20px 20px 60px;
+          justify-content: flex-start;
+          padding: 32px 24px 80px;
           max-width: 480px;
           margin: 0 auto;
           width: 100%;
-          min-height: calc(100vh - 200px);
         }
         .step-bar {
           display:flex;

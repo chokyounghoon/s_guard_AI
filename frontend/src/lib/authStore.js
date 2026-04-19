@@ -21,6 +21,18 @@ export const getAccessToken = () => {
   return accessToken;
 };
 
+/**
+ * 🛠️ Get standard headers with Authorization Bearer token
+ */
+export const getAuthHeaders = (extraHeaders = {}) => {
+  const token = getAccessToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...extraHeaders
+  };
+};
+
 export const setUserProfile = (user) => {
   userProfile = user;
   if (user) {
