@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutDashboard, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getAuthHeaders } from '../lib/authStore';
 
@@ -267,7 +267,7 @@ ${formData.content}`;
               className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-white'}`}
               title="그리드 보기"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutDashboard className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Search, User, Shield, RefreshCw,
   Trash2, Mail, Phone, Building2,
   ChevronRight, Key, MoreHorizontal, UserCheck, UserX,
-  LayoutGrid, List as ListIcon, X, Star, Edit3, CheckCircle2, Hash, Activity, Eye
+  LayoutDashboard, List as ListIcon, X, Star, Edit3, CheckCircle2, Hash, Activity, Eye
 } from 'lucide-react';
 import { getAccessToken, getUserProfile, getAuthHeaders } from '../lib/authStore';
 import { SMS_WORKER_URL } from '../config/api';
@@ -381,7 +381,7 @@ export default function UserManagementPage() {
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-500 hover:text-white'}`}
                 >
-                  <span><LayoutGrid className="w-4 h-4" /></span>
+                  <span><LayoutDashboard className="w-4 h-4" /></span>
                 </button>
                 <button
                   onClick={() => setViewMode('list')}

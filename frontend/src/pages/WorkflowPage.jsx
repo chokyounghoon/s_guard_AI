@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar,
          ChevronRight, ChevronDown, User, Clock, Terminal, Printer,
-         LayoutGrid, UserX, MessageSquare } from 'lucide-react';
+         LayoutDashboard, UserX, MessageSquare } from 'lucide-react';
 import { getAuthHeaders } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -349,7 +349,7 @@ export default function WorkflowPage() {
                   </motion.button>
                   <motion.button whileHover={{ y: -1 }} onClick={() => navigate('/dashboard')}
                     className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-white transition-all">
-                    <LayoutGrid className="w-3 h-3" /> Dashboard
+                    <LayoutDashboard className="w-3 h-3" /> Dashboard
                   </motion.button>
                 </div>
               </div>
