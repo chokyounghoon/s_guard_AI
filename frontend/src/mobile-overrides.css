@@ -22,11 +22,15 @@ html, body {
 /* ══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
   /* ── 전체 가로 스크롤 방지 및 박스 모델 강제 ── */
-  * {
+  *, *::before, *::after {
     max-width: 100vw !important;
     box-sizing: border-box !important;
-    overflow-x: hidden !important; /* 강제로 가로 스크롤 차단 */
     word-break: break-all !important; /* 긴 텍스트 강제 줄바꿈 */
+  }
+
+  /* 강제로 가로 스크롤 차단 (특정 요소만) */
+  html, body, #mobile-root, .DashboardPage {
+    overflow-x: hidden !important;
   }
 
   /* 스크롤이 필요한 경우 수직 스크롤은 허용 */
@@ -193,16 +197,36 @@ html, body {
   .gap-4 { gap: 8px !important; }
 
   /* ── 폼 최적화 ────────────────────────────────────── */
-  textarea, input[type="text"], input[type="password"], select {
+  textarea, input[type="text"], input[type="password"], input[type="tel"], select {
     font-size: 14px !important;
-    padding: 10px 14px !important;
+    padding: 10px 14px 10px 42px !important; /* 아이콘 공간 pl-11(44px) 근사치 확보 */
+    appearance: none !important;
+    -webkit-appearance: none !important;
+  }
+
+  /* 아이콘이 없는 검색창 등은 패딩 원상복구 */
+  input.pl-4 {
+    padding-left: 14px !important;
   }
 
   /* ── 프로파일 모달 전체화면 ──────────────────────── */
-  .fixed.inset-0.z-\[200\] > div:last-child {
+  /* DashboardPage.jsx의 ProfileModalContent는 z-[100]임 */
+  .fixed.inset-0.z-\[100\] {
+    align-items: flex-start !important; /* 상단 짤림 방지: 위에서부터 배치 */
+    overflow-y: auto !important;
+    padding: 0 !important;
+  }
+
+  .fixed.inset-0.z-\[100\] > div:last-child {
     width: 100% !important;
     max-width: 100% !important;
     border-radius: 0 !important;
-    height: 100% !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+  }
+
+  /* 모달 내부 스크롤 영역 확장 */
+  .space-y-4.max-h-\[60vh\] {
+    max-height: 65vh !important;
   }
 }

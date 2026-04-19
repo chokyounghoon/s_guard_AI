@@ -329,7 +329,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           inc_id: incidentId,
           title: smsTitle,
-          creator_id: userProfile?.id || null,
+          creator_id: userProfile?.employee_id || null,
           severity: 'CRITICAL',
           leader_summary: leaderSummary
         })
@@ -511,9 +511,9 @@ export default function DashboardPage() {
    }, [selectedSms]);
 
   const fetchWarRooms = async () => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.employee_id) return;
     try {
-      const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.id}`, {
+      const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.employee_id}`, {
         headers: getAuthHeaders()
       });
       if (res.ok) {
@@ -535,7 +535,7 @@ export default function DashboardPage() {
   };
 
   const fetchActivityLogs = async () => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.employee_id) return;
     try {
       const res = await fetch(`${apiBase}/activity-logs`, {
         headers: getAuthHeaders()
@@ -550,9 +550,9 @@ export default function DashboardPage() {
   };
 
   const fetchMyAssignments = async () => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.employee_id) return;
     try {
-      const res = await fetch(`${apiBase}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`, {
+      const res = await fetch(`${apiBase}/ai/incident/my-assignments?user_id=${userProfile.employee_id}&from=${assignmentDateRange.from}&to=${assignmentDateRange.to}`, {
         headers: getAuthHeaders()
       });
       if (res.ok) {
@@ -569,9 +569,9 @@ export default function DashboardPage() {
   };
 
   const fetchUserActivityHistory = async () => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.employee_id) return;
     try {
-      const res = await fetch(`${apiBase}/ai/user/activity-history?user_id=${userProfile.id}`, {
+      const res = await fetch(`${apiBase}/ai/user/activity-history?user_id=${userProfile.employee_id}`, {
         headers: getAuthHeaders()
       });
       if (res.ok) {
@@ -585,12 +585,12 @@ export default function DashboardPage() {
 
   const leaveWarRoom = async (e, inc_id) => {
     e.stopPropagation();
-    if (!userProfile?.id || !window.confirm('이 워룸에서 나가시겠습니까?')) return;
+    if (!userProfile?.employee_id || !window.confirm('이 워룸에서 나가시겠습니까?')) return;
     try {
       const res = await fetch(`${apiBase}/ai/warroom/leave`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ user_id: userProfile.id, inc_id: inc_id })
+        body: JSON.stringify({ user_id: userProfile.employee_id, inc_id: inc_id })
       });
       if (res.ok) {
         fetchWarRooms();
@@ -601,13 +601,13 @@ export default function DashboardPage() {
   };
 
   const updateAssignmentStatus = async (inc_id, newStatus) => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.employee_id) return;
     try {
       const res = await fetch(`${apiBase}/ai/incident/status`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          user_id: userProfile.id,
+          user_id: userProfile.employee_id,
           inc_id: inc_id,
           status: newStatus
         })
@@ -950,12 +950,12 @@ export default function DashboardPage() {
     const cleanIncId = String(smsMessage.inc_id).replace('INC-', '');
 
     // Trigger Assignment to the current user
-    if (userProfile?.id) {
+    if (userProfile?.employee_id) {
       fetch(`${apiBase}/ai/incident/assign`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          user_id: userProfile.id,
+          user_id: userProfile.employee_id,
           login_id: userProfile.email,
           inc_id: String(smsMessage.inc_id).replace('INC-', ''),
           incident_title: 'SMS 수신 확인'
@@ -1349,18 +1349,17 @@ export default function DashboardPage() {
             <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
               <div
                 onClick={toggleSmsPanel}
-                className="p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
+                className="p-4 sm:p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-600/20 p-2 rounded-xl">
-                    <MessageSquare className="w-5 h-5 text-blue-400" />
+                  <div className="flex items-center gap-2 sm:gap-3.5">
+                    <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
+                      <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-white text-base sm:text-lg tracking-tight">실시간 SMS수신내역</h3>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-white text-lg">실시간 SMS 수신 내역</h3>
-                    <p className="text-[10px] text-slate-500 font-mono uppercase">REAL-TIME SMS MONITORING</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-4">
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
                     className={`p-2 rounded-xl border transition-all ${showThresholdSettings ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'}`}
@@ -1378,10 +1377,11 @@ export default function DashboardPage() {
                       await Promise.all([fetchSMSMessages(), fetchMyAssignments()]);
                       setTimeout(() => setIsRefreshing(false), 1000);
                     }}
-                    className={`text-[10px] ${isRefreshing ? 'bg-blue-600/30' : 'bg-blue-600/10'} border border-blue-500/30 text-blue-400 px-3 py-1.5 rounded-xl hover:bg-blue-600/20 transition-all font-black flex items-center gap-1.5 shadow-sm active:scale-95`}
+                    className={`text-[10px] ${isRefreshing ? 'bg-blue-600/30' : 'bg-blue-600/10'} border border-blue-500/30 text-blue-400 px-2 sm:px-3 py-1.5 rounded-xl hover:bg-blue-600/20 transition-all font-black flex items-center gap-1.5 shadow-sm active:scale-95`}
                   >
                     <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                    <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                    <span className="sm:hidden">{isRefreshing ? '...' : ''}</span>
                   </button>
                   <div className="flex items-center space-x-2">
                     <span className="relative flex h-2 w-2">
@@ -1454,69 +1454,76 @@ export default function DashboardPage() {
                             setAgentMessages([]);
                           }
                         }}
-                        className={`rounded-2xl p-4 border flex items-start justify-between group transition-all cursor-pointer
+                        className={`rounded-2xl py-4 px-2.5 border flex items-start justify-between group transition-all cursor-pointer
                           ${isSelected
                             ? 'bg-yellow-500/5 border-yellow-500/40 ring-1 ring-yellow-500/30 shadow-lg shadow-yellow-500/10'
                             : 'bg-[#11141d] border-white/5 hover:border-blue-500/30'}`}
                       >
-                        <div className="flex items-start space-x-3 flex-1">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
+                        <div className="flex items-start space-x-2 sm:space-x-3 flex-1">
+                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
                             {msg.keyword_detected ? (
-                              <AlertCircle className={`w-6 h-6 ${isSelected ? 'text-yellow-300' : 'text-yellow-300'}`} />
+                              <AlertCircle className={`w-5 h-5 sm:w-6 sm:h-6 ${isSelected ? 'text-yellow-300' : 'text-yellow-300'}`} />
                             ) : (
-                              <Info className={`w-6 h-6 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
+                              <Info className={`w-5 h-5 sm:w-6 sm:h-6 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-1.5">
-                                  <h4 className={`font-black text-sm tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
-                                    {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Auto-Detection'}
-                                  </h4>
-                                </div>
-                                <div className="flex items-center gap-2 ml-auto select-none font-mono">
-                                  <span 
-                                    translate="no"
-                                    className={`text-[10px] font-black px-2 py-0.5 rounded-lg border flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
-                                    msg.incident_status === '처리완료'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
-                                      : Number(msg.is_analyzed) >= 1 
-                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 opacity-100' 
-                                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
-                                  }`}>
-                                    {msg.incident_status === '처리완료' ? (
-                                      <span className="flex items-center gap-1.5">
-                                        <CheckCircle key={`comp-${msg.inc_id}`} className="w-3 h-3 text-emerald-500" />
-                                        <span>처리완료</span>
-                                      </span>
-                                    ) : Number(msg.is_analyzed) >= 1 ? (
-                                      <span className="flex items-center gap-1.5">
-                                        <CheckCircle2 key={`check-${msg.inc_id}`} className="w-3 h-3 text-blue-500" />
-                                        <span>ANL_COMPLETE</span>
-                                      </span>
-                                    ) : (
-                                      <span className="flex items-center gap-1.5">
-                                        <Zap key={`zap-${msg.inc_id}`} className="w-3 h-3 text-yellow-500 animate-pulse" />
-                                        <span>ANALYZING...</span>
+                            <div className="flex items-center justify-between gap-1.5 sm:gap-3 mb-2">
+                                <div className="flex flex-col min-w-0 flex-1 justify-start">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <h4 className={`font-black text-sm sm:text-[15px] leading-tight tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'} break-all`}>
+                                      {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Reg' : 'SMS Detected'}
+                                    </h4>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1.5">
+                                    <p className="text-[11px] text-slate-400 font-medium">발신: {msg.sender}</p>
+                                    {msg.employee_id && (
+                                      <span className="text-[10px] text-blue-400 font-mono font-bold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                                        사번: {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
                                       </span>
                                     )}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 font-black bg-white/5 px-2.5 py-0.5 rounded-lg border border-white/5 shadow-inner">
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-2 ml-2 select-none font-mono shrink-0 justify-center">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
+                                      className="text-[10px] font-black text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/25 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 border border-blue-500/20 shadow-sm"
+                                    >
+                                      진행 상태 <ExternalLink className="w-2.5 h-2.5" />
+                                    </button>
+                                    <span 
+                                      translate="no"
+                                      className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg border flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
+                                      msg.incident_status === '처리완료'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
+                                        : Number(msg.is_analyzed) >= 1 
+                                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 opacity-100' 
+                                          : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse' 
+                                    }`}>
+                                      {msg.incident_status === '처리완료' ? (
+                                        <span className="flex items-center gap-1">
+                                          <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
+                                          <span>완료</span>
+                                        </span>
+                                      ) : Number(msg.is_analyzed) >= 1 ? (
+                                        <span className="flex items-center gap-1">
+                                          <CheckCircle2 className="w-2.5 h-2.5 text-blue-500" />
+                                          <span>ANL</span>
+                                        </span>
+                                      ) : (
+                                        <Zap className="w-2.5 h-2.5 text-yellow-500 animate-pulse" />
+                                      )}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 font-bold bg-white/5 px-2.5 py-1 rounded-lg border border-white/5 shadow-inner">
                                     {formatYYMMDD(msg.timestamp)}
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="text-xs text-slate-400">발신: {msg.sender}</p>
-                                {msg.employee_id && (
-                                  <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-                                    사번: {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
-                                  </span>
-                                )}
-                              </div>
-                               <div className="flex items-start justify-between gap-4">
-                                 <div className="flex-1 min-w-0">
-                                   <p className={`text-sm leading-snug ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
+                               <div className="flex flex-col gap-2 text-left">
+                                 <div className="w-full text-left">
+                                   <p className={`text-[13px] leading-relaxed text-left ${isSelected ? 'text-yellow-100' : 'text-slate-200'}`}>{msg.message}</p>
                                    
                                    {/* 🚀 AI Matching Rationale: 유사도 점수 및 산출 근거 표시 */}
                                    {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
@@ -1535,12 +1542,6 @@ export default function DashboardPage() {
                                      </div>
                                    )}
                                  </div>
-                                 <button
-                                   onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                                   className="text-[10px] font-black text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all flex items-center gap-1 border border-white/5 shadow-sm shrink-0 mt-1"
-                                 >
-                                   진행 상태 <ExternalLink className="w-2.5 h-2.5" />
-                                 </button>
                                </div>
                             </div>
                           <button
@@ -2712,7 +2713,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">이름 *</label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input required type="text" value={formData.name} onChange={handleChange('name')} placeholder="홍길동" className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white" />
+                <input required type="text" value={formData.name} onChange={handleChange('name')} placeholder="홍길동" className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white appearance-none" />
               </div>
             </div>
 
@@ -2721,7 +2722,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">핸드폰 번호</label>
               <div className="relative">
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type="tel" value={formData.phone || ''} onChange={handlePhoneChange} placeholder="010-0000-0000" maxLength={13} className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white" />
+                <input type="tel" value={formData.phone || ''} onChange={handlePhoneChange} placeholder="010-0000-0000" maxLength={13} className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white appearance-none" />
               </div>
             </div>
 
@@ -2818,46 +2819,46 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               {showPasswordChange && (
                 <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/5 animate-slide-down">
                   {/* 현재 비밀번호 */}
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500" />
-                    <input 
-                      type={showPw ? 'text' : 'password'} 
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="현재 비밀번호" 
-                      className="w-full bg-[#1a1f2e] border border-amber-500/30 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all"
-                    />
-                  </div>
-                  <div className="border-t border-white/5 pt-3">
-                    {/* 새 비밀번호 */}
-                    <div className="relative mb-3">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                      <input 
-                        type={showPw ? 'text' : 'password'} 
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="새 비밀번호 입력" 
-                        className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                      />
-                      <button
-                        onClick={() => setShowPw(!showPw)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                      >
-                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {/* 새 비밀번호 확인 */}
                     <div className="relative">
-                      <CheckCircle2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500" />
                       <input 
                         type={showPw ? 'text' : 'password'} 
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="새 비밀번호 확인" 
-                        className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="현재 비밀번호" 
+                        className="w-full bg-[#1a1f2e] border border-amber-500/30 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all appearance-none"
                       />
                     </div>
-                  </div>
+                    <div className="border-t border-white/5 pt-3">
+                      {/* 새 비밀번호 */}
+                      <div className="relative mb-3">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input 
+                          type={showPw ? 'text' : 'password'} 
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="새 비밀번호 입력" 
+                          className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                        />
+                        <button
+                          onClick={() => setShowPw(!showPw)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                        >
+                          {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {/* 새 비밀번호 확인 */}
+                      <div className="relative">
+                        <CheckCircle2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input 
+                          type={showPw ? 'text' : 'password'} 
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="새 비밀번호 확인" 
+                          className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                        />
+                      </div>
+                    </div>
                   <button
                     onClick={handlePasswordChange}
                     disabled={isChangingPassword}

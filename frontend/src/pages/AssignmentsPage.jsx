@@ -24,13 +24,13 @@ export default function AssignmentsPage() {
 
   // Fetch real incidents from backend specifically for the user
   useEffect(() => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.employee_id) return;
     
     // Default 1 month window for the assignment list page
     const toDate = new Date().toISOString().split('T')[0];
     const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.id}&from=${fromDate}&to=${toDate}`, {
+    fetch(`${API_BASE}/ai/incident/my-assignments?user_id=${userProfile.employee_id}&from=${fromDate}&to=${toDate}`, {
       headers: getAuthHeaders()
     })
       .then(r => r.json())
