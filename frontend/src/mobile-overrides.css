@@ -108,6 +108,12 @@ html, body {
     gap: 8px !important;
   }
 
+  /* KPI 전용: 모바일에서도 4줄 유지 */
+  .grid.kpi-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6px !important;
+  }
+
   /* ── flex 가로 배치 → 세로 스택 ───────────────────── */
   .flex.gap-4:not(nav):not(.flex-col):not(.items-center),
   .flex.gap-6:not(nav):not(.flex-col):not(.items-center) {

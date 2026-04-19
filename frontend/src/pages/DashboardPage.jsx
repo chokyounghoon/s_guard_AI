@@ -1729,7 +1729,7 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-8">
+          <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-8 kpi-grid">
             {/* Total */}
             <div className="bg-gradient-to-br from-[#1a1c24] to-[#11141d] p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer hover:border-blue-500/40 transition-all shadow-lg" onClick={() => navigate('/assignments?tab=전체')}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700 hidden sm:block" />
