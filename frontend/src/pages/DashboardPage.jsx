@@ -357,7 +357,7 @@ export default function DashboardPage() {
       if (analysisText) {
         await fetch(`${apiBase}/warroom/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             incident_id: incidentId,
             sender: 'AI Autopilot',
@@ -909,7 +909,7 @@ export default function DashboardPage() {
         // Save to DB
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             incident_id: String(currentIncId),
             messages: currentMsgs
@@ -953,7 +953,7 @@ export default function DashboardPage() {
     if (userProfile?.id) {
       fetch(`${apiBase}/ai/incident/assign`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           user_id: userProfile.id,
           login_id: userProfile.email,
@@ -1013,7 +1013,7 @@ export default function DashboardPage() {
 
         const res = await fetch(`${apiBase}/ai/report/save`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             title: reportTitle,
             content: reportContent,
@@ -1107,10 +1107,7 @@ export default function DashboardPage() {
             const token = getAccessToken();
             const res = await fetch(`${apiBase}/auth/profile`, {
               method: 'PATCH',
-              headers: { 
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-              },
+              headers: getAuthHeaders(),
               body: JSON.stringify({
                 user_id: updated.id,
                 name: updated.name,
@@ -1153,7 +1150,9 @@ export default function DashboardPage() {
         fetchMyAssignments(),
         fetchActivityLogs(),
         // Trigger backend self-healing
-        fetch(`${apiBase}/ai/knowledge/sync-status`).catch(e => console.warn("Sync status trigger failed:", e))
+        fetch(`${apiBase}/ai/knowledge/sync-status`, {
+          headers: getAuthHeaders()
+        }).catch(e => console.warn("Sync status trigger failed:", e))
       ]);
       
       // Remove loading message
@@ -2435,7 +2434,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
   useEffect(() => {
     const token = getAccessToken();
     fetch(`${apiBase}/org/tree`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      headers: getAuthHeaders()
     })
       .then(r => r.json())
       .then(tree => {
@@ -2575,6 +2574,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
     try {
       const res = await fetch(`${apiBase}/warroom/upload`, {
         method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': null }),
         body: formDataObj
       });
       if (!res.ok) {
@@ -2610,7 +2610,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
     try {
       const res = await fetch(`${apiBase}/auth/change-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         // old_password로 자체 검증 — JWT 불필요
         body: JSON.stringify({
           user_id: formData.id,
@@ -2641,6 +2641,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
         // 1. 백엔드에 로그아웃 요청 — HttpOnly 쿠키(세션) 삭제
         await fetch(`${apiBase}/auth/logout`, {
           method: 'POST',
+          headers: getAuthHeaders(),
           credentials: 'include'
         }).catch(() => {});
       } finally {

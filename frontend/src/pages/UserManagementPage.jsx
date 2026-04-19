@@ -4,9 +4,10 @@ import {
   ArrowLeft, Search, User, Shield, RefreshCw,
   Trash2, Mail, Phone, Building2,
   ChevronRight, Key, MoreHorizontal, UserCheck, UserX,
-  LayoutGrid, List as ListIcon, X, Star, Edit3, CheckCircle2
+  LayoutGrid, List as ListIcon, X, Star, Edit3, CheckCircle2, Hash, Activity, Eye
 } from 'lucide-react';
-import { getAccessToken, getUserProfile } from '../lib/authStore';
+import { getAccessToken, getUserProfile, getAuthHeaders } from '../lib/authStore';
+import { SMS_WORKER_URL } from '../config/api';
 
 export default function UserManagementPage() {
   const navigate = useNavigate();
@@ -49,8 +50,8 @@ export default function UserManagementPage() {
       // API로 최신 정보 가져오기
       if (stored?.employee_id && token) {
         const res = await fetch(`${API_BASE}/users/${stored.employee_id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        headers: getAuthHeaders()
+      });
         if (res.ok) {
           const data = await res.json();
           setMyProfile(data.user || data);
@@ -65,9 +66,8 @@ export default function UserManagementPage() {
 
   const fetchUsers = () => {
     setLoading(true);
-    const token = getAccessToken();
     fetch(`${API_BASE}/users`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      headers: getAuthHeaders()
     })
       .then(r => {
         if (!r.ok) throw new Error('데이터를 불러오지 못했습니다.');
@@ -84,9 +84,8 @@ export default function UserManagementPage() {
   useEffect(() => {
     fetchMyProfile();
     fetchUsers();
-    const token = getAccessToken();
     fetch(`${API_BASE}/org/tree`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      headers: getAuthHeaders()
     })
       .then(r => {
         if (!r.ok) throw new Error('조직도 데이터를 불러오지 못했습니다.');
@@ -101,12 +100,11 @@ export default function UserManagementPage() {
     if (!newPass) return;
 
     try {
-      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${userId}/reset-password`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          ...getAuthHeaders()
         },
         body: JSON.stringify({ new_password: newPass })
       });
@@ -132,12 +130,11 @@ export default function UserManagementPage() {
     if (!window.confirm(confirmMsg)) return;
 
     try {
-      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${user.employee_id}/status`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          ...getAuthHeaders()
         },
         body: JSON.stringify({ status: nextStatus })
       });
@@ -155,12 +152,11 @@ export default function UserManagementPage() {
 
   const handleUpdateRole = async (userId, newRole) => {
     try {
-      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${userId}/role`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          ...getAuthHeaders()
         },
         body: JSON.stringify({ role: newRole })
       });
@@ -250,13 +246,9 @@ export default function UserManagementPage() {
     };
 
     try {
-      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${editingUser.employee_id}/org`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
+        method: 'POST',
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -297,10 +289,7 @@ export default function UserManagementPage() {
       const token = getAccessToken();
       const res = await fetch(`${API_BASE}/admin/users`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -335,9 +324,7 @@ export default function UserManagementPage() {
       const token = getAccessToken();
       const res = await fetch(`${API_BASE}/users/${user.employee_id}`, {
         method: 'DELETE',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
+        headers: getAuthHeaders()
       });
       if (res.ok) {
         fetchUsers();

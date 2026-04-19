@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal, ChevronDown, ChevronUp, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getAuthHeaders } from '../lib/authStore';
 
 const IncidentPushPage = () => {
     const navigate = useNavigate();
@@ -235,6 +236,7 @@ const IncidentPushPage = () => {
 
                 const response = await fetch(getApiUrl('/sms/convert-multimodal'), { 
                     method: 'POST', 
+                    headers: getAuthHeaders({ 'Content-Type': null }),
                     body: formData 
                 });
                 
@@ -398,9 +400,7 @@ const IncidentPushPage = () => {
 
             const response = await fetch(getApiUrl('/sms/receive'), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(payload)
             });
 

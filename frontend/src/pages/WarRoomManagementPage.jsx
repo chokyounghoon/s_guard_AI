@@ -6,6 +6,7 @@ import {
   Image, Paperclip, ChevronDown, Zap, CheckCircle2, AlertCircle,
   Hash, Activity, Eye
 } from 'lucide-react';
+import { getAuthHeaders } from '../lib/authStore';
 
 const getApiUrl = (path) => {
   const base = window.location.hostname === 'localhost'
@@ -181,7 +182,9 @@ export default function WarRoomManagementPage() {
       if (filters.assignee) params.append('assigned_to', filters.assignee);
       // NOTE: division/team filters would need a common location in IncidentDB OR a join (currently filtered by assignee string for simplicity or description)
       
-      const res = await fetch(getApiUrl(`/warroom/rooms?${params.toString()}`));
+      const res = await fetch(getApiUrl(`/warroom/rooms?${params.toString()}`), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setRooms(data.rooms || []);
@@ -209,7 +212,7 @@ export default function WarRoomManagementPage() {
       const user = userStr ? JSON.parse(userStr) : { name: '익명' };
       await fetch(getApiUrl(`/warroom/rooms/${room.code}/join`), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_name: user.name || '익명' })
       });
       setJoinSuccess(room.code);

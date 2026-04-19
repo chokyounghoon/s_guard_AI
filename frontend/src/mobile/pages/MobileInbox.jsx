@@ -4,7 +4,7 @@ import {
   Inbox as InboxIcon, AlertTriangle, Info, Bell,
   ChevronRight, CheckCircle2, Loader2, MailOpen, RefreshCw
 } from 'lucide-react';
-import { getAccessToken } from '../../lib/authStore';
+import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import PullToRefresh from '../components/PullToRefresh';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -35,7 +35,7 @@ export default function MobileInbox({ user }) {
       if (!token || !userId) { setLoading(false); return; }
 
       const res = await fetch(`${API_BASE}/inbox?user_id=${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error('인박스 로드 실패');
 

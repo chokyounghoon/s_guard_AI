@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutGrid, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getAuthHeaders } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -36,7 +37,7 @@ export default function KnowledgeBasePage() {
         ? `${API_BASE}/ai/knowledge/search?q=${encodeURIComponent(query)}`
         : `${API_BASE}/ai/knowledge`;
         
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setKnowledge(data.results || []);
@@ -134,7 +135,7 @@ ${formData.content}`;
       // (This guarantees the exact Title and Content are inserted since Dify workflow might have mapping issues)
       const localSaveRes = await fetch(`${API_BASE}/ai/knowledge/save`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...formData, // Has title, content, category, tags
           id: editingEntry ? editingEntry.id : undefined,
@@ -164,7 +165,10 @@ ${formData.content}`;
   const handleDelete = async (id) => {
     if (!window.confirm('정말 삭제하시겠습니까?')) return;
     try {
-      const res = await fetch(`${API_BASE}/ai/knowledge/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/ai/knowledge/${id}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       if (res.ok) fetchKnowledge();
     } catch (err) {
       console.error("Delete knowledge error:", err);

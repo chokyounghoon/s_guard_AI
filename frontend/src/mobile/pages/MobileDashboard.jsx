@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Bell, ChevronRight, Shield, Zap,
-  CheckCircle2, Loader2, Wifi, Activity, Settings
+  CheckCircle2, Loader2, Wifi, Activity, Settings, RefreshCw
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import { PushManager } from '../../lib/pushManager';
@@ -32,7 +32,7 @@ export default function MobileDashboard({ user }) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/sms/recent?limit=20`, { 
+      const res = await fetch(`${API_BASE}/activity-logs?limit=50`, { 
         headers: getAuthHeaders() 
       });
       if (!res.ok) throw new Error('데이터 로드 실패');

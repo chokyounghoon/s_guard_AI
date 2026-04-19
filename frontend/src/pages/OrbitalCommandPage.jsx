@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Zap, ServerCrash, Search, Compass, CheckCircle2, XCircle, Loader2, Database, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
+import { getAuthHeaders } from '../lib/authStore';
 
 export default function OrbitalCommandPage() {
   const [threshold, setThreshold] = useState(0.80);
@@ -16,7 +17,9 @@ export default function OrbitalCommandPage() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('https://sguardai.khcho0421.workers.dev/ai/knowledge/sync-status');
+      const res = await fetch('https://sguardai.khcho0421.workers.dev/ai/knowledge/sync-status', {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       setStats({ total: data.total, success: data.success, pending: data.pending });
     } catch (e) {
@@ -28,7 +31,9 @@ export default function OrbitalCommandPage() {
 
   useEffect(() => {
     // 🚀 Unified API Integration
-    fetch('https://sguardai.khcho0421.workers.dev/sms/settings')
+    fetch('https://sguardai.khcho0421.workers.dev/sms/settings', {
+      headers: getAuthHeaders()
+    })
       .then(r => r.json())
       .then(data => { 
         if (data.success) {
@@ -45,7 +50,7 @@ export default function OrbitalCommandPage() {
     try {
       const res = await fetch('https://sguardai.khcho0421.workers.dev/sms/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ key: 'similarity_threshold_technical', value: String(newVal) })
       });
       if (res.ok) {
@@ -66,7 +71,10 @@ export default function OrbitalCommandPage() {
     setIsSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch('https://sguardai.khcho0421.workers.dev/ai/knowledge/sync-pending', { method: 'POST' });
+      const res = await fetch('https://sguardai.khcho0421.workers.dev/ai/knowledge/sync-pending', { 
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (data.success) {
         setSyncResult({ type: 'success', msg: `동기화 완료: ${data.successCount}건 성공 (총 ${data.processed} 처리)` });
@@ -87,7 +95,9 @@ export default function OrbitalCommandPage() {
     setIsSearching(true);
     try {
       // Sandbox 조회 시 threshold 0으로 보내어 전체 스코어를 받아오고 프론트에서 필터/블러 처리
-      const res = await fetch(`https://sguardai.khcho0421.workers.dev/ai/knowledge/search?q=${encodeURIComponent(sandboxQuery)}&threshold=0.0`);
+      const res = await fetch(`https://sguardai.khcho0421.workers.dev/ai/knowledge/search?q=${encodeURIComponent(sandboxQuery)}&threshold=0.0`, {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (data.results) {
         setSandboxResults(data.results);

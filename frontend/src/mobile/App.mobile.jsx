@@ -48,10 +48,10 @@ import { CodebookProvider }   from '../context/CodebookContext';
 
 // ── Auth Store ────────────────────────────────────────────────────────────────
 import {
-  setAccessToken, getAccessToken,
-  setUserProfile as setStoreUserProfile,
-  getUserProfile, addAuthListener,
-  getGhostToken, setGhostToken,
+  getAccessToken, setAccessToken, clearSession,
+  getUserProfile, setUserProfile as setStoreUserProfile,
+  addAuthListener,
+  getGhostToken, setGhostToken, getAuthHeaders,
 } from '../lib/authStore';
 
 // ── PWA Install Button (모바일 전용) ──────────────────────────────────────────
@@ -172,7 +172,9 @@ function AppContent() {
 
   const fetchWarRooms = async () => {
     try {
-      const res = await fetch(`${API_BASE}/warroom/rooms`);
+      const res = await fetch(`${API_BASE}/warroom/rooms`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setWarRooms(data.rooms || []);

@@ -4,7 +4,7 @@ import {
   Send, AlertTriangle, CheckCircle, Loader2, ChevronLeft,
   Mic, Square, Image as ImageIcon, Terminal, X
 } from 'lucide-react';
-import { getAccessToken, getUserProfile } from '../../lib/authStore';
+import { getAccessToken, getUserProfile, getAuthHeaders } from '../../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -58,11 +58,10 @@ export default function MobileIncidentPush({ user }) {
       try {
         const form = new FormData();
         form.append('file', file);
-        const token = getAccessToken();
         const res = await fetch(`${API_BASE}/sms/convert-multimodal`, {
           method: 'POST',
           body: form,
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: getAuthHeaders({ 'Content-Type': null }),
         });
         if (!res.ok) throw new Error('변환 실패');
 
@@ -100,13 +99,9 @@ export default function MobileIncidentPush({ user }) {
     if (!message.trim()) return;
     setSending(true); setResult(null);
     try {
-      const token = getAccessToken();
       const res = await fetch(`${API_BASE}/sms/receive`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           sender: sender || '00-0000-0000',
           message: message.trim(),

@@ -772,7 +772,7 @@ export default function ChatPage() {
           formData.append('uploaded_by', currentUser.name || '익명');
           const uploadRes = await fetch(`${apiBase}/warroom/upload`, { 
             method: 'POST', 
-            headers: getAuthHeaders({}), // Empty literal to avoid default JSON content-type if multipart is used
+            headers: getAuthHeaders({ 'Content-Type': null }), // Let browser set multipart boundary
             body: formData 
           });
           if (uploadRes.ok) {
@@ -837,7 +837,7 @@ export default function ChatPage() {
     try {
       const res = await fetch(getApiUrl('/warroom/leave'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_id: currentUser.employee_id,
           inc_id: incidentId
@@ -863,7 +863,7 @@ export default function ChatPage() {
     try {
       const res = await fetch(getApiUrl('/warroom/resolve-only'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ inc_id: incidentId, user_id: currentUser.employee_id })
       });
       if (res.ok) {
@@ -878,7 +878,9 @@ export default function ChatPage() {
 
   const fetchDMHistory = async (otherId) => {
     try {
-      const res = await fetch(getApiUrl(`/warroom/dm/${otherId}?my_id=${currentUser.employee_id}`));
+      const res = await fetch(getApiUrl(`/warroom/dm/${otherId}?my_id=${currentUser.employee_id}`), {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setDmHistory(data);
@@ -891,7 +893,7 @@ export default function ChatPage() {
     try {
       const res = await fetch(getApiUrl('/warroom/dm'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           sender_id: currentUser.employee_id,
           receiver_id: dmTargetUser.employee_id,
@@ -935,7 +937,7 @@ export default function ChatPage() {
       // 1. Mark as Resolved in DB
       await fetch(getApiUrl('/warroom/resolve'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ incident_id: incidentId })
       });
       // 2. Success - Navigate to AI Report Page (as per user request to restore legacy behavior)

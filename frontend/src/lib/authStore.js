@@ -26,11 +26,18 @@ export const getAccessToken = () => {
  */
 export const getAuthHeaders = (extraHeaders = {}) => {
   const token = getAccessToken();
-  return {
+  const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...extraHeaders
   };
+  
+  // If Content-Type is explicitly null, remove it (useful for FormData)
+  if (extraHeaders['Content-Type'] === null) {
+    delete headers['Content-Type'];
+  }
+  
+  return headers;
 };
 
 export const setUserProfile = (user) => {

@@ -5,8 +5,9 @@ import remarkGfm from 'remark-gfm';
 import {
   ArrowLeft, Share2, Sparkles, AlertCircle, MessageSquare,
   FileText, Paperclip, Clock, Users, CheckCircle2, Send, User, Check, ChevronRight, X,
-  Database, Shield, Server, Bot, Activity, RefreshCw, Loader
+  Database, Shield, Server, Bot, Activity, RefreshCw, Loader, Zap
 } from 'lucide-react';
+import { getAuthHeaders } from '../lib/authStore';
 
 const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
@@ -92,7 +93,7 @@ export default function AiReportPage() {
       const reqId = safeId.startsWith('INC-') ? safeId.slice(4) : safeId;
       const res = await fetch(`${API_BASE_URL}/ai/generate-report`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ incident_id: reqId }),
         signal: controller.signal,
       });
@@ -163,7 +164,9 @@ export default function AiReportPage() {
     }
     const fetchReport = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/warroom/report/${incidentId}`);
+        const res = await fetch(`${API_BASE_URL}/warroom/report/${incidentId}`, {
+          headers: getAuthHeaders()
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setReport(data);
@@ -177,7 +180,9 @@ export default function AiReportPage() {
 
     const fetchSummary = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/db/summary/${incidentId}`);
+        const res = await fetch(`${API_BASE_URL}/db/summary/${incidentId}`, {
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           const data = await res.json();
           if (data && data.summary) {
@@ -191,7 +196,6 @@ export default function AiReportPage() {
     fetchSummary();
   }, [incidentId]);
 
-  // Auto-generate AI report when tab is active
   useEffect(() => {
     if (activeTab === 'ai_report' && !aiGenText && !isGenerating && report) {
       generateAiReport();
@@ -206,10 +210,9 @@ export default function AiReportPage() {
     try {
       await fetch(`${API_BASE_URL}/ai/report/save`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          inc_id: incidentId,
-          user_id: currentUser.employee_id,
+          incident_id: incidentId,
           title: report?.title || incidentId,
           content: `[6W1H]\nWho: ${report?.who}\nWhen: ${report?.when}\nWhere: ${report?.where}\nWhat: ${report?.what}\nWhy: ${report?.why}\nHow: ${report?.how}\n\n[메모]\n${memo}`,
         }),

@@ -39,9 +39,9 @@ export default function MobileActivity({ user }) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const token = getAccessToken();
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`${API_BASE}/activity-logs?limit=50`, { headers });
+      const res = await fetch(`${API_BASE}/activity-logs?limit=50`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error('로드 실패');
       const data = await res.json();
       const logs = data.logs || [];
