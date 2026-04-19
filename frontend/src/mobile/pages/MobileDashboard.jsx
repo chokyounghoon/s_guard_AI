@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Bell, ChevronRight, Shield, Zap,
   CheckCircle2, Loader2, Wifi, Activity, Settings, RefreshCw,
-  LayoutGrid, Clock
+  LayoutDashboard, Timer
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import { PushManager } from '../../lib/pushManager';
@@ -133,8 +133,8 @@ export default function MobileDashboard({ user }) {
       {/* ── 통계 카드 ── */}
       <div className="grid grid-cols-2 gap-3 px-4 pt-4 pb-2">
         {[
-          { label: '전체 인시던트', value: stats.total, icon: LayoutGrid, color: 'blue' },
-          { label: '처리 대기',     value: stats.pending, icon: Clock,       color: 'yellow', alert: stats.pending > 0 },
+          { label: '전체 인시던트', value: stats.total, icon: LayoutDashboard, color: 'blue' },
+          { label: '처리 대기',     value: stats.pending, icon: Timer,       color: 'yellow', alert: stats.pending > 0 },
           { label: '긴급 감지',     value: stats.critical, icon: AlertTriangle, color: 'red', alert: stats.critical > 0 },
           { label: '분석 완료',     value: stats.resolved, icon: CheckCircle2, color: 'emerald' },
         ].map(({ label, value, icon: Icon, color, alert }) => (
