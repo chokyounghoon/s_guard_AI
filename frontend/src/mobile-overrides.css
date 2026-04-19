@@ -32,7 +32,7 @@ html, body {
 
   /* ── 메인 컨테이너 ─────────────────────────────────── */
   .p-6.max-w-7xl {
-    padding: 12px 12px 100px !important;
+    padding: 0px 0px 100px !important; /* 좌우 여백 제거 */
     max-width: 100% !important;
   }
 
@@ -40,7 +40,9 @@ html, body {
   .bg-\[\#1a1f2e\].rounded-3xl,
   .bg-\[\#11141d\].rounded-3xl,
   .bg-\[\#1a1f2e\].rounded-2xl {
-    border-radius: 16px !important;
+    border-radius: 0px !important; /* 모바일에서는 둥근 모서리 제거하여 풀로 보이게 */
+    border-left: none !important;
+    border-right: none !important;
   }
 
   /* ── SMS 패널 헤더 ─────────────────────────────────── */
