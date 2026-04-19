@@ -217,13 +217,13 @@ export default function WorkflowPage() {
       </header>
 
       {/* 메인 — 좌우 동일 높이, 각자 스크롤 */}
-      <main className="flex-1 relative z-10 overflow-hidden">
-        <div className="max-w-6xl mx-auto px-5 py-5 h-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-full">
+      <main className="flex-1 relative z-10 overflow-hidden md:overflow-hidden overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-4 md:px-5 py-4 md:py-5 md:h-full">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 md:h-full">
 
             {/* ── 좌측 패널 ── */}
-            <div className="lg:col-span-4 flex flex-col" style={{ height: PANEL_H }}>
-              <div className="bg-[#151926]/70 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
+            <div className="lg:col-span-4 flex flex-col" style={{ height: window.innerWidth >= 1024 ? PANEL_H : 'auto' }}>
+              <div className="bg-[#151926]/70 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ minHeight: '300px' }}>
 
                 {/* 고정 헤더 */}
                 <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-white/5 space-y-3">
@@ -356,10 +356,10 @@ export default function WorkflowPage() {
             </div>
 
             {/* ── 우측 패널 ── */}
-            <div className="lg:col-span-8 flex flex-col" style={{ height: PANEL_H }}>
+            <div className="lg:col-span-8 flex flex-col" style={{ height: window.innerWidth >= 1024 ? PANEL_H : 'auto' }}>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                 className="bg-[#151926]/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl relative flex-1 overflow-y-auto"
-                style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                style={{ minHeight: '400px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                 {/* 수직 타임라인 선 */}
                 <div className="absolute left-[68px] top-16 bottom-16 w-[1px] bg-gradient-to-b from-blue-600/40 via-white/5 to-transparent pointer-events-none" />
 

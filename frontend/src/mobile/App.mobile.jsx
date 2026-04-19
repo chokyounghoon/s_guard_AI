@@ -31,6 +31,13 @@ import OrbitalCommandPage     from '../pages/OrbitalCommandPage';
 import SecurityLogPage        from '../pages/SecurityLogPage';
 import ProcessingFlowPage     from '../pages/ProcessingFlowPage';
 
+// ── 모바일 전용 페이지 (카드 기반, 네이티브 UX) ────────────────────────────────
+import MobileDashboard        from './pages/MobileDashboard';
+import MobileActivity         from './pages/MobileActivity';
+import MobileInbox            from './pages/MobileInbox';
+import MobileIncidentPush     from './pages/MobileIncidentPush';
+import MobileChat             from './pages/MobileChat';
+
 // ── 기존 PC 공통 컴포넌트 그대로 재사용 ─────────────────────────────────────────
 import SMSNotification        from '../components/SMSNotification';
 import ErrorBoundary          from '../components/ErrorBoundary';
@@ -208,15 +215,19 @@ function AppContent() {
         {/* 로그인 + 하단 PWA 설치 버튼 */}
         <Route path="/" element={<LoginPageWithPWA />} />
 
-        {/* ── PC와 동일한 전체 라우트 ── */}
-        <Route path="/dashboard"               element={<PR><DashboardPage /></PR>} />
+        {/* ── 모바일 전용 핵심 라우트 (카드 기반 네이티브 UX) ── */}
+        <Route path="/dashboard"   element={<PR><MobileDashboard user={userProfile} /></PR>} />
+        <Route path="/activity"    element={<PR><MobileActivity user={userProfile} /></PR>} />
+        <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} /></PR>} />
+        <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} /></PR>} />
+        <Route path="/chat/:incidentId?" element={<PR><MobileChat user={userProfile} /></PR>} />
+
+        {/* ── PC 페이지 재사용 (나머지 라우트) ── */}
         <Route path="/ai-report/:incidentId?"  element={<PR><AiReportPage /></PR>} />
         <Route path="/assignment-detail"       element={<PR><AssignmentDetailPage /></PR>} />
-        <Route path="/chat/:incidentId?"       element={<PR><ChatPage /></PR>} />
         <Route path="/chat-summary/:incidentId" element={<PR><ChatSummaryPage /></PR>} />
         <Route path="/ai-process-report"       element={<PR><AiProcessReportPage /></PR>} />
         <Route path="/report-publish"          element={<PR><ReportPublishPage /></PR>} />
-        <Route path="/activity"                element={<PR><ActivityPage /></PR>} />
         <Route path="/activity-detail"         element={<PR><ActivityDetailPage /></PR>} />
         <Route path="/assignments"             element={<PR><AssignmentsPage /></PR>} />
         <Route path="/overall-status"          element={<PR><OverallStatusPage /></PR>} />
@@ -224,7 +235,6 @@ function AppContent() {
         <Route path="/incident-list"           element={<PR><IncidentListPage /></PR>} />
         <Route path="/keyword-management"      element={<PR><KeywordManagementPage /></PR>} />
         <Route path="/report-line-management"  element={<PR><ReportLineManagementPage /></PR>} />
-        <Route path="/incident-push"           element={<PR><IncidentPushPage /></PR>} />
         <Route path="/security-logs"           element={<PR><SecurityLogPage /></PR>} />
         <Route path="/processing-flow"         element={<PR><ProcessingFlowPage /></PR>} />
         <Route path="/knowledge-base"          element={<PR><KnowledgeBasePage /></PR>} />
@@ -233,7 +243,6 @@ function AppContent() {
         <Route path="/warroom-management"      element={<PR><WarRoomManagementPage /></PR>} />
         <Route path="/codebook-management"     element={<PR><CodebookManagementPage /></PR>} />
         <Route path="/workflow/:inc_id"        element={<PR><WorkflowPage /></PR>} />
-        <Route path="/inbox"                   element={<PR><InboxPage /></PR>} />
         <Route path="/orbital-command"         element={<PR><OrbitalCommandPage /></PR>} />
       </Routes>
 

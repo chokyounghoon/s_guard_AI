@@ -83,17 +83,27 @@ export default function OverallStatusPage() {
       <div className="fixed bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px] animate-pulse pointer-events-none" />
 
       {/* 헤더 영역 */}
-      <header className="sticky top-0 z-[60] px-6 py-4 backdrop-blur-xl border-b border-white/5 bg-[#06080c]/80 shadow-2xl">
+      <header className="sticky top-0 z-[60] px-4 md:px-6 py-3 md:py-4 backdrop-blur-xl border-b border-white/5 bg-[#06080c]/80 shadow-2xl">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-3 md:space-x-6">
             <button 
               onClick={() => navigate('/dashboard')}
-              className="p-3 rounded-2xl hover:bg-white/5 border border-white/5 transition-all hover:scale-105 active:scale-95 group"
+              className="p-2 md:p-3 rounded-2xl hover:bg-white/5 border border-white/5 transition-all hover:scale-105 active:scale-95 group"
             >
-              <ArrowLeft className="w-6 h-6 group-hover:text-blue-400 transition-colors" />
+              <ArrowLeft className="w-5 h-5 md:w-6 md:h-6 group-hover:text-blue-400 transition-colors" />
             </button>
             <div className="flex flex-col">
-              <h1 className="text-2xl font-black flex items-center gap-3">
+              {/* 모바일: 간결한 제목 */}
+              <h1 className="text-base font-black flex items-center gap-2 md:hidden">
+                <Target className="w-5 h-5 text-purple-400" />
+                <span className="text-white">거버넌스 현황</span>
+                <div className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 rounded-full flex items-center gap-1">
+                  <div className="w-1 h-1 rounded-full bg-purple-500 animate-pulse" />
+                  <span className="text-[9px] text-purple-400 font-black uppercase">LIVE</span>
+                </div>
+              </h1>
+              {/* PC: 전체 제목 */}
+              <h1 className="hidden md:flex text-2xl font-black items-center gap-3">
                 <Target className="w-8 h-8 text-purple-400 animate-bounce" />
                 <span className="bg-gradient-to-r from-white via-slate-300 to-slate-500 bg-clip-text text-transparent">
                   S-Guard 핵심 거버넌스 꿈의 집계 (Full-Sync)
@@ -103,10 +113,10 @@ export default function OverallStatusPage() {
                   <span className="text-[10px] text-purple-400 font-black uppercase tracking-tighter">Dream Mode</span>
                 </div>
               </h1>
-              <p className="text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase mt-1">Cross-Table Intelligence: Users · SMS · Knowledge · Logs · Assignments</p>
+              <p className="hidden md:block text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase mt-1">Cross-Table Intelligence: Users · SMS · Knowledge · Logs · Assignments</p>
             </div>
           </div>
-          <div className="flex items-center space-x-4 bg-black/40 px-6 py-2.5 rounded-2xl border border-white/10 shadow-inner">
+          <div className="flex items-center space-x-4 bg-black/40 px-3 md:px-6 py-2 md:py-2.5 rounded-2xl border border-white/10 shadow-inner">
             <Clock className="w-4 h-4 text-blue-400" />
             <span className="text-xs font-mono font-black text-slate-300">
               {new Date().toLocaleTimeString('ko-KR')}
@@ -115,10 +125,10 @@ export default function OverallStatusPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-6 space-y-6 relative z-10 pb-60">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-6 relative z-10 pb-60">
         
-        {/* 꿈의 집계 핵심 인디케이터 (With Methodology) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* 모바일: 2열 요약 카드 그리드 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
           <div className="flex flex-col space-y-2">
             <StatCard 
               icon={<Shield className="text-emerald-400" />}

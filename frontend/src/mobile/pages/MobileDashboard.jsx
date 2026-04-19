@@ -1,4 +1,7 @@
-  CheckCircle2, Loader2, Wifi, Activity as ActivityIcon, Settings
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Bell, ChevronRight, Shield, Zap,
+  CheckCircle2, Loader2, Wifi, Activity, Settings
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import { PushManager } from '../../lib/pushManager';
@@ -155,7 +158,7 @@ export default function MobileDashboard({ user }) {
       <div className="px-4 pb-2">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-            <ActivityIcon className="w-4 h-4 text-blue-400" />
+            <Activity className="w-4 h-4 text-blue-400" />
             실시간 인시던트
           </h2>
           {lastUpdate && (
@@ -232,6 +235,7 @@ export default function MobileDashboard({ user }) {
             })}
           </div>
         )}
+      </div>
       </div>
     </PullToRefresh>
   );
