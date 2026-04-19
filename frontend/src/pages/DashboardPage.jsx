@@ -1483,17 +1483,17 @@ export default function DashboardPage() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <div className="flex flex-col items-end gap-1 shrink-0 ml-auto">
                               <div className="flex items-center gap-1.5">
                                 <button
                                   onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                                  className="text-[9px] font-black text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/25 px-2 py-1 rounded-lg transition-all flex items-center gap-1 border border-blue-500/20 shadow-sm"
+                                  className="text-[9px] font-black text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/25 px-2 py-1 rounded-lg transition-all flex items-center gap-1 border border-blue-500/20 shadow-sm whitespace-nowrap"
                                 >
                                   진행상태 <ExternalLink className="w-2.5 h-2.5" />
                                 </button>
                                 <span 
                                   translate="no"
-                                  className={`text-[9px] font-black px-2 py-1 rounded-lg border flex items-center gap-1 shadow-sm transition-all duration-300 ${
+                                  className={`text-[9px] font-black px-2 py-1 rounded-lg border flex items-center gap-1 shadow-sm transition-all duration-300 whitespace-nowrap ${
                                   msg.incident_status === '처리완료'
                                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                     : Number(msg.is_analyzed) >= 1 
@@ -1503,7 +1503,7 @@ export default function DashboardPage() {
                                   {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
                                 </span>
                               </div>
-                              <span className="text-[9px] text-slate-500 font-bold font-mono">
+                              <span className="text-[9px] text-slate-500 font-bold font-mono opacity-80">
                                 {formatYYMMDD(msg.timestamp)}
                               </span>
                             </div>
@@ -1849,98 +1849,42 @@ export default function DashboardPage() {
                         }`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="flex items-center gap-2 max-w-[70%]">
-                          <span className={`text-[8px] font-black px-1 py-0.5 rounded border flex-shrink-0 bg-blue-500/20 text-blue-400 border-blue-500/30`}>
-                            SMS
-                          </span>
-                          <h4 className="text-sm font-bold text-white truncate">{item.message || '상공 발생'}</h4>
-                          {Number(item.received_count || 1) >= 2 && (
-                             <div key={`rc-assign-${item.inc_id}`} className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-600/20 to-indigo-500/20 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)] backdrop-blur-sm group/badge hover:scale-105 transition-transform">
-                               <span className="text-[10px] font-black font-mono text-blue-400 group-hover/badge:text-blue-300 transition-colors">
-                                 {Number(item.occurrence_count) > 0 ? Number(item.occurrence_count) : (Number(item.received_count) || 1)}
-                               </span>
-                               <span className="text-[8px] font-bold text-blue-500/60 uppercase tracking-tighter">Event</span>
-                             </div>
-                          )}
-                          {Number(item.keyword_detected || 0) > 0 && (
-                            <div className="flex items-center gap-1.5 flex-shrink-0 select-none">
-                              <span className="bg-yellow-400/20 text-yellow-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-yellow-400/30 flex items-center gap-1 shadow-[0_0_15px_rgba(250,204,21,0.2)] animate-pulse">
-                                <Zap key={`zap-assign-${item.inc_id}`} className="w-2.5 h-2.5" />
-                                키워드 감지 ({item.keyword_detected})
-                              </span>
-                                   <span 
-                            key={`status-assign-${item.inc_id}`} 
-                            translate="no"
-                            className={`text-[10px] font-black px-2 py-0.5 rounded border flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
-                            Number(item.is_analyzed) >= 1 
-                              ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' 
-                              : (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS')
-                                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 animate-pulse'
-                                : 'hidden'
-                          }`}>
-                            {Number(item.is_analyzed) >= 1 ? (
-                               <span className="flex items-center gap-1.5">
-                                 <CheckCircle2 key={`check-assign-${item.id || item.inc_id}`} className="w-3 h-3 text-blue-500" />
-                                 <span>ANL_COMPLETE</span>
-                               </span>
-                            ) : (
-                               <span className="flex items-center gap-1.5">
-                                 <Zap key={`zap-assign-${item.id || item.inc_id}`} className="w-3 h-3 text-yellow-500 animate-pulse" />
-                                 <span>분석 중</span>
+                      <div className="flex flex-col sm:flex-row justify-between items-start mb-1 gap-1 sm:gap-4">
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <h4 className="text-sm font-bold text-white truncate w-full">{item.message || '상공 발생'}</h4>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            <span className={`text-[8px] font-black px-1 py-0.5 rounded border flex-shrink-0 bg-blue-500/20 text-blue-400 border-blue-500/30`}>
+                              SMS
+                            </span>
+                            {Number(item.received_count || 1) >= 2 && (
+                               <div key={`rc-assign-${item.inc_id}`} className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-blue-600/20 to-indigo-500/20 border border-blue-500/30 shadow-sm backdrop-blur-sm">
+                                 <span className="text-[9px] font-black font-mono text-blue-400">
+                                   {Number(item.occurrence_count) > 0 ? Number(item.occurrence_count) : (Number(item.received_count) || 1)}
+                                 </span>
+                                 <span className="text-[7px] font-bold text-blue-500/60 uppercase tracking-tighter">Event</span>
+                               </div>
+                            )}
+                            {Number(item.keyword_detected || 0) > 0 && (
+                               <span className="bg-yellow-400/20 text-yellow-400 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-yellow-400/30 flex items-center gap-1 shadow-sm">
+                                 <Zap key={`zap-assign-ico-${item.inc_id}`} className="w-2 h-2" />
+                                 감지 ({item.keyword_detected})
                                </span>
                             )}
-                          </span>
-                              {item.response_message && (
-                                <span className="text-[9px] text-yellow-500/60 font-medium px-1 max-w-[100px] truncate" title={item.response_message}>
-                                  {item.response_message}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className={`text-[10px] font-bold px-3 py-1 rounded-full border shadow-sm transition-all duration-300 flex items-center gap-1.5
-                            ${(item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
-                              (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 font-black' : 
-                              'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}
-                            style={{
-                              animation: (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'sguard-blink-fast 0.5s infinite' : 
-                                         (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'sguard-blink-slow 2.0s infinite' : 'none'
-                            }}>
-                            <style>{`
-                              @keyframes sguard-blink-fast {
-                                0%, 100% { opacity: 1; transform: scale(1); }
-                                50% { opacity: 0.3; transform: scale(0.98); }
-                              }
-                              @keyframes sguard-blink-slow {
-                                0%, 100% { opacity: 1; filter: brightness(1.2); }
-                                50% { opacity: 0.5; filter: brightness(0.8); }
-                              }
-                              @keyframes sguard-twinkle {
-                                0%, 100% { text-shadow: 0 0 5px rgba(59, 130, 246, 0.5); opacity: 1; }
-                                50% { text-shadow: 0 0 15px rgba(59, 130, 246, 0.8), 0 0 20px rgba(59, 130, 246, 0.4); opacity: 0.7; color: #60a5fa; }
-                              }
-                            `}</style>
-                            <div className={`w-1 h-1 rounded-full ${
-                              (item.status === '미확인' || item.status === '미처리') ? 'bg-red-400' : 
-                              item.status === '처리중' ? 'bg-orange-400' : 
-                              'bg-emerald-400'
-                            }`} />
-                             {item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS' ? '분석중입니다' : item.status}
-                             {(item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') && (
-                               <span className="text-[9px] opacity-70 ml-1 border-l border-orange-500/30 pl-1.5 flex items-center gap-1">
-                                 <MessageSquare className="w-2.5 h-2.5" />
-                                 대화중
-                               </span>
-                             )}
-                           </div>
-                          <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
-                            {formatYYMMDD(item.assigned_at)}
-                          </span>
+                            <span 
+                                key={`status-assign-${item.inc_id}`} 
+                                className={`text-[9px] font-black px-1.5 py-0.5 rounded border flex items-center gap-1 shadow-sm transition-all ${
+                                Number(item.is_analyzed) >= 1 
+                                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' 
+                                  : (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS')
+                                    ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 animate-pulse'
+                                    : 'hidden'
+                              }`}>
+                                {Number(item.is_analyzed) >= 1 ? 'ANL_COMPLETE' : '분석 중'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <p className="text-xs text-slate-300 leading-snug mb-2 flex items-center gap-3">
+                      <p className="text-xs text-slate-300 leading-snug mt-2 flex items-center gap-3">
                         <span>발신: {item.sender}</span>
                         {item.employee_id && (
                           <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded">
@@ -1949,21 +1893,50 @@ export default function DashboardPage() {
                         )}
                       </p>
                     </div>
-                    <button
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        if (['미확인', '미처리', '대기'].includes(item.status)) {
-                          alert("해당 워룸이 존재하지 않습니다.");
-                          return;
-                        }
-                        navigate(`/chat/${String(item.inc_id).replace('INC-', '')}`); 
-                      }}
-                      className="ml-4 p-2.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all group/flow"
-                      title="해당 War-Room으로 즉시 이동"
-                    >
-                      <Users className="w-4 h-4 group-hover/flow:scale-110 transition-transform" />
-                    </button>
+
+                    <div className="flex items-center gap-2">
+                       <div className={`text-[10px] font-bold px-3 py-1 rounded-full border shadow-sm transition-all duration-300 flex items-center gap-1.5
+                         ${(item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
+                           (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 font-black' : 
+                           'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}
+                         style={{
+                           animation: (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'sguard-blink-fast 0.5s infinite' : 
+                                      (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'sguard-blink-slow 2.0s infinite' : 'none'
+                         }}>
+                         <div className={`w-1 h-1 rounded-full ${
+                           (item.status === '미확인' || item.status === '미처리') ? 'bg-red-400' : 
+                           item.status === '처리중' ? 'bg-orange-400' : 
+                           'bg-emerald-400'
+                         }`} />
+                          {item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS' ? '분석중입니다' : item.status}
+                          {(item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') && (
+                            <span className="text-[9px] opacity-70 ml-1 border-l border-orange-500/30 pl-1.5 flex items-center gap-1">
+                              <MessageSquare className="w-2.5 h-2.5" />
+                              대화중
+                            </span>
+                          )}
+                        </div>
+                       <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                         {formatYYMMDD(item.assigned_at)}
+                       </span>
+                    </div>
                   </div>
+
+                  <button
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (['미확인', '미처리', '대기'].includes(item.status)) {
+                        alert("해당 워룸이 존재하지 않습니다.");
+                        return;
+                      }
+                      navigate(`/chat/${String(item.inc_id).replace('INC-', '')}`); 
+                    }}
+                    className="mt-3 w-full p-2.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all flex items-center justify-center gap-2 group/flow"
+                  >
+                    <Activity className="w-4 h-4 group-hover/flow:scale-110 transition-transform" />
+                    <span className="text-xs font-bold font-mono tracking-tight">GO TO WAR-ROOM</span>
+                    <ChevronRight className="w-4 h-4 group-hover/flow:translate-x-0.5 transition-transform" />
+                  </button>
                 </div>
               ))
             ) : (
@@ -1982,21 +1955,21 @@ export default function DashboardPage() {
           <div className="flex justify-between items-center mb-6 cursor-pointer group" onClick={toggleFlowPanel}>
             <div className="flex items-center space-x-2">
               <Activity className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-              <h2 className="font-bold text-lg">
-                {selectedIncidentIdFlow ? (
-                  <>
-                    장애 처리 현황 [
-                    <span className="text-blue-400">
-                      {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
-                        smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
-                        selectedIncidentIdFlow).substring(0, 50)}
-                      {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
-                        smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
-                        "").length > 50 ? '...' : ''}
-                    </span>
-                    ]
-                  </>
-                ) : '장애 처리 현황'}
+              <h2 className="font-bold text-lg flex flex-col sm:flex-row sm:items-center gap-1">
+                <span className="shrink-0 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-purple-400 sm:hidden" />
+                  장애 처리 현황
+                </span>
+                {selectedIncidentIdFlow && (
+                  <span className="text-[11px] sm:text-base text-blue-400 font-medium sm:before:content-['['] sm:before:ml-1 sm:after:content-[']'] line-clamp-1 sm:line-clamp-none max-w-full">
+                    {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                      smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                      selectedIncidentIdFlow).substring(0, 50)}
+                    {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                      smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message || 
+                      "").length > 50 ? '...' : ''}
+                  </span>
+                )}
               </h2>
             </div>
             <div className="flex items-center gap-6">
