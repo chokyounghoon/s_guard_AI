@@ -334,20 +334,25 @@ export default function LoginPage() {
     if(state===S.B){ if(pw.length<8){ setError('비밀번호는 8자 이상이어야 합니다.'); return; } if(pw!==pwConf){ setError('비밀번호가 일치하지 않습니다.'); return; } }
     setLoading(true); clearErr();
     try {
+      const payload = { 
+        employee_id: employeeId.trim(), 
+        otp, 
+        password:pw, 
+        mode: isNewUser ? 'PRE_REGISTERED' : 'ACTIVE',
+        consent_personal_info: consent1,
+        consent_third_party_ai: consent2
+      };
+      console.log('[Auth-Debug] Verifying with payload:', { ...payload, password: payload.password?'***':'(empty)' });
+      
       const res  = await fetch(`${API_BASE}/auth/verify`, { 
         method:'POST', 
         headers:{'Content-Type':'application/json'}, 
-        body:JSON.stringify({ 
-          employee_id: employeeId.trim(), 
-          otp, 
-          password:pw, 
-          mode: isNewUser ? 'PRE_REGISTERED' : 'ACTIVE',
-          consent_personal_info: consent1,
-          consent_third_party_ai: consent2
-        }) 
+        body:JSON.stringify(payload) 
       });
+      
       const data = await res.json();
       if(!res.ok){
+        setError(`[${res.status}] ${data.detail || '인증 실패'}`);
         if (data.code === 'SUSPENDED' || data.code === 'ACCOUNT_SUSPENDED') {
           setError('보안 정책에 의해 사용이 중지된 계정입니다. 관리자에게 문의하세요.');
         } else if (data.code === 'REGISTRATION_REQUIRED' || (res.status === 403 && data.code === 'PRE_REGISTERED')) {
