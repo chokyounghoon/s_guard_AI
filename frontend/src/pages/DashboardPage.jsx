@@ -1252,7 +1252,7 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-[110] flex justify-end animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowNotifications(false)} />
           <div className="w-full max-w-sm bg-[#1a1f2e] h-full shadow-2xl relative z-10 animate-in slide-in-from-right duration-500 flex flex-col border-l border-white/10">
-            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+            <div className="fluid-p border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
               <div className="flex items-center gap-3">
                 <div className="bg-blue-600/20 p-2 rounded-xl">
                   <Bell className="w-5 h-5 text-blue-400" />
@@ -1338,7 +1338,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="p-6 max-w-7xl mx-auto pb-24">
+      <div className="fluid-p max-w-7xl mx-auto pb-24">
         {/* Header Section */}
         <div>
         </div>
@@ -1349,7 +1349,7 @@ export default function DashboardPage() {
             <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
               <div
                 onClick={toggleSmsPanel}
-                className="p-4 sm:p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
+                className="p-4 sm:fluid-p flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
               >
                   <div className="flex items-center gap-2 sm:gap-3.5">
                     <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
@@ -1397,7 +1397,7 @@ export default function DashboardPage() {
               </div>
 
               {/* 🛠️ similarity Threshold Control Panel */}
-              <div className={`transition-all duration-500 ease-in-out bg-blue-600/5 border-y border-white/5 ${showThresholdSettings ? 'max-h-64 opacity-100 p-6' : 'max-h-0 opacity-0 overflow-hidden py-0'}`}>
+              <div className={`transition-all duration-500 ease-in-out bg-blue-600/5 border-y border-white/5 ${showThresholdSettings ? 'max-h-64 opacity-100 fluid-p' : 'max-h-0 opacity-0 overflow-hidden py-0'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
@@ -1438,7 +1438,7 @@ export default function DashboardPage() {
               </div>
 
               <div className={`transition-all duration-500 ease-in-out ${isSmsPanelCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[380px] border-t border-white/5'}`}>
-                <div className="p-6 space-y-4 overflow-y-auto max-h-[380px] scrollbar-thin">
+                <div className="fluid-p space-y-4 overflow-y-auto max-h-[380px] scrollbar-thin">
                   {visibleSms.map((msg) => {
                     const isSelected = selectedSms?.inc_id === msg.inc_id;
                     return (
@@ -1560,7 +1560,7 @@ export default function DashboardPage() {
         {/* Main Content Areas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Alerts List (Section 1) */}
-          <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
+          <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] fluid-p rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
             <div className="flex justify-between items-center mb-4 shrink-0">
               <h3 className="font-bold flex items-center">
                 <Activity className="w-4 h-4 mr-2 text-blue-400" />
@@ -1702,7 +1702,7 @@ export default function DashboardPage() {
         </div>
 
 
-        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
+        <div className="bg-[#1a1f2e] rounded-3xl fluid-p border border-white/5 shadow-xl mt-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div className="flex items-center space-x-2">
               <User className="w-5 h-5 text-blue-500" />
@@ -1951,7 +1951,7 @@ export default function DashboardPage() {
 
 
         {/* Activity History Flow Area */}
-        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
+        <div className="bg-[#1a1f2e] rounded-3xl fluid-p border border-white/5 shadow-xl mt-6">
           <div className="flex justify-between items-center mb-6 cursor-pointer group" onClick={toggleFlowPanel}>
             <div className="flex items-center space-x-2">
               <Activity className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
@@ -2215,7 +2215,7 @@ export default function DashboardPage() {
 
           <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-in slide-in-from-bottom-full duration-500">
             {/* Header */}
-            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+            <div className="fluid-p border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
               <div className="flex items-center space-x-3">
                 <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
                   <MessageSquare className="w-5 h-5 text-blue-400" />
