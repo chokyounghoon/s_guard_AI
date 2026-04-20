@@ -1560,7 +1560,7 @@ export default function DashboardPage() {
         {/* Main Content Areas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Alerts List (Section 1) */}
-          <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] p-6 rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
+          <div id="live-incident-stream" className="lg:col-span-1 bg-[#1a1f2e] p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col max-h-[420px] h-fit shadow-xl transition-all duration-300">
             <div className="flex justify-between items-center mb-4 shrink-0">
               <h3 className="font-bold flex items-center">
                 <Activity className="w-4 h-4 mr-2 text-blue-400" />
@@ -2200,12 +2200,11 @@ export default function DashboardPage() {
       {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
       {/* AI Agent Demo Components - Emergency Modal disabled by user request
       <EmergencyActionModal
-        isOpen={showEmergencyModal}
+        isOpen={false}
         onClose={() => setShowEmergencyModal(false)}
         onApprove={handleApproveAction}
       />
       */}
-
         {renderProfileModal()}
       {/* <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} /> */}
 

@@ -32,3 +32,29 @@
         animation: slide-down 0.3s ease-out;
     }
 }
+
+/* 📱 Mobile UI Global Optimization */
+@media (max-width: 640px) {
+    /* Scale down large typography while maintaining hierarchy */
+    .text-6xl { font-size: 2.25rem !important; line-height: 2.5rem !important; }
+    .text-5xl { font-size: 2rem !important; line-height: 2.25rem !important; }
+    .text-4xl { font-size: 1.75rem !important; line-height: 2.125rem !important; }
+    .text-3xl { font-size: 1.375rem !important; line-height: 1.875rem !important; }
+    .text-2xl { font-size: 1.125rem !important; line-height: 1.75rem !important; }
+    .text-xl  { font-size: 1rem !important; line-height: 1.5rem !important; }
+    
+    /* Global heading tag scale down */
+    h1 { font-size: 1.5rem !important; letter-spacing: -0.01em !important; }
+    h2 { font-size: 1.25rem !important; }
+    h3 { font-size: 1.125rem !important; }
+
+    /* Shrink common oversized elements like large icon boxes */
+    .mobile-shrink-container {
+        padding: 1rem !important;
+    }
+    
+    .mobile-header-spacing {
+        padding-top: 1.5rem !important;
+        padding-bottom: 1rem !important;
+    }
+}
