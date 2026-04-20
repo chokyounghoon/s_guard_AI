@@ -91,7 +91,7 @@ export default function MobileInbox({ user }) {
       <div className="flex-1 flex flex-col bg-[#0a0e17] pb-24">
 
       {/* 헤더 */}
-      <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 px-5 pt-4 pb-3">
+      <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 fluid-px pt-4 pb-3">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function MobileInbox({ user }) {
       </header>
 
       {/* 리스트 */}
-      <div className="px-4 pt-3 space-y-2">
+      <div className="fluid-px pt-3 space-y-2">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500/40" />

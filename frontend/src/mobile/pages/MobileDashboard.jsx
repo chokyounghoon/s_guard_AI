@@ -85,8 +85,8 @@ export default function MobileDashboard({ user }) {
     <PullToRefresh onRefresh={() => fetchData(true)}>
       <div className="flex-1 flex flex-col bg-[#0a0e17] pb-24">
 
-      {/* ── 헤더 ── */}
-      <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 px-5 pt-4 pb-3">
+      {/* 헤더 */}
+      <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 fluid-px pt-4 pb-3">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-blue-500" />
@@ -131,7 +131,7 @@ export default function MobileDashboard({ user }) {
       )}
 
       {/* ── 통계 카드 ── */}
-      <div className="grid grid-cols-2 gap-3 px-4 pt-4 pb-2">
+      <div className="grid grid-cols-2 gap-3 fluid-px pt-4 pb-2">
         {[
           { label: '전체 인시던트', value: stats.total, icon: LayoutDashboard, color: 'blue' },
           { label: '처리 대기',     value: stats.pending, icon: Timer,       color: 'yellow', alert: stats.pending > 0 },
@@ -156,7 +156,7 @@ export default function MobileDashboard({ user }) {
       </div>
 
       {/* ── 인시던트 리스트 ── */}
-      <div className="px-4 pb-2">
+      <div className="fluid-px pb-2">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
             <Activity className="w-4 h-4 text-blue-400" />
@@ -185,7 +185,8 @@ export default function MobileDashboard({ user }) {
             <p className="text-sm">수신된 인시던트가 없습니다.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          /* 리스트 */
+          <div className="fluid-px pt-3 space-y-2">
             {incidents.map((item) => {
               const s = STATUS_MAP[item.incident_status] || STATUS_MAP.DEFAULT;
               const isUrgent = item.keyword_detected === 1;
