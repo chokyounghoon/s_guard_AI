@@ -100,9 +100,9 @@ export default function InboxPage() {
   return (
     <div className="min-h-screen bg-[#0a0c14] text-slate-200 pb-24">
       {/* Header Section */}
-      <div className="bg-gradient-to-b from-blue-900/20 to-transparent pt-8 sm:pt-12 pb-5 sm:pb-8 px-5 sm:px-6">
+      <div className="bg-gradient-to-b from-blue-900/20 to-transparent pt-12 pb-8 px-6">
         <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8">
+          <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-4">
               <button 
                 onClick={() => navigate(-1)}
@@ -110,28 +110,28 @@ export default function InboxPage() {
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <div className="p-2 sm:p-3 bg-blue-600/20 rounded-xl sm:rounded-2xl border border-blue-500/30">
-                <Inbox className="w-5 h-5 sm:w-8 sm:h-8 text-blue-400" />
+              <div className="p-3 bg-blue-600/20 rounded-2xl border border-blue-500/30">
+                <Inbox className="w-8 h-8 text-blue-400" />
               </div>
               <div>
                 <h1 className="text-3xl font-black text-white tracking-tight">메시지함</h1>
                 <p className="text-slate-500 text-sm font-medium mt-1">쪽지 및 보고서 알림을 확인하세요</p>
               </div>
             </div>
-            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl px-4 py-2 hover:border-blue-500/30 transition-all group w-full sm:max-w-xs">
+            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl px-4 py-2 hover:border-blue-500/30 transition-all group">
               <Search className="w-5 h-5 text-slate-500 group-hover:text-blue-400 transition-colors" />
               <input 
                 type="text" 
                 placeholder="검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border-none focus:outline-none ml-3 text-sm placeholder:text-slate-600 flex-1"
+                className="bg-transparent border-none focus:outline-none ml-3 text-sm placeholder:text-slate-600 w-48"
               />
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center p-1.5 bg-white/5 rounded-2xl w-full sm:w-fit border border-white/10 space-x-1 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center p-1.5 bg-white/5 rounded-2xl w-fit border border-white/10 space-x-1">
             {[
               { id: 'all', label: '전체', icon: Hash },
               { id: 'message', label: '쪽지', icon: MessageSquare },
@@ -141,7 +141,7 @@ export default function InboxPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-3 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                className={`flex items-center space-x-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
                   activeTab === tab.id 
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' 
                     : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
@@ -207,10 +207,10 @@ export default function InboxPage() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center space-x-2 overflow-hidden">
-                        <span className="text-sm font-black text-slate-200 tracking-tight truncate">{msg.sender_name || 'System'}</span>
-                        <span className="text-[10px] text-slate-500 flex-shrink-0">●</span>
-                        <span className="text-[10px] font-mono text-slate-500 uppercase tracking-tighter whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-black text-slate-200 tracking-tight">{msg.sender_name || 'System'}</span>
+                        <span className="text-[10px] text-slate-500">●</span>
+                        <span className="text-[10px] font-mono text-slate-500 uppercase tracking-tighter">
                           {msg.created_at ? new Date(msg.created_at).toLocaleString('ko-KR') : ''}
                         </span>
                       </div>

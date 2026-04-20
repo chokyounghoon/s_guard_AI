@@ -217,12 +217,12 @@ function AppContent() {
         {/* 로그인 + 하단 PWA 설치 버튼 */}
         <Route path="/" element={<LoginPageWithPWA />} />
 
-        {/* ── 대시보드: 모바일 전용 MobileDashboard 사용 ── */}
-        <Route path="/dashboard"   element={<PR><MobileDashboard user={userProfile} /></PR>} />
+        {/* ── 대시보드: PC DashboardPage 그대로 사용 ── */}
+        <Route path="/dashboard"   element={<PR><DashboardPage /></PR>} />
         <Route path="/activity"    element={<PR><MobileActivity user={userProfile} /></PR>} />
         <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} /></PR>} />
         <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} /></PR>} />
-        <Route path="/chat/:incidentId?" element={<PR><MobileChat user={userProfile} /></PR>} />
+        <Route path="/chat/:incidentId?" element={<PR><ChatPage /></PR>} />
 
         {/* ── PC 페이지 재사용 (나머지 라우트) ── */}
         <Route path="/ai-report/:incidentId?"  element={<PR><AiReportPage /></PR>} />
@@ -301,7 +301,7 @@ function AppContent() {
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30">CRITICAL</span>
                       {roomId === currentIncidentId && <span className="text-[9px] text-blue-400 font-bold">● 현재 채팅방</span>}
                     </div>
-                    <p className="text-sm font-semibold text-white truncate" title={room.msg || room.title || roomId}>{room.msg || room.title || roomId}</p>
+                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
                   </div>
                 );
@@ -342,7 +342,7 @@ function AppContent() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-blue-500/20 text-blue-400 border-blue-500/30">COMPLETED</span>
                     </div>
-                    <p className="text-sm font-semibold text-white truncate" title={room.msg || room.title || roomId}>{room.msg || room.title || roomId}</p>
+                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
                   </div>
                 );

@@ -82,7 +82,7 @@ export default function AssignmentsPage() {
   return (
     <div className="min-h-screen bg-[#0f111a] text-white font-sans flex flex-col pb-24">
       {/* Header */}
-      <header className="flex items-center justify-between fluid-p sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-40 border-b border-white/5">
+      <header className="flex items-center justify-between p-5 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-40 border-b border-white/5">
         <div className="flex items-center space-x-3">
           <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
