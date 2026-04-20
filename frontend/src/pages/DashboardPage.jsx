@@ -1851,7 +1851,7 @@ export default function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row justify-between items-start mb-1 gap-1 sm:gap-4">
                         <div className="flex flex-col min-w-0 flex-1">
-                          <h4 className="text-sm font-bold text-white truncate w-full">{item.message || '상공 발생'}</h4>
+                          <h4 className="text-sm font-bold text-white truncate w-full" title={item.message || '상공 발생'}>{item.message || '상공 발생'}</h4>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                             <span className={`text-[8px] font-black px-1 py-0.5 rounded border flex-shrink-0 bg-blue-500/20 text-blue-400 border-blue-500/30`}>
                               SMS
@@ -2257,7 +2257,7 @@ export default function DashboardPage() {
                     <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">{room.time}</span>
                   </div>
 
-                  <h4 className="font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-relaxed line-clamp-2">
+                  <h4 className="font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-relaxed line-clamp-2" title={room.sms_message ? `INC-${room.id} | ${room.sms_message}` : room.title}>
                     {room.sms_message ? `INC-${room.id} | ${room.sms_message}` : room.title}
                   </h4>
                   {room.lastMsg && <p className="text-xs text-slate-400 truncate mb-3">{room.lastMsg}</p>}

@@ -211,7 +211,7 @@ export default function MobileDashboard({ user }) {
                   </div>
 
                   {/* 메시지 */}
-                  <p className="text-sm text-slate-200 font-medium leading-snug line-clamp-2 mb-2">
+                  <p className="text-sm text-slate-200 font-medium leading-snug line-clamp-2 mb-2" title={item.message}>
                     {item.message}
                   </p>
 
