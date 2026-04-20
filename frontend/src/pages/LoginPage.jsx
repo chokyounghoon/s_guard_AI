@@ -162,6 +162,7 @@ export default function LoginPage() {
   const [showPw, setShowPw]           = useState(false);
   const [showManual, setShowManual]   = useState(false);
   const [isNewUser, setIsNewUser]     = useState(false);
+  const [consent1, setConsent1]       = useState(false); // 개인정보 수집/이용 동의
   const [consent2, setConsent2]       = useState(false); // 개인정보 제3자 제공 동의 (AI)
   const [showLegal, setShowLegal]     = useState(null);  // 'p1' or 'ai'
   const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
