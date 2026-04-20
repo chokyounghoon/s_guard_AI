@@ -10,103 +10,109 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 const S = { A: 'A', B: 'B', C1: 'C1', C2: 'C2', RESET_A: 'RESET_A', RESET_B: 'RESET_B' };
 
-/* ── OTP 6칸 ── */
-function OtpBoxes({ value, onChange, disabled }) {
-  const refs = useRef([]);
+/* ── OTP 6칸 (Aggressive Focus Lock + Memoized) ── */
+const OtpBoxes = React.memo(({ value, onChange, disabled }) => {
+  const inputRef = useRef(null);
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? '');
 
-  const focusAt = (i) => {
-    const el = refs.current[Math.max(0, Math.min(5, i))];
-    el?.focus();
-    setTimeout(() => el?.setSelectionRange(el.value.length, el.value.length), 0);
-  };
-
-  const updateAt = (i, ch) => {
-    const arr = [...digits];
-    arr[i] = ch;
-    onChange(arr.join(''));
-  };
-
-  /* 모바일에서 onChange로 입력된 가장 마지막 숫자를 타겟 칸에 세팅하고 다음 칸으로 이동 */
-  const handleChange = (i, e) => {
-    const raw = e.target.value.replace(/\D/g, '');
-    if (!raw) return;
-    const ch = raw.slice(-1); // 마지막 숫자만 사용
-    updateAt(i, ch);
-    if (i < 5) focusAt(i + 1);
-  };
-
-  const handleKeyDown = (i, e) => {
-    if (e.key === 'ArrowLeft')  { e.preventDefault(); focusAt(i - 1); return; }
-    if (e.key === 'ArrowRight') { e.preventDefault(); focusAt(i + 1); return; }
-    if (e.key === 'Tab') return;
-
-    if (e.key === 'Backspace') {
-      e.preventDefault();
-      if (digits[i]) {
-        updateAt(i, '');
-      } else if (i > 0) {
-        updateAt(i - 1, '');
-        focusAt(i - 1);
-      }
-      return;
-    }
-
-    if (e.key === 'Delete') { e.preventDefault(); updateAt(i, ''); return; }
-
-    const digit = e.key.replace(/\D/g, '');
-    if (digit.length === 1) {
-      e.preventDefault();
-      updateAt(i, digit);
-      if (i < 5) focusAt(i + 1);
+  // 🔒 강제 포커스 유지 로직
+  const forceFocus = () => {
+    if (disabled) return;
+    if (document.activeElement !== inputRef.current) {
+      inputRef.current?.focus();
     }
   };
 
-  const handlePaste = (e) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (!pasted) return;
-    const arr = Array.from({ length: 6 }, (_, i) => pasted[i] ?? '');
-    onChange(arr.join(''));
-    focusAt(Math.min(pasted.length, 5));
+  // 타이핑 시마다 포커스 상태 강제 확인
+  React.useLayoutEffect(() => {
+    forceFocus();
+  }, [value, disabled]);
+
+  const handleChange = (e) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+    onChange(val);
+  };
+
+  const handleBlur = () => {
+    if (disabled) return;
+    // 브라우저가 포커스를 빼앗으려 할 때 다음 프레임에서 즉시 탈환
+    requestAnimationFrame(forceFocus);
   };
 
   return (
-    <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
-      {[0,1,2,3,4,5].map(i => (
-        <input
-          key={i}
-          ref={el => refs.current[i] = el}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={1}
-          value={digits[i]}
-          disabled={disabled}
-          onKeyDown={e => handleKeyDown(i, e)}
-          onChange={e => handleChange(i, e)}
-          onPaste={handlePaste}
-          onClick={() => focusAt(i)}
-          style={{
-            width:44, height:52, textAlign:'center',
-            fontSize:'1.4rem', fontWeight:700,
-            background: digits[i] ? 'rgba(0,70,255,0.15)' : 'rgba(0,70,255,0.06)',
-            border: digits[i] ? '2px solid rgba(0,70,255,0.55)' : '2px solid rgba(0,70,255,0.2)',
-            borderRadius:12,
-            color: digits[i] ? '#60a5fa' : 'rgba(255,255,255,0.2)',
-            outline:'none', caretColor:'transparent',
-            fontFamily:'inherit', transition:'background .15s, border-color .15s',
-            opacity: disabled ? 0.45 : 1,
-            cursor: disabled ? 'not-allowed' : 'text',
-            userSelect:'none',
-          }}
-          onFocus={e => { e.target.style.borderColor='#0046FF'; e.target.style.boxShadow='0 0 0 3px rgba(0,70,255,0.2)'; }}
-          onBlur={e  => { e.target.style.borderColor=digits[i]?'rgba(0,70,255,0.55)':'rgba(0,70,255,0.2)'; e.target.style.boxShadow='none'; }}
-        />
-      ))}
+    <div 
+      onClick={forceFocus}
+      style={{ position: 'relative', width: 270, margin: '0 auto', height: 56, cursor: 'text' }}
+    >
+      {/* 🔑 실제로 타이핑을 받는 네이티브 입력창 */}
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="one-time-code"
+        maxLength={6}
+        value={value}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        disabled={disabled}
+        autoFocus
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          opacity: 1,           // 0이면 일부 브라우저에서 포커스 제외됨
+          color: 'transparent', // 글자만 투명하게
+          background: 'transparent',
+          caretColor: 'transparent',
+          border: 'none', outline: 'none',
+          padding: 0, margin: 0, zIndex: 10,
+          fontSize: 18,         // 16px 이상이어야 iOS 줌인 방지
+          WebkitTapHighlightColor: 'transparent'
+        }}
+      />
+
+      {/* 👁️ 시각적 레이어 (배경) */}
+      <div style={{
+        display: 'flex', gap: 7, justifyContent: 'center', width: '100%', height: '100%',
+        pointerEvents: 'none', position: 'absolute', top: 0, left: 0
+      }}>
+        {[0, 1, 2, 3, 4, 5].map(i => {
+          const isFilled = digits[i] !== '';
+          const isCurrent = i === value.length && !disabled;
+          return (
+            <div
+              key={i}
+              style={{
+                width: 40, height: 56,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 28, fontWeight: 900,
+                color: '#60a5fa',
+                background: isFilled ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.03)',
+                border: isCurrent
+                  ? '2.5px solid #60a5fa'
+                  : isFilled
+                  ? '2px solid rgba(96,165,250,0.7)'
+                  : '1.5px solid rgba(255,255,255,0.12)',
+                borderRadius: 12,
+                boxShadow: isCurrent ? '0 0 15px rgba(96,165,250,0.4)' : 'none',
+                textShadow: isFilled ? '0 0 12px rgba(96,165,250,0.6)' : 'none',
+                transition: 'all 0.1s ease',
+                flexShrink: 0
+              }}
+            >
+              {digits[i] || (isCurrent ? (
+                <span style={{ 
+                  width: 2, height: 26, background: '#60a5fa', borderRadius: 2,
+                  animation: 'blink 1s step-end infinite' 
+                }} />
+              ) : null)}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
-}
+});
+
 
 
 /* ── 타이머 ── */
@@ -156,13 +162,30 @@ export default function LoginPage() {
   const [showPw, setShowPw]           = useState(false);
   const [showManual, setShowManual]   = useState(false);
   const [isNewUser, setIsNewUser]     = useState(false);
-  const [consent1, setConsent1]       = useState(false); // 개인정보 수집 및 이용 동의
   const [consent2, setConsent2]       = useState(false); // 개인정보 제3자 제공 동의 (AI)
   const [showLegal, setShowLegal]     = useState(null);  // 'p1' or 'ai'
+  const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileView(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('sguard_saved_empid');
     if(saved) setEmployeeId(saved);
+
+    // 🔒 로그인 페이지에서는 바운스 차단 (스크롤은 자동 허용)
+    document.body.style.overflowX = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    document.body.style.height = 'auto';
+
+    return () => {
+      document.body.style.overflowX = '';
+      document.body.style.overscrollBehavior = '';
+      document.body.style.height = '';
+    };
   }, []);
 
   const clearErr = () => setError('');
@@ -543,12 +566,15 @@ export default function LoginPage() {
   const stepInfo = state===S.A ? 0 : (state===S.B || state===S.C1) ? 1 : 2;
   const stepLabels = ['사번 확인','비밀번호','OTP 인증'];
 
+  // 모바일 뷰이면서 사번 입력 단계가 아닐 때만 축소 모드 적용
+  const isShrink = isMobileView && state !== S.A;
+
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
         * { box-sizing: border-box; margin:0; padding:0; }
-        body { margin:0; }
+        body { margin:0; background:#05091a; }
         @keyframes spin { to { transform:rotate(360deg); } }
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(18px); }
@@ -561,6 +587,10 @@ export default function LoginPage() {
         @keyframes glowPulse {
           0%, 100% { filter: drop-shadow(0 0 2px rgba(96,165,250,0.3)); opacity: 0.8; }
           50% { filter: drop-shadow(0 0 8px rgba(96,165,250,0.6)); opacity: 1; }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
         }
         .keyword-loop-container {
           display: flex;
@@ -587,23 +617,23 @@ export default function LoginPage() {
         .keyword-item {
           font-size: 9px;
           font-weight: 800;
-          letter-spacing: 0.18em;
+          letter-spacing: 0.1em;
           color: #93c5fd;
           text-shadow: 0 0 10px rgba(0,70,255,0.2);
-          transition: all 0.3s ease;
+          white-space: nowrap;
         }
         .keyword-arrow {
           color: #60a5fa;
           font-size: 10px;
-          margin: 0 10px;
+          margin: 0 6px;
           display: flex;
           align-items: center;
           font-weight: 900;
+          white-space: nowrap;
           animation: glowPulse 2s ease-in-out infinite;
         }
         .header-section {
           background: linear-gradient(160deg, #001550 0%, #0030cc 40%, #0046FF 70%, #1a5aff 100%);
-          padding: 56px 0 56px;
           position: relative;
           overflow: hidden;
           flex-shrink: 0;
@@ -637,7 +667,6 @@ export default function LoginPage() {
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          padding: 32px 24px 80px;
           max-width: 480px;
           margin: 0 auto;
           width: 100%;
@@ -645,7 +674,7 @@ export default function LoginPage() {
         .step-bar {
           display:flex;
           align-items:center;
-          margin-bottom: 28px;
+          margin-bottom: 16px;
         }
         .step-item {
           display:flex;
@@ -684,18 +713,20 @@ export default function LoginPage() {
         .input-icon { position:absolute; right:14px; top:50%; transform:translateY(-50%); }
         .login-bg {
           min-height: 100vh;
+          min-height: 100dvh;
           background: #05091a;
           font-family: 'Inter','Noto Sans KR',sans-serif;
           display: flex;
           flex-direction: column;
+          overflow-x: hidden;
         }
       `}</style>
 
       <div className="login-bg">
-        <div className="header-section">
-          <div style={{ position:'relative', zIndex:1, paddingBottom:4 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:4, marginBottom:10 }}>
-              <div style={{ width: 72, height: 86, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div className="header-section" style={{ padding: isShrink ? '14px 0 12px' : '32px 0' }}>
+          <div style={{ position:'relative', zIndex:1 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap: isShrink ? 4 : 6, marginBottom: isShrink ? 0 : 10 }}>
+              <div style={{ width: isShrink ? 28 : 72, height: isShrink ? 34 : 86, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ position:'absolute', width:'100%', height:'100%', filter:'drop-shadow(0 6px 16px rgba(0,0,0,0.4))' }}>
                   <path d="M20 2L4 10V24C4 35 12 44 20 48C28 44 36 35 36 24V10L20 2Z" fill="rgba(255,255,255,0.06)" stroke="url(#glassOutline)" strokeWidth="1.2" strokeLinejoin="round" />
                   <path d="M20 2L4 10V24C4 35 12 44 20 48V2Z" fill="rgba(255,255,255,0.05)" />
@@ -707,29 +738,33 @@ export default function LoginPage() {
                     </linearGradient>
                   </defs>
                 </svg>
-                <span style={{ color:'white', fontSize:54, fontWeight:900, fontFamily:"'Inter', 'OneShinhan', sans-serif", position:'relative', zIndex:3, marginTop:-6, textShadow:'0 4px 8px rgba(0,0,0,0.6)' }}>S</span>
+                <span style={{ color:'white', fontSize: isShrink ? 20 : 54, fontWeight:900, fontFamily:"'Inter', sans-serif", position:'relative', zIndex:3, marginTop: isShrink ? -2 : -6, textShadow:'0 4px 8px rgba(0,0,0,0.6)' }}>S</span>
               </div>
-              <h1 style={{ color: '#ffffff', fontSize: 54, fontWeight: 900, letterSpacing: '0.07em', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.4), 0 0 40px rgba(255,255,255,0.2)', fontFamily: "'Inter', sans-serif" }}>GUARD</h1>
+              <h1 style={{ color: '#ffffff', fontSize: isShrink ? 20 : 54, fontWeight: 900, letterSpacing: '0.07em', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.4)', fontFamily: "'Inter', sans-serif", margin: 0 }}>GUARD</h1>
             </div>
 
-            {/* 🛡️ 다이내믹 피드백 루프 (DETECTION → DIAGNOSIS → MITIGATION → FORESIGHT) */}
-            <p style={{ color:'rgba(255,255,255,0.8)', fontSize:12, fontWeight:500, letterSpacing:'0.02em', marginBottom:14, fontStyle:'italic', textShadow:'0 2px 10px rgba(0,70,255,0.3)' }}>
-              "Knowledge Today, Foresight Tomorrow"
-            </p>
-            <div className="keyword-loop-container">
-              {['DETECTION','DIAGNOSIS','MITIGATION','FORESIGHT'].map((w, i) => (
-                <React.Fragment key={w}>
-                  {i > 0 && (
-                    <span className="keyword-arrow">→</span>
-                  )}
-                  <span className="keyword-item">{w}</span>
-                </React.Fragment>
-              ))}
-            </div>
+            {/* 🛡️ 다이내믹 피드백 루프 - 축소 모드일 때 자동 숨김 */}
+            {!isShrink && (
+              <>
+                <p style={{ color:'rgba(255,255,255,0.8)', fontSize:12, fontWeight:500, letterSpacing:'0.02em', marginBottom:14, fontStyle:'italic', textShadow:'0 2px 10px rgba(0,70,255,0.3)' }}>
+                  "Knowledge Today, Foresight Tomorrow"
+                </p>
+                <div className="keyword-loop-container">
+                  {['DETECTION','DIAGNOSIS','MITIGATION','FORESIGHT'].map((w, i) => (
+                    <React.Fragment key={w}>
+                      {i > 0 && (
+                        <span className="keyword-arrow">→</span>
+                      )}
+                      <span className="keyword-item">{w}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="card-section">
+        <div className="card-section" style={{ padding: isShrink ? '0 24px 40px' : '16px 24px 40px' }}>
           {state !== S.B && state !== S.RESET_A && state !== S.RESET_B && (
             <div className="step-bar" style={{ animation:'fadeUp .3s ease' }}>
               {stepLabels.map((label,idx) => (

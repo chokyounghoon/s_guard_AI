@@ -50,6 +50,10 @@ self.addEventListener('fetch', (event) => {
   
   const url = new URL(event.request.url);
   
+  // 🛡️ SECURITY & STABILITY: Only handle http/https requests
+  // Prevents "Request scheme 'chrome-extension' is unsupported" errors from browser extensions
+  if (!url.protocol.startsWith('http')) return;
+  
   // Skip API requests (Cloudflare Workers) to ensure fresh data
   if (url.hostname.includes('workers.dev') || url.hostname.includes('api.chokerslab.store')) {
     return;
