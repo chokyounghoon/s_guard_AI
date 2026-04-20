@@ -318,9 +318,12 @@ export default function LoginPage() {
       if(res.ok){ setOtpExpired(false); setOtp(''); setResendCnt(p=>p+1); setTimerKey(k=>k+1); }
       else {
         const data = await res.json();
-        setError(data.detail || '재발송에 실패했습니다.');
+        setError(data.detail || `재발송 실패 (Status: ${res.status})`);
       }
-    } catch { setError('서버에 연결할 수 없습니다.'); }
+    } catch (err) { 
+      console.error('[Resend-Error]', err);
+      setError(`서버에 연결할 수 없습니다. (${err.message})`); 
+    }
     finally { setLoading(false); }
   };
 
@@ -382,7 +385,10 @@ export default function LoginPage() {
       
       setStoreUserProfile(data.user || data);
       navigate('/dashboard');
-    } catch { setError('서버에 연결할 수 없습니다.'); }
+    } catch (err) { 
+      console.error('[Verify-Error]', err);
+      setError(`서버에 연결할 수 없습니다. (${err.message})`); 
+    }
     finally { setLoading(false); }
   };
 
