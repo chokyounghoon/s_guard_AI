@@ -352,21 +352,22 @@ export default function LoginPage() {
       
       const data = await res.json();
       if(!res.ok){
-        setError(`[${res.status}] ${data.detail || '인증 실패'}`);
+        // 🧪 Stage 2 Debug Mode: Force Raw Error Display
+        setError(`[Status: ${res.status} | Code: ${data.code || 'NULL'}] ${data.detail || '인증 실패'}`);
+        /* Friendly translations temporarily disabled for debugging
         if (data.code === 'SUSPENDED' || data.code === 'ACCOUNT_SUSPENDED') {
           setError('보안 정책에 의해 사용이 중지된 계정입니다. 관리자에게 문의하세요.');
         } else if (data.code === 'REGISTRATION_REQUIRED' || (res.status === 403 && data.code === 'PRE_REGISTERED')) {
           setError('최초 가입 인증이 필요합니다. 사번 인증부터 다시 진행해 주세요.');
           setTimeout(() => setState(S.A), 2000);
-        } else if(data.code==='OTP_EXPIRED') {
+        } else if(data.code==='OTP_EXPIRED' || data.code==='E3') {
           setError('인증번호가 만료되었습니다. 재발송해 주세요.');
-        } else if(data.code==='OTP_MISMATCH') {
+        } else if(data.code==='OTP_MISMATCH' || data.code==='E4') {
           setError('인증번호가 올바르지 않습니다.');
         } else if(data.code==='WRONG_PASSWORD') {
           setError('비밀번호가 올바르지 않습니다.');
-        } else {
-          setError(data.detail||'인증에 실패했습니다.');
-        }
+        } 
+        */
         return;
       }
       // 🧹 Clean Slate: Prevent legacy token pollution
