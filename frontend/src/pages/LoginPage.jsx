@@ -509,7 +509,7 @@ export default function LoginPage() {
           <div style={{ background:'rgba(59,130,246,0.2)', padding:10, borderRadius:12 }}>
             <Download size={22} color="#60a5fa" />
           </div>
-          <h3 style={{ color:'white', fontSize:22, fontWeight:800, margin:0 }}>Android 설치 매뉴얼 (v1.0)</h3>
+          <h3 style={{ color:'white', fontSize:22, fontWeight:800, margin:0 }}>Android 설치 매뉴얼</h3>
         </div>
 
         <div style={{ maxHeight:'60vh', overflowY:'auto', paddingRight:8, display:'flex', flexDirection:'column', gap:28 }}>
@@ -552,11 +552,11 @@ export default function LoginPage() {
 
         <div style={{ marginTop:32 }}>
           <button 
-            onClick={() => { window.location.href = '/sguard-bridge_v1.0.apk'; onClose(); }}
+            onClick={() => { window.location.href = '/sguard-bridge.apk'; onClose(); }}
             style={{ ...primaryBtn, padding:'16px' }}
           >
             <Download size={18} />
-            <span>APK 다운로드 시작 (v1.0)</span>
+            <span>APK 다운로드 시작</span>
           </button>
           <p style={{ textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11, marginTop:16 }}>
             보안 정책에 따라 설치 파일은 사내 네트워크에서만 다운로드 가능할 수 있습니다.
@@ -822,7 +822,7 @@ export default function LoginPage() {
               <div style={{ display:'flex', gap:8, marginTop:8 }}>
                 <button type="button" onClick={() => setShowManual(true)}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
-                  <Download size={12} />Android APK (v1.0)
+                  <Download size={12} />Android APK
                 </button>
                 <button type="button" onClick={() => window.alert('iOS 단축어 배포 준비 중입니다.')}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
