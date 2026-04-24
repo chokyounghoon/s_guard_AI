@@ -193,6 +193,7 @@ const authMiddleware = async (c, next) => {
     path === '/sms/receive' || 
     path === '/retrieval' ||
     path.startsWith('/warroom/asset/') ||  // ⚡ R2 파일 서빙 — <img src> 직접 접근이므로 JWT 불가
+    path.startsWith('/warroom/ws/') ||     // ⚡ WebSocket 업그레이드 — 브라우저 SDK 전용 (헤더 불가)
     path.startsWith('/debug/') ||
     path === '/org/tree' ||                // 조직도 공개 참조 데이터 (프로필 편집용)
     path.startsWith('/codebook');          // 코드북 공개 참조 데이터
@@ -1382,13 +1383,15 @@ const verifyJWT = async (token, secret) => {
 // Body: { employee_id, otp, password, mode }
 // ──────────────────────────────────────────
 app.post('/auth/verify', async (c) => {
+  try {
   const { employee_id, otp, password, mode, consent_personal_info, consent_third_party_ai } = await c.req.json();
   const db  = c.env.DB;
   const kv  = c.env.SMS_STORAGE;
   const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
 
   if (!employee_id || !otp) {
-    return c.json({ detail: '사번과 인증번호는 필수입니다.' }, 400);
+    console.error('[Auth-Verify-Fail] Missing employee_id or otp:', { employee_id: !!employee_id, otp: !!otp });
+    return c.json({ detail: '사번과 인증번호는 필수입니다.', code: 'E1' }, 400);
   }
   const empId = String(employee_id).trim();
 
@@ -1408,7 +1411,7 @@ app.post('/auth/verify', async (c) => {
   
   if (!stored) {
     console.warn(`[OTP-Error] ${empId}: No OTP found in KV (possibly expired)`);
-    return c.json({ detail: '인증번호가 만료되었습니다. 다시 요청해 주세요.', code: 'OTP_EXPIRED' }, 400);
+    return c.json({ detail: '인증번호가 만료되었습니다. 다시 요청해 주세요.', code: 'E3' }, 400);
   }
   
   const inputOtp = String(otp || '').trim();
@@ -1418,7 +1421,7 @@ app.post('/auth/verify', async (c) => {
 
   if (serverOtp !== inputOtp) {
     console.warn(`[OTP-Error] ${empId}: Mismatch! Server expected "${serverOtp}" but got "${inputOtp}"`);
-    return c.json({ detail: '인증번호가 올바르지 않습니다. 정확히 입력해 주세요.', code: 'OTP_MISMATCH' }, 400);
+    return c.json({ detail: '인증번호가 올바르지 않습니다. 정확히 입력해 주세요.', code: 'E4' }, 400);
   }
   // OTP 즉시 삭제 (재사용 방지)
   if (kv) await kv.delete(kvKey);
@@ -1440,7 +1443,8 @@ app.post('/auth/verify', async (c) => {
   // 3. 신규 사용자 — 비밀번호 설정 + ACTIVE 전환
   if (user.status === 'PRE_REGISTERED') {
     if (!password || password.length < 8) {
-      return c.json({ detail: '비밀번호는 8자 이상이어야 합니다.' }, 400);
+      console.error('[Auth-Verify-Fail] New user password invalid:', { hasPassword: !!password, length: password?.length });
+      return c.json({ detail: '비밀번호는 8자 이상이어야 합니다.', code: 'E5' }, 400);
     }
     const hashed = await hashPassword(password);
     await db.prepare(`
@@ -1463,7 +1467,8 @@ app.post('/auth/verify', async (c) => {
   // 4. 기존 사용자 — 비밀번호 검증
   else {
     if (!password) {
-      return c.json({ detail: '비밀번호를 입력해 주세요.' }, 400);
+      console.error('[Auth-Verify-Fail] Existing user missing password');
+      return c.json({ detail: '비밀번호를 입력해 주세요.', code: 'E6' }, 400);
     }
     const ok = await verifyPassword(password, user.password_hash);
     if (!ok) {
@@ -1523,8 +1528,18 @@ app.post('/auth/verify', async (c) => {
     is_admin:        updated.is_admin || 0,
     status:          updated.status,
     profile_picture: updated.profile_picture,
-    terms_agreed_at: updated.terms_agreed_at, // ⚖️ Phase 19 fix
-  });
+    });
+  } catch (err) {
+    console.error('[auth/verify] Fatal Error:', err.message);
+    const origin = c.req.header('Origin') || '*';
+    return c.json({ 
+      detail: `서버 내부 오류가 발생했습니다. (${err.message})`, 
+      code: 'INTERNAL_SERVER_ERROR' 
+    }, 500, {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true'
+    });
+  }
 });
 
 // POST /auth/set-password
@@ -4923,7 +4938,7 @@ app.post('/ai/summarize-chat', async (c) => {
       
       // ── 인시던트 핵심 이벤트 타임라인 수집 ──
       const incDetail = await db.prepare(
-        "SELECT inc_id, reg_dt, created_at, title, sender FROM incidents WHERE inc_id = ?"
+        "SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?"
       ).bind(incident_id).first();
       const { results: wfLogs } = await db.prepare(
         "SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC"
@@ -7462,7 +7477,8 @@ app.get('/warroom/dm/:user_id', async (c) => {
 // ── Inbox Management ───────────────────────────────────────────────────────
 app.get('/inbox', async (c) => {
   const db = c.env.DB
-  const user_id = c.req.query('user_id')
+  const user = c.get('user')
+  const user_id = c.req.query('user_id') || user?.employee_id
   const folder = c.req.query('folder') || 'INBOX'
   
   if (!user_id) return c.json({ error: 'user_id is required' }, 400)
