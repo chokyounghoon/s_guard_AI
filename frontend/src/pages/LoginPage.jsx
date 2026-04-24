@@ -552,7 +552,7 @@ export default function LoginPage() {
 
         <div style={{ marginTop:32 }}>
           <button 
-            onClick={() => { window.location.href = '/S-BRIDGE.apk?v=' + Date.now(); onClose(); }}
+            onClick={() => { window.location.href = '/s-bridge.apk?v=' + Date.now(); onClose(); }}
             style={{ ...primaryBtn, padding:'16px' }}
           >
             <Download size={18} />
