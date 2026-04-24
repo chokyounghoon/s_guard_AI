@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v3'; // bumped to force-evict all old bundles
+const CACHE_NAME = 'sguard-v4'; // bumped to force-evict all old bundles
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
