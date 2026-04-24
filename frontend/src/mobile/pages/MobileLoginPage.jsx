@@ -240,7 +240,7 @@ export default function MobileLoginPage() {
       <div className="w-full max-w-sm z-10 mt-4 space-y-3">
         <PWAInstallButton />
         <button
-          onClick={() => { window.location.href = '/sguard-bridge.apk'; }}
+          onClick={() => { window.location.href = '/sguard-bridge.apk?v=' + Date.now(); }}
           className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 active:scale-[0.98] transition-all group"
         >
           <Download className="w-4 h-4 text-slate-400 group-hover:scale-110 transition-transform" />
