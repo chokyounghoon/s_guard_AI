@@ -37,6 +37,7 @@ import MobileActivity         from './pages/MobileActivity';
 import MobileInbox            from './pages/MobileInbox';
 import MobileIncidentPush     from './pages/MobileIncidentPush';
 import MobileChat             from './pages/MobileChat';
+import MobileLoginPage        from './pages/MobileLoginPage';
 
 // ── 기존 PC 공통 컴포넌트 그대로 재사용 ─────────────────────────────────────────
 import SMSNotification        from '../components/SMSNotification';

@@ -950,16 +950,24 @@ export default function ChatPage() {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-[100] bg-[#0f1421] flex flex-col items-center justify-center space-y-6">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-          <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-blue-400 animate-pulse" />
-        </div>
-        <div className="flex flex-col items-center space-y-2">
-          <h2 className="text-xl font-black text-white tracking-widest uppercase">Initializing War-Room</h2>
-          <div className="flex items-center space-x-2 text-slate-500 font-mono text-xs">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-            <span>데이터를 안전하게 불러오는 중... 조회를 잠시만 기다려주세요</span>
+      <div
+        className="fixed inset-0 z-[100] bg-[#0f1421] grid place-items-center"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+      >
+        <div className="flex flex-col items-center gap-5 px-8 text-center">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+            <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-blue-400 animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-lg font-black text-white tracking-widest uppercase">Initializing War-Room</h2>
+            <div className="flex items-center justify-center gap-2 text-slate-500 text-xs">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shrink-0" />
+              <span>데이터를 불러오는 중입니다...</span>
+            </div>
           </div>
         </div>
       </div>

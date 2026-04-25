@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Bell, ChevronRight, Shield, Zap,
   CheckCircle2, Loader2, Wifi, Activity, Settings, RefreshCw,
-  LayoutDashboard, Timer
+  LayoutDashboard, Timer, Flame, Target, MoreHorizontal
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import { PushManager } from '../../lib/pushManager';
@@ -10,13 +10,48 @@ import PullToRefresh from '../components/PullToRefresh';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
-// 상태 배지 색상 (API 응답의 incident_status 기준)
+// ── 커스텀 롱 프레스 훅 (모바일 크롬 최적화) ──
+const useLongPress = (onLongPress, onClick, { delay = 500 } = {}) => {
+  const [longPressTriggered, setLongPressTriggered] = useState(false);
+  const timerRef = useRef();
+  const targetRef = useRef();
+
+  const start = useCallback((event) => {
+    if (event.target) {
+      targetRef.current = event.target;
+    }
+    setLongPressTriggered(false);
+    timerRef.current = setTimeout(() => {
+      onLongPress(event);
+      setLongPressTriggered(true);
+    }, delay);
+  }, [onLongPress, delay]);
+
+  const stop = useCallback((event) => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    if (!longPressTriggered && onClick) {
+      onClick(event);
+    }
+    setLongPressTriggered(false);
+  }, [onClick, longPressTriggered]);
+
+  return {
+    onMouseDown: e => start(e),
+    onTouchStart: e => start(e),
+    onMouseUp: e => stop(e),
+    onMouseLeave: e => stop(e),
+    onTouchEnd: e => stop(e),
+  };
+};
+
 const STATUS_MAP = {
-  '미처리':   { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', label: '미처리' },
-  '미확인':   { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', label: '미확인' },
-  '처리중':   { color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   label: '처리중' },
-  '처리완료': { color: 'text-emerald-400',bg: 'bg-emerald-500/10',border: 'border-emerald-500/20',label: '완료'   },
-  DEFAULT:    { color: 'text-slate-400',  bg: 'bg-slate-500/10',  border: 'border-slate-500/20',  label: '미확인' },
+  '미처리':   { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.2)', label: '미처리' },
+  '미확인':   { color: '#fb923c', bg: 'rgba(251,146,60,0.1)', border: 'rgba(251,146,60,0.2)', label: '미확인' },
+  '처리중':   { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)', label: '처리중' },
+  '처리완료': { color: '#34d399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)', label: '완료'   },
+  DEFAULT:    { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)', label: '미확인' },
 };
 
 export default function MobileDashboard({ user }) {
@@ -59,185 +94,147 @@ export default function MobileDashboard({ user }) {
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => fetchData(true), 30000);
-    
-    // Check push status
     PushManager.getStatus().then(setPushStatus);
-
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const handlePushToggle = async () => {
-    setPushLoading(true);
-    if (pushStatus.enabled) {
-      await PushManager.unsubscribe(API_BASE);
-    } else {
-      await PushManager.subscribe(API_BASE);
-    }
-    const newStatus = await PushManager.getStatus();
-    setPushStatus(newStatus);
-    setPushLoading(false);
+  // ── 인시던트 항목 클릭/롱프레스 처리 ──
+  const handleIncidentClick = (id) => navigate(`/chat/${id}`);
+  const handleIncidentLongPress = (item) => {
+    if (navigator.vibrate) navigator.vibrate(50); // 햅틱 피드백
+    window.alert(`인시던트 상세정보\nID: ${item.inc_id}\n상태: ${item.incident_status}\n서비스: ${item.service_name || 'N/A'}`);
   };
-
-
-
 
   return (
     <PullToRefresh onRefresh={() => fetchData(true)}>
-      <div className="flex-1 flex flex-col bg-[#0a0e17] pb-24">
+      <div className="flex-1 flex flex-col bg-[#060a12] min-h-screen pb-24 relative overflow-hidden">
+        {/* 배경 글로우 */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-600/5 blur-[120px] rounded-full -mr-48 -mt-48 pointer-events-none" />
 
-      {/* 헤더 */}
-      <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 fluid-px pt-4 pb-3">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-blue-500" />
-            <span className="font-black text-white text-lg tracking-tight">S-GUARD</span>
-            <span className="text-[10px] font-mono text-blue-400/80 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">LIVE</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => fetchData(true)}
-              disabled={refreshing}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-95"
-            >
-              <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
-              <span className="text-xs font-bold text-blue-400">{user?.name?.[0] || 'U'}</span>
+        {/* 헤더: 모바일 최적화 높이 및 폰트 */}
+        <header className="sticky top-0 z-40 bg-[#060a12]/80 backdrop-blur-xl border-b border-white/5 px-5 pt-6 pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="font-black text-white text-xl tracking-tighter leading-none mb-1">S-GUARD AI</h1>
+              <p className="text-[9px] font-black text-blue-400/50 tracking-[0.15em] uppercase italic leading-none">Active Surveillance</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => fetchData(true)} className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-transform">
+                <RefreshCw className={`w-3.5 h-3.5 text-slate-300 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 p-[1px]">
+                <div className="w-full h-full rounded-[7px] bg-[#0a0e17] flex items-center justify-center text-xs font-black text-white">
+                  {user?.name?.[0] || 'U'}
+                </div>
+              </div>
             </div>
           </div>
+          {user && (
+            <div className="flex items-center gap-2 px-0.5 opacity-50">
+              <div className="w-1 h-1 rounded-full bg-blue-500" />
+              <p className="text-[10px] text-slate-300 font-bold tracking-tight">
+                {user.name} <span className="mx-1 opacity-20">|</span> {user.company || 'Security Ops'}
+              </p>
+            </div>
+          )}
+        </header>
+
+        {/* 통계: 패딩 및 폰트 조정 */}
+        <div className="grid grid-cols-2 gap-3.5 px-5 pt-6">
+          {[
+            { label: 'Total Logs', value: stats.total, icon: LayoutDashboard, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+            { label: 'Pending',    value: stats.pending, icon: Timer, color: '#f97316', bg: 'rgba(249,115,22,0.1)', alert: stats.pending > 0 },
+            { label: 'Critical',   value: stats.critical, icon: Flame, color: '#ef4444', bg: 'rgba(239,68,68,0.1)', alert: stats.critical > 0 },
+            { label: 'AI Analyzed',value: stats.resolved, icon: Target, color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+          ].map((s, idx) => (
+            <div key={s.label} className="glass-card rounded-[2rem] p-5 relative overflow-hidden animate-fade-in-up" style={{ animationDelay: `${idx * 80}ms` }}>
+              <div className="absolute top-0 right-0 w-16 h-16 opacity-15 -mr-8 -mt-8 blur-xl rounded-full" style={{ background: s.color }} />
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-4 border border-white/5" style={{ background: s.bg }}>
+                <s.icon className="w-4 h-4" style={{ color: s.color }} />
+              </div>
+              <div className="text-2xl font-black text-white tracking-tighter mb-0.5 font-mono">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin opacity-20" /> : s.value}
+              </div>
+              <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{s.label}</p>
+              {s.alert && <div className="absolute top-5 right-5 w-1.5 h-1.5 rounded-full animate-ping" style={{ background: s.color }} />}
+            </div>
+          ))}
         </div>
-        {user && (
-          <p className="text-[11px] text-slate-500 truncate">
-            {user.name} · {user.company || user.honbu || ''}
-          </p>
-        )}
-      </header>
 
-      {/* ── 알람 설정 배너 ── */}
-      {pushStatus.supported && !pushStatus.enabled && (
-        <div className="mx-4 mt-3 p-3 bg-blue-600/10 border border-blue-500/20 rounded-xl flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-blue-400" />
-            <span className="text-[11px] text-blue-100 font-medium">실시간 장애 알림을 활성화하세요.</span>
-          </div>
-          <button
-            onClick={handlePushToggle}
-            disabled={pushLoading}
-            className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg active:scale-95 disabled:opacity-50"
-          >
-            {pushLoading ? '처리중...' : '알람 켜기'}
-          </button>
-        </div>
-      )}
-
-      {/* ── 통계 카드 ── */}
-      <div className="grid grid-cols-2 gap-3 fluid-px pt-4 pb-2">
-        {[
-          { label: '전체 인시던트', value: stats.total, icon: LayoutDashboard, color: 'blue' },
-          { label: '처리 대기',     value: stats.pending, icon: Timer,       color: 'yellow', alert: stats.pending > 0 },
-          { label: '긴급 감지',     value: stats.critical, icon: AlertTriangle, color: 'red', alert: stats.critical > 0 },
-          { label: '분석 완료',     value: stats.resolved, icon: CheckCircle2, color: 'emerald' },
-        ].map(({ label, value, icon: Icon, color, alert }) => (
-          <div
-            key={label}
-            className={`bg-[#131927] rounded-2xl p-4 border transition-colors ${
-              alert ? `border-${color}-500/30 bg-${color}-900/10` : 'border-white/5'
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-xl bg-${color}-500/15 flex items-center justify-center mb-3`}>
-              <Icon className={`w-4 h-4 text-${color}-400`} />
+        {/* 리스트: 롱프레스 적용 및 폰트 최적화 */}
+        <div className="flex-1 px-5 mt-8">
+          <div className="flex items-center justify-between mb-5 px-0.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-0.5 h-5 bg-blue-600 rounded-full" />
+              <h2 className="text-lg font-black text-white tracking-tight">Surveillance Logs</h2>
             </div>
-            <div className={`text-2xl font-black ${alert ? `text-${color}-400` : 'text-white'} leading-none mb-1`}>
-              {loading ? <Loader2 className="w-5 h-5 animate-spin opacity-50" /> : value}
-            </div>
-            <p className="text-[11px] text-slate-500 font-medium">{label}</p>
           </div>
-        ))}
-      </div>
 
-      {/* ── 인시던트 리스트 ── */}
-      <div className="fluid-px pb-2">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-blue-400" />
-            실시간 인시던트
-          </h2>
-          {lastUpdate && (
-            <span className="text-[10px] text-slate-600 font-mono">
-              {lastUpdate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </span>
+          {loading ? (
+            <div className="space-y-3.5">
+              {[1, 2, 3].map(i => <div key={i} className="h-28 glass-card rounded-[2rem] animate-pulse" />)}
+            </div>
+          ) : incidents.length === 0 ? (
+            <div className="py-16 text-center glass-card rounded-[2.5rem] border-dashed border-white/5">
+              <Wifi className="w-10 h-10 text-slate-800 mx-auto mb-3" />
+              <p className="text-xs font-black text-slate-600 uppercase tracking-widest">Everything is Secure</p>
+            </div>
+          ) : (
+            <div className="space-y-3.5 pb-10">
+              {incidents.map((item, idx) => {
+                const s = STATUS_MAP[item.incident_status] || STATUS_MAP.DEFAULT;
+                const isUrgent = item.keyword_detected === 1;
+                
+                // 롱프레스 훅 사용
+                const longPressProps = useLongPress(
+                  () => handleIncidentLongPress(item),
+                  () => handleIncidentClick(item.inc_id)
+                );
+
+                return (
+                  <div
+                    key={item.inc_id}
+                    {...longPressProps}
+                    onContextMenu={(e) => e.preventDefault()} // 기본 메뉴 방지
+                    className={`w-full text-left glass-card rounded-[2rem] p-5 active:scale-[0.98] transition-all group relative overflow-hidden animate-fade-in-up ${isUrgent ? 'border-red-600/20' : ''}`}
+                    style={{ animationDelay: `${(idx % 8) * 40}ms` }}
+                  >
+                    {isUrgent && <div className="absolute top-0 left-0 w-1 h-full bg-red-600/50" />}
+                    <div className="flex items-center justify-between mb-3.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-black px-2 py-1 rounded-lg border uppercase tracking-wider" style={{ color: s.color, background: s.bg, borderColor: s.border }}>{s.label}</span>
+                        {isUrgent && <span className="text-[8px] font-black px-2 py-1 rounded-lg bg-red-600 text-white uppercase tracking-wider">Urgent</span>}
+                      </div>
+                      <span className="text-[9px] text-slate-500 font-bold font-mono">
+                        {item.timestamp ? new Date(item.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                    <p className="text-[14px] text-slate-100 font-bold leading-snug line-clamp-2 mb-4 pr-2 tracking-tight group-active:text-blue-400 transition-colors">{item.message}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 overflow-hidden">
+                        {item.service_name && (
+                          <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 flex items-center gap-1.5 shrink-0">
+                            <Activity className="w-2.5 h-2.5 text-blue-500" />
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight truncate max-w-[80px]">{item.service_name}</span>
+                          </div>
+                        )}
+                        {item.error_code && (
+                          <div className="px-2 py-0.5 rounded-md bg-orange-500/10 border border-orange-500/10 flex items-center gap-1.5 shrink-0">
+                            <Zap className="w-2.5 h-2.5 text-orange-500" />
+                            <span className="text-[9px] text-orange-400 font-mono font-bold tracking-tight">{item.error_code}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center group-active:bg-blue-600/20 transition-all">
+                        <ChevronRight className="w-4 h-4 text-slate-600 group-active:text-blue-400" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
-
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-[#131927] border border-white/5 rounded-2xl p-4 animate-pulse">
-                <div className="h-3 bg-white/5 rounded-full w-1/3 mb-3" />
-                <div className="h-4 bg-white/5 rounded-full w-4/5 mb-2" />
-                <div className="h-3 bg-white/5 rounded-full w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : incidents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-600">
-            <Wifi className="w-12 h-12 mb-4 opacity-30" />
-            <p className="text-sm">수신된 인시던트가 없습니다.</p>
-          </div>
-        ) : (
-          /* 리스트 */
-          <div className="fluid-px pt-3 space-y-2">
-            {incidents.map((item) => {
-              const s = STATUS_MAP[item.incident_status] || STATUS_MAP.DEFAULT;
-              const isUrgent = item.keyword_detected === 1;
-              return (
-                <button
-                  key={item.inc_id}
-                  id={`incident-${item.inc_id}`}
-                  onClick={() => navigate(`/chat/${item.inc_id}`)}
-                  className={`w-full text-left bg-[#131927] border rounded-2xl p-4 transition-all active:scale-[0.98] group ${
-                    isUrgent ? 'border-red-500/20 bg-red-900/5' : 'border-white/5'
-                  }`}
-                >
-                  {/* 상단: 상태 + 시간 */}
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${s.color} ${s.bg} ${s.border}`}>
-                      {s.label}
-                    </span>
-                    <span className="text-[10px] text-slate-600 font-mono">
-                      {item.timestamp
-                        ? new Date(item.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-                        : ''}
-                    </span>
-                  </div>
-
-                  {/* 메시지 */}
-                  <p className="text-sm text-slate-200 font-medium leading-snug line-clamp-2 mb-2" title={item.message}>
-                    {item.message}
-                  </p>
-
-                  {/* 하단: 메타 + 화살표 */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {item.service_name && (
-                        <span className="text-[10px] text-blue-400/80 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/10">
-                          {item.service_name}
-                        </span>
-                      )}
-                      {item.error_code && (
-                        <span className="text-[10px] text-orange-400/80 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/10 font-mono">
-                          {item.error_code}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
       </div>
     </PullToRefresh>
   );

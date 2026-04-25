@@ -559,97 +559,101 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
 
   return (
-    <div className={`bg-gradient-to-br from-[#1a1f2e] to-[#11141d] rounded-3xl p-6 border shadow-xl relative overflow-hidden group transition-all duration-500
-      ${isAnalyzingSms && isCritical ? 'border-red-500/30' : isAnalyzingSms ? 'border-yellow-500/20' : 'border-blue-500/20'}`}>
-      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+    <div className={`rounded-3xl p-3 sm:p-6 border shadow-2xl relative overflow-hidden transition-all duration-500
+      ${isAnalyzingSms && isCritical
+        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-red-500/40 shadow-red-900/20'
+        : isAnalyzingSms
+        ? 'bg-gradient-to-br from-[#1a1b10] to-[#11141d] border-yellow-500/30 shadow-yellow-900/10'
+        : 'bg-gradient-to-br from-[#141928] via-[#161c2b] to-[#0e1018] border-blue-500/20 shadow-blue-900/20'}`}>
+      <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/3 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none" />
 
-      {/* 헤더 */}
-      <div className="flex items-start justify-between mb-4 relative z-10">
-        <div className="flex items-center space-x-3">
-          <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : isAnalyzingSms ? 'bg-yellow-500/20 border-yellow-500/30' : 'bg-blue-600/20 border-blue-500/30'}`}>
+      {/* 헤더 - SMS 수신내역과 동일한 구조 */}
+      <div className="flex items-center justify-between gap-3 mb-4 relative z-10">
+        {/* 왼쪽: 아이콘 + 타이틀 */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`p-2.5 rounded-xl border shrink-0 ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : isAnalyzingSms ? 'bg-yellow-500/20 border-yellow-500/30' : 'bg-blue-600/20 border-blue-500/30'}`}>
             {isAnalyzingSms && isCritical
-              ? <AlertTriangle className="w-6 h-6 text-red-400 animate-pulse" />
+              ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
               : isAnalyzingSms
-              ? <MessageSquare className="w-6 h-6 text-yellow-400 animate-pulse" />
-              : <Brain className="w-6 h-6 text-blue-400 animate-pulse" />
+              ? <MessageSquare className="w-5 h-5 text-yellow-400 animate-pulse" />
+              : <Brain className="w-5 h-5 text-blue-400" />
             }
           </div>
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <h2 className="text-sm font-black text-white flex items-center gap-2">
-              <Brain className={`w-4 h-4 ${isAnalyzingSms ? 'text-yellow-400 animate-pulse' : isCritical ? 'text-red-400' : 'text-blue-400'}`} />
-              <span className="truncate">S-Autopilot Insight</span>
-              <span className="relative flex h-2 w-2 flex-shrink-0">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isAnalyzingSms && isCritical ? 'bg-red-400' : isAnalyzingSms ? 'bg-yellow-400' : 'bg-blue-400'}`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
-              </span>
+          <div className="min-w-0">
+            <h2 className="font-black text-white text-base sm:text-lg tracking-tight">
+              S-Autopilot Insight
             </h2>
             {insightTimestamp && (
-              <div className="flex flex-col items-start ml-2 border-l border-white/10 pl-3">
-                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest leading-none mb-1 opacity-60">Registered At</span>
-                <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded shadow-[0_0_10px_rgba(255,255,255,0.1)] border border-white/5 whitespace-nowrap">
-                  {(() => {
-                    const d = new Date(insightTimestamp);
-                    const yy = String(d.getFullYear()).slice(2);
-                    const mm = String(d.getMonth() + 1).padStart(2, '0');
-                    const dd = String(d.getDate()).padStart(2, '0');
-                    const hh = String(d.getHours()).padStart(2, '0');
-                    const min = String(d.getMinutes()).padStart(2, '0');
-                    const ss = String(d.getSeconds()).padStart(2, '0');
-                    return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
-                  })()}
-                </span>
-              </div>
+              <p className="text-[9px] text-slate-500 font-mono mt-0.5 truncate">
+                {(() => {
+                  const d = new Date(insightTimestamp);
+                  const yy = String(d.getFullYear()).slice(2);
+                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                  const dd = String(d.getDate()).padStart(2, '0');
+                  const hh = String(d.getHours()).padStart(2, '0');
+                  const min = String(d.getMinutes()).padStart(2, '0');
+                  const ss = String(d.getSeconds()).padStart(2, '0');
+                  return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
+                })()}
+              </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          {isAnalyzingSms && (
-            <div className={`px-3 py-1.5 rounded-lg flex items-center space-x-2 border ${isCritical ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
-              <Zap className={`w-3 h-3 animate-pulse ${isCritical ? 'text-red-400' : 'text-yellow-400'}`} />
-              <span className={`text-xs font-mono ${isCritical ? 'text-red-300' : 'text-yellow-300'}`}>
-                {isCritical ? 'CRITICAL' : 'SMS 분석'}
-              </span>
-            </div>
-          )}
-          <div
-            className={`px-3 py-1.5 rounded-lg flex items-center space-x-2 border transition-all duration-500 ${
-              isAnalyzingSms
-                ? 'bg-red-500/20 border-red-400/50 shadow-[0_0_14px_rgba(239,68,68,0.45)]'
-                : 'bg-[#0f111a] border-white/5'
-            }`}
-          >
-            <span
-              className={`relative flex items-center justify-center w-2 h-2 ${isAnalyzingSms ? '' : 'opacity-40'}`}
-            >
-              {isAnalyzingSms && (
-                <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
-              )}
-              <Activity className={`relative w-3 h-3 ${isAnalyzingSms ? 'text-red-400 animate-pulse' : 'text-emerald-500'}`} />
-            </span>
-            <span
-              className={`text-xs font-mono font-black tracking-widest ${
-                isAnalyzingSms ? 'text-red-300 animate-pulse' : 'text-slate-500'
-              }`}
-            >
-              LIVE
-            </span>
-          </div>
+        {/* 오른쪽: 버튼들 */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* LIVE / 분석중 / 완료 뱃지 */}
+          {(() => {
+            const isDone = analysisComplete && !isAnalyzingSms;
+            const badgeStyle = isDone
+              ? 'bg-white/[0.03] border-white/10 opacity-50'
+              : isAnalyzingSms && isCritical
+              ? 'bg-red-500/20 border-red-400/50 shadow-[0_0_12px_rgba(239,68,68,0.4)]'
+              : isAnalyzingSms
+              ? 'bg-yellow-500/10 border-yellow-500/30'
+              : 'bg-blue-500/10 border-blue-500/20';
+            const dotColor = isDone ? 'bg-slate-600'
+              : isAnalyzingSms && isCritical ? 'bg-red-500'
+              : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500';
+            const pingColor = isDone ? '' : isAnalyzingSms && isCritical ? 'bg-red-400'
+              : isAnalyzingSms ? 'bg-yellow-400' : 'bg-blue-400';
+            const textColor = isDone ? 'text-slate-500'
+              : isAnalyzingSms && isCritical ? 'text-red-400'
+              : isAnalyzingSms ? 'text-yellow-400' : 'text-blue-400';
+            const label = isDone ? 'DONE'
+              : isAnalyzingSms && isCritical ? 'CRIT'
+              : isAnalyzingSms ? 'ANL' : 'LIVE';
+            return (
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-500 ${badgeStyle}`}>
+                <span className="relative flex h-1.5 w-1.5">
+                  {!isDone && (
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pingColor}`}></span>
+                  )}
+                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotColor}`}></span>
+                </span>
+                <span className={`text-[9px] font-black uppercase tracking-widest ${textColor}`}>{label}</span>
+              </div>
+            );
+          })()}
+
+          {/* 재분석 버튼 */}
           <button
             onClick={handleManualAnalyze}
             disabled={isAnalyzingSms}
-            className={`px-3 py-1.5 rounded-lg border transition-all duration-300 flex items-center space-x-2 
-              ${isAnalyzingSms 
-                ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed opacity-50' 
-                : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 active:scale-95'}`}
+            className={`h-8 w-8 flex items-center justify-center rounded-lg border transition-all ${
+              isAnalyzingSms
+                ? 'border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50'
+                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-blue-400 active:scale-90'}`}
             title="AI 재분석 (수동)"
           >
-            <RotateCcw className={`w-3.5 h-3.5 ${isAnalyzingSms ? 'animate-spin' : ''}`} />
-            <span className="text-xs font-bold whitespace-nowrap">재분석</span>
+            <RotateCcw className={`w-4 h-4 ${isAnalyzingSms ? 'animate-spin' : ''}`} />
           </button>
-          <button 
-             onClick={() => setIsCollapsed(!isCollapsed)}
-             className="px-2 py-1.5 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors text-slate-400"
+
+          {/* 접기 버튼 */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 transition-all active:scale-90"
           >
             <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
           </button>
@@ -663,10 +667,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         const color = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-yellow-500' : score > 0 ? 'bg-orange-500' : 'bg-slate-600';
         const textColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-yellow-400' : score > 0 ? 'text-orange-400' : 'text-slate-500';
         return (
-          <div className="flex items-center space-x-4 mb-4 relative z-10 animate-in fade-in duration-700">
-            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <div className="flex items-center gap-3 mb-4 relative z-10 animate-in fade-in duration-700">
+            <div className="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden shadow-inner">
               <div
-                className={`h-full transition-all duration-1000 ease-out ${color}`}
+                className={`h-full transition-all duration-1000 ease-out rounded-full shadow-sm ${color}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -696,11 +700,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
       )}
 
-      <div className={`transition-all duration-700 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'} -mx-2 px-2 pb-12 relative`}>
+      <div className={`transition-all duration-700 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'} pb-4 relative`}>
         
         {/* 장애 상세 정보 (확장 파라미터) */}
         {selectedSms && (
-          <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-500">
+          <div className="mb-3 animate-in fade-in slide-in-from-top-2 duration-500">
             <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
               <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">장애 상세 정보 (Detailed Incident Info)</span>
@@ -755,17 +759,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         )}
 
         {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
-      <div className={`rounded-xl p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px]
-        ${isAnalyzingSms && isCritical ? 'bg-[#150a0a] border-red-500/30' : isAnalyzingSms ? 'bg-[#11110a] border-yellow-500/30' : 'bg-[#0a0c12] border-blue-500/10'}`}>
+      <div className={`rounded-2xl p-3 sm:p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px]
+        ${isAnalyzingSms && isCritical ? 'bg-[#130a0a] border-red-500/25 shadow-red-900/20' : isAnalyzingSms ? 'bg-[#111009] border-yellow-500/20 shadow-yellow-900/10' : 'bg-[#080a10] border-blue-500/10 shadow-blue-900/20'}`}>
         <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-500/5 h-full w-full pointer-events-none" />
         <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
           <Brain className="w-12 h-12" />
         </div>
 
         <div className="w-full relative z-10">
-          <div className="flex items-start space-x-3 text-slate-400 min-h-full">
-            <span className={`mt-0.5 shrink-0 font-black ${isAnalyzingSms && isCritical ? 'text-red-500' : isAnalyzingSms ? 'text-yellow-500' : 'text-blue-500'}`}>❯</span>
-            <div className={`leading-relaxed w-full ${textColor}`}>
+          <div className={`leading-relaxed w-full ${textColor}`}>
               {displayedText ? (
                 <MarkdownViewer text={displayedText} />
               ) : (
@@ -778,46 +780,63 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             </div>
           </div>
         </div>
-      </div>
 
       {/* Feedback & War-Room Section */}
       <div className="mt-4 flex flex-col space-y-3 relative z-10">
         
-        {/* Feedback Buttons (👍/👎) */}
+        {/* Feedback Buttons (👍/👎) - 눈에 띄는 전체 너비 카드 */}
         {analysisComplete && displayedText && (
-          <div className="flex items-center justify-end px-1 animate-in fade-in slide-in-from-right-2 duration-500">
-             <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1.5 space-x-2">
-                <span className="text-[10px] text-slate-500 font-bold px-2 border-r border-white/10 uppercase tracking-tighter">AI 분석이 정확한가요?</span>
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => handleFeedback('UP')}
-                    disabled={feedback === 'UP'}
-                    className={`p-1.5 rounded-lg transition-all ${feedback === 'UP' ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30' : 'text-slate-500 hover:text-blue-400 hover:bg-white/10 border border-transparent'}`}
-                    title="정확한 분석입니다"
-                  >
-                    <ThumbsUp className={`w-3.5 h-3.5 ${feedback === 'UP' ? 'fill-current' : ''}`} />
-                  </button>
-                  <button
-                    onClick={() => handleFeedback('DOWN')}
-                    disabled={feedback === 'DOWN' && !showFeedbackModal}
-                    className={`p-1.5 rounded-lg transition-all ${feedback === 'DOWN' ? 'text-red-400 bg-red-500/10 border border-red-500/30' : 'text-slate-500 hover:text-red-400 hover:bg-white/10 border border-transparent'}`}
-                    title="분석 결과 교정하기"
-                  >
-                    <ThumbsDown className={`w-3.5 h-3.5 ${feedback === 'DOWN' ? 'fill-current' : ''}`} />
-                  </button>
-                </div>
-             </div>
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className={`w-full rounded-2xl border p-4 transition-all duration-500 ${
+              feedback === 'UP'
+                ? 'bg-blue-500/10 border-blue-500/30 shadow-lg shadow-blue-900/20'
+                : feedback === 'DOWN'
+                ? 'bg-red-500/10 border-red-500/30 shadow-lg shadow-red-900/20'
+                : 'bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent border-indigo-500/20 shadow-lg shadow-indigo-900/10'
+            }`}>
+              <p className={`text-[11px] font-black uppercase tracking-widest mb-3 ${
+                feedback === 'UP' ? 'text-blue-400' : feedback === 'DOWN' ? 'text-red-400' : 'text-slate-400'
+              }`}>
+                {feedback === 'UP' ? '✅ 정확한 분석으로 평가하셨습니다' : feedback === 'DOWN' ? '📝 피드백을 제출해 주셔서 감사합니다' : '🤖 AI 분석이 정확한가요?'}
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => handleFeedback('UP')}
+                  disabled={feedback === 'UP'}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 ${
+                    feedback === 'UP'
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-inner'
+                      : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-blue-500/15 hover:text-blue-300 hover:border-blue-500/30 hover:shadow-md'
+                  }`}
+                >
+                  <ThumbsUp className={`w-5 h-5 ${feedback === 'UP' ? 'fill-current' : ''}`} />
+                  <span>정확해요</span>
+                </button>
+                <button
+                  onClick={() => handleFeedback('DOWN')}
+                  disabled={feedback === 'DOWN' && !showFeedbackModal}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 ${
+                    feedback === 'DOWN'
+                      ? 'bg-red-500/20 text-red-300 border border-red-500/40 shadow-inner'
+                      : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-red-500/15 hover:text-red-300 hover:border-red-500/30 hover:shadow-md'
+                  }`}
+                >
+                  <ThumbsDown className={`w-5 h-5 ${feedback === 'DOWN' ? 'fill-current' : ''}`} />
+                  <span>아니에요</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
         {/* War-Room 개설 버튼 (항상 표시하며, 상태에 따라 disabled 처리) */}
-      <div className={`mt-4 flex items-center gap-3 p-4 rounded-2xl border transition-all duration-500
+      <div className={`mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 p-5 rounded-2xl border transition-all duration-500
         ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30) 
-          ? 'bg-slate-800/50 border-slate-700/50' 
+          ? 'bg-slate-800/30 border-slate-700/30' 
           : isCritical 
-            ? 'bg-red-500/5 border-red-500/20' 
-            : 'bg-yellow-500/5 border-yellow-500/20'}`}>
-        <div className={`flex-1 text-xs ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || lockingUser) ? 'text-slate-400 animate-pulse' : isCritical ? 'text-red-300' : 'text-yellow-300'}`}>
+            ? 'bg-red-500/5 border-red-500/25 shadow-lg shadow-red-900/10' 
+            : 'bg-gradient-to-r from-yellow-500/5 to-transparent border-yellow-500/20 shadow-lg shadow-yellow-900/5'}`}>
+        <div className={`flex-1 text-xs leading-relaxed ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || lockingUser) ? 'text-slate-500 animate-pulse' : isCritical ? 'text-red-300' : 'text-yellow-300/90'}`}>
           {(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30)
             ? '⏳ AI 에이전트가 분석중입니다. 분석 완료 후 개설 가능합니다...'
             : lockingUser
@@ -831,14 +850,14 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         <button
           onClick={handleOpenWarRoom}
           disabled={!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || (lockingUser && !warRoomExists)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-lg
+          className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black text-sm whitespace-nowrap transition-all active:scale-95
             ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || (lockingUser && !warRoomExists))
-              ? 'bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+              ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
               : isCritical && !warRoomExists
-              ? 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/30 active:scale-95'
+              ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30'
               : warRoomExists
-              ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/30 active:scale-95'
-              : 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-yellow-500/30 active:scale-95'}`}
+              ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/30'
+              : 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-lg shadow-yellow-500/20'}`}
         >
           <Users className="w-4 h-4" />
           {lockingUser && !warRoomExists ? '다른 사용자 처리 중' : warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}

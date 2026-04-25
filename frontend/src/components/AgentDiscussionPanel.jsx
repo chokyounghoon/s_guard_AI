@@ -26,11 +26,20 @@ const AgentAvatar = ({ role }) => {
   const Icon = style.icon;
 
   return (
-    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${style.bg} border ${style.border} shadow-sm`}>
+    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${style.bg} border ${style.border} shadow-md shrink-0`}>
       <Icon className={`w-4 h-4 ${style.text}`} />
     </div>
   );
 };
+
+// ** 등 마크다운 마커 제거 함수
+const cleanText = (text = '') =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, '$1')   // **bold** → bold
+    .replace(/\*(.*?)\*/g, '$1')        // *italic* → italic
+    .replace(/^#+\s/gm, '')             // ## 헤딩 제거
+    .replace(/`([^`]+)`/g, '$1')        // `code` → code
+    .trim();
 
 export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false, incident }) {
   const scrollRef = useRef(null);
@@ -104,7 +113,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent" ref={scrollRef}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center text-center text-slate-500 text-xs py-20 opacity-40 space-y-3">
             <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center animate-pulse border border-white/5">
@@ -116,42 +125,64 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         
         {messages.map((msg, idx) => {
           const isLeader = msg.role.toLowerCase().includes('leader') || msg.role.toLowerCase().includes('리더');
-          
+          const roleColor =
+            msg.role.toLowerCase().includes('security') || msg.role.toLowerCase().includes('system') ? 'text-red-400' :
+            msg.role.toLowerCase().includes('db') ? 'text-yellow-400' :
+            msg.role.toLowerCase().includes('devops') || msg.role.toLowerCase().includes('analyst') ? 'text-blue-400' :
+            isLeader ? 'text-purple-400' : 'text-slate-400';
+
+          const bubbleBg = isLeader
+            ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.45) 0%, rgba(147,51,234,0.45) 100%)', borderColor: 'rgba(139,92,246,0.3)' }
+            : { background: '#1e2640', borderColor: 'rgba(255,255,255,0.07)' };
+
+          const tailColor = isLeader ? 'rgba(99,102,241,0.5)' : '#1e2640';
+
           return (
-            <div key={idx} className="flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 justify-start">
-              <div className="flex max-w-[85%] flex-row items-start gap-3">
-                
+            <div key={idx} className="flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 justify-start mb-1">
+              <div className="flex max-w-[90%] flex-row items-start gap-2">
+
                 {/* Avatar */}
-                <div className="shrink-0 mt-1 shadow-2xl">
+                <div className="shrink-0 mt-5">
                   <AgentAvatar role={msg.role} />
                 </div>
-                
+
                 {/* Message Content */}
-                <div className="flex flex-col items-start">
+                <div className="flex flex-col items-start gap-0.5">
                   {/* Name */}
-                  <span className={`text-[11px] mb-2 px-1 font-black tracking-widest uppercase ${
-                    msg.role.toLowerCase().includes('security') || msg.role.toLowerCase().includes('system') ? 'text-red-400' :
-                    msg.role.toLowerCase().includes('db') ? 'text-yellow-400' :
-                    msg.role.toLowerCase().includes('devops') || msg.role.toLowerCase().includes('analyst') ? 'text-blue-400' :
-                    isLeader ? 'text-purple-400' :
-                    'text-slate-400'
-                  }`}>
+                  <span className={`text-[10px] px-1 font-bold ${roleColor}`}>
                     {msg.role.toLowerCase().includes('agent') ? msg.role : `${msg.role} Agent`}
                   </span>
-                  
-                  {/* Bubble and Time Row */}
-                  <div className="flex items-end gap-2 flex-row">
-                    {/* Bubble */}
-                    <div className={`p-4 text-[13.5px] leading-relaxed shadow-2xl transition-all duration-300 whitespace-pre-wrap break-words
-                      ${isLeader 
-                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tl-sm border border-purple-500/30' 
-                        : 'bg-slate-800/80 text-slate-100 rounded-2xl rounded-tl-sm border border-white/5 shadow-black/40'
-                    }`}>
-                      {msg.text}
+
+                  {/* Bubble + Time */}
+                  <div className="flex items-end gap-1.5">
+                    <div className="relative">
+                      {/* 카카오톡 스타일 꼬리 */}
+                      <div style={{
+                        position: 'absolute',
+                        left: '-7px',
+                        top: '12px',
+                        width: 0,
+                        height: 0,
+                        borderTop: '7px solid transparent',
+                        borderRight: `7px solid ${tailColor}`,
+                        borderBottom: '7px solid transparent',
+                      }} />
+                      {/* 말풍선 본체 */}
+                      <div
+                        className="px-4 py-3 text-[13px] leading-relaxed shadow-md whitespace-pre-wrap break-words"
+                        style={{
+                          ...bubbleBg,
+                          borderRadius: '0 20px 20px 20px',
+                          border: `1px solid ${bubbleBg.borderColor}`,
+                          color: isLeader ? '#fff' : '#cbd5e1',
+                          maxWidth: '100%',
+                        }}
+                      >
+                        {cleanText(msg.text)}
+                      </div>
                     </div>
-                    
                     {/* Time */}
-                    <span className="text-[10px] text-slate-500 shrink-0 mb-1 font-bold tracking-tighter tabular-nums opacity-60">
+                    <span className="text-[9px] text-slate-600 shrink-0 mb-1 tabular-nums">
                       {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true })}
                     </span>
                   </div>

@@ -8,296 +8,97 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 w-full bg-[#0f111a] border-t border-white/10 px-6 py-3 flex justify-between items-center z-50 pb-safe">
-        <div
-          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/dashboard' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
-          onClick={() => navigate('/dashboard')}
-        >
-          <Home className={`w-6 h-6 ${currentPath === '/dashboard' ? 'fill-current' : ''}`} />
-          <span className="text-[10px] font-medium">홈</span>
-        </div>
-        
-        <div
-          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/chat' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
-          onClick={() => {
-            if (onWarRoomClick) {
-              onWarRoomClick();
-            } else {
-              navigate('/chat');
-            }
-          }}
-        >
-          <MessageSquare className={`w-6 h-6 ${currentPath === '/chat' ? 'fill-current' : ''}`} />
-          <span className="text-[10px] font-medium">War-Room</span>
-        </div>
-        
-        <div
-          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath.startsWith('/ai-report') ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
-          onClick={() => {
-            if (onReportClick) {
-              onReportClick();
-            } else {
-              navigate('/report-publish');
-            }
-          }}
-        >
-          <FileText className={`w-6 h-6 ${currentPath.startsWith('/ai-report') ? 'fill-current' : ''}`} />
-          <span className="text-[10px] font-medium">Report</span>
-        </div>
-
-        <div
-          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/inbox' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
-          onClick={() => navigate('/inbox')}
-        >
-          <Inbox className={`w-6 h-6 ${currentPath === '/inbox' ? 'fill-current' : ''}`} />
-          <span className="text-[10px] font-medium">메시지함</span>
-        </div>
-        
-        <div
-          className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${currentPath === '/search' ? 'text-blue-500' : 'text-slate-500 hover:text-white'}`}
-          onClick={() => navigate('/search')}
-        >
-          <Search className={`w-6 h-6 ${currentPath === '/search' ? 'fill-current' : ''}`} />
-          <span className="text-[10px] font-medium">검색</span>
-        </div>
-
-        {/* AI Assistant Nav Button */}
-        <div 
-          className="flex flex-col items-center space-y-1 text-slate-500 hover:text-purple-400 transition-colors cursor-pointer"
-          onClick={onAiClick}
-        >
-            <div className="relative">
-              <Bot className="w-6 h-6" />
-              {showAiPulse && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border-2 border-[#0f111a] animate-pulse"></span>
-              )}
-            </div>
-            <span className="text-[10px] font-medium">AI</span>
-        </div>
-        
-        <div
-          className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer"
-          onClick={() => setShowMoreMenu(true)}
-        >
-          <MoreHorizontal className="w-6 h-6" />
-          <span className="text-[10px] font-medium">더보기</span>
-        </div>
-      </nav>
+      <div className="fixed bottom-0 left-0 w-full z-50 px-4 pb-6 pointer-events-none">
+        <nav className="max-w-lg mx-auto glass-panel rounded-[2.5rem] px-6 py-4 flex justify-between items-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 pointer-events-auto">
+          {[
+            { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
+            { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
+            { id: 'report', label: 'Report', icon: FileText, path: '/ai-report', action: onReportClick },
+            { id: 'inbox', label: 'Inbox', icon: Inbox, path: '/inbox' },
+            { id: 'ai', label: 'AI', icon: Bot, action: onAiClick, isAi: true },
+            { id: 'more', label: 'More', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
+          ].map((item) => {
+            const isActive = currentPath === item.path || (item.path && currentPath?.startsWith(item.path));
+            const Icon = item.icon;
+            
+            return (
+              <button
+                key={item.id}
+                onClick={() => item.action ? item.action() : navigate(item.path)}
+                className={`flex flex-col items-center gap-1 group active-scale relative ${
+                  isActive ? 'text-blue-400' : 'text-slate-500'
+                }`}
+              >
+                <div className="relative">
+                  <Icon className={`w-6 h-6 transition-all duration-300 ${
+                    isActive ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.5)] scale-110' : 'group-hover:text-slate-300'
+                  }`} />
+                  {item.isAi && showAiPulse && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-500 rounded-full border-2 border-[#0f111a] animate-pulse shadow-[0_0_10px_rgba(168,85,247,0.5)]"></span>
+                  )}
+                </div>
+                <span className={`text-[10px] font-bold tracking-tighter transition-all ${
+                  isActive ? 'opacity-100 translate-y-0' : 'opacity-60'
+                }`}>
+                  {item.label}
+                </span>
+                {isActive && (
+                  <div className="absolute -bottom-2 w-1 h-1 bg-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.8)]"></div>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
 
       {/* More Menu Popup */}
       {showMoreMenu && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowMoreMenu(false)} />
-          <div className="w-full bg-[#1a1f2e] rounded-t-[40px] border-t border-white/10 shadow-2xl relative z-10 animate-in slide-in-from-bottom duration-500 overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="p-8 pb-4">
-              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-8" />
-              <h3 className="text-xl font-bold text-white mb-2 text-center">시스템 관리 설정</h3>
-              <p className="text-xs text-slate-500 text-center mb-10 uppercase tracking-[4px]">System Operations</p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/orbital-command');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:border-cyan-400 hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4 relative overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="bg-cyan-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform border border-cyan-500/30">
-                    <Cpu className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
-                  </div>
-                  <div className="relative z-10">
-                    <span className="block font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-sm sm:text-base tracking-wide">오비탈 커맨드</span>
-                    <span className="text-[9px] sm:text-[10px] text-cyan-500/70 mt-1 block font-mono">Zero-G RAG Control</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/report-line-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-purple-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Users className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">보고 라인 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Approval Hierarchy</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/incident-push');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-green-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-green-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 text-green-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">장애 수동 접수</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Manual Incident Entry & Testing</span>
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/user-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <User className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">사용자 계정 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Account & Security Admin</span>
-                  </div>
-                </div>
-
-                {/* 🛡️ 보안 접속 로그 (관리자 전용) */}
-                {(user?.is_admin === 1 || user?.role === 'admin') && (
-                  <div
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      navigate('/security-logs');
-                    }}
-                    className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:border-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                  >
-                    <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform border border-blue-500/30">
-                      <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                    </div>
-                    <div>
-                      <span className="block font-bold text-blue-200 text-sm sm:text-base">보안 접속 로그</span>
-                      <span className="text-[9px] sm:text-[10px] text-blue-500/70 mt-1 block font-mono">Access Audit Trails</span>
-                    </div>
-                  </div>
-                )}
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/organization-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-emerald-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Network className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">부서/조직도 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Org Hierarchy Tree Admin</span>
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/knowledge-base');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">지식 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">RAG Knowledge Management</span>
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/overall-status');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-orange-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-orange-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-orange-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">전체 장애 통계</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Global Error Statistics</span>
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/warroom-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-red-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-red-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-red-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">WAR-ROOM 현황</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Incident War-Room Hub</span>
-                  </div>
-                </div>
-                
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/activity');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-cyan-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-cyan-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">사용자 활동 기록</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">System Activity Logs</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    navigate('/codebook-management');
-                  }}
-                  className="bg-[#11141d] p-4 sm:p-6 rounded-3xl border border-white/5 hover:border-yellow-500/30 transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4"
-                >
-                  <div className="bg-yellow-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform">
-                    <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400" />
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200 text-sm sm:text-base">코드북 관리</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 mt-1 block">Common Codebook Admin</span>
-                  </div>
-                </div>
-
-                {/* 📊 데이터 처리 명세서 (관리자 전용) */}
-                {(user?.is_admin === 1 || user?.role === 'admin') && (
-                  <div
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      navigate('/processing-flow');
-                    }}
-                    className="bg-[#0f111a] p-4 sm:p-6 rounded-3xl border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:border-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all cursor-pointer group flex flex-col items-center text-center space-y-3 sm:space-y-4 relative overflow-hidden"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="bg-blue-600/20 p-3 sm:p-4 rounded-2xl group-hover:scale-110 transition-transform border border-blue-500/30">
-                      <Layers className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                    </div>
-                    <div>
-                      <span className="block font-bold text-blue-200 text-sm sm:text-base">데이터 처리 명세서</span>
-                      <span className="text-[9px] sm:text-[10px] text-blue-500/70 mt-1 block font-mono">Technical Logic DFD</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+        <div className="fixed inset-0 z-[110] flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-500" onClick={() => setShowMoreMenu(false)} />
+          <div className="w-full max-w-xl bg-premium-dark rounded-t-[3rem] border-t border-white/10 shadow-2xl relative z-10 animate-in slide-in-from-bottom duration-500 overflow-hidden max-h-[90vh] flex flex-col">
+            
+            <div className="pt-4 pb-2 px-8 flex flex-col items-center">
+              <div className="w-12 h-1.5 bg-white/10 rounded-full mb-6" />
+              <h3 className="text-2xl font-black text-white tracking-tighter">System Console</h3>
+              <p className="text-[10px] text-blue-500 font-black uppercase tracking-[0.3em] mt-1">Management & Intelligence</p>
             </div>
 
-            <div className="p-8 pt-4 pb-12">
+            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 gap-4">
+              {[
+                { label: 'Orbital Command', sub: 'Zero-G RAG Control', icon: Cpu, path: '/orbital-command', color: 'cyan' },
+                { label: 'Report Line', sub: 'Approval Hierarchy', icon: Users, path: '/report-line-management', color: 'purple' },
+                { label: 'Manual Entry', sub: 'Incident Injection', icon: MessageSquare, path: '/incident-push', color: 'green' },
+                { label: 'Accounts', sub: 'Security Admin', icon: User, path: '/user-management', color: 'blue' },
+                { label: 'Security Logs', sub: 'Access Audit Trails', icon: Shield, path: '/security-logs', color: 'indigo', adminOnly: true },
+                { label: 'Organization', sub: 'Org Hierarchy', icon: Network, path: '/organization-management', color: 'emerald' },
+                { label: 'Knowledge Base', sub: 'RAG Knowledge', icon: FileText, path: '/knowledge-base', color: 'sky' },
+                { label: 'Global Stats', sub: 'System Metrics', icon: Activity, path: '/overall-status', color: 'orange' },
+                { label: 'War-Room Hub', sub: 'Active Channels', icon: Shield, path: '/warroom-management', color: 'red' },
+                { label: 'Activity Logs', sub: 'User Footprints', icon: Activity, path: '/activity', color: 'cyan' },
+                { label: 'Codebook', sub: 'Common Metadata', icon: BookOpen, path: '/codebook-management', color: 'yellow' },
+                { label: 'Data Flow', sub: 'Technical DFD', icon: Layers, path: '/processing-flow', color: 'blue', adminOnly: true },
+              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item, idx) => (
+                <div
+                  key={item.label}
+                  onClick={() => { setShowMoreMenu(false); navigate(item.path); }}
+                  className={`glass-card p-4 rounded-[2rem] active-scale group flex flex-col items-center text-center animate-fade-in-up`}
+                  style={{ animationDelay: `${idx * 40}ms` }}
+                >
+                  <div className={`p-3 rounded-2xl bg-${item.color}-500/10 border border-${item.color}-500/20 mb-3 group-hover:scale-110 transition-transform`}>
+                    <item.icon className={`w-6 h-6 text-${item.color}-400`} />
+                  </div>
+                  <span className="block font-black text-slate-100 text-[13px] tracking-tight">{item.label}</span>
+                  <span className="text-[9px] text-slate-500 mt-1 font-bold uppercase tracking-tighter">{item.sub}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-8 pt-2 pb-10">
               <button
                 onClick={() => setShowMoreMenu(false)}
-                className="w-full py-4 rounded-2xl bg-white/5 text-slate-400 font-bold hover:bg-white/10 transition-colors"
+                className="w-full py-4 rounded-[1.5rem] bg-white/5 border border-white/10 text-slate-400 font-black text-sm active-scale"
               >
-                닫기
+                CLOSE CONSOLE
               </button>
             </div>
           </div>

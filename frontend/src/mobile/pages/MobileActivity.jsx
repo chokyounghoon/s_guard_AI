@@ -89,7 +89,7 @@ export default function MobileActivity({ user }) {
 
   return (
     <PullToRefresh onRefresh={() => fetchLogs(true)}>
-      <div className="flex-1 flex flex-col bg-[#0a0e17] pb-24">
+      <div className="flex flex-col bg-[#0a0e17] pb-24 min-h-full">
 
       {/* 헤더 */}
       <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 px-4 pt-4 pb-3">

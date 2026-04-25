@@ -6,22 +6,37 @@ import path from 'path'
 // This produces a separate optimized bundle for mobile browsers.
 // Deploy to a separate Cloudflare Pages project: sguard-mobile
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'configure-server',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url === '/') {
+            req.url = '/index.mobile.html'
+          }
+          next()
+        })
+      }
+    }
+  ],
   root: '.',
-  // 🔑 PC 서버(5173)와 캐시 충돌 방지: 모바일 전용 캐시 디렉터리
-  cacheDir: 'node_modules/.vite-mobile',
+  // 🔑 캐시 충돌 완벽 차단을 위해 새로운 캐시 디렉터리 사용
+  cacheDir: 'node_modules/.vite-mobile-final',
   optimizeDeps: {
     // 주요 의존성을 미리 명시해 504 Outdated Dep 에러 방지
     include: [
       'react',
       'react-dom',
       'react-dom/client',
+      'react/jsx-dev-runtime',
+      'react/jsx-runtime',
       'react-router-dom',
       'lucide-react',
       'react-markdown',
       '@react-oauth/google',
     ],
-    force: false, // 개발 중 true로 설정하면 매번 강제 재번들
+    force: true, // 에러 방지를 위해 강제 재번들 활성화
   },
   build: {
     outDir: 'dist-mobile',
@@ -34,6 +49,10 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5174,
     // 개발 서버도 모바일 캐시 폴더 사용
-    hmr: true,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 5174,
+    },
   },
 })

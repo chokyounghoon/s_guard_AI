@@ -195,7 +195,7 @@ const MarkdownViewer = ({ text }) => {
             );
           },
           ul: ({ children }) => (
-            <ul className="mb-8 space-y-6 list-none p-0 relative before:absolute before:left-[3px] before:top-2 before:bottom-2 before:w-[1.5px] before:bg-blue-500/20">
+            <ul className="mb-4 space-y-2 list-none p-0">
               {children}
             </ul>
           ),
@@ -234,10 +234,10 @@ const MarkdownViewer = ({ text }) => {
             }
 
             return (
-              <li className={`relative pl-8 text-gray-300 text-sm leading-relaxed mb-4
-                before:absolute before:left-[-1px] before:top-1.5 before:z-10 before:h-2.5 before:w-2.5 before:rounded-full 
-                before:border-2 before:border-[#1a1f2e] before:bg-slate-500
-                hover:text-white transition-all group`}>
+              <li className={`relative pl-4 text-gray-300 text-sm leading-relaxed mb-2
+                before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full 
+                before:bg-slate-500
+                hover:text-white transition-all`}>
                 {children}
               </li>
             );

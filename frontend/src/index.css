@@ -17,18 +17,60 @@
     }
 
     @keyframes slide-down {
-        from {
-            opacity: 0;
-            transform: translateY(-20px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
-    .animate-slide-down {
-        animation: slide-down 0.3s ease-out;
+    @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-slide-down { animation: slide-down 0.3s ease-out; }
+    .animate-fade-in-up { animation: fade-in-up 0.4s ease-out forwards; }
+
+    /* 💎 Premium Glassmorphism */
+    .glass-card {
+        @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+    }
+    
+    .glass-panel {
+        @apply bg-[#0f111a]/80 backdrop-blur-md border-t border-white/5;
+    }
+
+    /* ✨ High-end Gradients */
+    .bg-premium-dark {
+        background: radial-gradient(circle at top left, #1a1f2e 0%, #0a0e17 100%);
+    }
+
+    .text-gradient-blue {
+        @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400;
+    }
+
+    .text-gradient-purple {
+        @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400;
+    }
+
+    /* 🎯 Interactive Elements */
+    .active-scale {
+        @apply active:scale-95 transition-transform duration-200;
+    }
+
+    .premium-border {
+        position: relative;
+    }
+    
+    .premium-border::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        padding: 1px;
+        background: linear-gradient(to bottom right, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
     }
 }

@@ -399,20 +399,26 @@ export default function LoginPage() {
     finally { setLoading(false); }
   };
 
+  const stepInfo = state===S.A ? 0 : (state===S.B || state===S.C1) ? 1 : 2;
+  const stepLabels = ['사번 확인','비밀번호','OTP 인증'];
+
+  // 모바일 뷰이면서 사번 입력 단계가 아닐 때만 축소 모드 적용
+  const isShrink = isMobileView && state !== S.A;
+
   const inputStyle = {
-    width:'100%', padding:'14px 48px 14px 16px',
+    width:'100%', padding: isShrink ? '12px 48px 12px 16px' : '14px 48px 14px 16px',
     background:'rgba(255,255,255,0.05)',
     border:'1.5px solid rgba(255,255,255,0.12)',
-    borderRadius:12, color:'white', fontSize:15,
+    borderRadius:12, color:'white', fontSize: isShrink ? 14 : 15,
     fontFamily:'inherit', outline:'none', boxSizing:'border-box',
     transition:'border-color .2s, box-shadow .2s',
   };
 
   const primaryBtn = {
-    width:'100%', padding:'15px',
+    width:'100%', padding: isShrink ? '12px' : '15px',
     background: loading ? 'rgba(0,70,255,0.5)' : 'linear-gradient(135deg,#0046FF 0%,#1a5aff 100%)',
     border:'none', borderRadius:14, color:'white',
-    fontSize:15, fontWeight:700, fontFamily:'inherit',
+    fontSize: isShrink ? 14 : 15, fontWeight:700, fontFamily:'inherit',
     cursor: loading ? 'not-allowed' : 'pointer',
     display:'flex', alignItems:'center', justifyContent:'center', gap:8,
     boxShadow:'0 4px 20px rgba(0,70,255,0.4)',
@@ -556,7 +562,7 @@ export default function LoginPage() {
             style={{ ...primaryBtn, padding:'16px' }}
           >
             <Download size={18} />
-            <span>APK 다운로드 시작</span>
+            <span>Android S-bridge 설치</span>
           </button>
           <p style={{ textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11, marginTop:16 }}>
             보안 정책에 따라 설치 파일은 사내 네트워크에서만 다운로드 가능할 수 있습니다.
@@ -576,11 +582,6 @@ export default function LoginPage() {
     </button>
   );
 
-  const stepInfo = state===S.A ? 0 : (state===S.B || state===S.C1) ? 1 : 2;
-  const stepLabels = ['사번 확인','비밀번호','OTP 인증'];
-
-  // 모바일 뷰이면서 사번 입력 단계가 아닐 때만 축소 모드 적용
-  const isShrink = isMobileView && state !== S.A;
 
   return (
     <>
@@ -736,24 +737,10 @@ export default function LoginPage() {
       `}</style>
 
       <div className="login-bg">
-        <div className="header-section" style={{ padding: isShrink ? '14px 0 12px' : '32px 0' }}>
+        <div className="header-section" style={{ padding: isShrink ? '30px 0 20px' : '60px 0 100px' }}>
           <div style={{ position:'relative', zIndex:1 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap: isShrink ? 4 : 6, marginBottom: isShrink ? 0 : 10 }}>
-              <div style={{ width: isShrink ? 28 : 72, height: isShrink ? 34 : 86, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ position:'absolute', width:'100%', height:'100%', filter:'drop-shadow(0 6px 16px rgba(0,0,0,0.4))' }}>
-                  <path d="M20 2L4 10V24C4 35 12 44 20 48C28 44 36 35 36 24V10L20 2Z" fill="rgba(255,255,255,0.06)" stroke="url(#glassOutline)" strokeWidth="1.2" strokeLinejoin="round" />
-                  <path d="M20 2L4 10V24C4 35 12 44 20 48V2Z" fill="rgba(255,255,255,0.05)" />
-                  <defs>
-                    <linearGradient id="glassOutline" x1="20" y1="0" x2="20" y2="48" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-                      <stop offset="40%" stopColor="rgba(255,255,255,0.1)" />
-                      <stop offset="100%" stopColor="rgba(255,255,255,0.6)" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <span style={{ color:'white', fontSize: isShrink ? 20 : 54, fontWeight:900, fontFamily:"'Inter', sans-serif", position:'relative', zIndex:3, marginTop: isShrink ? -2 : -6, textShadow:'0 4px 8px rgba(0,0,0,0.6)' }}>S</span>
-              </div>
-              <h1 style={{ color: '#ffffff', fontSize: isShrink ? 20 : 54, fontWeight: 900, letterSpacing: '0.07em', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.4)', fontFamily: "'Inter', sans-serif", margin: 0 }}>GUARD</h1>
+              <h1 style={{ color: '#ffffff', fontSize: isShrink ? 24 : 54, fontWeight: 900, letterSpacing: '0.07em', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.4)', fontFamily: "'Inter', sans-serif", margin: 0 }}>S-GUARD</h1>
             </div>
 
             {/* 🛡️ 다이내믹 피드백 루프 - 축소 모드일 때 자동 숨김 */}
@@ -777,7 +764,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="card-section" style={{ padding: isShrink ? '0 24px 40px' : '16px 24px 40px' }}>
+        <div className="card-section" style={{ padding: isShrink ? '40px 24px 40px' : '60px 24px 40px' }}>
           {state !== S.B && state !== S.RESET_A && state !== S.RESET_B && (
             <div className="step-bar" style={{ animation:'fadeUp .3s ease' }}>
               {stepLabels.map((label,idx) => (
@@ -800,7 +787,7 @@ export default function LoginPage() {
           )}
 
           {state === S.A && (
-            <form onSubmit={handleInit} style={{ display:'flex', flexDirection:'column', gap:14, animation:'fadeUp .3s ease' }}>
+            <form onSubmit={handleInit} style={{ display:'flex', flexDirection:'column', gap: isShrink ? 10 : 14, animation:'fadeUp .3s ease' }}>
               <div>
                 <p className="form-section-label">사원번호</p>
                 <div className="input-wrap">
@@ -819,21 +806,28 @@ export default function LoginPage() {
               <ErrorBox msg={error} />
               <SubmitBtn label="로그인" />
               
-              <div style={{ display:'flex', gap:8, marginTop:8 }}>
+              <div style={{ display:'flex', gap:8, marginTop: isShrink ? 4 : 8 }}>
                 <button type="button" onClick={() => setShowManual(true)}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
-                  <Download size={12} />Android APK
+                  <Download size={12} />Android S-bridge
                 </button>
-                <button type="button" onClick={() => window.alert('iOS 단축어 배포 준비 중입니다.')}
+                <button type="button" onClick={() => window.alert('iOS S-bridge 배포 준비 중입니다.')}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
-                  <Apple size={12} />iOS 단축어
+                  <Apple size={12} />iOS S-bridge
                 </button>
               </div>
 
-              <div style={{ marginTop:4, padding:'12px 14px', background:'rgba(0,70,255,0.05)', border:'1px solid rgba(0,70,255,0.12)', borderRadius:12 }}>
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 20 }}>
+                  <div style={{ width: 5, height: 5, background: '#10b981', borderRadius: '50%', boxShadow: '0 0 10px rgba(16,185,129,0.5)' }} />
+                  <span style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em' }}>SECURITY S-BRIDGE INTEGRATED</span>
+                </div>
+              </div>
+
+              <div style={{ marginTop:16, padding:'12px 14px', background:'rgba(0,70,255,0.05)', border:'1px solid rgba(0,70,255,0.12)', borderRadius:12 }}>
                 <p style={{ display:'flex', alignItems:'center', gap:6, color:'rgba(255,255,255,0.25)', fontSize:10.5, lineHeight:1.5 }}>
                   <Lock size={10} style={{ flexShrink:0 }} />
-                  본 시스템은 신한임직원및 협력사 전용입니다. 보안 수칙을 준수해 주세요.
+                  본 시스템은 신한임직원 및 협력사 전용입니다. 보안 수칙을 준수해 주세요.
                 </p>
               </div>
 
