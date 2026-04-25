@@ -450,9 +450,6 @@ function AppContent() {
           </div>
         </div>
       )}
-          </div>
-        </div>
-      )}
 
       {/* Global AI Assistant Panel */}
       {!isAuthPage && (
