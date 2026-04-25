@@ -34,6 +34,11 @@ import SecurityLogPage from './pages/SecurityLogPage';
 import ProcessingFlowPage from './pages/ProcessingFlowPage';
 import ConsentModal from './components/ConsentModal';
 
+// ── 모바일 최적화 페이지 (PC에서도 사용 — 사이즈만 다름) ──
+import MobileActivity     from './mobile/pages/MobileActivity';
+import MobileInbox        from './mobile/pages/MobileInbox';
+import MobileIncidentPush from './mobile/pages/MobileIncidentPush';
+
 import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
 import { useState, useEffect } from 'react';
@@ -270,32 +275,32 @@ function AppContent() {
 
         {/* 🔒 Protected Routes: 인증 필수 */}
         <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage /></ErrorBoundary></ProtectedRoute>} />
-        <Route path="/ai-report/:incidentId?" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiReportPage /></ProtectedRoute>} />
-        <Route path="/assignment-detail" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentDetailPage /></ProtectedRoute>} />
-        <Route path="/chat/:incidentId?" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ChatPage /></ProtectedRoute>} />
+        <Route path="/activity"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileActivity      user={userProfile} /></ProtectedRoute>} />
+        <Route path="/inbox"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileInbox         user={userProfile} /></ProtectedRoute>} />
+        <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileIncidentPush  user={userProfile} /></ProtectedRoute>} />
+        <Route path="/ai-report/:incidentId?"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiReportPage /></ProtectedRoute>} />
+        <Route path="/assignment-detail"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentDetailPage /></ProtectedRoute>} />
+        <Route path="/chat/:incidentId?"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ChatPage /></ProtectedRoute>} />
         <Route path="/chat-summary/:incidentId" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ChatSummaryPage /></ProtectedRoute>} />
-        <Route path="/ai-process-report" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiProcessReportPage /></ProtectedRoute>} />
-        <Route path="/report-publish" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportPublishPage /></ProtectedRoute>} />
-        <Route path="/activity" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ActivityPage /></ProtectedRoute>} />
-        <Route path="/activity-detail" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ActivityDetailPage /></ProtectedRoute>} />
-        <Route path="/assignments" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
-        <Route path="/overall-status" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OverallStatusPage /></ProtectedRoute>} />
-        <Route path="/search" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
-        <Route path="/incident-list" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentListPage /></ProtectedRoute>} />
-        <Route path="/keyword-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KeywordManagementPage /></ProtectedRoute>} />
-        <Route path="/report-line-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportLineManagementPage /></ProtectedRoute>} />
-        <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentPushPage /></ProtectedRoute>} />
-        <Route path="/security-logs" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SecurityLogPage /></ProtectedRoute>} />
-        <Route path="/processing-flow" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ProcessingFlowPage /></ProtectedRoute>} />
-        <Route path="/knowledge-base" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KnowledgeBasePage /></ProtectedRoute>} />
-        <Route path="/user-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><UserManagementPage /></ProtectedRoute>} />
+        <Route path="/ai-process-report"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiProcessReportPage /></ProtectedRoute>} />
+        <Route path="/report-publish"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportPublishPage /></ProtectedRoute>} />
+        <Route path="/activity-detail"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ActivityDetailPage /></ProtectedRoute>} />
+        <Route path="/assignments"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
+        <Route path="/overall-status"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OverallStatusPage /></ProtectedRoute>} />
+        <Route path="/search"                  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
+        <Route path="/incident-list"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentListPage /></ProtectedRoute>} />
+        <Route path="/keyword-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KeywordManagementPage /></ProtectedRoute>} />
+        <Route path="/report-line-management"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportLineManagementPage /></ProtectedRoute>} />
+        <Route path="/security-logs"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SecurityLogPage /></ProtectedRoute>} />
+        <Route path="/processing-flow"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ProcessingFlowPage /></ProtectedRoute>} />
+        <Route path="/knowledge-base"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KnowledgeBasePage /></ProtectedRoute>} />
+        <Route path="/user-management"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><UserManagementPage /></ProtectedRoute>} />
         <Route path="/organization-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrganizationManagementPage /></ProtectedRoute>} />
-        <Route path="/warroom-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WarRoomManagementPage /></ProtectedRoute>} />
-        <Route path="/codebook-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><CodebookManagementPage /></ProtectedRoute>} />
-        <Route path="/workflow/:inc_id" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WorkflowPage /></ProtectedRoute>} />
-        <Route path="/inbox" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><InboxPage /></ProtectedRoute>} />
-        <Route path="/report/:incId" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportViewPage /></ProtectedRoute>} />
-        <Route path="/orbital-command" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrbitalCommandPage /></ProtectedRoute>} />
+        <Route path="/warroom-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WarRoomManagementPage /></ProtectedRoute>} />
+        <Route path="/codebook-management"     element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><CodebookManagementPage /></ProtectedRoute>} />
+        <Route path="/workflow/:inc_id"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WorkflowPage /></ProtectedRoute>} />
+        <Route path="/report/:incId"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportViewPage /></ProtectedRoute>} />
+        <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrbitalCommandPage /></ProtectedRoute>} />
       </Routes>
 
       {/* ⚖️ Governance & Mandatory Consent Guard */}
