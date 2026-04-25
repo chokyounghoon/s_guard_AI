@@ -8,48 +8,43 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 w-full z-50 px-4 pb-6 pointer-events-none">
-        <nav className="max-w-lg mx-auto glass-panel rounded-[2.5rem] px-6 py-4 flex justify-between items-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 pointer-events-auto">
-          {[
-            { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
-            { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
-            { id: 'report', label: 'Report', icon: FileText, path: '/ai-report', action: onReportClick },
-            { id: 'inbox', label: 'Inbox', icon: Inbox, path: '/inbox' },
-            { id: 'ai', label: 'AI', icon: Bot, action: onAiClick, isAi: true },
-            { id: 'more', label: 'More', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
-          ].map((item) => {
-            const isActive = currentPath === item.path || (item.path && currentPath?.startsWith(item.path));
-            const Icon = item.icon;
-            
-            return (
-              <button
-                key={item.id}
-                onClick={() => item.action ? item.action() : navigate(item.path)}
-                className={`flex flex-col items-center gap-1 group active-scale relative ${
-                  isActive ? 'text-blue-400' : 'text-slate-500'
-                }`}
-              >
-                <div className="relative">
-                  <Icon className={`w-6 h-6 transition-all duration-300 ${
-                    isActive ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.5)] scale-110' : 'group-hover:text-slate-300'
-                  }`} />
-                  {item.isAi && showAiPulse && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-500 rounded-full border-2 border-[#0f111a] animate-pulse shadow-[0_0_10px_rgba(168,85,247,0.5)]"></span>
-                  )}
-                </div>
-                <span className={`text-[10px] font-bold tracking-tighter transition-all ${
-                  isActive ? 'opacity-100 translate-y-0' : 'opacity-60'
-                }`}>
-                  {item.label}
-                </span>
-                {isActive && (
-                  <div className="absolute -bottom-2 w-1 h-1 bg-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.8)]"></div>
+      {/* Flat Bottom Tab Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0f1219]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden">
+        {[
+          { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
+          { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
+          { id: 'report', label: 'Report', icon: FileText, path: '/ai-report', action: onReportClick },
+          { id: 'inbox', label: 'Inbox', icon: Inbox, path: '/inbox' },
+          { id: 'ai', label: 'AI', icon: Bot, action: onAiClick, isAi: true },
+          { id: 'more', label: '더보기', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
+        ].map((item) => {
+          const isActive = currentPath === item.path || (item.path && currentPath?.startsWith(item.path));
+          const Icon = item.icon;
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => item.action ? item.action() : navigate(item.path)}
+              className={`flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all duration-200 relative min-w-[48px] ${
+                isActive ? 'text-blue-400' : 'text-slate-500'
+              }`}
+            >
+              {isActive && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+              )}
+              <div className="relative">
+                <Icon className={`w-5 h-5 transition-all duration-200 ${isActive ? 'drop-shadow-[0_0_6px_rgba(59,130,246,0.6)]' : ''}`} />
+                {item.isAi && showAiPulse && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border border-[#0f111a] animate-pulse" />
                 )}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+              </div>
+              <span className={`text-[9px] font-bold tracking-tight leading-none ${isActive ? 'text-blue-400' : 'text-slate-600'}`}>
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
 
       {/* More Menu Popup */}
       {showMoreMenu && (

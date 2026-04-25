@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import html2pdf from 'html2pdf.js';
+import BottomMenu from '../components/BottomMenu';
 
 export default function ChatSummaryPage() {
   const { incidentId } = useParams();
@@ -51,6 +52,8 @@ export default function ChatSummaryPage() {
   const [governanceStep, setGovernanceStep] = useState(null); // null, 'knowledge', 'resolving', 'done'
 
   const [reportingLines, setReportingLines] = useState([]);
+  const [incidentMessage, setIncidentMessage] = useState('');     // 장애 SMS 문자 내용
+  const [workflowSteps, setWorkflowSteps] = useState([]);          // 장애처리현황 단계
 
   const getApiUrl = (endpoint) => {
     // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보)
@@ -195,6 +198,35 @@ export default function ChatSummaryPage() {
     };
     fetchIncidentStatus();
 
+    // Fetch Incident SMS Message & Workflow Steps
+    const fetchIncidentData = async () => {
+      try {
+        const cleanId = incidentId.startsWith('INC-') ? incidentId : `INC-${incidentId}`;
+        const res = await fetch(getApiUrl(`/ai/incident/${cleanId}`));
+        if (res.ok) {
+          const data = await res.json();
+          const inc = data.incident;
+          // 우선순위: sms_message(received_messages JOIN) > title에 포함된 SMS > description
+          if (inc?.sms_message) {
+            setIncidentMessage(inc.sms_message);
+          } else if (inc?.title && inc.title.includes(' | ')) {
+            setIncidentMessage(inc.title.split(' | ').slice(1).join(' | '));
+          } else if (inc?.description) {
+            setIncidentMessage(inc.description);
+          }
+        }
+      } catch (e) { console.error('Failed to fetch incident message:', e); }
+
+      try {
+        const res = await fetch(getApiUrl(`/ai/incident/workflow-details?inc_id=${incidentId}`));
+        if (res.ok) {
+          const data = await res.json();
+          setWorkflowSteps(data.steps || []);
+        }
+      } catch (e) { console.error('Failed to fetch workflow steps:', e); }
+    };
+    fetchIncidentData();
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -223,21 +255,45 @@ export default function ChatSummaryPage() {
       '주요 조치 사항': { icon: ListChecks, color: 'from-indigo-600 to-indigo-400' },
       '최종 결과': { icon: CheckCircle, color: 'from-emerald-600 to-emerald-400' },
       '향후 과제': { icon: TrendingUp, color: 'from-purple-600 to-purple-400' },
+      '타임라인': { icon: History, color: 'from-blue-500 to-cyan-400' },
       'Default': { icon: Zap, color: 'from-slate-600 to-slate-400' }
     };
 
-    if (parts.length <= 1 && !cleanTextForParsing.includes('###')) {
-      // Fallback if no sections are found - ONLY show if NO LONGER LOADING to avoid showing raw transcript
-      if (isLoading) return []; 
+    // 🕐 타임라인 텍스트를 마크다운 리스트 형식으로 변환
+    // 예: "[12:19:37] 장애 인지: ..." → "- [12:19:37] 장애 인지: ..."
+    const convertToTimeline = (content) => {
+      // 이미 리스트 형식이면 그대로
+      if (/^\s*[-*]\s*\[\d/.test(content)) return content;
+      // 인라인 타임스탬프를 개별 리스트 아이템으로 분리
+      return content
+        .replace(/([^\n])\s*(\[\d{1,2}:\d{2}(?::\d{2})?\])/g, '\n$2')  // 앞 텍스트와 분리
+        .split('\n')
+        .map(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return '';
+          if (/^\[\d{1,2}:\d{2}/.test(trimmed)) return `- ${trimmed}`;
+          return trimmed;
+        })
+        .filter(Boolean)
+        .join('\n');
+    };
 
-      return [{ title: '인시던트 상세 요약', content: cleanTextForParsing, icon: FileText, color: 'from-blue-600 to-indigo-600' }];
+    if (parts.length <= 1 && !cleanTextForParsing.includes('###')) {
+      if (isLoading) return []; 
+      const isTimeline = /\[\d{1,2}:\d{2}/.test(cleanTextForParsing);
+      const processedContent = isTimeline ? convertToTimeline(cleanTextForParsing) : cleanTextForParsing;
+      return [{ title: isTimeline ? '장애 대응 타임라인 요약' : '인시던트 상세 요약', content: processedContent, icon: isTimeline ? History : FileText, color: 'from-blue-500 to-cyan-400' }];
     }
 
     return parts.map(part => {
       const lines = part.split('\n');
       const title = lines[0].trim().replace(/^\d+\.?\s*/, '');
-      const content = lines.slice(1).join('\n').trim();
+      let content = lines.slice(1).join('\n').trim();
       
+      // 타임라인 섹션이면 리스트 형식 변환
+      const isTimeline = title.includes('타임라인') || /\[\d{1,2}:\d{2}/.test(content.substring(0, 200));
+      if (isTimeline) content = convertToTimeline(content);
+
       // Try to find matching config or use default
       const config = Object.entries(sectionConfig).find(([key]) => title.includes(key))?.[1] || sectionConfig.Default;
       
@@ -463,135 +519,242 @@ export default function ChatSummaryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans pb-20">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-[#0f1421]/80 backdrop-blur-md border-b border-white/5 z-50 px-6 flex items-center justify-between print:hidden">
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-full hover:bg-white/10 transition-all active:scale-95"
-          >
-            <ArrowLeft className="w-6 h-6" />
+    <div className="min-h-screen bg-[#0f1421] text-white font-sans pb-28">
+      {/* Header - Mobile Optimized */}
+      <header className="fixed top-0 left-0 right-0 bg-[#0f1421]/90 backdrop-blur-md border-b border-white/5 z-50 print:hidden">
+        <div className="flex items-center gap-2 px-3 py-3">
+          {/* 뒤로 + 제목 */}
+          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-all active:scale-95 shrink-0">
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-sm font-black tracking-widest uppercase text-blue-400">WAR-ROOM TIMELINE REPORT</h1>
-            <p className="text-[10px] text-slate-500 font-mono">{incidentId}</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xs font-black tracking-wider uppercase text-blue-400 truncate">War-Room Report</h1>
+            <p className="text-[9px] text-slate-500 font-mono truncate">{incidentId}</p>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-2">
-          <button 
-            onClick={handleCopy}
-            className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold transition-all active:scale-95"
-          >
-            {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{isCopied ? 'Copied' : 'Copy'}</span>
-          </button>
-          
-          <button 
-            onClick={handleGovernance}
-            disabled={isGoverning || isStreaming || isLoading || !summary || govSuccess || incidentStatus === '처리완료'}
-            className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all border active:scale-95 shadow-xl ${
-              (govSuccess || incidentStatus === '처리완료')
-                ? 'bg-emerald-600 border-emerald-500/50 text-white shadow-emerald-500/20 opacity-80 cursor-default' 
-                : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 border-indigo-400/30 text-white shadow-indigo-500/20 hover:scale-105 active:scale-95'
-            } disabled:opacity-50 group origin-right disabled:hover:scale-100 disabled:cursor-not-allowed`}
-          >
-            {isGoverning ? (
-              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : govSuccess ? (
-              <CheckCircle2 className="w-4 h-4" />
-            ) : (
-              <Shield className="w-4 h-4 text-indigo-200 group-hover:rotate-12 transition-transform" />
-            )}
-            <div className="flex flex-col items-start leading-none space-y-0.5">
-              <span>
-                {isGoverning 
-                  ? (governanceStep === 'knowledge' ? '지식화(RAG) 등록 중...' : governanceStep === 'resolving' ? '인시던트 상태 업데이트 중...' : '분석 처리 중...') 
-                  : isStreaming ? `[분석중] ${loadingStatus}` 
-                  : (govSuccess || incidentStatus === '처리완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}
+          {/* 버튼 그룹 */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* 재분석 버튼 */}
+            <button
+              onClick={() => {
+                setSummary('');
+                setError(null);
+                setIsLoading(true);
+                setIsStreaming(true);
+                setLoadingStatus('Dify AI 엔진에 재분석을 요청하고 있습니다...');
+                // fetchSummary 재호출 (useEffect 트리거)
+                const controller = new AbortController();
+                abortControllerRef.current = controller;
+                (async () => {
+                  try {
+                    const response = await fetch(getApiUrl('/ai/summarize-chat'), {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ incident_id: incidentId }),
+                      signal: controller.signal
+                    });
+                    if (!response.ok || !response.body) throw new Error('재분석 요청 실패');
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    while (true) {
+                      const { value, done } = await reader.read();
+                      if (done) break;
+                      buffer += decoder.decode(value, { stream: true });
+                      const events = buffer.split('\n\n');
+                      buffer = events.pop() || '';
+                      for (const evt of events) {
+                        for (const line of evt.split('\n')) {
+                          if (!line.trim().startsWith('data:')) continue;
+                          const dataStr = line.replace(/^data:\s*/, '').trim();
+                          if (dataStr === '[DONE]') continue;
+                          try {
+                            const data = JSON.parse(dataStr);
+                            if (data.status) setLoadingStatus(data.status);
+                            if (data.answer) setSummary(prev => { const t = prev + data.answer; if (t.length > 5) setIsLoading(false); return t; });
+                            if (data.error) setError(data.error);
+                          } catch {}
+                        }
+                      }
+                    }
+                  } catch (err) {
+                    if (err.name !== 'AbortError') setError('재분석 중 오류가 발생했습니다.');
+                  } finally {
+                    setIsLoading(false);
+                    setIsStreaming(false);
+                  }
+                })();
+              }}
+              disabled={isLoading || isStreaming || isGoverning || govSuccess}
+              className="p-2 rounded-xl bg-white/5 hover:bg-indigo-500/20 border border-white/10 hover:border-indigo-500/30 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="재분석 (Dify 재호출)"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading || isStreaming ? 'animate-spin text-indigo-400' : 'text-slate-300'}`} />
+            </button>
+
+            {/* Copy - 아이콘만 */}
+            <button onClick={handleCopy} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all active:scale-95" title={isCopied ? 'Copied' : 'Copy'}>
+              {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            </button>
+
+            {/* 지식화/완료 처리 */}
+            <button
+              onClick={handleGovernance}
+              disabled={isGoverning || isStreaming || isLoading || !summary || govSuccess || incidentStatus === '처리완료'}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black transition-all border active:scale-95 ${
+                (govSuccess || incidentStatus === '처리완료')
+                  ? 'bg-emerald-600/80 border-emerald-500/40 text-white'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-400/30 text-white hover:opacity-90'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              {isGoverning ? (
+                <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : govSuccess ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                <Shield className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {isGoverning ? '처리 중...' : (govSuccess || incidentStatus === '처리완료') ? '완료됨' : '지식화/장애/보고/완료 처리'}
               </span>
-            </div>
-          </button>
+              <span className="sm:hidden">
+                {isGoverning ? '...' : (govSuccess || incidentStatus === '처리완료') ? '완료' : '완료 처리'}
+              </span>
+            </button>
 
-          <button 
-            onClick={handlePrint}
-            className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold transition-all shadow-lg shadow-blue-500/20 active:scale-95"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Print Report</span>
-          </button>
+            {/* Print - 아이콘만 */}
+            <button onClick={handlePrint} className="p-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-all active:scale-95" title="Print Report">
+              <Printer className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="pt-24 px-6 max-w-4xl mx-auto">
+      <main className="pt-20 px-3 sm:px-6 max-w-4xl mx-auto">
         {/* Report Cover Style Component */}
-        <div id="report-content" className="bg-[#1a1f2e] border border-white/10 rounded-3xl overflow-visible shadow-2xl mb-8 print:shadow-none print:border-slate-200">
+        <div id="report-content" className="bg-[#1a1f2e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl mb-6 print:shadow-none print:border-slate-200">
           {/* Top accent bar */}
-          <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
+          <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
           
-          <div className="p-8 md:p-12">
-            <div className="flex justify-between items-start mb-10">
-              <div className="space-y-4">
-                <div className="bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full inline-flex items-center space-x-2 font-mono">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-tighter">AI-Generated Timeline</span>
+          <div className="p-4 sm:p-8">
+            {/* Cover: 타이틀 */}
+            <div className="flex justify-between items-start mb-5">
+              <div className="space-y-2">
+                <div className="bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 font-mono">
+                  <Sparkles className="w-3 h-3 text-blue-400" />
+                  <span className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">AI-Generated Timeline</span>
                 </div>
-                <h2 className="text-3xl md:text-4xl font-black leading-tight uppercase tracking-tight">
-                  장애 대응 <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Collaborative Timeline</span>
+                <h2 className="text-xl sm:text-3xl font-black leading-tight uppercase tracking-tight">
+                  장애 대응
+                  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Collaborative Timeline</span>
                 </h2>
               </div>
-              <div className="text-right hidden sm:block">
-                <FileText className="w-12 h-12 text-slate-700 ml-auto mb-2" />
-                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Formal Document</div>
-                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">S-Guard AI Engine v2.0</div>
-              </div>
+              <FileText className="w-8 h-8 text-slate-700 shrink-0 mt-1" />
             </div>
 
-            {/* Metadata Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 px-8 py-6 bg-white/[0.02] border-b border-white/5 print:border-slate-200 print:bg-slate-50">
-              <div className="space-y-1">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Incident ID</div>
-                <div className="text-sm font-black text-blue-400 font-mono tracking-tighter">#{incidentId}</div>
+            {/* Metadata Grid - 2열 모바일 */}
+            <div className="grid grid-cols-2 gap-3 p-3 sm:p-5 bg-white/[0.02] rounded-xl border border-white/5 mb-4">
+              <div className="col-span-2 space-y-1">
+                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Incident ID</div>
+                <div className="text-xs font-black text-blue-400 font-mono">
+                  {incidentId.replace(/^INC-/i, '')}
+                </div>
+                {/* 장애 SMS 문자 내용 (API 우선, 없으면 summary fallback) */}
+                <div className="text-[11px] text-slate-400 leading-relaxed mt-1 line-clamp-3">
+                  {incidentMessage
+                    ? incidentMessage
+                    : summary
+                      ? summary.replace(/\*\*/g, '').replace(/#{1,3}\s*/g, '').replace(/\n+/g, ' ').trim()
+                      : '장애 메시지 로딩 중...'}
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Summary Date</div>
-                <div className="text-sm font-bold text-white print:text-slate-900">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+              <div className="space-y-0.5">
+                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Summary Date</div>
+                <div className="text-xs font-bold text-white">
+                  {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {' '}{new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Report Status</div>
-                <div className="flex items-center space-x-1.5">
-                  <span className={`text-sm font-bold ${isLoading ? 'text-orange-400 animate-pulse flex items-center gap-1.5' : 'text-emerald-400 flex items-center gap-1.5'}`}>
-                    {isLoading && <RefreshCw className="w-3 h-3 animate-spin" />}
-                    {isLoading ? 'AI 분석 처리중...' : 'Verified'}
+              <div className="space-y-0.5">
+                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Report Status</div>
+                <div className="flex items-center gap-1">
+                  <span className={`text-xs font-bold flex items-center gap-1 ${isLoading ? 'text-orange-400 animate-pulse' : 'text-emerald-400'}`}>
+                    {isLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin" />}
+                    {isLoading ? '분석 중...' : 'Verified'}
                   </span>
                   {!isLoading && (
-                    <button 
-                      onClick={() => {
-                        setSummary('');
-                        window.location.reload(); 
-                      }}
-                      className="p-1 rounded-full hover:bg-white/10 text-slate-500 hover:text-white transition-all ml-1"
-                      title="다시 분석하기"
-                    >
-                      <RefreshCw className="w-3 h-3" />
+                    <button onClick={() => { setSummary(''); window.location.reload(); }} className="p-0.5 rounded-full hover:bg-white/10 text-slate-500 hover:text-white transition-all">
+                      <RefreshCw className="w-2.5 h-2.5" />
                     </button>
                   )}
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Confidentiality</div>
-                <div className="flex items-center space-x-1.5">
-                  <Shield className="w-3.5 h-3.5 text-amber-500/70" />
-                  <span className="text-sm text-amber-500/70 font-bold uppercase tracking-tighter">Restricted</span>
+              <div className="space-y-0.5">
+                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Confidentiality</div>
+                <div className="flex items-center gap-1">
+                  <Shield className="w-3 h-3 text-amber-500/70" />
+                  <span className="text-xs text-amber-500/70 font-bold uppercase">Restricted</span>
                 </div>
               </div>
             </div>
 
+            {/* 장애처리현황 - 4단계 MTTR (일시분초) */}
+            {workflowSteps.length > 0 && (() => {
+              const smsStep = workflowSteps.find(s => s.id === 'SMS');
+              const ragStep = workflowSteps.find(s => s.id === 'RAG') || workflowSteps.find(s => s.id === 'AGENT');
+              const warStep = workflowSteps.find(s => s.id === 'WARROOM');
+              const knwStep = workflowSteps.find(s => s.id === 'KNOWLEDGE');
+              const now = new Date();
+              const formatDHMS = (from, to) => {
+                if (!from) return '-';
+                const ms = (to ? new Date(to.timestamp) : now) - new Date(from.timestamp);
+                if (ms < 0) return '-';
+                const d = Math.floor(ms / 86400000);
+                const h = Math.floor((ms % 86400000) / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                const s = Math.floor((ms % 60000) / 1000);
+                if (d > 0) return `${d}일 ${h}시간 ${m}분 ${s}초`;
+                if (h > 0) return `${h}시간 ${m}분 ${s}초`;
+                if (m > 0) return `${m}분 ${s}초`;
+                return `${s}초`;
+              };
+              const phases = [
+                { label: '인지', from: smsStep, to: ragStep },
+                { label: '분석', from: ragStep, to: warStep },
+                { label: '워룸진행', from: warStep, to: knwStep },
+                { label: '처리완료', from: smsStep, to: knwStep },
+              ];
+              return (
+                <div className="mb-4 p-3 bg-white/[0.02] rounded-xl border border-white/5">
+                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-2">장애처리현황 MTTR</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {phases.map(({ label, from, to }) => {
+                      const isDone = !!to;
+                      const isActive = !!from && !to;
+                      return (
+                        <div key={label} className={`flex flex-col gap-0.5 px-3 py-2 rounded-lg border ${
+                          isDone ? 'bg-emerald-500/5 border-emerald-500/20'
+                          : isActive ? 'bg-blue-500/5 border-blue-500/20'
+                          : 'bg-white/[0.01] border-white/5'
+                        }`}>
+                          <div className="flex items-center gap-1">
+                            <div className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-400' : isActive ? 'bg-blue-400 animate-pulse' : 'bg-slate-600'}`} />
+                            <span className={`text-[9px] font-black ${isDone ? 'text-emerald-400' : isActive ? 'text-blue-400' : 'text-slate-600'}`}>{label}</span>
+                          </div>
+                          <span className={`text-[11px] font-black font-mono ${isDone ? 'text-emerald-300' : isActive ? 'text-blue-300' : 'text-slate-600'}`}>
+                            {formatDHMS(from, to)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Content Area */}
-            <div className="content-area min-h-[400px] p-8 md:p-12">
+            <div className="content-area min-h-[200px]">
               {isLoading && (
                 <div className="flex flex-col items-center justify-center py-20 space-y-8 animate-in fade-in zoom-in-95 duration-700">
                   <div className="relative">
@@ -637,48 +800,68 @@ export default function ChatSummaryPage() {
                 </div>
               )}
 
-              {!isLoading && !error && summary && (
-                <div id="report-content" className="animate-in fade-in duration-1000 relative space-y-12">
-                   {parseSections(summary).map((section, idx) => (
-                    <div 
-                      key={idx} 
-                      className="group relative bg-white/[0.02] border border-white/5 rounded-3xl p-8 md:p-10 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-500 animate-in slide-in-from-bottom-5 fade-in"
-                      style={{ animationDelay: `${idx * 150}ms`, fillMode: 'both' }}
-                    >
-                      <div className="flex items-start space-x-8">
-                        <div className={`p-4 rounded-2xl bg-gradient-to-br ${section.color} shadow-xl shadow-black/20 group-hover:scale-110 transition-transform duration-500 ring-1 ring-white/10`}>
-                          <section.icon className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1 space-y-6">
-                          <h3 className="text-xl font-black tracking-tight text-white group-hover:text-indigo-300 transition-colors uppercase">
-                            {section.title}
-                          </h3>
-                          <div className="prose prose-invert prose-sm max-w-none opacity-90 group-hover:opacity-100 transition-opacity leading-relaxed">
-                            <MarkdownViewer text={section.content} />
+              {!isLoading && !error && summary && (() => {
+                  const sections = parseSections(summary);
+                  let sectionNum = 0;
+                  const sectionColorMap = [
+                    { keys: ['타임라인'], style: null },
+                    { keys: ['장애내용','장애 내용','장애 개요','개요'], style: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-300', num: 'bg-blue-500' } },
+                    { keys: ['발생원인','발생 원인','핵심원인','핵심 원인','원인'], style: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-300', num: 'bg-amber-500' } },
+                    { keys: ['진행결과','진행 결과','조치','처리'], style: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-300', num: 'bg-indigo-500' } },
+                    { keys: ['상황종료','상황 종료','종료','최종 결과','최종'], style: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300', num: 'bg-emerald-500' } },
+                    { keys: ['추가작업','추가 작업','향후','과제'], style: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-300', num: 'bg-purple-500' } },
+                  ];
+                  const getStyle = (title) => {
+                    const entry = sectionColorMap.find(e => e.keys.some(k => title.includes(k)));
+                    return entry ? entry.style : { bg: 'bg-white/[0.02]', border: 'border-white/5', text: 'text-slate-300', num: 'bg-slate-500' };
+                  };
+                  return (
+                    <div id="report-content" className="animate-in fade-in duration-1000 relative space-y-4">
+                      {sections.map((section, idx) => {
+                        const isTimeline = section.title.includes('타임라인');
+                        if (!isTimeline) sectionNum++;
+                        const style = getStyle(section.title);
+                        return (
+                          <div
+                            key={idx}
+                            className={`group relative rounded-2xl p-4 border transition-all duration-300 ${
+                              isTimeline
+                                ? 'bg-white/[0.02] border-white/5'
+                                : `${style?.bg} ${style?.border}`
+                            }`}
+                            style={{ animationDelay: `${idx * 100}ms` }}
+                          >
+                            {!isTimeline && style && (
+                              <div className="mb-4">
+                                <div className={`flex items-baseline gap-1.5 pb-2 border-b-2 ${style.border}`}>
+                                  <span className={`text-base font-black tabular-nums ${style.text}`}>
+                                    {sectionNum}.
+                                  </span>
+                                  <h3 className={`text-base font-black tracking-tight ${style.text}`}>
+                                    {section.title}
+                                  </h3>
+                                </div>
+                              </div>
+                            )}
+                            <div className="prose prose-invert prose-sm max-w-none leading-relaxed">
+                              <MarkdownViewer text={section.content} />
+                            </div>
                           </div>
+                        );
+                      })}
+                      {isStreaming && (
+                        <div className="flex items-center justify-center space-x-3 mt-8 p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl animate-pulse">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+                          </div>
+                          <span className="text-sm font-bold text-indigo-300 tracking-wide">{loadingStatus || 'Dify AI가 실시간으로 분석 중입니다...'}</span>
                         </div>
-                      </div>
-                      
-                      {/* Subtle accent line mapping to color */}
-                      <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-gradient-to-b ${section.color} opacity-0 group-hover:opacity-100 transition-all duration-500`} />
+                      )}
                     </div>
-                  ))}
-
-                  {/* Streaming indicator shown while fetching data from Dify */}
-                  {isStreaming && (
-                    <div className="flex items-center justify-center space-x-3 mt-8 p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl animate-pulse">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
-                      </div>
-                      <span className="text-sm font-bold text-indigo-300 tracking-wide">{loadingStatus || 'Dify AI가 실시간으로 분석 중입니다...'}</span>
-                    </div>
-                  )}
-
-
-                </div>
-              )}
+                  );
+              })()}
             </div>
 
             {/* Additional Notes Section */}
@@ -701,7 +884,7 @@ export default function ChatSummaryPage() {
                 </div>
                 <p className="mt-2 text-[10px] text-slate-500 font-mono uppercase tracking-tight flex items-center print:hidden">
                   <AlertCircle className="w-3 h-3 mr-1" />
-                  이 영역의 내용은 PDF 리포트와 메일 전송 시 함께 포함됩니다.
+                  이 영역의 내용은 보고서 전송 및 지식화에 함께 포함되어 적용됩니다.
                 </p>
               </div>
             )}
@@ -876,6 +1059,7 @@ export default function ChatSummaryPage() {
           .prose { color: #000000 !important; max-width: 100% !important; }
         }
       ` }} />
+      <BottomMenu currentPath="/chat" />
     </div>
   );
 }

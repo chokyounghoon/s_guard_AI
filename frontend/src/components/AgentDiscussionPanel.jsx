@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Shield, Database, Server, User, Terminal } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Shield, Database, Server, User, Terminal, Copy, Check, X } from 'lucide-react';
 
 const AgentAvatar = ({ role }) => {
   const getAgentStyle = (role) => {
@@ -43,12 +43,65 @@ const cleanText = (text = '') =>
 
 export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false, incident }) {
   const scrollRef = useRef(null);
+  const longPressTimer = useRef(null);
+  const [contextMenu, setContextMenu] = useState(null); // { text, x, y }
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // 컨텍스트 메뉴 닫기
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    if (contextMenu) {
+      window.addEventListener('touchstart', close, { once: true });
+      window.addEventListener('mousedown', close, { once: true });
+    }
+    return () => {
+      window.removeEventListener('touchstart', close);
+      window.removeEventListener('mousedown', close);
+    };
+  }, [contextMenu]);
+
+  const startLongPress = useCallback((text, e) => {
+    e.preventDefault();
+    const touch = e.touches?.[0] || e;
+    const x = Math.min(touch.clientX, window.innerWidth - 180);
+    const y = Math.max(touch.clientY - 100, 60);
+    longPressTimer.current = setTimeout(() => {
+      setContextMenu({ text, x, y });
+      // 진동 피드백 (모바일)
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 500);
+  }, []);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleCopy = async () => {
+    if (!contextMenu?.text) return;
+    try {
+      await navigator.clipboard.writeText(contextMenu.text);
+      setCopied(true);
+      setTimeout(() => { setCopied(false); setContextMenu(null); }, 1200);
+    } catch {
+      const el = document.createElement('textarea');
+      el.value = contextMenu.text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => { setCopied(false); setContextMenu(null); }, 1200);
+    }
+  };
 
   if (!isVisible) return null;
 
@@ -169,7 +222,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                       }} />
                       {/* 말풍선 본체 */}
                       <div
-                        className="px-4 py-3 text-[13px] leading-relaxed shadow-md whitespace-pre-wrap break-words"
+                        className="px-4 py-3 text-[13px] leading-relaxed shadow-md whitespace-pre-wrap break-words select-none"
                         style={{
                           ...bubbleBg,
                           borderRadius: '0 20px 20px 20px',
@@ -177,6 +230,13 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                           color: isLeader ? '#fff' : '#cbd5e1',
                           maxWidth: '100%',
                         }}
+                        onTouchStart={(e) => startLongPress(cleanText(msg.text), e)}
+                        onTouchEnd={cancelLongPress}
+                        onTouchMove={cancelLongPress}
+                        onMouseDown={(e) => startLongPress(cleanText(msg.text), e)}
+                        onMouseUp={cancelLongPress}
+                        onMouseLeave={cancelLongPress}
+                        onContextMenu={(e) => { e.preventDefault(); startLongPress(cleanText(msg.text), e); }}
                       >
                         {cleanText(msg.text)}
                       </div>
@@ -193,6 +253,32 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         })}
       </div>
       
+      {/* 롱 프레스 컨텍스트 메뉴 */}
+      {contextMenu && (
+        <div
+          className="fixed z-[9999] bg-[#1a1f2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+          style={{ left: contextMenu.x, top: contextMenu.y, minWidth: 160 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={handleCopy}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-white/10 transition-all"
+          >
+            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-blue-400" />}
+            {copied ? '복사됨!' : '텍스트 복사'}
+          </button>
+          <div className="h-px bg-white/5" />
+          <button
+            onClick={() => setContextMenu(null)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-400 hover:bg-white/10 transition-all"
+          >
+            <X className="w-4 h-4" />
+            닫기
+          </button>
+        </div>
+      )}
+
       {/* Footer Status */}
       <div className="p-3 bg-[#0d111a] border-t border-white/5 text-[10px] text-slate-500 text-center font-bold tracking-widest uppercase">
         Multi-Agent System Active • 4 Agents Online

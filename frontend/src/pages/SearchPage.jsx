@@ -394,7 +394,15 @@ export default function SearchPage() {
                   {searchResults.filter(i => activeCategory === 'all' || i.category === activeCategory).map((incident, i) => (
                     <div 
                       key={i} 
-                      onClick={() => navigate('/chat/' + incident.id)} 
+                      onClick={() => {
+                        const cleanId = String(incident.id).replace('INC-', '');
+                        // 조치완료(처리완료) 상태인 경우 리포트 페이지로, 그 외는 채팅방으로 이동
+                        if (incident.category === '조치완료' || incident.status === '처리완료') {
+                          navigate(`/report/${cleanId}`);
+                        } else {
+                          navigate('/chat/' + cleanId);
+                        }
+                      }}
                       className="bg-[#1a1f2e] p-6 rounded-3xl border border-white/5 hover:border-blue-500/40 transition-all cursor-pointer group relative overflow-hidden shadow-2xl"
                     >
                       <div className={`absolute top-0 left-0 w-1.5 h-full bg-${incident.color}-500 shadow-[0_0_15px_rgba(37,99,235,0.3)]`} />

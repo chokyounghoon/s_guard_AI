@@ -110,50 +110,64 @@ function IOSGuideModal({ onClose }) {
 
 // ─── Android / 기타 안내 모달 ─────────────────────────────────────────────────
 function AndroidGuideModal({ onClose }) {
+  const steps = [
+    { icon: <MoreVertical style={{width:20,height:20,color:'#60a5fa'}} />, title: '오른쪽 상단 메뉴(⋮) 탭', desc: 'Chrome 주소창 오른쪽 점 세 개 아이콘을 탭하세요.' },
+    { icon: <Download style={{width:20,height:20,color:'#60a5fa'}} />, title: '"앱 설치" 또는 "홈 화면에 추가" 탭', desc: '메뉴에서 해당 항목을 찾아 탭하세요.' },
+    { icon: <CheckCircle2 style={{width:20,height:20,color:'#34d399'}} />, title: '"설치" 버튼으로 완료', desc: '확인 다이얼로그에서 "설치"를 탭하면 홈 화면에 추가됩니다.' },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[300] flex items-end justify-center px-4 pb-0"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-[#131927] rounded-t-3xl border border-white/10 shadow-2xl overflow-hidden">
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-white/20 rounded-full" />
+    <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'0 16px', background:'rgba(0,0,0,0.72)', backdropFilter:'blur(8px)' }}>
+      <div style={{ position:'absolute', inset:0 }} onClick={onClose} />
+      <div style={{ position:'relative', width:'100%', maxWidth:400, background:'#131927', borderRadius:'24px 24px 0 0', border:'1px solid rgba(255,255,255,0.1)', boxShadow:'0 -8px 40px rgba(0,0,0,0.5)', overflow:'hidden' }}>
+        {/* 핸들 */}
+        <div style={{ display:'flex', justifyContent:'center', padding:'12px 0 4px' }}>
+          <div style={{ width:40, height:4, background:'rgba(255,255,255,0.2)', borderRadius:99 }} />
         </div>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600/20 rounded-2xl border border-blue-500/30 flex items-center justify-center">
-              <Smartphone className="w-5 h-5 text-blue-400" />
+
+        {/* 헤더 */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
+            <div style={{ width:38, height:38, background:'rgba(37,99,235,0.15)', borderRadius:14, border:'1px solid rgba(59,130,246,0.3)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <Smartphone style={{ width:18, height:18, color:'#60a5fa' }} />
             </div>
-            <div>
-              <h3 className="font-bold text-white text-base">홈 화면에 추가</h3>
-              <p className="text-[11px] text-slate-500">Android Chrome 설치 가이드</p>
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontWeight:700, color:'#fff', fontSize:15, whiteSpace:'nowrap' }}>홈 화면에 추가</div>
+              <div style={{ fontSize:11, color:'#64748b', whiteSpace:'nowrap' }}>Chrome 설치 가이드</div>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors">
-            <X className="w-4 h-4 text-slate-400" />
+          <button onClick={onClose} style={{ padding:8, borderRadius:99, background:'transparent', border:'none', cursor:'pointer', flexShrink:0 }}>
+            <X style={{ width:16, height:16, color:'#64748b' }} />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
-          {[
-            { icon: <MoreVertical className="w-5 h-5 text-blue-400" />, step: 1, title: '오른쪽 상단 메뉴(⋮) 탭', desc: 'Chrome 주소창 오른쪽 점 세 개 아이콘을 탭하세요.' },
-            { icon: <Download className="w-5 h-5 text-blue-400" />, step: 2, title: '"앱 설치" 또는 "홈 화면에 추가" 탭', desc: '메뉴에서 해당 항목을 찾아 탭하세요.' },
-            { icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />, step: 3, title: '"설치" 버튼으로 완료', desc: '확인 다이얼로그에서 "설치"를 탭하면 홈 화면에 추가됩니다.' },
-          ].map(({ icon, step, title, desc }) => (
-            <div key={step} className="flex gap-4">
-              <div className="w-9 h-9 rounded-2xl bg-[#1e2535] border border-white/10 flex items-center justify-center shrink-0">
-                {icon}
+
+        {/* 단계 */}
+        <div style={{ padding:'20px 20px', paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}>
+          {steps.map((step, i) => (
+            <div key={i} style={{ display:'flex', gap:14, alignItems:'flex-start' }}>
+              {/* 아이콘 + 연결선 */}
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', flexShrink:0 }}>
+                <div style={{ width:36, height:36, borderRadius:12, background:'#1e2640', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {step.icon}
+                </div>
+                {i < steps.length - 1 && (
+                  <div style={{ width:1, flexGrow:1, minHeight:20, background:'rgba(255,255,255,0.06)', margin:'4px 0' }} />
+                )}
               </div>
-              <div className="flex-1">
-                <span className="text-[10px] font-bold text-slate-600 font-mono">STEP {step}</span>
-                <p className="text-sm font-bold text-white mb-0.5">{title}</p>
-                <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+              {/* 텍스트 */}
+              <div style={{ flex:1, paddingBottom: i < steps.length - 1 ? 16 : 0 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#475569', fontFamily:'monospace', letterSpacing:'0.1em', marginBottom:4 }}>STEP {i + 1}</div>
+                <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4 }}>{step.title}</div>
+                <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.5 }}>{step.desc}</div>
               </div>
             </div>
           ))}
-          <div className="bg-blue-900/15 border border-blue-500/15 rounded-2xl p-4">
-            <p className="text-xs text-blue-400/80 leading-relaxed">
+
+          {/* 팁 */}
+          <div style={{ marginTop:16, background:'rgba(30,58,138,0.15)', border:'1px solid rgba(59,130,246,0.15)', borderRadius:14, padding:'12px 14px' }}>
+            <div style={{ fontSize:12, color:'rgba(96,165,250,0.8)', lineHeight:1.5 }}>
               💡 주소창에 설치 아이콘(⬇)이 자동으로 나타나면 바로 탭해도 됩니다.
-            </p>
+            </div>
           </div>
         </div>
       </div>

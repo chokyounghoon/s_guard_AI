@@ -6485,11 +6485,14 @@ app.get('/ai/incident/:inc_id', async (c) => {
   const db = c.env.DB
   
   const incident = await db.prepare(`
-    SELECT i.*, u.name as assignee_name 
+    SELECT i.*, u.name as assignee_name,
+           r.message as sms_message, r.sender as sms_sender
     FROM incidents i 
     LEFT JOIN users u ON i.assigned_to = u.employee_id 
+    LEFT JOIN received_messages r ON (r.inc_id = ? OR r.inc_id = ?)
     WHERE i.inc_id = ? OR i.inc_id = ?
-  `).bind(normId, `INC-${normId}`).first()
+    LIMIT 1
+  `).bind(normId, 'INC-' + normId, normId, 'INC-' + normId).first()
   
   if (!incident) return c.json({ error: "Not found" }, 404)
   return c.json({ incident })
@@ -7573,6 +7576,27 @@ app.post('/api/v1/reports/submit', async (c) => {
       await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(knowledgeId).run();
     }
 
+    // 2-1. Save to reports table (CREATE IF NOT EXISTS for safety)
+    try {
+      await db.prepare(`
+        CREATE TABLE IF NOT EXISTS reports (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          inc_id TEXT NOT NULL,
+          user_id TEXT,
+          title TEXT,
+          content TEXT,
+          created_at TEXT
+        )
+      `).run()
+      await db.prepare(`
+        INSERT INTO reports (inc_id, user_id, title, content, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT DO NOTHING
+      `).bind(normId, sender_id, title, content, now).run()
+    } catch (e) {
+      console.warn('[Submit] reports table insert failed:', e.message)
+    }
+
     // 3. Find Reporting Lines (Superiors)
     const { results: superiors } = await db.prepare(
       "SELECT user_id, user_name FROM report_lines WHERE owner_id = ? ORDER BY hierarchy_level ASC"
@@ -7625,6 +7649,61 @@ app.post('/api/v1/reports/submit', async (c) => {
     console.error('Report submission failed:', err)
     return c.json({ error: err.message }, 500)
   }
+})
+
+// GET /reports/:incId - 저장된 보고서 조회 (링크 직접 열람용)
+app.get('/reports/:inc_id', async (c) => {
+  const rawId = c.req.param('inc_id')
+  const normId = String(rawId).replace('INC-', '')
+  const db = c.env.DB
+
+  // reports 테이블 없으면 생성
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inc_id TEXT NOT NULL,
+        user_id TEXT,
+        title TEXT,
+        content TEXT,
+        created_at TEXT
+      )
+    `).run()
+  } catch (e) { /* already exists */ }
+
+  // 1순위: reports 테이블
+  let report = null
+  try {
+    report = await db.prepare(
+      "SELECT * FROM reports WHERE inc_id = ? OR inc_id = ? ORDER BY id DESC LIMIT 1"
+    ).bind(normId, 'INC-' + normId).first()
+  } catch (e) {
+    console.warn('[reports GET] reports table error:', e.message)
+  }
+
+  // 2순위: inbox_items REPORT 타입 (이전 완료처리 데이터 폴백)
+  if (!report) {
+    try {
+      const inbox = await db.prepare(
+        "SELECT * FROM inbox_items WHERE (inc_id = ? OR inc_id = ?) AND type = 'REPORT' ORDER BY id DESC LIMIT 1"
+      ).bind(normId, 'INC-' + normId).first()
+      if (inbox) {
+        report = {
+          id: inbox.id,
+          inc_id: inbox.inc_id || normId,
+          user_id: inbox.sender_id,
+          title: inbox.title,
+          content: inbox.content,
+          created_at: inbox.created_at || inbox.reg_dt
+        }
+      }
+    } catch (e) {
+      console.warn('[reports GET] inbox_items fallback error:', e.message)
+    }
+  }
+
+  if (!report) return c.json({ error: 'Report not found' }, 404)
+  return c.json({ report })
 })
 
 app.post('/inbox', async (c) => {

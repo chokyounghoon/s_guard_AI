@@ -257,10 +257,13 @@ export default function DashboardPage() {
     to: getKstDate(0)
   });
   const [isMyAssignOpen, setIsMyAssignOpen] = useState(true);
+  const [isOpeningWarRoom, setIsOpeningWarRoom] = useState(false);
 
   const handleOpenWarRoomFromInsight = async (smsMessage, analysisText) => {
+    if (isOpeningWarRoom) return;
     const currentSms = smsMessage || selectedSmsRef.current;
     if (!currentSms) return;
+    setIsOpeningWarRoom(true);
 
     // The raw received SMS ID (e.g. 20231026154512345) MUST be the primary key DB identifier
     // to match aichat_history.
@@ -1179,7 +1182,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#0f1421] text-white font-sans overflow-x-clip relative">
       {/* Top Navigation */}
       <nav className="flex justify-between items-center p-4 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30">
         <div
@@ -1853,13 +1856,18 @@ export default function DashboardPage() {
           {/* List Items - Dynamic */}
           <div className="space-y-3">
             {myAssignments.length > 0 ? (
-              myAssignments.slice(0, 5).map((item) => (
+              myAssignments.slice(0, 5).map((item) => {
+                const isItemSelected = String(selectedIncidentIdFlow) === String(item.inc_id).replace('INC-', '') ||
+                                       String(selectedIncidentIdFlow) === String(item.inc_id);
+                return (
                 <div
                   key={`assign-${item.id || item.inc_id}`}
-                  className={`p-4 rounded-2xl border relative cursor-pointer transition-all hover:border-white/10
-                    ${(item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/5 border-red-500/10' :
-                      (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/5 border-orange-500/10' :
-                      'bg-emerald-500/5 border-emerald-500/10'}`}
+                  className={`p-3 rounded-2xl border relative cursor-pointer transition-all
+                    ${isItemSelected
+                      ? 'bg-blue-500/10 border-blue-500/50 shadow-[0_0_16px_rgba(59,130,246,0.2)]'
+                      : (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/5 border-red-500/10 hover:border-red-500/30' :
+                        (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/5 border-orange-500/10 hover:border-orange-500/30' :
+                        'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30'}`}
                   onClick={() => {
                     const msg = smsMessages.find(m => m.inc_id === item.inc_id) || { inc_id: item.inc_id, message: item.message, sender: item.sender };
                     setSelectedSms(msg);
@@ -1867,13 +1875,13 @@ export default function DashboardPage() {
                     startLiveScenario(msg);
                   }}
                 >
-                  {/* 상단: 아이콘 + 제목 (꾹 누르면 전체 표시) */}
-                  <div className="flex items-start gap-3 mb-2">
+                  {/* 상단: 아이콘 + 제목 */}
+                  <div className="flex items-start gap-2 mb-2">
                     <div className={`${
                       (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/10' :
                       (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/10' :
                       'bg-emerald-500/10'
-                    } p-2 rounded-full shrink-0 mt-0.5`}>
+                    } p-1.5 rounded-full shrink-0 mt-0.5`}>
                       <AlertCircle className={`w-4 h-4 ${
                         (item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'text-red-500' :
                         (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'text-orange-500' :
@@ -1882,31 +1890,13 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4
-                        className={`text-sm font-bold text-white leading-snug select-none transition-all duration-300 ${
-                          expandedAssignments.has(item.inc_id) ? 'break-words' : 'line-clamp-2'
-                        }`}
-                        onMouseDown={() => {
-                          pressTimerRef.current = setTimeout(() => {
-                            setExpandedAssignments(prev => {
-                              const next = new Set(prev);
-                              if (next.has(item.inc_id)) next.delete(item.inc_id);
-                              else next.add(item.inc_id);
-                              return next;
-                            });
-                          }, 600);
-                        }}
+                        className={`text-sm font-bold leading-snug select-none transition-all duration-300 ${
+                          isItemSelected ? 'text-blue-300' : 'text-white'
+                        } ${expandedAssignments.has(item.inc_id) ? 'break-words' : 'line-clamp-2'}`}
+                        onMouseDown={() => { pressTimerRef.current = setTimeout(() => { setExpandedAssignments(prev => { const next = new Set(prev); if (next.has(item.inc_id)) next.delete(item.inc_id); else next.add(item.inc_id); return next; }); }, 600); }}
                         onMouseUp={() => clearTimeout(pressTimerRef.current)}
                         onMouseLeave={() => clearTimeout(pressTimerRef.current)}
-                        onTouchStart={() => {
-                          pressTimerRef.current = setTimeout(() => {
-                            setExpandedAssignments(prev => {
-                              const next = new Set(prev);
-                              if (next.has(item.inc_id)) next.delete(item.inc_id);
-                              else next.add(item.inc_id);
-                              return next;
-                            });
-                          }, 600);
-                        }}
+                        onTouchStart={() => { pressTimerRef.current = setTimeout(() => { setExpandedAssignments(prev => { const next = new Set(prev); if (next.has(item.inc_id)) next.delete(item.inc_id); else next.add(item.inc_id); return next; }); }, 600); }}
                         onTouchEnd={() => clearTimeout(pressTimerRef.current)}
                       >
                         {item.message || '장애 발생'}
@@ -1917,14 +1907,12 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* 뱃지 영역 */}
-                  <div className="flex flex-wrap items-center gap-1.5 mb-2 pl-9">
+                  {/* 뱃지 영역 - pl 제거 */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
                     <span className="text-[8px] font-black px-1.5 py-0.5 rounded border bg-blue-500/20 text-blue-400 border-blue-500/30">SMS</span>
                     {Number(item.received_count || 1) >= 2 && (
                       <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-blue-600/20 to-indigo-500/20 border border-blue-500/30">
-                        <span className="text-[9px] font-black font-mono text-blue-400">
-                          {Number(item.occurrence_count) > 0 ? Number(item.occurrence_count) : (Number(item.received_count) || 1)}
-                        </span>
+                        <span className="text-[9px] font-black font-mono text-blue-400">{Number(item.occurrence_count) > 0 ? Number(item.occurrence_count) : (Number(item.received_count) || 1)}</span>
                         <span className="text-[7px] font-bold text-blue-500/60 uppercase">Event</span>
                       </div>
                     )}
@@ -1941,9 +1929,9 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {/* 하단: 상태 + 날짜 한 줄 */}
-                  <div className="flex items-center justify-between pl-9 mt-2">
-                    <div className={`text-[10px] font-bold px-2.5 py-1 rounded-full border flex items-center gap-1.5
+                  {/* 하단: 상태 + 날짜 - pl 제거 */}
+                  <div className="flex items-center justify-between mt-1">
+                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5
                       ${(item.status === '미확인' || item.status === '미처리' || item.status === '대기') ? 'bg-red-500/20 text-red-400 border-red-500/30' :
                         (item.status === '처리중' || item.status === '진행중' || item.status === 'IN_PROGRESS') ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
                         'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
@@ -1956,24 +1944,42 @@ export default function DashboardPage() {
                     <span className="text-[10px] text-slate-500 font-mono">{formatYYMMDD(item.assigned_at)}</span>
                   </div>
 
-                  {/* WAR-ROOM 버튼 */}
+                  {/* WAR-ROOM / REPORT 버튼 */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (['미확인', '미처리', '대기'].includes(item.status)) {
-                        alert("해당 워룸이 존재하지 않습니다.");
-                        return;
+                      if (['미확인', '미처리', '대기'].includes(item.status)) { alert("해당 워룸이 존재하지 않습니다."); return; }
+                      const cleanId = String(item.inc_id).replace('INC-', '');
+                      
+                      // 처리완료인 경우 리포트 페이지로, 아니면 채팅방으로 이동
+                      if (item.status === '처리완료' || item.status === '조치완료') {
+                        navigate(`/report/${cleanId}`);
+                      } else {
+                        navigate(`/chat/${cleanId}`);
                       }
-                      navigate(`/chat/${String(item.inc_id).replace('INC-', '')}`);
                     }}
-                    className="mt-3 w-full p-2 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all flex items-center justify-center gap-2"
+                    className={`mt-2 w-full p-2 rounded-xl border transition-all flex items-center justify-center gap-2 ${
+                      isItemSelected
+                        ? 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30'
+                        : 'bg-blue-600/10 border-blue-500/20 text-blue-400 hover:bg-blue-600/20'
+                    }`}
                   >
-                    <Activity className="w-4 h-4" />
-                    <span className="text-xs font-bold font-mono tracking-tight">GO TO WAR-ROOM</span>
+                    { (item.status === '처리완료' || item.status === '조치완료') ? (
+                      <>
+                        <FileText className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold font-mono tracking-tight text-emerald-400">VIEW REPORT</span>
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-4 h-4" />
+                        <span className="text-xs font-bold font-mono tracking-tight">GO TO WAR-ROOM</span>
+                      </>
+                    )}
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-              ))
+                );
+              })
             ) : (
               <div className="bg-[#11141d] p-8 rounded-2xl border border-white/5 text-center">
                 <Info className="w-12 h-12 text-slate-600 mx-auto mb-3" />
@@ -2015,22 +2021,74 @@ export default function DashboardPage() {
                   if (!startTime) return null;
                   const durationMs = (endTime || currentTime) - startTime;
                   const isClosed = !!endTime;
+
+                  // 4단계 MTTR 계산
+                  const smsStep     = incidentWorkflowSteps.find(s => s.id === 'SMS');
+                  const ragStep     = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                  const warStep     = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
+                  const knwStep     = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
+
+                  const calcDiff = (a, b) => {
+                    if (!a) return null;
+                    const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp);
+                    const m = Math.floor(ms / 60000);
+                    const s = Math.floor((ms % 60000) / 1000);
+                    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+                  };
+
+                  const phases = [
+                    { label: '인지', time: calcDiff(smsStep, ragStep), done: !!ragStep },
+                    { label: '분석', time: calcDiff(ragStep, warStep), done: !!warStep },
+                    { label: '워룸', time: calcDiff(warStep, knwStep), done: !!knwStep },
+                    { label: '완료', time: calcDiff(warStep || ragStep || smsStep, knwStep), done: !!knwStep },
+                  ];
+
                   return (
-                    <div className="flex items-center gap-3 mt-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">탐지</span>
-                        <span className="text-[11px] font-black font-mono text-white bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
-                          {formatYYMMDD(startTime)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">MTTR</span>
-                        <div className="flex items-center gap-1">
-                          <div className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
-                          <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400' : 'text-blue-400'}`}>
-                            {formatDuration(durationMs)}
+                    <div className="space-y-1.5 mt-1">
+                      {/* 탐지 + MTTR */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">탐지</span>
+                          <span className="text-[11px] font-black font-mono text-white bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                            {formatYYMMDD(startTime)}
                           </span>
                         </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">MTTR</span>
+                          <div className="flex items-center gap-1">
+                            <div className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
+                            <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400' : 'text-blue-400'}`}>
+                              {formatDuration(durationMs)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* 4단계 MTTR 요약 바 */}
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {[
+                          { label: '인지', from: smsStep, to: ragStep },
+                          { label: '분석', from: ragStep, to: warStep },
+                          { label: '워룸진행', from: warStep, to: knwStep },
+                          { label: '처리완료', from: smsStep, to: knwStep },
+                        ].map(({ label, from, to }) => {
+                          const isDone = label === '처리완료' ? !!knwStep : !!to;
+                          const isActive = !!from && !to;
+                          const ms = from ? ((to ? new Date(to.timestamp) : currentTime) - new Date(from.timestamp)) : 0;
+                          const m = Math.floor(ms / 60000);
+                          const s = Math.floor((ms % 60000) / 1000);
+                          const timeStr = from ? (m > 0 ? `${m}m${s}s` : `${s}s`) : '-';
+                          return (
+                            <div key={label} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black ${
+                              isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                              : isActive ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                              : 'bg-white/3 border-white/5 text-slate-600'
+                            }`}>
+                              <span className="text-[8px] opacity-70">{label}</span>
+                              <span className="font-mono tabular-nums">{timeStr}</span>
+                              {isActive && <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -2220,9 +2278,17 @@ export default function DashboardPage() {
                                ) : (
                                  <button
                                    onClick={() => handleOpenWarRoomFromInsight(selectedSms, '')}
-                                   className="mt-2 inline-flex items-center gap-1.5 group/btn text-[11px] font-black text-white border border-red-500/30 hover:border-red-400 px-3 py-1.5 rounded-xl bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.3)] hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] transition-all active:scale-95"
+                                   disabled={isOpeningWarRoom}
+                                   className={`mt-2 inline-flex items-center gap-1.5 group/btn text-[11px] font-black text-white border px-3 py-1.5 rounded-xl transition-all ${
+                                     isOpeningWarRoom
+                                       ? 'opacity-50 cursor-not-allowed border-red-500/20 bg-red-500/60 pointer-events-none'
+                                       : 'border-red-500/30 hover:border-red-400 bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.3)] hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] active:scale-95'
+                                   }`}
                                  >
-                                   <Users className="w-3.5 h-3.5" />
+                                   {isOpeningWarRoom
+                                     ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                     : <Users className="w-3.5 h-3.5" />
+                                   }
                                    War-Room 개설 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
                                  </button>
                                );
@@ -2408,16 +2474,16 @@ function AlertItem({ title, time, severity, desc, isSelected }) {
   };
 
   return (
-    <div className={`flex items-start space-x-4 p-4 rounded-xl transition-all group cursor-pointer ${
+    <div className={`flex items-start space-x-2 p-3 rounded-xl transition-all group cursor-pointer ${
       isSelected 
         ? "bg-yellow-500/10 border border-yellow-500/30 shadow-lg shadow-yellow-500/5" 
         : "bg-slate-900/30 border border-white/5 hover:bg-slate-800/50"
     }`}>
-      <div className={`w-1.5 h-1.5 mt-2 rounded-full ${sevColor[severity]} ${isSelected ? 'animate-pulse' : ''} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
-      <div className="flex-1">
-        <div className="flex justify-between items-start mb-1">
+      <div className={`w-1.5 h-1.5 mt-2 rounded-full shrink-0 ${sevColor[severity]} ${isSelected ? 'animate-pulse' : ''} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start mb-1 gap-2">
           <h4 className={`font-bold text-sm transition-colors ${isSelected ? 'text-yellow-400' : 'text-slate-200 group-hover:text-white'}`}>{title}</h4>
-          <span className="text-[11px] font-black text-white whitespace-nowrap ml-2 bg-white/10 px-2.5 py-1 rounded border border-white/20 shadow-md">
+          <span className="text-[11px] font-black text-white whitespace-nowrap bg-white/10 px-2 py-0.5 rounded border border-white/20 shadow-md shrink-0">
             {time}
           </span>
         </div>

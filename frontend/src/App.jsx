@@ -28,6 +28,7 @@ import WarRoomManagementPage from './pages/WarRoomManagementPage';
 import CodebookManagementPage from './pages/CodebookManagementPage';
 import WorkflowPage from './pages/WorkflowPage';
 import InboxPage from './pages/InboxPage';
+import ReportViewPage from './pages/ReportViewPage';
 import OrbitalCommandPage from './pages/OrbitalCommandPage';
 import SecurityLogPage from './pages/SecurityLogPage';
 import ProcessingFlowPage from './pages/ProcessingFlowPage';
@@ -293,6 +294,7 @@ function AppContent() {
         <Route path="/codebook-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><CodebookManagementPage /></ProtectedRoute>} />
         <Route path="/workflow/:inc_id" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WorkflowPage /></ProtectedRoute>} />
         <Route path="/inbox" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><InboxPage /></ProtectedRoute>} />
+        <Route path="/report/:incId" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportViewPage /></ProtectedRoute>} />
         <Route path="/orbital-command" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrbitalCommandPage /></ProtectedRoute>} />
       </Routes>
 

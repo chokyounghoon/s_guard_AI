@@ -134,7 +134,14 @@ export default function AssignmentsPage() {
                   key={assignment.id}
                   onClick={(e) => {
                     if (e.target.closest('button')) return;
-                    navigate(`/chat/${String(assignment.inc_id).replace('INC-', '')}`);
+                    const cleanId = String(assignment.inc_id).replace('INC-', '');
+                    
+                    // 처리완료인 경우 채팅방이 아닌 리포트 페이지로 이동
+                    if (assignment.status === '처리완료' || assignment.status === '조치완료') {
+                      navigate(`/report/${cleanId}`);
+                    } else {
+                      navigate(`/chat/${cleanId}`);
+                    }
                   }}
                 className={`p-6 rounded-3xl border ${assignment.borderColor} ${assignment.bgColor} relative overflow-hidden group transition-all duration-500 shadow-lg cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 active:scale-[0.98]`}
               >
