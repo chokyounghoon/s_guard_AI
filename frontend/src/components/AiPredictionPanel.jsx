@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserCheck, Calendar, Clock, PlayCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { UserCheck, Calendar, Clock, PlayCircle, CircleCheckBig, ChevronRight } from 'lucide-react';
 
 const AiPredictionPanel = ({ counts, onShowDetail }) => {
   const [activeTab, setActiveTab] = useState('assigned');
@@ -8,7 +8,7 @@ const AiPredictionPanel = ({ counts, onShowDetail }) => {
   const tabs = [
     { id: 'assigned', label: '할당됨', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
     { id: 'processing', label: '분석중입니다', icon: PlayCircle, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
-    { id: 'completed', label: '처리완료', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+    { id: 'completed', label: '처리완료', icon: CircleCheckBig, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
   ];
 
   return (

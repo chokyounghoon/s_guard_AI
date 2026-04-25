@@ -99,7 +99,15 @@ export default function MobileDashboard({ user }) {
   }, [fetchData]);
 
   // ── 인시던트 항목 클릭/롱프레스 처리 ──
-  const handleIncidentClick = (id) => navigate(`/chat/${id}`);
+  const handleIncidentClick = (item) => {
+    const cleanId = String(item.inc_id).replace('INC-', '');
+    // 처리완료 상태인 경우 리포트 페이지로 이동
+    if (item.incident_status === '처리완료') {
+      navigate(`/report/${cleanId}`);
+    } else {
+      navigate(`/chat/${cleanId}`);
+    }
+  };
   const handleIncidentLongPress = (item) => {
     if (navigator.vibrate) navigator.vibrate(50); // 햅틱 피드백
     window.alert(`인시던트 상세정보\nID: ${item.inc_id}\n상태: ${item.incident_status}\n서비스: ${item.service_name || 'N/A'}`);
@@ -188,7 +196,7 @@ export default function MobileDashboard({ user }) {
                 // 롱프레스 훅 사용
                 const longPressProps = useLongPress(
                   () => handleIncidentLongPress(item),
-                  () => handleIncidentClick(item.inc_id)
+                  () => handleIncidentClick(item)
                 );
 
                 return (

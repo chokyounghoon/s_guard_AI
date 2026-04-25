@@ -1,100 +1,117 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Plus, Edit3, Trash2, Building2, GitMerge, Users, Save, X, Network, Search, Command, User
+  ChevronLeft, Plus, Edit3, Trash2, Building2, GitMerge,
+  Users, Save, X, Network, Search, Command, User, Loader2, ChevronRight
 } from 'lucide-react';
 import { getAccessToken } from '../lib/authStore';
+
+const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+
+const DEPTH_CONFIG = [
+  { label: '회사',    icon: Building2, color: '#60a5fa' },
+  { label: '부문/실', icon: Network,   color: '#a78bfa' },
+  { label: '본부',   icon: GitMerge,  color: '#34d399' },
+  { label: '팀',     icon: Users,     color: '#818cf8' },
+  { label: '파트',   icon: Users,     color: '#93c5fd' },
+];
 
 export default function OrganizationManagementPage() {
   const navigate = useNavigate();
   const [tree, setTree] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [activeDepth, setActiveDepth] = useState(0); // 현재 보고 있는 depth 탭 (0~4)
 
-  const [selectedDepth1, setSelectedDepth1] = useState(null);
-  const [selectedDepth2, setSelectedDepth2] = useState(null);
-  const [selectedDepth3, setSelectedDepth3] = useState(null);
-  const [selectedDepth4, setSelectedDepth4] = useState(null);
-  const [selectedDepth5, setSelectedDepth5] = useState(null);
+  const [selected, setSelected] = useState([null, null, null, null, null]); // depth별 선택된 id
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit'
+  const [modalMode, setModalMode] = useState('add');
   const [modalData, setModalData] = useState({ id: null, name: '', code: '', parentId: null, depth: 1 });
-  
-  // Member List State
+
   const [partUsers, setPartUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-
-  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+  const [saving, setSaving] = useState(false);
 
   const fetchTree = () => {
     setLoading(true);
     const token = getAccessToken();
     fetch(`${API_BASE}/org/tree`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
-      .then(r => {
-        if (!r.ok) throw new Error('조직도 데이터를 불러오지 못했습니다.');
-        return r.json();
-      })
-      .then(data => {
-        setTree(Array.isArray(data) ? data : []);
-      })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setTree(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchTree();
-  }, []);
+  useEffect(() => { fetchTree(); }, []);
 
-  // Fetch users when any selection (Company to Part) changes
+  // 선택된 가장 하위 노드 기준으로 인원 조회
   useEffect(() => {
-    const deepestId = selectedDepth5 || selectedDepth4 || selectedDepth3 || selectedDepth2 || selectedDepth1;
-    if (!deepestId) {
-      setPartUsers([]);
-      return;
-    }
+    const deepestId = [...selected].reverse().find(id => id !== null);
+    if (!deepestId) { setPartUsers([]); return; }
 
-    setLoadingUsers(true);
-    // Find the node to get its code
     const findNode = (nodes, id) => {
       for (const n of nodes) {
         if (n.id === id) return n;
-        if (n.children) {
-          const found = findNode(n.children, id);
-          if (found) return found;
-        }
+        if (n.children) { const f = findNode(n.children, id); if (f) return f; }
       }
       return null;
     };
-
     const node = findNode(tree, deepestId);
-    if (!node || !node.code) {
-      // If code is missing, we can't filter correctly, so clear users
-      setPartUsers([]);
-      setLoadingUsers(false);
-      return;
-    }
+    if (!node?.code) { setPartUsers([]); return; }
 
-    // Use the robust 'orgCode' generic filter that matches any column
+    setLoadingUsers(true);
     const token = getAccessToken();
     fetch(`${API_BASE}/users?orgCode=${encodeURIComponent(node.code)}`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
-      .then(r => {
-        if (!r.ok) throw new Error('인원 정보를 불러오지 못했습니다.');
-        return r.json();
-      })
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => setPartUsers(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoadingUsers(false));
-  }, [selectedDepth1, selectedDepth2, selectedDepth3, selectedDepth4, selectedDepth5, tree]);
+  }, [selected, tree]);
 
-  const handleOpenAddModal = (parentId, depth) => {
+  const handleSelect = (depthIdx, id) => {
+    const next = [...selected];
+    next[depthIdx] = id;
+    // 하위 depth 초기화
+    for (let i = depthIdx + 1; i < 5; i++) next[i] = null;
+    setSelected(next);
+    // 자동으로 다음 depth 탭으로 이동 (자식이 있는 경우)
+    if (depthIdx < 4) setActiveDepth(depthIdx + 1);
+  };
+
+  // depth별 노드 목록
+  const getNodes = (depth) => {
+    if (depth === 0) return tree;
+    const parentId = selected[depth - 1];
+    if (!parentId) return [];
+    const findChildren = (nodes, id) => {
+      for (const n of nodes) {
+        if (n.id === id) return n.children || [];
+        if (n.children) { const f = findChildren(n.children, id); if (f.length > -1 && f !== null) return f; }
+      }
+      return [];
+    };
+    // Simplified: build flat arrays per depth selection
+    return getNodesAtDepth(tree, depth, 0);
+  };
+
+  const getNodesAtDepth = (nodes, targetDepth, currentDepth) => {
+    if (currentDepth === targetDepth) return nodes;
+    const parentId = selected[currentDepth];
+    if (!parentId) return [];
+    const parent = nodes.find(n => n.id === parentId);
+    if (!parent?.children) return [];
+    return getNodesAtDepth(parent.children, targetDepth, currentDepth + 1);
+  };
+
+  const handleOpenAddModal = () => {
+    const parentId = activeDepth > 0 ? selected[activeDepth - 1] : null;
     setModalMode('add');
-    setModalData({ id: null, name: '', code: '', parentId, depth });
+    setModalData({ id: null, name: '', code: '', parentId, depth: activeDepth + 1 });
     setIsModalOpen(true);
   };
 
@@ -105,374 +122,413 @@ export default function OrganizationManagementPage() {
   };
 
   const handleSaveNode = async () => {
-    if (!modalData.name) {
-      alert('조직명을 입력하세요.');
-      return;
-    }
-
-    try {
-      if (modalMode === 'add') {
-        const token = getAccessToken();
-        const res = await fetch(`${API_BASE}/org/nodes`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({
-            name: modalData.name,
-            code: modalData.code,
-            parent_id: modalData.parentId,
-            depth: modalData.depth,
-            sort_order: 0
-          })
-        });
-        if (res.ok) {
-          alert('새 조직이 추가되었습니다.');
-          fetchTree();
-        } else {
-          const err = await res.json().catch(() => ({}));
-          alert(`실패: ${err.detail || '서버 오류'}`);
-        }
-      } else {
-        const token = getAccessToken();
-        const res = await fetch(`${API_BASE}/org/nodes/${modalData.id}`, {
-          method: 'PATCH',
-          headers: { 
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({ name: modalData.name, code: modalData.code })
-        });
-        if (res.ok) {
-          alert('변경 내용이 저장되었습니다.');
-          fetchTree();
-        } else {
-          const err = await res.json().catch(() => ({}));
-          alert(`실패: ${err.detail || '서버 오류'}`);
-        }
-      }
-      setIsModalOpen(false);
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDeleteNode = async (nodeId) => {
-    if (!window.confirm('정말 삭제하시겠습니까? 하위 조직이 모두 삭제됩니다.')) return;
+    if (!modalData.name.trim()) { alert('조직명을 입력하세요.'); return; }
+    setSaving(true);
     try {
       const token = getAccessToken();
-      const res = await fetch(`${API_BASE}/org/nodes/${nodeId}`, { 
-        method: 'DELETE',
-        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      const url = modalMode === 'add'
+        ? `${API_BASE}/org/nodes`
+        : `${API_BASE}/org/nodes/${modalData.id}`;
+      const method = modalMode === 'add' ? 'POST' : 'PATCH';
+      const body = modalMode === 'add'
+        ? { name: modalData.name, code: modalData.code, parent_id: modalData.parentId, depth: modalData.depth, sort_order: 0 }
+        : { name: modalData.name, code: modalData.code };
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
       });
-      if (res.ok) {
-        const resetAll = () => {
-          setSelectedDepth1(null);
-          setSelectedDepth2(null);
-          setSelectedDepth3(null);
-          setSelectedDepth4(null);
-          setSelectedDepth5(null);
-        };
-
-        if (nodeId === selectedDepth1) resetAll();
-        else if (nodeId === selectedDepth2) {
-          setSelectedDepth2(null);
-          setSelectedDepth3(null);
-          setSelectedDepth4(null);
-          setSelectedDepth5(null);
-        }
-        else if (nodeId === selectedDepth3) {
-          setSelectedDepth3(null);
-          setSelectedDepth4(null);
-          setSelectedDepth5(null);
-        }
-        else if (nodeId === selectedDepth4) {
-          setSelectedDepth4(null);
-          setSelectedDepth5(null);
-        }
-        else if (nodeId === selectedDepth5) {
-          setSelectedDepth5(null);
-        }
-        fetchTree();
-      }
+      if (res.ok) { fetchTree(); setIsModalOpen(false); }
+      else { const e = await res.json().catch(() => ({})); alert(`실패: ${e.detail || '서버 오류'}`); }
     } catch (e) { console.error(e); }
+    finally { setSaving(false); }
   };
 
-  // Helper to find nodes
-  const depth1Nodes = tree;
-  const depth2Nodes = selectedDepth1 ? tree.find(n => n.id === selectedDepth1)?.children || [] : [];
-  const depth3Nodes = selectedDepth2 ? depth2Nodes.find(n => n.id === selectedDepth2)?.children || [] : [];
-  const depth4Nodes = selectedDepth3 ? depth3Nodes.find(n => n.id === selectedDepth3)?.children || [] : [];
-  const depth5Nodes = selectedDepth4 ? depth4Nodes.find(n => n.id === selectedDepth4)?.children || [] : [];
-
-  // Filter by search if needed (simply filtering names for now)
-  const filterNodes = (nodes) => {
-    if (!search) return nodes;
-    return nodes.filter(n => n.name.toLowerCase().includes(search.toLowerCase()) || (n.code && n.code.toLowerCase().includes(search.toLowerCase())));
+  const handleDeleteNode = async (nodeId, e) => {
+    e.stopPropagation();
+    if (!window.confirm('삭제하면 하위 조직도 모두 삭제됩니다.')) return;
+    const token = getAccessToken();
+    const res = await fetch(`${API_BASE}/org/nodes/${nodeId}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (res.ok) {
+      // 삭제된 depth부터 하위 초기화
+      const depthIdx = activeDepth;
+      const next = [...selected];
+      for (let i = depthIdx; i < 5; i++) next[i] = null;
+      setSelected(next);
+      fetchTree();
+    }
   };
 
-  const renderList = (nodes, depth, selectedId, onSelect, icon, bgColor, borderColor) => {
-    const filtered = filterNodes(nodes);
-    return (
-      <div className={`flex flex-col h-[600px] border ${borderColor} ${bgColor} rounded-[32px] overflow-hidden shadow-xl`}>
-        <div className="p-5 border-b border-white/5 flex items-center justify-between bg-black/20">
-          <div className="flex items-center gap-2">
-            {icon}
-            <h3 className="font-bold text-white tracking-wide">
-              {depth === 1 ? '회사' : depth === 2 ? '부문/실' : depth === 3 ? '본부' : depth === 4 ? '팀' : '파트'}
-            </h3>
-          </div>
-          <button
-            onClick={() => handleOpenAddModal(
-              depth === 1 ? null : 
-              depth === 2 ? selectedDepth1 : 
-              depth === 3 ? selectedDepth2 : 
-              depth === 4 ? selectedDepth3 : selectedDepth4, 
-              depth
-            )}
-            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-            title="추가"
-            disabled={depth > 1 && !(
-              depth === 2 ? selectedDepth1 : 
-              depth === 3 ? selectedDepth2 : 
-              depth === 4 ? selectedDepth3 : selectedDepth4
-            )}
-          >
-            <Plus className="w-4 h-4 text-white" />
-          </button>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-          {filtered.length === 0 ? (
-             <div className="flex items-center justify-center h-full text-slate-500 text-sm">목록이 없습니다.</div>
-          ) : (
-             filtered.map(node => (
-               <div
-                 key={node.id}
-                 onClick={() => onSelect(node.id)}
-                 className={`group flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all border
-                   ${selectedId === node.id 
-                      ? 'bg-blue-600/20 border-blue-500/50 shadow-lg shadow-blue-900/20' 
-                      : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'}`}
-               >
-                  <div className="flex-1 min-w-0">
-                     <p className={`font-bold truncate ${selectedId === node.id ? 'text-blue-400' : 'text-slate-200'}`}>
-                        {node.name}
-                     </p>
-                     {node.code && (
-                       <div className="flex items-center gap-1 mt-1">
-                         <Command className="w-3 h-3 text-slate-500" />
-                         <p className="text-[10px] text-slate-400 font-mono tracking-wider">{node.code}</p>
-                       </div>
-                     )}
-                  </div>
-                  <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${selectedId === node.id ? 'opacity-100' : ''}`}>
-                    <button
-                       onClick={(e) => { e.stopPropagation(); handleOpenEditModal(node); }}
-                       className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                       onClick={(e) => { e.stopPropagation(); handleDeleteNode(node.id); }}
-                       className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-               </div>
-             ))
-          )}
-        </div>
-      </div>
-    );
-  };
+  const currentNodes = getNodes(activeDepth).filter(n =>
+    !search || n.name.toLowerCase().includes(search.toLowerCase()) || (n.code || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  const cfg = DEPTH_CONFIG[activeDepth];
+  const Icon = cfg.icon;
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] text-white font-sans pb-24 relative overflow-x-hidden">
-      {/* Background Decor */}
-      <div className="fixed top-0 left-0 w-full h-96 bg-blue-600/5 blur-[120px] rounded-full -z-10" />
-      <div className="fixed bottom-0 right-0 w-full h-96 bg-purple-600/5 blur-[120px] rounded-full -z-10" />
+    <div style={{
+      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      background: 'linear-gradient(160deg, #060a18 0%, #0a0f20 60%, #060a18 100%)',
+      fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
+    }}>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#0f111a]/80 backdrop-blur-xl border-b border-white/5 p-5">
-        <div className="flex items-center justify-between max-w-[1400px] mx-auto w-full">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 transition-all border border-white/5"
-            >
-              <ArrowLeft className="w-5 h-5 text-slate-400" />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
-                 <GitMerge className="w-5 h-5 text-blue-500" /> 조직 구조 관리
-              </h1>
-              <p className="text-[10px] text-slate-500 font-mono tracking-[0.2em] uppercase mt-0.5">5-Depth Org Structure Admin</p>
-            </div>
-          </div>
-          
-          <div className="relative group w-64 hidden sm:block">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
-              <input
-                type="text"
-                placeholder="조직명 / 코드 검색..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-[#1a1f2e] border border-white/5 rounded-[16px] py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500/40 transition-all"
-              />
+      {/* ①  헤더 */}
+      <header style={{
+        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '13px 16px',
+        borderBottom: '1px solid rgba(59,130,246,0.1)',
+        background: 'rgba(6,10,24,0.95)', backdropFilter: 'blur(20px)',
+      }}>
+        <button onClick={() => navigate(-1)} style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        }}>
+          <ChevronLeft size={18} color="#64748b" />
+        </button>
+
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontSize: 16, fontWeight: 900, letterSpacing: '0.04em',
+            background: 'linear-gradient(90deg, #60a5fa, #818cf8)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>조직 구조 관리</div>
+          <div style={{ fontSize: 11, color: '#3b82f6', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.7 }}>
+            5-DEPTH ORG ADMIN
           </div>
         </div>
+
+        <button
+          onClick={handleOpenAddModal}
+          disabled={activeDepth > 0 && !selected[activeDepth - 1]}
+          style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            opacity: activeDepth > 0 && !selected[activeDepth - 1] ? 0.4 : 1,
+          }}>
+          <Plus size={18} color="#60a5fa" />
+        </button>
       </header>
 
-      <main className="max-w-[1400px] mx-auto p-5 space-y-8">
-        {loading ? (
-             <div className="flex flex-col items-center justify-center py-32 space-y-4">
-                <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-500 rounded-full animate-spin" />
-                <p className="text-sm text-slate-500 animate-pulse">조직도를 불러오는 중입니다...</p>
-             </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-               {/* Depth 1: 회사 */}
-               {renderList(depth1Nodes, 1, selectedDepth1, (id) => {
-                 setSelectedDepth1(id);
-                 setSelectedDepth2(null);
-                 setSelectedDepth3(null);
-                 setSelectedDepth4(null);
-                 setSelectedDepth5(null);
-               }, <Building2 className="w-5 h-5 text-blue-400" />, 'bg-[#121623]', 'border-blue-500/10')}
-   
-               {/* Depth 2: 부문/실 */}
-               {renderList(depth2Nodes, 2, selectedDepth2, (id) => {
-                 setSelectedDepth2(id);
-                 setSelectedDepth3(null);
-                 setSelectedDepth4(null);
-                 setSelectedDepth5(null);
-               }, <Network className="w-5 h-5 text-purple-400" />, 'bg-[#151928]', 'border-purple-500/10')}
-   
-               {/* Depth 3: 본부 */}
-               {renderList(depth3Nodes, 3, selectedDepth3, (id) => {
-                 setSelectedDepth3(id);
-                 setSelectedDepth4(null);
-                 setSelectedDepth5(null);
-               }, <Users className="w-5 h-5 text-emerald-400" />, 'bg-[#181d2f]', 'border-emerald-500/10')}
-   
-               {/* Depth 4: 팀 */}
-               {renderList(depth4Nodes, 4, selectedDepth4, (id) => {
-                 setSelectedDepth4(id);
-                 setSelectedDepth5(null);
-               }, <Network className="w-5 h-5 text-indigo-400" />, 'bg-[#1a1f33]', 'border-indigo-500/10')}
-  
-               {/* Depth 5: 파트 */}
-               {renderList(depth5Nodes, 5, selectedDepth5, (id) => {
-                 setSelectedDepth5(id);
-               }, <Users className="w-5 h-5 text-blue-300" />, 'bg-[#1c223a]', 'border-blue-400/10')}
-            </div>
-  
-            {/* Member List Section */}
-            {selectedDepth5 && (
-              <section className="bg-[#121623] border border-white/5 rounded-[40px] p-8 shadow-2xl animate-in slide-in-from-bottom-5 duration-500">
-                 <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-4">
-                       <div className="bg-blue-600/20 p-3 rounded-2xl">
-                          <Users className="w-6 h-6 text-blue-400" />
-                       </div>
-                       <div>
-                          <h2 className="text-2xl font-bold text-white tracking-tight">소속 인원 현황</h2>
-                          <p className="text-xs text-slate-500 font-mono tracking-widest uppercase mt-1">Organization Members</p>
-                       </div>
-                    </div>
-                    <div className="px-4 py-1.5 bg-blue-600/10 border border-blue-500/20 rounded-full">
-                       <span className="text-xs font-bold text-blue-400">Total: {partUsers.length}명</span>
-                    </div>
-                 </div>
-  
-                 {loadingUsers ? (
-                    <div className="flex justify-center py-12">
-                       <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-500 rounded-full animate-spin" />
-                    </div>
-                 ) : partUsers.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                       {partUsers.map((user, i) => (
-                          <div 
-                             key={i}
-                             className="bg-white/5 border border-white/5 p-4 rounded-3xl hover:border-blue-500/30 transition-all group"
-                          >
-                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                   <User className="w-5 h-5" />
-                                </div>
-                                <div>
-                                   <p className="font-bold text-slate-100">{user.name}</p>
-                                   <p className="text-[10px] text-slate-500">{user.position} | {user.employee_id}</p>
-                                </div>
-                             </div>
-                          </div>
-                       ))}
-                    </div>
-                 ) : (
-                    <div className="text-center py-12 bg-white/5 rounded-3xl border border-dashed border-white/10">
-                       <p className="text-sm text-slate-500">배정된 인원이 없습니다.</p>
-                    </div>
-                 )}
-              </section>
-            )}
-          </>
-        )}
-      </main>
+      {/* ②  검색 바 */}
+      <div style={{ flexShrink: 0, padding: '10px 16px 0', position: 'relative' }}>
+        <Search size={15} color="#475569" style={{ position: 'absolute', left: 28, top: '50%', transform: 'translateY(-30%)' }} />
+        <input
+          type="text"
+          placeholder="조직명 / 코드 검색..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12, padding: '12px 14px 12px 38px',
+            color: '#e2e8f0', fontSize: 15, outline: 'none',
+          }}
+        />
+      </div>
 
-      {/* Add/Edit Modal */}
+      {/* ③  Depth 탭 네비게이션 */}
+      <div style={{
+        flexShrink: 0, display: 'flex', gap: 6, padding: '10px 16px 0',
+        overflowX: 'auto',
+      }}>
+        {DEPTH_CONFIG.map((d, i) => {
+          const DIcon = d.icon;
+          const isActive = activeDepth === i;
+          const isEnabled = i === 0 || selected[i - 1] !== null;
+          return (
+            <button
+              key={i}
+              onClick={() => isEnabled && setActiveDepth(i)}
+              style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
+                padding: '8px 14px', borderRadius: 10, cursor: isEnabled ? 'pointer' : 'not-allowed',
+                background: isActive ? `${d.color}18` : 'rgba(255,255,255,0.03)',
+                border: isActive ? `1px solid ${d.color}40` : '1px solid rgba(255,255,255,0.06)',
+                opacity: isEnabled ? 1 : 0.35, transition: 'all 0.15s',
+              }}
+            >
+              <DIcon size={13} color={isActive ? d.color : '#475569'} />
+              <span style={{ fontSize: 13, fontWeight: 800, color: isActive ? d.color : '#475569', whiteSpace: 'nowrap' }}>
+                {d.label}
+              </span>
+              {selected[i] && (
+                <span style={{
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: d.color, flexShrink: 0,
+                }} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ④  선택 경로 브레드크럼 */}
+      {selected.some(s => s !== null) && (
+        <div style={{
+          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
+          padding: '8px 16px 0', flexWrap: 'wrap',
+        }}>
+          {selected.map((id, i) => {
+            if (!id) return null;
+            const findNode = (nodes, targetId) => {
+              for (const n of nodes) {
+                if (n.id === targetId) return n;
+                if (n.children) { const f = findNode(n.children, targetId); if (f) return f; }
+              }
+              return null;
+            };
+            const node = findNode(tree, id);
+            return (
+              <React.Fragment key={i}>
+                {i > 0 && <ChevronRight size={11} color="#334155" />}
+                <span style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: i === activeDepth - 1 ? DEPTH_CONFIG[i].color : '#475569',
+                }}>
+                  {node?.name || '…'}
+                </span>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ⑤  노드 목록 (flex:1 스크롤) */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 16px' }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Loader2 size={24} color="#3b82f6" style={{ animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : currentNodes.length === 0 ? (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            height: 120, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 16, gap: 8,
+          }}>
+            <Icon size={24} color="#1e293b" />
+            <span style={{ fontSize: 13, color: '#334155', fontWeight: 700 }}>
+              {activeDepth > 0 && !selected[activeDepth - 1]
+                ? `먼저 ${DEPTH_CONFIG[activeDepth - 1].label}을 선택하세요`
+                : '항목이 없습니다'}
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {currentNodes.map(node => {
+              const isSelected = selected[activeDepth] === node.id;
+              const hasChildren = node.children && node.children.length > 0;
+              return (
+                <div
+                  key={node.id}
+                  onClick={() => handleSelect(activeDepth, node.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '14px 16px', borderRadius: 16, cursor: 'pointer',
+                    background: isSelected ? `${cfg.color}12` : 'rgba(255,255,255,0.03)',
+                    border: isSelected ? `1px solid ${cfg.color}35` : '1px solid rgba(255,255,255,0.07)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                    background: isSelected ? `${cfg.color}20` : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${isSelected ? cfg.color + '35' : 'rgba(255,255,255,0.08)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon size={18} color={isSelected ? cfg.color : '#475569'} />
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: isSelected ? '#f1f5f9' : '#e2e8f0', marginBottom: 2 }}>
+                      {node.name}
+                    </div>
+                    {node.code && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Command size={10} color="#334155" />
+                        <span style={{ fontSize: 12, color: '#475569', fontFamily: 'monospace' }}>{node.code}</span>
+                        {hasChildren && (
+                          <span style={{
+                            fontSize: 11, color: cfg.color, marginLeft: 4, fontWeight: 700,
+                            background: `${cfg.color}15`, borderRadius: 4, padding: '1px 6px',
+                          }}>
+                            {node.children.length}개
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleOpenEditModal(node); }}
+                      style={{
+                        width: 32, height: 32, borderRadius: 9,
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      }}>
+                      <Edit3 size={13} color="#64748b" />
+                    </button>
+                    <button
+                      onClick={e => handleDeleteNode(node.id, e)}
+                      style={{
+                        width: 32, height: 32, borderRadius: 9,
+                        background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      }}>
+                      <Trash2 size={13} color="#f87171" />
+                    </button>
+                  </div>
+
+                  {isSelected && activeDepth < 4 && (
+                    <ChevronRight size={16} color={cfg.color} style={{ flexShrink: 0 }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 인원 목록 (파트 선택 시) */}
+        {selected[4] && activeDepth === 4 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Users size={15} color="#60a5fa" />
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0' }}>소속 인원</span>
+              <span style={{
+                fontSize: 12, color: '#60a5fa', fontWeight: 800,
+                background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)',
+                borderRadius: 6, padding: '1px 8px',
+              }}>{partUsers.length}명</span>
+            </div>
+            {loadingUsers ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
+                <Loader2 size={20} color="#475569" style={{ animation: 'spin 1s linear infinite' }} />
+              </div>
+            ) : partUsers.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {partUsers.map((u, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '11px 12px', borderRadius: 14,
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+                  }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, fontWeight: 900, color: '#60a5fa',
+                    }}>{u.name?.[0]}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
+                      <div style={{ fontSize: 12, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.position || u.role}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center', padding: '20px', fontSize: 13, color: '#334155',
+                border: '1px dashed rgba(255,255,255,0.06)', borderRadius: 14,
+              }}>배정된 인원이 없습니다.</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 추가/수정 모달 */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="bg-[#1a1f2e] border border-white/10 rounded-[32px] p-8 max-w-md w-full relative z-10 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between mb-8 text-white">
-              <h2 className="text-2xl font-bold tracking-tight">
-                {modalMode === 'add' ? '조직 추가' : '조직 수정'}
-                <span className="block text-xs text-slate-500 font-mono tracking-widest uppercase mt-1">Org Management</span>
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors">
-                <X className="w-5 h-5" />
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          display: 'flex', alignItems: 'flex-end',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+        }} onClick={() => setIsModalOpen(false)}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', padding: '24px 20px 32px',
+              background: 'linear-gradient(180deg, #0f172a, #0a0e1a)',
+              borderRadius: '24px 24px 0 0',
+              border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#f1f5f9' }}>
+                  {modalMode === 'add' ? '조직 추가' : '조직 수정'}
+                </div>
+                <div style={{ fontSize: 12, color: '#475569', fontFamily: 'monospace', marginTop: 2 }}>
+                  {DEPTH_CONFIG[activeDepth].label} · Depth {activeDepth + 1}
+                </div>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} style={{
+                width: 34, height: 34, borderRadius: 10,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              }}>
+                <X size={16} color="#64748b" />
               </button>
             </div>
 
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">조직명 (Name)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', marginBottom: 6 }}>조직명</div>
                 <input
-                  type="text"
-                  autoFocus
-                  placeholder="예: 경영기획본부"
-                  className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+                  autoFocus type="text" placeholder="예: 경영기획본부"
                   value={modalData.name}
-                  onChange={(e) => setModalData({ ...modalData, name: e.target.value })}
+                  onChange={e => setModalData({ ...modalData, name: e.target.value })}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 12, padding: '14px 16px', color: '#f1f5f9',
+                    fontSize: 16, outline: 'none',
+                  }}
                 />
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">조직 코드 (Code)</label>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', marginBottom: 6 }}>조직 코드 (선택)</div>
                 <input
-                  type="text"
-                  placeholder="예: ORG-001 (선택사항)"
-                  className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors font-mono"
+                  type="text" placeholder="예: ORG-001"
                   value={modalData.code}
-                  onChange={(e) => setModalData({ ...modalData, code: e.target.value })}
+                  onChange={e => setModalData({ ...modalData, code: e.target.value })}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 12, padding: '14px 16px', color: '#f1f5f9',
+                    fontSize: 16, fontFamily: 'monospace', outline: 'none',
+                  }}
                 />
               </div>
-
-              <div className="pt-4">
-                <button
-                  onClick={handleSaveNode}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl py-4 flex items-center justify-center gap-2 shadow-xl shadow-blue-900/30 transition-all active:scale-[0.98]"
-                >
-                  <Save className="w-5 h-5" />
-                  저장하기
-                </button>
-              </div>
+              <button
+                onClick={handleSaveNode}
+                disabled={saving}
+                style={{
+                  marginTop: 4, width: '100%', padding: '16px',
+                  borderRadius: 14, fontWeight: 900, fontSize: 16,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                  border: 'none', color: '#fff', cursor: 'pointer',
+                  boxShadow: '0 0 24px rgba(59,130,246,0.3)',
+                }}>
+                {saving
+                  ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> 저장 중...</>
+                  : <><Save size={16} /> 저장하기</>}
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        input::placeholder { color: #1e293b; }
+        ::-webkit-scrollbar { width: 3px; height: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.2); border-radius: 99px; }
+      `}</style>
     </div>
   );
 }

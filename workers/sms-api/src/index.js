@@ -1647,6 +1647,12 @@ app.post('/auth/login', async (c) => {
   // ACTIVE 상태인 경우에만 비밀번호 검증 진행
   if (!user.password_hash || !(await verifyPassword(password, user.password_hash))) {
     await db.prepare("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE employee_id = ?").bind(user.employee_id).run();
+    // 🔐 로그인 실패 기록
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    const ua = c.req.header('User-Agent') || 'unknown';
+    await db.prepare(
+      "INSERT INTO login_history (user_id, email, ip_address, user_agent, status) VALUES (?, ?, ?, ?, 'FAILURE')"
+    ).bind(user.employee_id, user.email, ip, ua).run().catch(() => {});
     return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다.", code: 'AUTH_WRONG_PASSWORD' }, 401);
   }
 
@@ -1674,6 +1680,13 @@ app.post('/auth/login', async (c) => {
       secure: true,
     });
   }
+
+  // 🔐 로그인 성공 기록
+  const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+  const ua = c.req.header('User-Agent') || 'unknown';
+  await db.prepare(
+    "INSERT INTO login_history (user_id, email, ip_address, user_agent, status) VALUES (?, ?, ?, ?, 'SUCCESS')"
+  ).bind(user.employee_id, user.email, ip, ua).run().catch(() => {});
 
   return c.json({ 
     ok: true, 
@@ -2514,12 +2527,18 @@ function extractOccurrence(occStr) {
 
 app.post('/sms/receive', async (c) => {
   const body = await c.req.json()
-  const { 
+  let { 
     sender, message, employee_id, 
     channel: bodyChannel, if_id: bodyIfId, service_code: bodyServiceCode, service_name: bodyServiceName, 
     biz_system: bodyBizSystem, error_code: bodyErrorCode, occurrence_count: bodyOccurrenceCount, 
     occurrence_node: bodyOccurrenceNode, error_message: bodyErrorMessage, occurrence_time: bodyOccurrenceTime, received_at 
   } = body
+
+  // 🛡️ Global Sanitize: Strip "[Web발신]" prefix immediately
+  if (message) {
+    message = message.replace(/\[Web발신\]/g, '').trim();
+  }
+
 
   // 🚀 Phase 14: Universal Entity Extraction (MCI / Batch / Generic)
   const uniqueIdPatterns = [
@@ -3793,19 +3812,22 @@ app.get('/warroom/rooms', async (c) => {
       w.inc_id                          AS code,
       w.inc_id,
       w.title,
+      w.title                           AS msg,
       r.message                         AS sms_message,
       w.severity,
       w.status,
       w.creator_id,
       w.leader_summary,
-      w.reg_dt                          AS created_at,
+      w.reg_dt,
       (SELECT COUNT(*) FROM warroom_chats wc WHERE wc.inc_id = w.inc_id)       AS message_count,
       (SELECT COUNT(*) FROM warroom_attachments wa WHERE wa.inc_id = w.inc_id) AS attachment_count,
       (SELECT wc2.text FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)     AS last_message,
       (SELECT u_msg.name FROM warroom_chats wc2 LEFT JOIN users u_msg ON wc2.sender = u_msg.employee_id WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
       (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
     FROM warroom_list w
-    LEFT JOIN received_messages r ON w.inc_id = r.inc_id
+    LEFT JOIN received_messages r ON (
+      LOWER(TRIM(REPLACE(w.inc_id, 'INC-', ''))) = LOWER(TRIM(REPLACE(r.inc_id, 'INC-', '')))
+    )
     WHERE 1=1
   `
   const params = []
@@ -7486,15 +7508,26 @@ app.get('/inbox', async (c) => {
   
   if (!user_id) return c.json({ error: 'user_id is required' }, 400)
 
-  let query = "SELECT * FROM inbox_items WHERE user_id = ?"
+  // Join with received_messages to get the original SMS that triggered the incident
+  // Using a very robust join that ignores prefixes and whitespace
+  let query = `
+    SELECT 
+      i.*, 
+      r.message AS sms_message
+    FROM inbox_items i
+    LEFT JOIN received_messages r ON (
+      LOWER(TRIM(REPLACE(i.inc_id, 'INC-', ''))) = LOWER(TRIM(REPLACE(r.inc_id, 'INC-', '')))
+    )
+    WHERE i.user_id = ?
+  `
   const params = [user_id]
   
   if (folder) {
-    query += " AND folder = ?"
+    query += " AND i.folder = ?"
     params.push(folder)
   }
   
-  query += " ORDER BY created_at DESC"
+  query += " ORDER BY i.created_at DESC"
 
   const { results } = await db.prepare(query).bind(...params).all()
   return c.json(results || [])
@@ -7703,7 +7736,49 @@ app.get('/reports/:inc_id', async (c) => {
   }
 
   if (!report) return c.json({ error: 'Report not found' }, 404)
-  return c.json({ report })
+
+  // 추가: received_messages에서 원본 문자 조회
+  let smsMessage = null
+  try {
+    const sms = await db.prepare(
+      "SELECT message FROM received_messages WHERE LOWER(TRIM(REPLACE(inc_id,'INC-',''))) = LOWER(TRIM(REPLACE(?,'INC-',''))) LIMIT 1"
+    ).bind(normId).first()
+    smsMessage = sms?.message || null
+  } catch (e) { /* ignore */ }
+
+  // users 테이블에서 조직/이름 정보 조회 (D1은 병렬 쿼리 미지원 → 순차 실행)
+  let userName = null
+  let userOrgPath = null
+  if (report.user_id) {
+    try {
+      const u = await db.prepare(
+        "SELECT name, company, honbu, team, part FROM users WHERE employee_id = ? LIMIT 1"
+      ).bind(String(report.user_id)).first()
+
+      if (u) {
+        userName = u.name
+
+        // 코드 → 조직명 변환 (순차 실행)
+        const resolveCode = async (code) => {
+          if (!code) return null
+          const row = await db.prepare("SELECT name FROM organizations WHERE code = ? LIMIT 1").bind(code).first()
+          return row?.name || code
+        }
+
+        const companyName = await resolveCode(u.company)
+        const honbuName   = await resolveCode(u.honbu)
+        const teamName    = await resolveCode(u.team)
+        const partName    = await resolveCode(u.part)
+
+        const parts = [companyName, honbuName, teamName, partName, u.name].filter(Boolean)
+        userOrgPath = parts.join(' / ')
+      }
+    } catch (e) {
+      console.warn('[reports] user org lookup failed:', e.message)
+    }
+  }
+
+  return c.json({ report: { ...report, sms_message: smsMessage, user_name: userName, user_org_path: userOrgPath } })
 })
 
 app.post('/inbox', async (c) => {

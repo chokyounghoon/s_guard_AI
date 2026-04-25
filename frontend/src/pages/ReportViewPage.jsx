@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, Calendar, User, Printer } from 'lucide-react';
+import {
+  ArrowLeft, ScrollText, Clock, User, Printer,
+  CheckCircle, MessageSquare, ChevronRight, Building2
+} from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import BottomMenu from '../components/BottomMenu';
 
@@ -30,92 +33,165 @@ export default function ReportViewPage() {
   }, [incId]);
 
   const cleanId = String(incId || '').replace(/^INC-/i, '');
+  const cleanTitle = (t) => (t || '').split(':')[0].trim();
 
+  /* ── Loading ── */
   if (loading) return (
-    <div className="min-h-screen bg-[#0f1421] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">보고서 로딩 중...</p>
+    <div style={{ minHeight: '100dvh', background: '#090c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <div style={{ width: 40, height: 40, border: '3px solid rgba(16,185,129,0.15)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: '#475569', fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>리포트 불러오는 중...</p>
       </div>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
+  /* ── Error ── */
   if (error) return (
-    <div className="min-h-screen bg-[#0f1421] flex items-center justify-center">
-      <div className="text-center">
-        <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 text-sm">{error}</p>
-        <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm">
-          돌아가기
-        </button>
+    <div style={{ minHeight: '100dvh', background: '#090c14', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
+      <div style={{ width: 60, height: 60, borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <ScrollText size={26} color="#334155" />
       </div>
+      <p style={{ color: '#64748b', fontSize: 14 }}>{error}</p>
+      <button onClick={() => navigate(-1)} style={{ padding: '10px 24px', borderRadius: 12, background: '#1d4ed8', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+        돌아가기
+      </button>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans pb-28">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-[#0f1421]/90 backdrop-blur-md border-b border-white/5 z-50 print:hidden">
-        <div className="flex items-center gap-2 px-3 py-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-all active:scale-95 shrink-0">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xs font-black tracking-wider uppercase text-emerald-400 truncate">Incident Report</h1>
-            <p className="text-[9px] text-slate-500 font-mono truncate">{cleanId}</p>
-          </div>
-          <button
-            onClick={() => window.print()}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all active:scale-95"
-            title="인쇄"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
+    <div style={{ minHeight: '100dvh', background: '#090c14', color: '#fff', paddingBottom: 100 }}>
+
+      {/* ── Header ── */}
+      <header style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
+        background: 'rgba(9,12,20,0.92)', backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '10px 16px',
+        display: 'flex', alignItems: 'center', gap: 12,
+      }}>
+        {/* 뒤로가기 */}
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            width: 36, height: 36, borderRadius: 12,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          <ArrowLeft size={16} color="#94a3b8" />
+        </button>
+
+        {/* 타이틀 */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 11, fontWeight: 900, color: '#10b981', letterSpacing: '0.12em', textTransform: 'uppercase', lineHeight: 1 }}>
+            Incident Report
+          </p>
+          <p style={{ fontSize: 10, color: '#334155', fontFamily: 'monospace', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cleanId}
+          </p>
         </div>
+
+        {/* 인쇄 */}
+        <button
+          onClick={() => window.print()}
+          style={{
+            width: 36, height: 36, borderRadius: 12,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', flexShrink: 0,
+          }}
+          title="인쇄"
+        >
+          <Printer size={15} color="#64748b" />
+        </button>
       </header>
 
-      <div className="pt-16 px-3 max-w-2xl mx-auto">
-        {/* Report Meta Card */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 mb-4 mt-2">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              <FileText className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-black text-white truncate">{report?.title || `[인시던트 보고서] ${cleanId}`}</h2>
-              <div className="flex items-center gap-3 mt-1">
-                {report?.user_id && (
-                  <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                    <User className="w-3 h-3" /> {report.user_id}
-                  </span>
-                )}
-                {report?.created_at && (
-                  <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                    <Calendar className="w-3 h-3" />
-                    {new Date(report.created_at).toLocaleString('ko-KR')}
-                  </span>
-                )}
-              </div>
-              <div className="mt-1.5">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-400 uppercase">
-                  ✅ 처리완료
+      {/* ── Content ── */}
+      <div style={{ paddingTop: 64, paddingInline: 16, maxWidth: 680, margin: '0 auto' }}>
+
+        {/* Meta Card */}
+        <div style={{
+          marginTop: 16, marginBottom: 12,
+          background: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(9,12,20,0) 60%)',
+          border: '1px solid rgba(16,185,129,0.15)',
+          borderRadius: 20, padding: '16px 18px',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {/* 왼쪽 강조선 */}
+          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: '#10b981', borderRadius: '20px 0 0 20px' }} />
+
+          {/* 상태 배지 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 6, padding: '3px 10px', letterSpacing: '0.04em' }}>처리완료</span>
+            <span style={{ fontSize: 11, color: '#334155', fontFamily: 'monospace', fontWeight: 700 }}>{cleanId}</span>
+          </div>
+
+          {/* 제목 */}
+          <h2 style={{ fontSize: 16, fontWeight: 900, color: '#f1f5f9', lineHeight: 1.4, marginBottom: 14 }}>
+            {cleanTitle(report?.title || `[인시던트 보고서] ${cleanId}`)}
+          </h2>
+
+          {/* 메타 정보 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {(report?.user_org_path || report?.user_id) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <Building2 size={12} color="#475569" />
+                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, lineHeight: 1.5 }}>
+                  {report.user_org_path || report.user_id}
                 </span>
               </div>
-            </div>
+            )}
+            {report?.created_at && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <Clock size={12} color="#475569" />
+                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                  {new Date(report.created_at).toLocaleString('ko-KR')}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Report Content */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+        {/* 원본 문자 메시지 카드 */}
+        {report?.sms_message && (
+          <div style={{
+            marginBottom: 12,
+            background: 'rgba(59,130,246,0.04)',
+            border: '1px solid rgba(59,130,246,0.15)',
+            borderRadius: 20, padding: '14px 18px',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: '#3b82f6', borderRadius: '20px 0 0 20px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+              <MessageSquare size={13} color="#60a5fa" />
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: '0.08em', textTransform: 'uppercase' }}>수신 문자 원문</span>
+            </div>
+            <p style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              {report.sms_message}
+            </p>
+          </div>
+        )}
+
+        {/* 리포트 본문 */}
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 20, padding: '16px 18px',
+        }}>
           {report?.content ? (
             <MarkdownViewer text={report.content} />
           ) : (
-            <p className="text-slate-500 text-sm text-center py-8">보고서 내용이 없습니다.</p>
+            <p style={{ color: '#475569', fontSize: 14, textAlign: 'center', padding: '32px 0' }}>
+              보고서 내용이 없습니다.
+            </p>
           )}
         </div>
       </div>
 
       <BottomMenu />
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

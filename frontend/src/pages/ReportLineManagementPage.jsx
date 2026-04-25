@@ -1,13 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, Search, Save, Shield, Star, 
-  Users, Trash2, TrendingDown, User, Zap, ChevronDown,
-  Plus, Settings, AlertCircle, RefreshCw
+import {
+  ChevronLeft, Search, Save, Shield, Star,
+  Users, Trash2, TrendingDown, User, Zap, ChevronUp, ChevronDown,
+  Plus, AlertCircle, RefreshCw, Loader2
 } from 'lucide-react';
 import { SMS_WORKER_URL } from '../config/api';
 
 const getApiUrl = (endpoint) => `${SMS_WORKER_URL}${endpoint}`;
+
+const roleStyles = {
+  '대표': { icon: Shield, color: '#a855f7' },
+  '본부': { icon: Star,   color: '#60a5fa' },
+  '상무': { icon: Star,   color: '#60a5fa' },
+  '전무': { icon: Star,   color: '#60a5fa' },
+  '팀장': { icon: Users,  color: '#34d399' },
+  '파트장':{ icon: Zap,   color: '#fb923c' },
+  'default':{ icon: User, color: '#f472b6' },
+};
+
+const getStyle = (role) => {
+  if (!role) return roleStyles.default;
+  for (const [k, v] of Object.entries(roleStyles)) {
+    if (role.includes(k)) return v;
+  }
+  return roleStyles.default;
+};
+
+const nodeColors = (index, total) => {
+  if (index === 0) return '#a855f7';
+  if (index === total - 1) return '#10b981';
+  return '#3b82f6';
+};
 
 export default function ReportLineManagementPage() {
   const navigate = useNavigate();
@@ -18,328 +42,358 @@ export default function ReportLineManagementPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Default icons/colors mapping by role keyword matching
-  const roleStyles = {
-    '대표': { icon: Shield, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
-    '본부': { icon: Star, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-    '상무': { icon: Star, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-    '전무': { icon: Star, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-    '팀장': { icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
-    '파트장': { icon: Zap, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-    'default': { icon: User, color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/20' }
-  };
-
-  const getStyleForRole = (role) => {
-    if (!role) return roleStyles.default;
-    for (const [key, style] of Object.entries(roleStyles)) {
-      if (role.includes(key)) return style;
-    }
-    return roleStyles.default;
-  };
-
   useEffect(() => {
-    const savedUser = localStorage.getItem('sguard_user');
-    if (savedUser) {
-      try { setCurrentUser(JSON.parse(savedUser)); } catch (e) {}
-    }
+    const saved = localStorage.getItem('sguard_user');
+    if (saved) { try { setCurrentUser(JSON.parse(saved)); } catch (e) {} }
     fetchData();
   }, []);
 
   const fetchData = async () => {
     setIsLoading(true);
-    let userId = currentUser?.employee_id || '';
-    if (!userId) {
-      const savedUser = localStorage.getItem('sguard_user');
-      if (savedUser) {
-        try { userId = JSON.parse(savedUser).employee_id; } catch (e) {}
-      }
-    }
-    
+    let userId = '';
+    const saved = localStorage.getItem('sguard_user');
+    if (saved) { try { userId = JSON.parse(saved).employee_id; } catch (e) {} }
     try {
       const [usersRes, linesRes] = await Promise.all([
         fetch(getApiUrl('/api/v1/users/organization')),
-        fetch(getApiUrl(`/api/v1/report-lines?user_id=${userId}`))
+        fetch(getApiUrl(`/api/v1/report-lines?user_id=${userId}`)),
       ]);
-      
       if (usersRes.ok && linesRes.ok) {
         const usersData = await usersRes.json();
         const linesData = await linesRes.json();
-        
         setAvailableMembers(usersData.users || []);
-        
-        // Map saved lines back to user objects for full rendering
-        const hydratedLines = (linesData.report_lines || []).map(line => {
-          const matchedUser = (usersData.users || []).find(u => u.id === line.user_id) || {};
-          return {
-            ...line,
-            name: matchedUser.name || line.user_name,
-            role: matchedUser.role || line.role_name || '결재자',
-            honbu: matchedUser.honbu || '',
-            team: matchedUser.team || '',
-            id: line.user_id // using user_id as unique key for tree
-          };
+        const hydrated = (linesData.report_lines || []).map(line => {
+          const u = (usersData.users || []).find(u => u.id === line.user_id) || {};
+          return { ...line, name: u.name || line.user_name, role: u.role || line.role_name || '결재자', honbu: u.honbu || '', team: u.team || '', id: line.user_id };
         });
-        
-        setReportLines(hydratedLines);
+        setReportLines(hydrated);
       }
-    } catch (e) {
-      console.error("Failed to load organization data:", e);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setIsLoading(false); }
   };
 
   const saveReportLines = async () => {
     setIsSaving(true);
     try {
-      const payload = reportLines.map((line, index) => ({
-        hierarchy_level: index + 1,
-        role_name: line.role || '결재자',
-        user_id: line.id,
-        user_name: line.name
-      }));
-
+      const payload = reportLines.map((l, i) => ({ hierarchy_level: i + 1, role_name: l.role || '결재자', user_id: l.id, user_name: l.name }));
       const res = await fetch(getApiUrl('/api/v1/report-lines'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          owner_id: currentUser?.employee_id,
-          report_lines: payload 
-        })
+        body: JSON.stringify({ owner_id: currentUser?.employee_id, report_lines: payload }),
       });
-
-      if (res.ok) {
-        alert('보고 라인이 성공적으로 저장되었습니다.');
-      } else {
-        alert('저장에 실패했습니다.');
-      }
-    } catch (e) {
-      console.error('Save error:', e);
-      alert('서버 오류로 인해 저장하지 못했습니다.');
-    } finally {
-      setIsSaving(false);
-    }
+      if (!res.ok) alert('저장 실패');
+    } catch (e) { alert('서버 오류'); }
+    finally { setIsSaving(false); }
   };
 
-  const addToReportLine = (member) => {
-    if (reportLines.some(line => line.id === member.id)) {
-      alert('이미 보고 라인에 추가된 대상입니다.');
-      return;
-    }
-    setReportLines(prev => [...prev, member]);
+  const addMember = (m) => {
+    if (reportLines.some(l => l.id === m.id)) return;
+    setReportLines(prev => [...prev, m]);
+  };
+  const removeMember = (id) => setReportLines(prev => prev.filter(l => l.id !== id));
+  const moveUp = (i) => {
+    if (i === 0) return;
+    setReportLines(prev => { const a = [...prev]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; return a; });
+  };
+  const moveDown = (i) => {
+    if (i === reportLines.length - 1) return;
+    setReportLines(prev => { const a = [...prev]; [a[i], a[i + 1]] = [a[i + 1], a[i]]; return a; });
   };
 
-  const removeFromReportLine = (userId) => {
-    setReportLines(prev => prev.filter(line => line.id !== userId));
-  };
-  
-  // Custom Reordering via arrows
-  const moveUp = (index) => {
-    if (index === 0) return;
-    setReportLines(prev => {
-      const arr = [...prev];
-      const temp = arr[index - 1];
-      arr[index - 1] = arr[index];
-      arr[index] = temp;
-      return arr;
-    });
-  };
-
-  const moveDown = (index) => {
-    if (index === reportLines.length - 1) return;
-    setReportLines(prev => {
-      const arr = [...prev];
-      const temp = arr[index + 1];
-      arr[index + 1] = arr[index];
-      arr[index] = temp;
-      return arr;
-    });
-  };
-
-  const filteredMembers = availableMembers.filter(m => 
-    m.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filtered = availableMembers.filter(m =>
+    m.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.honbu?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.team?.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => {
     if (!searchTerm && currentUser) {
-      const aIsMyTeam = a.team === currentUser.team;
-      const bIsMyTeam = b.team === currentUser.team;
-      if (aIsMyTeam && !bIsMyTeam) return -1;
-      if (!aIsMyTeam && bIsMyTeam) return 1;
-
-      const aIsMyHonbu = a.honbu === currentUser.honbu;
-      const bIsMyHonbu = b.honbu === currentUser.honbu;
-      if (aIsMyHonbu && !bIsMyHonbu) return -1;
-      if (!aIsMyHonbu && bIsMyHonbu) return 1;
+      if (a.team === currentUser.team && b.team !== currentUser.team) return -1;
+      if (a.team !== currentUser.team && b.team === currentUser.team) return 1;
+      if (a.honbu === currentUser.honbu && b.honbu !== currentUser.honbu) return -1;
+      if (a.honbu !== currentUser.honbu && b.honbu === currentUser.honbu) return 1;
     }
     return 0;
   });
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] text-white font-sans pb-24 relative overflow-x-hidden">
-      <div className="fixed top-0 left-0 w-full h-96 bg-purple-900/5 blur-[100px] -z-10 pointer-events-none" />
+    <div style={{
+      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      background: 'linear-gradient(160deg, #07030f 0%, #0a0714 50%, #060311 100%)',
+      fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
+    }}>
 
-      {/* Header */}
-      <header className="flex justify-between items-center p-5 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-50 border-b border-white/5">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold">보고/결재 라인 관리</h1>
-            <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Approval Hierarchy Database</p>
+      {/* ── 헤더 ── */}
+      <header style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 16px', flexShrink: 0,
+        borderBottom: '1px solid rgba(168,85,247,0.1)',
+        background: 'rgba(7,3,15,0.9)', backdropFilter: 'blur(20px)',
+      }}>
+        <button onClick={() => navigate(-1)} style={{
+          width: 34, height: 34, borderRadius: 10,
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        }}>
+          <ChevronLeft size={16} color="#64748b" />
+        </button>
+
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontSize: 16, fontWeight: 900, letterSpacing: '0.04em',
+            background: 'linear-gradient(90deg, #a855f7, #60a5fa)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>보고 / 결재 라인</div>
+          <div style={{ fontSize: 11, color: '#a855f7', fontWeight: 800, letterSpacing: '0.18em', opacity: 0.6 }}>
+            APPROVAL HIERARCHY
           </div>
         </div>
-        <div className="flex space-x-2">
-          <button onClick={fetchData} disabled={isLoading} className="p-2 rounded-xl border border-white/10 text-slate-400 hover:text-white transition-colors">
-            <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={fetchData} disabled={isLoading} style={{
+            width: 34, height: 34, borderRadius: 10,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}>
+            <RefreshCw size={14} color="#64748b" style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
-          <button onClick={saveReportLines} disabled={isSaving} className="bg-purple-600/20 text-purple-400 px-4 rounded-xl hover:bg-purple-600/30 transition-colors border border-purple-500/20 flex items-center space-x-2 font-bold text-sm">
-            <Save className="w-4 h-4" />
-            <span>{isSaving ? '저장 중...' : '저장하기'}</span>
+          <button onClick={saveReportLines} disabled={isSaving} style={{
+            height: 34, padding: '0 14px', borderRadius: 10,
+            background: isSaving ? 'rgba(168,85,247,0.1)' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+            border: 'none', color: '#fff', fontWeight: 800, fontSize: 12,
+            display: 'flex', alignItems: 'center', gap: 5, cursor: isSaving ? 'not-allowed' : 'pointer',
+          }}>
+            {isSaving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+            {isSaving ? '저장 중' : '저장'}
           </button>
         </div>
       </header>
 
-      <main className="p-5 space-y-8 max-w-2xl mx-auto">
-        {/* Organizational Chart Section */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-purple-400" />
-              장애 알림 결재/통보 라인
-            </h2>
-            <div className="bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
-              <span className="text-[9px] font-bold text-purple-400 uppercase tracking-tighter">Dynamic Hierarchy</span>
-            </div>
+      {/* ── 상단: 보고 라인 트리 ── */}
+      <div style={{
+        flex: '0 0 auto', maxHeight: '42%',
+        display: 'flex', flexDirection: 'column',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        {/* 섹션 타이틀 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px 8px', flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <TrendingDown size={13} color="#a855f7" />
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.04em' }}>알림 결재 / 통보 라인</span>
           </div>
+          <span style={{
+            fontSize: 12, fontWeight: 800, color: '#a855f7',
+            background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)',
+            borderRadius: 6, padding: '3px 10px', letterSpacing: '0.06em',
+          }}>
+            {reportLines.length}명
+          </span>
+        </div>
 
-          <div className="relative pl-6 sm:pl-8 space-y-4">
-            {/* Connection Line */}
-            {reportLines.length > 1 && (
-              <div className="absolute left-[43px] sm:left-[51px] top-8 bottom-8 w-1 bg-gradient-to-b from-purple-500/70 via-blue-500/50 to-emerald-500/30 rounded-full" />
-            )}
-
-            {reportLines.length === 0 && !isLoading && (
-              <div className="bg-[#1a1f2e] border border-dashed border-white/20 rounded-3xl p-10 flex flex-col items-center justify-center text-center">
-                <AlertCircle className="w-10 h-10 text-slate-500 mb-3" />
-                <h3 className="text-sm font-bold text-slate-300">지정된 보고 라인이 없습니다</h3>
-                <p className="text-xs text-slate-500 mt-1">아래 조직도 검색에서 인원을 선택하여 추가해주세요.</p>
-              </div>
-            )}
-
-            {reportLines.map((member, index) => {
-              const styles = getStyleForRole(member.role);
-              const isFirst = index === 0;
-              const isLast = index === reportLines.length - 1;
-              const nodeBg = isFirst ? 'bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.6)]' : isLast ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.5)]';
-
-              return (
-                <div key={member.id} className="relative group animate-in slide-in-from-left-4 duration-300">
-                  {/* Node Point */}
-                  <div className={`absolute left-[-23px] sm:left-[-35px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-[3px] border-[#0a0e17] z-10 transition-transform group-hover:scale-125 ${nodeBg}`} />
-
-                  <div className="bg-[#11141d] rounded-3xl border border-white/5 shadow-xl group-hover:border-purple-500/20 transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 sm:p-5">
-                    
-                    <div className="flex items-center space-x-4 mb-3 sm:mb-0">
-                      <div className="text-center w-6 opacity-30 font-black text-xl italic">{index+1}차</div>
-                      <div className={`${styles.bg} ${styles.border} p-3 rounded-2xl border flex items-center justify-center shadow-inner`}>
-                        <styles.icon className={`w-5 h-5 ${styles.color}`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold text-white tracking-tight">{member.name}</h3>
-                          <span className={`text-[10px] font-black tracking-widest ${styles.color}`}>{member.role}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-slate-400">{member.honbu} {member.team !== member.honbu && member.team}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 self-end sm:self-auto border-t sm:border-none border-white/5 pt-3 sm:pt-0 w-full sm:w-auto justify-end">
-                      <button onClick={() => moveUp(index)} disabled={isFirst} className="p-2 rounded-xl bg-white/5 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                        <ChevronDown className="w-4 h-4 rotate-180" />
-                      </button>
-                      <button onClick={() => moveDown(index)} disabled={isLast} className="p-2 rounded-xl bg-white/5 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                        <ChevronDown className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => removeFromReportLine(member.id)} className="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors ml-1">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Member Search Section (Compact) */}
-        <section className="bg-[#11141d] rounded-3xl p-6 border border-white/5 relative overflow-hidden mt-8">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 blur-3xl rounded-full" />
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 relative z-10 gap-4">
-            <div>
-               <h2 className="text-sm font-bold text-slate-300">조직 구성원 추가</h2>
-               <p className="text-[10px] text-slate-500 mt-0.5">상단 보고라인 트리에 추가할 인원을 클릭하세요.</p>
-            </div>
-            <div className="relative w-full sm:w-56">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input 
-                type="text"
-                placeholder="이름, 부서 등 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[#0a0e17] border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:border-purple-500/50 transition-colors"
-               />
-            </div>
-          </div>
-
+        {/* 트리 목록 */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 10px' }}>
           {isLoading ? (
-            <div className="flex justify-center py-10"><RefreshCw className="w-6 h-6 animate-spin text-slate-500" /></div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 80 }}>
+              <Loader2 size={20} color="#475569" style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : reportLines.length === 0 ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 6, height: 80, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 14,
+            }}>
+              <AlertCircle size={20} color="#334155" />
+              <span style={{ fontSize: 11, color: '#334155', fontWeight: 700 }}>아래에서 구성원을 추가하세요</span>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
-              {filteredMembers.map(member => (
-                <div 
-                  key={member.id} 
-                  onClick={() => addToReportLine(member)}
-                  className="flex items-center justify-between p-3 bg-[#0a0e17] hover:bg-purple-900/20 rounded-2xl transition-all cursor-pointer group border border-white/5 hover:border-purple-500/30"
-                >
-                  <div className="flex items-center space-x-3 truncate">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex flex-shrink-0 items-center justify-center border border-white/10 group-hover:border-purple-500/30 transition-colors">
-                      <div className="text-xs font-bold text-slate-400 group-hover:text-purple-300">{member.name[0]}</div>
-                    </div>
-                    <div className="truncate">
-                      <h4 className="text-xs font-bold text-slate-200 truncate flex items-center gap-1.5">
-                        {member.name}
-                        {currentUser && member.team === currentUser.team && !searchTerm && (
-                           <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">내 소속 부서</span>
-                        )}
-                        {currentUser && member.honbu === currentUser.honbu && member.team !== currentUser.team && !searchTerm && (
-                           <span className="text-[9px] bg-blue-500/10 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/20">같은 본부</span>
-                        )}
-                      </h4>
-                      <span className="text-[10px] text-slate-500 truncate block">{member.team || member.honbu} {member.role !== 'user' && `| ${member.role}`}</span>
-                    </div>
-                  </div>
-                  <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors flex-shrink-0">
-                    <Plus className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400" />
-                  </div>
-                </div>
-              ))}
-              
-              {filteredMembers.length === 0 && (
-                <div className="col-span-full py-8 text-center text-slate-500 text-xs">
-                  검색 결과가 없습니다.
-                </div>
+            <div style={{ position: 'relative', paddingLeft: 28 }}>
+              {/* 연결선 */}
+              {reportLines.length > 1 && (
+                <div style={{
+                  position: 'absolute', left: 12, top: 20, bottom: 20, width: 2,
+                  background: 'linear-gradient(180deg, #a855f7, #3b82f6, #10b981)',
+                  borderRadius: 99,
+                }} />
               )}
+
+              {reportLines.map((m, i) => {
+                const style = getStyle(m.role);
+                const Icon = style.icon;
+                const col = nodeColors(i, reportLines.length);
+                return (
+                  <div key={m.id} style={{ position: 'relative', marginBottom: 8 }}>
+                    {/* 노드 점 */}
+                    <div style={{
+                      position: 'absolute', left: -22, top: '50%', transform: 'translateY(-50%)',
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: col, boxShadow: `0 0 8px ${col}`,
+                      border: '2px solid #07030f', zIndex: 2,
+                    }} />
+
+                    <div style={{
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+                      borderRadius: 14, padding: '9px 10px',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      {/* 순서 */}
+                      <span style={{ fontSize: 10, fontWeight: 900, color: col, fontFamily: 'monospace', width: 18, textAlign: 'center', flexShrink: 0 }}>
+                        {i + 1}
+                      </span>
+
+                      {/* 아이콘 */}
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 10,
+                        background: `${style.color}15`, border: `1px solid ${style.color}30`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        <Icon size={14} color={style.color} />
+                      </div>
+
+                      {/* 이름/부서 */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', lineHeight: 1.2 }}>{m.name}</div>
+                        <div style={{ fontSize: 12, color: '#475569', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m.role} · {m.team || m.honbu}
+                        </div>
+                      </div>
+
+                      {/* 조작 버튼 */}
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button onClick={() => moveUp(i)} disabled={i === 0} style={{
+                          width: 26, height: 26, borderRadius: 8,
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 1,
+                        }}>
+                          <ChevronUp size={12} color="#94a3b8" />
+                        </button>
+                        <button onClick={() => moveDown(i)} disabled={i === reportLines.length - 1} style={{
+                          width: 26, height: 26, borderRadius: 8,
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: i === reportLines.length - 1 ? 'not-allowed' : 'pointer', opacity: i === reportLines.length - 1 ? 0.3 : 1,
+                        }}>
+                          <ChevronDown size={12} color="#94a3b8" />
+                        </button>
+                        <button onClick={() => removeMember(m.id)} style={{
+                          width: 26, height: 26, borderRadius: 8,
+                          background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                        }}>
+                          <Trash2 size={12} color="#f87171" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
-        </section>
-      </main>
+        </div>
+      </div>
+
+      {/* ── 하단: 멤버 검색/추가 ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* 검색 바 */}
+        <div style={{ padding: '10px 16px 8px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.04em' }}>조직 구성원 추가</span>
+            <span style={{ fontSize: 10, color: '#475569' }}>· 클릭하여 라인에 추가</span>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <Search size={13} color="#475569" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="이름, 부서 검색..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10, padding: '9px 12px 9px 32px',
+                color: '#e2e8f0', fontSize: 12, outline: 'none',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 멤버 목록 */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 16px' }}>
+          {isLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+              <Loader2 size={20} color="#475569" style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#334155', fontSize: 12 }}>검색 결과 없음</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {filtered.map(m => {
+                const isAdded = reportLines.some(l => l.id === m.id);
+                const isMyTeam = currentUser && m.team === currentUser.team;
+                const isMyHonbu = currentUser && m.honbu === currentUser.honbu && m.team !== currentUser.team;
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => !isAdded && addMember(m)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '9px 10px', borderRadius: 12, cursor: isAdded ? 'default' : 'pointer',
+                      background: isAdded ? 'rgba(168,85,247,0.08)' : 'rgba(255,255,255,0.03)',
+                      border: isAdded ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                      opacity: isAdded ? 0.6 : 1, transition: 'all 0.15s',
+                    }}
+                  >
+                    {/* 아바타 */}
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                      background: isAdded ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 900,
+                      color: isAdded ? '#a855f7' : '#64748b',
+                    }}>
+                      {m.name?.[0]}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {m.name}
+                        {isMyTeam && !searchTerm && (
+                          <span style={{ fontSize: 8, background: 'rgba(168,85,247,0.2)', color: '#c084fc', borderRadius: 4, padding: '1px 4px', flexShrink: 0 }}>내팀</span>
+                        )}
+                        {isMyHonbu && !searchTerm && (
+                          <span style={{ fontSize: 8, background: 'rgba(59,130,246,0.1)', color: '#93c5fd', borderRadius: 4, padding: '1px 4px', flexShrink: 0 }}>본부</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.team || m.honbu}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 7, flexShrink: 0,
+                      background: isAdded ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.05)',
+                      border: isAdded ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.07)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {isAdded
+                        ? <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 900 }}>✓</span>
+                        : <Plus size={11} color="#64748b" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.2); border-radius: 99px; }
+      `}</style>
     </div>
   );
 }
-

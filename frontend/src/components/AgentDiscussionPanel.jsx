@@ -185,10 +185,10 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
             isLeader ? 'text-purple-400' : 'text-slate-400';
 
           const bubbleBg = isLeader
-            ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.45) 0%, rgba(147,51,234,0.45) 100%)', borderColor: 'rgba(139,92,246,0.3)' }
-            : { background: '#1e2640', borderColor: 'rgba(255,255,255,0.07)' };
+            ? { background: 'linear-gradient(135deg, rgba(37,99,235,0.15) 0%, rgba(30,58,138,0.3) 100%)', borderColor: 'rgba(59,130,246,0.3)' }
+            : { background: 'rgba(26,31,46,0.8)', borderColor: 'rgba(255,255,255,0.05)' };
 
-          const tailColor = isLeader ? 'rgba(99,102,241,0.5)' : '#1e2640';
+          const tailColor = isLeader ? 'rgba(37,99,235,0.2)' : 'rgba(26,31,46,0.8)';
 
           return (
             <div key={idx} className="flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 justify-start mb-1">
@@ -222,13 +222,13 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                       }} />
                       {/* 말풍선 본체 */}
                       <div
-                        className="px-4 py-3 text-[13px] leading-relaxed shadow-md whitespace-pre-wrap break-words select-none"
+                        className="px-4 py-3 text-[14px] leading-relaxed shadow-[0_8px_30px_rgba(0,0,0,0.3)] whitespace-pre-wrap break-words select-none backdrop-blur-md transition-all active:scale-[0.98]"
                         style={{
                           ...bubbleBg,
-                          borderRadius: '0 20px 20px 20px',
+                          borderRadius: '0 24px 24px 24px',
                           border: `1px solid ${bubbleBg.borderColor}`,
-                          color: isLeader ? '#fff' : '#cbd5e1',
-                          maxWidth: '100%',
+                          color: isLeader ? '#ffffff' : '#e2e8f0',
+                          fontWeight: 500
                         }}
                         onTouchStart={(e) => startLongPress(cleanText(msg.text), e)}
                         onTouchEnd={cancelLongPress}

@@ -38,7 +38,7 @@ import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, MessageSquare, FileText } from 'lucide-react';
+import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User } from 'lucide-react';
 
 import { CodebookProvider } from './context/CodebookContext';
 
@@ -318,39 +318,69 @@ function AppContent() {
       {/* Global War-Room List Popup */}
       {showWarRoomPopup && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
-                  <MessageSquare className="w-5 h-5 text-blue-400" />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowWarRoomPopup(false)} />
+          <div className="bg-[#0f1219]/95 w-full max-w-xl rounded-t-[3rem] border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] relative z-10 overflow-hidden flex flex-col max-h-[75vh] animate-in slide-in-from-bottom-full duration-500 pb-safe">
+            {/* Top Handle bar */}
+            <div className="flex justify-center pt-4 pb-2">
+              <div className="w-12 h-1.5 bg-white/10 rounded-full" />
+            </div>
+            
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-blue-600/20 p-3 rounded-2xl border border-blue-500/30 shadow-[0_0_15px_rgba(37,99,235,0.2)]">
+                  <MessageSquare className="w-6 h-6 text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>
-                  <p className="text-[10px] text-slate-500 font-mono">ACTIVE CHANNELS ({warRooms.length})</p>
+                  <h3 className="font-black text-xl text-white tracking-tight">참여 중인 워룸</h3>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Active Channels ({warRooms.length})</p>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
+              <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors border border-white/5">
+                <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
               {warRooms.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">진행 중인 War-Room이 없습니다.</div>
+                <div className="text-center py-20">
+                  <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+                    <MessageSquare className="w-8 h-8 text-slate-700" />
+                  </div>
+                  <p className="text-slate-500 text-sm font-bold">진행 중인 War-Room이 없습니다.</p>
+                </div>
               ) : warRooms.map((room) => {
                 const roomId = room.inc_id || room.id;
+                const isCurrent = roomId === currentIncidentId;
                 return (
                   <div
                     key={roomId}
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
-                    className={`bg-[#11141d] p-4 rounded-2xl border transition-all cursor-pointer group ${roomId === currentIncidentId ? 'border-blue-500/40 bg-blue-900/10' : 'border-white/5 hover:border-blue-500/30'}`}
+                    className={`p-5 rounded-[2rem] border transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] ${
+                      isCurrent 
+                        ? 'bg-blue-600/10 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.1)]' 
+                        : 'bg-[#1a1f2e]/40 border-white/5 hover:border-blue-500/30 hover:bg-[#1a1f2e]/60'
+                    }`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30">CRITICAL</span>
-                      {roomId === currentIncidentId && <span className="text-[9px] text-blue-400 font-bold">● 현재 채팅방</span>}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30 tracking-tighter">CRITICAL</span>
+                        {isCurrent && <span className="text-[10px] text-blue-400 font-black tracking-tight flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                          NOW
+                        </span>}
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono font-bold">{room.reg_dt ? new Date(room.reg_dt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                     </div>
-                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
+                    <p className="text-[15px] font-bold text-white group-hover:text-blue-400 transition-colors truncate pr-4">{room.msg || room.title || roomId}</p>
+                    <div className="flex items-center gap-2 mt-2 opacity-60">
+                      <div className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center">
+                        <User className="w-2.5 h-2.5 text-slate-500" />
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{roomId}</span>
+                    </div>
                   </div>
                 );
               })}
@@ -361,43 +391,65 @@ function AppContent() {
 
       {/* Global Report List Popup */}
       {showReportPopup && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReportPopup(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-emerald-500/20 rounded-2xl">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowReportPopup(false)} />
+          <div className="bg-[#0f1219] w-full max-w-md rounded-[2.5rem] border border-white/10 shadow-2xl relative z-10 animate-in zoom-in-95 duration-300 overflow-hidden max-h-[80vh] flex flex-col">
+            
+            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-emerald-600/10 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-500/20 p-2 rounded-xl border border-emerald-500/30">
                   <FileText className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-white">장애 보고서 선택</h3>
-                  <p className="text-[10px] text-slate-500 font-mono">AVAILABLE REPORTS ({warRooms.length})</p>
+                  <h3 className="font-black text-lg text-white tracking-tight">Report Selection</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active War-Rooms</p>
                 </div>
               </div>
-              <button onClick={() => setShowReportPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
+              <button 
+                onClick={() => setShowReportPopup(false)}
+                className="p-2 rounded-full hover:bg-white/5 transition-colors group"
+              >
+                <X className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {warRooms.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">리포트 가능한 장애 건이 없습니다.</div>
+                <div className="py-12 flex flex-col items-center justify-center text-center px-6">
+                  <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/5">
+                    <FileText className="w-8 h-8 text-slate-700" />
+                  </div>
+                  <p className="text-slate-400 font-bold text-sm">발행된 리포트가 없습니다.</p>
+                </div>
               ) : warRooms.map((room) => {
                 const roomId = room.inc_id || room.id;
                 return (
                   <div
                     key={roomId}
                     onClick={() => { setShowReportPopup(false); navigate(`/ai-report/${roomId}`); }}
-                    className="bg-[#11141d] p-4 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group"
+                    className="group bg-white/[0.02] p-4 rounded-2xl border border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all cursor-pointer relative overflow-hidden active:scale-[0.98]"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-blue-500/20 text-blue-400 border-blue-500/30">COMPLETED</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="bg-emerald-500/10 text-emerald-400 text-[9px] font-black px-2 py-0.5 rounded-md border border-emerald-500/20 tracking-tighter">
+                        COMPLETED
+                      </div>
+                      <span className="text-[10px] text-slate-600 font-mono font-bold">{roomId}</span>
                     </div>
-                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
+                    <h4 className="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition-colors line-clamp-1">{room.msg || room.title || roomId}</h4>
+                    <div className="flex items-center justify-between mt-3 text-[10px] text-slate-500">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {room.reg_dt ? new Date(room.reg_dt).toLocaleDateString() : ''}
+                      </div>
+                      <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all text-emerald-500" />
+                    </div>
                   </div>
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
           </div>
         </div>
       )}

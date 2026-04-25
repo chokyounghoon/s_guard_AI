@@ -354,82 +354,81 @@ export default function UserManagementPage() {
     (u.employee_id && u.employee_id.includes(search))
   );
 
-  return (
-    <div className="min-h-screen bg-[#0a0e17] text-white font-sans pb-24 relative overflow-x-hidden" translate="no">
-      {/* Background Decor */}
-      <div className="fixed top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full -z-10 animate-pulse" />
-      <div className="fixed bottom-0 right-1/4 w-[400px] h-[400px] bg-purple-600/10 blur-[100px] rounded-full -z-10" />
+  const activeCount    = users.filter(u => u.status === 'ACTIVE').length;
+  const suspendCount   = users.filter(u => u.status === 'SUSPENDED').length;
+  const pendingCount   = users.filter(u => u.status === 'PRE_REGISTERED').length;
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#0f111a]/80 backdrop-blur-xl border-b border-white/5 p-5">
-        <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 transition-all border border-white/5 shadow-lg active:scale-95"
-            >
-              <span><ArrowLeft className="w-5 h-5 text-slate-400" /></span>
+  return (
+    <div className="min-h-screen bg-[#08091200] text-white font-sans pb-24 relative overflow-x-hidden" style={{ background: 'linear-gradient(160deg, #05080f 0%, #090c1a 60%, #05080f 100%)' }} translate="no">
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-indigo-600/8 blur-[140px] rounded-full -z-10 pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-[400px] h-[400px] bg-violet-600/8 blur-[120px] rounded-full -z-10 pointer-events-none" />
+
+      {/* ── 헤더 ── */}
+      <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{ background: 'rgba(5,8,15,0.94)', borderColor: 'rgba(129,140,248,0.1)' }}>
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+
+          {/* 좌측: 뒤로 + 타이틀 */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => navigate(-1)} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+              <ArrowLeft className="w-4 h-4 text-slate-400" />
             </button>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">사용자 계정 관리</h1>
-              <p className="text-[10px] text-slate-500 font-mono tracking-[0.2em] uppercase mt-0.5">User Identity Management Service</p>
+            <div className="min-w-0">
+              <h1 className="text-base font-black tracking-tight" style={{ background:'linear-gradient(90deg,#f1f5f9,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>사용자 계정 관리</h1>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color:'rgba(129,140,248,0.55)' }}>User Identity Management</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-             <div className="bg-[#11141d] p-1 rounded-xl border border-white/5 flex">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-500 hover:text-white'}`}
-                >
-                  <span><LayoutDashboard className="w-4 h-4" /></span>
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-500 hover:text-white'}`}
-                >
-                  <span><ListIcon className="w-4 h-4" /></span>
-                </button>
-             </div>
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/20 active:scale-95 border border-blue-400/30"
-              >
-                 <UserCheck className="w-4 h-4" />
-                 <span>사용자 등록</span>
+
+          {/* 우측: 뷰 전환 + 등록 + 새로고침 */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div style={{ display:'flex', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, padding:3, gap:2 }}>
+              <button onClick={() => setViewMode('grid')} style={{ padding:'6px 8px', borderRadius:8, background: viewMode==='grid' ? 'rgba(129,140,248,0.15)' : 'transparent', border: viewMode==='grid' ? '1px solid rgba(129,140,248,0.3)' : '1px solid transparent', cursor:'pointer', display:'flex', alignItems:'center' }}>
+                <LayoutDashboard className="w-3.5 h-3.5" style={{ color: viewMode==='grid' ? '#818cf8' : '#475569' }} />
               </button>
-              <button
-                onClick={fetchUsers}
-                className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-slate-400"
-              >
-                 <span><RefreshCw className="w-5 h-5" /></span>
+              <button onClick={() => setViewMode('list')} style={{ padding:'6px 8px', borderRadius:8, background: viewMode==='list' ? 'rgba(129,140,248,0.15)' : 'transparent', border: viewMode==='list' ? '1px solid rgba(129,140,248,0.3)' : '1px solid transparent', cursor:'pointer', display:'flex', alignItems:'center' }}>
+                <ListIcon className="w-3.5 h-3.5" style={{ color: viewMode==='list' ? '#818cf8' : '#475569' }} />
               </button>
+            </div>
+            <button onClick={() => setIsAddModalOpen(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:10, background:'linear-gradient(135deg,#4f46e5,#818cf8)', border:'none', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', boxShadow:'0 4px 20px rgba(129,140,248,0.25)' }}>
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>사용자 등록</span>
+            </button>
+            <button onClick={fetchUsers} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+              <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
+        </div>
+
+        {/* ── 통계 칩 행 ── */}
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex items-center gap-2">
+          {[
+            { label:'전체', value: users.length,    color:'#818cf8' },
+            { label:'정상', value: activeCount,      color:'#10b981' },
+            { label:'대기', value: pendingCount,     color:'#eab308' },
+            { label:'차단', value: suspendCount,     color:'#f87171' },
+          ].map(s => (
+            <div key={s.label} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', borderRadius:99, background:`${s.color}10`, border:`1px solid ${s.color}28` }}>
+              <span style={{ fontSize:14, fontWeight:900, color:s.color, fontFamily:'monospace' }}>{s.value}</span>
+              <span style={{ fontSize:11, fontWeight:700, color: s.color, opacity:0.7 }}>{s.label}</span>
+            </div>
+          ))}
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto p-5 space-y-8">
-        {/* Search and Stats */}
-        <section className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1 group">
+        {/* 검색창 */}
+        <section>
+          <div className="relative group">
             <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-              <span><Search className="w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors" /></span>
+              <Search className="w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
             </div>
             <input
               type="text"
               placeholder="이름, 이메일, 사번으로 검색..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-[#1a1f2e] border border-white/5 rounded-[24px] py-4 pl-14 pr-6 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 transition-all shadow-2xl"
+              className="w-full rounded-2xl py-3.5 pl-12 pr-5 text-sm focus:outline-none transition-all"
+              style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#e2e8f0' }}
             />
-          </div>
-          <div className="bg-[#1a1f2e] border border-white/5 rounded-3xl px-6 py-4 flex items-center gap-4 shadow-xl shrink-0">
-             <div className="bg-blue-600/20 p-2.5 rounded-xl">
-                <span><User className="w-5 h-5 text-blue-400" /></span>
-             </div>
-             <div>
-                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">전체 사용자</p>
-                <p className="text-xl font-bold font-mono tracking-tighter"><span>{users.length}</span></p>
-             </div>
           </div>
         </section>
 

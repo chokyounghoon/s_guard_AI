@@ -141,7 +141,16 @@ export default function MobileActivity({ user }) {
           <div className="divide-y divide-white/5">
             {items.map((item) => (
               <button key={item.id} id={`activity-${item.id}`}
-                onClick={() => item.incId && navigate(`/chat/${item.incId}`)}
+                onClick={() => {
+                  if (!item.incId) return;
+                  const cleanId = String(item.incId).replace('INC-', '');
+                  // 타입이 AI 리포트이거나 이미 완료된 건인 경우 리포트 페이지로 이동
+                  if (item.type === 'AI 리포트' || item.action === '완료') {
+                    navigate(`/report/${cleanId}`);
+                  } else {
+                    navigate(`/chat/${cleanId}`);
+                  }
+                }}
                 className="w-full text-left px-4 py-4 flex items-start gap-4 hover:bg-white/5 active:bg-white/10 transition-colors group">
                 <div className="w-10 h-10 rounded-full bg-blue-600/10 border border-blue-500/20 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-5 h-5 text-blue-500" />

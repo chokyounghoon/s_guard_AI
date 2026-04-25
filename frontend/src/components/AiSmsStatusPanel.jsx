@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, MessageSquare, Activity, Shield, CheckCircle2, Clock, PlayCircle } from 'lucide-react';
+import { Brain, MessageSquare, Activity, Shield, CircleCheckBig, Clock, PlayCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = window.location.hostname === 'localhost'
@@ -110,7 +110,7 @@ const AiSmsStatusPanel = () => {
                     <span className="text-xl font-black text-white font-mono">{stats.processing}</span>
                 </div>
                 <div className="bg-[#11141d] p-3 rounded-xl border border-white/5 flex flex-col items-center group/item hover:bg-emerald-500/5 transition-all cursor-pointer" onClick={() => navigate('/warroom-management?status=처리완료')}>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 mb-1 group-hover/item:scale-110 transition-transform" />
+                    <CircleCheckBig className="w-4 h-4 text-emerald-400 mb-1 group-hover/item:scale-110 transition-transform" />
                     <span className="text-[10px] text-slate-500 font-medium">처리완료</span>
                     <span className="text-xl font-black text-white font-mono">{stats.completed}</span>
                 </div>

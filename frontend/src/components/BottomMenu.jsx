@@ -49,49 +49,115 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
       {/* More Menu Popup */}
       {showMoreMenu && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-500" onClick={() => setShowMoreMenu(false)} />
-          <div className="w-full max-w-xl bg-premium-dark rounded-t-[3rem] border-t border-white/10 shadow-2xl relative z-10 animate-in slide-in-from-bottom duration-500 overflow-hidden max-h-[90vh] flex flex-col">
-            
-            <div className="pt-4 pb-2 px-8 flex flex-col items-center">
-              <div className="w-12 h-1.5 bg-white/10 rounded-full mb-6" />
-              <h3 className="text-2xl font-black text-white tracking-tighter">System Console</h3>
-              <p className="text-[10px] text-blue-500 font-black uppercase tracking-[0.3em] mt-1">Management & Intelligence</p>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowMoreMenu(false)} />
+          <div className="w-full max-w-xl rounded-t-[2rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col"
+            style={{ background: '#0e1118', maxHeight: '85vh' }}>
+
+            {/* 헤더 */}
+            <div className="pt-4 pb-3 px-6 flex flex-col items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="w-10 h-1 rounded-full mb-4" style={{ background: 'rgba(255,255,255,0.1)' }} />
+              <h3 className="text-lg font-black text-white tracking-tight">System Console</h3>
+              <p className="text-[9px] font-black uppercase tracking-[0.25em] mt-0.5" style={{ color: '#3b82f6' }}>Management & Intelligence</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 gap-4">
-              {[
-                { label: 'Orbital Command', sub: 'Zero-G RAG Control', icon: Cpu, path: '/orbital-command', color: 'cyan' },
-                { label: 'Report Line', sub: 'Approval Hierarchy', icon: Users, path: '/report-line-management', color: 'purple' },
-                { label: 'Manual Entry', sub: 'Incident Injection', icon: MessageSquare, path: '/incident-push', color: 'green' },
-                { label: 'Accounts', sub: 'Security Admin', icon: User, path: '/user-management', color: 'blue' },
-                { label: 'Security Logs', sub: 'Access Audit Trails', icon: Shield, path: '/security-logs', color: 'indigo', adminOnly: true },
-                { label: 'Organization', sub: 'Org Hierarchy', icon: Network, path: '/organization-management', color: 'emerald' },
-                { label: 'Knowledge Base', sub: 'RAG Knowledge', icon: FileText, path: '/knowledge-base', color: 'sky' },
-                { label: 'Global Stats', sub: 'System Metrics', icon: Activity, path: '/overall-status', color: 'orange' },
-                { label: 'War-Room Hub', sub: 'Active Channels', icon: Shield, path: '/warroom-management', color: 'red' },
-                { label: 'Activity Logs', sub: 'User Footprints', icon: Activity, path: '/activity', color: 'cyan' },
-                { label: 'Codebook', sub: 'Common Metadata', icon: BookOpen, path: '/codebook-management', color: 'yellow' },
-                { label: 'Data Flow', sub: 'Technical DFD', icon: Layers, path: '/processing-flow', color: 'blue', adminOnly: true },
-              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item, idx) => (
-                <div
-                  key={item.label}
-                  onClick={() => { setShowMoreMenu(false); navigate(item.path); }}
-                  className={`glass-card p-4 rounded-[2rem] active-scale group flex flex-col items-center text-center animate-fade-in-up`}
-                  style={{ animationDelay: `${idx * 40}ms` }}
-                >
-                  <div className={`p-3 rounded-2xl bg-${item.color}-500/10 border border-${item.color}-500/20 mb-3 group-hover:scale-110 transition-transform`}>
-                    <item.icon className={`w-6 h-6 text-${item.color}-400`} />
-                  </div>
-                  <span className="block font-black text-slate-100 text-[13px] tracking-tight">{item.label}</span>
-                  <span className="text-[9px] text-slate-500 mt-1 font-bold uppercase tracking-tighter">{item.sub}</span>
+            {/* Manual Entry - 전체 너비 강조 버튼 */}
+            <div style={{ padding: '4px 16px 0' }}>
+              <div
+                onClick={() => { setShowMoreMenu(false); navigate('/incident-push'); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '14px 18px',
+                  background: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.06) 100%)',
+                  border: '1px solid rgba(16,185,129,0.25)',
+                  borderRadius: 16, cursor: 'pointer',
+                  position: 'relative', overflow: 'hidden',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
+                  background: 'linear-gradient(180deg, #10b981, #059669)',
+                  borderRadius: '16px 0 0 16px',
+                }} />
+                <div style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <MessageSquare size={18} color="#10b981" />
                 </div>
-              ))}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#e2e8f0', letterSpacing: '0.01em' }}>Manual Entry</div>
+                  <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, letterSpacing: '0.06em', opacity: 0.8 }}>INCIDENT INJECTION · 장애 수동 접수</div>
+                </div>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 9,
+                  background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <span style={{ fontSize: 14, color: '#10b981', fontWeight: 900 }}>›</span>
+                </div>
+              </div>
             </div>
 
-            <div className="p-8 pt-2 pb-10">
+            {/* 그리드: 2열 (Manual Entry 제외) */}
+            <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              {[
+                { label: 'Orbital\nCommand', sub: 'RAG Control', icon: Cpu, path: '/orbital-command', color: '#06b6d4' },
+                { label: 'Report\nLine', sub: 'Approval', icon: Users, path: '/report-line-management', color: '#a855f7' },
+                { label: 'Accounts', sub: 'Security Admin', icon: User, path: '/user-management', color: '#3b82f6' },
+                { label: 'Security\nLogs', sub: 'Audit Trails', icon: Shield, path: '/security-logs', color: '#6366f1', adminOnly: true },
+                { label: 'Organization', sub: 'Org Hierarchy', icon: Network, path: '/organization-management', color: '#10b981' },
+                { label: 'Knowledge\nBase', sub: 'RAG Docs', icon: FileText, path: '/knowledge-base', color: '#0ea5e9' },
+                { label: 'Global\nStats', sub: 'Metrics', icon: Activity, path: '/overall-status', color: '#f97316' },
+                { label: 'War-Room\nHub', sub: 'Channels', icon: Shield, path: '/warroom-management', color: '#ef4444' },
+                { label: 'Activity\nLogs', sub: 'Footprints', icon: Activity, path: '/activity', color: '#06b6d4' },
+                { label: 'Codebook', sub: 'Metadata', icon: BookOpen, path: '/codebook-management', color: '#eab308' },
+                { label: 'Data\nFlow', sub: 'DFD', icon: Layers, path: '/processing-flow', color: '#3b82f6', adminOnly: true },
+              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.label}
+                    onClick={() => { setShowMoreMenu(false); navigate(item.path); }}
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.07)',
+                      borderRadius: 16,
+                      padding: '14px 8px 12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      gap: 6,
+                      transition: 'background 0.2s',
+                    }}
+                  >
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 12,
+                      background: `${item.color}18`,
+                      border: `1px solid ${item.color}30`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <Icon size={18} color={item.color} />
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', lineHeight: 1.3, whiteSpace: 'pre-line' }}>
+                      {item.label}
+                    </span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                      {item.sub}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 닫기 */}
+            <div style={{ padding: '12px 16px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <button
                 onClick={() => setShowMoreMenu(false)}
-                className="w-full py-4 rounded-[1.5rem] bg-white/5 border border-white/10 text-slate-400 font-black text-sm active-scale"
+                style={{ width: '100%', padding: '13px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: 13, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.06em' }}
               >
                 CLOSE CONSOLE
               </button>

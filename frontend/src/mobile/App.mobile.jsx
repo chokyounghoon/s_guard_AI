@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
@@ -30,6 +30,8 @@ import InboxPage              from '../pages/InboxPage';
 import OrbitalCommandPage     from '../pages/OrbitalCommandPage';
 import SecurityLogPage        from '../pages/SecurityLogPage';
 import ProcessingFlowPage     from '../pages/ProcessingFlowPage';
+import ReportViewPage        from '../pages/ReportViewPage';
+
 
 // ── 모바일 전용 페이지 (카드 기반, 네이티브 UX) ────────────────────────────────
 import MobileDashboard        from './pages/MobileDashboard';
@@ -58,7 +60,7 @@ import {
 // ── PWA Install Button (모바일 전용) ──────────────────────────────────────────
 import PWAInstallButton from './components/PWAInstallButton';
 
-import { X, MessageSquare, FileText } from 'lucide-react';
+import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User } from 'lucide-react';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -81,6 +83,10 @@ function AppContent() {
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [showReportPopup, setShowReportPopup] = useState(false);
   const [warRooms, setWarRooms] = useState([]);
+  const [reportLongPressItem, setReportLongPressItem] = useState(null);
+  const reportLongPressTimer = useRef(null);
+  const reportTouchStartX = useRef(null);
+  const reportTouchStartY = useRef(null);
   const [userProfile, setUserProfile] = useState(
     () => getUserProfile() || JSON.parse(localStorage.getItem('sguard_user') || 'null')
   );
@@ -247,6 +253,7 @@ function AppContent() {
         <Route path="/codebook-management"     element={<PR><CodebookManagementPage /></PR>} />
         <Route path="/workflow/:inc_id"        element={<PR><WorkflowPage /></PR>} />
         <Route path="/orbital-command"         element={<PR><OrbitalCommandPage /></PR>} />
+        <Route path="/report/:incId"           element={<PR><ReportViewPage /></PR>} />
       </Routes>
 
       {/* Consent Modal */}
@@ -270,87 +277,387 @@ function AppContent() {
         />
       )}
 
-      {/* War-Room 리스트 팝업 - PC와 동일 */}
+      {/* Global War-Room List Popup */}
       {showWarRoomPopup && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
-                  <MessageSquare className="w-5 h-5 text-blue-400" />
-                </div>
+        <div className="fixed inset-0 z-[110] flex items-end justify-center">
+          {/* 배경 딤 */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
+
+          {/* 시트 본체 */}
+          <div className="relative z-10 w-full max-w-xl flex flex-col rounded-t-[2rem] overflow-hidden max-h-[78vh]"
+            style={{ background: '#0e1118', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+
+            {/* 헤더 */}
+            <div style={{
+              background: 'linear-gradient(160deg, rgba(10,20,50,1) 0%, rgba(10,14,24,1) 100%)',
+              padding: '14px 20px 16px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+            }}>
+              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 99, margin: '0 auto 14px' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>
-                  <p className="text-[10px] text-slate-500 font-mono">ACTIVE CHANNELS ({warRooms.length})</p>
+                  <h3 style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                    참여 중인 워룸
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                    <span style={{ width: 6, height: 6, background: '#3b82f6', borderRadius: 99, display: 'inline-block', boxShadow: '0 0 6px #3b82f6', animation: 'pulse 2s infinite' }} />
+                    <p style={{ fontSize: 10, color: '#3b82f6', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                      Active Channels
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {warRooms.length > 0 && (
+                    <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 99, padding: '4px 10px', fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>
+                      {warRooms.length}건
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowWarRoomPopup(false)}
+                    style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <X size={14} color="#64748b" />
+                  </button>
                 </div>
               </div>
-              <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            {/* 리스트 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {warRooms.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">진행 중인 War-Room이 없습니다.</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', textAlign: 'center' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <MessageSquare size={24} color="#334155" />
+                  </div>
+                  <p style={{ color: '#475569', fontSize: 14, fontWeight: 600 }}>진행 중인 War-Room이 없습니다.</p>
+                </div>
               ) : warRooms.map((room) => {
-                const roomId = room.inc_id || room.id;
+                const roomId = room.inc_id || room.code || room.id;
+                const rawId = String(roomId || '').replace(/^INC-/i, '');
+                const isCurrent = String(roomId) === String(currentIncidentId);
+
+                // 년월일시 포맷
+                const regDate = room.reg_dt ? new Date(room.reg_dt) : null;
+                const dateTimeStr = regDate
+                  ? `${regDate.getFullYear()}.${String(regDate.getMonth()+1).padStart(2,'0')}.${String(regDate.getDate()).padStart(2,'0')} ${String(regDate.getHours()).padStart(2,'0')}:${String(regDate.getMinutes()).padStart(2,'0')}`
+                  : '';
+
+                // SMS 미리보기 파싱
+                const rawTitle = room.title || room.msg || '';
+                const pipeIdx = rawTitle.indexOf('|');
+                let smsText = room.sms_message || (pipeIdx !== -1 ? rawTitle.slice(pipeIdx + 1).trim() : rawTitle) || '';
+                smsText = smsText.replace(/\[Web발신\]/g, '').trim();
+
+                const accentColor = isCurrent ? '#60a5fa' : '#3b82f6';
+
                 return (
-                  <div key={roomId}
+                  <div
+                    key={roomId}
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
-                    className={`bg-[#11141d] p-4 rounded-2xl border transition-all cursor-pointer group ${roomId === currentIncidentId ? 'border-blue-500/40 bg-blue-900/10' : 'border-white/5 hover:border-blue-500/30'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30">CRITICAL</span>
-                      {roomId === currentIncidentId && <span className="text-[9px] text-blue-400 font-bold">● 현재 채팅방</span>}
+                    style={{
+                      background: isCurrent
+                        ? 'linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(37,99,235,0.08) 100%)'
+                        : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isCurrent ? 'rgba(96,165,250,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                      borderRadius: 20,
+                      padding: '18px 16px 18px 20px',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      minHeight: 110,
+                      boxShadow: isCurrent ? '0 0 20px rgba(59,130,246,0.12)' : 'none',
+                    }}
+                  >
+                    {/* 왼쪽 강조 바 */}
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, bottom: 0, width: 4,
+                      background: isCurrent
+                        ? 'linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%)'
+                        : 'linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)',
+                      borderRadius: '20px 0 0 20px',
+                    }} />
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+
+                        {/* 1행: 배지 + [장애ID & 년월일시] */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{
+                              fontSize: 9, fontWeight: 900, color: '#f87171',
+                              background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)',
+                              borderRadius: 6, padding: '2px 8px', letterSpacing: '0.08em'
+                            }}>CRITICAL</span>
+                            {isCurrent && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 900, color: '#60a5fa' }}>
+                                <span style={{ width: 5, height: 5, borderRadius: 99, background: '#60a5fa', boxShadow: '0 0 8px #60a5fa', display: 'inline-block' }} />
+                                NOW
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 10, color: '#475569', fontFamily: 'monospace', fontWeight: 700 }}>
+                              {rawId}
+                            </span>
+                            <span style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace', fontWeight: 700 }}>
+                              {dateTimeStr}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 2행: SMS 2줄 미리보기 */}
+                        {smsText && (
+                          <p style={{
+                            fontSize: 14, color: '#f1f5f9', fontWeight: 500,
+                            lineHeight: 1.6, margin: 0,
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}>
+                            {smsText}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 화살표 */}
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 10,
+                        background: `rgba(59,130,246,0.1)`,
+                        border: `1px solid rgba(59,130,246,0.15)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, alignSelf: 'center',
+                      }}>
+                        <ChevronRight size={15} color={accentColor} />
+                      </div>
                     </div>
-                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
                   </div>
                 );
               })}
+            </div>
+
+            {/* 닫기 */}
+            <div style={{ padding: '12px 16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0e1118', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowWarRoomPopup(false)}
+                style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+              >
+                닫기
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Report 팝업 - PC와 동일 */}
+      {/* Global Report List Popup */}
       {showReportPopup && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReportPopup(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-bottom-full duration-500">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-emerald-500/20 rounded-2xl">
-                  <FileText className="w-5 h-5 text-emerald-400" />
-                </div>
+        <div className="fixed inset-0 z-[110] flex items-end justify-center">
+          {/* 배경 딤 */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowReportPopup(false)} />
+
+          {/* 시트 본체 */}
+          <div className="relative z-10 w-full max-w-xl flex flex-col rounded-t-[2rem] overflow-hidden max-h-[78vh]"
+            style={{ background: '#0e1118', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+
+            {/* 상단 헤더 */}
+            <div style={{
+              background: 'linear-gradient(160deg, rgba(16,24,48,1) 0%, rgba(10,14,24,1) 100%)',
+              padding: '14px 20px 16px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+            }}>
+              {/* 핸들 */}
+              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 99, margin: '0 auto 14px' }} />
+
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-bold text-lg text-white">장애 보고서 선택</h3>
-                  <p className="text-[10px] text-slate-500 font-mono">AVAILABLE REPORTS ({warRooms.length})</p>
+                  <h3 style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                    리포트 선택
+                  </h3>
+                  <p style={{ fontSize: 10, color: '#10b981', fontWeight: 800, letterSpacing: '0.12em', marginTop: 3, textTransform: 'uppercase' }}>
+                    완료된 War-Room 목록
+                  </p>
                 </div>
+                {warRooms.length > 0 && (
+                  <div style={{
+                    background: 'rgba(16,185,129,0.1)',
+                    border: '1px solid rgba(16,185,129,0.25)',
+                    borderRadius: 99, padding: '4px 10px',
+                    fontSize: 11, fontWeight: 800, color: '#10b981',
+                  }}>
+                    {warRooms.length}건
+                  </div>
+                )}
               </div>
-              <button onClick={() => setShowReportPopup(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            {/* 리스트 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {warRooms.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">리포트 가능한 장애 건이 없습니다.</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', textAlign: 'center' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <FileText size={24} color="#334155" />
+                  </div>
+                  <p style={{ color: '#475569', fontSize: 14, fontWeight: 600 }}>발행된 리포트가 없습니다.</p>
+                </div>
               ) : warRooms.map((room) => {
                 const roomId = room.inc_id || room.id;
+                const rawId = String(roomId).replace('INC-', '');
+
+                // 년월일시 포맷
+                const regDate = room.reg_dt ? new Date(room.reg_dt) : null;
+                const dateTimeStr = regDate
+                  ? `${regDate.getFullYear()}.${String(regDate.getMonth()+1).padStart(2,'0')}.${String(regDate.getDate()).padStart(2,'0')} ${String(regDate.getHours()).padStart(2,'0')}:${String(regDate.getMinutes()).padStart(2,'0')}`
+                  : '';
+
+                // 제목: warroom_list.title에서 | 이후 내용 추출
+                const rawTitle = room.title || room.msg || '';
+                const pipeIdx = rawTitle.indexOf('|');
+                const msgFromTitle = pipeIdx !== -1 ? rawTitle.substring(pipeIdx + 1).trim() : rawTitle;
+
+                // SMS 미리보기
+                const smsPreviewRaw = room.sms_message || msgFromTitle || '';
+                const smsPreview = smsPreviewRaw.replace(/\[Web발신\]/g, '').trim() || null;
+
+                const handleLongPressStart = (e) => {
+                  reportTouchStartX.current = e.touches[0].clientX;
+                  reportTouchStartY.current = e.touches[0].clientY;
+                  reportLongPressTimer.current = setTimeout(() => {
+                    if (navigator.vibrate) navigator.vibrate(40);
+                    setReportLongPressItem({ roomId, title: rawTitle, cleanRoomId: rawId });
+                  }, 500);
+                };
+                const handleLongPressMove = (e) => {
+                  const dx = Math.abs(e.touches[0].clientX - reportTouchStartX.current);
+                  const dy = Math.abs(e.touches[0].clientY - reportTouchStartY.current);
+                  if (dx > 10 || dy > 10) clearTimeout(reportLongPressTimer.current);
+                };
+                const handleLongPressEnd = () => clearTimeout(reportLongPressTimer.current);
+
                 return (
-                  <div key={roomId}
+                  <div
+                    key={roomId}
                     onClick={() => { setShowReportPopup(false); navigate(`/ai-report/${roomId}`); }}
-                    className="bg-[#11141d] p-4 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-blue-500/20 text-blue-400 border-blue-500/30">COMPLETED</span>
+                    onTouchStart={handleLongPressStart}
+                    onTouchMove={handleLongPressMove}
+                    onTouchEnd={handleLongPressEnd}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 20, padding: '18px 16px 18px 20px',
+                      cursor: 'pointer', position: 'relative', overflow: 'hidden',
+                      marginBottom: 12,
+                      minHeight: 110,
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                  >
+                    {/* 왼쪽 강조 바 */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 4, background: '#10b981', borderRadius: '20px 0 0 20px' }} />
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, width: '100%' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* 1행: 배지 + [장애ID & 년월일시] */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                          <span style={{
+                            fontSize: 9, fontWeight: 900, color: '#10b981',
+                            background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
+                            borderRadius: 6, padding: '2px 8px', letterSpacing: '0.08em',
+                          }}>✓ 완료</span>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 10, color: '#475569', fontFamily: 'monospace', fontWeight: 700 }}>
+                              {rawId}
+                            </span>
+                            <span style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace', fontWeight: 700 }}>
+                              {dateTimeStr}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 2행: SMS 원문 2줄 미리보기 */}
+                        {smsPreview && (
+                          <p style={{
+                            fontSize: 14, color: '#f1f5f9', fontWeight: 500,
+                            lineHeight: 1.6, margin: 0,
+                            overflow: 'hidden',
+                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                          }}>
+                            {smsPreview}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 화살표 */}
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 10,
+                        background: 'rgba(16,185,129,0.08)',
+                        border: '1px solid rgba(16,185,129,0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, alignSelf: 'center',
+                      }}>
+                        <ChevronRight size={15} color="#10b981" />
+                      </div>
                     </div>
-                    <p className="text-sm font-semibold text-white truncate">{room.msg || room.title || roomId}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{room.reg_dt ? new Date(room.reg_dt).toLocaleString('ko-KR') : ''}</p>
                   </div>
                 );
               })}
             </div>
+
+            {/* 닫기 버튼 */}
+            <div style={{ padding: '12px 16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0e1118', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowReportPopup(false)}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: 14,
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#64748b', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                닫기
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* 리포트 롱프레스 액션시트 */}
+      {reportLongPressItem && (
+        <>
+          <div
+            onClick={() => setReportLongPressItem(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 120, backdropFilter: 'blur(4px)' }}
+          />
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 121,
+            background: '#141820', borderRadius: '24px 24px 0 0',
+            border: '1px solid rgba(255,255,255,0.08)',
+            padding: '12px 0', paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
+          }}>
+            <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 99, margin: '0 auto 14px' }} />
+            <div style={{ padding: '0 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <p style={{ fontSize: 10, color: '#475569', fontWeight: 700, marginBottom: 3 }}>선택된 리포트</p>
+              <p style={{ fontSize: 14, color: '#fff', fontWeight: 800 }}>{reportLongPressItem.title}</p>
+              <p style={{ fontSize: 10, color: '#334155', fontFamily: 'monospace', marginTop: 3 }}>{reportLongPressItem.cleanRoomId}</p>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <button
+                onClick={() => { setReportLongPressItem(null); setShowReportPopup(false); navigate(`/ai-report/${reportLongPressItem.roomId}`); }}
+                style={{ width: '100%', padding: '15px 20px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+              >
+                <ChevronRight size={20} color="#10b981" />
+                <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>리포트 상세보기</span>
+              </button>
+              <button
+                onClick={() => setReportLongPressItem(null)}
+                style={{ width: '100%', padding: '15px 20px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+              >
+                <span style={{ fontSize: 15, color: '#475569', fontWeight: 600 }}>취소</span>
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* AI Assistant */}

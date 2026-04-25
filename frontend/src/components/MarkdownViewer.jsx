@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Terminal, Brain, MessageSquare, AlertTriangle, CheckCircle2, Clock, Zap, Shield, Database, Server, Star } from 'lucide-react';
+import { Copy, Check, Terminal, Brain, MessageSquare, TriangleAlert, CircleCheckBig, Clock, Zap, Shield, Database, Server, Star, CirclePlus } from 'lucide-react';
 
 const CodeBlock = ({ children, className }) => {
   const [copied, setCopied] = useState(false);
@@ -60,248 +60,184 @@ const MarkdownViewer = ({ text }) => {
   );
 
   return (
-    <div className="prose prose-invert max-w-none">
+    <div className="prose prose-invert max-w-none space-y-8 pb-12">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => (
-            <h1 className="mb-6 text-3xl font-black text-white tracking-tight">{children}</h1>
+            <h1 className="mb-8 text-4xl font-black text-white tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mb-4 mt-8 text-2xl font-bold text-white border-b border-white/10 pb-2">{children}</h2>
+            <h2 className="mb-6 mt-12 text-2xl font-black text-white flex items-center gap-3">
+              <div className="w-2 h-8 bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+              {children}
+            </h2>
           ),
-          // ** * 모두 plain text로
-          strong: ({ children }) => <span className="font-semibold text-white">{children}</span>,
-          em: ({ children }) => <span>{children}</span>,
-          h3: ({ children }) => {
-            // h3 → 타임라인 안에서 문단 시작 레이블로 표시
-            const contentStr = String(React.Children.toArray(children).map(c => typeof c === 'string' ? c : '').join(''));
-            // 타임라인 제목 계열은 완전 숨김
-            if (contentStr.includes('타임라인 요약') || contentStr.includes('\u23f1')) return null;
-            return (
-              <div className="flex items-center gap-2 mt-5 mb-2">
-                <div className="w-1 h-4 bg-indigo-500 rounded-full" />
-                <span className="text-[11px] font-black text-indigo-300 uppercase tracking-widest">{contentStr}</span>
-                <div className="flex-1 h-px bg-white/5" />
-              </div>
-            );
-          },
+          strong: ({ children }) => <span className="font-black text-white border-b border-blue-500/30">{children}</span>,
+          em: ({ children }) => <span className="text-slate-400 italic">{children}</span>,
+          
           p: ({ children }) => {
-            // Check if children contain any block-level components to avoid invalid nesting
             const childrenArray = React.Children.toArray(children);
-            const hasBlockElement = childrenArray.some(child => {
-              if (React.isValidElement(child)) {
-                return typeof child.type !== 'string' || ['div', 'pre', 'table', 'blockquote', 'h1', 'h2', 'h3'].includes(child.type);
-              }
-              return false;
-            });
+            const contentStr = childrenArray.map(child => typeof child === 'string' ? child : '').join('');
 
-            const contentStr = childrenArray.map(child => {
-              if (typeof child === 'string') return child;
-              if (React.isValidElement(child) && typeof child.props.children === 'string') return child.props.children;
-              return '';
-            }).join('');
-
-            // 💡 핵심 원인 (Root Cause) 특수 스타일 적용 - 강조 색상
+            // 💡 핵심 원인 (Root Cause) - High Fidelity Card
             if (contentStr.includes('💡 핵심 원인') || contentStr.includes('Root Cause:')) {
               return (
-                <div className="my-4 p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/50 shadow-lg shadow-amber-900/20 animate-in fade-in slide-in-from-left-2 duration-500">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-amber-500/30 p-1.5 rounded-lg">
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <div className="group my-8 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-orange-600/5 blur-xl opacity-50" />
+                  <div className="relative bg-[#1a1c26]/80 backdrop-blur-2xl rounded-[2.5rem] border border-amber-500/20 p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all hover:border-amber-500/40 group/card">
+                    <div className="flex items-start gap-6 mb-6">
+                      <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-600 shadow-[0_0_25px_rgba(245,158,11,0.4)] rounded-[1.25rem] shrink-0 flex items-center justify-center rotate-3 group-hover/card:rotate-0 transition-transform duration-500">
+                        <TriangleAlert className="w-7 h-7 text-black stroke-[2.5px]" />
+                      </div>
+                      <div className="pt-1">
+                        <span className="text-[11px] font-black text-amber-500 uppercase tracking-[0.3em] block mb-1 opacity-80">Critical Analysis</span>
+                        <h4 className="text-2xl font-black text-white tracking-tight">핵심 원인 분석</h4>
+                      </div>
                     </div>
-                    <span className="text-xs font-black text-amber-400 uppercase tracking-widest">⚠ 핵심 원인 분석</span>
-                  </div>
-                  <div className="text-amber-100 font-semibold leading-relaxed text-sm">
-                    {children}
+                    <div className="text-amber-50/90 font-medium leading-relaxed text-[16px] pl-6 border-l-2 border-amber-500/30 ml-1 py-1">
+                      {children}
+                    </div>
                   </div>
                 </div>
               );
             }
 
-            // ✅ 최종 조치 결과 (Resolution) 특수 스타일 적용
+            // ✅ 최종 조치 결과 (Resolution) - High Fidelity Card
             if (contentStr.includes('✅ 최종 조치 결과') || contentStr.includes('Resolution:')) {
               return (
-                <div className="my-6 p-6 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 shadow-xl shadow-emerald-900/10 border-l-4 border-l-emerald-500 animate-in fade-in slide-in-from-left-2 duration-500">
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <div className="bg-emerald-500/20 p-1.5 rounded-lg">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <div className="group my-8 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-teal-600/5 blur-xl opacity-50" />
+                  <div className="relative bg-[#1a1c26]/80 backdrop-blur-2xl rounded-[2.5rem] border border-emerald-500/20 p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all hover:border-emerald-500/40 group/card">
+                    <div className="flex items-start gap-6 mb-6">
+                      <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-teal-600 shadow-[0_0_25px_rgba(16,185,129,0.4)] rounded-[1.25rem] shrink-0 flex items-center justify-center -rotate-3 group-hover/card:rotate-0 transition-transform duration-500">
+                        <CircleCheckBig className="w-7 h-7 text-black stroke-[2.5px]" />
+                      </div>
+                      <div className="pt-1">
+                        <span className="text-[11px] font-black text-emerald-500 uppercase tracking-[0.3em] block mb-1 opacity-80">Resolution Confirmed</span>
+                        <h4 className="text-2xl font-black text-white tracking-tight">최종 조치 결과</h4>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Final Resolution Confirmed</span>
-                  </div>
-                  <div className="text-emerald-50/90 font-bold leading-relaxed text-[13px]">
-                    {children}
+                    <div className="text-emerald-50/90 font-medium leading-relaxed text-[16px] pl-6 border-l-2 border-emerald-500/30 ml-1 py-1">
+                      {children}
+                    </div>
                   </div>
                 </div>
               );
             }
 
-            // Timestamp detection logic for paragraph starts
-            let timestampBadge = null;
-            let remainingChildren = children;
-
-            if (childrenArray.length > 0 && typeof childrenArray[0] === 'string') {
-              const firstChild = childrenArray[0];
-              const timestampMatch = firstChild.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?(?:\sKST)?)\]\s*/);
-              
-              if (timestampMatch) {
-                const timestamp = timestampMatch[1];
-                timestampBadge = (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 mr-2 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-black border border-indigo-500/30 shadow-lg shadow-indigo-500/10 uppercase tracking-tighter">
-                    <Clock className="w-3 h-3" />
-                    {timestamp}
-                  </span>
-                );
-                
-                // Remove the matched timestamp from the first text node
-                const cleanedText = firstChild.replace(timestampMatch[0], '');
-                remainingChildren = [cleanedText, ...childrenArray.slice(1)];
-              }
-            }
-
-            const content = (
-              <>
-                {timestampBadge}
-                {remainingChildren}
-              </>
-            );
-
-            if (hasBlockElement) {
-              return <div className="mb-4 text-gray-200 leading-relaxed text-sm antialiased">{content}</div>;
-            }
-            return <p className="mb-6 text-gray-200 leading-relaxed text-sm antialiased">{content}</p>;
+            return <div className="mb-4 text-slate-300 leading-relaxed text-[15px] font-medium antialiased">{children}</div>;
           },
-          strong: ({ children }) => {
-            const content = String(children);
-            const isCritical = /CRITICAL|ERROR|장애|위험|9[0-9]%/.test(content);
-            const isWarning = /WARNING|주의|8[0-9]%/.test(content);
-            
-            const isSecurity = content.includes('Security') && (content.includes('Agent') || content.includes('AGENT'));
-            const isDB = content.includes('DB') && (content.includes('Agent') || content.includes('AGENT'));
-            const isDevOps = content.includes('DevOps') && (content.includes('Agent') || content.includes('AGENT'));
-            const isLeader = content.includes('Leader') && (content.includes('Agent') || content.includes('AGENT'));
-            
-            let colorCls = 'text-white';
-            if (isSecurity) colorCls = 'text-red-400';
-            else if (isDB) colorCls = 'text-yellow-400';
-            else if (isDevOps) colorCls = 'text-blue-400';
-            else if (isLeader) colorCls = 'text-purple-400';
-            else if (isCritical) colorCls = 'text-red-400 px-1 rounded bg-red-400/10';
-            else if (isWarning) colorCls = 'text-amber-400 px-1 rounded bg-amber-400/10';
 
-            return (
-              <strong className={`font-black ${colorCls}`}>
-                {children}
-              </strong>
-            );
-          },
-          // 소제목 순번 카운터 - 렌더 스코프 변수
-          ol: ({ children }) => (
-            <ol className="mb-2 space-y-3 list-none p-0 m-0">
-              {children}
-            </ol>
-          ),
-          ul: ({ children }) => (
-            <ul className="mb-2 space-y-3 list-none p-0 m-0">
-              {children}
-            </ul>
-          ),
+          ol: ({ children }) => <div className="space-y-6 my-8">{children}</div>,
+          ul: ({ children }) => <div className="space-y-6 my-8">{children}</div>,
+
           li: ({ children }) => {
-            // 재귀적으로 텍스트 추출
             const extractText = (node) => {
               if (typeof node === 'string' || typeof node === 'number') return String(node);
               if (Array.isArray(node)) return node.map(extractText).join('');
               if (React.isValidElement(node)) return extractText(node.props.children);
               return '';
             };
-            const rawContent = extractText(children);
-            // ** 및 단독 * 완전 제거 (leading * 포함)
-            const content = rawContent
-              .replace(/\*\*/g, '')
-              .replace(/^\*\s*/,'')   // 앞에 붙은 * 제거
-              .replace(/\*/g, '')     // 나머지 * 제거
-              .trim();
-
-            // 빈 리스트 아이템 숨김 (* 단독 등)
+            const content = extractText(children).trim();
             if (!content || content === '*' || content === '-') return null;
 
-            const timestampMatch = content.match(/^\[((?:\d{4}-\d{2}-\d{2}\s)?\d{2}:\d{2}(?::\d{2})?(?:\sKST)?)\]/);
-
-            if (timestampMatch) {
-              const timestamp = timestampMatch[1];
-              const text = content.replace(timestampMatch[0], '').replace(/\*\*/g, '').replace(/^:\s*/, '').trim();
-              if (!text) return null;
+            // ⏱️ Timeline Item Logic
+            const timestampMatch = content.match(/^\[?((?:\d{4}-\d{2}-\d{2}\s)?\d{2}:\d{2}(?::\d{2})?(?:\s*~\s*\d{2}:\d{2})?(?:\sKST)?)\]?/);
+            if (timestampMatch || content.match(/^\d{2}:\d{2}/)) {
+              const fullMatch = timestampMatch ? timestampMatch[0] : content.split(':')[0] + ':' + content.split(':')[1].substring(0,2);
+              const timestamp = timestampMatch ? timestampMatch[1] : fullMatch;
+              const text = content.replace(fullMatch, '').replace(/^[:\s\-~]+/, '').trim();
+              
               return (
-                <li className="list-none w-full pb-3">
-                  <div className="w-full bg-white/[0.03] border border-white/5 rounded-xl p-3 hover:bg-white/[0.05] transition-all">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono text-[10px] font-bold border border-blue-500/20 shrink-0">
+                <div className="relative pl-12 pb-8 last:pb-0 group">
+                  {/* Timeline Line */}
+                  <div className="absolute left-[19px] top-2 bottom-0 w-0.5 bg-gradient-to-b from-blue-500/50 to-transparent group-last:hidden" />
+                  {/* Timeline Dot */}
+                  <div className="absolute left-0 top-1.5 w-10 h-10 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)] z-10 transition-transform group-hover:scale-125" />
+                    <div className="absolute w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 animate-pulse" />
+                  </div>
+                  
+                  <div className="bg-[#1a1f2e]/40 border border-white/5 rounded-3xl p-5 transition-all hover:bg-[#1a1f2e]/60 hover:border-blue-500/30">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 font-mono text-[11px] font-black border border-blue-500/20 shadow-inner">
                         {timestamp}
                       </span>
-                      <div className="h-px flex-1 bg-white/5" />
+                      <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
                     </div>
-                    <p className="text-gray-200 text-sm leading-relaxed m-0">{text}</p>
+                    <p className="text-slate-200 text-[14px] leading-relaxed font-semibold">{text}</p>
                   </div>
-                </li>
+                </div>
               );
             }
 
-            // ✅ 소제목 감지: __SH_N__키워드 패턴 (processedText에서 미리 번호 삽입됨)
+            // 🏷️ Section Header Logic
             const shMatch = content.match(/^__SH__(.+)$/);
             if (shMatch) {
               const heading = shMatch[1].trim();
-              const SUB_COLORS = {
-                '장애': { text: 'text-blue-300', border: 'border-blue-400/60', num: 'text-blue-400' },
-                '발생': { text: 'text-amber-300', border: 'border-amber-400/60', num: 'text-amber-400' },
-                '핵심': { text: 'text-amber-300', border: 'border-amber-400/60', num: 'text-amber-400' },
-                '진행': { text: 'text-indigo-300', border: 'border-indigo-400/60', num: 'text-indigo-400' },
-                '상황': { text: 'text-emerald-300', border: 'border-emerald-400/60', num: 'text-emerald-400' },
-                '추가': { text: 'text-purple-300', border: 'border-purple-400/60', num: 'text-purple-400' },
+              const ICONS = {
+                '장애': { icon: TriangleAlert, color: 'blue' },
+                '발생': { icon: Zap, color: 'amber' },
+                '핵심': { icon: Brain, color: 'orange' },
+                '진행': { icon: Clock, color: 'indigo' },
+                '상황': { icon: Shield, color: 'emerald' },
+                '추가': { icon: CirclePlus, color: 'purple' },
               };
-              const colorKey = Object.keys(SUB_COLORS).find(k => heading.includes(k)) || '장애';
-              const color = SUB_COLORS[colorKey];
+              const iconKey = Object.keys(ICONS).find(k => heading.includes(k)) || '장애';
+              const { icon: SectionIcon, color } = ICONS[iconKey];
+
               return (
-                <li className="list-none w-full mt-6 mb-2">
-                  <div className={`flex items-baseline gap-1.5 pb-2 border-b-2 ${color.border} w-full`}>
-                    <span className={`text-base font-black tracking-tight ${color.text}`}>{heading}</span>
+                <div className="mt-16 mb-8 first:mt-4">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className={`bg-${color}-500 shadow-[0_0_15px_rgba(0,0,0,0.2)] p-2 rounded-xl`}>
+                      <SectionIcon className="w-5 h-5 text-black stroke-[2.5px]" />
+                    </div>
+                    <h3 className={`text-xl font-black text-white tracking-tight uppercase`}>{heading}</h3>
                   </div>
-                </li>
+                  <div className={`h-1 w-full bg-gradient-to-r from-${color}-500/50 via-${color}-500/10 to-transparent rounded-full`} />
+                </div>
               );
             }
 
-            // 구레거 소제목 감지 코드 제거 (전체 매칭만 허용)
-            // 일반 리스트 아이템
+            // Regular List Item
             return (
-              <li className="list-none text-gray-300 text-sm leading-relaxed pb-1 flex items-start gap-2">
-                <span className="mt-1.5 w-1 h-1 rounded-full bg-slate-500 shrink-0" />
-                <span>{content}</span>
-              </li>
+              <div className="flex items-start gap-4 bg-white/5 border border-white/5 p-5 rounded-3xl hover:bg-white/10 transition-all group">
+                <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] shrink-0 transition-transform group-hover:scale-150" />
+                <span className="text-slate-200 text-[15px] font-medium leading-relaxed">{content}</span>
+              </div>
             );
           },
-          code: ({ node, inline, className, children, ...props }) => {
+
+          code: ({ inline, className, children }) => {
             return !inline ? (
               <CodeBlock children={children} className={className} />
             ) : (
-              <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-xs font-bold text-blue-300" {...props}>
+              <code className="rounded-lg bg-blue-500/10 px-2 py-1 font-mono text-[11px] font-black text-blue-400 border border-blue-500/20">
                 {children}
               </code>
             );
           },
+
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-blue-500/50 bg-blue-500/5 p-4 rounded-r-xl my-6 italic text-blue-100">
-              {children}
-            </blockquote>
+            <div className="relative my-10 pl-8">
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full" />
+              <div className="bg-gradient-to-r from-blue-500/10 to-transparent p-6 rounded-r-[2rem] italic text-lg text-blue-50 font-medium leading-relaxed">
+                {children}
+              </div>
+            </div>
           ),
+
           table: ({ children }) => (
-            <div className="my-6 overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-lg">
-              <table className="w-full border-collapse text-left text-sm">{children}</table>
+            <div className="my-10 overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#1a1f2e]/40 shadow-2xl backdrop-blur-xl">
+              <table className="w-full border-collapse text-left text-[13px]">{children}</table>
             </div>
           ),
           th: ({ children }) => (
-            <th className="border-b border-white/10 bg-white/10 px-4 py-3 font-bold text-white">{children}</th>
+            <th className="bg-white/5 px-6 py-4 font-black text-white uppercase tracking-widest border-b border-white/10">{children}</th>
           ),
           td: ({ children }) => (
-            <td className="border-b border-white/5 px-4 py-3 text-gray-300">{children}</td>
+            <td className="px-6 py-4 text-slate-300 border-b border-white/5">{children}</td>
           ),
           img: ({ src, alt }) => {
             if (src && (src.includes('aitopia.ai') || src.includes('logo.svg'))) {

@@ -1,366 +1,203 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCodebook } from '../context/CodebookContext';
-import {
-  ArrowLeft, Plus, Search, BookOpen, 
-  Trash2, Save, Filter, Edit2, CheckCircle2, XCircle,
-  Layers, ChevronRight, MoreVertical
-} from 'lucide-react';
+import { ChevronLeft, Plus, Search, BookOpen, Trash2, Edit2, CheckCircle2, XCircle, Layers, Loader2, X } from 'lucide-react';
+
+const EMPTY_FORM = { category: '', code: '', name: '', sort_order: 0, is_active: true, description: '' };
+const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function CodebookManagementPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const { allCodes: codes, isLoading: loading, refreshCodes } = useCodebook();
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedCat, setSelectedCat] = useState('ALL');
+  const [showModal, setShowModal] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
-  
-  // Form State
-  const [formData, setFormData] = useState({
-    category: '',
-    code: '',
-    name: '',
-    sort_order: 0,
-    is_active: true,
-    description: ''
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
 
-  const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+  const cats = ['ALL', ...new Set(codes.map(c => c.category))];
 
-
-  const categories = ['ALL', ...new Set(codes.map(c => c.category))];
+  const openAdd = () => { setEditingCode(null); setForm(EMPTY_FORM); setShowModal(true); };
+  const openEdit = (item) => {
+    setEditingCode(item);
+    setForm({ category: item.category, code: item.code, name: item.name, sort_order: item.sort_order, is_active: item.is_active === 1, description: item.description || '' });
+    setShowModal(true);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const method = editingCode ? 'PUT' : 'POST';
     const url = editingCode ? `${API_BASE}/sms/codebook/${editingCode.id}` : `${API_BASE}/sms/codebook`;
-
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      if (res.ok) {
-        setShowAddModal(false);
-        setEditingCode(null);
-        setFormData({ category: '', code: '', name: '', sort_order: 0, is_active: true, description: '' });
-        refreshCodes();
-      }
-    } catch (e) {
-      console.error('Save code error:', e);
-    }
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      if (res.ok) { setShowModal(false); refreshCodes(); }
+    } catch (e) { console.error(e); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('정말 삭제하시겠습니까?')) return;
-    try {
-      const res = await fetch(`${API_BASE}/sms/codebook/${id}`, { method: 'DELETE' });
-      if (res.ok) refreshCodes();
-    } catch (e) {
-      console.error('Delete code error:', e);
-    }
+    try { const res = await fetch(`${API_BASE}/sms/codebook/${id}`, { method: 'DELETE' }); if (res.ok) refreshCodes(); } catch (e) { console.error(e); }
   };
 
-  const openEdit = (item) => {
-    setEditingCode(item);
-    setFormData({
-      category: item.category,
-      code: item.code,
-      name: item.name,
-      sort_order: item.sort_order,
-      is_active: item.is_active === 1,
-      description: item.description || ''
-    });
-    setShowAddModal(true);
-  };
-
-  const filteredCodes = codes.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || 
-                          c.code.toLowerCase().includes(search.toLowerCase()) ||
-                          c.category.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = selectedCategory === 'ALL' || c.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+  const filtered = codes.filter(c => {
+    const q = search.toLowerCase();
+    const matchSearch = c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.category.toLowerCase().includes(q);
+    return matchSearch && (selectedCat === 'ALL' || c.category === selectedCat);
   });
 
-  return (
-    <div className="min-h-screen bg-[#0a0e17] text-white font-sans pb-24 relative overflow-x-hidden">
-      {/* Background Effects */}
-      <div className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-600/10 blur-[120px] rounded-full" />
-      </div>
+  const stats = [
+    { label: 'Total', value: codes.length, color: '#818cf8' },
+    { label: 'Categories', value: cats.length - 1, color: '#60a5fa' },
+    { label: 'Active', value: codes.filter(c => c.is_active).length, color: '#34d399' },
+  ];
 
-      {/* Header */}
-      <header className="flex justify-between items-center p-6 sticky top-0 bg-[#0f111a]/80 backdrop-blur-xl z-40 border-b border-white/5">
-        <div className="flex items-center space-x-5">
-          <button onClick={() => navigate(-1)} className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 transition-all border border-white/5">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">코드북 관리</h1>
-            <p className="text-[10px] text-slate-500 font-mono uppercase tracking-[3px] mt-0.5">Common Code Management</p>
-          </div>
+  return (
+    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(160deg,#05080f,#090c1a)', fontFamily: "'Pretendard','Inter',sans-serif", color: '#cbd5e1' }}>
+      <style>{`
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        input::placeholder,textarea::placeholder{color:#1e293b}
+        input:focus,textarea:focus,select:focus{outline:none;border-color:rgba(129,140,248,.4)!important}
+        ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(129,140,248,.2);border-radius:99px}
+      `}</style>
+
+      {/* 헤더 */}
+      <header style={{ flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px 16px', borderBottom:'1px solid rgba(129,140,248,.12)', background:'rgba(5,8,15,.96)', backdropFilter:'blur(20px)' }}>
+        <button onClick={() => navigate(-1)} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+          <ChevronLeft size={18} color="#64748b" />
+        </button>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:16, fontWeight:900, background:'linear-gradient(90deg,#818cf8,#a78bfa)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>코드북 관리</div>
+          <div style={{ fontSize:10, color:'#6366f1', fontWeight:800, letterSpacing:'0.12em', opacity:.7 }}>COMMON CODE MANAGEMENT</div>
         </div>
-        <button 
-          onClick={() => {
-            setEditingCode(null);
-            setFormData({ category: '', code: '', name: '', sort_order: 0, is_active: true, description: '' });
-            setShowAddModal(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-2xl transition-all shadow-lg shadow-blue-900/40 active:scale-95 border border-blue-400/20"
-        >
-          <Plus className="w-5 h-5" />
+        <button onClick={openAdd} style={{ width:36, height:36, borderRadius:10, background:'rgba(129,140,248,.12)', border:'1px solid rgba(129,140,248,.25)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+          <Plus size={18} color="#818cf8" />
         </button>
       </header>
 
-      <main className="p-6 space-y-8 max-w-5xl mx-auto">
-        {/* Search & Filter Bar */}
-        <section className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
-            <input
-              type="text"
-              placeholder="코드명, 코드값, 카테고리 검색..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-[#161b2c] border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all"
-            />
+      {/* 통계 */}
+      <div style={{ flexShrink:0, display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'10px 16px 0' }}>
+        {stats.map(s => (
+          <div key={s.label} style={{ background:'rgba(255,255,255,.03)', border:'1px solid rgba(255,255,255,.07)', borderRadius:14, padding:'10px', textAlign:'center' }}>
+            <div style={{ fontSize:24, fontWeight:900, color:s.color, fontFamily:'monospace' }}>{s.value}</div>
+            <div style={{ fontSize:10, color:'#334155', fontWeight:800, marginTop:2 }}>{s.label}</div>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-            <Filter className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                  selectedCategory === cat 
-                  ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-900/30' 
-                  : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'
-                }`}
-              >
-                {cat}
+        ))}
+      </div>
+
+      {/* 검색 */}
+      <div style={{ flexShrink:0, position:'relative', padding:'10px 16px 0' }}>
+        <Search size={14} color="#475569" style={{ position:'absolute', left:28, top:'50%', transform:'translateY(-35%)' }} />
+        <input type="text" placeholder="코드명, 코드값, 카테고리 검색..." value={search} onChange={e => setSearch(e.target.value)}
+          style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)', borderRadius:12, padding:'11px 14px 11px 36px', color:'#e2e8f0', fontSize:14 }} />
+      </div>
+
+      {/* 카테고리 필터 */}
+      <div style={{ flexShrink:0, display:'flex', gap:6, padding:'8px 16px 0', overflowX:'auto', scrollbarWidth:'none' }}>
+        {cats.map(cat => (
+          <button key={cat} onClick={() => setSelectedCat(cat)} style={{
+            flexShrink:0, padding:'7px 14px', borderRadius:10, cursor:'pointer', fontSize:13, fontWeight:800, whiteSpace:'nowrap',
+            background: selectedCat === cat ? 'rgba(129,140,248,.12)' : 'rgba(255,255,255,.03)',
+            border: selectedCat === cat ? '1px solid rgba(129,140,248,.3)' : '1px solid rgba(255,255,255,.06)',
+            color: selectedCat === cat ? '#818cf8' : '#475569',
+          }}>{cat}</button>
+        ))}
+      </div>
+
+      {/* 목록 */}
+      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'10px 16px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+        {loading ? (
+          <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:100 }}>
+            <Loader2 size={22} color="#818cf8" style={{ animation:'spin 1s linear infinite' }} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign:'center', padding:40, fontSize:14, color:'#334155' }}>검색 결과 없음</div>
+        ) : filtered.map(item => (
+          <div key={item.id} style={{ borderRadius:18, padding:'14px 16px', background:'rgba(255,255,255,.03)', border:'1px solid rgba(255,255,255,.07)', display:'flex', alignItems:'center', gap:14 }}>
+            <div style={{ width:44, height:44, borderRadius:13, background: item.is_active ? 'rgba(129,140,248,.1)' : 'rgba(71,85,105,.1)', border:`1px solid ${item.is_active ? 'rgba(129,140,248,.2)' : 'rgba(71,85,105,.2)'}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <BookOpen size={18} color={item.is_active ? '#818cf8' : '#475569'} />
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
+                <span style={{ fontSize:11, fontWeight:800, color:'#818cf8', background:'rgba(129,140,248,.1)', border:'1px solid rgba(129,140,248,.2)', borderRadius:5, padding:'1px 7px' }}>{item.category}</span>
+                <span style={{ fontSize:11, fontFamily:'monospace', color:'#475569' }}>{item.code}</span>
+              </div>
+              <div style={{ fontSize:15, fontWeight:800, color:'#f1f5f9', marginBottom:2 }}>{item.name}</div>
+              {item.description && <div style={{ fontSize:12, color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.description}</div>}
+              <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:5 }}>
+                {item.is_active ? <CheckCircle2 size={12} color="#10b981" /> : <XCircle size={12} color="#475569" />}
+                <span style={{ fontSize:11, color: item.is_active ? '#10b981' : '#475569', fontWeight:700 }}>{item.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
+                <span style={{ fontSize:11, color:'#334155', marginLeft:8 }}>순서 {item.sort_order}</span>
+              </div>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
+              <button onClick={() => openEdit(item)} style={{ width:34, height:34, borderRadius:10, background:'rgba(129,140,248,.08)', border:'1px solid rgba(129,140,248,.2)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <Edit2 size={14} color="#818cf8" />
               </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Stats Summary */}
-        <section className="grid grid-cols-3 gap-4">
-          <div className="bg-[#11141d]/50 backdrop-blur-md rounded-3xl p-5 border border-white/5">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Total Codes</p>
-            <p className="text-2xl font-black text-white">{codes.length}</p>
-          </div>
-          <div className="bg-[#11141d]/50 backdrop-blur-md rounded-3xl p-5 border border-white/5">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Categories</p>
-            <p className="text-2xl font-black text-blue-400">{categories.length - 1}</p>
-          </div>
-          <div className="bg-[#11141d]/50 backdrop-blur-md rounded-3xl p-5 border border-white/5">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Active</p>
-            <p className="text-2xl font-black text-emerald-400">{codes.filter(c => c.is_active).length}</p>
-          </div>
-        </section>
-
-        {/* Code List */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-blue-400" />
-              코드 목록
-            </h2>
-            <span className="text-[10px] text-slate-500 font-mono">RESULTS: {filteredCodes.length}</span>
-          </div>
-
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 space-y-4">
-              <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-              <p className="text-slate-500 text-sm animate-pulse">데이터 로딩 중...</p>
+              <button onClick={() => handleDelete(item.id)} style={{ width:34, height:34, borderRadius:10, background:'rgba(239,68,68,.06)', border:'1px solid rgba(239,68,68,.15)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <Trash2 size={14} color="#ef4444" />
+              </button>
             </div>
-          ) : (
-            <div className="grid gap-4">
-              {filteredCodes.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-[#11141d]/60 backdrop-blur-sm p-5 rounded-3xl border border-white/5 flex items-center justify-between group hover:border-blue-500/30 hover:bg-[#161b2c] transition-all"
-                >
-                  <div className="flex items-center space-x-5">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                      item.is_active ? 'bg-blue-600/10' : 'bg-slate-600/10'
-                    }`}>
-                      <BookOpen className={`w-6 h-6 ${item.is_active ? 'text-blue-400' : 'text-slate-600'}`} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-blue-500/80 tracking-widest uppercase">{item.category}</span>
-                        <ChevronRight className="w-3 h-3 text-slate-700" />
-                        <span className="text-[10px] font-mono text-slate-500">{item.code}</span>
-                      </div>
-                      <h3 className="text-base font-bold text-slate-200 mt-0.5">{item.name}</h3>
-                      {item.description && (
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-1">{item.description}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex flex-col items-end mr-4">
-                      <span className="text-[10px] text-slate-600 font-mono">Order: {item.sort_order}</span>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        {item.is_active ? (
-                          <>
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            <span className="text-[9px] font-bold text-emerald-500/80">ACTIVE</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-3 h-3 text-slate-600" />
-                            <span className="text-[9px] font-bold text-slate-600">INACTIVE</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => openEdit(item)}
-                      className="p-3 rounded-xl text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(item.id)}
-                      className="p-3 rounded-xl text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+          </div>
+        ))}
+      </div>
 
-              {filteredCodes.length === 0 && (
-                <div className="text-center py-24 bg-[#11141d]/30 rounded-[40px] border border-dashed border-white/5 mt-4">
-                  <div className="bg-slate-800/20 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <Search className="w-8 h-8 text-slate-700" />
-                  </div>
-                  <h3 className="text-slate-400 font-bold">검색 결과가 없습니다</h3>
-                  <p className="text-slate-600 text-sm mt-1">다른 키워드나 필터를 사용해 보세요.</p>
-                </div>
-              )}
+      {/* 모달 */}
+      {showModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'flex-end' }}>
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.6)', backdropFilter:'blur(8px)' }} onClick={() => setShowModal(false)} />
+          <div style={{ position:'relative', width:'100%', background:'#0e1120', borderRadius:'24px 24px 0 0', border:'1px solid rgba(255,255,255,.1)', padding:'20px 20px 36px', maxHeight:'85dvh', overflowY:'auto' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+              <div>
+                <div style={{ fontSize:18, fontWeight:900, color:'#f1f5f9' }}>{editingCode ? '코드 수정' : '코드 추가'}</div>
+                <div style={{ fontSize:11, color:'#475569' }}>{editingCode ? `ID: ${editingCode.id}` : 'New Common Code'}</div>
+              </div>
+              <button onClick={() => setShowModal(false)} style={{ width:34, height:34, borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <X size={16} color="#64748b" />
+              </button>
             </div>
-          )}
-        </section>
-      </main>
-
-      {/* Add/Edit Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowAddModal(false)} />
-          <div className="bg-[#1a1f2e] w-full max-w-lg rounded-[40px] border border-white/10 shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-white/5 bg-gradient-to-br from-blue-600/10 to-transparent">
-              <h2 className="text-2xl font-bold text-white mb-1">
-                {editingCode ? '코드 정보 수정' : '새 코드 추가'}
-              </h2>
-              <p className="text-xs text-slate-500 uppercase tracking-widest font-mono">
-                {editingCode ? `ID: ${editingCode.id}` : 'Create New Common Code'}
-              </p>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">카테고리</label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value.toUpperCase()})}
-                    placeholder="e.g. POSITION"
-                    className="w-full bg-[#11141d] border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">코드값</label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({...formData, code: e.target.value})}
-                    placeholder="e.g. POS_001"
-                    className="w-full bg-[#11141d] border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500/50"
-                  />
-                </div>
+            <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                {[{ label:'카테고리 *', key:'category', ph:'POSITION', upper:true }, { label:'코드값 *', key:'code', ph:'POS_001' }].map(f => (
+                  <div key={f.key}>
+                    <div style={{ fontSize:11, color:'#475569', fontWeight:800, marginBottom:5 }}>{f.label}</div>
+                    <input required type="text" placeholder={f.ph} value={form[f.key]} onChange={e => setForm({...form, [f.key]: f.upper ? e.target.value.toUpperCase() : e.target.value})}
+                      style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:14 }} />
+                  </div>
+                ))}
               </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">코드명</label>
-                <input
-                  required
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="표시될 이름을 입력하세요"
-                  className="w-full bg-[#11141d] border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500/50"
-                />
+              <div>
+                <div style={{ fontSize:11, color:'#475569', fontWeight:800, marginBottom:5 }}>코드명 *</div>
+                <input required type="text" placeholder="표시될 이름" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                  style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:14 }} />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">정렬 순서</label>
-                  <input
-                    type="number"
-                    value={formData.sort_order}
-                    onChange={(e) => setFormData({...formData, sort_order: parseInt(e.target.value)})}
-                    className="w-full bg-[#11141d] border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500/50"
-                  />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div>
+                  <div style={{ fontSize:11, color:'#475569', fontWeight:800, marginBottom:5 }}>정렬 순서</div>
+                  <input type="number" value={form.sort_order} onChange={e => setForm({...form, sort_order: parseInt(e.target.value)||0})}
+                    style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:14 }} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">상태</label>
-                  <div className="flex p-1 bg-[#11141d] rounded-2xl border border-white/5 h-[46px]">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, is_active: true})}
-                      className={`flex-1 rounded-xl text-[10px] font-bold transition-all ${
-                        formData.is_active ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'text-slate-500'
-                      }`}
-                    >
-                      사용함
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, is_active: false})}
-                      className={`flex-1 rounded-xl text-[10px] font-bold transition-all ${
-                        !formData.is_active ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'text-slate-500'
-                      }`}
-                    >
-                      사용안함
-                    </button>
+                <div>
+                  <div style={{ fontSize:11, color:'#475569', fontWeight:800, marginBottom:5 }}>상태</div>
+                  <div style={{ display:'flex', gap:6 }}>
+                    {[{ label:'사용', val:true, color:'#10b981' }, { label:'미사용', val:false, color:'#ef4444' }].map(b => (
+                      <button key={b.label} type="button" onClick={() => setForm({...form, is_active: b.val})} style={{
+                        flex:1, padding:'10px 0', borderRadius:10, cursor:'pointer', fontSize:13, fontWeight:800,
+                        background: form.is_active === b.val ? `${b.color}18` : 'rgba(255,255,255,.04)',
+                        border: form.is_active === b.val ? `1px solid ${b.color}40` : '1px solid rgba(255,255,255,.08)',
+                        color: form.is_active === b.val ? b.color : '#475569',
+                      }}>{b.label}</button>
+                    ))}
                   </div>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">설명</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="코드에 대한 간단한 설명을 입력하세요"
-                  rows="3"
-                  className="w-full bg-[#11141d] border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500/50 resize-none"
-                />
+              <div>
+                <div style={{ fontSize:11, color:'#475569', fontWeight:800, marginBottom:5 }}>설명</div>
+                <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={2} placeholder="간단한 설명..."
+                  style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:14, resize:'none' }} />
               </div>
-
-              <div className="flex gap-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-4 rounded-2xl bg-white/5 text-slate-400 font-bold hover:bg-white/10 transition-all border border-white/5"
-                >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-500 transition-all shadow-xl shadow-blue-900/40 active:scale-[0.98]"
-                >
-                  {editingCode ? '수정 완료' : '저장하기'}
-                </button>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:10, marginTop:4 }}>
+                <button type="button" onClick={() => setShowModal(false)} style={{ padding:'14px', borderRadius:12, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', color:'#64748b', fontSize:14, fontWeight:700, cursor:'pointer' }}>취소</button>
+                <button type="submit" style={{ padding:'14px', borderRadius:12, background:'linear-gradient(135deg,#4f46e5,#818cf8)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>{editingCode ? '수정 완료' : '저장하기'}</button>
               </div>
             </form>
           </div>

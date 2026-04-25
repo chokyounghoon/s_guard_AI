@@ -12,7 +12,12 @@ import {
   ArrowLeft,
   X,
   Hash,
-  Clock
+  Clock,
+  ChevronRight,
+  Sparkles,
+  Bell,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MarkdownViewer from '../components/MarkdownViewer';
@@ -103,187 +108,236 @@ export default function InboxPage() {
     return matchesSearch;
   });
 
+  const getMsgTypeStyles = (type, title) => {
+    if (type === 'REPORT') {
+      if (title.includes('긴급') || title.includes('CRITICAL')) return {
+        bg: 'from-red-500/20 to-red-600/5',
+        border: 'border-red-500/30',
+        text: 'text-red-400',
+        icon: AlertTriangle,
+        tag: '긴급 보고서'
+      };
+      return {
+        bg: 'from-emerald-500/20 to-emerald-600/5',
+        border: 'border-emerald-500/30',
+        text: 'text-emerald-400',
+        icon: FileText,
+        tag: 'AI 리포트'
+      };
+    }
+    return {
+      bg: 'from-blue-500/20 to-blue-600/5',
+      border: 'border-blue-500/30',
+      text: 'text-blue-400',
+      icon: MessageSquare,
+      tag: '쪽지'
+    };
+  };
+
   return (
-    <div className="min-h-screen bg-[#0a0c14] text-slate-200 pb-24">
-      {/* Header */}
-      <div className="bg-gradient-to-b from-blue-900/20 to-transparent pt-12 pb-6 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <button onClick={() => navigate(-1)} className="p-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-slate-400 hover:text-white transition-all">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="p-2 bg-blue-600/20 rounded-xl border border-blue-500/30">
-                <Inbox className="w-6 h-6 text-blue-400" />
+    <div className="min-h-screen bg-[#07090e] text-slate-200 pb-28 font-sans">
+      {/* Immersive Header */}
+      <header className="relative pt-10 pb-20 px-6 overflow-hidden">
+        {/* Background Blobs */}
+        <div className="absolute top-0 left-0 w-full h-full">
+          <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-blue-600/20 blur-[100px] rounded-full" />
+          <div className="absolute bottom-0 left-[-10%] w-48 h-48 bg-purple-600/10 blur-[80px] rounded-full" />
+        </div>
+
+        <div className="relative z-10 flex flex-col gap-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/40 border border-white/10">
+                <Inbox className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-black text-white tracking-tight">메시지함</h1>
-                <p className="text-slate-500 text-xs">쪽지 및 보고서 알림</p>
+                <h1 className="text-2xl font-black text-white tracking-tight">받은사건함</h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    {userProfile?.name} · {userProfile?.team_name || '운영팀'}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 hover:border-blue-500/30 transition-all group">
-              <Search className="w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="검색..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="bg-transparent border-none focus:outline-none ml-2 text-sm placeholder:text-slate-600 w-32"
-              />
-            </div>
+            <button 
+              onClick={fetchInbox}
+              className="p-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 active:scale-95 transition-all"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex items-center gap-1 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
+          {/* Search Bar - Modern Style */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <Search className="w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+            </div>
+            <input
+              type="text"
+              placeholder="사건번호, 발신자 검색..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-[1.25rem] py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all backdrop-blur-md shadow-inner"
+            />
+          </div>
+
+          {/* Tab Menu - Pill Style */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
             {[
               { id: 'all', label: '전체', icon: Hash },
+              { id: 'received_report', label: '리포트', icon: Sparkles },
               { id: 'message', label: '쪽지', icon: MessageSquare },
-              { id: 'received_report', label: '받은 보고서', icon: FileText },
-              { id: 'sent_report', label: '보낸 보고서', icon: Send }
+              { id: 'sent_report', label: '발행', icon: Send }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activeTab === tab.id ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-200'
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black whitespace-nowrap border transition-all active:scale-95 ${
+                  activeTab === tab.id 
+                    ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-900/40' 
+                    : 'bg-[#151926]/80 border-white/5 text-slate-500 backdrop-blur-md'
                 }`}
               >
                 <tab.icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-                {tab.id === 'all' && messages.some(m => !m.is_read) && (
-                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                {tab.label}
+                {tab.id === 'all' && messages.filter(m => !m.is_read).length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-[8px] rounded-full text-white">
+                    {messages.filter(m => !m.is_read).length}
+                  </span>
                 )}
               </button>
             ))}
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Message List */}
-      <div className="max-w-4xl mx-auto px-4">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 space-y-4">
-            <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
-            <p className="text-slate-500 text-sm">불러오는 중...</p>
+      {/* Message Feed Area */}
+      <main className="px-6 -mt-10 relative z-20 space-y-4">
+        {loading && messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 space-y-4">
+            <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-500 rounded-full animate-spin" />
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest animate-pulse">Synchronizing 피드...</p>
           </div>
         ) : filteredMessages.length > 0 ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1 mb-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-              <span>LISTING {filteredMessages.length} ITEMS</span>
-              <div className="flex gap-3">
-                <button className="flex items-center hover:text-slate-200 transition-colors">
-                  <Filter className="w-3 h-3 mr-1" /> FILTER
-                </button>
-                <button className="flex items-center hover:text-slate-200 transition-colors">
-                  <CheckCircle2 className="w-3 h-3 mr-1" /> READ ALL
-                </button>
-              </div>
-            </div>
-
-            {filteredMessages.map(msg => (
+          filteredMessages.map(msg => {
+            const style = getMsgTypeStyles(msg.type, msg.title);
+            const Icon = style.icon;
+            return (
               <div
                 key={msg.id}
                 onClick={() => handleOpen(msg)}
-                className={`group relative bg-[#11141d] rounded-2xl border transition-all cursor-pointer overflow-hidden ${
-                  !msg.is_read
-                    ? 'border-blue-500/30 bg-blue-900/5 hover:border-blue-500/50'
-                    : 'border-white/5 hover:border-white/20'
-                }`}
+                className={`group relative bg-gradient-to-br ${style.bg} rounded-[2.5rem] border ${style.border} p-6 shadow-2xl backdrop-blur-xl transition-all active:scale-[0.97] hover:border-white/20 ${!msg.is_read ? 'ring-1 ring-blue-500/20' : 'opacity-80'}`}
               >
-                {!msg.is_read && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-2xl" />}
-                <div className="p-4 flex items-start gap-3">
-                  <div className={`p-2.5 rounded-xl shrink-0 ${
-                    msg.type === 'MESSAGE' ? 'bg-purple-600/10 text-purple-400' : 'bg-emerald-600/10 text-emerald-400'
-                  }`}>
-                    {msg.type === 'MESSAGE' ? <MessageSquare className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                {!msg.is_read && (
+                  <div className="absolute top-6 right-6">
+                    <span className="flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    </span>
                   </div>
+                )}
+
+                <div className="flex items-start gap-4">
+                  <div className={`p-4 rounded-[1.25rem] bg-black/40 border border-white/5 shadow-inner ${style.text}`}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-black text-slate-200">{msg.sender_name || 'System'}</span>
-                      <span className="text-[9px] text-slate-500">
-                        {msg.created_at ? new Date(msg.created_at).toLocaleString('ko-KR') : ''}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg border border-current/20 bg-current/10 ${style.text} uppercase tracking-tighter`}>
+                        {style.tag}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono font-bold">
+                        {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
-                    <h3 className={`text-sm font-bold truncate mb-0.5 ${!msg.is_read ? 'text-white' : 'text-slate-400'}`}>
+
+                    <h3 className={`text-[16px] font-black mb-1.5 tracking-tight leading-snug line-clamp-2 ${!msg.is_read ? 'text-white' : 'text-slate-400'}`}>
                       {msg.title}
                     </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1">
+
+                    <p className="text-[13px] text-slate-500 font-medium leading-relaxed line-clamp-2 mb-4">
                       {stripMarkdown(msg.preview || msg.content)}
                     </p>
-                  </div>
-                  <div className="flex flex-col items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={e => { e.stopPropagation(); handleDelete(msg.id); }}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 hover:text-red-400 text-slate-400 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                    <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center border border-white/10">
+                          <Hash className="w-2.5 h-2.5 text-slate-500" />
+                        </div>
+                        <span className="text-[11px] text-slate-400 font-bold">{msg.sender_name || 'System'}</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 text-[11px] font-black ${style.text}`}>
+                        {msg.type === 'REPORT' ? '리포트 확인' : '상세보기'}
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })
         ) : (
-          <div className="flex flex-col items-center justify-center py-32 text-center opacity-40">
-            <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
-              <Inbox className="w-8 h-8 text-slate-600" />
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="w-20 h-20 rounded-[2.5rem] bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+              <Inbox className="w-10 h-10 text-slate-700" />
             </div>
-            <h3 className="text-lg font-bold text-slate-400">메시지함이 비어 있습니다</h3>
-            <p className="text-slate-500 text-sm mt-1">새로운 소식이 오면 여기에 표시됩니다.</p>
+            <h3 className="text-xl font-black text-slate-400">사건함이 비어있습니다.</h3>
+            <p className="text-slate-500 text-sm mt-2 max-w-[200px] mx-auto leading-relaxed">새로운 보고서나 알림이 도착하면 여기에 표시됩니다.</p>
           </div>
         )}
-      </div>
+      </main>
 
-      {/* ─── 디테일 모달 (슬라이드업) ─── */}
+      {/* Detail Slide-up Modal */}
       {selectedMsg && (
         <div className="fixed inset-0 z-[200] flex items-end">
-          {/* 배경 딤 */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedMsg(null)} />
-
-          {/* 모달 패널 */}
-          <div className="relative w-full max-h-[90vh] bg-[#0f1219] rounded-t-3xl border-t border-white/10 flex flex-col animate-in slide-in-from-bottom duration-300 z-10">
-            {/* 모달 핸들 */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/5 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-xl ${selectedMsg.type === 'REPORT' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                  {selectedMsg.type === 'REPORT' ? <FileText className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setSelectedMsg(null)} />
+          <div className="relative w-full max-h-[92vh] bg-[#0d0f14] rounded-t-[3rem] border-t border-white/10 flex flex-col animate-in slide-in-from-bottom duration-500 z-10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
+            {/* Modal Handle */}
+            <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto my-4 shrink-0" />
+            
+            <div className="px-6 pb-4 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-2xl ${selectedMsg.type === 'REPORT' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                  {selectedMsg.type === 'REPORT' ? <FileText className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
                 </div>
                 <div>
-                  <p className="text-xs font-black text-white truncate max-w-[220px]">{selectedMsg.title}</p>
-                  <p className="text-[9px] text-slate-500 font-mono">
+                  <h3 className="text-lg font-black text-white leading-tight">{selectedMsg.title}</h3>
+                  <p className="text-[11px] text-slate-500 font-bold mt-0.5 uppercase tracking-widest">
                     {selectedMsg.sender_name} · {selectedMsg.created_at ? new Date(selectedMsg.created_at).toLocaleString('ko-KR') : ''}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => setSelectedMsg(null)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-all">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button onClick={() => setSelectedMsg(null)} className="p-2 bg-white/5 rounded-full text-slate-500 hover:text-white transition-all">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* 모달 컨텐츠 */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
               {selectedMsg.type === 'REPORT' && selectedMsg.content ? (
                 <MarkdownViewer text={selectedMsg.content} />
               ) : (
-                <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
-                  {selectedMsg.content || selectedMsg.preview || '내용 없음'}
-                </p>
+                <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
+                  <p className="text-slate-200 text-[15px] leading-relaxed whitespace-pre-wrap font-medium">
+                    {selectedMsg.content || selectedMsg.preview || '내용 없음'}
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* 모달 하단 액션 */}
-            <div className="shrink-0 px-4 pb-8 pt-3 border-t border-white/5 flex gap-2">
+            <div className="p-6 pb-10 border-t border-white/5 bg-[#0d0f14]/80 backdrop-blur-md flex gap-3">
               <button
                 onClick={() => handleDelete(selectedMsg.id)}
-                className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-black hover:bg-red-500/20 transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 py-4 rounded-[1.25rem] bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-black active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                <Trash2 className="w-3.5 h-3.5" /> 삭제
+                <Trash2 className="w-4 h-4" /> 삭제하기
               </button>
               <button
                 onClick={() => setSelectedMsg(null)}
-                className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-black hover:bg-white/10 transition-all"
+                className="flex-[2] py-4 rounded-[1.25rem] bg-blue-600 text-white text-sm font-black shadow-lg shadow-blue-900/40 active:scale-95 transition-all"
               >
-                닫기
+                확인 완료
               </button>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Bot, Send, X, Star, Zap, FileText, AlertTriangle, MessageSquare, Menu, Plus, Trash2, History, ChevronRight, ChevronDown } from 'lucide-react';
+import { Sparkles, Bot, Send, X, Star, Zap, FileText, TriangleAlert, MessageSquare, Menu, Plus, Trash2, History, ChevronRight, ChevronDown } from 'lucide-react';
 import AIChatBubble from './AIChatBubble';
 import AIThinkingIndicator from './AIThinkingIndicator';
 import ServerStatusChart from './chat/ServerStatusChart';
@@ -217,7 +217,7 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
   };
 
   const quickActions = [
-    { id: 'error', label: '이 에러 원인 분석해줘', icon: AlertTriangle },
+    { id: 'error', label: '이 에러 원인 분석해줘', icon: TriangleAlert },
     { id: 'history', label: '유사 장애 이력 찾아줘', icon: FileText },
     { id: 'action', label: '조치 방법 추천해줘', icon: Zap }
   ];

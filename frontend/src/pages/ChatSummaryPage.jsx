@@ -7,17 +7,17 @@ import {
   Share2, 
   Copy, 
   Check, 
-  CheckCircle,
-  CheckCircle2,
+  CircleCheck,
+  CircleCheckBig,
   RefreshCw,
   Activity,
   ListChecks,
-  PlusCircle,
+  CirclePlus,
   TrendingUp,
   Info,
   Sparkles,
   Clock,
-  AlertCircle,
+  CircleAlert,
   Shield,
   Printer,
   History,
@@ -253,7 +253,7 @@ export default function ChatSummaryPage() {
     const sectionConfig = {
       '장애 개요': { icon: Info, color: 'from-blue-600 to-blue-400' },
       '주요 조치 사항': { icon: ListChecks, color: 'from-indigo-600 to-indigo-400' },
-      '최종 결과': { icon: CheckCircle, color: 'from-emerald-600 to-emerald-400' },
+      '최종 결과': { icon: CircleCheck, color: 'from-emerald-600 to-emerald-400' },
       '향후 과제': { icon: TrendingUp, color: 'from-purple-600 to-purple-400' },
       '타임라인': { icon: History, color: 'from-blue-500 to-cyan-400' },
       'Default': { icon: Zap, color: 'from-slate-600 to-slate-400' }
@@ -610,7 +610,7 @@ export default function ChatSummaryPage() {
               {isGoverning ? (
                 <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
               ) : govSuccess ? (
-                <CheckCircle2 className="w-3.5 h-3.5" />
+                <CircleCheckBig className="w-3.5 h-3.5" />
               ) : (
                 <Shield className="w-3.5 h-3.5" />
               )}
@@ -785,7 +785,7 @@ export default function ChatSummaryPage() {
               {error && (
                 <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl flex items-center space-x-6 animate-in slide-in-from-top-4">
                   <div className="p-4 bg-red-500/20 rounded-2xl">
-                    <AlertCircle className="w-8 h-8 text-red-500" />
+                    <CircleAlert className="w-8 h-8 text-red-500" />
                   </div>
                   <div>
                     <h4 className="text-red-400 text-lg font-black uppercase tracking-tight mb-1">오류 발생</h4>
@@ -883,7 +883,7 @@ export default function ChatSummaryPage() {
                   </div>
                 </div>
                 <p className="mt-2 text-[10px] text-slate-500 font-mono uppercase tracking-tight flex items-center print:hidden">
-                  <AlertCircle className="w-3 h-3 mr-1" />
+                  <CircleAlert className="w-3 h-3 mr-1" />
                   이 영역의 내용은 보고서 전송 및 지식화에 함께 포함되어 적용됩니다.
                 </p>
               </div>

@@ -2,20 +2,35 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Inbox as InboxIcon, AlertTriangle, Info, Bell,
-  ChevronRight, CheckCircle2, Loader2, MailOpen, RefreshCw
+  ChevronRight, CheckCircle2, MailOpen, RefreshCw, Hash,
+  MessageSquare
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import PullToRefresh from '../components/PullToRefresh';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
-// /inbox API는 inbox_items 배열을 직접 반환
-// { id, user_id, title, preview, type, urgency, is_read, inc_id, created_at, folder }
 const URGENCY_MAP = {
-  CRITICAL: { label: '긴급', color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/20',    icon: AlertTriangle },
-  HIGH:     { label: '높음', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: AlertTriangle },
-  NORMAL:   { label: '일반', color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/10',   icon: Bell },
-  LOW:      { label: '낮음', color: 'text-slate-400',  bg: 'bg-slate-500/10',  border: 'border-slate-500/10',  icon: Info },
+  CRITICAL: { label: '긴급', color: '#f87171', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', icon: AlertTriangle },
+  HIGH:     { label: '높음', color: '#fb923c', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.25)', icon: AlertTriangle },
+  NORMAL:   { label: '일반', color: '#60a5fa', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)', icon: Bell },
+  LOW:      { label: '낮음', color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', border: 'rgba(148,163,184,0.15)', icon: Info },
+};
+
+const stripMarkdown = (str = '') =>
+  str
+    .replace(/\*\*([^*]*)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+// 제목에서 장애 ID 이후 내용 제거 (콜론 기준 앞부분만 표시)
+// 예: "[인시던트 보고서] 20260423084406535: 🕐 ..." → "[인시던트 보고서] 20260423084406535"
+const cleanTitle = (title = '') => {
+  const colonIdx = title.indexOf(':');
+  if (colonIdx !== -1) return title.substring(0, colonIdx).trim();
+  return title.trim();
 };
 
 export default function MobileInbox({ user }) {
@@ -25,24 +40,20 @@ export default function MobileInbox({ user }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeFilter, setActiveFilter] = useState('ALL');
   const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
   const [swipedId, setSwipedId] = useState(null);
+  const [longPressItem, setLongPressItem] = useState(null); // 롱프레스 컨텍스트 메뉴
+  const longPressTimer = useRef(null);
 
   const fetchInbox = async () => {
     setLoading(true);
     try {
-      const token = getAccessToken();
       const userId = user?.employee_id || user?.id;
-      // user가 없더라도 일단 호출 (인터셉터가 JWT로 처리하므로 백엔드에서 user_id를 주입함)
-      const url = userId 
+      const url = userId
         ? `${API_BASE}/inbox?user_id=${userId}`
         : `${API_BASE}/inbox`;
-
-      const res = await fetch(url, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`인박스 로드 실패: ${res.status}`);
-
-      // API는 배열을 직접 반환
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.items || data.results || []);
       setItems(list);
@@ -70,11 +81,31 @@ export default function MobileInbox({ user }) {
 
   const handleItemClick = (item) => {
     if (!item.is_read) markRead(item.id);
-    if (item.inc_id) navigate(`/chat/${item.inc_id}`);
+    if (item.inc_id) {
+      const cleanId = String(item.inc_id).replace('INC-', '');
+      navigate(item.type === 'REPORT' ? `/report/${cleanId}` : `/chat/${cleanId}`);
+    }
   };
 
-  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchStart = (e, item) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    // 롱프레스 타이머 시작 (500ms)
+    longPressTimer.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(40); // 진동 피드백
+      setLongPressItem(item);
+    }, 500);
+  };
+
+  const onTouchMove = (e) => {
+    // 손가락이 많이 움직이면 롱프레스 취소
+    const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
+    const dy = Math.abs(e.touches[0].clientY - touchStartY.current);
+    if (dx > 10 || dy > 10) clearTimeout(longPressTimer.current);
+  };
+
   const onTouchEnd = (e, id) => {
+    clearTimeout(longPressTimer.current);
     const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (diff > 60) setSwipedId(prev => (prev === id ? null : id));
     else if (diff < -40) setSwipedId(null);
@@ -86,115 +117,277 @@ export default function MobileInbox({ user }) {
     return true;
   });
 
+  const FILTERS = [
+    { key: 'ALL',      label: `전체 ${items.length}` },
+    { key: 'UNREAD',   label: `안읽음 ${unreadCount}` },
+    { key: 'CRITICAL', label: '긴급' },
+  ];
+
   return (
     <PullToRefresh onRefresh={fetchInbox}>
-      <div className="flex-1 flex flex-col bg-[#0a0e17] pb-24">
+      <div style={{ minHeight: '100dvh', background: '#0a0c12', paddingBottom: 100 }}>
 
-      {/* 헤더 */}
-      <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 fluid-px pt-4 pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <InboxIcon className="w-5 h-5 text-blue-400" />
-              <h1 className="font-black text-white text-lg">받은사건함</h1>
+        {/* 헤더 */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 50,
+          background: 'rgba(10,12,18,0.96)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '16px 20px 12px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <InboxIcon size={20} color="#60a5fa" />
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>받은 사건함</span>
               {unreadCount > 0 && (
-                <span className="text-[10px] font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">{unreadCount}</span>
+                <span style={{
+                  background: '#2563eb', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  borderRadius: 99, padding: '2px 7px',
+                }}>
+                  {unreadCount}
+                </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {user?.name || ''} · {user?.honbu_name || user?.company || ''}
-            </p>
-          </div>
-          <button onClick={fetchInbox} className="p-2 rounded-full hover:bg-white/10 transition-colors">
-            <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        {/* 필터 탭 */}
-        <div className="flex gap-2 mt-3">
-          {[
-            { key: 'ALL',      label: `전체 (${items.length})` },
-            { key: 'UNREAD',   label: `안읽음${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
-            { key: 'CRITICAL', label: '긴급' },
-          ].map(({ key, label }) => (
-            <button key={key} onClick={() => setActiveFilter(key)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
-                activeFilter === key ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'
-              }`}>
-              {label}
+            <button
+              onClick={fetchInbox}
+              style={{ padding: 8, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+            >
+              <RefreshCw size={16} color="#94a3b8" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
             </button>
-          ))}
-        </div>
-      </header>
+          </div>
 
-      {/* 리스트 */}
-      <div className="fluid-px pt-3 space-y-2">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500/40" />
+          {/* 필터 */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+            {FILTERS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveFilter(key)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 99,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: activeFilter === key ? '#2563eb' : 'rgba(255,255,255,0.06)',
+                  color: activeFilter === key ? '#fff' : '#64748b',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-600">
-            <MailOpen className="w-12 h-12 mb-4 opacity-30" />
-            <p className="text-sm">{activeFilter === 'UNREAD' ? '읽지 않은 알림이 없습니다.' : '알림이 없습니다.'}</p>
-          </div>
-        ) : filtered.map((item) => {
-          const u = URGENCY_MAP[item.urgency] || URGENCY_MAP.NORMAL;
-          const Icon = u.icon;
-          const isSwiped = swipedId === item.id;
-          return (
-            <div key={item.id} className="relative overflow-hidden rounded-2xl"
-              onTouchStart={onTouchStart}
-              onTouchEnd={(e) => onTouchEnd(e, item.id)}>
-              {/* 스와이프 읽음 버튼 */}
-              <div className={`absolute right-0 top-0 bottom-0 flex items-center justify-center bg-blue-600/80 rounded-r-2xl transition-all duration-200 ${isSwiped ? 'w-20' : 'w-0 overflow-hidden'}`}>
-                <button onClick={() => { markRead(item.id); setSwipedId(null); }}
-                  className="flex flex-col items-center gap-1">
-                  <CheckCircle2 className="w-5 h-5 text-white" />
-                  <span className="text-[9px] text-white font-bold">읽음</span>
+        </div>
+
+        {/* 리스트 */}
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {loading && items.length === 0 ? (
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
+              <div style={{ width: 32, height: 32, border: '3px solid rgba(59,130,246,0.2)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '80px 0', color: '#475569' }}>
+              <MailOpen size={40} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+              <p style={{ fontSize: 14 }}>알림이 없습니다.</p>
+            </div>
+          ) : filtered.map((item) => {
+            const u = URGENCY_MAP[item.urgency] || URGENCY_MAP.NORMAL;
+            const Icon = u.icon;
+            const isSwiped = swipedId === item.id;
+
+            // 표시할 문자 본문: received_messages에서 조인된 sms_message 우선
+            const bodyText = item.sms_message || item.content || item.preview || null;
+
+            return (
+              <div
+                key={item.id}
+                style={{ position: 'relative', overflow: 'hidden', borderRadius: 20 }}
+                onTouchStart={(e) => onTouchStart(e, item)}
+                onTouchMove={onTouchMove}
+                onTouchEnd={(e) => onTouchEnd(e, item.id)}
+              >
+                {/* 스와이프 읽음 버튼 */}
+                <div style={{
+                  position: 'absolute', right: 0, top: 0, bottom: 0,
+                  width: isSwiped ? 80 : 0,
+                  background: '#2563eb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden',
+                  transition: 'width 0.25s ease',
+                  borderRadius: '0 20px 20px 0',
+                }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); markRead(item.id); setSwipedId(null); }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', background: 'none', border: 'none' }}
+                  >
+                    <CheckCircle2 size={22} color="#fff" />
+                    <span style={{ color: '#fff', fontSize: 9, fontWeight: 800 }}>읽음</span>
+                  </button>
+                </div>
+
+                {/* 카드 */}
+                <button
+                  onClick={() => handleItemClick(item)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    background: !item.is_read ? u.bg : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${!item.is_read ? u.border : 'rgba(255,255,255,0.06)'}`,
+                    borderRadius: 20,
+                    padding: '16px',
+                    cursor: 'pointer',
+                    transform: isSwiped ? 'translateX(-72px)' : 'translateX(0)',
+                    transition: 'transform 0.25s ease',
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                >
+                  {/* 상단: 아이콘 + 긴급도 + 시간 */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Icon size={15} color={u.color} />
+                      <span style={{ fontSize: 11, fontWeight: 800, color: u.color }}>{u.label}</span>
+                      {!item.is_read && (
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+                      )}
+                    </div>
+                    <span style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>
+                      {item.created_at
+                        ? new Date(item.created_at.replace(' ', 'T'))
+                            .toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                        : ''}
+                    </span>
+                  </div>
+
+                  {/* 제목: 장애 ID까지만 표시 */}
+                  <p style={{
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: !item.is_read ? '#fff' : '#64748b',
+                    marginBottom: bodyText ? 10 : 0,
+                    lineHeight: 1.4,
+                  }}>
+                    {cleanTitle(item.title)}
+                  </p>
+
+                  {/* 문자 본문 - received_messages에서 조인된 내용 */}
+                  {bodyText && (
+                    <div style={{
+                      background: 'rgba(0,0,0,0.25)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 12,
+                      padding: '10px 12px',
+                      marginBottom: 10,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                        <MessageSquare size={11} color="#60a5fa" />
+                        <span style={{ fontSize: 10, color: '#60a5fa', fontWeight: 700 }}>문자 본문</span>
+                      </div>
+                      <p style={{
+                        fontSize: 13,
+                        color: '#cbd5e1',
+                        lineHeight: 1.6,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 5,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}>
+                        {stripMarkdown(bodyText)}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 하단: 더보기 */}
+                  {item.inc_id && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 3 }}>
+                      <span style={{ fontSize: 11, color: u.color, fontWeight: 700 }}>
+                        {item.type === 'REPORT' ? '리포트 보기' : 'War-Room 열기'}
+                      </span>
+                      <ChevronRight size={13} color={u.color} />
+                    </div>
+                  )}
                 </button>
               </div>
+            );
+          })}
+        </div>
 
-              {/* 카드 */}
-              <button onClick={() => handleItemClick(item)}
-                style={{ transform: isSwiped ? 'translateX(-72px)' : 'translateX(0)', transition: 'transform 0.2s ease' }}
-                className={`w-full text-left p-4 rounded-2xl transition-colors active:scale-[0.99] ${
-                  !item.is_read ? 'bg-[#131927] border border-blue-500/15' : 'bg-[#0f1320] border border-white/5'
-                }`}>
-                <div className="flex gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${u.bg} border ${u.border}`}>
-                    <Icon className={`w-5 h-5 ${u.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-[10px] font-bold ${u.color}`}>{u.label}</span>
-                      <span className="text-[10px] text-slate-600 font-mono">
-                        {item.created_at
-                          ? new Date(item.created_at.replace(' ', 'T'))
-                              .toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                          : ''}
-                      </span>
-                    </div>
-                    <p className={`text-sm font-semibold leading-snug truncate ${!item.is_read ? 'text-white' : 'text-slate-400'}`}>
-                      {item.title}
-                    </p>
-                    {item.preview && (
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{item.preview}</p>
-                    )}
-                  </div>
-                  {!item.is_read && <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1" />}
-                </div>
-                {item.inc_id && (
-                  <div className="mt-2 flex items-center justify-end gap-1 text-[10px] text-blue-400/70">
-                    <span>War-Room 열기</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </div>
+        {/* 롱프레스 바텀시트 */}
+        {longPressItem && (
+          <>
+            {/* 배경 딤 */}
+            <div
+              onClick={() => setLongPressItem(null)}
+              style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+                zIndex: 100, backdropFilter: 'blur(4px)',
+              }}
+            />
+            {/* 액션 시트 */}
+            <div style={{
+              position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 101,
+              background: '#141820',
+              borderRadius: '24px 24px 0 0',
+              border: '1px solid rgba(255,255,255,0.08)',
+              padding: '12px 0 40px',
+            }}>
+              {/* 핸들 */}
+              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 99, margin: '0 auto 16px' }} />
+
+              {/* 선택된 항목 제목 */}
+              <div style={{ padding: '0 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 700, marginBottom: 2 }}>선택된 항목</p>
+                <p style={{ fontSize: 14, color: '#fff', fontWeight: 800 }}>{cleanTitle(longPressItem.title)}</p>
+              </div>
+
+              {/* 액션 목록 */}
+              <div style={{ marginTop: 8 }}>
+                {!longPressItem.is_read && (
+                  <button
+                    onClick={() => { markRead(longPressItem.id); setLongPressItem(null); }}
+                    style={{
+                      width: '100%', padding: '16px 20px', background: 'none', border: 'none',
+                      display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+                    }}
+                  >
+                    <CheckCircle2 size={20} color="#60a5fa" />
+                    <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>읽음으로 표시</span>
+                  </button>
                 )}
-              </button>
+                {longPressItem.inc_id && (
+                  <button
+                    onClick={() => { handleItemClick(longPressItem); setLongPressItem(null); }}
+                    style={{
+                      width: '100%', padding: '16px 20px', background: 'none', border: 'none',
+                      display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+                    }}
+                  >
+                    <ChevronRight size={20} color="#34d399" />
+                    <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>
+                      {longPressItem.type === 'REPORT' ? '리포트 상세보기' : 'War-Room 열기'}
+                    </span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setLongPressItem(null)}
+                  style={{
+                    width: '100%', padding: '16px 20px', background: 'none', border: 'none',
+                    display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontSize: 15, color: '#475569', fontWeight: 600 }}>취소</span>
+                </button>
+              </div>
             </div>
-          );
-        })}
-      </div>
+          </>
+        )}
+
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     </PullToRefresh>
   );
