@@ -300,6 +300,29 @@ app.post('/auth/push-test', async (c) => {
   return c.json({ success: true, target: userId, results });
 });
 
+// ✅ NEW: /push/notify - 특정 사용자에게 푸시 알림 전송 (초대 등)
+app.post('/push/notify', async (c) => {
+  const sender = c.get('user');
+  if (!sender) return c.json({ error: 'Auth required' }, 401);
+
+  const { target_user_id, title, body, url, inc_id, tag, priority } = await c.req.json();
+  if (!target_user_id || !title || !body) {
+    return c.json({ error: 'target_user_id, title, body required' }, 400);
+  }
+
+  const payload = {
+    title: title || '[S-Guard] 알림',
+    body: body || '',
+    url: url || '/',
+    inc_id: inc_id || '',
+    tag: tag || `notify-${Date.now()}`,
+    priority: typeof priority === 'number' ? priority : 0
+  };
+
+  const results = await sendPushNotification(c, target_user_id, payload);
+  return c.json({ success: true, target: target_user_id, results });
+});
+
 // Utility for KST Timestamp
 const getKst = () => {
   const now = new Date()
@@ -5780,7 +5803,38 @@ app.post('/ai/warroom/open', async (c) => {
       console.error("Lock release error:", e);
     }
   }
-  
+
+  // ✅ NEW: 워룸 개설 시 할당된 멤버 전원에게 첫 푸시 알림 발송 (개설자 제외)
+  c.executionCtx.waitUntil((async () => {
+    try {
+      const { results: assignees } = await db.prepare(
+        "SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ? OR inc_id = ?"
+      ).bind(normId, `INC-${normId}`).all();
+
+      const absentUserIds = assignees
+        .map(a => a.user_id)
+        .filter(uid => uid !== creator_id);
+
+      const chatUrl = `/chat/${normId}`;
+      const pushPayload = {
+        title: `[${normId}] WarRoom 개설`,
+        body: `${title || '장애'}에 대한 워룸이 개설되었습니다. 참여해 주세요.`,
+        url: chatUrl,
+        inc_id: String(normId),
+        tag: `warroom-open-${normId}`,
+        priority: 80
+      };
+
+      for (const uid of absentUserIds) {
+        await sendPushNotification({ env: c.env }, uid, pushPayload).catch(e =>
+          console.error(`[WR-Open Push] Failed for ${uid}:`, e.message)
+        );
+      }
+    } catch (e) {
+      console.error('[WR-Open Push] Error:', e.message);
+    }
+  })());
+
   return c.json({ status: 'opened', inc_id: normId })
 })
 
@@ -8425,18 +8479,29 @@ export class WarRoom {
         const now = getKst(); 
         const lastRow = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(data.incident_id).first();
         const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1;
-        
+
+        // ✅ read_count: 온라인 세션이 아닌 실제 등록 참여자 수 기준
+        let initialReadCount = 0;
+        try {
+          const memberCount = await db.prepare(
+            "SELECT COUNT(DISTINCT user_id) as cnt FROM incident_assignments WHERE inc_id = ? OR inc_id = ?"
+          ).bind(String(data.incident_id), String(data.incident_id).replace('INC-', '')).first();
+          initialReadCount = Math.max(0, (memberCount?.cnt || 0) - 1); // 발신자 제외
+        } catch (_) {
+          initialReadCount = Math.max(0, this.sessions.size - 1); // fallback
+        }
+
         await db.prepare(
           "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt, parent_seq, reactions, read_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
-          data.incident_id, seq, data.sender, data.role || 'user', data.msg_type || 'user', data.text, now, data.sender, now, data.sender, now, 
-          data.reply_to || null, 
-          JSON.stringify({}), // Initial empty reactions
-          Math.max(0, this.sessions.size - 1) // 발신자 제외한 현재 접속자 수
+          data.incident_id, seq, data.sender, data.role || 'user', data.msg_type || 'user', data.text, now, data.sender, now, data.sender, now,
+          data.reply_to || null,
+          JSON.stringify({}),
+          initialReadCount
         ).run();
 
         // 2. Broadcast
-        const initialUnread = Math.max(0, this.sessions.size - 1);
+        const initialUnread = initialReadCount;
         const broadcastMsg = {
           type: "CHAT_MESSAGE",
           msg_id: `${data.incident_id}_${seq}`,
@@ -8488,7 +8553,7 @@ export class WarRoom {
                 inc_id: String(incId),
                 tag: `chat-${incId}`, // Kakao-style: replaces previous notification
                 priority: 0,           // Chat messages have default priority
-                url: `/warroom/${incId}`
+                url: `/chat/${incId}`  // ✅ ChatPage 딥링크
               };
 
               for (const sub of subs) {

@@ -68,6 +68,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [participants, setParticipants] = useState([]);
   const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
   const textareaRef = useRef(null);
@@ -333,6 +334,25 @@ export default function ChatPage() {
         setToastMessage(`✅ ${user.name}님을 워룸에 초대했습니다`);
         setTimeout(() => setToastMessage(''), 3000);
         setShowInviteModal(false);
+
+        // ✅ 초대한 사람에게 푸시 알림 전송 (채팅방 딥링크 포함)
+        try {
+          await fetch(getApiUrl('/push/notify'), {
+            method: 'POST',
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({
+              target_user_id: user.employee_id,
+              title: `[${incidentId}] 워룸 초대`,
+              body: `${currentUser.name}님이 채팅방에 초대했습니다.`,
+              url: `/chat/${incidentId}`,
+              inc_id: incidentId,
+              tag: `invite-${incidentId}`,
+              priority: 50
+            })
+          });
+        } catch (pe) {
+          console.warn('Push notification to invited user failed:', pe);
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         setToastMessage(`❌ 초대 실패: ${err.message || res.status}`);
@@ -445,6 +465,8 @@ export default function ChatPage() {
                     try { return JSON.parse(data.reactions || '{}'); } catch (e) { return {}; }
                   })()
                 };
+                // ✅ 타인 메시지 수신 시 참여자 뱃지 깜박임 트리거
+                if (newMessage.type === 'other') setHasNewMessage(true);
                 return [...prev, newMessage];
               });
               if (data.sender !== currentUser.employee_id && data.sender !== currentUser.name && data.seq && wsRef.current?.readyState === WebSocket.OPEN) {
@@ -857,7 +879,7 @@ export default function ChatPage() {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
               wsRef.current.send(JSON.stringify({
                 type: "CHAT_SEND",
-                incident_id: normId,
+                incident_id: incidentId,
                 sender: currentUser.employee_id,
                 name: currentUser.name,
                 role: currentUser.role,
@@ -1195,12 +1217,16 @@ export default function ChatPage() {
               </div>
                 {/* 참여자 아이콘 및 숫자 */}
                 <button
-                  onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
+                  onClick={() => { setShowParticipantDropdown(!showParticipantDropdown); setHasNewMessage(false); }}
                   title="참여 사용자 목록"
-                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-all active:scale-95"
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border transition-all active:scale-95 ${
+                    hasNewMessage
+                      ? 'bg-yellow-500/20 border-yellow-500/50 animate-pulse shadow-lg shadow-yellow-500/20'
+                      : 'bg-white/5 hover:bg-white/10 border-white/5'
+                  }`}
                 >
-                  <User className="w-3.5 h-3.5 text-slate-300" />
-                  <span className="text-[11px] font-semibold text-slate-300 leading-none">
+                  <User className={`w-3.5 h-3.5 ${hasNewMessage ? 'text-yellow-400' : 'text-slate-300'}`} />
+                  <span className={`text-[11px] font-semibold leading-none ${hasNewMessage ? 'text-yellow-400' : 'text-slate-300'}`}>
                     +{assignees.length + participants.filter(p => !assignees.some(a => a.name === p.name || a.name === p.sender)).length || 0}
                   </span>
                 </button>
