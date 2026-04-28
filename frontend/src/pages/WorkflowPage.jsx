@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar,
          ChevronRight, ChevronDown, User, Clock, Terminal, Printer,
-         LayoutDashboard, UserX, MessageSquare } from 'lucide-react';
+         LayoutDashboard, UserX, MessageSquare, AlertTriangle, Users } from 'lucide-react';
 import { getAuthHeaders } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -15,7 +15,6 @@ const FLOW_STEPS = [
   { id: 'KNOWLEDGE', label: '장애 대응 및 지식화',     icon: CheckCircle2, color: 'emerald' }
 ];
 
-/** ▶ 키 : [값] 형태의 MCI SMS 메시지 파싱 */
 const parseMciFields = (msg) => {
   if (!msg) return {};
   const patterns = {
@@ -59,6 +58,9 @@ export default function WorkflowPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [showRawMsg, setShowRawMsg] = useState(false);
+  
+  // 모바일 탭 상태: 'info' | 'timeline'
+  const [activeTab, setActiveTab] = useState('info');
 
   const formatDuration = (ms) => {
     if (ms < 0) return '00:00:00';
@@ -134,8 +136,8 @@ export default function WorkflowPage() {
   if (loading) return (
     <div className="min-h-screen bg-[#0a0c14] flex flex-col items-center justify-center text-white">
       <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-        className="w-20 h-20 rounded-full border-t-2 border-b-2 border-blue-500" />
-      <p className="text-slate-500 font-mono text-[10px] tracking-[0.3em] uppercase mt-6">Synchronizing Neural Pipeline</p>
+        className="w-16 h-16 rounded-full border-t-2 border-b-2 border-blue-500" />
+      <p className="text-blue-400 font-mono text-[10px] tracking-[0.3em] uppercase mt-6 animate-pulse">Synchronizing Pipeline</p>
     </div>
   );
 
@@ -155,7 +157,6 @@ export default function WorkflowPage() {
   }).length;
   const progress = (doneCount / FLOW_STEPS.length) * 100;
 
-  // 구조화된 필드 목록 (값 있는 것만)
   const fields = [
     { label: '채널',     value: incidentData?.channel,          badge: true },
     { label: 'IF아이디', value: incidentData?.if_id,            mono: true },
@@ -171,279 +172,374 @@ export default function WorkflowPage() {
     { label: '거래일자', value: incidentData?.trade_date,        mono: true },
     { label: '거래시간', value: incidentData?.trade_time,        mono: true },
     { label: '에러내용', value: incidentData?.error_message,     wrap: true },
-  ].filter(f => f.value);
+  ].filter(f => f.value && f.value !== '0' && f.value !== 0);
 
-  const PANEL_H = 'calc(100vh - 7.5rem)';
+  const getAvatarColor = (name) => {
+    const colors = ['bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-cyan-500', 'bg-fuchsia-500'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
 
-  return (
-    <div className="bg-[#0a0c14] text-white font-sans flex flex-col" style={{ height: '100vh', overflow: 'hidden' }}>
-      {/* 배경 그래디언트 */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/5 blur-[120px] rounded-full" />
+  const getInitials = (name) => {
+    return name.substring(0, 1).toUpperCase();
+  };
+
+  // Info 탭 콘텐츠
+  const InfoContent = () => (
+    <div className="space-y-4 pb-20 lg:pb-0">
+      {/* 뱃지 & MTTR */}
+      <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl p-5 shadow-lg">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-xl ${isClosed ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+              <Shield className={`w-4 h-4 ${isClosed ? 'text-emerald-400' : 'text-red-400'}`} />
+            </div>
+            <div>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${isClosed ? 'text-emerald-400' : 'text-red-400/90'}`}>
+                {isClosed ? 'Incident Closed' : 'Active Emergency'}
+              </span>
+              <p className="text-[10px] text-slate-500">LIFECYCLE ALPHA-7</p>
+            </div>
+          </div>
+          <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${
+            isClosed ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                     : 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse'}`}>
+            {isClosed ? 'CLOSED' : 'LIVE'}
+          </span>
+        </div>
+        
+        <div className="bg-black/20 rounded-2xl p-4 border border-white/5 flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest block mb-1">MTTR (복구소요시간)</span>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-400 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]'}`} />
+              <span className="text-3xl font-black font-mono tracking-tighter tabular-nums text-white drop-shadow-sm">{formatDuration(durMs)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Calendar className="w-3 h-3 text-slate-500" />
+              <span className="text-[9px] font-bold text-slate-500 uppercase">인지시각</span>
+            </div>
+            <span className="text-xs font-mono font-bold text-slate-300">{fmt(incidentData?.created_at) || '-'}</span>
+          </div>
+          <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <User className="w-3 h-3 text-slate-500" />
+              <span className="text-[9px] font-bold text-slate-500 uppercase">발신자</span>
+            </div>
+            <span className="text-xs font-bold text-slate-300 truncate block">{incidentData?.sender || 'SYSTEM'}</span>
+          </div>
+        </div>
       </div>
 
-      {/* 헤더 */}
-      <header className="z-50 bg-[#0a0c14]/90 backdrop-blur-2xl border-b border-white/5 flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => navigate(-1)}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group">
-              <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-white" />
-            </motion.button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-black tracking-tight text-white">Incident Intelligence Flow</h1>
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-[9px] font-black text-blue-400 uppercase tracking-widest">Real-time</span>
-              </div>
-              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">S-GUARD AI ANALYTICS PIPELINE</p>
-            </div>
+      {/* 구조화 장애 정보 */}
+      {fields.length > 0 && (
+        <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden shadow-lg">
+          <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02]">
+            <h3 className="text-xs font-black text-white flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-blue-400" />
+              상세 정보
+            </h3>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex flex-col items-end">
-              <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Process Stability</span>
-              <div className="flex items-center gap-2">
-                <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }}
-                    className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full" />
+          <div className="p-2">
+            {fields.map(f => (
+              <div key={f.label} className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 p-3 hover:bg-white/[0.02] rounded-xl transition-colors">
+                <span className="text-[11px] text-slate-500 font-bold shrink-0 pt-0.5">{f.label}</span>
+                <span className={`text-[13px] break-all sm:text-right
+                  ${f.highlight ? 'text-orange-400 font-bold' : f.mono ? 'text-slate-300 font-mono' : 'text-white'}
+                  ${f.wrap ? 'whitespace-pre-wrap mt-1 sm:mt-0' : ''}`}>
+                  {f.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Response Team */}
+      <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden shadow-lg">
+        <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+          <h3 className="text-xs font-black text-white flex items-center gap-2">
+            <Users className="w-3.5 h-3.5 text-indigo-400" />
+            대응팀
+          </h3>
+          <span className="text-[10px] font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+            {assignees.length} 명
+          </span>
+        </div>
+        <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {assignees.length > 0 ? assignees.map((a, i) => (
+            <div key={`${a.user_id}-${i}`} className="flex items-center justify-between p-3 bg-white/[0.02] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-[11px] shadow-inner ${getAvatarColor(a.name || a.user_id)}`}>
+                  {getInitials(a.name || a.user_id)}
                 </div>
-                <span className="text-xs font-mono text-blue-400 font-bold">{Math.round(progress)}%</span>
+                <div>
+                  <p className="text-xs font-bold text-white">{a.name || a.user_id}</p>
+                  <p className="text-[9px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px]">
+                    {a.user_id} {a.team_name || a.part_name ? `· ${[a.team_name, a.part_name].filter(Boolean).join(' ')}` : ''}
+                  </p>
+                </div>
               </div>
+              <span className={`text-[9px] font-black px-2 py-1 rounded-full flex items-center gap-1 border ${
+                a.status==='처리완료' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                a.status==='미참여'   ? 'bg-slate-800 text-slate-500 border-white/5' :
+                                        'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                {a.status==='처리중'   && <Zap className="w-2.5 h-2.5" />}
+                {a.status==='처리완료' && <CheckCircle2 className="w-2.5 h-2.5" />}
+                {a.status==='미참여'   && <UserX className="w-2.5 h-2.5" />}
+                {a.status}
+              </span>
             </div>
-            <div className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg font-mono text-[9px] font-black text-blue-400">{inc_id}</div>
+          )) : <div className="p-4 text-center text-[11px] text-slate-500 col-span-2">할당된 담당자가 없습니다.</div>}
+        </div>
+      </div>
+
+      {/* 원문 SMS */}
+      {incidentData?.rawMessage && (
+        <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden shadow-lg">
+          <button onClick={() => setShowRawMsg(!showRawMsg)} className="w-full px-5 py-4 flex items-center justify-between bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+            <h3 className="text-xs font-black text-white flex items-center gap-2">
+              <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+              원문 SMS 전문
+            </h3>
+            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showRawMsg ? 'rotate-180' : ''}`} />
+          </button>
+          <AnimatePresence>
+            {showRawMsg && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <div className="p-5 bg-black/40 border-t border-white/5">
+                  <p className="text-[11px] text-slate-400 font-mono leading-relaxed break-all whitespace-pre-wrap">
+                    {incidentData.rawMessage}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+    </div>
+  );
+
+  // Timeline 탭 콘텐츠
+  const TimelineContent = () => {
+    const smsStep = workflowLogs.find(s => s.id === 'SMS');
+    const ragStep = workflowLogs.find(s => s.id === 'RAG') || workflowLogs.find(s => s.id === 'AGENT');
+    const warStep = workflowLogs.find(s => s.id === 'WARROOM');
+    const knwStep = workflowLogs.find(s => s.id === 'KNOWLEDGE');
+
+    return (
+      <div className="bg-[#151926]/40 backdrop-blur-xl border border-white/5 rounded-3xl shadow-2xl p-5 lg:p-8 pb-10">
+        
+        {/* 장애 처리 현황 요약 바 */}
+        <div className="mb-8 p-4 bg-white/[0.02] border border-white/5 rounded-2xl">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4 text-purple-400" />
+            <h3 className="text-sm font-bold text-white">장애 처리 현황</h3>
           </div>
+          
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[
+              { label: '인지', from: smsStep, to: ragStep },
+              { label: '분석', from: ragStep, to: warStep },
+              { label: '워룸진행', from: warStep, to: knwStep },
+              { label: '처리완료', from: smsStep, to: knwStep },
+            ].map(({ label, from, to }) => {
+              const isDone = label === '처리완료' ? !!knwStep : !!to;
+              const isActive = !!from && !to;
+              const ms = from ? ((to ? new Date(to.timestamp) : currentTime) - new Date(from.timestamp)) : 0;
+              const m = Math.floor(ms / 60000);
+              const s = Math.floor((ms % 60000) / 1000);
+              const timeStr = from ? (m > 0 ? `${m}m ${s}s` : `${s}s`) : '-';
+              return (
+                <div key={label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black ${
+                  isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : isActive ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                  : 'bg-white/5 border-white/5 text-slate-500'
+                }`}>
+                  <span className="opacity-80">{label}</span>
+                  <span className="font-mono tabular-nums">{timeStr}</span>
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse ml-1" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="relative">
+          {/* 타임라인 선 */}
+          <div className="absolute left-[19px] lg:left-[23px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-white/10 to-transparent pointer-events-none" />
+
+          <div className="space-y-8 relative z-10">
+            <AnimatePresence>
+              {FLOW_STEPS.map((step, sIdx) => {
+                let log = workflowLogs.find(l => l.id === step.id);
+                if (step.id === 'RAG_AGENT') log = workflowLogs.find(l=>l.id==='RAG') || workflowLogs.find(l=>l.id==='AGENT');
+                const done = !!log;
+            const next = sIdx === firstPending;
+            const Icon = step.icon;
+
+            let intervalText = null;
+            let intervalMinutes = 0;
+            if (done && sIdx < FLOW_STEPS.length - 1) {
+              const nextId = FLOW_STEPS[sIdx+1].id;
+              let nextLog = workflowLogs.find(l => l.id === nextId);
+              if (!nextLog && nextId === 'RAG_AGENT') {
+                nextLog = workflowLogs.find(l => l.id === 'RAG') || workflowLogs.find(l => l.id === 'AGENT');
+              }
+              if (nextLog) {
+                const diff = new Date(nextLog.timestamp) - new Date(log.timestamp);
+                const m = Math.floor(diff / 60000);
+                const sec = Math.floor((diff % 60000) / 1000);
+                intervalMinutes = m;
+                intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요` : m > 0 ? `⏱ ${m}분 ${sec}초 소요` : `⏱ ${sec}초 소요`;
+              } else if (sIdx === firstPending - 1) {
+                const diff = currentTime - new Date(log.timestamp);
+                const m = Math.floor(diff / 60000);
+                const sec = Math.floor((diff % 60000) / 1000);
+                intervalMinutes = m;
+                intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과` : m > 0 ? `⏱ ${m}분 ${sec}초 경과` : `⏱ ${sec}초 경과`;
+              }
+            }
+
+            return (
+              <motion.div key={step.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: sIdx * 0.1 }} className="relative pl-14 lg:pl-20">
+                {/* 아이콘 마커 */}
+                <div className={`absolute left-0 top-0 w-10 h-10 lg:w-12 lg:h-12 rounded-2xl border-2 border-[#0a0c14] z-20 flex items-center justify-center transition-all duration-500
+                  ${done ? `bg-${step.color}-500 shadow-[0_0_15px_rgba(var(--color-${step.color}-500),0.5)]` : next ? 'bg-[#151926] border-blue-500' : 'bg-[#151926] border-white/10'}`}>
+                  <Icon className={`w-4 h-4 lg:w-5 lg:h-5 ${done ? 'text-white' : next ? 'text-blue-400' : 'text-slate-600'}`} />
+                  {next && <div className="absolute inset-0 rounded-2xl bg-blue-500/20 animate-ping" />}
+                </div>
+
+                {/* 콘텐츠 카드 */}
+                <div className={`p-4 lg:p-5 rounded-2xl border transition-all duration-300 ${done ? 'bg-white/[0.03] border-white/10 shadow-lg' : next ? 'bg-blue-900/10 border-blue-500/30 shadow-[0_0_20px_rgba(37,99,235,0.1)]' : 'bg-transparent border-transparent opacity-40'}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                    <h4 className={`text-base font-black tracking-tight ${done ? 'text-white' : next ? 'text-blue-400' : 'text-slate-500'}`}>
+                      {step.label}
+                    </h4>
+                    {done ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-slate-400 bg-black/30 px-2 py-0.5 rounded-md">{fmt(log.timestamp)}</span>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      </div>
+                    ) : next && (
+                      <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md uppercase animate-pulse border border-blue-500/20">Processing</span>
+                    )}
+                  </div>
+                  
+                  <p className={`text-sm leading-relaxed ${done ? 'text-slate-300' : next ? 'text-blue-200' : 'text-slate-600'}`}>
+                    {done ? log.detail : next ? '실시간 AI 분석 및 보안 정책 대조를 통한 대응 시퀀스가 활성화되었습니다.' : '이전 단계 완료 대기 중'}
+                  </p>
+
+                  {/* 워룸 진입 버튼 */}
+                  {(done || next) && step.id === 'WARROOM' && (
+                    <button onClick={() => navigate(`/chat/${inc_id}`)} className={`mt-4 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-xs transition-all shadow-lg active:scale-95
+                      ${isClosed ? 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
+                      <MessageSquare className="w-4 h-4" />
+                      {isClosed ? '워룸 히스토리 보기' : 'War-Room 입장하기'}
+                      <ChevronRight className="w-4 h-4 opacity-70" />
+                    </button>
+                  )}
+
+                  {/* 소요 시간 라벨 */}
+                  {intervalText && sIdx < FLOW_STEPS.length - 1 && (
+                    <div className="mt-3 flex justify-end">
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${
+                        intervalMinutes > 60 ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' : intervalMinutes > 10 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                      }`}>
+                        {intervalText}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+    </div>
+  </div>
+);
+};
+
+  return (
+    <div className="bg-[#0a0c14] text-white font-sans flex flex-col min-h-screen">
+      {/* 배경 */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-600/10 blur-[120px] rounded-full mix-blend-screen" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-indigo-600/10 blur-[120px] rounded-full mix-blend-screen" />
+      </div>
+
+      {/* 상단 앱바 */}
+      <header className="sticky top-0 z-50 bg-[#0a0c14]/80 backdrop-blur-2xl border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors">
+              <ArrowLeft className="w-5 h-5 text-slate-300" />
+            </button>
+            <div>
+              <h1 className="text-sm font-black tracking-tight text-white flex items-center gap-2">
+                Incident Flow
+                <span className="px-1.5 py-0.5 rounded-md bg-blue-500/20 text-[9px] text-blue-400 uppercase">Live</span>
+              </h1>
+              <p className="text-[10px] text-slate-500 font-mono mt-0.5">{inc_id}</p>
+            </div>
+          </div>
+          {/* 진행도 미니바 */}
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[10px] font-black text-blue-400">{Math.round(progress)}%</span>
+            <div className="w-16 h-1 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        </div>
+
+        {/* 모바일 탭 네비게이션 (lg 이하에서만 표시) */}
+        <div className="lg:hidden flex border-t border-white/5">
+          <button onClick={() => setActiveTab('info')} className={`flex-1 py-3 text-xs font-black transition-colors relative ${activeTab === 'info' ? 'text-blue-400' : 'text-slate-500'}`}>
+            상세 정보
+            {activeTab === 'info' && <motion.div layoutId="tab-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />}
+          </button>
+          <button onClick={() => setActiveTab('timeline')} className={`flex-1 py-3 text-xs font-black transition-colors relative ${activeTab === 'timeline' ? 'text-blue-400' : 'text-slate-500'}`}>
+            대응 타임라인
+            {activeTab === 'timeline' && <motion.div layoutId="tab-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />}
+          </button>
         </div>
       </header>
 
-      {/* 메인 — 좌우 동일 높이, 각자 스크롤 */}
-      <main className="flex-1 relative z-10 overflow-hidden md:overflow-hidden overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-4 md:px-5 py-4 md:py-5 md:h-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 md:h-full">
-
-            {/* ── 좌측 패널 ── */}
-            <div className="lg:col-span-4 flex flex-col" style={{ height: window.innerWidth >= 1024 ? PANEL_H : 'auto' }}>
-              <div className="bg-[#151926]/70 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ minHeight: '300px' }}>
-
-                {/* 고정 헤더 */}
-                <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-white/5 space-y-3">
-                  {/* 뱃지 */}
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-red-500/10 rounded-lg border border-red-500/20">
-                      <Shield className="w-3.5 h-3.5 text-red-400" />
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-red-400/80">Active Emergency</span>
-                      <p className="text-[9px] text-slate-500 leading-none">LIFECYCLE ALPHA-7</p>
-                    </div>
-                    <span className={`ml-auto text-[9px] font-black px-2 py-0.5 rounded-full border ${
-                      isClosed ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                               : 'bg-orange-500/10 text-orange-400 border-orange-500/20 animate-pulse'}`}>
-                      {isClosed ? 'CLOSED' : 'LIVE'}
-                    </span>
-                  </div>
-
-                  {/* MTTR */}
-                  <div className="px-3 py-2.5 bg-white/5 rounded-xl border border-white/5">
-                    <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest">MTTR</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isClosed ? 'bg-emerald-500' : 'bg-blue-400 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]'}`} />
-                      <span className="text-2xl font-black font-mono tracking-tighter tabular-nums">{formatDuration(durMs)}</span>
-                    </div>
-                  </div>
-
-                  {/* Detection / Reporter */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="px-3 py-2 bg-white/5 rounded-xl border border-white/5">
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <Calendar className="w-2.5 h-2.5 text-slate-500" />
-                        <span className="text-[8px] font-bold text-slate-500 uppercase">인지시각</span>
-                      </div>
-                      <span className="text-[9px] font-mono font-bold text-white leading-tight block">{fmt(incidentData?.created_at)}</span>
-                    </div>
-                    <div className="px-3 py-2 bg-white/5 rounded-xl border border-white/5">
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <User className="w-2.5 h-2.5 text-slate-500" />
-                        <span className="text-[8px] font-bold text-slate-500 uppercase">발신자</span>
-                      </div>
-                      <span className="text-[9px] font-bold text-white leading-tight block truncate">{incidentData?.sender || 'SYSTEM'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 스크롤 가능 본문 */}
-                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-
-                  {/* 구조화 장애 정보 */}
-                  {fields.length > 0 && (
-                    <section>
-                      <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-2">장애 상세 정보</p>
-                      <div className="space-y-1">
-                        {fields.map(f => (
-                          <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-white/[0.04] rounded-lg border border-white/[0.06] hover:bg-white/[0.07] transition-colors">
-                            <span className="text-[9px] text-slate-500 font-bold min-w-[60px] flex-shrink-0 mt-px">{f.label}</span>
-                            <span className={`text-[11px] leading-snug break-all font-medium
-                              ${f.highlight ? 'text-orange-300' : f.mono ? 'text-slate-300 font-mono' : 'text-white'}
-                              ${f.wrap ? 'whitespace-pre-wrap' : ''}`}>
-                              {f.value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* 원문 SMS 토글 */}
-                  {incidentData?.rawMessage && (
-                    <section>
-                      <button onClick={() => setShowRawMsg(v => !v)}
-                        className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-colors w-full mb-1.5">
-                        <MessageSquare className="w-2.5 h-2.5" />
-                        원문 SMS 전문
-                        <ChevronDown className={`w-2.5 h-2.5 ml-auto transition-transform ${showRawMsg ? 'rotate-180' : ''}`} />
-                      </button>
-                      {showRawMsg && (
-                        <div className="bg-black/40 border border-white/5 rounded-xl p-3 max-h-36 overflow-y-auto">
-                          <p className="text-[10px] text-slate-400 font-mono leading-relaxed break-all whitespace-pre-wrap">
-                            {incidentData.rawMessage}
-                          </p>
-                        </div>
-                      )}
-                    </section>
-                  )}
-
-                  {/* Response Team */}
-                  <section>
-                    <div className="flex items-center gap-2 mb-2">
-                      <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Response Team</p>
-                      <span className="ml-auto text-[8px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">{assignees.length} members</span>
-                    </div>
-                    <div className="space-y-1">
-                      {assignees.length > 0 ? assignees.map((a, i) => (
-                        <div key={`${a.user_id}-${i}`} className="flex items-center justify-between px-3 py-2 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                              a.status==='처리완료' ? 'bg-emerald-500' : a.status==='미참여' ? 'bg-slate-700' : 'bg-orange-400 animate-pulse'}`} />
-                            <span className="text-[11px] font-bold text-white">{a.name || a.user_id}</span>
-                          </div>
-                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 border ${
-                            a.status==='처리완료' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                            a.status==='미참여'   ? 'bg-slate-800 text-slate-500 border-white/5' :
-                                                    'bg-orange-500/20 text-orange-400 border-orange-500/30'}`}>
-                            {a.status==='처리중'   && <Zap className="w-2 h-2" />}
-                            {a.status==='처리완료' && <CheckCircle2 className="w-2 h-2" />}
-                            {a.status==='미참여'   && <UserX className="w-2 h-2" />}
-                            {a.status}
-                          </span>
-                        </div>
-                      )) : <p className="text-[10px] text-slate-600 italic">No assignees found</p>}
-                    </div>
-                  </section>
-                </div>
-
-                {/* 하단 버튼 */}
-                <div className="flex-shrink-0 px-4 py-3 border-t border-white/5 flex gap-2">
-                  <motion.button whileHover={{ y: -1 }} onClick={() => window.print()}
-                    className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-white transition-all">
-                    <Printer className="w-3 h-3" /> PDF
-                  </motion.button>
-                  <motion.button whileHover={{ y: -1 }} onClick={() => navigate('/dashboard')}
-                    className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-white transition-all">
-                    <LayoutDashboard className="w-3 h-3" /> Dashboard
-                  </motion.button>
-                </div>
-              </div>
+      {/* 메인 콘텐츠 영역 */}
+      <main className="flex-1 relative z-10 w-full max-w-7xl mx-auto">
+        <div className="p-4 lg:p-6 h-full">
+          {/* 데스크탑: 2단 레이아웃, 모바일: 탭 스위칭 */}
+          <div className="hidden lg:grid grid-cols-12 gap-8 h-full">
+            <div className="col-span-5 flex flex-col h-[calc(100vh-8rem)] overflow-y-auto pr-2 custom-scrollbar">
+              <InfoContent />
             </div>
-
-            {/* ── 우측 패널 ── */}
-            <div className="lg:col-span-8 flex flex-col" style={{ height: window.innerWidth >= 1024 ? PANEL_H : 'auto' }}>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                className="bg-[#151926]/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl relative flex-1 overflow-y-auto"
-                style={{ minHeight: '400px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-                {/* 수직 타임라인 선 */}
-                <div className="absolute left-[68px] top-16 bottom-16 w-[1px] bg-gradient-to-b from-blue-600/40 via-white/5 to-transparent pointer-events-none" />
-
-                <div className="p-8">
-                  <div className="space-y-10">
-                    <AnimatePresence>
-                      {FLOW_STEPS.map((step, sIdx) => {
-                        let log = workflowLogs.find(l => l.id === step.id);
-                        if (step.id === 'RAG_AGENT') log = workflowLogs.find(l=>l.id==='RAG') || workflowLogs.find(l=>l.id==='AGENT');
-                        const done = !!log;
-                        const next = sIdx === firstPending;
-                        const Icon = step.icon;
-
-                        return (
-                          <motion.div key={step.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: sIdx * 0.12 }} className="relative pl-20">
-
-                            {/* 아이콘 */}
-                            <div className={`absolute left-0 top-0 w-12 h-12 rounded-2xl border-2 border-[#151926] z-20 flex items-center justify-center transition-all duration-500
-                              ${done
-                                ? `bg-${step.color==='blue'?'blue':step.color==='purple'?'purple':step.color==='indigo'?'indigo':'emerald'}-600 shadow-lg`
-                                : next ? 'bg-[#0a0c14] border-blue-500' : 'bg-[#0a0c14] border-white/5'}`}>
-                              <Icon className={`w-5 h-5 ${done ? 'text-white' : next ? 'text-blue-400' : 'text-slate-800'}`} />
-                              {next && (
-                                <motion.div animate={{ scale:[1,1.3,1], opacity:[0.4,0.1,0.4] }}
-                                  transition={{ duration: 2, repeat: Infinity }}
-                                  className="absolute inset-0 rounded-2xl bg-blue-500/20" />
-                              )}
-                            </div>
-
-                            {/* 내용 */}
-                            <div className={`transition-all duration-500 ${done||next ? 'opacity-100' : 'opacity-10'}`}>
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                                <div>
-                                  <h4 className={`text-base font-black ${done ? 'text-white' : next ? 'text-blue-400' : 'text-slate-600'}`}>
-                                    {step.label}
-                                  </h4>
-                                  {done && (
-                                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
-                                      <Clock className="w-2.5 h-2.5" />
-                                      {fmt(log.timestamp)}
-                                    </div>
-                                  )}
-                                </div>
-                                {done ? (
-                                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-400 uppercase tracking-widest flex-shrink-0">
-                                    <CheckCircle2 className="w-2.5 h-2.5" /> VERIFIED
-                                  </div>
-                                ) : next && (
-                                  <div className="px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[9px] font-black text-blue-400 uppercase tracking-widest animate-pulse flex-shrink-0">
-                                    Processing…
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className={`p-4 rounded-xl border transition-all duration-300
-                                ${done ? 'bg-white/5 border-white/5' : next ? 'bg-blue-500/5 border-blue-500/20' : 'bg-transparent border-transparent'}`}>
-                                <p className={`text-sm leading-relaxed ${done ? 'text-slate-300' : next ? 'text-slate-200 font-semibold' : 'text-slate-800'}`}>
-                                  {done ? log.detail : next
-                                    ? '실시간 AI 분석 및 보안 정책 대조를 통한 대응 시퀀스가 활성화되었습니다.'
-                                    : '업무 단계 연결을 기다리는 중'}
-                                </p>
-
-                                {(done || next) && step.id === 'WARROOM' && (
-                                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                    onClick={() => navigate(`/chat/${inc_id}`)}
-                                    className={`mt-5 w-full flex items-center justify-center gap-3 py-4 rounded-xl font-black text-sm transition-all
-                                      ${isClosed ? 'bg-slate-800 text-slate-400' : 'bg-blue-600 text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] hover:shadow-[0_15px_40px_rgba(37,99,235,0.5)]'}`}>
-                                    <Zap className={`w-4 h-4 fill-current ${isClosed ? '' : 'animate-pulse'}`} />
-                                    {isClosed ? 'View War-Room History' : 'Enter Live War-Room & Take Action'}
-                                    <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                  </motion.button>
-                                )}
-                              </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              </motion.div>
+            <div className="col-span-7 flex flex-col h-[calc(100vh-8rem)] overflow-y-auto pl-2 custom-scrollbar">
+              <TimelineContent />
             </div>
-
+          </div>
+          
+          <div className="block lg:hidden">
+            <AnimatePresence mode="wait">
+              {activeTab === 'info' ? (
+                <motion.div key="info" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
+                  <InfoContent />
+                </motion.div>
+              ) : (
+                <motion.div key="timeline" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}>
+                  <TimelineContent />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </main>
