@@ -46,11 +46,22 @@ const IncidentPushPage = () => {
                 const user = JSON.parse(savedUser);
                 if (user.employee_id) {
                     setEmployeeId(user.employee_id);
-                    fetch(getApiUrl(`/users/${user.employee_id}`))
-                        .then(res => res.json())
+                }
+                if (user.name) setUserProfile(user);
+
+                // ① sguard_user에 phone이 있으면 바로 사용 (API 호출 불필요)
+                if (user.phone) {
+                    setSender(user.phone);
+                } else if (user.employee_id) {
+                    // ② phone 없으면 /users/:id API로 fallback (인증 헤더 포함)
+                    fetch(getApiUrl(`/users/${user.employee_id}`), {
+                        headers: getAuthHeaders()
+                    })
+                        .then(res => res.ok ? res.json() : null)
                         .then(dbUser => {
+                            if (!dbUser) return;
                             if (dbUser.phone) setSender(dbUser.phone);
-                            if (dbUser.name) setUserProfile(dbUser);
+                            if (dbUser.name && !user.name) setUserProfile(dbUser);
                         })
                         .catch(err => console.error('Failed to fetch user info:', err));
                 }

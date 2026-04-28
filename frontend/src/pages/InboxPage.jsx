@@ -220,38 +220,44 @@ export default function InboxPage() {
             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest animate-pulse">Synchronizing 피드...</p>
           </div>
         ) : filteredMessages.length > 0 ? (
-          filteredMessages.map(msg => {
-            const style = getMsgTypeStyles(msg.type, msg.title);
-            const Icon = style.icon;
-            return (
-              <div
-                key={msg.id}
-                onClick={() => handleOpen(msg)}
-                className={`group relative bg-gradient-to-br ${style.bg} rounded-[2.5rem] border ${style.border} p-6 shadow-2xl backdrop-blur-xl transition-all active:scale-[0.97] hover:border-white/20 ${!msg.is_read ? 'ring-1 ring-blue-500/20' : 'opacity-80'}`}
-              >
-                {!msg.is_read && (
-                  <div className="absolute top-6 right-6">
-                    <span className="flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-4">
-                  <div className={`p-4 rounded-[1.25rem] bg-black/40 border border-white/5 shadow-inner ${style.text}`}>
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg border border-current/20 bg-current/10 ${style.text} uppercase tracking-tighter`}>
-                        {style.tag}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-mono font-bold">
-                        {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
+          [...filteredMessages]
+            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+            .map((msg, idx, arr) => {
+              const style = getMsgTypeStyles(msg.type, msg.title);
+              const Icon = style.icon;
+              const seqNo = arr.length - idx;
+              return (
+                <div
+                  key={msg.id}
+                  onClick={() => handleOpen(msg)}
+                  className={`group relative bg-gradient-to-br ${style.bg} rounded-[2.5rem] border ${style.border} p-6 shadow-2xl backdrop-blur-xl transition-all active:scale-[0.97] hover:border-white/20 ${!msg.is_read ? 'ring-1 ring-blue-500/20' : 'opacity-80'}`}
+                >
+                  {!msg.is_read && (
+                    <div className="absolute top-6 right-6">
+                      <span className="flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                       </span>
                     </div>
+                  )}
+
+                  <div className="flex items-start gap-4">
+                    <div className={`p-4 rounded-[1.25rem] bg-black/40 border border-white/5 shadow-inner ${style.text}`}>
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-black text-slate-400 bg-slate-800/80 border border-slate-700/50 px-2.5 py-0.5 rounded-lg font-mono">
+                          No.{seqNo}
+                        </span>
+                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg border border-current/20 bg-current/10 ${style.text} uppercase tracking-tighter`}>
+                          {style.tag}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono font-bold">
+                          {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
 
                     <h3 className={`text-[16px] font-black mb-1.5 tracking-tight leading-snug line-clamp-2 ${!msg.is_read ? 'text-white' : 'text-slate-400'}`}>
                       {msg.title}

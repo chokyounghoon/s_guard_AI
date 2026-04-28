@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Zap, Search, Compass, CheckCircle2, Loader2, Database, ShieldAlert, SlidersHorizontal, ChevronLeft, TrendingUp } from 'lucide-react';
+import { RefreshCw, Zap, Search, Compass, CheckCircle2, Loader2, Database, ShieldAlert, SlidersHorizontal, ChevronLeft, TrendingUp, FileText, BrainCircuit, Activity } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import { getAuthHeaders } from '../lib/authStore';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +19,8 @@ export default function OrbitalCommandPage() {
   const fetchStats = async () => {
     try {
       const res = await fetch('https://sguardai.khcho0421.workers.dev/ai/knowledge/sync-status', {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       });
       const data = await res.json();
       setStats({ total: data.total, success: data.success, pending: data.pending });
@@ -88,15 +89,45 @@ export default function OrbitalCommandPage() {
     if (!sandboxQuery.trim()) return;
     setIsSearching(true);
     try {
-      const res = await fetch(
-        `https://sguardai.khcho0421.workers.dev/ai/knowledge/search?q=${encodeURIComponent(sandboxQuery)}&threshold=0.0`,
-        { headers: getAuthHeaders() }
-      );
+      console.log('[Sandbox] Starting search for:', sandboxQuery);
+      
+      const searchUrl = `https://sguardai.khcho0421.workers.dev/ai/knowledge/search?q=${encodeURIComponent(sandboxQuery)}&threshold=0.0`;
+      const authHeaders = getAuthHeaders();
+      
+      console.log('[Sandbox] Auth check:', authHeaders.Authorization ? 'Token Present ✅' : 'Token Missing ❌');
+
+      const res = await fetch(searchUrl, { 
+        headers: authHeaders,
+        credentials: 'include' // 🔑 쿠키 기반 세션 유지를 위해 필수
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('[Sandbox] API error:', res.status, errText);
+        
+        if (res.status === 401) {
+          toast.error('인증 세션이 만료되었습니다. 다시 로그인해 주세요.');
+        } else {
+          toast.error(`검색 실패 (HTTP ${res.status})`);
+        }
+        setSandboxResults([]);
+        return;
+      }
+
       const data = await res.json();
-      setSandboxResults(data.results || []);
+      console.log('[Sandbox] Received data:', data);
+      
+      const results = data.results || [];
+      setSandboxResults(results);
+      
+      if (results.length === 0) {
+        toast('검색 결과가 없습니다', { icon: '🔍' });
+      } else {
+        toast.success(`${results.length}건의 유사 항목을 찾았습니다.`);
+      }
     } catch (e) {
-      toast.error('검색 중 오류 발생');
-      setSandboxResults([]);
+      console.error('[Sandbox] Fatal fetch error:', e);
+      toast.error('네트워크 오류가 발생했습니다. 서버 연결을 확인하세요.');
     } finally {
       setIsSearching(false);
     }
@@ -160,17 +191,26 @@ export default function OrbitalCommandPage() {
         </div>
       </header>
 
-      {/* ── 메인 콘텐츠 ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: 12, overflow: 'hidden' }}>
+      {/* ── 스크롤 가능한 본문 ── */}
+      <div style={{ 
+        flex: 1, 
+        overflowY: 'auto', 
+        WebkitOverflowScrolling: 'touch',
+        padding: '12px 16px',
+        paddingBottom: 'calc(120px + env(safe-area-inset-bottom))',
+        gap: 12,
+        display: 'flex',
+        flexDirection: 'column'
+      }} className="hide-scrollbar">
 
         {/* ── 섹션 1: 상태 게이지 + SYNC 버튼 ── */}
         <div style={{
           background: 'rgba(79,70,229,0.06)',
           border: '1px solid rgba(79,70,229,0.15)',
-          borderRadius: 20, padding: '14px 16px',
+          borderRadius: 20, padding: '16px',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {/* 원형 게이지 */}
             <div style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
               <svg width="72" height="72" style={{ transform: 'rotate(-90deg)' }}>
@@ -183,38 +223,32 @@ export default function OrbitalCommandPage() {
                   strokeLinecap="round"
                   style={{ transition: 'stroke-dashoffset 1s ease-out' }}
                 />
-                <defs>
-                  <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#06b6d4" />
-                    <stop offset="100%" stopColor="#818cf8" />
-                  </linearGradient>
-                </defs>
               </svg>
               <div style={{
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexDirection: 'column'
               }}>
-                <span style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
                   {isStatsLoading ? '…' : `${syncPct}%`}
                 </span>
               </div>
             </div>
 
             {/* 수치 */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <RefreshCw size={12} color="#818cf8" />
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#818cf8', letterSpacing: '0.08em' }}>GLOBAL SYNC ENGINE</span>
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#818cf8', letterSpacing: '0.1em' }}>SYNC ENGINE STATUS</span>
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingRight: 4 }}>
                 {[
-                  { label: 'Total', val: stats.total, color: '#94a3b8' },
-                  { label: 'Synced', val: stats.success, color: '#06b6d4' },
-                  { label: 'Pending', val: stats.pending, color: '#f87171' },
+                  { label: 'CORPUS', val: stats.total, color: '#94a3b8' },
+                  { label: 'VECTORIZED', val: stats.success, color: '#06b6d4' },
+                  { label: 'QUEUE', val: stats.pending, color: '#f87171' },
                 ].map(s => (
                   <div key={s.label} style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: s.color, fontFamily: 'monospace' }}>{isStatsLoading ? '-' : s.val}</div>
-                    <div style={{ fontSize: 8, color: '#475569', fontWeight: 700, letterSpacing: '0.04em' }}>{s.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: s.color, fontFamily: 'monospace', lineHeight: 1 }}>{isStatsLoading ? '-' : s.val}</div>
+                    <div style={{ fontSize: 8, color: '#475569', fontWeight: 800, letterSpacing: '0.02em', marginTop: 4 }}>{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -223,7 +257,7 @@ export default function OrbitalCommandPage() {
 
           {/* 동기화 진행 바 */}
           {isSyncing && (
-            <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden', marginTop: 10 }}>
+            <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden', marginTop: 12 }}>
               <div style={{ height: '100%', background: 'linear-gradient(90deg, #06b6d4, #818cf8)', animation: 'pulse 1s ease-in-out infinite' }} />
             </div>
           )}
@@ -233,9 +267,9 @@ export default function OrbitalCommandPage() {
             onClick={handleSync}
             disabled={isSyncing || stats.pending === 0}
             style={{
-              marginTop: 12, width: '100%', padding: '14px',
-              borderRadius: 12, fontWeight: 800, fontSize: 15,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              marginTop: 16, width: '100%', padding: '14px',
+              borderRadius: 12, fontWeight: 800, fontSize: 14,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               cursor: isSyncing || stats.pending === 0 ? 'not-allowed' : 'pointer',
               background: isSyncing ? 'rgba(79,70,229,0.2)'
                 : stats.pending === 0 ? 'rgba(255,255,255,0.04)'
@@ -246,84 +280,75 @@ export default function OrbitalCommandPage() {
               transition: 'all 0.2s',
             }}
           >
-            {isSyncing ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> 벡터라이징 중...</>
-              : stats.pending === 0 ? <><CheckCircle2 size={14} /> 모든 데이터 동기화 완료</>
-              : <><Zap size={14} /> SYNC NOW — {stats.pending}건 대기 중</>}
+            {isSyncing ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> PROCESSING VECTOR...</>
+              : stats.pending === 0 ? <><CheckCircle2 size={16} /> ALL KNOWLEDGE VECTORIZED</>
+              : <><Zap size={16} /> SYNC {stats.pending} ITEMS NOW</>}
           </button>
-
-          {syncResult && (
-            <div style={{
-              marginTop: 8, textAlign: 'center', fontSize: 11, fontFamily: 'monospace', fontWeight: 700,
-              color: syncResult.type === 'success' ? '#10b981' : '#f87171'
-            }}>
-              {syncResult.msg}
-            </div>
-          )}
         </div>
 
         {/* ── 섹션 2: Threshold Controller ── */}
         <div style={{
           background: 'rgba(255,255,255,0.03)',
           border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 20, padding: '14px 16px',
+          borderRadius: 20, padding: '16px',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <SlidersHorizontal size={18} color="#94a3b8" />
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.05em' }}>THRESHOLD CONTROLLER</div>
-                <div style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>Similarity Cutoff (0.00 – 1.00)</div>
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 12,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <SlidersHorizontal size={18} color="#94a3b8" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: '#e2e8f0', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>THRESHOLD CONTROLLER</div>
+              <div style={{ fontSize: 10, color: '#475569', fontFamily: 'monospace' }}>RAG Similarity Cutoff</div>
             </div>
             <div style={{
-              padding: '4px 14px', borderRadius: 8,
-              background: `${thresholdColor}18`, border: `1px solid ${thresholdColor}40`,
+              padding: '6px 12px', borderRadius: 10, minWidth: 64, textAlign: 'center',
+              background: `${thresholdColor}15`, border: `1px solid ${thresholdColor}30`,
             }}>
-              <span style={{ fontSize: 28, fontWeight: 900, color: thresholdColor, fontFamily: 'monospace' }}>
+              <span style={{ fontSize: 22, fontWeight: 900, color: thresholdColor, fontFamily: 'monospace', lineHeight: 1 }}>
                 {threshold.toFixed(2)}
               </span>
             </div>
           </div>
 
-          <input
-            type="range" min="0.00" max="1.00" step="0.01"
-            value={threshold}
-            onChange={handleSliderChange}
-            style={{ width: '100%', accentColor: thresholdColor, cursor: 'pointer', height: 4 }}
-          />
+          <div style={{ padding: '0 4px' }}>
+            <input
+              type="range" min="0.00" max="1.00" step="0.01"
+              value={threshold}
+              onChange={handleSliderChange}
+              style={{ width: '100%', accentColor: thresholdColor, cursor: 'pointer', height: 6, marginBottom: 8 }}
+            />
 
-          <div style={{ position: 'relative', height: 20, marginTop: 6 }}>
-            {[
-              { label: '0.00', pct: 0,   color: '#64748b', align: 'left' },
-              { label: '0.80 STD',  pct: 80,  color: '#eab308', align: 'center' },
-              { label: '0.90 STRICT', pct: 90,  color: '#10b981', align: 'center' },
-              { label: '1.00', pct: 100, color: '#64748b', align: 'right' },
-            ].map(t => (
-              <span key={t.label} style={{
-                position: 'absolute',
-                left: `${t.pct}%`,
-                transform: t.pct === 0 ? 'translateX(0)' : t.pct === 100 ? 'translateX(-100%)' : 'translateX(-50%)',
-                fontSize: 8, fontFamily: 'monospace', fontWeight: 700, color: t.color,
-                whiteSpace: 'nowrap',
-              }}>
-                {t.label}
-              </span>
-            ))}
+            <div style={{ position: 'relative', height: 16 }}>
+              {[
+                { label: '0.00', pct: 0,   color: '#475569' },
+                { label: '0.80 STD',  pct: 80,  color: '#eab308' },
+                { label: '0.90 STRICT', pct: 90,  color: '#10b981' },
+                { label: '1.00', pct: 100, color: '#475569' },
+              ].map(t => (
+                <span key={t.label} style={{
+                  position: 'absolute',
+                  left: `${t.pct}%`,
+                  transform: t.pct === 0 ? 'none' : t.pct === 100 ? 'translateX(-100%)' : 'translateX(-50%)',
+                  fontSize: 7, fontFamily: 'monospace', fontWeight: 800, color: t.color,
+                  whiteSpace: 'nowrap',
+                }}>
+                  {t.label}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div style={{
-            marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-            fontSize: 9, fontFamily: 'monospace', color: '#334155', fontWeight: 600,
-            background: 'rgba(0,0,0,0.2)', padding: '6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)'
+            marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            fontSize: 9, fontFamily: 'monospace', color: '#475569', fontWeight: 700,
+            background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)'
           }}>
-            <Database size={10} /> 변경 시 KV Storage에 실시간 반영
+            <Database size={10} /> PERSISTED TO EDGE KV IN REAL-TIME
           </div>
         </div>
 
@@ -333,17 +358,13 @@ export default function OrbitalCommandPage() {
           border: '1px solid rgba(6,182,212,0.12)',
           borderRadius: 20,
           overflow: 'hidden',
-          display: 'flex', flexDirection: 'column',
-          ...(showSandbox ? { flex: 1, minHeight: 0 } : { flexShrink: 0 }),
+          flexShrink: 0,
         }}>
           {/* 샌드박스 헤더 */}
-          <button
-            onClick={() => setShowSandbox(v => !v)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '13px 16px', cursor: 'pointer', background: 'transparent', border: 'none', width: '100%',
-            }}
-          >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '13px 16px',
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
                 width: 30, height: 30, borderRadius: 10,
@@ -358,91 +379,150 @@ export default function OrbitalCommandPage() {
               </div>
             </div>
             <div style={{
-              width: 22, height: 22, borderRadius: 6,
-              background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transform: showSandbox ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.2s',
+              padding: '3px 8px', borderRadius: 6,
+              background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)',
+              fontSize: 8, fontWeight: 800, color: '#06b6d4', fontFamily: 'monospace', letterSpacing: '0.05em'
             }}>
-              <TrendingUp size={11} color="#06b6d4" />
+              LIVE
             </div>
-          </button>
+          </div>
 
-          {showSandbox && (
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '0 16px 14px' }}>
-              {/* 입력 */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                <input
-                  type="text"
-                  value={sandboxQuery}
-                  onChange={e => setSandboxQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSandboxSearch()}
-                  placeholder="증상 입력... (e.g. Connection Error)"
-                  style={{
-                    flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(6,182,212,0.2)',
-                    borderRadius: 10, padding: '9px 12px', color: '#e2e8f0', fontSize: 12,
-                    outline: 'none', fontFamily: 'monospace',
-                  }}
-                />
+          {/* 항상 펼쳐진 본문 */}
+          <div style={{ display: 'flex', flexDirection: 'column', padding: '0 16px 16px' }}>
+            {/* 입력 영역 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <TrendingUp size={12} color="#06b6d4" />
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#06b6d4', letterSpacing: '0.05em' }}>QUERY PARAMETER</span>
+                </div>
                 <button
                   onClick={handleSandboxSearch}
                   disabled={isSearching}
                   style={{
-                    padding: '9px 16px', borderRadius: 10,
+                    padding: '8px 16px', borderRadius: 10,
                     background: 'linear-gradient(135deg, #0891b2, #06b6d4)',
-                    border: 'none', color: '#fff', fontWeight: 800, fontSize: 12,
+                    border: 'none', color: '#fff', fontWeight: 800, fontSize: 11,
                     cursor: isSearching ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 4,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    whiteSpace: 'nowrap', transition: 'all 0.2s',
+                    boxShadow: '0 4px 12px rgba(8,145,178,0.3)',
                   }}
                 >
-                  {isSearching ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : 'TEST'}
+                  {isSearching
+                    ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <><Zap size={12} /> 유사도 근거 분석</>}
                 </button>
               </div>
-
-              {/* 결과 스크롤 영역 */}
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                {sandboxResults.length === 0 && !isSearching ? (
-                  <div style={{
-                    height: '100%', minHeight: 80, display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center', gap: 6,
-                    border: '1px dashed rgba(255,255,255,0.06)', borderRadius: 12,
-                  }}>
-                    <ShieldAlert size={22} color="#334155" />
-                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#334155', letterSpacing: '0.1em' }}>AWAITING QUERY INJECTION</span>
-                  </div>
-                ) : sandboxResults.map((res, i) => {
-                  const below = res.score < threshold;
-                  const col = res.score >= 0.9 ? '#10b981' : res.score >= 0.8 ? '#eab308' : '#f87171';
-                  return (
-                    <div key={i} style={{
-                      background: 'rgba(0,0,0,0.3)', border: `1px solid ${col}30`,
-                      borderRadius: 12, padding: '10px 12px', marginBottom: 8,
-                      display: 'flex', gap: 10,
-                      opacity: below ? 0.35 : 1, filter: below ? 'blur(1px)' : 'none',
-                      transition: 'all 0.2s',
-                    }}>
-                      <div style={{
-                        width: 48, flexShrink: 0, borderRadius: 8,
-                        background: `${col}12`, border: `1px solid ${col}30`,
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4px 0'
-                      }}>
-                        <span style={{ fontSize: 12, fontWeight: 900, color: col, fontFamily: 'monospace' }}>{res.score.toFixed(2)}</span>
-                        <span style={{ fontSize: 7, color: col, opacity: 0.7, fontFamily: 'monospace' }}>SCORE</span>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {res.title}
-                        </div>
-                        <div style={{ fontSize: 10, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {res.content}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              
+              <textarea
+                id="sandbox-query-input"
+                value={sandboxQuery}
+                onChange={e => {
+                  setSandboxQuery(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSandboxSearch();
+                  }
+                }}
+                placeholder="장애 증상 또는 전문 코드 입력..."
+                style={{
+                  width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(6,182,212,0.2)',
+                  borderRadius: 12, color: '#e2e8f0', fontSize: 13,
+                  outline: 'none', fontFamily: 'monospace', resize: 'none',
+                  minHeight: '60px', maxHeight: '300px', lineHeight: '1.6',
+                  textAlign: 'left', boxSizing: 'border-box',
+                  padding: '12px',
+                }}
+                rows={1}
+              />
             </div>
-          )}
+
+            {/* 결과 목록 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {sandboxResults.length === 0 && !isSearching ? (
+                <div style={{
+                  minHeight: 120, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 10,
+                  border: '1px dashed rgba(255,255,255,0.06)', borderRadius: 16,
+                  background: 'rgba(255,255,255,0.01)',
+                }}>
+                  <ShieldAlert size={28} color="#334155" />
+                  <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#475569', letterSpacing: '0.15em', fontWeight: 700 }}>AWAITING QUERY INJECTION</span>
+                </div>
+              ) : sandboxResults.map((res, i) => {
+                const below = res.score < threshold;
+                const col = res.score >= 0.9 ? '#10b981' : res.score >= 0.8 ? '#eab308' : '#f87171';
+                return (
+                  <div key={i} style={{
+                    background: 'rgba(0,0,0,0.35)', border: `1px solid ${col}25`,
+                    borderRadius: 16, padding: '16px',
+                    display: 'flex', flexDirection: 'column', gap: 12,
+                    opacity: below ? 0.4 : 1, filter: below ? 'blur(0.5px)' : 'none',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative', overflow: 'hidden'
+                  }}>
+                    {/* 상단 헤더 영역 (스코어 + 리포트 버튼) */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ 
+                          padding: '4px 8px', borderRadius: 8, background: `${col}15`, border: `1px solid ${col}30`,
+                          display: 'flex', alignItems: 'center', gap: 4
+                        }}>
+                          <span style={{ fontSize: 12, fontWeight: 900, color: col, fontFamily: 'monospace' }}>{res.score.toFixed(2)}</span>
+                          <span style={{ fontSize: 8, fontWeight: 800, color: col, opacity: 0.8 }}>SCORE</span>
+                        </div>
+                        <div style={{ height: 12, width: 1, background: 'rgba(255,255,255,0.1)' }} />
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em' }}>SIMILARITY MATCH</span>
+                      </div>
+
+                      {res.inc_id && (
+                        <button
+                          onClick={() => navigate(`/report/${res.inc_id}`)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px',
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: 8, color: '#94a3b8', fontSize: 10, fontWeight: 700,
+                            cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                          onMouseOut={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                        >
+                          <FileText size={12} /> 장애보고서
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#f1f5f9', lineHeight: '1.4' }}>
+                        {res.title}
+                      </div>
+                      
+                      <div style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', lineHeight: '1.5' }}>
+                        {res.content}
+                      </div>
+
+                      {res.reason && (
+                        <div style={{
+                          marginTop: 4, fontSize: 10, color: col, background: `${col}08`,
+                          padding: '10px 12px', borderRadius: 10, border: `1px solid ${col}15`,
+                          fontStyle: 'italic', display: 'flex', alignItems: 'flex-start', gap: 8,
+                          whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.5'
+                        }}>
+                          <BrainCircuit size={12} style={{ flexShrink: 0, marginTop: 2, opacity: 0.8 }} /> 
+                          <span><strong>AI 분석 근거:</strong> {res.reason}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -450,6 +530,14 @@ export default function OrbitalCommandPage() {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
         input[type=range]::-webkit-slider-thumb { width:18px; height:18px; border-radius:50%; cursor:pointer; }
+        
+        #sandbox-query-input {
+          padding-left: 8px !important;
+          padding-right: 8px !important;
+          padding-top: 10px !important;
+          padding-bottom: 10px !important;
+          text-indent: 0 !important;
+        }
       `}</style>
     </div>
   );

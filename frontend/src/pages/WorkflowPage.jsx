@@ -366,8 +366,8 @@ export default function WorkflowPage() {
                   : 'bg-white/5 border-white/5 text-slate-500'
                 }`}>
                   <span className="opacity-80">{label}</span>
-                  <span className="font-mono tabular-nums">{timeStr}</span>
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse ml-1" />}
+                  <span className="font-mono tabular-nums inline-block w-[3.5rem] text-right">{timeStr}</span>
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 ml-1" />}
                 </div>
               );
             })}
@@ -416,7 +416,6 @@ export default function WorkflowPage() {
                 <div className={`absolute left-0 top-0 w-10 h-10 lg:w-12 lg:h-12 rounded-2xl border-2 border-[#0a0c14] z-20 flex items-center justify-center transition-all duration-500
                   ${done ? `bg-${step.color}-500 shadow-[0_0_15px_rgba(var(--color-${step.color}-500),0.5)]` : next ? 'bg-[#151926] border-blue-500' : 'bg-[#151926] border-white/10'}`}>
                   <Icon className={`w-4 h-4 lg:w-5 lg:h-5 ${done ? 'text-white' : next ? 'text-blue-400' : 'text-slate-600'}`} />
-                  {next && <div className="absolute inset-0 rounded-2xl bg-blue-500/20 animate-ping" />}
                 </div>
 
                 {/* 콘텐츠 카드 */}
@@ -431,7 +430,7 @@ export default function WorkflowPage() {
                         <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                       </div>
                     ) : next && (
-                      <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md uppercase animate-pulse border border-blue-500/20">Processing</span>
+                      <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md uppercase border border-blue-500/20">Processing</span>
                     )}
                   </div>
                   
@@ -439,15 +438,6 @@ export default function WorkflowPage() {
                     {done ? log.detail : next ? '실시간 AI 분석 및 보안 정책 대조를 통한 대응 시퀀스가 활성화되었습니다.' : '이전 단계 완료 대기 중'}
                   </p>
 
-                  {/* 워룸 진입 버튼 */}
-                  {(done || next) && step.id === 'WARROOM' && (
-                    <button onClick={() => navigate(`/chat/${inc_id}`)} className={`mt-4 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-xs transition-all shadow-lg active:scale-95
-                      ${isClosed ? 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
-                      <MessageSquare className="w-4 h-4" />
-                      {isClosed ? '워룸 히스토리 보기' : 'War-Room 입장하기'}
-                      <ChevronRight className="w-4 h-4 opacity-70" />
-                    </button>
-                  )}
 
                   {/* 소요 시간 라벨 */}
                   {intervalText && sIdx < FLOW_STEPS.length - 1 && (
@@ -521,10 +511,10 @@ export default function WorkflowPage() {
           {/* 데스크탑: 2단 레이아웃, 모바일: 탭 스위칭 */}
           <div className="hidden lg:grid grid-cols-12 gap-8 h-full">
             <div className="col-span-5 flex flex-col h-[calc(100vh-8rem)] overflow-y-auto pr-2 custom-scrollbar">
-              <InfoContent />
+              {InfoContent()}
             </div>
             <div className="col-span-7 flex flex-col h-[calc(100vh-8rem)] overflow-y-auto pl-2 custom-scrollbar">
-              <TimelineContent />
+              {TimelineContent()}
             </div>
           </div>
           
@@ -532,11 +522,11 @@ export default function WorkflowPage() {
             <AnimatePresence mode="wait">
               {activeTab === 'info' ? (
                 <motion.div key="info" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-                  <InfoContent />
+                  {InfoContent()}
                 </motion.div>
               ) : (
                 <motion.div key="timeline" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}>
-                  <TimelineContent />
+                  {TimelineContent()}
                 </motion.div>
               )}
             </AnimatePresence>

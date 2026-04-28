@@ -30,7 +30,11 @@ import InboxPage              from '../pages/InboxPage';
 import OrbitalCommandPage     from '../pages/OrbitalCommandPage';
 import SecurityLogPage        from '../pages/SecurityLogPage';
 import ProcessingFlowPage     from '../pages/ProcessingFlowPage';
+import PushDiagnosticPage     from '../pages/PushDiagnosticPage';
 import ReportViewPage        from '../pages/ReportViewPage';
+import AlertMonitorPage      from '../pages/AlertMonitorPage';
+import IncidentKeywordPage   from '../pages/IncidentKeywordPage';
+import UserKeywordPage       from '../pages/UserKeywordPage';
 
 
 // ── 모바일 전용 페이지 (카드 기반, 네이티브 UX) ────────────────────────────────
@@ -40,6 +44,9 @@ import MobileInbox            from './pages/MobileInbox';
 import MobileIncidentPush     from './pages/MobileIncidentPush';
 import MobileChat             from './pages/MobileChat';
 import MobileLoginPage        from './pages/MobileLoginPage';
+import MobileMyAssignments    from './pages/MobileMyAssignments';
+import MobileReportSearch     from './pages/MobileReportSearch';
+import MobileExpertAdvisor    from './pages/MobileExpertAdvisor';
 
 // ── 기존 PC 공통 컴포넌트 그대로 재사용 ─────────────────────────────────────────
 import SMSNotification        from '../components/SMSNotification';
@@ -77,10 +84,21 @@ function ProtectedRoute({ children, isRefreshing, userProfile }) {
 function AppContent() {
   const location  = useLocation();
   const navigate  = useNavigate();
-  const isAuthPage = location.pathname === '/';
+  const isAuthPage    = location.pathname === '/';
+  // 채팅·몰입형 페이지에서는 BottomMenu 숨김 (카카오톡 방식)
+  const isImmersivePage = [
+    '/chat',
+    '/chat-summary',
+    '/workflow',
+    '/ai-report',
+    '/ai-process-report',
+    '/report-publish',
+    '/chat-summary',
+  ].some(p => location.pathname.startsWith(p));
 
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
+  const [hideCompletedWarRooms, setHideCompletedWarRooms] = useState(true);
   const [showReportPopup, setShowReportPopup] = useState(false);
   const [warRooms, setWarRooms] = useState([]);
   const [reportLongPressItem, setReportLongPressItem] = useState(null);
@@ -151,24 +169,23 @@ function AppContent() {
 
         setAccessToken(null);
         setStoreUserProfile(null);
-        if (!isAuthPage) navigate('/', { replace: true });
-      } catch (e) {
-        const cachedUser = localStorage.getItem('sguard_user');
-        if (cachedUser && cachedUser !== 'null') {
-          try {
-            const parsed = JSON.parse(cachedUser);
-            if (parsed?.employee_id) { setStoreUserProfile(parsed); setIsRefreshing(false); return; }
-          } catch (_) {}
+        // 🔒 세션 복구 실패 시 (토큰 없음): 강제 로그아웃 및 로그인 페이지행
+        if (!isAuthPage) {
+          console.warn('[Session] Restoration failed, redirecting to login');
+          navigate('/', { replace: true });
         }
-        setStoreUserProfile(null);
+      } catch (e) {
+        console.error('[Session-Error]', e);
         setAccessToken(null);
+        setStoreUserProfile(null);
+        if (!isAuthPage) navigate('/', { replace: true });
       } finally {
         setIsRefreshing(false);
       }
     };
     localStorage.removeItem('sguard_jwt');
     checkSession();
-  }, []);
+  }, [navigate, isAuthPage]);
 
   // 로그인 상태에서 로그인 페이지 접근 시 대시보드로
   useEffect(() => {
@@ -225,10 +242,12 @@ function AppContent() {
         <Route path="/" element={<LoginPageWithPWA />} />
 
         {/* ── 대시보드: PC DashboardPage 그대로 사용 ── */}
-        <Route path="/dashboard"   element={<PR><DashboardPage /></PR>} />
-        <Route path="/activity"    element={<PR><MobileActivity user={userProfile} /></PR>} />
-        <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} /></PR>} />
-        <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} /></PR>} />
+        <Route path="/dashboard"   element={<PR><DashboardPage onAiClick={() => setShowAIAssistant(true)} /></PR>} />
+        <Route path="/activity"    element={<PR><MobileActivity user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
+        <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
+        <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
+        <Route path="/my-assignments" element={<PR><MobileMyAssignments user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
+        <Route path="/expert-advisor/:incidentId?" element={<PR><MobileExpertAdvisor user={userProfile} /></PR>} />
         <Route path="/chat/:incidentId?" element={<PR><ChatPage /></PR>} />
 
         {/* ── PC 페이지 재사용 (나머지 라우트) ── */}
@@ -241,11 +260,13 @@ function AppContent() {
         <Route path="/assignments"             element={<PR><AssignmentsPage /></PR>} />
         <Route path="/overall-status"          element={<PR><OverallStatusPage /></PR>} />
         <Route path="/search"                  element={<PR><SearchPage /></PR>} />
+        <Route path="/mobile-report-search"    element={<PR><MobileReportSearch user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/incident-list"           element={<PR><IncidentListPage /></PR>} />
         <Route path="/keyword-management"      element={<PR><KeywordManagementPage /></PR>} />
         <Route path="/report-line-management"  element={<PR><ReportLineManagementPage /></PR>} />
         <Route path="/security-logs"           element={<PR><SecurityLogPage /></PR>} />
         <Route path="/processing-flow"         element={<PR><ProcessingFlowPage /></PR>} />
+        <Route path="/push-diagnostic"         element={<PR><PushDiagnosticPage /></PR>} />
         <Route path="/knowledge-base"          element={<PR><KnowledgeBasePage /></PR>} />
         <Route path="/user-management"         element={<PR><UserManagementPage /></PR>} />
         <Route path="/organization-management" element={<PR><OrganizationManagementPage /></PR>} />
@@ -254,6 +275,9 @@ function AppContent() {
         <Route path="/workflow/:inc_id"        element={<PR><WorkflowPage /></PR>} />
         <Route path="/orbital-command"         element={<PR><OrbitalCommandPage /></PR>} />
         <Route path="/report/:incId"           element={<PR><ReportViewPage /></PR>} />
+        <Route path="/alert-monitor"           element={<PR><AlertMonitorPage /></PR>} />
+        <Route path="/incident-keyword"         element={<PR><IncidentKeywordPage /></PR>} />
+        <Route path="/user-keyword"             element={<PR><UserKeywordPage /></PR>} />
       </Routes>
 
       {/* Consent Modal */}
@@ -262,12 +286,12 @@ function AppContent() {
          userProfile.terms_agreed_at === undefined ||
          userProfile.terms_agreed_at === '') &&
         !isAuthPage && (
-          <ConsentModal userProfile={userProfile} setUserProfile={setUserProfile} />
+          <ConsentModal userProfile={userProfile} setUserProfile={(u) => { setUserProfile(u); setStoreUserProfile(u); }} />
         )}
 
 
-      {/* BottomMenu - PC와 완전히 동일 */}
-      {!isAuthPage && (
+      {/* BottomMenu - 채팅방·몰입형 페이지에서는 숨김 */}
+      {!isAuthPage && !isImmersivePage && (
         <BottomMenu
           currentPath={location.pathname}
           onWarRoomClick={() => { fetchWarRooms(); setShowWarRoomPopup(true); }}
@@ -308,6 +332,18 @@ function AppContent() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      id="hideCompletedMobile"
+                      checked={hideCompletedWarRooms}
+                      onChange={(e) => setHideCompletedWarRooms(e.target.checked)}
+                      style={{ width: 14, height: 14, accentColor: '#3b82f6', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="hideCompletedMobile" style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, cursor: 'pointer' }}>
+                      완료숨김
+                    </label>
+                  </div>
                   {warRooms.length > 0 && (
                     <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 99, padding: '4px 10px', fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>
                       {warRooms.length}건
@@ -332,7 +368,7 @@ function AppContent() {
                   </div>
                   <p style={{ color: '#475569', fontSize: 14, fontWeight: 600 }}>진행 중인 War-Room이 없습니다.</p>
                 </div>
-              ) : warRooms.map((room) => {
+              ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' && r.status !== '완료' : true).map((room) => {
                 const roomId = room.inc_id || room.code || room.id;
                 const rawId = String(roomId || '').replace(/^INC-/i, '');
                 const isCurrent = String(roomId) === String(currentIncidentId);
@@ -384,11 +420,19 @@ function AppContent() {
                         {/* 1행: 배지 + [장애ID & 년월일시] */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{
-                              fontSize: 9, fontWeight: 900, color: '#f87171',
-                              background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)',
-                              borderRadius: 6, padding: '2px 8px', letterSpacing: '0.08em'
-                            }}>CRITICAL</span>
+                            {(() => {
+                              const sev = room.severity || room.urgency || 'NORMAL';
+                              let color = '#60a5fa', bg = 'rgba(59,130,246,0.15)', border = 'rgba(59,130,246,0.3)';
+                              if (sev === 'CRITICAL' || sev === '긴급') { color = '#f87171'; bg = 'rgba(248,113,113,0.15)'; border = 'rgba(248,113,113,0.3)'; }
+                              else if (sev === 'HIGH' || sev === '높음') { color = '#fb923c'; bg = 'rgba(249,115,22,0.15)'; border = 'rgba(249,115,22,0.3)'; }
+                              return (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 900, color,
+                                  background: bg, border: `1px solid ${border}`,
+                                  borderRadius: 6, padding: '2px 8px', letterSpacing: '0.08em'
+                                }}>{sev === '긴급' ? 'CRITICAL' : sev === '높음' ? 'HIGH' : sev === '일반' ? 'NORMAL' : sev}</span>
+                              );
+                            })()}
                             {isCurrent && (
                               <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 900, color: '#60a5fa' }}>
                                 <span style={{ width: 5, height: 5, borderRadius: 99, background: '#60a5fa', boxShadow: '0 0 8px #60a5fa', display: 'inline-block' }} />

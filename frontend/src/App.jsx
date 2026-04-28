@@ -32,6 +32,10 @@ import ReportViewPage from './pages/ReportViewPage';
 import OrbitalCommandPage from './pages/OrbitalCommandPage';
 import SecurityLogPage from './pages/SecurityLogPage';
 import ProcessingFlowPage from './pages/ProcessingFlowPage';
+import PushDiagnosticPage from './pages/PushDiagnosticPage';
+import AlertMonitorPage from './pages/AlertMonitorPage';
+import IncidentKeywordPage from './pages/IncidentKeywordPage';
+import UserKeywordPage from './pages/UserKeywordPage';
 import ConsentModal from './components/ConsentModal';
 
 // ── 모바일 최적화 페이지 (PC에서도 사용 — 사이즈만 다름) ──
@@ -49,6 +53,7 @@ import { CodebookProvider } from './context/CodebookContext';
 
 import { Navigate } from 'react-router-dom';
 import { setAccessToken, getAccessToken, setUserProfile as setStoreUserProfile, getUserProfile, addAuthListener, getGhostToken, setGhostToken } from './lib/authStore';
+import { PushManager } from './lib/pushManager';
 
 // 🔒 인증된 사용자만 접근할 수 있도록 보호하는 컴포넌트 (Navigation Guard)
 // 🔒 Protected Route: Waits for session refresh to complete before redirecting
@@ -82,6 +87,7 @@ function AppContent() {
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [showReportPopup, setShowReportPopup] = useState(false);
   const [warRooms, setWarRooms] = useState([]);
+  const [hideCompletedWarRooms, setHideCompletedWarRooms] = useState(true);
   const [userProfile, setUserProfile] = useState(() => getUserProfile() || JSON.parse(localStorage.getItem('sguard_user') || 'null'));
   const [isRefreshing, setIsRefreshing] = useState(true);
 
@@ -92,6 +98,19 @@ function AppContent() {
     });
     return () => removeListener();
   }, []);
+
+  // 🔔 AUTO PUSH SUBSCRIBE: 세션 복원(Silent Refresh) 후 구독 재동기화
+  useEffect(() => {
+    if (!userProfile || isRefreshing) return;
+    // 토큰이 없어도 시도 — PushManager 내에서 gracefully 처리
+    PushManager.subscribe(apiBase).then(result => {
+      if (result.success) {
+        console.log('[Push] Session-restore subscribe success ✅');
+      } else if (result.error !== 'Notification permission denied' && result.error !== 'No auth token — login first') {
+        console.warn('[Push] Session-restore subscribe failed:', result.error);
+      }
+    });
+  }, [userProfile?.employee_id, isRefreshing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load user profile & 실시간 세션 검증 + 🔄 Silent Refresh
   useEffect(() => {
@@ -274,7 +293,7 @@ function AppContent() {
         <Route path="/" element={<LoginPage />} />
 
         {/* 🔒 Protected Routes: 인증 필수 */}
-        <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage /></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage onAiClick={() => setShowAIAssistant(true)} /></ErrorBoundary></ProtectedRoute>} />
         <Route path="/activity"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileActivity      user={userProfile} /></ProtectedRoute>} />
         <Route path="/inbox"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileInbox         user={userProfile} /></ProtectedRoute>} />
         <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileIncidentPush  user={userProfile} /></ProtectedRoute>} />
@@ -288,11 +307,13 @@ function AppContent() {
         <Route path="/assignments"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
         <Route path="/overall-status"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OverallStatusPage /></ProtectedRoute>} />
         <Route path="/search"                  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
+        <Route path="/mobile-report-search"    element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
         <Route path="/incident-list"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentListPage /></ProtectedRoute>} />
         <Route path="/keyword-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KeywordManagementPage /></ProtectedRoute>} />
         <Route path="/report-line-management"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportLineManagementPage /></ProtectedRoute>} />
         <Route path="/security-logs"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SecurityLogPage /></ProtectedRoute>} />
         <Route path="/processing-flow"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ProcessingFlowPage /></ProtectedRoute>} />
+        <Route path="/push-diagnostic"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PushDiagnosticPage /></ProtectedRoute>} />
         <Route path="/knowledge-base"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KnowledgeBasePage /></ProtectedRoute>} />
         <Route path="/user-management"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><UserManagementPage /></ProtectedRoute>} />
         <Route path="/organization-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrganizationManagementPage /></ProtectedRoute>} />
@@ -301,6 +322,9 @@ function AppContent() {
         <Route path="/workflow/:inc_id"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WorkflowPage /></ProtectedRoute>} />
         <Route path="/report/:incId"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportViewPage /></ProtectedRoute>} />
         <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrbitalCommandPage /></ProtectedRoute>} />
+        <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AlertMonitorPage /></ProtectedRoute>} />
+        <Route path="/incident-keyword"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentKeywordPage /></ProtectedRoute>} />
+        <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><UserKeywordPage /></ProtectedRoute>} />
       </Routes>
 
       {/* ⚖️ Governance & Mandatory Consent Guard */}
@@ -343,9 +367,23 @@ function AppContent() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors border border-white/5">
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    id="hideCompletedWarRoomsApp"
+                    checked={hideCompletedWarRooms}
+                    onChange={(e) => setHideCompletedWarRooms(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-white/20 bg-black/50 checked:bg-blue-500 checked:border-blue-500 transition-all cursor-pointer"
+                  />
+                  <label htmlFor="hideCompletedWarRoomsApp" className="text-xs font-bold text-slate-400 cursor-pointer select-none hover:text-white transition-colors">
+                    완료숨김
+                  </label>
+                </div>
+                <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors border border-white/5">
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
@@ -356,7 +394,7 @@ function AppContent() {
                   </div>
                   <p className="text-slate-500 text-sm font-bold">진행 중인 War-Room이 없습니다.</p>
                 </div>
-              ) : warRooms.map((room) => {
+              ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' : true).map((room) => {
                 const roomId = room.inc_id || room.id;
                 const isCurrent = roomId === currentIncidentId;
                 return (

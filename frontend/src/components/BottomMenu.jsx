@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user }) {
   const navigate = useNavigate();
@@ -13,9 +13,8 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
           { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
-          { id: 'report', label: 'Report', icon: FileText, path: '/ai-report', action: onReportClick },
-          { id: 'inbox', label: 'Inbox', icon: Inbox, path: '/inbox' },
-          { id: 'ai', label: 'AI', icon: Bot, action: onAiClick, isAi: true },
+          { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox' },
+          { id: 'my', label: 'MY', icon: User, path: '/my-assignments' },
           { id: 'more', label: '더보기', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
         ].map((item) => {
           const isActive = currentPath === item.path || (item.path && currentPath?.startsWith(item.path));
@@ -103,6 +102,9 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {[
                 { label: 'Orbital\nCommand', sub: 'RAG Control', icon: Cpu, path: '/orbital-command', color: '#06b6d4' },
+                { label: 'Alert\nMonitor', sub: '임계치 분류', icon: BellDot, path: '/alert-monitor', color: '#ef4444' },
+                { label: 'Incident\nKeyword', sub: 'Global Match', icon: Hash, path: '/incident-keyword', color: '#22d3ee' },
+                { label: 'Personal\nKeyword', sub: 'My Watchlist', icon: Keyboard, path: '/user-keyword', color: '#06b6d4' },
                 { label: 'Report\nLine', sub: 'Approval', icon: Users, path: '/report-line-management', color: '#a855f7' },
                 { label: 'Accounts', sub: 'Security Admin', icon: User, path: '/user-management', color: '#3b82f6' },
                 { label: 'Security\nLogs', sub: 'Audit Trails', icon: Shield, path: '/security-logs', color: '#6366f1', adminOnly: true },
@@ -113,12 +115,14 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'Activity\nLogs', sub: 'Footprints', icon: Activity, path: '/activity', color: '#06b6d4' },
                 { label: 'Codebook', sub: 'Metadata', icon: BookOpen, path: '/codebook-management', color: '#eab308' },
                 { label: 'Data\nFlow', sub: 'DFD', icon: Layers, path: '/processing-flow', color: '#3b82f6', adminOnly: true },
+                { label: 'Push\nDiagnostic', sub: 'Notification', icon: Bell, path: '/push-diagnostic', color: '#f59e0b' },
+                { label: 'AI\nReport', sub: '장애 분석서', icon: FileText, path: '/mobile-report-search', color: '#10b981' },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
                 const Icon = item.icon;
                 return (
                   <div
                     key={item.label}
-                    onClick={() => { setShowMoreMenu(false); navigate(item.path); }}
+                    onClick={() => { setShowMoreMenu(false); item.action ? item.action() : navigate(item.path); }}
                     style={{
                       background: 'rgba(255,255,255,0.04)',
                       border: '1px solid rgba(255,255,255,0.07)',

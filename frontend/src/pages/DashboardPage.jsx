@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
@@ -102,7 +102,7 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
 }
 
 // ── 메인 대시보드 컴포넌트 ───────────────────────
-export default function DashboardPage() {
+export default function DashboardPage({ onAiClick }) {
   const navigate = useNavigate();
   const [showAgentPanel, setShowAgentPanel] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
@@ -202,12 +202,13 @@ export default function DashboardPage() {
     return kstDate.toISOString().split('T')[0];
   };
 
-  const [hideCompletedSms, setHideCompletedSms] = useState(false);
+  const [hideCompletedSms, setHideCompletedSms] = useState(true);
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
   const selectedSmsRef = useRef(null);
   const [lastAutoTriggeredKey, setLastAutoTriggeredKey] = useState(null);
   const lastAutoTriggeredKeyRef = useRef(null);
+  const [saveStatus, setSaveStatus] = useState('');
 
   useEffect(() => {
     if (selectedSms) {
@@ -504,7 +505,7 @@ export default function DashboardPage() {
       clearInterval(historyInterval);
       sse.close();
     };
-  }, [userProfile, assignmentDateRange]);
+  }, [userProfile, assignmentDateRange, hideCompletedSms]);
 
   // SMS 선택 시 에이전트 토론 자동 시작
    useEffect(() => {
@@ -653,6 +654,8 @@ export default function DashboardPage() {
       });
       if (response.ok) {
         console.log(`${key === 'similarity_threshold_technical' ? '기술' : '일상'} 임계값이 ${value}로 업데이트되었습니다.`);
+        setSaveStatus(`${key === 'similarity_threshold_technical' ? 'Technical threshold' : 'Casual strictness'} 저장 완료!`);
+        setTimeout(() => setSaveStatus(''), 2500);
         fetchSettings();
       }
     } catch (e) {
@@ -666,7 +669,7 @@ export default function DashboardPage() {
     // 🚫 Don't poll if not authenticated — prevents 401 loop
     if (!getAccessToken() && !localStorage.getItem('sguard_ghost')) return;
     try {
-      const response = await fetch(`${apiBase}/sms/recent?limit=20`, {
+      const response = await fetch(`${apiBase}/sms/recent?limit=20${hideCompletedSms ? '&excludeCompleted=true' : ''}`, {
         headers: getAuthHeaders()
       });
       if (response.ok) {
@@ -1200,16 +1203,13 @@ export default function DashboardPage() {
             <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
           </div>
 
-          {/* Search Button removed per user request */}
-          <div className="relative group">
-            <Bell
-              className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors cursor-pointer"
-              onClick={() => setShowNotifications(true)}
-            />
-            {allNotifications.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-            )}
-          </div>
+          {/* AI Assistant Button matching MobileInbox */}
+          <button
+            onClick={onAiClick}
+            className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
+          </button>
           <div
             className="flex items-center space-x-3 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
             onClick={() => setShowProfileModal(true)}
@@ -1378,7 +1378,7 @@ export default function DashboardPage() {
                     className="flex items-center gap-1.5 cursor-pointer bg-white/5 hover:bg-white/10 px-2 sm:px-3 py-1.5 rounded-xl border border-white/5 transition-colors"
                   >
                     <input type="checkbox" checked={hideCompletedSms} onChange={() => setHideCompletedSms(!hideCompletedSms)} className="w-3.5 h-3.5 sm:w-4 sm:h-4 accent-blue-500 rounded border-white/20" />
-                    <span className="text-[10px] sm:text-xs font-bold text-slate-300">완료건 숨기기</span>
+                    <span className="text-[10px] sm:text-xs font-bold text-slate-300">완료숨김</span>
                   </label>
 
 
@@ -1497,12 +1497,7 @@ export default function DashboardPage() {
                             }`}>
                               {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
                             </span>
-                            <button
-                              onClick={(e) => deleteSMSMessage(e, msg.inc_id)}
-                              className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-white/10 text-slate-600 hover:text-red-400 transition-colors hidden group-hover:flex"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+
                           </div>
                         </div>
 
@@ -1564,8 +1559,8 @@ export default function DashboardPage() {
         {/* Main Content Areas */}
         <div className="flex flex-col gap-6">
           {/* AI War-Room Situation Log (Section 2) */}
-          <div className={`transition-all duration-500 w-full ${isWarRoomCollapsed ? '' : 'h-[650px]'}`}>
-            <div className={`bg-[#0a0c12] rounded-3xl border border-white/5 overflow-hidden flex flex-col shadow-2xl ${isWarRoomCollapsed ? '' : 'h-full'}`}>
+          <div className="w-full h-[650px]">
+            <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
               {/* Header */}
               <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
@@ -1609,16 +1604,11 @@ export default function DashboardPage() {
                       </div>
                     );
                   })()}
-                  <button
-                    onClick={toggleWarRoomPanel}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
-                  >
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isWarRoomCollapsed ? 'rotate-180' : ''}`} />
-                  </button>
+
                 </div>
               </div>
 
-              {!isWarRoomCollapsed && (
+
                 <div className="flex-1 overflow-hidden">
                   {showAgentPanel || selectedSms ? (
                     <div className="h-full flex flex-col overflow-hidden">
@@ -1648,7 +1638,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-              )}
+
             </div>
           </div>
         </div>
@@ -1656,20 +1646,13 @@ export default function DashboardPage() {
 
         {/* Activity History Flow Area */}
         <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
-          <div className="flex justify-between items-center mb-6 cursor-pointer group" onClick={toggleFlowPanel}>
+          <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <Activity className="w-4 h-4 text-purple-400 shrink-0 group-hover:scale-110 transition-transform" />
               <div className="min-w-0 flex-1">
                 {/* 제목 + 간략 메시지 한 줄 */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-bold text-base text-white whitespace-nowrap">장애 처리 현황</h2>
-                  {selectedIncidentIdFlow && (
-                    <span className="text-[10px] text-blue-400 font-mono truncate max-w-[140px]">
-                      {(myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message ||
-                        smsMessages.find(m => String(m.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''))?.message ||
-                        selectedIncidentIdFlow).substring(0, 30)}...
-                    </span>
-                  )}
                 </div>
                 {/* 시간 정보: DETECTION + MTTR 한 줄 */}
                 {selectedIncidentIdFlow && (() => {
@@ -1756,12 +1739,10 @@ export default function DashboardPage() {
                 })()}
               </div>
             </div>
-            <div className="ml-2 p-2 rounded-full group-hover:bg-white/5 transition-all shrink-0">
-              <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${isFlowCollapsed ? 'rotate-180' : ''}`} />
-            </div>
+
           </div>
 
-          {!isFlowCollapsed && (
+
           <div className="relative">
             {/* Vertical Line */}
             <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
@@ -1938,19 +1919,11 @@ export default function DashboardPage() {
                                  </button>
                                ) : (
                                  <button
-                                   onClick={() => handleOpenWarRoomFromInsight(selectedSms, '')}
-                                   disabled={isOpeningWarRoom}
-                                   className={`mt-2 inline-flex items-center gap-1.5 group/btn text-[11px] font-black text-white border px-3 py-1.5 rounded-xl transition-all ${
-                                     isOpeningWarRoom
-                                       ? 'opacity-50 cursor-not-allowed border-red-500/20 bg-red-500/60 pointer-events-none'
-                                       : 'border-red-500/30 hover:border-red-400 bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.3)] hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] active:scale-95'
-                                   }`}
+                                   disabled
+                                   className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black text-slate-500 border border-white/5 px-3 py-1.5 rounded-xl bg-white/5 cursor-not-allowed"
                                  >
-                                   {isOpeningWarRoom
-                                     ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                     : <Users className="w-3.5 h-3.5" />
-                                   }
-                                   War-Room 개설 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
+                                   <Users className="w-3.5 h-3.5 opacity-50" />
+                                   워룸 미개설 (이동 불가)
                                  </button>
                                );
                             })()}
@@ -2080,6 +2053,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
 
       {/* Bottom Navigation */}
       <BottomMenu 
@@ -2625,6 +2599,14 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
           )}
         </div>
       </div>
+      
+      {/* 🚀 Dynamic Save Toast for Thresholds */}
+      {saveStatus && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#1a1f2e] border border-emerald-500/30 text-emerald-400 text-xs font-black px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
+          <CheckCircle className="w-4 h-4 animate-bounce" />
+          <span>{saveStatus}</span>
+        </div>
+      )}
     </div>
   );
 }

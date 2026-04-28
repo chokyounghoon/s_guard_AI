@@ -242,3 +242,143 @@ html, body {
     max-height: 65vh !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════ */
+/*  💬 S-Guard Chat — 타이포그래피 & 말풍선 & 코드블록 시스템      */
+/* ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. 전체 폰트 시스템 ────────────────────────────────────── */
+.font-sans,
+body, html, input, textarea, button, select {
+  font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR', 'Malgun Gothic',
+               -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  letter-spacing: -0.02em;
+}
+
+/* ── 2. 말풍선 꼬리 (상대방: 좌측 상단, 내 말풍선: 우측 상단) ── */
+
+/* 상대방 말풍선 꼬리 (rounded-tl-none 클래스 대상) */
+.rounded-2xl.rounded-tl-none {
+  position: relative;
+  border-radius: 4px 16px 16px 16px !important;
+}
+.rounded-2xl.rounded-tl-none::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -7px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 8px 9px 0;
+  border-color: transparent;
+  border-right-color: #333333; /* other bubble */
+}
+
+/* 내 말풍선 꼬리 (rounded-tr-none 클래스 대상) */
+.rounded-2xl.rounded-tr-none {
+  position: relative;
+  border-radius: 16px 4px 16px 16px !important;
+}
+.rounded-2xl.rounded-tr-none::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -7px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 9px 8px 0 0;
+  border-color: transparent;
+  border-top-color: #00236e; /* navy blue */
+  border-right-color: transparent;
+}
+
+/* ── 3. 커스텀 얇은 스크롤바 (채팅 영역) ───────────────────── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+/* ── 4. 코드블록 스타일 ─────────────────────────────────────── */
+.sguard-code-block {
+  background: #0d1117;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-left: 3px solid #3b82f6;
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 100%;
+  margin: 6px 0;
+}
+
+.sguard-code-lang {
+  display: block;
+  padding: 3px 10px;
+  background: rgba(59,130,246,0.15);
+  color: #60a5fa;
+  font-size: 9px !important;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+  border-bottom: 1px solid rgba(59,130,246,0.15);
+}
+
+.sguard-code-pre {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 12px !important;
+  line-height: 1.65 !important;
+  letter-spacing: 0 !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace !important;
+  color: #e2e8f0;
+  white-space: pre;
+  word-break: normal;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.sguard-code-pre::-webkit-scrollbar { height: 3px; }
+.sguard-code-pre::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 99px;
+}
+.sguard-code-pre code { display: block; }
+
+/* ── 5. 인라인 코드 ─────────────────────────────────────────── */
+.sguard-inline-code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+  background: rgba(59,130,246,0.12);
+  border: 1px solid rgba(59,130,246,0.2);
+  color: #93c5fd;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ── 6. 메시지 이름/시간 사이즈 강제 ───────────────────────── */
+.text-\[10px\].text-slate-500 {
+  font-size: 11px !important;
+  color: #888888 !important;
+}
+
+/* ── 7. 모바일 말풍선 최대 너비 ─────────────────────────────── */
+@media (max-width: 480px) {
+  .max-w-\[280px\] {
+    max-width: calc(100vw - 96px) !important;
+  }
+}

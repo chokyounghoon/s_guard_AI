@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Guard 푸시 알림 등록</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #05091a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 20px;
+        }
+        h1 { font-size: 22px; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 6px; }
+        .sub { color: rgba(255,255,255,0.4); font-size: 13px; margin-bottom: 32px; }
+        .card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 16px;
+        }
+        .card h2 { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 13px;
+        }
+        .status-row:last-child { border: none; }
+        .badge {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .badge.ok { background: rgba(16,185,129,0.2); color: #10b981; }
+        .badge.fail { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .badge.warn { background: rgba(245,158,11,0.2); color: #f59e0b; }
+        .badge.unknown { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+        input {
+            width: 100%;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            color: #fff;
+            padding: 12px 16px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            border-radius: 14px;
+            border: none;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+        button:active { transform: scale(0.97); }
+        .btn-primary { background: #0046FF; color: #fff; }
+        .btn-green { background: #059669; color: #fff; }
+        .btn-orange { background: #d97706; color: #fff; }
+        .btn-gray { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+        .log {
+            background: #000;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 14px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #d1d5db;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log .ok { color: #10b981; }
+        .log .err { color: #ef4444; }
+        .log .warn { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <h1>🛰️ S-Guard Push 진단</h1>
+    <p class="sub">이 페이지에서 푸시 알림 등록 및 테스트</p>
+
+    <!-- 상태 진단 -->
+    <div class="card">
+        <h2>📋 현재 상태</h2>
+        <div class="status-row">
+            <span>서비스워커 지원</span>
+            <span class="badge" id="sw-support">확인 중...</span>
+        </div>
+        <div class="status-row">
+            <span>Push API 지원</span>
+            <span class="badge" id="push-support">확인 중...</span>
+        </div>
+        <div class="status-row">
+            <span>알림 권한</span>
+            <span class="badge" id="notif-perm">확인 중...</span>
+        </div>
+        <div class="status-row">
+            <span>서비스워커 등록</span>
+            <span class="badge" id="sw-reg">확인 중...</span>
+        </div>
+        <div class="status-row">
+            <span>Push 구독</span>
+            <span class="badge" id="push-sub">확인 중...</span>
+        </div>
+        <div class="status-row">
+            <span>서버 등록 현황</span>
+            <span class="badge" id="server-sub">확인 중...</span>
+        </div>
+    </div>
+
+    <!-- 로그인 + 구독 등록 -->
+    <div class="card">
+        <h2>🔑 토큰 입력 (로그인 후)</h2>
+        <input type="text" id="token-input" placeholder="JWT Access Token (로그인 후 콘솔에서 복사)" />
+        <button class="btn-primary" onclick="registerPush()">🔔 지금 푸시 구독 등록</button>
+        <button class="btn-orange" onclick="requestPermission()">📣 알림 권한만 요청</button>
+    </div>
+
+    <!-- 서버 직접 테스트 -->
+    <div class="card">
+        <h2>🧪 서버 상태 확인</h2>
+        <button class="btn-green" onclick="checkServer()">서버 구독 목록 확인</button>
+        <button class="btn-gray" onclick="refreshStatus()">상태 새로고침</button>
+    </div>
+
+    <!-- 로그 -->
+    <div class="card">
+        <h2>📝 로그</h2>
+        <div class="log" id="log">준비됨...</div>
+    </div>
+
+    <script>
+        const API = 'https://sguardai.khcho0421.workers.dev';
+
+        function log(msg, type = '') {
+            const el = document.getElementById('log');
+            const t = new Date().toLocaleTimeString();
+            el.innerHTML = `<span class="${type}">[${t}] ${msg}</span>\n` + el.innerHTML;
+        }
+
+        function badge(id, text, type) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = 'badge ' + type;
+        }
+
+        async function refreshStatus() {
+            log('상태 확인 중...', 'warn');
+
+            // SW 지원
+            const swOk = 'serviceWorker' in navigator;
+            badge('sw-support', swOk ? '지원' : '미지원', swOk ? 'ok' : 'fail');
+
+            // Push 지원
+            const pushOk = 'PushManager' in window;
+            badge('push-support', pushOk ? '지원' : '미지원', pushOk ? 'ok' : 'fail');
+
+            // 알림 권한
+            const perm = Notification.permission;
+            badge('notif-perm', perm, perm === 'granted' ? 'ok' : perm === 'denied' ? 'fail' : 'warn');
+
+            // SW 등록
+            try {
+                const reg = await navigator.serviceWorker.getRegistration('/');
+                badge('sw-reg', reg ? '등록됨' : '미등록', reg ? 'ok' : 'fail');
+
+                // 현재 구독
+                if (reg) {
+                    const sub = await reg.pushManager.getSubscription();
+                    badge('push-sub', sub ? '구독됨' : '미구독', sub ? 'ok' : 'fail');
+                    if (sub) {
+                        log('현재 구독 endpoint: ' + sub.endpoint.substring(0, 60) + '...', 'ok');
+                    }
+                } else {
+                    badge('push-sub', '-', 'unknown');
+                }
+            } catch (e) {
+                badge('sw-reg', '오류: ' + e.message, 'fail');
+                badge('push-sub', '-', 'unknown');
+            }
+
+            // 서버 구독 수
+            await checkServer(true);
+        }
+
+        async function checkServer(silent = false) {
+            try {
+                const res = await fetch(`${API}/debug/push-subscriptions?pass=verify`);
+                const data = await res.json();
+                badge('server-sub', `${data.count}건`, data.count > 0 ? 'ok' : 'fail');
+                if (!silent) {
+                    log(`서버 구독 수: ${data.count}건`, data.count > 0 ? 'ok' : 'err');
+                    if (data.subscriptions?.length) {
+                        data.subscriptions.forEach(s => log(`  - ${s.user_id}: ${s.endpoint?.substring(0,50)}...`, 'ok'));
+                    }
+                }
+            } catch (e) {
+                badge('server-sub', '오류', 'fail');
+                if (!silent) log('서버 확인 실패: ' + e.message, 'err');
+            }
+        }
+
+        async function requestPermission() {
+            log('알림 권한 요청 중...', 'warn');
+            try {
+                const perm = await Notification.requestPermission();
+                log('알림 권한: ' + perm, perm === 'granted' ? 'ok' : 'err');
+                badge('notif-perm', perm, perm === 'granted' ? 'ok' : perm === 'denied' ? 'fail' : 'warn');
+            } catch (e) {
+                log('권한 요청 실패: ' + e.message, 'err');
+            }
+        }
+
+        async function registerPush() {
+            const token = document.getElementById('token-input').value.trim();
+
+            // 1. 알림 권한
+            let perm = Notification.permission;
+            if (perm === 'default') {
+                log('알림 권한 요청 중...', 'warn');
+                perm = await Notification.requestPermission();
+            }
+            badge('notif-perm', perm, perm === 'granted' ? 'ok' : perm === 'denied' ? 'fail' : 'warn');
+            if (perm !== 'granted') {
+                log('❌ 알림 권한 거부됨. 설정에서 허용 필요!', 'err');
+                return;
+            }
+
+            // 2. VAPID 키 조회
+            log('VAPID 키 조회 중...', 'warn');
+            let publicKey;
+            try {
+                const kr = await fetch(`${API}/auth/push-vapid-public`);
+                const kd = await kr.json();
+                publicKey = kd.publicKey;
+                log('VAPID 키 획득: ' + publicKey?.substring(0, 20) + '...', 'ok');
+            } catch (e) {
+                log('VAPID 키 획득 실패: ' + e.message, 'err');
+                return;
+            }
+
+            // 3. 서비스워커 준비
+            log('서비스워커 준비 중...', 'warn');
+            let reg;
+            try {
+                reg = await navigator.serviceWorker.ready;
+                log('서비스워커 준비 완료', 'ok');
+            } catch (e) {
+                log('서비스워커 실패: ' + e.message, 'err');
+                return;
+            }
+
+            // 4. 기존 구독 해제 후 재구독
+            try {
+                const existing = await reg.pushManager.getSubscription();
+                if (existing) {
+                    await existing.unsubscribe();
+                    log('기존 구독 해제 완료', 'warn');
+                }
+            } catch (e) { log('구독 해제 스킵: ' + e.message); }
+
+            // 5. 신규 구독
+            function urlB64ToUint8(base64String) {
+                const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+                const rawData = window.atob(base64);
+                const outputArray = new Uint8Array(rawData.length);
+                for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+                return outputArray;
+            }
+            let subscription;
+            try {
+                log('새 구독 생성 중...', 'warn');
+                subscription = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlB64ToUint8(publicKey)
+                });
+                log('구독 생성 성공: ' + subscription.endpoint.substring(0, 50) + '...', 'ok');
+                badge('push-sub', '구독됨', 'ok');
+            } catch (e) {
+                log('구독 생성 실패: ' + e.message, 'err');
+                return;
+            }
+
+            // 6. 서버 동기화
+            if (!token) {
+                log('⚠️ 토큰 없음 — 서버 동기화 스킵. 토큰 입력 후 다시 시도!', 'warn');
+                return;
+            }
+            try {
+                log('서버 동기화 중...', 'warn');
+                const syncRes = await fetch(`${API}/auth/push-subscribe`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ subscription })
+                });
+                const syncData = await syncRes.json();
+                if (syncRes.ok) {
+                    log('✅ 서버 동기화 성공!', 'ok');
+                    badge('server-sub', '등록됨', 'ok');
+                    await checkServer(true);
+                } else {
+                    log('서버 동기화 실패: ' + JSON.stringify(syncData), 'err');
+                }
+            } catch (e) {
+                log('서버 동기화 오류: ' + e.message, 'err');
+            }
+        }
+
+        // 초기 상태 확인
+        refreshStatus();
+    </script>
+</body>
+</html>

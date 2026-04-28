@@ -57,6 +57,7 @@ const STATUS_MAP = {
 export default function MobileDashboard({ user }) {
   const navigate = useNavigate();
   const [incidents, setIncidents] = useState([]);
+  const [hideCompleted, setHideCompleted] = useState(true);
   const [stats, setStats] = useState({ total: 0, pending: 0, critical: 0, resolved: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -68,7 +69,7 @@ export default function MobileDashboard({ user }) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/sms/recent?limit=50`, { 
+      const res = await fetch(`${API_BASE}/sms/recent?limit=50&excludeCompleted=${hideCompleted}`, { 
         headers: getAuthHeaders() 
       });
       if (!res.ok) throw new Error('데이터 로드 실패');
@@ -89,7 +90,7 @@ export default function MobileDashboard({ user }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [hideCompleted]);
 
   useEffect(() => {
     fetchData();
@@ -101,12 +102,7 @@ export default function MobileDashboard({ user }) {
   // ── 인시던트 항목 클릭/롱프레스 처리 ──
   const handleIncidentClick = (item) => {
     const cleanId = String(item.inc_id).replace('INC-', '');
-    // 처리완료 상태인 경우 리포트 페이지로 이동
-    if (item.incident_status === '처리완료') {
-      navigate(`/report/${cleanId}`);
-    } else {
-      navigate(`/chat/${cleanId}`);
-    }
+    navigate(`/expert-advisor/${cleanId}`);
   };
   const handleIncidentLongPress = (item) => {
     if (navigator.vibrate) navigator.vibrate(50); // 햅틱 피드백
@@ -176,6 +172,15 @@ export default function MobileDashboard({ user }) {
               <div className="w-0.5 h-5 bg-blue-600 rounded-full" />
               <h2 className="text-lg font-black text-white tracking-tight">Surveillance Logs</h2>
             </div>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideCompleted}
+                onChange={(e) => setHideCompleted(e.target.checked)}
+                className="w-4 h-4 rounded border-white/20 bg-black/50 text-blue-500 focus:ring-0 focus:ring-offset-0 transition-all"
+              />
+              <span className="text-xs font-bold text-slate-400">완료건 숨기기</span>
+            </label>
           </div>
 
           {loading ? (
@@ -189,7 +194,9 @@ export default function MobileDashboard({ user }) {
             </div>
           ) : (
             <div className="space-y-3.5 pb-10">
-              {incidents.map((item, idx) => {
+              {incidents
+                .filter(item => !hideCompleted || item.incident_status !== '처리완료')
+                .map((item, idx) => {
                 const s = STATUS_MAP[item.incident_status] || STATUS_MAP.DEFAULT;
                 const isUrgent = item.keyword_detected === 1;
                 

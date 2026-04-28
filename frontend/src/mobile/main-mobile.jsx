@@ -26,7 +26,34 @@ window.fetch = async (...args) => {
                        urlString.startsWith('/ai/');
 
   if (isApiRequest) {
-    const jwt = getAccessToken();
+    let jwt = getAccessToken();
+    
+    // ⚡ [Proactive Refresh] 토큰은 없는데 Ghost Token이 있다면 즉시 리프레시 시도
+    if (!jwt && !urlString.includes('/auth/login') && !urlString.includes('/auth/refresh')) {
+      const ghost = getGhostToken();
+      if (ghost && !isRefreshingPromise) {
+        isRefreshingPromise = (async () => {
+          try {
+            const r = await originalFetch(`${API_BASE}/auth/refresh`, {
+              method: 'GET',
+              headers: { 'Authorization': `Bearer ${ghost}` }
+            });
+            if (r.ok) {
+              const d = await r.json();
+              if (d.access_token) {
+                setAccessToken(d.access_token);
+                if (d.ghost_token) setGhostToken(d.ghost_token);
+                return d.access_token;
+              }
+            }
+          } catch {}
+          return null;
+        })();
+        jwt = await isRefreshingPromise;
+        isRefreshingPromise = null;
+      }
+    }
+
     if (jwt) {
       const headers = new Headers(config.headers || {});
       if (!headers.has('Authorization')) {

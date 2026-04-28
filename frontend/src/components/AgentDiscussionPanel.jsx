@@ -137,33 +137,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
       )}
 
       {/* Incident Details Summary (Shared) */}
-      {incident && (
-        <div className="px-5 pt-5 pb-2 border-b border-white/5 bg-white/[0.02]">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="p-1.5 bg-blue-500/10 rounded-lg shrink-0 border border-blue-500/20">
-              <Terminal className="w-3.5 h-3.5 text-blue-400" />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Source SMS Message</h4>
-              <p className="text-xs text-white line-clamp-2 leading-relaxed opacity-80 italic">"{incident.message}"</p>
-            </div>
-          </div>
-          {/* Detailed Badges */}
-          <div className="flex flex-wrap gap-2 mb-2">
-            {[
-              { label: 'CH', value: incident.channel },
-              { label: 'SVC', value: incident.service_name || incident.service_code },
-              { label: 'ERR', value: incident.error_code },
-              { label: 'NODE', value: incident.occurrence_node },
-            ].map((d, i) => d.value && (
-              <div key={i} className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                <span className="text-[9px] text-slate-500 font-bold">{d.label}</span>
-                <span className="text-[10px] text-blue-300 font-mono">{d.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent" ref={scrollRef}>
@@ -222,7 +196,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                       }} />
                       {/* 말풍선 본체 */}
                       <div
-                        className="px-4 py-3 text-[14px] leading-relaxed shadow-[0_8px_30px_rgba(0,0,0,0.3)] whitespace-pre-wrap break-words select-none backdrop-blur-md transition-all active:scale-[0.98]"
+                        className="px-4 py-3 text-[13px] leading-relaxed shadow-[0_8px_30px_rgba(0,0,0,0.3)] whitespace-pre-wrap break-words select-none backdrop-blur-md transition-all active:scale-[0.98]"
                         style={{
                           ...bubbleBg,
                           borderRadius: '0 24px 24px 24px',

@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v4'; // bumped to force-evict all old bundles
+const CACHE_NAME = 'sguard-v10'; // unique tag per push
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -43,108 +43,101 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 🚀 FETCH: Stale-While-Revalidate Strategy
+// 🚀 FETCH: Stale-While-Revalidate Strategy (Async/Await)
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests (except fonts) and non-GET requests
   if (event.request.method !== 'GET') return;
   
   const url = new URL(event.request.url);
   
   // 🛡️ SECURITY & STABILITY: Only handle http/https requests
-  // Prevents "Request scheme 'chrome-extension' is unsupported" errors from browser extensions
   if (!url.protocol.startsWith('http')) return;
   
+  // ⚡ DEV OPTIMIZATION: Skip caching for local dev server assets (Vite/HMR)
+  // This prevents 'promise rejected' errors during development
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    if (url.pathname.includes('/src/') || url.search.includes('t=')) {
+      return; 
+    }
+  }
+
   // Skip API requests (Cloudflare Workers) to ensure fresh data
   if (url.hostname.includes('workers.dev') || url.hostname.includes('api.chokerslab.store')) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Cache the new response
-        if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // If offline and not in cache, returning undefined will trigger browser error
-      });
+    (async () => {
+      try {
+        const cachedResponse = await caches.match(event.request);
+        
+        // Network fetch promise (to update cache)
+        const fetchPromise = fetch(event.request).then(async (networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        }).catch(() => {
+          // If both fail, return fallback response
+          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+        });
 
-      // Return cached response immediately if available, otherwise wait for network
-      return cachedResponse || fetchPromise;
-    })
+        // Stale-While-Revalidate: Return cache if available, but still update it in background
+        return cachedResponse || fetchPromise;
+      } catch (err) {
+        console.error('[SW] Fetch handler error:', err);
+        return fetch(event.request);
+      }
+    })()
   );
 });
 
 // 🔔 PUSH: Web Push Notification Receiver
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
+  // 기본값 세팅
+  let title = 'S-Guard AI';
+  let body = '장애가 수신되었습니다. S-GUARD로 이동하세요.';
+  let tag = 'sguard-push';
+  let url = '/';
+  let vibrate = [200, 100, 200];
 
-  try {
-    const data = event.data.json();
-    const title = data.title || 'S-Guard AI';
-    const priority = data.priority || 0; // 0.0 to 1.0
-    const isChat = data.tag && data.tag.startsWith('chat-');
-    
-    // 🧠 Learning-based Vibration Patterns (incident only, not chat)
-    let vibrationPattern = [100]; // Default
-    if (!isChat) {
-      if (priority >= 0.8) {
-        // CRITICAL: Intense repeating pattern
-        vibrationPattern = [300, 100, 300, 100, 300];
-      } else if (priority >= 0.5) {
-        // NORMAL: Double beat
-        vibrationPattern = [200, 100, 200];
-      }
+  // 페이로드 파싱 (실패해도 기본값 사용)
+  if (event.data) {
+    try {
+      const rawText = event.data.text();
+      console.log('[SW] Raw push text (first 200):', rawText.substring(0, 200));
+      const data = JSON.parse(rawText);
+      if (data.title) title = data.title;
+      if (data.body)  body  = data.body;
+      if (data.tag)   tag   = data.tag;
+      if (data.url)   url   = data.url;
+      if (data.inc_id) body = `📋 장애ID: ${data.inc_id}\n` + body;
+      const priority = typeof data.priority === 'number' ? data.priority : 0;
+      if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
+    } catch (e) {
+      console.error('[SW] Push JSON parse failed:', e.message);
+      // 원시 텍스트라도 보여주기 시도
+      try {
+        const raw = event.data.text();
+        if (raw && raw.length > 0 && raw.length < 500) body = raw;
+      } catch (_) {}
     }
-
-    // Actions: different for incidents vs chat
-    const actions = isChat
-      ? [
-          { action: 'open_chat', title: '💬 입장' },
-          { action: 'close', title: '닿e기' }
-        ]
-      : [
-          { action: 'open', title: '🚨 확인' },
-          { action: 'dispatch', title: '📍 현장출동' }
-        ];
-
-    const options = {
-      body: data.body || '새로운 장맨 인시던트가 접수되었습니다.',
-      icon: '/icons/icon-192.png',
-      badge: '/sguard-icon.svg',
-      vibrate: vibrationPattern,
-      // 🍪 KAKAO-STYLE TAGGING: same tag = replace previous notification
-      tag: data.tag || data.inc_id || 'sguard-push',
-      renotify: true,
-      data: {
-        url: data.url || '/',
-        inc_id: data.inc_id,
-        action_type: isChat ? 'chat' : 'incident'
-      },
-      actions
-    };
-
-    event.waitUntil(
-      (async () => {
-        await self.registration.showNotification(title, options);
-
-        // 🔔 BADGE API: Increment unread count on app icon
-        if ('setAppBadge' in navigator) {
-          try {
-            const currentBadge = await self.registration.getNotifications();
-            await navigator.setAppBadge(currentBadge.length + 1);
-          } catch (e) { /* Badge API may not be available */ }
-        }
-      })()
-    );
-  } catch (err) {
-    console.error('[SW] Push processing failed:', err);
   }
+
+  // tag에 타임스탬프를 붙여 매번 새 알림으로 표시 (이전 알림 미확인 상태여도 새 알림 생성)
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      vibrate,
+      tag: `${tag}-${Date.now()}`,
+      renotify: true,
+      silent: false,
+      requireInteraction: (typeof vibrate[0] === 'number' && vibrate.length >= 5),
+      data: { url }
+    })
+  );
 });
 
 // 🖥️ NOTIFICATION CLICK: Handle actions and redirection

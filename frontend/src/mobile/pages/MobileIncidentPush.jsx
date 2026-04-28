@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Send, AlertTriangle, CheckCircle, Loader2, ChevronLeft,
   Mic, Square, Image as ImageIcon, Zap, ClipboardList,
-  Clock, RefreshCw, ChevronRight
+  Clock, RefreshCw, ChevronRight, Bot
 } from 'lucide-react';
 import { getUserProfile, getAuthHeaders } from '../../lib/authStore';
 
@@ -25,7 +25,7 @@ const STATUS_COLOR = {
   '미참여':   '#475569',
 };
 
-export default function MobileIncidentPush({ user }) {
+export default function MobileIncidentPush({ user, onAiClick }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState('push'); // 'push' | 'log'
 
@@ -194,7 +194,17 @@ export default function MobileIncidentPush({ user }) {
           </div>
         </div>
 
-        <div style={{ width: 36 }} />
+        {onAiClick ? (
+          <button onClick={onAiClick} style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}>
+            <Bot size={18} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
+          </button>
+        ) : (
+          <div style={{ width: 36 }} />
+        )}
       </header>
 
       {/* ②  탭 */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Inbox as InboxIcon, AlertTriangle, Info, Bell,
-  ChevronRight, CheckCircle2, MailOpen, RefreshCw, Hash,
+  ChevronRight, CheckCircle2, MailOpen, RefreshCw, Hash, Bot,
   MessageSquare
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
@@ -27,13 +27,23 @@ const stripMarkdown = (str = '') =>
 
 // 제목에서 장애 ID 이후 내용 제거 (콜론 기준 앞부분만 표시)
 // 예: "[인시던트 보고서] 20260423084406535: 🕐 ..." → "[인시던트 보고서] 20260423084406535"
-const cleanTitle = (title = '') => {
+const cleanTitle = (title = '', item = {}) => {
   const colonIdx = title.indexOf(':');
-  if (colonIdx !== -1) return title.substring(0, colonIdx).trim();
-  return title.trim();
+  const baseTitle = colonIdx !== -1 ? title.substring(0, colonIdx).trim() : title.trim();
+  
+  let org = '상담';
+  if (item.sender_org_path) {
+    const parts = item.sender_org_path.trim().split(/\s+/);
+    org = parts[parts.length - 1];
+  }
+  
+  if (baseTitle.includes('보고서') || item.type === 'REPORT') {
+    return `[${org} 장애 완료 보고서]`;
+  }
+  return `[${org}] ${baseTitle}`;
 };
 
-export default function MobileInbox({ user }) {
+export default function MobileInbox({ user, onAiClick }) {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +148,7 @@ export default function MobileInbox({ user }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <InboxIcon size={20} color="#60a5fa" />
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>받은 사건함</span>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>나의 레포트 수신함</span>
               {unreadCount > 0 && (
                 <span style={{
                   background: '#2563eb', color: '#fff',
@@ -149,12 +159,22 @@ export default function MobileInbox({ user }) {
                 </span>
               )}
             </div>
-            <button
-              onClick={fetchInbox}
-              style={{ padding: 8, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
-            >
-              <RefreshCw size={16} color="#94a3b8" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {onAiClick && (
+                <button
+                  onClick={onAiClick}
+                  style={{ padding: 8, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                >
+                  <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
+                </button>
+              )}
+              <button
+                onClick={fetchInbox}
+                style={{ padding: 8, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+              >
+                <RefreshCw size={16} color="#94a3b8" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+              </button>
+            </div>
           </div>
 
           {/* 필터 */}
@@ -245,33 +265,32 @@ export default function MobileInbox({ user }) {
                     zIndex: 1,
                   }}
                 >
-                  {/* 상단: 아이콘 + 긴급도 + 시간 */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Icon size={15} color={u.color} />
-                      <span style={{ fontSize: 11, fontWeight: 800, color: u.color }}>{u.label}</span>
+                  {/* 제목 + 수신일자 */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: bodyText ? 10 : 0 }}>
+                    <p style={{
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: !item.is_read ? '#fff' : '#64748b',
+                      lineHeight: 1.4,
+                      flex: 1,
+                      minWidth: 0,
+                    }}>
                       {!item.is_read && (
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', marginRight: 6, verticalAlign: 'middle', flexShrink: 0 }} />
                       )}
-                    </div>
-                    <span style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>
-                      {item.created_at
-                        ? new Date(item.created_at.replace(' ', 'T'))
-                            .toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-                        : ''}
-                    </span>
+                      {cleanTitle(item.title, item)}
+                    </p>
+                    {item.created_at && (() => {
+                      const d = new Date(item.created_at.replace(' ', 'T'));
+                      const pad = n => String(n).padStart(2, '0');
+                      const fmt = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                      return (
+                        <span style={{ fontSize: 10, color: '#475569', fontFamily: 'monospace', whiteSpace: 'nowrap', paddingTop: 2, flexShrink: 0 }}>
+                          {fmt}
+                        </span>
+                      );
+                    })()}
                   </div>
-
-                  {/* 제목: 장애 ID까지만 표시 */}
-                  <p style={{
-                    fontSize: 14,
-                    fontWeight: 800,
-                    color: !item.is_read ? '#fff' : '#64748b',
-                    marginBottom: bodyText ? 10 : 0,
-                    lineHeight: 1.4,
-                  }}>
-                    {cleanTitle(item.title)}
-                  </p>
 
                   {/* 문자 본문 - received_messages에서 조인된 내용 */}
                   {bodyText && (

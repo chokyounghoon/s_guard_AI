@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity, ChevronLeft, RefreshCw, CheckCircle2,
-  ChevronRight, Loader2, Search, CalendarDays
+  ChevronRight, Loader2, Search, CalendarDays, Bot
 } from 'lucide-react';
 import { getAccessToken } from '../../lib/authStore';
 import PullToRefresh from '../components/PullToRefresh';
@@ -27,7 +27,7 @@ const formatDate = (ts) => {
   return label;
 };
 
-export default function MobileActivity({ user }) {
+export default function MobileActivity({ user, onAiClick }) {
   const navigate = useNavigate();
   const [rawLogs, setRawLogs] = useState([]);
   const [sections, setSections] = useState([]);
@@ -104,6 +104,11 @@ export default function MobileActivity({ user }) {
             </div>
             <p className="text-[11px] text-slate-500">최근 50건 처리 내역</p>
           </div>
+          {onAiClick && (
+            <button onClick={onAiClick} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+              <Bot className="w-4 h-4 text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.4)]" />
+            </button>
+          )}
           <button onClick={() => fetchLogs(true)} disabled={refreshing}
             className="p-2 rounded-full hover:bg-white/10 transition-colors">
             <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />

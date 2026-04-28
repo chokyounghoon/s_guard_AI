@@ -1,10 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Inbox, MessageSquare, Plus, Activity } from 'lucide-react';
+import { LayoutDashboard, FileText, MessageSquare, Plus, Activity } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/dashboard',      icon: LayoutDashboard, label: '대시보드' },
-  { path: '/inbox',          icon: Inbox,            label: '인박스'    },
+  { path: '/inbox',          icon: FileText,         label: 'Report'    },
   { path: '/incident-push',  icon: Plus,             label: '장애접수', accent: true },
   { path: '/chat',           icon: MessageSquare,    label: 'War-Room'  },
   { path: '/activity',       icon: Activity,         label: '처리현황'  },

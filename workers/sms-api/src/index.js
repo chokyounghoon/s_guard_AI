@@ -196,7 +196,10 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/warroom/ws/') ||     // ⚡ WebSocket 업그레이드 — 브라우저 SDK 전용 (헤더 불가)
     path.startsWith('/debug/') ||
     path === '/org/tree' ||                // 조직도 공개 참조 데이터 (프로필 편집용)
-    path.startsWith('/codebook');          // 코드북 공개 참조 데이터
+    path === '/sms/shortcut/keywords' ||   // ⚡ iPhone 단축어 전용 (userId 기반 조회)
+    path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
+    path.startsWith('/codebook') ||
+    path.startsWith('/sms/');              // ⚡ SMS 원문 조회 경로 (Public 허용)
     
   if (isPublic) {
     console.log(`[Auth-Pass] Public access to: ${path}`);
@@ -223,8 +226,9 @@ const authMiddleware = async (c, next) => {
     return c.json({ detail: '유효하지 않거나 만료된 토큰입니다.', code: 'AUTH_INVALID_TOKEN' }, 401);
   }
 
-  // 사용자 정보를 context에 저장
-  c.set('user', payload);
+  // 사용자 정보를 context에 저장 (JWT의 sub를 employee_id로 매핑하여 호환성 유지)
+  const userObj = { ...payload, employee_id: payload.employee_id || payload.sub };
+  c.set('user', userObj);
   await next();
 };
 
@@ -279,6 +283,23 @@ app.post('/auth/push-unsubscribe', async (c) => {
   }
 });
 
+app.post('/auth/push-test', async (c) => {
+  const user = c.get('user');
+  const userId = user?.employee_id;
+  if (!userId) return c.json({ error: 'Auth required' }, 401);
+
+  const payload = {
+    title: '[S-Guard] Push Test ✅',
+    body: `테스트 알림이 정상적으로 수신되었습니다.\n시각: ${new Date().toLocaleTimeString()}`,
+    priority: 100,
+    tag: 'test-push',
+    url: '/push-diagnostic'
+  };
+
+  const results = await sendPushNotification(c, userId, payload);
+  return c.json({ success: true, target: userId, results });
+});
+
 // Utility for KST Timestamp
 const getKst = () => {
   const now = new Date()
@@ -289,7 +310,7 @@ const getKst = () => {
 // 🔔 PUSH: Web Push Notification Helper
 const sendPushNotification = async (c, userId, payload) => {
   const db = c.env.DB;
-  if (!db) return;
+  if (!db) return [];
 
   const vapidPublicKey = c.env.VAPID_PUBLIC_KEY;
   const vapidPrivateKey = c.env.VAPID_PRIVATE_KEY;
@@ -297,14 +318,16 @@ const sendPushNotification = async (c, userId, payload) => {
 
   if (!vapidPublicKey || !vapidPrivateKey) {
     console.error('[Push] VAPID keys missing in environment secrets.');
-    return;
+    return [{ error: 'VAPID keys missing' }];
   }
 
+  const results = [];
   try {
-    // 1. Get user's active subscriptions
     const subscriptions = await db.prepare("SELECT * FROM push_subscriptions WHERE user_id = ?").bind(userId).all();
     
-    if (!subscriptions.results || subscriptions.results.length === 0) return;
+    if (!subscriptions.results || subscriptions.results.length === 0) {
+      return [{ error: 'No subscriptions found for user' }];
+    }
 
     for (const sub of subscriptions.results) {
       try {
@@ -332,19 +355,34 @@ const sendPushNotification = async (c, userId, payload) => {
           body: pushPayload.body
         });
 
+        results.push({
+          endpoint: sub.endpoint.substring(0, 30) + '...',
+          status: response.status,
+          ok: response.ok
+        });
+
         if (response.status === 410 || response.status === 404) {
-          // Subscription expired or invalid -> Remove from DB
           await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(sub.endpoint).run();
-          console.log(`[Push] Removed expired subscription: ${sub.endpoint}`);
         }
       } catch (err) {
-        console.error(`[Push] Failed to send to ${sub.endpoint}:`, err.message);
+        results.push({ endpoint: sub.endpoint.substring(0, 30) + '...', error: err.message });
       }
     }
   } catch (e) {
-    console.error('[Push] Database error:', e.message);
+    results.push({ error: 'DB Error: ' + e.message });
   }
+  return results;
 };
+
+// 🛰️ Debug: Push Subscriptions Check
+app.get('/debug/push-subscriptions', async (c) => {
+  const pass = c.req.query('pass');
+  if (pass !== 'verify') return c.json({ error: 'Unauthorized' }, 401);
+  
+  const db = c.env.DB;
+  const { results } = await db.prepare("SELECT user_id, endpoint, mod_dt FROM push_subscriptions").all();
+  return c.json({ count: results.length, subscriptions: results });
+});
 
 // 🚀 Database One-time Migration Endpoint (Phase 4: Governance & Bypass)
 app.get('/debug/db-init', async (c) => {
@@ -417,7 +455,7 @@ app.get('/debug/db-init', async (c) => {
     { name: 'voter_count',    type: 'INTEGER DEFAULT 0' },
     { name: 'audit_log',      type: 'TEXT' },
     // 누락 컬럼 (기존 DB에 없어서 INSERT 시 오류 발생)
-    { name: 'inc_id',           type: 'TEXT' },
+    { name: 'incident_id',      type: 'TEXT' },
     { name: 'vector_id',        type: 'TEXT' },
     { name: 'error_category',   type: 'TEXT' },
     { name: 'user_correction',  type: 'TEXT' },
@@ -528,7 +566,7 @@ app.get('/debug/db-init', async (c) => {
       CREATE TABLE IF NOT EXISTS ai_feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
-        inc_id TEXT,
+        incident_id TEXT,
         vector_id TEXT,
         query TEXT NOT NULL,
         answer TEXT NOT NULL,
@@ -589,6 +627,29 @@ app.get('/debug/db-init', async (c) => {
 
   // knowledge_feedback 컬럼 확장
   try { await db.prepare("ALTER TABLE ai_feedback ADD COLUMN point_awarded BOOLEAN DEFAULT FALSE").run(); } catch(e) {}
+
+  // 🔐 Security: Create login_history table if not exists
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS login_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        email TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        status TEXT,
+        login_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+        reg_id TEXT DEFAULT 'SYSTEM',
+        reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        mod_id TEXT DEFAULT 'SYSTEM',
+        mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    results.push({ table: 'login_history', status: 'Created or verified' });
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_login_history_user_id ON login_history(user_id)").run();
+  } catch (e) {
+    results.push({ table: 'login_history', status: 'Error', error: e.message });
+  }
 
   return c.json({ 
     message: 'Phase 18 Leadboard Infrastructure Ready', 
@@ -792,6 +853,7 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
           values: messageVector,
           metadata: {
             inc_id: String(sms_id),
+            title: `[과거 장애] ${cleanedMessage.substring(0, 30)}...`,
             sender: sms.sender || 'Unknown',
             timestamp: sms.timestamp,
             text: cleanedMessage.substring(0, 500),
@@ -899,38 +961,47 @@ ${detailedInfo}`;
     let resultData = null;
 
     if (similarityScore !== undefined && similarityScore !== null) {
-      // 🚀 Dynamic Threshold Selection from DB
-      let technicalThreshold = 0.85;
-      let casualThreshold = 0.95;
-      
+      // 🚀 Dynamic config from DB: similarity thresholds + alert thresholds
+      let technicalThreshold = 0.85, casualThreshold = 0.95;
+      let alertCriticalCount = 100, alertMajorCount = 51; // 안전한 기본값 (높게)
+
       try {
-        const configs = await db.prepare("SELECT config_key, config_value FROM system_config WHERE config_key IN ('similarity_threshold_technical', 'similarity_threshold_casual')").all();
+        const configs = await db.prepare(
+          "SELECT config_key, config_value FROM system_config WHERE config_key IN ('similarity_threshold_technical','similarity_threshold_casual','alert_critical_error_count','alert_major_error_count')"
+        ).all();
         configs.results.forEach(c => {
           if (c.config_key === 'similarity_threshold_technical') technicalThreshold = parseFloat(c.config_value);
-          if (c.config_key === 'similarity_threshold_casual') casualThreshold = parseFloat(c.config_value);
+          if (c.config_key === 'similarity_threshold_casual')    casualThreshold    = parseFloat(c.config_value);
+          if (c.config_key === 'alert_critical_error_count')     alertCriticalCount = parseFloat(c.config_value);
+          if (c.config_key === 'alert_major_error_count')        alertMajorCount    = parseFloat(c.config_value);
         });
       } catch (ce) {
         console.error("[Config] Failed to fetch live thresholds, using defaults.", ce);
       }
-      
+
+      // 🚨 Severity: occurrence_count vs alert-monitor 임계값
+      const occCount = Number(sms.occurrence_count) || 1;
+      const alertSeverity =
+        occCount >= alertCriticalCount ? 'CRITICAL' :
+        occCount >= alertMajorCount    ? 'MAJOR'    : 'NORMAL';
+      console.log(`[severity] occ=${occCount} critThr=${alertCriticalCount} majThr=${alertMajorCount} → ${alertSeverity}`);
+
       const effectiveThreshold = isTechnicalSignal ? technicalThreshold : casualThreshold;
 
       if (similarityScore >= effectiveThreshold && matchedContent) {
         fullOutput = `[지능형 지식 활용] 유사도(${(similarityScore * 100).toFixed(1)}%)가 매우 높음\n\n### ${matchedTitle}\n\n` + matchedContent;
-        
         const rationalePrefix = isTechnicalSignal ? "지능형 장애 지식 매칭" : "고정명 정합 매칭";
         const reasonToSave = similarityReason || rationalePrefix;
 
         await db.prepare(`
           INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
-          VALUES (?, ?, 'INFO', 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
-          ON CONFLICT(inc_id) DO UPDATE SET 
-            content=excluded.content, 
-            mod_dt=excluded.mod_dt, 
-            similarity_score=excluded.similarity_score,
-            similarity_reason=excluded.similarity_reason
-        `).bind(String(sms_id), fullOutput, now, now, similarityScore ?? 0, reasonToSave).run();
-        
+          VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
+          ON CONFLICT(inc_id) DO UPDATE SET
+            content=excluded.content, mod_dt=excluded.mod_dt, severity=excluded.severity,
+            similarity_score=COALESCE(excluded.similarity_score, autopilot_insight.similarity_score),
+            similarity_reason=COALESCE(excluded.similarity_reason, autopilot_insight.similarity_reason)
+        `).bind(String(sms_id), fullOutput, alertSeverity, now, now, similarityScore ?? null, reasonToSave).run();
+
       } else {
         resultStatus = 1; // Mark for Dify fallback
       }
@@ -1031,25 +1102,21 @@ ${detailedInfo}`;
 
       // 💾 Persist Result to Insight (outside branch)
       if (fullOutput) {
-        const severity = fullOutput.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
         const difyReason = "S-Guard AI 자체 분석 (임계값 미달)";
-        
         await db.prepare(`
           INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
           VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
-          ON CONFLICT(inc_id) DO UPDATE SET 
-            content=excluded.content, 
-            mod_dt=excluded.mod_dt, 
-            similarity_score=excluded.similarity_score,
-            similarity_reason=excluded.similarity_reason
-        `).bind(String(sms_id), fullOutput, severity, now, now, similarityScore ?? 0, difyReason).run();
-        
-        // Mark as analyzed successfully
+          ON CONFLICT(inc_id) DO UPDATE SET
+            content=excluded.content, mod_dt=excluded.mod_dt,
+            similarity_score=COALESCE(excluded.similarity_score, autopilot_insight.similarity_score),
+            similarity_reason=COALESCE(excluded.similarity_reason, autopilot_insight.similarity_reason)
+        `).bind(String(sms_id), fullOutput, alertSeverity ?? 'NORMAL', now, now, similarityScore ?? null, difyReason).run();
         await db.prepare("UPDATE received_messages SET status = 'ANALYZED' WHERE inc_id = ?").bind(String(sms_id)).run();
       } else {
         // Specific Error Hints based on status
         let errorMsg = FALLBACK_MSG;
         let errorReason = "분석 중 알수없는 오류";
+
 
         if (resultStatus === 401) {
           errorMsg = "🤖 AI 엔진 인증 오류: Dify API Key를 확인해 주세요. (워크플로우 HTTP 노드의 인증 설정도 확인이 필요합니다)";
@@ -1078,45 +1145,7 @@ ${detailedInfo}`;
       }
     }
 
-    // 🔔 🚀 PUSH TRIGGER: Notify Team and Assignees
-    try {
-      const smsData = await db.prepare("SELECT sender, message, employee_id, biz_system, service_name FROM received_messages WHERE inc_id = ?").bind(String(sms_id)).first();
-      if (smsData) {
-        // 1. Get recipients: Team members + Explicit Assignees
-        // Priority Score Logic: Include in payload for SW vibration logic
-        const pushPayload = {
-          title: `[S-Guard] 장애 알림: ${smsData.service_name || smsData.biz_system || '신규 사건'}`,
-          body: smsData.message ? (smsData.message.length > 50 ? smsData.message.substring(0, 50) + '...' : smsData.message) : '새로운 장애가 접수되었습니다.',
-          inc_id: String(sms_id),
-          priority: similarityScore || 0, // Using similarity/priority score
-          url: `/mobile/incident/${sms_id}`
-        };
-
-        // Fetch users in the same team as the sender
-        const { results: teamMembers } = await db.prepare(`
-          SELECT employee_id FROM users 
-          WHERE part = (SELECT part FROM users WHERE employee_id = ?) 
-          AND is_active = 1
-        `).bind(smsData.employee_id).all();
-
-        // Fetch explicitly assigned users
-        const { results: assignees } = await db.prepare(`
-          SELECT user_id as employee_id FROM incident_assignments 
-          WHERE inc_id = ? OR inc_id = ?
-        `).bind(String(sms_id), String(sms_id).replace('INC-', '')).all();
-
-        const allRecipients = new Set([
-          ...teamMembers.map(u => u.employee_id),
-          ...assignees.map(u => u.employee_id)
-        ]);
-
-        for (const recipientId of allRecipients) {
-          c.executionCtx.waitUntil(sendPushNotification(c, recipientId, pushPayload));
-        }
-      }
-    } catch (pushErr) {
-      console.error('[Push-Trigger] Failed to send notifications:', pushErr.message);
-    }
+    // 🔔 Push는 /sms/receive 라우트에서 이미 처리됨 — 여기서는 중복 발송 방지를 위해 스킵
 
     if (kv) await kv.delete(lockKey);
   } catch (err) {
@@ -1384,16 +1413,19 @@ const verifyJWT = async (token, secret) => {
 // ──────────────────────────────────────────
 app.post('/auth/verify', async (c) => {
   try {
-  const { employee_id, otp, password, mode, consent_personal_info, consent_third_party_ai } = await c.req.json();
-  const db  = c.env.DB;
-  const kv  = c.env.SMS_STORAGE;
+  const { employee_id: rawEmpId, otp, password, mode, consent_personal_info, consent_third_party_ai } = await c.req.json();
+  const empId = String(rawEmpId || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim();
+  const db = c.env.DB;
   const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+  const now = getKst();
+  
+  console.log(`[Auth-Verify-Debug] Verifying user: ${empId}, Mode: ${mode}`);
+  const kv  = c.env.SMS_STORAGE;
 
-  if (!employee_id || !otp) {
-    console.error('[Auth-Verify-Fail] Missing employee_id or otp:', { employee_id: !!employee_id, otp: !!otp });
+  if (!empId || !otp) {
+    console.error('[Auth-Verify-Fail] Missing employee_id or otp:', { employee_id: !!empId, otp: !!otp });
     return c.json({ detail: '사번과 인증번호는 필수입니다.', code: 'E1' }, 400);
   }
-  const empId = String(employee_id).trim();
 
   // 🛡️ Rate Limiting: 인증 시도 보호 (1분당 5회 제한)
   if (kv) {
@@ -1437,7 +1469,6 @@ app.post('/auth/verify', async (c) => {
     return c.json({ detail: '사용이 중지된 계정입니다.', code: 'SUSPENDED' }, 403);
   }
 
-  const now   = getKst();
   const token = `sguard-token-${empId}`;
 
   // 3. 신규 사용자 — 비밀번호 설정 + ACTIVE 전환
@@ -1473,6 +1504,18 @@ app.post('/auth/verify', async (c) => {
     const ok = await verifyPassword(password, user.password_hash);
     if (!ok) {
       await db.prepare("UPDATE users SET failed_attempts=failed_attempts+1 WHERE employee_id=?").bind(empId).run();
+      // 🔐 로그인 실패 기록
+      try {
+        const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+        const ua = c.req.header('User-Agent') || 'unknown';
+        await db.prepare(
+          `INSERT INTO login_history 
+           (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
+           VALUES (?, ?, ?, ?, 'FAILURE', DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'))`
+        ).bind(empId, user.email || '', ip, ua).run();
+      } catch (err) {
+        console.error(`[Auth-Verify-Error] Failed to record login failure:`, err.message);
+      }
       return c.json({ detail: '비밀번호가 올바르지 않습니다.', code: 'WRONG_PASSWORD' }, 401);
     }
     await db.prepare(`
@@ -1511,11 +1554,47 @@ app.post('/auth/verify', async (c) => {
     console.warn('[Session-Warning] Proceeding without refresh token due to DB error.');
   }
 
+  // 🔐 로그인 성공 기록 (Success path for /auth/verify)
+  try {
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    const ua = c.req.header('User-Agent') || 'unknown';
+    const kstNow = getKst();
+    
+    await db.prepare(
+      `INSERT INTO login_history 
+       (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
+       VALUES (?, ?, ?, ?, 'SUCCESS', ?, ?, ?)`
+    ).bind(empId, updated.email || '', ip, ua, kstNow, kstNow, kstNow).run();
+
+    console.log(`[Auth-Verify] Login history recorded for user: ${empId}`);
+  } catch (historyErr) {
+    console.error(`[Auth-Verify-History-Error] Failed to record login history for ${empId}:`, historyErr.message);
+  }
+
   return c.json({
     ok: true,
     token,                          // 하위 호환성 유지
     access_token:    jwt,           // 🔒 신규: 메모리 저장용 Access Token
     ghost_token:     refreshToken,  // 👻 신규: 장기 세션용
+    user: {
+      id:              empId,
+      employee_id:     empId,
+      email:           updated.email,
+      name:            updated.name,
+      role:            updated.role,
+      company:         updated.company,
+      honbu:           updated.honbu,
+      team:            updated.team,
+      part:            updated.part,
+      subpart:         updated.subpart,
+      phone:           updated.phone,
+      position:        updated.position,
+      is_admin:        updated.is_admin || 0,
+      status:          updated.status,
+      profile_picture: updated.profile_picture,
+      terms_agreed_at: updated.terms_agreed_at,
+    },
+    // 하위 호환성: 최상위 레벨 필드도 유지
     id:              empId,
     employee_id:     empId,
     email:           updated.email,
@@ -1524,10 +1603,14 @@ app.post('/auth/verify', async (c) => {
     company:         updated.company,
     honbu:           updated.honbu,
     team:            updated.team,
+    part:            updated.part,
+    subpart:         updated.subpart,
+    phone:           updated.phone,
     position:        updated.position,
     is_admin:        updated.is_admin || 0,
     status:          updated.status,
     profile_picture: updated.profile_picture,
+    terms_agreed_at: updated.terms_agreed_at,
     });
   } catch (err) {
     console.error('[auth/verify] Fatal Error:', err.message);
@@ -1593,18 +1676,31 @@ app.post('/auth/set-password', async (c) => {
     company: updated.company,
     honbu: updated.honbu,
     team: updated.team,
+    part: updated.part,
+    subpart: updated.subpart,
+    phone: updated.phone,
     position: updated.position,
     is_admin: updated.is_admin || 0,
     status: 'ACTIVE',
     profile_picture: updated.profile_picture,
-    terms_agreed_at: updated.terms_agreed_at // ⚖️ Phase 19 fix
+    terms_agreed_at: updated.terms_agreed_at
   });
 });
 
 app.post('/auth/login', async (c) => {
-  const { email, password } = await c.req.json()
-  const db = c.env.DB
+  const { email, employee_id: rawEmpId, password } = await c.req.json();
+  const db = c.env.DB;
   
+  // 🛡️ 로그인 식별자 정제 (email 또는 employee_id 둘 다 지원)
+  const loginId = (email || rawEmpId || '').trim();
+  const cleanEmpId = String(rawEmpId || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim();
+  
+  console.log(`[Auth-Login-Debug] Login attempt for: ${loginId} (Cleaned ID: ${cleanEmpId})`);
+
+  if (!loginId || !password) {
+    return c.json({ detail: "이메일(또는 사번)과 비밀번호를 입력해 주세요.", code: 'MISSING_CREDENTIALS' }, 400);
+  }
+
   // Find user by email or employee_id (Get status to check)
   const user = await db.prepare(`
     SELECT 
@@ -1620,9 +1716,9 @@ app.post('/auth/login', async (c) => {
     LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
     LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
     LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
-    WHERE (u.email = ? OR u.employee_id = ?)
+    WHERE (u.email = ? OR u.employee_id = ? OR u.employee_id = ?)
   `)
-    .bind(email, email)
+    .bind(loginId, loginId, cleanEmpId)
     .first()
 
   if (!user) {
@@ -1648,11 +1744,17 @@ app.post('/auth/login', async (c) => {
   if (!user.password_hash || !(await verifyPassword(password, user.password_hash))) {
     await db.prepare("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE employee_id = ?").bind(user.employee_id).run();
     // 🔐 로그인 실패 기록
-    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
-    const ua = c.req.header('User-Agent') || 'unknown';
-    await db.prepare(
-      "INSERT INTO login_history (user_id, email, ip_address, user_agent, status) VALUES (?, ?, ?, ?, 'FAILURE')"
-    ).bind(user.employee_id, user.email, ip, ua).run().catch(() => {});
+    try {
+      const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+      const ua = c.req.header('User-Agent') || 'unknown';
+      await db.prepare(
+        `INSERT INTO login_history 
+         (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
+         VALUES (?, ?, ?, ?, 'FAILURE', DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'))`
+      ).bind(user.employee_id, user.email || '', ip, ua).run();
+    } catch (err) {
+      console.error(`[Auth-Error] Failed to record login failure:`, err.message);
+    }
     return c.json({ detail: "이메일(또는 사번) 또는 비밀번호가 올바르지 않습니다.", code: 'AUTH_WRONG_PASSWORD' }, 401);
   }
 
@@ -1660,11 +1762,12 @@ app.post('/auth/login', async (c) => {
   
   // 1. Access Token 생성 (15분)
   const jwt = await generateJWT({
-    sub:      user.employee_id,
-    name:     user.name,
-    role:     user.role,
-    is_admin: user.is_admin || 0,
-    company:  user.company,
+    sub:         user.employee_id,
+    employee_id: user.employee_id,
+    name:        user.name,
+    role:        user.role,
+    is_admin:    user.is_admin || 0,
+    company:     user.company,
   }, jwtSecret, 1800); // ⚡ Increased to 30 minutes (1800s)
   
   // 2. Refresh Token 생성 및 저장
@@ -1682,11 +1785,26 @@ app.post('/auth/login', async (c) => {
   }
 
   // 🔐 로그인 성공 기록
-  const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
-  const ua = c.req.header('User-Agent') || 'unknown';
-  await db.prepare(
-    "INSERT INTO login_history (user_id, email, ip_address, user_agent, status) VALUES (?, ?, ?, ?, 'SUCCESS')"
-  ).bind(user.employee_id, user.email, ip, ua).run().catch(() => {});
+  try {
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    const ua = c.req.header('User-Agent') || 'unknown';
+    
+    // 1. History Insert (KST 보정)
+    const kstNow = getKst();
+    await db.prepare(
+      `INSERT INTO login_history 
+       (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
+       VALUES (?, ?, ?, ?, 'SUCCESS', ?, ?, ?)`
+    ).bind(user.employee_id, user.email || '', ip, ua, kstNow, kstNow, kstNow).run();
+
+    // 2. Update Last Login Time
+    await db.prepare("UPDATE users SET last_login_at = ?, failed_attempts = 0 WHERE employee_id = ?")
+      .bind(kstNow, user.employee_id).run();
+      
+    console.log(`[Auth] Login success and history recorded for user: ${user.employee_id}`);
+  } catch (err) {
+    console.error(`[Auth-Critical-Error] Failed to record login history for ${user.employee_id}:`, err.message);
+  }
 
   return c.json({ 
     ok: true, 
@@ -1770,6 +1888,15 @@ app.get('/auth/refresh', async (c) => {
 
     if (!user || user.status !== 'ACTIVE') {
       return c.json({ error: 'User inactive or not found', code: 'USER_INACTIVE' }, 403);
+    }
+
+    // 🔄 세션 갱신 시 마지막 로그인 시간만 업데이트 (login_history 기록 제외)
+    try {
+      const kstNow = getKst();
+      await db.prepare("UPDATE users SET last_login_at = ?, failed_attempts = 0 WHERE employee_id = ?")
+        .bind(kstNow, user.employee_id).run();
+    } catch (e) {
+      console.error(`[Auth-Refresh] Failed to update last_login_at for ${user.employee_id}:`, e.message);
     }
 
     // 4. 새 Access Token 발급
@@ -1900,6 +2027,20 @@ app.post('/auth/signup', async (c) => {
 
   const userId = res.meta.last_row_id
   console.log('[Signup Success] New user ID:', userId);
+
+  // 🔐 회원가입 성공 이력 기록
+  try {
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    const ua = c.req.header('User-Agent') || 'unknown';
+    const kstNow = getKst();
+    await db.prepare(
+      `INSERT INTO login_history 
+       (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
+       VALUES (?, ?, ?, ?, 'SIGNUP_SUCCESS', ?, ?, ?)`
+    ).bind(cleanEmpId, email || '', ip, ua, kstNow, kstNow, kstNow).run();
+  } catch (e) {
+    console.error(`[Signup-History-Error] Failed to log signup for ${cleanEmpId}:`, e.message);
+  }
 
   return c.json({ 
     status: "success", 
@@ -2208,17 +2349,37 @@ app.get('/users/:id', async (c) => {
   if (!user) return c.json({ detail: "User not found" }, 404)
   return c.json(user)
 })
-
 app.patch('/auth/profile', async (c) => {
-  const db = c.env.DB
-  const { user_id, name, phone, company, honbu, team, part, subpart, profile_picture } = await c.req.json()
-  const modDt = getKst()
+  const body = await c.req.json()
+  const { user_id, employee_id, name, phone, company, honbu, team, part, subpart, profile_picture } = body
+  console.log('[Auth-Profile-Debug] Received Profile Update:', JSON.stringify(body))
   
-  const empId = user_id // user_id is now already the employee_id
+  const targetId = String(user_id || employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
+  if (!targetId) return c.json({ error: "Missing ID" }, 400)
+  
+  const modDt = getKst()
+  const db = c.env.DB
+  
+  // 🛡️ SECURITY: Prevent overwriting with null/empty if fields are missing in JSON
+  // Only update fields that are explicitly provided (not undefined)
+  // To explicitly clear a field, it should be passed as null or "" (depending on preference)
+  // Here we use COALESCE in SQL or logic in JS to keep existing values.
+  
+  const existing = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(targetId).first()
+  if (!existing) return c.json({ detail: "User not found" }, 404)
+
+  const finalName    = name !== undefined ? name : existing.name
+  const finalPhone   = phone !== undefined ? phone : existing.phone
+  const finalCompany = company !== undefined ? company : existing.company
+  const finalHonbu   = honbu !== undefined ? honbu : existing.honbu
+  const finalTeam    = team !== undefined ? team : existing.team
+  const finalPart    = part !== undefined ? part : existing.part
+  const finalSubpart = subpart !== undefined ? subpart : existing.subpart
+  const finalPic     = profile_picture !== undefined ? profile_picture : existing.profile_picture
 
   await db.prepare(
-    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, profile_picture = COALESCE(?, profile_picture), mod_dt = ?, mod_id = ? WHERE employee_id = ?"
-  ).bind(name, phone || null, company || null, honbu || null, team || null, part || null, subpart || null, profile_picture !== undefined ? profile_picture : null, modDt, empId, user_id).run()
+    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, profile_picture = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
+  ).bind(finalName, finalPhone, finalCompany, finalHonbu, finalTeam, finalPart, finalSubpart, finalPic, modDt, targetId, targetId).run()
   
   const updated = await db.prepare(`
     SELECT 
@@ -2235,7 +2396,7 @@ app.patch('/auth/profile', async (c) => {
     LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
     LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
     WHERE u.employee_id = ?
-  `).bind(user_id).first()
+  `).bind(targetId).first()
   return c.json({ status: "success", user: updated })
 })
 
@@ -2526,7 +2687,33 @@ function extractOccurrence(occStr) {
 }
 
 app.post('/sms/receive', async (c) => {
-  const body = await c.req.json()
+  // 🛡️ 강화된 Body 파싱: JSON / form-data / text 모두 수용
+  let body = {};
+  try {
+    const contentType = c.req.header('content-type') || '';
+    if (contentType.includes('application/json')) {
+      body = await c.req.json();
+    } else if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await c.req.formData();
+      for (const [key, value] of formData.entries()) {
+        body[key] = value;
+      }
+    } else {
+      // fallback: raw text 또는 JSON 시도
+      const rawText = await c.req.text();
+      try {
+        body = JSON.parse(rawText);
+      } catch {
+        // plain text → message 필드로 처리
+        body = { message: rawText };
+        console.warn('[sms/receive] Non-JSON body received, treated as plain message. Content-Type:', contentType);
+      }
+    }
+  } catch (parseErr) {
+    console.error('[sms/receive] Body parse failed:', parseErr.message);
+    return c.json({ error: 'Invalid request body', detail: parseErr.message }, 400);
+  }
+
   let { 
     sender, message, employee_id, 
     channel: bodyChannel, if_id: bodyIfId, service_code: bodyServiceCode, service_name: bodyServiceName, 
@@ -2534,10 +2721,24 @@ app.post('/sms/receive', async (c) => {
     occurrence_node: bodyOccurrenceNode, error_message: bodyErrorMessage, occurrence_time: bodyOccurrenceTime, received_at 
   } = body
 
-  // 🛡️ Global Sanitize: Strip "[Web발신]" prefix immediately
-  if (message) {
-    message = message.replace(/\[Web발신\]/g, '').trim();
+  // 🛡️ 메시지 필수 검증
+  if (!message || !String(message).trim()) {
+    console.warn(`[sms/receive] Empty message from sender=${sender}, employee_id=${employee_id}`);
+    return c.json({ error: 'message is required and cannot be empty' }, 400);
   }
+  message = String(message).trim();
+
+  // 🛡️ Global Sanitize: Strip "[Web발신]", "[MMS]", "[SMS]" 등 접두어 제거
+  message = message
+    .replace(/\[Web발신\]/g, '')
+    .replace(/\[MMS\]/gi, '')
+    .replace(/\[SMS\]/gi, '')
+    .replace(/\[LMS\]/gi, '')
+    .trim();
+
+  // 📊 수신 로그 (단문/장문 구분)
+  const msgType = message.length > 90 ? 'LMS/MMS' : 'SMS';
+  console.log(`[sms/receive] ${msgType} received | len=${message.length} | sender=${sender} | employee_id=${employee_id} | ct=${c.req.header('content-type') || 'none'}`);
 
 
   // 🚀 Phase 14: Universal Entity Extraction (MCI / Batch / Generic)
@@ -2702,18 +2903,49 @@ app.post('/sms/receive', async (c) => {
         if (normalizedReceivers.length > 0) {
             const placeholders = normalizedReceivers.map(() => '?').join(',');
             try {
-                const result = await db.prepare(`
-                    INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
-                    SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?, ?, ?, ?, ?
-                    FROM users u_source
-                    JOIN users u_target ON u_source.company = u_target.company AND u_source.team = u_target.team
-                    WHERE u_source.is_active = 1
-                      AND u_target.is_active = 1
-                      AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
-                `).bind(existing.inc_id, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp, ...normalizedReceivers, ...normalizedReceivers).run();
-                console.log(`[Assignment] Bulk assignment completed for ${existing.inc_id}. Changes: ${result.meta.changes}`);
+                // 1. 송신자의 조직 및 직급 정보 조회
+                const u_sender = await db.prepare("SELECT company, honbu, team, part, subpart, position FROM users WHERE employee_id = ?").bind(employee_id).first();
+                
+                if (u_sender) {
+                    let scopeFilter = "";
+                    let scopeArgs = [existing.inc_id, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp, u_sender.company];
+
+                    if (u_sender.position >= 'POS_004') {
+                        // 본부장 이상: 본부 전체
+                        scopeFilter = "AND u_target.honbu = ?";
+                        scopeArgs.push(u_sender.honbu);
+                    } else if (u_sender.position === 'POS_003') {
+                        // 팀장: 팀 전체
+                        scopeFilter = "AND u_target.honbu = ? AND u_target.team = ?";
+                        scopeArgs.push(u_sender.honbu, u_sender.team);
+                    } else if (u_sender.position === 'POS_002') {
+                        // 파트장: 파트 전체
+                        scopeFilter = "AND u_target.honbu = ? AND u_target.team = ? AND u_target.part = ?";
+                        scopeArgs.push(u_sender.honbu, u_sender.team, u_sender.part);
+                    } else {
+                        // 일반 팀원: 서브파트 전체
+                        scopeFilter = "AND u_target.honbu = ? AND u_target.team = ? AND u_target.part = ? AND (u_target.subpart = ? OR (u_target.subpart IS NULL AND ? IS NULL))";
+                        scopeArgs.push(u_sender.honbu, u_sender.team, u_sender.part, u_sender.subpart, u_sender.subpart);
+                    }
+                    
+                    // Mentioned receivers filter
+                    scopeArgs.push(...normalizedReceivers, ...normalizedReceivers);
+
+                    const result = await db.prepare(`
+                        INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+                        SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?, ?, ?, ?, ?
+                        FROM users u_source
+                        JOIN users u_target ON u_source.company = u_target.company AND u_source.team = u_target.team
+                        WHERE u_source.is_active = 1
+                          AND u_target.is_active = 1
+                          AND u_target.company = ?
+                          ${scopeFilter}
+                          AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
+                    `).bind(...scopeArgs).run();
+                    console.log(`[Assignment] Rank-based bulk assignment completed for ${existing.inc_id}. Changes: ${result.meta.changes}`);
+                }
             } catch (assignError) {
-                console.error(`[Assignment] Error in bulk assignment for ${existing.inc_id}:`, assignError);
+                console.error(`[Assignment] Error in rank-based bulk assignment for ${existing.inc_id}:`, assignError);
             }
         }
     } else {
@@ -2722,6 +2954,35 @@ app.post('/sms/receive', async (c) => {
 
     // Trigger AI background processing if not already handled
     c.executionCtx.waitUntil(performBackgroundAiAnalysis(existing.inc_id, c.env).catch(e => console.error(e)));
+
+    // 🔔 즉시 푸시 - 중복 수신 시에도 본인 + 모든 담당자에게 일괄 전송
+    const dupPushPayload = {
+      title: `[S-GUARD] 🔁 반복 장애 알림 (×${newCount})`,
+      body: `📋 장애ID: ${existing.inc_id}\n${(message || '').length > 60 ? message.substring(0, 60) + '…' : (message || '내용 없음')}`,
+      inc_id: String(existing.inc_id),
+      priority: 70,
+      url: `/inbox`,
+      tag: `inc-${existing.inc_id}`
+    };
+
+    c.executionCtx.waitUntil((async () => {
+      try {
+        // 1. 수신 사번 본인 전송
+        if (employee_id) {
+          await sendPushNotification(c, employee_id, dupPushPayload).catch(e => console.error('[Push-Self-Dup]', e));
+        }
+        // 2. 담당자 전원 전송
+        const { results: assignees } = await db.prepare(
+          "SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ?"
+        ).bind(existing.inc_id).all();
+        if (assignees && assignees.length > 0) {
+          const pushPromises = assignees
+            .filter(a => a.user_id !== employee_id)
+            .map(a => sendPushNotification(c, a.user_id, dupPushPayload).catch(e => console.error(`[Push-Assignee-Dup:${a.user_id}]`, e)));
+          await Promise.allSettled(pushPromises);
+        }
+      } catch (e) { console.error('[Push-Broadcast-Dup] Error:', e.message); }
+    })());
 
     return c.json({ status: 'duplicate_incremented', inc_id: existing.inc_id, received_count: newCount })
   }
@@ -2777,26 +3038,86 @@ app.post('/sms/receive', async (c) => {
     tags, category
   ).run()
 
-  // --- 🚀 NEW: Automatic Assignment by Sender's Part (New Path) ---
+  // --- 🚀 NEW: Automatic Assignment by Sender's Rank (New Path) ---
   if (employee_id) {
      try {
-         const senderUser = await db.prepare("SELECT part FROM users WHERE employee_id = ?").bind(employee_id).first();
-         if (senderUser && senderUser.part) {
-             const { results: partUsers } = await db.prepare("SELECT employee_id FROM users WHERE part = ?").bind(senderUser.part).all();
-             if (partUsers && partUsers.length > 0) {
-                 for (const u of partUsers) {
+         const senderUser = await db.prepare("SELECT company, honbu, team, part, subpart, position FROM users WHERE employee_id = ?").bind(employee_id).first();
+         if (senderUser) {
+             let scopeQuery = "";
+             let scopeArgs = [senderUser.company];
+
+             if (senderUser.position >= 'POS_004') {
+                 // 본부장 이상: 본부 전체
+                 scopeQuery = "WHERE company = ? AND honbu = ?";
+                 scopeArgs.push(senderUser.honbu);
+             } else if (senderUser.position === 'POS_003') {
+                 // 팀장: 팀 전체
+                 scopeQuery = "WHERE company = ? AND honbu = ? AND team = ?";
+                 scopeArgs.push(senderUser.honbu, senderUser.team);
+             } else if (senderUser.position === 'POS_002') {
+                 // 파트장: 파트 전체
+                 scopeQuery = "WHERE company = ? AND honbu = ? AND team = ? AND part = ?";
+                 scopeArgs.push(senderUser.honbu, senderUser.team, senderUser.part);
+             } else {
+                 // 일반 팀원: 서브파트만
+                 scopeQuery = "WHERE company = ? AND honbu = ? AND team = ? AND part = ? AND (subpart = ? OR (subpart IS NULL AND ? IS NULL))";
+                 scopeArgs.push(senderUser.honbu, senderUser.team, senderUser.part, senderUser.subpart, senderUser.subpart);
+             }
+
+             const { results: targetUsers } = await db.prepare(`SELECT employee_id FROM users ${scopeQuery} AND is_active = 1`).bind(...scopeArgs).all();
+             
+             if (targetUsers && targetUsers.length > 0) {
+                 for (const u of targetUsers) {
                      await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, '미처리', ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
                       .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp).run();
                  }
              }
          }
      } catch (e) {
-         console.error("New Path Auto-assignment error:", e);
+         console.error("Rank-based Auto-assignment error:", e);
      }
   }
   
   // Eager Loading: Trigger background AI immediately for new insert
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
+
+  // 🔔 즉시 푸시 - 할당된 모든 사용자에게 일괄 전송
+  const shortMsg = (message || '').length > 60 ? message.substring(0, 60) + '…' : (message || '내용 없음');
+  const immediatePushPayload = {
+    title: detectedCount > 0 ? `🚨 [S-GUARD] 키워드 감지됨` : `📩 [S-GUARD] 새 문자 수신`,
+    body: `📋 장애ID: ${newIncId}\n📨 발신: ${sender || '알 수 없음'}\n${shortMsg}`,
+    inc_id: String(newIncId),
+    priority: detectedCount > 0 ? 90 : 50,
+    url: `/inbox`,
+    tag: `inc-${newIncId}`
+  };
+
+  // 할당된 사용자 목록 조회 후 일괄 푸시
+  c.executionCtx.waitUntil((async () => {
+    try {
+      // 1. 수신 사번 본인에게 먼저 전송
+      if (employee_id) {
+        await sendPushNotification(c, employee_id, immediatePushPayload).catch(e => console.error('[Push-Self]', e));
+      }
+
+      // 2. 자동 배정된 사용자들 조회 후 일괄 전송
+      const { results: assignees } = await db.prepare(
+        "SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ?"
+      ).bind(newIncId).all();
+
+      if (assignees && assignees.length > 0) {
+        const pushPromises = assignees
+          .filter(a => a.user_id !== employee_id) // 본인 중복 제외
+          .map(a => sendPushNotification(c, a.user_id, immediatePushPayload)
+            .catch(e => console.error(`[Push-Assignee:${a.user_id}]`, e))
+          );
+        await Promise.allSettled(pushPromises);
+        console.log(`[Push-Broadcast] Sent to ${assignees.length} user(s) for ${newIncId}`);
+      }
+    } catch (e) {
+      console.error('[Push-Broadcast] Error:', e.message);
+    }
+  })());
 
   return c.json({ status: detectedCount > 0 ? 'keyword_detected' : 'received', inc_id: newIncId })
 })
@@ -2895,24 +3216,33 @@ app.post('/sms/settings', async (c) => {
 
 app.get('/sms/recent', async (c) => {
   const limit = c.req.query('limit') || 10
+  const excludeCompleted = c.req.query('excludeCompleted') === 'true'
   const db = c.env.DB
   
-  // JOIN with users to get proper name/team, and autopilot_insight for similarity info
-  const { results } = await db.prepare(`
-    SELECT r.*, u.name, u.role, u.team, u.part,
-           ai.similarity_score, ai.similarity_reason,
-           (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE TRIM(REPLACE(ai2.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed,
-           COALESCE(
-             (SELECT '처리완료' FROM warroom_list wl WHERE TRIM(REPLACE(wl.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) AND (wl.status = 'CLOSED' OR wl.status = '최종완료') LIMIT 1),
-             (SELECT status FROM incident_assignments ia WHERE TRIM(REPLACE(ia.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) ORDER BY updated_at DESC LIMIT 1),
-             '미처리'
-           ) as incident_status
-    FROM received_messages r
-    LEFT JOIN users u ON r.employee_id = u.employee_id
-    LEFT JOIN autopilot_insight ai ON TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))
-    ORDER BY r.timestamp DESC 
-    LIMIT ?
-  `).bind(limit).all()
+  let baseQuery = `
+    SELECT * FROM (
+      SELECT r.*, u.name, u.role, u.team, u.part,
+             ai.similarity_score, ai.similarity_reason,
+             (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE TRIM(REPLACE(ai2.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed,
+             COALESCE(
+               (SELECT '처리완료' FROM warroom_list wl WHERE TRIM(REPLACE(wl.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) AND (wl.status = 'CLOSED' OR wl.status = '최종완료') LIMIT 1),
+               (SELECT status FROM incident_assignments ia WHERE TRIM(REPLACE(ia.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) ORDER BY updated_at DESC LIMIT 1),
+               '미처리'
+             ) as incident_status
+      FROM received_messages r
+      LEFT JOIN users u ON r.employee_id = u.employee_id
+      LEFT JOIN autopilot_insight ai ON TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))
+    )
+    WHERE 1=1
+  `
+  const params = []
+  if (excludeCompleted) {
+    baseQuery += ` AND incident_status != '처리완료' `
+  }
+  baseQuery += ` ORDER BY timestamp DESC LIMIT ? `
+  params.push(limit)
+
+  const { results } = await db.prepare(baseQuery).bind(...params).all()
 
   return c.json({ total: results.length, messages: results.map(r => ({ 
     inc_id: r.inc_id, 
@@ -3264,6 +3594,59 @@ app.post('/sms/keywords/delete/:keyword', async (c) => {
   return c.json({ status: "success" })
 })
 
+// ── NEW: User Specific Keyword Management ────────────────────────────────────
+app.get('/sms/user-keywords', async (c) => {
+  const user = c.get('user')
+  const db = c.env.DB
+  const userId = user.employee_id
+  
+  const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(userId).first()
+  return c.json({ keywords: result ? result.keywords : "" })
+})
+
+app.post('/sms/user-keywords', async (c) => {
+  const user = c.get('user')
+  const db = c.env.DB
+  const userId = user.employee_id
+  const { keywords } = await c.req.json()
+  
+  await db.prepare(`
+    INSERT INTO user_keywords (user_id, keywords, updated_at) 
+    VALUES (?, ?, CURRENT_TIMESTAMP) 
+    ON CONFLICT(user_id) DO UPDATE SET keywords = excluded.keywords, updated_at = excluded.updated_at
+  `).bind(userId, keywords).run()
+  
+  return c.json({ status: "success" })
+})
+
+// ── NEW: iPhone Shortcut Dedicated Endpoint ──────────────────────────────────
+// 아이폰 단축어에서 GET 요청으로 키워드를 쉽게 가져갈 수 있도록 하는 전용 경로
+app.get('/sms/shortcut/keywords', async (c) => {
+  const db = c.env.DB
+  const userId = c.req.query('userId') || c.req.query('id')
+  
+  // 🔐 SECURITY: iPhone 단축어 전용 비밀키 확인 (금융권 수준 보안 적용)
+  const authKey = c.req.header('X-SGUARD-AUTH')
+  if (authKey !== c.env.SHORTCUT_SECRET) {
+    return c.json({ error: "Unauthorized: Invalid or missing X-SGUARD-AUTH header" }, 401)
+  }
+  
+  if (!userId) {
+    return c.json({ error: "userId is required" }, 400)
+  }
+  
+  // 보안을 위해 token 검증 로직이 필요할 수 있으나, 
+  // 여기서는 기본적으로 user_keywords 테이블에서 해당 사용자의 데이터를 조회합니다.
+  const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(userId).first()
+  
+  return c.json({
+    userId: userId,
+    keywords: result ? result.keywords : "",
+    keywordList: result ? result.keywords.split('|').filter(k => k.trim()) : [],
+    timestamp: new Date().toISOString()
+  })
+})
+
 // ==========================================
 // 🚀 NEW: Codebook (Common Code) APIs
 // ==========================================
@@ -3332,7 +3715,7 @@ app.delete('/sms/codebook/:id', async (c) => {
 
 app.get('/incidents', async (c) => {
   const db = c.env.DB
-  const { inc_id, keyword, startDate, endDate, orgCode, assignee } = c.req.query()
+  const { inc_id, keyword, startDate, endDate, orgCode, orgName, assignee } = c.req.query()
   
   // High-performance MULTI-JOIN query to check all possible affiliation sources
   // i: incidents
@@ -3402,10 +3785,24 @@ app.get('/incidents', async (c) => {
     for(let i=0; i<10; i++) params.push(orgCode)
   }
   
+  if (orgName) {
+    query += ` AND (
+      i.assigned_to IN (SELECT employee_id FROM users WHERE company LIKE ? OR honbu LIKE ? OR team LIKE ? OR part LIKE ? OR subpart LIKE ?)
+      OR EXISTS (
+        SELECT 1 FROM incident_assignments ia_sub
+        INNER JOIN users u_sub ON ia_sub.user_id = u_sub.employee_id
+        WHERE ia_sub.inc_id = i.inc_id
+        AND (u_sub.company LIKE ? OR u_sub.honbu LIKE ? OR u_sub.team LIKE ? OR u_sub.part LIKE ? OR u_sub.subpart LIKE ?)
+      )
+    )`
+    const likeVal = `%${orgName}%`
+    for(let i=0; i<10; i++) params.push(likeVal)
+  }
+  
   if (assignee) {
-    // Check if the name or ID exists in the main assignee field OR the assignment list
-    query += " AND (ua.name LIKE ? OR i.assigned_to = ? OR uaa.name LIKE ? OR ia.user_id = ?)"
-    params.push(`%${assignee}%`, assignee, `%${assignee}%`, assignee)
+    // Check if the name or ID exists in the main assignee field OR the assignment list OR the sender (reporter)
+    query += " AND (ua.name LIKE ? OR i.assigned_to = ? OR uaa.name LIKE ? OR ia.user_id = ? OR us.name LIKE ? OR r.employee_id = ?)"
+    params.push(`%${assignee}%`, assignee, `%${assignee}%`, assignee, `%${assignee}%`, assignee)
   }
   
   query += " GROUP BY i.inc_id"
@@ -3510,7 +3907,7 @@ app.post('/ai/feedback', async (c) => {
   const db = c.env.DB
 
   const {
-    inc_id,
+    inc_id: incident_id,
     vector_id,
     query,
     answer,
@@ -3543,13 +3940,13 @@ app.post('/ai/feedback', async (c) => {
 
     const res = await db.prepare(`
       INSERT INTO ai_feedback (
-        user_id, inc_id, vector_id, query, answer, context, 
+        user_id, incident_id, vector_id, query, answer, context, 
         feedback_type, reason, user_correction, error_category,
         created_at, reg_id, reg_dt, mod_id, mod_dt
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       safeEmpId,
-      inc_id || null,
+      incident_id || null,
       vector_id || null,
       query,
       answer,
@@ -3927,7 +4324,13 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
           if (m.tags && metadata.error_code && m.tags.includes(metadata.error_code)) boost += 0.2;
 
           const finalScore = Math.min(1.0, 0.8 + boost);
-          results.push({ id: mid, score: finalScore, type: 'sms_sql_match', content: m.message });
+          results.push({ 
+            id: mid, 
+            score: finalScore, 
+            type: 'sms_sql_match', 
+            content: m.message,
+            title: `[이력 매칭] ${m.message.substring(0, 30)}...` 
+          });
           seenIds.add(mid);
         }
       });
@@ -4464,10 +4867,14 @@ ${feedbackContext}
           const now = getKst();
           const severity = fullContent.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
           await db.prepare(`
-            INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score)
-            VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?)
-            ON CONFLICT(inc_id) DO UPDATE SET content=excluded.content, mod_dt=excluded.mod_dt, similarity_score=excluded.similarity_score
-          `).bind(String(sms_id), fullContent, severity, now, now, similarityScore ?? 0).run();
+            INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
+            VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
+            ON CONFLICT(inc_id) DO UPDATE SET 
+              content=excluded.content, 
+              mod_dt=excluded.mod_dt, 
+              similarity_score=COALESCE(excluded.similarity_score, autopilot_insight.similarity_score),
+              similarity_reason=COALESCE(excluded.similarity_reason, autopilot_insight.similarity_reason)
+          `).bind(String(sms_id), fullContent, severity, now, now, similarityScore ?? null, matchedTitle || null).run();
         }
       }
 
@@ -5457,12 +5864,12 @@ app.post('/ai/report/save', async (c) => {
     errorMsg
   ).run()
 
-  // 4. Auto-update assignment status to '처리완료'
-
-  // 4. Auto-update assignment status to '처리완료'
-  if (normId && empId) {
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE (inc_id = ? OR inc_id = ?) AND user_id = ?")
-      .bind(now, now, empId, normId, `INC-${normId}`, empId).run()
+  // 4. 보고서 저장 완료 → 해당 incident 모든 담당자 일괄 처리완료 + SMS 상태 동기화
+  if (normId) {
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+      .bind(now, now, empId, normId, `INC-${normId}`).run()
+    await db.prepare("UPDATE received_messages SET status = '처리완료', mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
+      .bind(now, empId, normId, `INC-${normId}`).run()
   }
 
   return c.json({ status: 'saved', knowledge_synced: !!embeddingValue })
@@ -5475,29 +5882,35 @@ app.get('/warroom/report/:id', async (c) => {
   const idParam = c.req.param('id')
   const db = c.env.DB
 
-  const id = idParam.startsWith('INC-') ? idParam.slice(4) : idParam;
+  // 양쪽 포맷 모두 준비 (INC-xxx / xxx)
+  const rawId  = idParam.replace('INC-', '');
+  const fullId = 'INC-' + rawId;
 
-  // 1. War-Room base info
-  const wr = await db.prepare("SELECT * FROM warroom_list WHERE inc_id = ?").bind(id).first()
+  // 1. War-Room base info — inc_id 가 어떤 형태로 저장됐든 매칭
+  const wr = await db.prepare(
+    "SELECT * FROM warroom_list WHERE REPLACE(inc_id,'INC-','') = ?"
+  ).bind(rawId).first()
   if (!wr) return c.json({ error: 'War-Room not found' }, 404)
 
   // 2. S-Autopilot Insight (full AI analysis)
-  const insight = await db.prepare("SELECT content, severity, category FROM autopilot_insight WHERE inc_id = ?").bind(id).first()
+  const insight = await db.prepare(
+    "SELECT content, severity, category FROM autopilot_insight WHERE REPLACE(inc_id,'INC-','') = ?"
+  ).bind(rawId).first()
 
   // 3. AI Agent Discussion log (aichat_history)
   const { results: agentLogs } = await db.prepare(
-    "SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC"
-  ).bind(id).all()
+    "SELECT agent_role, content, reg_dt FROM aichat_history WHERE REPLACE(inc_id,'INC-','') = ? ORDER BY id ASC"
+  ).bind(rawId).all()
 
   // 4. War-Room chat history
   const { results: chatLogs } = await db.prepare(
-    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
-  ).bind(id).all()
+    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE REPLACE(wc.inc_id,'INC-','') = ? ORDER BY wc.timestamp ASC"
+  ).bind(rawId).all()
 
   // 5. Attachments
   const { results: attachments } = await db.prepare(
-    "SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC"
-  ).bind(id).all()
+    "SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE REPLACE(inc_id,'INC-','') = ? ORDER BY seq ASC"
+  ).bind(rawId).all()
 
   // 6. Find leader summary (from warroom_list first, fallback to aichat_history)
   const leaderRow = (agentLogs || []).find(r => r.agent_role === 'Leader')
@@ -5515,8 +5928,8 @@ app.get('/warroom/report/:id', async (c) => {
   const lastChat = (chatLogs || []).slice(-1)[0]
 
   return c.json({
-    inc_id: id,
-    title: wr.title || id,
+    inc_id: fullId,
+    title: wr.title || fullId,
     severity: wr.severity || 'NORMAL',
     status: wr.status || 'OPEN',
     creator_id: wr.creator_id || '',
@@ -5555,7 +5968,7 @@ app.get('/warroom/participants/:id', async (c) => {
   const normId = String(id).replace('INC-', '')
   const { results } = await db.prepare(`
     SELECT 
-      u.name, u.employee_id, u.role, u.company, u.position,
+      u.name, u.employee_id, u.role, u.company, u.position, u.phone,
       COALESCE(ot.name, u.team) as team_name,
       COALESCE(op.name, u.part) as part_name
     FROM user_warrooms uw
@@ -5568,7 +5981,7 @@ app.get('/warroom/participants/:id', async (c) => {
 })
 
 app.post('/warroom/join', async (c) => {
-  const { incident_id, user_id } = await c.req.json()
+  const { incident_id, user_id, name, inviter_name } = await c.req.json()
   const db = c.env.DB
   const normId = String(incident_id).replace('INC-', '')
   
@@ -5577,19 +5990,44 @@ app.post('/warroom/join', async (c) => {
   }
 
   const now = getKst()
+
+  // 1️⃣ 워룸 참여 등록
   await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
     .bind(user_id, normId, now).run()
 
-  // 🚀 Sync to incident_assignments so they appear in both lists
+  // 2️⃣ incident_assignments 동기화
   await db.prepare(`
     INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
     VALUES (?, ?, '처리중', ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, inc_id) 
     DO UPDATE SET status = '처리중', updated_at = excluded.updated_at, mod_dt = excluded.mod_dt, mod_id = excluded.mod_id
   `).bind(user_id, normId, now, now, user_id, now, user_id, now).run();
+
+  // 3️⃣ 채팅에 시스템 메시지 저장
+  const displayName = name || user_id;
+  const inviterLabel = inviter_name ? `(${inviter_name}님 초대)` : '';
+  const sysText = `🔔 <b>${displayName}</b>님이 워룸에 참여했습니다 ${inviterLabel}`;
+  try {
+    const maxSeq = await db.prepare("SELECT COALESCE(MAX(seq),0)+1 AS ns FROM warroom_chats WHERE inc_id=?").bind(normId).first();
+    await db.prepare(
+      "INSERT INTO warroom_chats (inc_id, sender, name, role, type, text, timestamp, seq) VALUES (?,?,?,?,?,?,?,?)"
+    ).bind(normId, 'SYSTEM', 'SYSTEM', 'system', 'system', sysText, now, maxSeq?.ns || 1).run();
+  } catch(e) { console.error('[warroom/join] system msg failed:', e.message); }
+
+  // 4️⃣ 초대된 사용자에게 푸시 알림
+  try {
+    const inc = await db.prepare("SELECT title FROM incident_queue WHERE id=?").bind(normId).first();
+    const incTitle = inc?.title || `장애 #${normId}`;
+    await sendPushNotification(c, user_id, {
+      title: `🚨 워룸 초대 알림`,
+      body: `${inviter_name || '관리자'}님이 "${incTitle}" 워룸에 초대했습니다.`,
+      data: { type: 'warroom_invite', incident_id: normId, url: `/chat/${normId}` }
+    });
+  } catch(e) { console.error('[warroom/join] push failed:', e.message); }
     
-  return c.json({ status: 'joined' })
+  return c.json({ status: 'joined', name: displayName })
 })
+
 
 // RAG Zero-G System Config Endpoints
 // RAG Zero-G System Config Endpoints (Unified with D1 & KV)
@@ -5788,29 +6226,39 @@ app.get('/ai/knowledge/search', async (c) => {
     // 5. Context Fetch from D1 (1:1 Mapping)
     const ids = filteredMatches.map(m => {
        if (m.id.startsWith('kn-')) return m.id.replace('kn-', '');
-       if (m.id.startsWith('inc-') || m.id.startsWith('gov-')) return null; // we lookup by inc_id later if needed, but 'kn-' is primary
-       return m.id; // fallback
+       if (m.id.startsWith('inc-')) return m.id.replace('inc-', '');
+       if (m.id.startsWith('gov-')) return m.id.replace('gov-', '');
+       return m.id;
     }).filter(Boolean);
 
     let dbRecords = [];
     if (ids.length > 0) {
       const placeholders = ids.map(() => '?').join(',');
       const { results } = await db.prepare(`
-        SELECT id, inc_id, title, content, category, tags
+        SELECT id, inc_id, title, content, 'KB' as source
         FROM knowledge_base 
         WHERE id IN (${placeholders}) OR inc_id IN (${placeholders})
       `).bind(...ids, ...ids).all();
       dbRecords = results || [];
     }
 
+    // Secondary lookup for raw SMS if not in KB
+    const missingIds = ids.filter(id => !dbRecords.some(r => String(r.id) === id || String(r.inc_id) === id));
+    if (missingIds.length > 0) {
+      const placeholders = missingIds.map(() => '?').join(',');
+      const { results: smsRecords } = await db.prepare(`
+        SELECT inc_id as id, inc_id, '[과거 이력] ' || SUBSTR(message, 1, 35) || '...' as title, message as content, 'SMS' as source
+        FROM received_messages 
+        WHERE inc_id IN (${placeholders})
+      `).bind(...missingIds).all();
+      if (smsRecords) dbRecords = [...dbRecords, ...smsRecords];
+    }
+
     // Map scores and reasons back to DB records
     const scoredResults = filteredMatches.map(m => {
-      let dbRec = null;
-      if (m.id.startsWith('kn-')) {
-         dbRec = dbRecords.find(r => String(r.id) === m.id.replace('kn-', ''));
-      } else {
-         dbRec = dbRecords.find(r => String(r.inc_id) === m.id.replace('inc-', ''));
-      }
+      let matchId = m.id.startsWith('kn-') ? m.id.replace('kn-', '') : m.id.replace('inc-', '');
+      let dbRec = dbRecords.find(r => String(r.id) === matchId || String(r.inc_id) === matchId);
+      
       return dbRec ? {
         ...dbRec,
         score: m.score,
@@ -6365,6 +6813,7 @@ app.get('/ai/incident/my-assignments', async (c) => {
       END as status,
       COALESCE(chat_counts.cnt, 0) as chat_count,
       m.sender, m.message, m.employee_id, m.timestamp as message_at, m.received_count, m.occurrence_count,
+      insight.similarity_score, insight.similarity_reason,
       CASE WHEN insight.inc_id IS NOT NULL THEN 1 ELSE 0 END as is_analyzed,
       u1.name as sender_name, 
       COALESCE(
@@ -6805,26 +7254,39 @@ app.patch('/incidents/:id', async (c) => {
 
 // Warroom chat list
 app.get('/warroom/chat/:id', async (c) => {
-  const id = c.req.param('id')
+  const idParam = c.req.param('id')
   const db = c.env.DB
 
-  // Always pull title and leader_summary from warroom_list (authoritative source)
-  const wr = await db.prepare("SELECT title, status, leader_summary FROM warroom_list WHERE inc_id = ?").bind(id).first()
-  let title = (wr && wr.title) ? wr.title : id
+  // INC- 접두사 유무 모두 처리
+  const rawId  = idParam.replace('INC-', '')
+  const fullId = 'INC-' + rawId
+
+  // Always pull title and leader_summary from warroom_list
+  const wr = await db.prepare(
+    "SELECT title, status, leader_summary FROM warroom_list WHERE REPLACE(inc_id,'INC-','') = ?"
+  ).bind(rawId).first()
+  let title = (wr && wr.title) ? wr.title : rawId
   let status = (wr && wr.status) ? wr.status : 'OPEN'
   const leader_summary_db = (wr && wr.leader_summary) ? wr.leader_summary : ''
   let description = leader_summary_db
 
   // Supplement description from incidents if warroom_list has none
-  const inc = await db.prepare("SELECT description, status FROM incidents WHERE inc_id = ?").bind(id).first()
+  const inc = await db.prepare(
+    "SELECT description, status FROM incidents WHERE REPLACE(inc_id,'INC-','') = ?"
+  ).bind(rawId).first()
+  const sms_body = (inc && inc.description) ? inc.description : ''   // ← 원본 SMS 텍스트
   if (inc) {
     if (!description && inc.description) description = inc.description
     if (inc.status && inc.status !== 'OPEN') status = inc.status
   }
 
   // Get messages
-  const { results: aiResults } = await db.prepare("SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all()
-  const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC").bind(id).all()
+  const { results: aiResults } = await db.prepare(
+    "SELECT * FROM aichat_history WHERE REPLACE(inc_id,'INC-','') = ? ORDER BY id ASC"
+  ).bind(rawId).all()
+  const { results: wrResults } = await db.prepare(
+    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE REPLACE(wc.inc_id,'INC-','') = ? ORDER BY wc.timestamp ASC"
+  ).bind(rawId).all()
 
   // Format AI messages
   const aiMessages = (aiResults || []).map(r => ({
@@ -6850,16 +7312,16 @@ app.get('/warroom/chat/:id', async (c) => {
     reactions: r.reactions || '{}'
   }));
 
-  // Extract Leader Agent summary: prefer warroom_list.leader_summary, fallback to aichat_history Leader row
-  const wrForSummary = await db.prepare("SELECT leader_summary FROM warroom_list WHERE inc_id = ?").bind(id).first()
+  // Extract Leader Agent summary
   const leaderRow = (aiResults || []).find(r => r.agent_role === 'Leader')
-  const leader_summary = (wrForSummary && wrForSummary.leader_summary) || (leaderRow ? leaderRow.content : '')
+  const leader_summary = leader_summary_db || (leaderRow ? leaderRow.content : '')
 
   // Combine and sort
   const allMessages = [...aiMessages, ...chatMessages].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  return c.json({ title, description, status, leader_summary, messages: allMessages })
+  return c.json({ title, description, sms_body, status, leader_summary, messages: allMessages })
 })
+
 
 // Warroom chat post
 app.post('/warroom/chat', async (c) => {
@@ -6936,14 +7398,6 @@ app.post('/warroom/upload', async (c) => {
     fileType, fileUrl, uploaded_by,
     now, uploaded_by, now, uploaded_by, now
   ).run()
-
-  const lastChat = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(incident_id).first()
-  const chatSeq  = (lastChat && lastChat.max_seq) ? lastChat.max_seq + 1 : 1
-  const chatText = `[첨부파일]${fileName}|${fileUrl}|${fileType}`
-
-  await db.prepare(
-    "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(incident_id, chatSeq, uploaded_by, 'Unknown', 'user', chatText, now, uploaded_by, now, uploaded_by, now).run()
 
   return c.json({ status: 'uploaded', seq, url: fileUrl, filename: fileName })
 })
@@ -7508,16 +7962,17 @@ app.get('/inbox', async (c) => {
   
   if (!user_id) return c.json({ error: 'user_id is required' }, 400)
 
-  // Join with received_messages to get the original SMS that triggered the incident
-  // Using a very robust join that ignores prefixes and whitespace
   let query = `
     SELECT 
       i.*, 
-      r.message AS sms_message
+      r.message AS sms_message,
+      u.part AS sender_part,
+      u.team AS sender_team
     FROM inbox_items i
     LEFT JOIN received_messages r ON (
       LOWER(TRIM(REPLACE(i.inc_id, 'INC-', ''))) = LOWER(TRIM(REPLACE(r.inc_id, 'INC-', '')))
     )
+    LEFT JOIN users u ON i.sender_id = u.employee_id
     WHERE i.user_id = ?
   `
   const params = [user_id]
@@ -7530,7 +7985,34 @@ app.get('/inbox', async (c) => {
   query += " ORDER BY i.created_at DESC"
 
   const { results } = await db.prepare(query).bind(...params).all()
-  return c.json(results || [])
+  
+  // 조직명 변환 (results 배열 가공)
+  const finalResults = []
+  const orgCache = {}
+  
+  for (const item of results) {
+    let orgName = '상담'
+    const targetCode = item.sender_part || item.sender_team
+    if (targetCode) {
+      if (orgCache[targetCode]) {
+        orgName = orgCache[targetCode]
+      } else {
+        try {
+          const row = await db.prepare("SELECT name FROM organizations WHERE code = ? LIMIT 1").bind(targetCode).first()
+          if (row?.name) {
+            orgName = row.name
+            orgCache[targetCode] = row.name
+          }
+        } catch (e) { /* ignore */ }
+      }
+    }
+    finalResults.push({
+      ...item,
+      sender_org_path: orgName
+    })
+  }
+
+  return c.json(finalResults)
 })
 
 // Unified Report Submission & Distribution
@@ -7945,14 +8427,16 @@ export class WarRoom {
         const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1;
         
         await db.prepare(
-          "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt, parent_seq, reactions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt, parent_seq, reactions, read_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
           data.incident_id, seq, data.sender, data.role || 'user', data.msg_type || 'user', data.text, now, data.sender, now, data.sender, now, 
           data.reply_to || null, 
-          JSON.stringify({}) // Initial empty reactions
+          JSON.stringify({}), // Initial empty reactions
+          Math.max(0, this.sessions.size - 1) // 발신자 제외한 현재 접속자 수
         ).run();
 
         // 2. Broadcast
+        const initialUnread = Math.max(0, this.sessions.size - 1);
         const broadcastMsg = {
           type: "CHAT_MESSAGE",
           msg_id: `${data.incident_id}_${seq}`,
@@ -7964,7 +8448,9 @@ export class WarRoom {
           text: data.text,
           timestamp: now,
           parent_seq: data.reply_to || null,
-          reactions: {}
+          reactions: {},
+          read_count: initialUnread
+
         };
         console.log(`[DO] [${this.state.id.toString()}] CHAT_SEND from ${data.sender}: ${data.text.slice(0, 50)}...`);
         this.broadcast(broadcastMsg);

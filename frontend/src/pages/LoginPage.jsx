@@ -1,47 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertCircle, ArrowLeft, RotateCcw,
-  CheckCircle, Check, Eye, EyeOff, Mail, KeyRound, UserCheck, Download, Lock, ChevronRight, BookOpen, X, ShieldAlert, Apple
+  CheckCircle, Check, Eye, EyeOff, Mail, KeyRound, UserCheck, Download, Lock, ChevronRight, BookOpen, X, Apple
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { setAccessToken, setUserProfile as setStoreUserProfile, setGhostToken } from '../lib/authStore';
+import { PushManager } from '../lib/pushManager';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 const S = { A: 'A', B: 'B', C1: 'C1', C2: 'C2', RESET_A: 'RESET_A', RESET_B: 'RESET_B' };
 
-/* ── OTP 6칸 (Aggressive Focus Lock + Memoized) ── */
+
 const OtpBoxes = React.memo(({ value, onChange, disabled }) => {
   const inputRef = useRef(null);
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? '');
 
-  // 🔒 강제 포커스 유지 로직
-  const forceFocus = () => {
-    if (disabled) return;
-    if (document.activeElement !== inputRef.current) {
-      inputRef.current?.focus();
-    }
-  };
-
-  // 타이핑 시마다 포커스 상태 강제 확인
-  React.useLayoutEffect(() => {
-    forceFocus();
-  }, [value, disabled]);
+  // OTP가 아직 미완성(6자리 미만)일 때만 오토포커스
+  // OtpSection이 LoginPage 내부 컴포넌트라 re-render 시 리마운트됨 → value 체크로 포커스 탈취 방지
+  React.useEffect(() => {
+    if (!disabled && value.length < 6) inputRef.current?.focus();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (e) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 6);
     onChange(val);
   };
 
-  const handleBlur = () => {
-    if (disabled) return;
-    // 브라우저가 포커스를 빼앗으려 할 때 다음 프레임에서 즉시 탈환
-    requestAnimationFrame(forceFocus);
-  };
-
   return (
     <div 
-      onClick={forceFocus}
+      onClick={() => inputRef.current?.focus()}
       style={{ position: 'relative', width: 270, margin: '0 auto', height: 56, cursor: 'text' }}
     >
       {/* 🔑 실제로 타이핑을 받는 네이티브 입력창 */}
@@ -54,9 +42,7 @@ const OtpBoxes = React.memo(({ value, onChange, disabled }) => {
         maxLength={6}
         value={value}
         onChange={handleChange}
-        onBlur={handleBlur}
         disabled={disabled}
-        autoFocus
         style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
           opacity: 1,           // 0이면 일부 브라우저에서 포커스 제외됨
@@ -177,15 +163,21 @@ export default function LoginPage() {
     const saved = localStorage.getItem('sguard_saved_empid');
     if(saved) setEmployeeId(saved);
 
-    // 🔒 로그인 페이지에서는 바운스 차단 (스크롤은 자동 허용)
-    document.body.style.overflowX = 'hidden';
+    // 🔒 로그인 페이지에서는 스크롤 및 바운스 전면 차단 (Native 앱 느낌)
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
     document.body.style.overscrollBehavior = 'none';
-    document.body.style.height = 'auto';
+    document.body.style.height = '100dvh';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
 
     return () => {
-      document.body.style.overflowX = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
       document.body.style.overscrollBehavior = '';
       document.body.style.height = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     };
   }, []);
 
@@ -391,6 +383,17 @@ export default function LoginPage() {
       }
       
       setStoreUserProfile(data.user || data);
+
+      // 🔔 로그인 성공 즉시 푸시 구독 등록 (Access Token이 확실히 있는 시점)
+      const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
+      PushManager.subscribe(API_BASE_URL).then(result => {
+        if (result.success) {
+          console.log('[Push] 푸시 구독 성공 ✅');
+        } else {
+          console.warn('[Push] 푸시 구독 실패:', result.error);
+        }
+      }).catch(e => console.error('[Push] 예외:', e));
+
       navigate('/dashboard');
     } catch (err) { 
       console.error('[Verify-Error]', err);
@@ -652,6 +655,14 @@ export default function LoginPage() {
           overflow: hidden;
           flex-shrink: 0;
           text-align: center;
+          transition: all 0.3s ease;
+        }
+        @media (max-width: 768px) {
+          .header-section { min-height: 160px; padding: 60px 0 40px !important; }
+          .header-section::after { height: 30px; border-radius: 30px 30px 0 0; display: block; }
+          .card-section { padding: 20px 24px !important; margin-top: 10px; }
+          .step-bar { margin-bottom: 12px !important; }
+          h1 { font-size: 36px !important; }
         }
         .header-section::before {
           content:'';
@@ -667,6 +678,10 @@ export default function LoginPage() {
           height:44px;
           background:#05091a;
           border-radius: 36px 36px 0 0;
+        }
+        @media (max-width: 768px) {
+          .header-section::after { display: none; }
+          .step-bar { margin-bottom: 5px !important; }
         }
         .header-nav {
           display: flex;
@@ -721,7 +736,7 @@ export default function LoginPage() {
           letter-spacing:0.1em;
           text-transform:uppercase;
           color:rgba(255,255,255,0.3);
-          margin-bottom:10px;
+          margin-bottom:8px;
         }
         .input-wrap { position:relative; }
         .input-icon { position:absolute; right:14px; top:50%; transform:translateY(-50%); }
@@ -732,12 +747,14 @@ export default function LoginPage() {
           font-family: 'Inter','Noto Sans KR',sans-serif;
           display: flex;
           flex-direction: column;
-          overflow-x: hidden;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          width: 100%;
         }
       `}</style>
 
       <div className="login-bg">
-        <div className="header-section" style={{ padding: isShrink ? '30px 0 20px' : '60px 0 100px' }}>
+        <div className="header-section" style={{ padding: isShrink ? '60px 0 40px' : '60px 0 100px' }}>
           <div style={{ position:'relative', zIndex:1 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap: isShrink ? 4 : 6, marginBottom: isShrink ? 0 : 10 }}>
               <h1 style={{ color: '#ffffff', fontSize: isShrink ? 24 : 54, fontWeight: 900, letterSpacing: '0.07em', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.4)', fontFamily: "'Inter', sans-serif", margin: 0 }}>S-GUARD</h1>
@@ -764,7 +781,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="card-section" style={{ padding: isShrink ? '40px 24px 40px' : '60px 24px 40px' }}>
+        <div className="card-section" style={{ padding: isShrink ? '0px 20px' : '60px 24px 40px' }}>
           {state !== S.B && state !== S.RESET_A && state !== S.RESET_B && (
             <div className="step-bar" style={{ animation:'fadeUp .3s ease' }}>
               {stepLabels.map((label,idx) => (
@@ -787,7 +804,7 @@ export default function LoginPage() {
           )}
 
           {state === S.A && (
-            <form onSubmit={handleInit} style={{ display:'flex', flexDirection:'column', gap: isShrink ? 10 : 14, animation:'fadeUp .3s ease' }}>
+            <form onSubmit={handleInit} style={{ display:'flex', flexDirection:'column', gap: isShrink ? 12 : 14, animation:'fadeUp .3s ease' }}>
               <div>
                 <p className="form-section-label">사원번호</p>
                 <div className="input-wrap">
@@ -806,7 +823,7 @@ export default function LoginPage() {
               <ErrorBox msg={error} />
               <SubmitBtn label="로그인" />
               
-              <div style={{ display:'flex', gap:8, marginTop: isShrink ? 4 : 8 }}>
+              <div style={{ display:'flex', gap:8, marginTop: isShrink ? 0 : 8 }}>
                 <button type="button" onClick={() => setShowManual(true)}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
                   <Download size={12} />Android S-bridge
@@ -817,21 +834,21 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ marginTop: isShrink ? 4 : 12, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 20 }}>
                   <div style={{ width: 5, height: 5, background: '#10b981', borderRadius: '50%', boxShadow: '0 0 10px rgba(16,185,129,0.5)' }} />
                   <span style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em' }}>SECURITY S-BRIDGE INTEGRATED</span>
                 </div>
               </div>
 
-              <div style={{ marginTop:16, padding:'12px 14px', background:'rgba(0,70,255,0.05)', border:'1px solid rgba(0,70,255,0.12)', borderRadius:12 }}>
+              <div style={{ marginTop: isShrink ? 3 : 16, padding: isShrink ? '6px 12px' : '12px 14px', background:'rgba(0,70,255,0.05)', border:'1px solid rgba(0,70,255,0.12)', borderRadius:12 }}>
                 <p style={{ display:'flex', alignItems:'center', gap:6, color:'rgba(255,255,255,0.25)', fontSize:10.5, lineHeight:1.5 }}>
                   <Lock size={10} style={{ flexShrink:0 }} />
                   본 시스템은 신한임직원 및 협력사 전용입니다. 보안 수칙을 준수해 주세요.
                 </p>
               </div>
 
-              <button type="button" onClick={() => setState(S.RESET_A)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:12, textDecoration:'underline', cursor:'pointer', marginTop:8 }}>비밀번호를 분실하셨나요?</button>
+              <button type="button" onClick={() => setState(S.RESET_A)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:12, textDecoration:'underline', cursor:'pointer', marginTop: isShrink ? 12 : 8 }}>비밀번호를 분실하셨나요?</button>
             </form>
           )}
 
@@ -997,6 +1014,8 @@ export default function LoginPage() {
             </div>
             <p style={{ color:'rgba(255,255,255,0.13)', fontSize:10, letterSpacing:'0.04em' }}>© 2026 Shinhan DS Corp. · S-GUARD AI Security Operations</p>
           </div>
+
+
         </div>
       </div>
       {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}

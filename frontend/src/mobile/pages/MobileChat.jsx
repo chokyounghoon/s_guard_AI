@@ -23,6 +23,7 @@ export default function MobileChat({ user }) {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [incidentInfo, setIncidentInfo] = useState(null);
+  const [participants, setParticipants] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const bottomRef = useRef(null);
@@ -50,10 +51,12 @@ export default function MobileChat({ user }) {
 
       const history = (chat.messages || []).map(m => ({
         id: m.id || m.seq || Math.random().toString(36),
-        role: m.sender === user?.employee_id ? 'user' : (m.type === 'ai_analysis' ? 'assistant' : 'other'),
+        seq: m.seq,
+        role: m.sender === user?.employee_id || m.sender === user?.name ? 'user' : (m.type === 'ai_analysis' ? 'assistant' : 'other'),
         sender: m.sender_name || m.sender,
         content: m.text || m.content || '',
         ts: m.timestamp,
+        read_count: m.read_count || 0,
       }));
       setMessages(history);
     }).catch(console.error)
@@ -61,6 +64,41 @@ export default function MobileChat({ user }) {
 
     return () => { isMounted.current = false; };
   }, [incidentId, user]);
+
+  const fetchParticipants = useCallback(async () => {
+    if (!incidentId) return;
+    try {
+      const normId = String(incidentId).replace('INC-', '');
+      const res = await fetch(`${API_BASE}/warroom/participants/${normId}`, {
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setParticipants(data.participants || []);
+      }
+    } catch (e) { console.error('Failed to fetch participants', e); }
+  }, [incidentId]);
+
+  useEffect(() => {
+    fetchParticipants();
+  }, [fetchParticipants]);
+
+  // Auto-mark as read
+  useEffect(() => {
+    if (messages.length > 0 && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const normId = String(incidentId).replace('INC-', '');
+      messages.forEach(msg => {
+        if (msg.read_count > 0 && msg.role !== 'user' && msg.seq) {
+          wsRef.current.send(JSON.stringify({
+            type: "MARK_READ",
+            incident_id: normId,
+            seq: msg.seq,
+            user_id: user.employee_id
+          }));
+        }
+      });
+    }
+  }, [messages.length, user?.employee_id, incidentId]);
 
   // WebSocket 연결
   useEffect(() => {
@@ -91,15 +129,24 @@ export default function MobileChat({ user }) {
             const data = JSON.parse(event.data);
             if (data.type === 'CHAT_MESSAGE') {
               setMessages(prev => {
-                if (prev.some(m => m.id === data.msg_id)) return prev;
+                if (prev.some(m => m.id === data.msg_id || (m.seq && m.seq === data.seq))) return prev;
                 return [...prev, {
                   id: data.msg_id || Date.now(),
-                  role: data.sender === user.employee_id ? 'user' : 'other',
+                  seq: data.seq,
+                  role: (data.sender === user.employee_id || data.sender === user.name) ? 'user' : 'other',
                   sender: data.sender_name || data.sender,
                   content: data.text,
                   ts: data.timestamp,
+                  read_count: data.read_count || 0,
                 }];
               });
+              if (data.sender !== user.employee_id && data.sender !== user.name && data.seq && wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                  type: "MARK_READ", incident_id: normId, seq: data.seq, user_id: user.employee_id
+                }));
+              }
+            } else if (data.type === 'READ_UPDATE') {
+              setMessages(prev => prev.map(m => (m.seq === data.seq) ? { ...m, read_count: data.read_count !== undefined ? data.read_count : Math.max(0, (m.read_count || 1) - 1) } : m));
             } else if (data.type === 'AI_SUMMARY') {
               setMessages(prev => [...prev, {
                 id: `ai_${Date.now()}`,
@@ -168,11 +215,13 @@ export default function MobileChat({ user }) {
 
     // 로컬에 즉시 표시
     const tempMsg = {
-      id: `local_${Date.now()}`,
+      id: Date.now(),
+      seq: null,
       role: 'user',
       sender: user?.name || '나',
       content: text,
       ts: new Date().toISOString(),
+      read_count: Math.max(0, participants.length - 1)
     };
     setMessages(prev => [...prev, tempMsg]);
 
@@ -224,10 +273,10 @@ export default function MobileChat({ user }) {
   };
 
   return (
-    <div className="flex flex-col bg-[#0a0e17] overflow-hidden" style={{ height: '100dvh' }}>
+    <div className="flex flex-col bg-[#191919] overflow-hidden" style={{ height: '100dvh' }}>
 
       {/* 헤더 */}
-      <header className="flex items-center gap-3 px-4 py-3 bg-[#0d1117]/95 backdrop-blur-md border-b border-white/5 shrink-0"
+      <header className="flex items-center gap-3 px-4 py-3 bg-[#191919] border-b border-[#242424] shrink-0"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
         <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 active:scale-90 transition-all">
           <ChevronLeft className="w-5 h-5 text-slate-300" />
@@ -275,9 +324,10 @@ export default function MobileChat({ user }) {
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[11px] font-bold ${
-              msg.role === 'user' ? 'bg-blue-600/30 border border-blue-500/30 text-blue-300'
-              : msg.role === 'assistant' ? 'bg-[#1e2535] border border-white/10 text-slate-300'
-              : 'bg-slate-700/40 border border-white/10 text-slate-400'
+              msg.role === 'user'
+                ? 'bg-[#00236e]/20 border border-[#00236e]/30 text-white/70'
+                : msg.role === 'assistant' ? 'bg-[#242424] border border-white/10 text-slate-300'
+                : 'bg-[#333333] border border-white/5 text-slate-400'
             }`}>
               {msg.role === 'user' ? (user?.name?.[0] || 'U') : msg.role === 'assistant' ? <Bot className="w-4 h-4" /> : (msg.sender?.[0] || '?')}
             </div>
@@ -286,18 +336,23 @@ export default function MobileChat({ user }) {
                 <span className="text-[10px] text-slate-500 px-1 font-medium">{msg.sender}</span>
               )}
               <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-tr-md'
+              msg.role === 'user'
+                  ? 'bg-[#00236e] text-white rounded-2xl rounded-tr-none'
                   : msg.role === 'assistant'
-                  ? 'bg-[#131927] border border-white/5 text-slate-200 rounded-tl-md'
-                  : 'bg-slate-700/40 border border-white/5 text-slate-300 rounded-tl-md'
+                  ? 'bg-[#242424] border border-[#333] text-slate-200 rounded-2xl rounded-tl-none'
+                  : 'bg-[#333333] border border-white/5 text-white rounded-2xl rounded-tl-none'
               }`}>
                 {msg.role === 'assistant'
                   ? <div className="prose prose-invert prose-sm max-w-none prose-p:my-1"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
                   : <p className="whitespace-pre-wrap">{msg.content}</p>
                 }
               </div>
-              <span className="text-[10px] text-slate-600 px-1">{formatTime(msg.ts)}</span>
+              <div className={`flex items-end gap-1.5 px-1 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <span className="text-[10px] text-slate-600 shrink-0">{formatTime(msg.ts)}</span>
+                {msg.read_count > 0 && (
+                  <span className="text-[11px] font-bold text-[#FAE100] leading-none mb-0.5">{msg.read_count}</span>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -305,7 +360,7 @@ export default function MobileChat({ user }) {
       </div>
 
       {/* 입력 영역 */}
-      <div className="bg-[#0d1117]/95 backdrop-blur-md border-t border-white/10 px-4 py-3 shrink-0"
+      <div className="bg-[#191919] border-t border-[#242424] px-3 py-2 shrink-0"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
         <div className="flex items-end gap-2">
           <button onClick={toggleSTT} className={`p-3 rounded-2xl transition-all shrink-0 ${
@@ -313,7 +368,7 @@ export default function MobileChat({ user }) {
           }`}>
             {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
-          <div className="flex-1 bg-[#1a2035] border border-white/10 rounded-2xl flex items-end overflow-hidden">
+          <div className="flex-1 bg-[#2A2A2A] rounded-3xl flex items-end overflow-hidden">
             <textarea
               ref={textareaRef}
               value={input}
@@ -322,13 +377,13 @@ export default function MobileChat({ user }) {
               placeholder={isConnected ? '메시지를 입력하세요...' : '연결 중...'}
               rows={1}
               disabled={!isConnected}
-              className="flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder:text-slate-600 resize-none focus:outline-none leading-relaxed disabled:opacity-50"
+              className="flex-1 bg-transparent px-4 py-2.5 text-[14px] text-white placeholder:text-[#666666] resize-none focus:outline-none leading-relaxed disabled:opacity-50"
               style={{ maxHeight: '120px' }}
             />
           </div>
           <button id="mobile-chat-send" onClick={sendMessage} disabled={sending || !input.trim() || !isConnected}
-            className="w-12 h-12 bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl flex items-center justify-center transition-all active:scale-90 shrink-0">
-            {sending ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Send className="w-4 h-4 text-white" />}
+            className="w-12 h-12 bg-[#00236e] hover:bg-blue-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-all active:scale-90 shrink-0 shadow-lg shadow-blue-900/30">
+            {sending ? <Loader2 className="w-5 h-5 animate-spin text-white" /> : <Send className="w-5 h-5 text-white fill-white" />}
           </button>
         </div>
         {isListening && (

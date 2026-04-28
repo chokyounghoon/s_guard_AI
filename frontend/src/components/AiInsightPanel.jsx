@@ -64,6 +64,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [isAnalyzingSms, setIsAnalyzingSms] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [isCritical, setIsCritical] = useState(false);
+  const [incidentCategory, setIncidentCategory] = useState('report'); // 'critical' | 'security' | 'server' | 'report'
   const [smsAnalysisTitle, setSmsAnalysisTitle] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [insightTimestamp, setInsightTimestamp] = useState(null);
@@ -73,6 +74,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [feedback, setFeedback] = useState(null); // 'UP', 'DOWN'
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [downReason, setDownReason] = useState('');
+  const [showSimilaritySheet, setShowSimilaritySheet] = useState(false);
   const [correction, setCorrection] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -152,6 +154,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               setDisplayedText(data.content);
               const critical = data.severity === 'CRITICAL';
                setIsCritical(critical);
+               setIncidentCategory(data.category || getCategoryFromAnalysis(data.content, selectedSms?.message));
                setAnalysisComplete(true);
                setInsightTimestamp(data.reg_dt);
                setIsAnalyzingSms(false);
@@ -259,6 +262,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               setIsAnalyzingSms(false);
               
               const category = getCategoryFromAnalysis(finalText, selectedSms.message);
+              setIncidentCategory(category);
               const userData = JSON.parse(localStorage.getItem('sguard_user') || '{}');
               fetch(`${API_BASE_URL}/ai/insight/save`, {
                 method: 'POST',
@@ -393,6 +397,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setIsAnalyzingSms(false);
       setAnalysisComplete(false);
       setIsCritical(false);
+      setIncidentCategory('report');
       delayShownRef.current = false;
       setInsightTimestamp(null);
       setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
@@ -403,6 +408,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
 
 
+  /*
   // 기본 폴링 루프 (SMS 미선택 시)
   useEffect(() => {
     if (isAnalyzingSms) return;
@@ -459,7 +465,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               const dataStr = line.slice(5).trim();
               if (dataStr === '[DONE]') {
                 setAnalysisComplete(true);
-                // After completion, wait 10 seconds before starting a new stream to avoid hammer
                 if (!isCancelled) {
                    const timer = setTimeout(startStreaming, 10000);
                    return timer;
@@ -469,21 +474,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               
               try {
                 const data = JSON.parse(dataStr);
-                
-                // Metadata update (prediction counts, etc.)
                 if (data.prediction_counts) {
                   setInsightData(prev => ({ ...prev, prediction_counts: data.prediction_counts }));
                   if (onLogReceived) onLogReceived({ type: 'info' }, data.prediction_counts);
                 }
-                
-                // Streaming text update
                 if (data.answer || data.current_log?.text) {
                   const newText = data.answer || data.current_log?.text;
                   cumulativeText += newText;
                   enqueueText(newText);
                 }
-
-                // Error handling
                 if (data.error) {
                   enqueueText(`\n⚠️ ${data.error}\n`);
                   if (!isCancelled) setTimeout(startStreaming, 10000);
@@ -498,8 +497,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       } catch (err) {
         console.error("Streaming error:", err);
         enqueueText("", { reset: true });
-
-
         if (!isCancelled) setTimeout(startStreaming, 7000);
       }
     };
@@ -507,6 +504,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     startStreaming();
     return () => { isCancelled = true; };
   }, [isAnalyzingSms, selectedSms]);
+  */
 
   // 현재 SMS incident에 이미 생성된 War-Room이 있는지 확인 (status 무관)
   const warRoomExists = warRooms && selectedSms && warRooms.some(r => 
@@ -562,8 +560,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     <div className={`rounded-3xl p-3 sm:p-6 border shadow-2xl relative overflow-hidden transition-all duration-500
       ${isAnalyzingSms && isCritical
         ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-red-500/40 shadow-red-900/20'
-        : isAnalyzingSms
-        ? 'bg-gradient-to-br from-[#1a1b10] to-[#11141d] border-yellow-500/30 shadow-yellow-900/10'
+        : selectedSms
+        ? 'bg-gradient-to-br from-[#1a1b10] to-[#11141d] border-yellow-500/40 shadow-yellow-500/10'
         : 'bg-gradient-to-br from-[#141928] via-[#161c2b] to-[#0e1018] border-blue-500/20 shadow-blue-900/20'}`}>
       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/3 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none" />
@@ -649,14 +647,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           >
             <RotateCcw className={`w-4 h-4 ${isAnalyzingSms ? 'animate-spin' : ''}`} />
           </button>
-
-          {/* 접기 버튼 */}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 transition-all active:scale-90"
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
-          </button>
         </div>
       </div>
 
@@ -666,6 +656,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         const pct = Math.min(100, score * 100);
         const color = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-yellow-500' : score > 0 ? 'bg-orange-500' : 'bg-slate-600';
         const textColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-yellow-400' : score > 0 ? 'text-orange-400' : 'text-slate-500';
+        const hasReason = !!insightData.similarity_reason;
         return (
           <div className="flex items-center gap-3 mb-4 relative z-10 animate-in fade-in duration-700">
             <div className="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden shadow-inner">
@@ -676,7 +667,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Similarity</span>
-              <span className={`text-xs font-mono font-black ${textColor}`}>
+              <span
+                className={`text-xs font-mono font-black ${textColor} ${hasReason ? 'underline decoration-dotted underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                onClick={hasReason ? () => setShowSimilaritySheet(true) : undefined}
+                title={hasReason ? '매칭 사유 보기' : undefined}
+              >
                 {pct.toFixed(1)}%
               </span>
             </div>
@@ -684,23 +679,83 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         );
       })()}
 
-      {insightData.similarity_reason && (
-        <div className="mb-4 px-1 animate-in fade-in slide-in-from-left-2 duration-1000">
-          <div className="flex items-start gap-2 bg-blue-500/5 border border-blue-500/10 rounded-xl p-3 shadow-inner">
-            <div className="mt-0.5 bg-blue-500/20 p-1 rounded-md">
-              <Zap className="w-3 h-3 text-blue-400" />
+      {/* Similarity Bottom Sheet */}
+      {showSimilaritySheet && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end justify-center"
+          onClick={() => setShowSimilaritySheet(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" />
+          {/* Sheet */}
+          <div
+            className="relative w-full max-w-lg bg-[#0f1624] border border-white/10 rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-300"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-5" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-white uppercase tracking-widest">Similarity Matching Rationale</p>
+                  <p className="text-[10px] text-slate-500 font-mono">벡터 유사도 매칭 사유</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSimilaritySheet(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <div className="flex-1">
-              <p className="text-[10px] font-black text-blue-400/80 uppercase tracking-widest mb-0.5">Matching Rationale</p>
-              <p className="text-[11px] text-slate-300 font-medium italic leading-relaxed">
-                "{insightData.similarity_reason}"
+
+            {/* Score */}
+            {(() => {
+              const score = insightData.similarity_score ?? 0;
+              const pct = Math.min(100, score * 100);
+              const barColor = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-yellow-500' : 'bg-orange-500';
+              const numColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-yellow-400' : 'text-orange-400';
+              return (
+                <div className="flex items-center gap-3 mb-5 p-3 bg-white/[0.03] rounded-2xl border border-white/5">
+                  <div className="flex-1">
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vector Cosine Similarity</span>
+                      <span className={`text-sm font-black font-mono ${numColor}`}>{pct.toFixed(2)}%</span>
+                    </div>
+                    <div className="h-2 bg-white/[0.05] rounded-full overflow-hidden">
+                      <div className={`h-full ${barColor} rounded-full transition-all duration-1000`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Reason */}
+            <div className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4">
+              <p className="text-[9px] font-black text-blue-400/70 uppercase tracking-widest mb-2">AI Matching Reason</p>
+              <p className="text-sm text-slate-200 leading-relaxed italic">
+                &ldquo;{insightData.similarity_reason || '사유 정보가 없습니다.'}&rdquo;
               </p>
+            </div>
+
+            <div className="mt-4 pb-safe">
+              <button
+                onClick={() => setShowSimilaritySheet(false)}
+                className="w-full py-3 bg-white/5 border border-white/10 text-slate-300 rounded-2xl text-sm font-black hover:bg-white/10 transition-colors"
+              >
+                닫기
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className={`transition-all duration-700 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'} pb-4 relative`}>
+      <div className="pb-4 relative">
         
         {/* 장애 상세 정보 (확장 파라미터) */}
         {selectedSms && (
@@ -721,7 +776,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   { label: '에러코드', value: selectedSms.error_code },
                   { label: '발생노드', value: selectedSms.occurrence_node },
                   { label: '발생건수', value: selectedSms.occurrence_count },
-                ].map((f, i) => f.value && (
+                ].map((f, i) => (f.value !== null && f.value !== undefined && f.value !== '' && f.value !== 0 && f.value !== '0') && (
                   <div key={i} className="min-w-0">
                     <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">{f.label}</p>
                     <p className="text-[10px] text-slate-200 font-mono break-all leading-tight" title={f.value}>
@@ -853,11 +908,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black text-sm whitespace-nowrap transition-all active:scale-95
             ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || (lockingUser && !warRoomExists))
               ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-              : isCritical && !warRoomExists
-              ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30'
               : warRoomExists
               ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/30'
-              : 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-lg shadow-yellow-500/20'}`}
+              : (isCritical || incidentCategory === 'critical')
+              ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30 animate-pulse'
+              : incidentCategory === 'security'
+              ? 'bg-purple-500 hover:bg-purple-400 text-white shadow-lg shadow-purple-500/30'
+              : incidentCategory === 'server'
+              ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-lg shadow-orange-500/30'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20'}`}
         >
           <Users className="w-4 h-4" />
           {lockingUser && !warRoomExists ? '다른 사용자 처리 중' : warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}

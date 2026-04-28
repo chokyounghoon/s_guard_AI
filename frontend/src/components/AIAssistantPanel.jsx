@@ -66,39 +66,12 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
     scrollToBottom();
   }, [aiMessages, isAiThinking]);
 
-  // 1. 초기 렌더링 시 로컬 스토리지에서 세션 불러오기
+  // 1. 초기 세션 생성 (chat-sessions API는 Worker에 없으므로 로컬 상태만 사용)
   useEffect(() => {
-    const fetchSessions = async () => {
-      const userId = userProfile?.employee_id;
-      if (!userId || userId === 'anonymous') return;
-      
-      try {
-        const token = getAccessToken();
-        const res = await fetch(getApiUrl(`/api/v1/user/chat-sessions/${userId}`), {
-          headers: {
-             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.sessions && data.sessions.length > 0) {
-            const restored = data.sessions.map(s => ({
-              ...s,
-              messages: s.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }))
-            }));
-            setChatSessions(restored);
-            setActiveSessionId(restored[0].id);
-            setAiMessages(restored[0].messages || []);
-            return;
-          }
-        }
-      } catch(e) {
-        console.error("Failed to fetch sessions from DB", e);
-      }
+    if (userProfile?.employee_id) {
       createNewSession();
-    };
-    fetchSessions();
-  }, [userProfile]);
+    }
+  }, [userProfile?.employee_id]);
 
   // 2. 새로운 채팅 세션 생성
   const createNewSession = () => {
@@ -138,16 +111,9 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
     }
   };
 
-  // 4. 세션 삭제
+  // 4. 세션 삭제 (로컬 상태만 관리)
   const deleteSession = (e, id) => {
-    e.stopPropagation(); // 카드 클릭 스위치 방지
-    const token = getAccessToken();
-    fetch(getApiUrl(`/api/v1/user/chat-sessions/${id}`), { 
-      method: 'DELETE',
-      headers: {
-         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    }).catch(console.error);
+    e.stopPropagation();
     setChatSessions(prev => {
       const filtered = prev.filter(s => s.id !== id);
       // 삭제하는 세션이 현재 활성 상태면 첫번째로 전환, 없으면 새거 생성
@@ -183,25 +149,7 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
           return s;
         });
 
-        // 비동기로 DB에 Session Upsert 요청
-        const updatedSession = next.find(s => s.id === activeSessionId);
-        if (updatedSession && userProfile?.employee_id) {
-          const token = getAccessToken();
-          fetch(getApiUrl('/api/v1/user/chat-sessions'), {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-            },
-            body: JSON.stringify({
-               id: updatedSession.id,
-               user_id: userProfile.employee_id,
-               title: updatedSession.title,
-               messages: updatedSession.messages,
-               updated_at: updatedSession.updatedAt
-            })
-          }).catch(console.error);
-        }
+        // 세션은 로컬 상태로만 관리 (Worker에 chat-sessions 엔드포인트 없음)
         return next;
       });
     }
