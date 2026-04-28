@@ -73,6 +73,7 @@ export default function ChatPage() {
   const scrollRef = useRef(null);
   const textareaRef = useRef(null);
   const longPressTimer = useRef(null);
+  const markedReadSeqs = useRef(new Set()); // ✅ 이미 MARK_READ 보낸 seq 추적
   const [longPressMsg, setLongPressMsg] = useState(null); // 길게 누른 메시지
   const [showAiPanel, setShowAiPanel] = useState(false);  // AI Summary 패널 (헤더 버튼)
 
@@ -386,10 +387,16 @@ export default function ChatPage() {
   // Post Chat Logic
 
   useEffect(() => {
-    // When messages load, mark those with read_count > 0 as read (if not from us)
+    // When messages load, mark OTHER people's messages with unread count as read — but only ONCE per seq
     if (mainMessages.length > 0 && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       mainMessages.forEach(msg => {
-        if (msg.read_count > 0 && msg.type !== 'me' && msg.seq) {
+        if (
+          msg.read_count > 0 &&
+          msg.type !== 'me' &&
+          msg.seq &&
+          !markedReadSeqs.current.has(msg.seq) // ✅ 이미 보낸 seq는 다시 보내지 않음
+        ) {
+          markedReadSeqs.current.add(msg.seq);
           wsRef.current.send(JSON.stringify({
             type: "MARK_READ",
             incident_id: incidentId,
@@ -399,7 +406,7 @@ export default function ChatPage() {
         }
       });
     }
-  }, [mainMessages.length, currentUser.name, currentUser.employee_id, incidentId]);
+  }, [mainMessages.length, currentUser.employee_id, incidentId]);
 
 
   useEffect(() => {
