@@ -1365,13 +1365,10 @@ export default function DashboardPage({ onAiClick }) {
 
           {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
           <div className="flex flex-col h-full overflow-hidden">
-          {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
+          {/* 실시간 SMS 수신 내역 패널 */}
           {smsMessages.length > 0 && (
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-              <div
-                onClick={toggleSmsPanel}
-                className="p-4 sm:p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
-              >
+            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden custom-scrollbar flex flex-col">
+              <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-2 sm:gap-3.5">
                     <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
                       <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
@@ -1415,9 +1412,6 @@ export default function DashboardPage({ onAiClick }) {
                       </div>
                     );
                   })()}
-                  <div className={`transition-transform duration-300 ${isSmsPanelCollapsed ? '' : 'rotate-180'}`}>
-                    <ChevronRight className="w-5 h-5 text-slate-400 rotate-90" />
-                  </div>
                 </div>
               </div>
 
@@ -1462,8 +1456,8 @@ export default function DashboardPage({ onAiClick }) {
                 </div>
               </div>
 
-              <div className={`transition-all duration-500 ease-in-out ${isSmsPanelCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[500px] border-t border-white/5'}`}>
-                <div className="p-3 space-y-1.5 overflow-y-auto max-h-[500px] scrollbar-thin">
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-3 space-y-1.5">
                   {visibleSms.map((msg) => {
                     const isSelected = selectedSms?.inc_id === msg.inc_id;
                     return (
