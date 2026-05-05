@@ -1568,7 +1568,7 @@ export default function DashboardPage({ onAiClick }) {
 
 
           {/* AI War-Room Situation Log (Section 2) */}
-          <div className="w-full h-[650px]">
+          <div className="flex-1 overflow-hidden flex flex-col">
             <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
               {/* Header */}
               <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between">
