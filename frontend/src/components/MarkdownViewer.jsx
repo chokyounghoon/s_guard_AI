@@ -38,25 +38,20 @@ const CodeBlock = ({ children, className }) => {
 const MarkdownViewer = ({ text }) => {
   if (!text) return null;
 
-  // 📝 Pre-process: 불필요 요소 제거 및 타임라인 포맷 정리
+  // 📝 Pre-process: 불필요 요소 제거 (번호 제목 **N.** 패턴은 유지)
   const processedText = text
     .replace(/([^\n])(⏱️)/g, '$1\n\n$2')
     .replace(/⏱️\s*장애 대응 타임라인 요약\s*\*?/g, '')
     .replace(/⏱️\s*[^\n]*/g, '')
-    .replace(/\*\*([^*\n]*)\*\*/g, '$1')
+    // **N. 제목** 패턴은 건드리지 않음 (숫자+점 형태만 보존)
+    .replace(/(?<!\*\*\d+\..*?)\*\*([^*\n]*)\*\*/g, '$1')  // 일반 bold만 제거
     .replace(/\*([^*\n]+)\*/g, '$1')
     .replace(/\*\*/g, '')
     .replace(/^[\*]\s+/gm, '- ')
-    .replace(/\d+\.\s+[\*\-]?\s*/g, '- ')
+    // 숫자. 패턴 변환은 하지 않음 (번호 제목 보존)
     .replace(/([^\n])\n?(💡 핵심 원인|Root Cause:)/g, '$1\n\n$2')
     .replace(/([^\n])\n?(✅ 최종 조치 결과|Resolution:)/g, '$1\n\n$2')
     .replace(/\n{3,}/g, '\n\n');
-
-  const SH_KEYWORDS = ['장애내용','장애 내용','발생원인','발생 원인','핵심원인','핵심 원인','진행결과','진행 결과','진행경과','진행 경과','상황종료','상황 종료','추가작업 진행여부','추가작업','추가 작업'];
-  const numberedText = processedText.replace(
-    new RegExp(`^(?:[-*]\\s+)?(${SH_KEYWORDS.join('|')})\\s*$`, 'gm'),
-    (_, kw) => `- __SH__${kw}`
-  );
 
   return (
     <div className="prose prose-invert max-w-none space-y-1 pb-2">
@@ -139,34 +134,6 @@ const MarkdownViewer = ({ text }) => {
               );
             }
 
-            // 🏷️ Section Header
-            const shMatch = content.match(/^__SH__(.+)$/);
-            if (shMatch) {
-              const heading = shMatch[1].trim();
-              const ICONS = {
-                '장애': { icon: TriangleAlert, color: 'blue' },
-                '발생': { icon: Zap, color: 'amber' },
-                '핵심': { icon: Brain, color: 'orange' },
-                '진행': { icon: Clock, color: 'indigo' },
-                '상황': { icon: Shield, color: 'emerald' },
-                '추가': { icon: CirclePlus, color: 'purple' },
-              };
-              const iconKey = Object.keys(ICONS).find(k => heading.includes(k)) || '장애';
-              const { icon: SectionIcon, color } = ICONS[iconKey];
-
-              return (
-                <div className="mt-4 mb-1 first:mt-1">
-                  <div className="flex items-center gap-2">
-                    <div className={`bg-${color}-500/20 border border-${color}-500/30 p-1 rounded-lg`}>
-                      <SectionIcon className={`w-3.5 h-3.5 text-${color}-400`} />
-                    </div>
-                    <h3 className="text-sm font-black text-white tracking-wide uppercase">{heading}</h3>
-                    <div className="h-px flex-1 bg-white/10" />
-                  </div>
-                </div>
-              );
-            }
-
             // Regular List Item
             return (
               <div className="flex items-start gap-2 py-0.5">
@@ -216,7 +183,7 @@ const MarkdownViewer = ({ text }) => {
           }
         }}
       >
-        {numberedText}
+        {processedText}
       </ReactMarkdown>
     </div>
   );

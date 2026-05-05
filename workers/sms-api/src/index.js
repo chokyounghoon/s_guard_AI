@@ -6443,6 +6443,28 @@ app.post('/ai/knowledge/save', async (c) => {
   }
 });
 
+app.delete('/ai/knowledge/:id', async (c) => {
+  const id = c.req.param('id');
+  const db = c.env.DB;
+  const vectorIndex = c.env.WARROOM_INDEX;
+
+  const existing = await db.prepare("SELECT id FROM knowledge_base WHERE id = ?").bind(id).first();
+  if (!existing) return c.json({ error: 'Not found' }, 404);
+
+  await db.prepare("DELETE FROM knowledge_base WHERE id = ?").bind(id).run();
+
+  // Vectorize에서도 삭제
+  if (vectorIndex) {
+    try {
+      await vectorIndex.deleteByIds([`kn-${id}`]);
+    } catch (e) {
+      console.warn(`[Knowledge DELETE] Vectorize removal failed for kn-${id}:`, e.message);
+    }
+  }
+
+  return c.json({ status: 'deleted', id });
+});
+
 // 🚀 NEW: Intelligent Related History Search (Robust Version)
 app.get('/ai/related-history', async (c) => {
   const query = c.req.query('q');
@@ -8117,15 +8139,16 @@ app.post('/api/v1/reports/submit', async (c) => {
 
     // 3. Register Knowledge Base
     const kbResult = await db.prepare(`
-      INSERT INTO knowledge_base (inc_id, title, content, category, reg_dt, mod_dt, vector, status)
-      VALUES (?, ?, ?, 'REPORT', ?, ?, ?, 'PENDING')
+      INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector, status)
+      VALUES (?, ?, ?, 'REPORT', ?, ?, ?, ?, ?, 'PENDING')
       ON CONFLICT(inc_id) DO UPDATE SET 
         content = excluded.content,
+        mod_id = excluded.mod_id,
         mod_dt = excluded.mod_dt,
         vector = excluded.vector,
         status = 'PENDING'
       RETURNING id
-    `).bind(incident_id, title, content, now, now, vectorArray).first()
+    `).bind(incident_id, title, content, sender_id, now, sender_id, now, vectorArray).first()
 
     const knowledgeId = kbResult?.id;
 

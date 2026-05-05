@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal, ChevronDown, ChevronUp, UserCircle } from 'lucide-react';
+import { Send, AlertTriangle, CheckCircle, Terminal, Image as ImageIcon, Mic, Loader2, Clipboard, ArrowRight, SlidersHorizontal, ChevronDown, ChevronUp, UserCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { getAuthHeaders } from '../lib/authStore';
 
 const IncidentPushPage = () => {
     const navigate = useNavigate();
+    const goBack = useBackNavigation('/dashboard');
     const [sender, setSender] = useState('');
     const [employeeId, setEmployeeId] = useState('');
     const [message, setMessage] = useState('');
@@ -454,6 +456,9 @@ const IncidentPushPage = () => {
                 <div className="flex flex-col border-b border-white/10 pb-8">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
+                            <button onClick={() => goBack()} className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors shrink-0">
+                                <ArrowLeft className="w-6 h-6 text-white" />
+                            </button>
                             <div className="p-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
                                 <Terminal className="w-6 h-6 text-blue-400" />
                             </div>

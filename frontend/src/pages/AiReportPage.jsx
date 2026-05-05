@@ -239,7 +239,7 @@ export default function AiReportPage() {
   const sevClass = severityColors[sev] || severityColors.NORMAL;
 
   return (
-    <div className="min-h-screen bg-[#0a0d14] text-white font-sans flex flex-col">
+    <div className="h-screen bg-[#0a0d14] text-white font-sans flex flex-col overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 sticky top-0 bg-[#0a0d14]/90 backdrop-blur-lg z-50 border-b border-white/5">
         <div className="max-w-5xl mx-auto w-full flex items-center justify-between">
@@ -311,7 +311,7 @@ export default function AiReportPage() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 mb-24 overflow-y-auto">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-36 overflow-y-auto custom-scrollbar">
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
             <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
@@ -611,7 +611,7 @@ export default function AiReportPage() {
       )}
 
       {/* Footer */}
-      <footer className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0a0d14] to-transparent pt-8 flex gap-3 z-50">
+      <footer className="shrink-0 p-4 bg-gradient-to-t from-[#0a0d14] to-transparent pt-8 flex gap-3 z-50">
         <button
           onClick={() => navigate(`/chat/${incidentId}`)}
           className="flex-1 h-13 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center gap-2 transition-all border border-white/5 py-3"

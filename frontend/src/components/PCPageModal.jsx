@@ -28,15 +28,19 @@ export default function PCPageModal({ children }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [isPC, handleClose]);
 
-  // 모바일: full-page 그대로 렌더링
-  if (!isPC) {
+  // Mobile Popup Mode Routes
+  const modalPaths = ['/chat-summary/', '/inbox', '/report/', '/ai-report/'];
+  const isModalPage = modalPaths.some(path => location.pathname.includes(path));
+
+  // 모바일: 기본적으로 full-page 렌더링하지만, 특정 페이지들은 팝업 형태로 유지
+  if (!isPC && !isModalPage) {
     return <>{children}</>;
   }
 
   // PC: 모달 오버레이
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-6 lg:p-10"
+      className={`fixed inset-0 z-[200] flex items-center justify-center ${isPC ? 'p-6 lg:p-10' : 'p-3 sm:p-6'}`}
       onClick={handleClose}
     >
       {/* Backdrop */}
@@ -45,36 +49,38 @@ export default function PCPageModal({ children }) {
       {/* Modal Panel */}
       <div
         className="
-          relative z-10 w-full max-w-5xl
-          bg-[#0f1421] border border-white/10 rounded-3xl shadow-2xl
+          relative z-10 w-full max-w-5xl h-fit
+          bg-[#0f1421] border border-white/10 rounded-[2.5rem] shadow-2xl
           flex flex-col overflow-hidden
           animate-in zoom-in-95 fade-in duration-300
         "
-        style={{ maxHeight: 'calc(100vh - 4rem)' }}
+        style={{ maxHeight: isPC ? 'calc(100vh - 4rem)' : 'calc(100vh - 2rem)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Top Bar */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#080c18] shrink-0">
-          <button
-            onClick={handleClose}
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold group"
-          >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            <span>대시보드</span>
-          </button>
+        {/* Modal Top Bar - 특정 페이지들은 자체 헤더를 사용하므로 숨김 */}
+        {!isModalPage && (
+          <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#080c18] shrink-0">
+            <button
+              onClick={handleClose}
+              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              <span>대시보드</span>
+            </button>
 
-          {/* 현재 경로 표시 */}
-          <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">
-            {location.pathname}
-          </span>
+            {/* 현재 경로 표시 */}
+            <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">
+              {location.pathname}
+            </span>
 
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Page Content — each page manages its own scroll */}
         <div className="flex-1 overflow-hidden flex flex-col">

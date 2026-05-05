@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MarkdownViewer from '../components/MarkdownViewer';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 
 // ** 등 마크다운 심볼 제거 유틸
 const stripMarkdown = (str = '') =>
@@ -34,6 +35,7 @@ const stripMarkdown = (str = '') =>
 
 export default function InboxPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState([]);
@@ -147,6 +149,9 @@ export default function InboxPage() {
         <div className="relative z-10 flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <button onClick={() => goBack()} className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors shrink-0">
+                <ArrowLeft className="w-6 h-6 text-white" />
+              </button>
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/40 border border-white/10">
                 <Inbox className="w-5 h-5 text-white" />
               </div>

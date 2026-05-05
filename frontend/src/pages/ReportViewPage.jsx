@@ -52,7 +52,6 @@ export default function ReportViewPage() {
           if (smsRes.ok) {
             const smsData = await smsRes.json();
             if (smsData) {
-              // Merge all SMS data columns
               reportData = { ...reportData, ...smsData };
               if (smsData.message) {
                 reportData.sms_message = smsData.message;
@@ -111,212 +110,220 @@ export default function ReportViewPage() {
   const cleanId = String(incId || '').replace(/^INC-/i, '');
   const cleanTitle = (t) => (t || '').split(':')[0].trim();
 
-  /* ── Loading ── */
   if (loading) return (
-    <div style={{ minHeight: '100dvh', background: '#090c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-        <div style={{ width: 40, height: 40, border: '3px solid rgba(16,185,129,0.15)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <p style={{ color: '#475569', fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>리포트 불러오는 중...</p>
+    <div className="min-h-screen bg-[#090c14] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+        <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">리포트 로딩중...</p>
       </div>
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
-  /* ── Error ── */
   if (error) return (
-    <div style={{ minHeight: '100dvh', background: '#090c14', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
-      <div style={{ width: 60, height: 60, borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <ScrollText size={26} color="#334155" />
+    <div className="min-h-screen bg-[#090c14] flex flex-col items-center justify-center gap-6 p-6">
+      <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+        <ScrollText className="w-8 h-8 text-slate-700" />
       </div>
-      <p style={{ color: '#64748b', fontSize: 14 }}>{error}</p>
-      <button onClick={() => navigate(-1)} style={{ padding: '10px 24px', borderRadius: 12, background: '#1d4ed8', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+      <p className="text-slate-500 text-sm font-bold">{error}</p>
+      <button 
+        onClick={() => navigate(-1)} 
+        className="px-8 py-3 rounded-2xl bg-blue-600 text-white text-sm font-bold active:scale-95 transition-all shadow-lg shadow-blue-600/20"
+      >
         돌아가기
       </button>
     </div>
   );
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#090c14', color: '#fff', paddingBottom: 100 }}>
-
-      {/* ── Header ── */}
-      <header style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-        background: 'rgba(9,12,20,0.92)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: '10px 16px',
-        display: 'flex', alignItems: 'center', gap: 12,
-      }}>
-        {/* 뒤로가기 */}
+    <div className="h-screen bg-[#090c14] text-white flex flex-col overflow-hidden">
+      {/* Header */}
+      <header className="shrink-0 flex items-center gap-4 px-6 h-20 bg-[#090c14]/80 backdrop-blur-2xl border-b border-white/5 z-50">
         <button
           onClick={() => navigate(-1)}
-          style={{
-            width: 36, height: 36, borderRadius: 12,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', flexShrink: 0,
-          }}
+          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-all"
         >
-          <ArrowLeft size={16} color="#94a3b8" />
+          <ArrowLeft className="w-5 h-5 text-slate-400" />
         </button>
 
-        {/* 타이틀 */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 11, fontWeight: 900, color: '#10b981', letterSpacing: '0.12em', textTransform: 'uppercase', lineHeight: 1 }}>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-1">
             Incident Report
           </p>
-          <p style={{ fontSize: 10, color: '#334155', fontFamily: 'monospace', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <p className="text-[11px] text-slate-500 font-mono font-bold truncate">
             {cleanId}
           </p>
         </div>
 
-        {/* 인쇄 */}
         <button
           onClick={() => window.print()}
-          style={{
-            width: 36, height: 36, borderRadius: 12,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', flexShrink: 0,
-          }}
+          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-all"
           title="인쇄"
         >
-          <Printer size={15} color="#64748b" />
+          <Printer className="w-5 h-5 text-slate-500" />
         </button>
       </header>
 
-      {/* ── Content ── */}
-      <div style={{ paddingTop: 64, paddingInline: 16, maxWidth: 680, margin: '0 auto' }}>
-
-        {/* Meta Card */}
-        <div style={{
-          marginTop: 16, marginBottom: 12,
-          background: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(9,12,20,0) 60%)',
-          border: '1px solid rgba(16,185,129,0.15)',
-          borderRadius: 20, padding: '16px 18px',
-          position: 'relative', overflow: 'hidden',
-        }}>
-          {/* 왼쪽 강조선 */}
-          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: '#10b981', borderRadius: '20px 0 0 20px' }} />
-
-          {/* 상태 배지 */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 6, padding: '3px 10px', letterSpacing: '0.04em' }}>처리완료</span>
-            <span style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace', fontWeight: 800 }}>
-              유사도 {report?.similarity ? (String(report.similarity).includes('%') ? report.similarity : `${report.similarity}%`) : '98.5%'}
-            </span>
-          </div>
-
-          {/* 제목 & MTTR */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 900, color: '#f1f5f9', lineHeight: 1.4, margin: 0 }}>
-              {(() => {
-                // 1. Users 테이블에서 user_id 기반 subpart 코드를 찾고, Org 테이블에서 명칭 조회
-                const writer = users.find(u => 
-                  String(u.user_id) === String(report?.user_id) || 
-                  String(u.id) === String(report?.user_id) ||
-                  (report?.user_id && String(u.name) === String(report.user_id))
-                );
-                const userSubpartCode = writer?.subpart || writer?.org_code || writer?.dept_code;
-
-                const findOrgNameByCode = (nodes, code) => {
-                  if (!nodes || !code) return null;
-                  for (const node of nodes) {
-                    if (String(node.code) === String(code)) return node.name;
-                    if (node.children) {
-                      const found = findOrgNameByCode(node.children, code);
-                      if (found) return found;
-                    }
-                  }
-                  return null;
-                };
-
-                const orgName = findOrgNameByCode(orgTree, userSubpartCode);
-                if (orgName) {
-                  return `[${orgName} 장애 완료 보고서]`;
-                }
-
-                const fallbackCode = report?.subpart_code || report?.subpart || report?.dept_code || report?.org_code;
-                const fallbackOrgName = findOrgNameByCode(orgTree, fallbackCode);
-                if (fallbackOrgName) {
-                  return `[${fallbackOrgName} 장애 완료 보고서]`;
-                }
-
-                return cleanTitle(report?.title || `[인시던트 보고서] ${cleanId}`);
-              })()}
-            </h2>
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto custom-scrollbar pb-36">
+        <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
+          
+          {/* Meta Card */}
+          <div className="relative overflow-hidden rounded-[2rem] border border-emerald-500/20 bg-emerald-500/5 p-6 md:p-8">
+            <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-emerald-500" />
             
-            {/* MTTR 배지 */}
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
-              padding: '6px 12px', borderRadius: 12,
-              background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
-              color: '#ef4444', fontSize: 13, fontWeight: 900,
-              flexShrink: 0,
-            }}>
-              <span style={{ fontSize: 9, color: 'rgba(239,68,68,0.5)', fontWeight: 900, letterSpacing: '0.05em' }}>MTTR</span>
-              <span style={{ fontFamily: 'monospace' }}>{report?.mttr || '12m 34s'}</span>
+            <div className="flex items-center justify-between mb-6">
+              <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                처리완료
+              </span>
+              <span className="text-[11px] font-black text-slate-500 font-mono tracking-tight">
+                유사도 {report?.similarity ? (String(report.similarity).includes('%') ? report.similarity : `${report.similarity}%`) : '98.5%'}
+              </span>
             </div>
-          </div>
 
-          {/* 메타 정보 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {(report?.user_org_path || report?.user_id) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <Building2 size={12} color="#475569" />
-                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, lineHeight: 1.5 }}>
-                  {report.user_org_path || report.user_id}
-                </span>
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
+              <h2 className="text-xl md:text-2xl font-black text-slate-100 leading-tight">
+                {(() => {
+                  const writer = users.find(u => 
+                    String(u.user_id) === String(report?.user_id) || 
+                    String(u.id) === String(report?.user_id) ||
+                    (report?.user_id && String(u.name) === String(report.user_id))
+                  );
+                  const userSubpartCode = writer?.subpart || writer?.org_code || writer?.dept_code;
+
+                  const findOrgNameByCode = (nodes, code) => {
+                    if (!nodes || !code) return null;
+                    for (const node of nodes) {
+                      if (String(node.code) === String(code)) return node.name;
+                      if (node.children) {
+                        const found = findOrgNameByCode(node.children, code);
+                        if (found) return found;
+                      }
+                    }
+                    return null;
+                  };
+
+                  const orgName = findOrgNameByCode(orgTree, userSubpartCode);
+                  if (orgName) return `[${orgName} 장애 완료 보고서]`;
+
+                  const fallbackCode = report?.subpart_code || report?.subpart || report?.dept_code || report?.org_code;
+                  const fallbackOrgName = findOrgNameByCode(orgTree, fallbackCode);
+                  if (fallbackOrgName) return `[${fallbackOrgName} 장애 완료 보고서]`;
+
+                  return cleanTitle(report?.title || `[인시던트 보고서] ${cleanId}`);
+                })()}
+              </h2>
+              
+              <div className="shrink-0 flex flex-col items-end px-4 py-2 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500">
+                <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-0.5">MTTR</span>
+                <span className="text-lg font-black font-mono leading-none">{report?.mttr || '12m 34s'}</span>
               </div>
-            )}
-            {report?.created_at && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <Clock size={12} color="#475569" />
-                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
-                  {new Date(report.created_at).toLocaleString('ko-KR')}
-                </span>
+            </div>
+
+            <div className="space-y-3">
+              {(report?.user_org_path || report?.user_id) && (
+                <div className="flex items-center gap-3 text-slate-400">
+                  <div className="p-1.5 bg-white/5 rounded-lg border border-white/5">
+                    <Building2 className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-bold leading-tight truncate">
+                    {report.user_org_path || report.user_id}
+                  </span>
+                </div>
+              )}
+              {report?.created_at && (
+                <div className="flex items-center gap-3 text-slate-500">
+                  <div className="p-1.5 bg-white/5 rounded-lg border border-white/5">
+                    <Clock className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-bold font-mono">
+                    {new Date(report.created_at).toLocaleString('ko-KR')}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Original SMS Card */}
+          {report?.sms_message && (
+            <div className="relative overflow-hidden rounded-[2rem] border border-blue-500/20 bg-blue-500/5 p-6">
+              <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-blue-500" />
+              <div className="flex items-center gap-2 mb-4">
+                <MessageSquare className="w-4 h-4 text-blue-400" />
+                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">수신 문자 원문</span>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* 원본 문자 메시지 카드 */}
-        {report?.sms_message && (
-          <div style={{
-            marginBottom: 20,
-            background: 'rgba(59,130,246,0.04)',
-            border: '1px solid rgba(59,130,246,0.15)',
-            borderRadius: 20, padding: '16px 20px',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: '#3b82f6', borderRadius: '20px 0 0 20px' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-              <MessageSquare size={14} color="#60a5fa" />
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', letterSpacing: '0.05em' }}>수신 문자 원문</span>
+              <div className="text-[13px] text-slate-300 leading-relaxed font-medium bg-black/20 p-4 rounded-2xl border border-white/5 whitespace-pre-wrap">
+                {report.sms_message || ''}
+              </div>
             </div>
-            <div style={{ color: '#cbd5e1', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-              {report.sms_message || ''}
-            </div>
-          </div>
-        )}
-
-        {/* 리포트 본문 */}
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 20, padding: '16px 18px',
-        }}>
-          {report?.content ? (
-            <MarkdownViewer text={report.content} />
-          ) : (
-            <p style={{ color: '#475569', fontSize: 14, textAlign: 'center', padding: '32px 0' }}>
-              보고서 내용이 없습니다.
-            </p>
           )}
+
+          {/* Report Body */}
+          <div className="rounded-[2.5rem] border border-white/5 bg-white/[0.03] p-6 md:p-8">
+            {report?.content ? (() => {
+              const lines = report.content.split('\n');
+              return (
+                <div className="space-y-4">
+                  {lines.map((line, idx) => {
+                    if (line.trim() === '') return null;
+
+                    // **N. 제목** → 굵은 번호 제목
+                    const boldTitleMatch = line.match(/^\*\*(\d+)\.\s+(.+?)\*\*$/);
+                    if (boldTitleMatch) {
+                      return (
+                        <div key={idx} className="pt-4 first:pt-0">
+                          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-blue-500/20">
+                            <span className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-600/20 text-blue-400 text-sm font-black shrink-0">
+                              {boldTitleMatch[1]}
+                            </span>
+                            <h3 className="text-sm font-black text-white tracking-tight">{boldTitleMatch[2]}</h3>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // - 항목 라인
+                    const bulletMatch = line.match(/^-\s+(.+)$/);
+                    if (bulletMatch) {
+                      const content = bulletMatch[1];
+                      const colonIdx = content.indexOf(': ');
+                      if (colonIdx > -1) {
+                        const key = content.substring(0, colonIdx);
+                        const val = content.substring(colonIdx + 2);
+                        return (
+                          <div key={idx} className="flex gap-2 text-sm pl-2 leading-relaxed -mt-2">
+                            <span className="text-blue-400 shrink-0">•</span>
+                            <span>
+                              <span className="text-slate-300 font-semibold">{key}:</span>
+                              <span className="text-slate-400"> {val}</span>
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={idx} className="flex gap-2 text-sm pl-2 leading-relaxed text-slate-400 -mt-2">
+                          <span className="text-blue-400 shrink-0">•</span>
+                          <span>{content}</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <p key={idx} className="text-sm text-slate-400 leading-relaxed pl-2">{line}</p>
+                    );
+                  })}
+                </div>
+              );
+            })() : (
+              <div className="py-20 flex flex-col items-center justify-center text-slate-600 gap-3">
+                <ScrollText className="w-12 h-12 opacity-20" />
+                <p className="text-sm font-bold">보고서 내용이 없습니다.</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
 
       <BottomMenu />
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

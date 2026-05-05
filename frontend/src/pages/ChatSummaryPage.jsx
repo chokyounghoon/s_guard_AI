@@ -35,6 +35,16 @@ import html2pdf from 'html2pdf.js';
 import BottomMenu from '../components/BottomMenu';
 import './ChatSummaryPage.css';
 
+// ** , __SH__ 등 불필요한 마크다운 심볼 제거 유틸
+const cleanAiText = (str = '') => {
+  if (!str) return '';
+  return str
+    .replace(/__SH__/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '')
+    .replace(/#{1,6}\s?/g, '');
+};
+
 export default function ChatSummaryPage() {
   const { incidentId } = useParams();
   const navigate = useNavigate();
@@ -82,10 +92,16 @@ export default function ChatSummaryPage() {
         currentController = new AbortController();
         abortControllerRef.current = currentController;
 
+        const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
+
         const response = await fetch(getApiUrl('/ai/summarize-chat'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ incident_id: incidentId }),
+          body: JSON.stringify({ 
+            incident_id: incidentId,
+            instructions: reportInstruction,
+            prompt: reportInstruction
+          }),
           signal: currentController.signal
         });
 
@@ -236,6 +252,20 @@ export default function ChatSummaryPage() {
       }
     };
   }, [incidentId]);
+
+  // Map of section titles to icons and colors
+  const sectionColorMap = [
+    { keys: ['장애내용', '장애 내용', '장애 개요', '개요'], label: '장애 내용', style: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-300' } },
+    { keys: ['발생원인', '발생 원인', '원인'], label: '발생 원인', style: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-300' } },
+    { keys: ['진행경과', '진행 경과', '타임라인', '경과'], label: '진행 경과', style: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-300' } },
+    { keys: ['상황종료', '상황 종료', '종료'], label: '상황 종료', style: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300' } },
+    { keys: ['사후관리', '사후 관리', '추가작업', '추가 작업', 'Action Items'], label: '사후 관리 (Action Items)', style: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-300' } },
+  ];
+
+  const getSectionInfo = (title) => {
+    const entry = sectionColorMap.find(e => e.keys.some(k => title.toLowerCase().includes(k.toLowerCase())));
+    return entry || { label: title, style: { bg: 'bg-white/[0.02]', border: 'border-white/5', text: 'text-slate-300' } };
+  };
 
   // 🧪 Section Parser Logic
   const parseSections = (text) => {
@@ -436,8 +466,109 @@ export default function ChatSummaryPage() {
     }
   };
 
+  const generateFinalReportText = () => {
+    const raw = summary || '';
+
+    // 불필요한 기호/마크다운 제거 (** 는 파싱 후에 제거)
+    const stripLine = (s) => s
+      .replace(/__SH__/g, '')
+      .replace(/__/g, '')
+      .replace(/[✅💡⏱️►▶]/g, '')
+      .replace(/^[-*•>\s]+/, '')
+      .trim();
+
+    // AI 원문에서 특정 블록 추출 (시작 키워드 ~ 다음 구분자까지)
+    const extractBlock = (startKw, endKws) => {
+      const startRe = new RegExp(startKw, 'i');
+      const startM = raw.match(startRe);
+      if (!startM) return '';
+      let start = startM.index + startM[0].length;
+      let end = raw.length;
+      for (const ek of endKws) {
+        const em = raw.slice(start).match(new RegExp(ek, 'i'));
+        if (em && (start + em.index) < end) end = start + em.index;
+      }
+      return raw.substring(start, end).trim();
+    };
+
+    // AI 원문 구조: [타임라인] → [핵심 원인] → [최종 보고서(1~5)]
+    // 최종 보고서 블록 추출
+    const reportBlock = extractBlock(
+      '최종\\s*보고서|Resolution Report',
+      ['---', '\\[수석 분석가', '그외 처리']
+    ) || raw;
+
+    // 핵심 원인 블록 추출 (ROOT CAUSE 또는 핵심 원인)
+    const rootCauseBlock = extractBlock(
+      '핵심\\s*원인|Root Cause',
+      ['최종\\s*보고서|Resolution Report', '---', '✅', '\\[수석']
+    );
+
+    // 최종보고서 블록에서 각 항목 추출
+    const getItem = (keywords, block) => {
+      for (const kw of keywords) {
+        const re = new RegExp(`${kw}[:\\s]+([^\\n]+)`, 'i');
+        const m = block.match(re);
+        if (m && stripLine(m[1]).length > 2) return stripLine(m[1]);
+      }
+      return null;
+    };
+
+    // 발생 원인: 최종보고서 내 '발생 원인' 또는 핵심 원인 블록의 본문
+    const getCause = () => {
+      // 최종보고서 안에서 먼저 찾기
+      const fromReport = getItem(['발생\\s*원인', '발생원인'], reportBlock);
+      if (fromReport) return fromReport;
+      // 핵심 원인 블록 본문 사용 (첫 줄)
+      if (rootCauseBlock) {
+        const firstLine = rootCauseBlock.split('\n').find(l => stripLine(l).length > 10);
+        if (firstLine) return stripLine(firstLine);
+      }
+      return '현재 원인 파악 단계 (추가 데이터 확보 후 정밀 분석 예정)';
+    };
+
+    // 진행 경과: 타임라인 항목들 합치기
+    const getProgress = () => {
+      const fromReport = getItem(['진행\\s*경과', '진행경과', '경과'], reportBlock);
+      if (fromReport) return fromReport;
+      // 타임라인에서 타임스탬프 항목 추출
+      const timelineMatches = [...raw.matchAll(/(\d{2}:\d{2}:\d{2})[^\n]{5,}/g)];
+      if (timelineMatches.length > 0) {
+        return timelineMatches.map(m => stripLine(m[0])).join(' → ');
+      }
+      return '워룸 개설 및 초기 인지 단계';
+    };
+
+    const scope    = getItem(['서비스\\s*영향\\s*범위', '영향\\s*범위'], reportBlock) || '분석 데이터 대기 중';
+    const symptom  = getItem(['주요\\s*현상', '주요현상'], reportBlock)                || '데이터 대기 중 (로그/이미지 분석 필요)';
+    const cause    = getCause();
+    const progress = getProgress();
+    const recovery = getItem(['복구\\s*확인\\s*지표', '복구\\s*확인', '복구지표'], reportBlock) || '확인 지표 대기 중';
+    const rawS5    = getItem(['추가\\s*작업\\s*진행\\s*여부', '사후\\s*관리', 'Action\\s*Items'], reportBlock) || '장애 원인 규명 후 수립 예정';
+
+    const finalS5 = additionalNotes ? additionalNotes.trim() : rawS5;
+
+    return `**1. 장애 내용**
+- 서비스 영향 범위: ${scope}
+- 주요 현상: ${symptom}
+
+**2. 발생 원인**
+- ${cause}
+
+**3. 진행 경과**
+- ${progress}
+
+**4. 상황 종료**
+- 복구 확인 지표: ${recovery}
+
+**5. 사후 관리 (Action Items)**
+- 추가 작업 진행 여부: ${finalS5}`;
+  };
+
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(summary);
+    const reportText = generateFinalReportText();
+    navigator.clipboard.writeText(reportText);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -469,10 +600,10 @@ export default function ChatSummaryPage() {
     setIsGoverning(true);
     setGovernanceStep('knowledge');
     
-    const fullContent = `${summary}\n\n### [그외 처리 사항]\n${additionalNotes || '없음'}`;
-
     try {
-      // Step 1: Call Consolidated Submission & Distribution API
+      const fullContent = generateFinalReportText();
+      const firstLine = cleanAiText(summary).split('\n')[0].replace(/[#*]/g, '').trim();
+
       const response = await fetch(getApiUrl('/api/v1/reports/submit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -480,7 +611,9 @@ export default function ChatSummaryPage() {
           incident_id: incidentId,
           sender_id: savedUser.employee_id,
           sender_name: savedUser.name || savedUser.employee_id,
-          title: `[인시던트 보고서] ${incidentId}: ${summary.split('\n')[0].substring(0, 50)}...`,
+          reg_id: savedUser.employee_id,
+          mod_id: savedUser.employee_id,
+          title: `[S-GUARD AI 보고서] ${incidentId}: ${firstLine.substring(0, 50)}`,
           content: fullContent,
           preview: `장애 대응 완료 보고서 (${incidentId})`
         })
@@ -521,7 +654,7 @@ export default function ChatSummaryPage() {
   };
 
   return (
-    <div className="h-screen bg-[#0f1421] text-white font-sans flex flex-col overflow-hidden">
+    <div className="min-h-0 max-h-full bg-[#0f1421] text-white font-sans flex flex-col overflow-hidden">
 
       {/* ── 헤더 (고정) ── */}
       <header className="shrink-0 bg-[#0f1421]/95 backdrop-blur-md border-b border-white/5 z-50 print:hidden">
@@ -543,9 +676,15 @@ export default function ChatSummaryPage() {
                 abortControllerRef.current = controller;
                 (async () => {
                   try {
+                    const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
                     const response = await fetch(getApiUrl('/ai/summarize-chat'), {
                       method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ incident_id: incidentId }), signal: controller.signal
+                      body: JSON.stringify({ 
+                        incident_id: incidentId,
+                        instructions: reportInstruction,
+                        prompt: reportInstruction
+                      }), 
+                      signal: controller.signal
                     });
                     if (!response.ok || !response.body) throw new Error('재분석 요청 실패');
                     const reader = response.body.getReader();
@@ -600,10 +739,10 @@ export default function ChatSummaryPage() {
                 : govSuccess ? <CircleCheckBig className="w-3.5 h-3.5" />
                 : <Shield className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">
-                {isGoverning ? '처리 중...' : (govSuccess || incidentStatus === '처리완료') ? '완료됨' : '지식화/장애/보고/완료 처리'}
+                {isGoverning ? '처리 중...' : (govSuccess || incidentStatus === '처리완료') ? '완료됨' : '최종완료(지식화/보고/장애종결)'}
               </span>
               <span className="sm:hidden">
-                {isGoverning ? '...' : (govSuccess || incidentStatus === '처리완료') ? '완료' : '완료 처리'}
+                {isGoverning ? '...' : (govSuccess || incidentStatus === '처리완료') ? '완료' : '최종완료'}
               </span>
             </button>
             {/* 인쇄 */}
@@ -615,7 +754,7 @@ export default function ChatSummaryPage() {
       </header>
 
       {/* ── 단일 스크롤 영역 ── */}
-      <main className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 pb-36 custom-scrollbar">
+      <main className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 pb-8 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-4">
 
           {/* 메타데이터 카드 */}
@@ -629,35 +768,38 @@ export default function ChatSummaryPage() {
                 </div>
                 <span className="text-xs font-black text-white uppercase ml-1">장애 대응 Collaborative Timeline</span>
               </div>
-              <div className="grid grid-cols-2 gap-3 p-3 sm:p-4 bg-white/[0.02] rounded-xl border border-white/5 mb-3">
-                <div className="col-span-2 space-y-1">
+              <div className="p-3 sm:p-4 bg-white/[0.02] rounded-xl border border-white/5 mb-3 space-y-4">
+                <div className="space-y-1">
                   <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Incident ID</div>
                   <div className="text-xs font-black text-blue-400 font-mono">{incidentId.replace(/^INC-/i, '')}</div>
-                  <div className="text-[11px] text-slate-400 leading-relaxed mt-1 line-clamp-3">
+                  <div className="text-[11px] text-slate-400 leading-relaxed mt-1 line-clamp-2">
                     {incidentMessage || (summary ? summary.replace(/\*\*/g, '').replace(/#{1,3}\s*/g, '').replace(/\n+/g, ' ').trim() : '장애 메시지 로딩 중...')}
                   </div>
                 </div>
-                <div className="space-y-0.5">
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Summary Date</div>
-                  <div className="text-xs font-bold text-white">
-                    {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    {' '}{new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-white/5">
+                  <div className="space-y-0.5">
+                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Summary Date</div>
+                    <div className="text-[11px] font-bold text-white">
+                      {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      {' '}{new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-0.5">
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Report Status</div>
-                  <div className="flex items-center gap-1">
-                    <span className={`text-xs font-bold flex items-center gap-1 ${isLoading ? 'text-orange-400 animate-pulse' : 'text-emerald-400'}`}>
-                      {isLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin" />}
-                      {isLoading ? '분석 중...' : 'Verified'}
-                    </span>
+                  <div className="space-y-0.5">
+                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Report Status</div>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-[11px] font-bold flex items-center gap-1 ${isLoading ? 'text-orange-400 animate-pulse' : 'text-emerald-400'}`}>
+                        {isLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin" />}
+                        {isLoading ? '분석 중...' : 'Verified'}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-0.5">
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Confidentiality</div>
-                  <div className="flex items-center gap-1">
-                    <Shield className="w-3 h-3 text-amber-500/70" />
-                    <span className="text-xs text-amber-500/70 font-bold uppercase">Restricted</span>
+                  <div className="space-y-0.5">
+                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Confidentiality</div>
+                    <div className="flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-amber-500/70" />
+                      <span className="text-[11px] text-amber-500/70 font-bold uppercase">Restricted</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -713,26 +855,18 @@ export default function ChatSummaryPage() {
             <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
             <div className="p-4 sm:p-6">
               {isLoading && !summary && (
-                <div className="flex flex-col items-center justify-center py-20 space-y-8 animate-in fade-in zoom-in-95 duration-700">
+                <div className="flex flex-col items-center justify-center py-20 space-y-6 animate-in fade-in zoom-in-95 duration-700">
                   <div className="relative">
                     <div className="w-20 h-20 border-[6px] border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Brain className="w-8 h-8 text-indigo-400 animate-pulse" />
                     </div>
                   </div>
-                  <div className="text-center space-y-4">
-                    <div className="px-4 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 inline-block mb-2">
-                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">AI Agent Analysis in Progress</span>
-                    </div>
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">분석 중입니다...</h3>
-                    <p className="text-sm text-slate-400 font-mono tracking-wide max-w-sm mx-auto leading-relaxed">
-                      {loadingStatus || 'Dify AI 분석 엔진이 대응 내역을 정밀하게 분석하여 요약을 생성하고 있습니다.'}
+                  <div className="text-center space-y-2">
+                    <p className="text-sm font-bold text-indigo-300 tracking-wide animate-pulse">
+                      {loadingStatus || 'Dify AI가 분석 중입니다...'}
                     </p>
-                    <div className="flex items-center justify-center space-x-3 pt-4">
-                      <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                      <div className="w-2 h-2 bg-indigo-300 rounded-full animate-bounce" />
-                    </div>
+                    <p className="text-xs text-slate-600">분석이 완료되면 보고서가 자동으로 표시됩니다</p>
                   </div>
                 </div>
               )}
@@ -749,40 +883,66 @@ export default function ChatSummaryPage() {
               )}
 
               {!error && summary && (() => {
-                const sections = parseSections(summary);
-                let sectionNum = 0;
-                const sectionColorMap = [
-                  { keys: ['타임라인'], style: null },
-                  { keys: ['장애내용','장애 내용','장애 개요','개요'], style: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-300' } },
-                  { keys: ['발생원인','발생 원인','핵심원인','핵심 원인','원인'], style: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-300' } },
-                  { keys: ['진행결과','진행 결과','조치','처리'], style: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-300' } },
-                  { keys: ['상황종료','상황 종료','종료','최종 결과','최종'], style: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300' } },
-                  { keys: ['추가작업','추가 작업','향후','과제'], style: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-300' } },
-                ];
-                const getStyle = (title) => {
-                  const entry = sectionColorMap.find(e => e.keys.some(k => title.includes(k)));
-                  return entry ? entry.style : { bg: 'bg-white/[0.02]', border: 'border-white/5', text: 'text-slate-300' };
-                };
+                // 화면 표시도 generateFinalReportText()와 완전히 동일하게 렌더링
+                const reportText = generateFinalReportText();
+                const lines = reportText.split('\n');
+
                 return (
-                  <div className="animate-in fade-in duration-1000 space-y-4">
-                    {sections.map((section, idx) => {
-                      const isTimeline = section.title.includes('타임라인');
-                      if (!isTimeline) sectionNum++;
-                      const style = getStyle(section.title);
-                      return (
-                        <div key={idx} className={`rounded-2xl p-4 border ${isTimeline ? 'bg-white/[0.02] border-white/5' : `${style?.bg} ${style?.border}`}`}>
-                          {!isTimeline && style && (
-                            <div className={`flex items-baseline gap-1.5 pb-2 mb-3 border-b-2 ${style.border}`}>
-                              <span className={`text-base font-black tabular-nums ${style.text}`}>{sectionNum}.</span>
-                              <h3 className={`text-base font-black tracking-tight ${style.text}`}>{section.title}</h3>
+                  <div className="animate-in fade-in duration-1000 space-y-5">
+                    {lines.map((line, idx) => {
+                      // 빈 줄
+                      if (line.trim() === '') return null;
+
+                      // **N. 제목** 패턴 → 굵은 번호 제목
+                      const boldTitleMatch = line.match(/^\*\*(\d+)\.\s+(.+?)\*\*$/);
+                      if (boldTitleMatch) {
+                        const num = boldTitleMatch[1];
+                        const title = boldTitleMatch[2];
+                        return (
+                          <div key={idx} className="pt-4 first:pt-0">
+                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-blue-500/20">
+                              <span className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-600/20 text-blue-400 text-sm font-black shrink-0">
+                                {num}
+                              </span>
+                              <h3 className="text-sm font-black text-white tracking-tight">{title}</h3>
                             </div>
-                          )}
-                          <div className="prose prose-invert prose-sm max-w-none leading-relaxed">
-                            <MarkdownViewer text={section.content} />
                           </div>
-                        </div>
+                        );
+                      }
+
+                      // - 항목 라인
+                      const bulletMatch = line.match(/^-\s+(.+)$/);
+                      if (bulletMatch) {
+                        const content = bulletMatch[1];
+                        // "키: 값" 형태 분리
+                        const colonIdx = content.indexOf(': ');
+                        if (colonIdx > -1) {
+                          const key = content.substring(0, colonIdx);
+                          const val = content.substring(colonIdx + 2);
+                          return (
+                            <div key={idx} className="flex gap-2 text-sm pl-2 leading-relaxed -mt-2">
+                              <span className="text-blue-400 shrink-0">•</span>
+                              <span>
+                                <span className="text-slate-300 font-semibold">{key}:</span>
+                                <span className="text-slate-400"> {val}</span>
+                              </span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={idx} className="flex gap-2 text-sm pl-2 leading-relaxed text-slate-400 -mt-2">
+                            <span className="text-blue-400 shrink-0">•</span>
+                            <span>{content}</span>
+                          </div>
+                        );
+                      }
+
+                      // 그 외 일반 텍스트
+                      return (
+                        <p key={idx} className="text-sm text-slate-400 leading-relaxed pl-2">{line}</p>
                       );
                     })}
+
                     {isStreaming && (
                       <div className="flex items-center justify-center space-x-3 mt-8 p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl animate-pulse">
                         <div className="flex items-center space-x-2">
@@ -796,6 +956,7 @@ export default function ChatSummaryPage() {
                   </div>
                 );
               })()}
+
 
               {/* 추가 메모 */}
               {!isLoading && summary && (
@@ -873,7 +1034,8 @@ export default function ChatSummaryPage() {
         </div>
       )}
 
-      <BottomMenu currentPath="/chat" />
+      {/* 팝업(모달) 형태로 열릴 때는 하단 메뉴 숨김 */}
+      {!location.pathname.includes('/chat-summary/') && <BottomMenu currentPath="/chat" />}
     </div>
   );
 }

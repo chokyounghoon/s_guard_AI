@@ -296,9 +296,9 @@ function AppContent() {
         {/* 🔒 Protected Routes: 인증 필수 */}
         {/* 대시보드는 항상 렌더링 (모달 배경) */}
         <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage onAiClick={() => setShowAIAssistant(true)} /></ErrorBoundary></ProtectedRoute>} />
-        <Route path="/activity"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileActivity      user={userProfile} /></ProtectedRoute>} />
-        <Route path="/inbox"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileInbox         user={userProfile} /></ProtectedRoute>} />
-        <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileIncidentPush  user={userProfile} /></ProtectedRoute>} />
+        <Route path="/activity"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ActivityPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/inbox"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><InboxPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><IncidentPushPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/ai-report/:incidentId?"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AiReportPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/assignment-detail"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AssignmentDetailPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/chat/:incidentId?"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ChatPage /></PCPageModal></ProtectedRoute>} />
@@ -349,11 +349,11 @@ function AppContent() {
 
       {/* Global War-Room List Popup */}
       {showWarRoomPopup && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 lg:p-10 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowWarRoomPopup(false)} />
-          <div className="bg-[#0f1219]/95 w-full max-w-xl rounded-t-[3rem] border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] relative z-10 overflow-hidden flex flex-col max-h-[75vh] animate-in slide-in-from-bottom-full duration-500 pb-safe">
-            {/* Top Handle bar */}
-            <div className="flex justify-center pt-4 pb-2">
+          <div className="bg-[#0f1219]/95 w-full max-w-5xl rounded-[2.5rem] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative z-10 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-300 pb-safe">
+            {/* Top Bar matching PCPageModal feel */}
+            <div className="flex justify-center pt-3 pb-1 lg:hidden">
               <div className="w-12 h-1.5 bg-white/10 rounded-full" />
             </div>
             
@@ -389,9 +389,9 @@ function AppContent() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
               {warRooms.length === 0 ? (
-                <div className="text-center py-20">
+                <div className="col-span-full text-center py-20">
                   <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
                     <MessageSquare className="w-8 h-8 text-slate-700" />
                   </div>
@@ -404,23 +404,25 @@ function AppContent() {
                   <div
                     key={roomId}
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
-                    className={`p-5 rounded-[2rem] border transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] ${
+                    className={`p-5 rounded-[2rem] border transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${
                       isCurrent 
                         ? 'bg-blue-600/10 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.1)]' 
                         : 'bg-[#1a1f2e]/40 border-white/5 hover:border-blue-500/30 hover:bg-[#1a1f2e]/60'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30 tracking-tighter">CRITICAL</span>
-                        {isCurrent && <span className="text-[10px] text-blue-400 font-black tracking-tight flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-                          NOW
-                        </span>}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30 tracking-tighter">CRITICAL</span>
+                          {isCurrent && <span className="text-[10px] text-blue-400 font-black tracking-tight flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                            NOW
+                          </span>}
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono font-bold">{room.reg_dt ? new Date(room.reg_dt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-mono font-bold">{room.reg_dt ? new Date(room.reg_dt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                      <p className="text-[15px] font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-2 pr-4 mb-3">{room.msg || room.title || roomId}</p>
                     </div>
-                    <p className="text-[15px] font-bold text-white group-hover:text-blue-400 transition-colors truncate pr-4">{room.msg || room.title || roomId}</p>
                     <div className="flex items-center gap-2 mt-2 opacity-60">
                       <div className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center">
                         <User className="w-2.5 h-2.5 text-slate-500" />
