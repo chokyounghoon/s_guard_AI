@@ -1655,15 +1655,19 @@ export default function DashboardPage({ onAiClick }) {
           {/* ── 4/4: 장애 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-hidden">
             {/* Activity History Flow Area */}
-            <div className="bg-[#1a1f2e] rounded-3xl p-5 border border-white/5 shadow-xl flex-1 overflow-y-auto custom-scrollbar">
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Activity className="w-4 h-4 text-purple-400 shrink-0 group-hover:scale-110 transition-transform" />
-                  <div className="min-w-0 flex-1">
-                    {/* 제목 + 간략 메시지 한 줄 */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="font-bold text-base text-white whitespace-nowrap">장애 처리 현황</h2>
-                    </div>
+            <div className="bg-[#0f1421] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded-xl shrink-0">
+                    <Activity className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-black text-white text-base tracking-tight">장애 처리 현황</h3>
+                    <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Incident Handling Progress</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                     {/* 시간 정보: DETECTION + MTTR 한 줄 */}
                     {selectedIncidentIdFlow && (() => {
                       const assignment = myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', '')) ||
@@ -1747,12 +1751,11 @@ export default function DashboardPage({ onAiClick }) {
                         </div>
                       );
                     })()}
-                  </div>
                 </div>
+              </div>{/* end header */}
 
-              </div>
-
-
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
               <div className="relative">
                 {/* Vertical Line */}
                 <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
@@ -1955,8 +1958,8 @@ export default function DashboardPage({ onAiClick }) {
                   )}
                 </div>
               </div>
-              )}
-            </div>{/* end Activity div */}
+              </div>{/* end scrollable body */}
+            </div>{/* end Activity card */}
           </div>{/* end col4 */}
 
         </div>{/* end grid */}
