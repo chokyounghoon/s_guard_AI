@@ -15,23 +15,36 @@ const getApiUrl = (endpoint) => {
 
 const API_BASE_URL = getApiUrl('');
 
-const DEFAULT_CRITICAL_THRESHOLDS = { errorCount: 10, errorRate: 50 };
+const DEFAULT_THRESHOLDS = {
+  critical: { errorCount: 10, errorRate: 50 },
+  major:    { errorCount: 3,  errorRate: 25 },
+};
 
-// per-incident CRITICAL 판정: received_count vs alert-monitor 임계치
-// errorRate는 200건 기준 전체 지표라 소량 SMS 목록에서는 오탐 발생 → 제외
-const isCriticalAnalysis = (_analysisText, _message, smsItem) => {
-  let thresholds = DEFAULT_CRITICAL_THRESHOLDS;
+// alert-monitor 3단계 판정: CRITICAL / MAJOR / NORMAL
+// received_count 없거나 1이하 → 비교 대상 없음 → NORMAL(녹색)
+const getSeverityLevel = (smsItem) => {
+  const vol = Number(smsItem?.received_count);
+  if (!vol || vol <= 1) return 'NORMAL';
+
+  let thresholds = DEFAULT_THRESHOLDS;
   try {
     const saved = localStorage.getItem('sguard_alert_thresholds_v3');
     if (saved) {
       const parsed = JSON.parse(saved);
-      thresholds = { ...DEFAULT_CRITICAL_THRESHOLDS, ...(parsed.critical || {}) };
+      thresholds = {
+        critical: { ...DEFAULT_THRESHOLDS.critical, ...(parsed.critical || {}) },
+        major:    { ...DEFAULT_THRESHOLDS.major,    ...(parsed.major    || {}) },
+      };
     }
-  } catch { /* 파싱 실패 시 기본값 사용 */ }
+  } catch { /* 기본값 사용 */ }
 
-  const vol = Number(smsItem?.received_count) || 1;
-  return vol >= thresholds.errorCount;
+  if (vol >= thresholds.critical.errorCount) return 'CRITICAL';
+  if (vol >= thresholds.major.errorCount)    return 'MAJOR';
+  return 'NORMAL';
 };
+
+// 하위 호환 wrapper
+const isCriticalAnalysis = (_at, _msg, smsItem) => getSeverityLevel(smsItem) === 'CRITICAL';
 
 const getCategoryFromAnalysis = (analysisText, message) => {
   const combined = ((analysisText || '') + (message || '')).toLowerCase();
@@ -868,44 +881,47 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         )}
 
-        {/* War-Room 개설 버튼 (항상 표시하며, 상태에 따라 disabled 처리) */}
-      <div className={`mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 p-5 rounded-2xl border transition-all duration-500
-        ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30) 
-          ? 'bg-slate-800/30 border-slate-700/30' 
-          : isCritical 
-            ? 'bg-red-500/5 border-red-500/25 shadow-lg shadow-red-900/10' 
-            : 'bg-gradient-to-r from-yellow-500/5 to-transparent border-yellow-500/20 shadow-lg shadow-yellow-900/5'}`}>
-        <div className={`flex-1 text-xs leading-relaxed ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || lockingUser) ? 'text-slate-500 animate-pulse' : isCritical ? 'text-red-300' : 'text-yellow-300/90'}`}>
-          {(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30)
-            ? '⏳ AI 에이전트가 분석중입니다. 분석 완료 후 개설 가능합니다...'
-            : lockingUser
-              ? `⚠️ ${lockingUser} 매니저가 현재 War-Room 개설 작업을 진행 중입니다...`
-              : warRoomExists 
-                ? '💡 해당 장애 건에 대해 이미 War-Room이 개설되어 진행 중입니다.'
-                : isCritical
-                  ? '⚠️ CRITICAL 장애가 감지되었습니다. 즉시 팀 전체가 참여하는 War-Room을 개설하세요.'
-                  : '💡 분석이 완료되었습니다. 필요 시 War-Room을 개설하여 팀과 상황을 공유하세요.'}
-        </div>
-        <button
-          onClick={handleOpenWarRoom}
-          disabled={!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || (lockingUser && !warRoomExists)}
-          className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black text-sm whitespace-nowrap transition-all active:scale-95
-            ${(!analysisComplete || isAnalyzingSms || !displayedText || displayedText.length < 30 || (lockingUser && !warRoomExists))
-              ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-              : warRoomExists
-              ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/30'
-              : isCritical
-              ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30 animate-pulse'
-              : incidentCategory === 'security'
-              ? 'bg-purple-500 hover:bg-purple-400 text-white shadow-lg shadow-purple-500/30'
-              : incidentCategory === 'server'
-              ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-lg shadow-orange-500/30'
-              : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20'}`}
-        >
-          <Users className="w-4 h-4" />
-          {lockingUser && !warRoomExists ? '다른 사용자 처리 중' : warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}
-        </button>
-      </div>
+        {/* War-Room 개설 버튼 — CRITICAL/MAJOR/NORMAL 3단계 색상 */}
+      {(() => {
+        const sev = getSeverityLevel(selectedSms);
+        const ready = analysisComplete && !isAnalyzingSms && displayedText && displayedText.length >= 30;
+        const blocked = lockingUser && !warRoomExists;
+        const containerCls = !ready
+          ? 'bg-slate-800/30 border-slate-700/30'
+          : sev === 'CRITICAL' ? 'bg-red-500/5 border-red-500/25 shadow-lg shadow-red-900/10'
+          : sev === 'MAJOR'    ? 'bg-orange-500/5 border-orange-500/25 shadow-lg shadow-orange-900/10'
+          :                      'bg-emerald-500/5 border-emerald-500/20 shadow-lg shadow-emerald-900/5';
+        const textCls = !ready || blocked ? 'text-slate-500 animate-pulse'
+          : sev === 'CRITICAL' ? 'text-red-300'
+          : sev === 'MAJOR'    ? 'text-orange-300'
+          :                      'text-emerald-300/90';
+        const btnCls = !ready || blocked
+          ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
+          : warRoomExists ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/30'
+          : sev === 'CRITICAL' ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30 animate-pulse'
+          : sev === 'MAJOR'    ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-lg shadow-orange-500/30'
+          :                      'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20';
+        const msgText = !ready
+          ? '⏳ AI 에이전트가 분석중입니다. 분석 완료 후 개설 가능합니다...'
+          : blocked   ? `⚠️ ${lockingUser} 매니저가 현재 War-Room 개설 작업을 진행 중입니다...`
+          : warRoomExists ? '💡 해당 장애 건에 대해 이미 War-Room이 개설되어 진행 중입니다.'
+          : sev === 'CRITICAL' ? '⚠️ CRITICAL 장애가 감지되었습니다. 즉시 팀 전체가 참여하는 War-Room을 개설하세요.'
+          : sev === 'MAJOR'    ? '⚡ MAJOR 장애가 감지되었습니다. 담당팀과 War-Room에서 상황을 공유하세요.'
+          :                      '💡 분석이 완료되었습니다. 필요 시 War-Room을 개설하여 팀과 상황을 공유하세요.';
+        return (
+          <div className={`mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 p-5 rounded-2xl border transition-all duration-500 ${containerCls}`}>
+            <div className={`flex-1 text-xs leading-relaxed ${textCls}`}>{msgText}</div>
+            <button
+              onClick={handleOpenWarRoom}
+              disabled={!ready || blocked}
+              className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black text-sm whitespace-nowrap transition-all active:scale-95 ${btnCls}`}
+            >
+              <Users className="w-4 h-4" />
+              {blocked ? '다른 사용자 처리 중' : warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}
+            </button>
+          </div>
+        );
+      })()}
       </div>
 
       {/* Detailed Feedback Modal (Popup) */}
