@@ -305,6 +305,7 @@ function AppContent() {
         <Route path="/report-publish"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportPublishPage /></ProtectedRoute>} />
         <Route path="/activity-detail"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ActivityDetailPage /></ProtectedRoute>} />
         <Route path="/assignments"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
+        <Route path="/my-assignments"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
         <Route path="/overall-status"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OverallStatusPage /></ProtectedRoute>} />
         <Route path="/search"                  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
         <Route path="/mobile-report-search"    element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />

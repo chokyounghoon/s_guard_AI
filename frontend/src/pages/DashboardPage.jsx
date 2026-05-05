@@ -136,6 +136,7 @@ export default function DashboardPage({ onAiClick }) {
   const [isWarRoomCollapsed, setIsWarRoomCollapsed] = useState(false);
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false);
   const [isFlowCollapsed, setIsFlowCollapsed] = useState(false);
+  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [selectedIncidentIdFlow, setSelectedIncidentIdFlow] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
@@ -1186,8 +1187,18 @@ export default function DashboardPage({ onAiClick }) {
 
   return (
     <div className="min-h-screen bg-[#0f1421] text-white font-sans overflow-x-clip relative">
+      {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
+      {isNavCollapsed && (
+        <div className="fixed top-3 left-4 z-50">
+          <button onClick={() => setIsNavCollapsed(false)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1a1f2e]/90 backdrop-blur-sm border border-white/10 hover:border-blue-500/40 transition-all shadow-xl group">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-bold text-xs">S</div>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white rotate-180" />
+          </button>
+        </div>
+      )}
       {/* Top Navigation */}
-      <nav className="flex justify-between items-center p-4 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30">
+      <nav className={`flex justify-between items-center p-4 px-5 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'flex'}`}>
         <div
           className="flex items-center cursor-pointer group"
           onClick={() => window.location.reload()}
@@ -1227,6 +1238,10 @@ export default function DashboardPage({ onAiClick }) {
               )}
             </div>
           </div>
+          <button onClick={() => setIsNavCollapsed(true)}
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all ml-1 group">
+            <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white" />
+          </button>
         </div>
       </nav>
 
@@ -1343,12 +1358,13 @@ export default function DashboardPage({ onAiClick }) {
         </div>
       )}
 
-      <div className="p-6 max-w-7xl mx-auto pb-24">
-        {/* Header Section */}
-        <div>
-        </div>
+      <div className="px-4 pt-4 pb-24">
 
-        <div className="flex flex-col gap-6 mb-6">
+        {/* ── 3컬럼 메인 그리드 ── */}
+        <div className={`grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch ${isNavCollapsed ? 'h-[calc(100vh-1.5rem)]' : 'h-[calc(100vh-5rem)]'}`}>
+
+          {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
+          <div className="flex flex-col gap-4 h-full overflow-y-auto">
           {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
           {smsMessages.length > 0 && (
             <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
@@ -1536,9 +1552,11 @@ export default function DashboardPage({ onAiClick }) {
             </div>
           )}
 
-          {/* AI Autopilot Insight Panel (항상 최신 SMS만 분석하도록 insightSms 적용) */}
-          <div className="w-full">
-            <AiInsightPanel 
+          </div>{/* end col1 */}
+
+          {/* ── 2/4: S-Autopilot Insight Panel ── */}
+          <div className="flex flex-col h-full">
+          <AiInsightPanel 
                onLogReceived={handleLogReceived} 
                onShowDetail={handleShowInsight} 
                selectedSms={insightSms} 
@@ -1546,18 +1564,13 @@ export default function DashboardPage({ onAiClick }) {
                onAgentContent={handleAgentContent}
                warRooms={warRooms}
             />
-          </div>
+          </div>{/* end col2 */}
 
-        </div>
-
-
-
+          {/* ── 3/4: S-Autopilot Expert Advisor ── */}
+          <div className="flex flex-col h-full">
 
 
 
-
-        {/* Main Content Areas */}
-        <div className="flex flex-col gap-6">
           {/* AI War-Room Situation Log (Section 2) */}
           <div className="w-full h-[650px]">
             <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
@@ -1641,315 +1654,322 @@ export default function DashboardPage({ onAiClick }) {
 
             </div>
           </div>
-        </div>
+          </div>{/* end col3 */}
 
-
-        {/* Activity History Flow Area */}
-        <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Activity className="w-4 h-4 text-purple-400 shrink-0 group-hover:scale-110 transition-transform" />
-              <div className="min-w-0 flex-1">
-                {/* 제목 + 간략 메시지 한 줄 */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="font-bold text-base text-white whitespace-nowrap">장애 처리 현황</h2>
-                </div>
-                {/* 시간 정보: DETECTION + MTTR 한 줄 */}
-                {selectedIncidentIdFlow && (() => {
-                  const assignment = myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', '')) ||
-                                     smsMessages.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''));
-                  const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
-                  const endStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-                  const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);
-                  const endTime = endStep ? new Date(endStep.timestamp) : null;
-                  if (!startTime) return null;
-                  const durationMs = (endTime || currentTime) - startTime;
-                  const isClosed = !!endTime;
-
-                  // 4단계 MTTR 계산
-                  const smsStep     = incidentWorkflowSteps.find(s => s.id === 'SMS');
-                  const ragStep     = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                  const warStep     = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
-                  const knwStep     = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-
-                  const calcDiff = (a, b) => {
-                    if (!a) return null;
-                    const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp);
-                    const m = Math.floor(ms / 60000);
-                    const s = Math.floor((ms % 60000) / 1000);
-                    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-                  };
-
-                  const phases = [
-                    { label: '인지', time: calcDiff(smsStep, ragStep), done: !!ragStep },
-                    { label: '분석', time: calcDiff(ragStep, warStep), done: !!warStep },
-                    { label: '워룸', time: calcDiff(warStep, knwStep), done: !!knwStep },
-                    { label: '완료', time: calcDiff(warStep || ragStep || smsStep, knwStep), done: !!knwStep },
-                  ];
-
-                  return (
-                    <div className="space-y-1.5 mt-1">
-                      {/* 탐지 + MTTR */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">탐지</span>
-                          <span className="text-[11px] font-black font-mono text-white bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
-                            {formatYYMMDD(startTime)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">MTTR</span>
-                          <div className="flex items-center gap-1">
-                            <div className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
-                            <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400' : 'text-blue-400'}`}>
-                              {formatDuration(durationMs)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      {/* 4단계 MTTR 요약 바 */}
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {[
-                          { label: '인지', from: smsStep, to: ragStep },
-                          { label: '분석', from: ragStep, to: warStep },
-                          { label: '워룸진행', from: warStep, to: knwStep },
-                          { label: '처리완료', from: smsStep, to: knwStep },
-                        ].map(({ label, from, to }) => {
-                          const isDone = label === '처리완료' ? !!knwStep : !!to;
-                          const isActive = !!from && !to;
-                          const ms = from ? ((to ? new Date(to.timestamp) : currentTime) - new Date(from.timestamp)) : 0;
-                          const m = Math.floor(ms / 60000);
-                          const s = Math.floor((ms % 60000) / 1000);
-                          const timeStr = from ? (m > 0 ? `${m}m${s}s` : `${s}s`) : '-';
-                          return (
-                            <div key={label} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black ${
-                              isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                              : isActive ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                              : 'bg-white/3 border-white/5 text-slate-600'
-                            }`}>
-                              <span className="text-[8px] opacity-70">{label}</span>
-                              <span className="font-mono tabular-nums">{timeStr}</span>
-                              {isActive && <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />}
-                            </div>
-                          );
-                        })}
-                      </div>
+          {/* ── 4/4: 장애 처리 현황 ── */}
+          <div className="flex flex-col h-full overflow-y-auto">
+            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col">
+            {/* Activity History Flow Area */}
+            <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Activity className="w-4 h-4 text-purple-400 shrink-0 group-hover:scale-110 transition-transform" />
+                  <div className="min-w-0 flex-1">
+                    {/* 제목 + 간략 메시지 한 줄 */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="font-bold text-base text-white whitespace-nowrap">장애 처리 현황</h2>
                     </div>
-                  );
-                })()}
-              </div>
-            </div>
+                    {/* 시간 정보: DETECTION + MTTR 한 줄 */}
+                    {selectedIncidentIdFlow && (() => {
+                      const assignment = myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', '')) ||
+                                         smsMessages.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''));
+                      const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
+                      const endStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
+                      const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);
+                      const endTime = endStep ? new Date(endStep.timestamp) : null;
+                      if (!startTime) return null;
+                      const durationMs = (endTime || currentTime) - startTime;
+                      const isClosed = !!endTime;
 
-          </div>
+                      // 4단계 MTTR 계산
+                      const smsStep     = incidentWorkflowSteps.find(s => s.id === 'SMS');
+                      const ragStep     = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                      const warStep     = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
+                      const knwStep     = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
 
+                      const calcDiff = (a, b) => {
+                        if (!a) return null;
+                        const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp);
+                        const m = Math.floor(ms / 60000);
+                        const s = Math.floor((ms % 60000) / 1000);
+                        return m > 0 ? `${m}m ${s}s` : `${s}s`;
+                      };
 
-          <div className="relative">
-            {/* Vertical Line */}
-            <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
-
-            <div className="space-y-8">
-              {selectedIncidentIdFlow ? (
-                // Workflow Flow View
-                <div className="flex flex-col space-y-0 py-6 relative">
-                  {(() => {
-                    const firstPendingIdx = FLOW_STEPS.findIndex(step => {
-                      if (step.id === 'RAG_AGENT') {
-                        return !incidentWorkflowSteps.find(s => s.id === 'RAG') && !incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                      }
-                      return !incidentWorkflowSteps.find(s => s.id === step.id);
-                    });
-                    
-                    return FLOW_STEPS.map((step, sIdx) => {
-                      let stepData = incidentWorkflowSteps.find(s => s.id === step.id);
-                      
-                      // Combined RAG/AGENT logic
-                      if (step.id === 'RAG_AGENT') {
-                         const rag = incidentWorkflowSteps.find(s => s.id === 'RAG');
-                         const agent = incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                         if (rag && agent) {
-                           stepData = { 
-                             ...agent, 
-                             id: 'RAG_AGENT',
-                             timestamp: agent.timestamp > rag.timestamp ? agent.timestamp : rag.timestamp, 
-                             detail: 'AI 에이전트 그룹이 수천 건의 과거 데이터와 내부 지식베이스를 결합하여 인시던트 근본 원인을 입체적으로 분석하고 대응 시나리오를 수립했습니다.' 
-                           };
-                         } else if (rag || agent) {
-                           stepData = { ...(rag || agent), id: 'RAG_AGENT' };
-                         }
-                      }
-                      
-                      const isCompleted = !!stepData;
-                      const isNextStep = sIdx === firstPendingIdx;
-                      
-                      // Fix detail for WARROOM if it's 2.0 (replace with user name)
-                      if (step.id === 'WARROOM' && stepData?.detail?.includes('2.0님')) {
-                        stepData.detail = stepData.detail.replace('2.0님', '조경훈님');
-                      }
-                      
-                      // Calculate interval duration to the NEXT step (the line below this step)
-                      let intervalText = null;
-                      let intervalMinutes = 0;
-                      if (isCompleted && sIdx < FLOW_STEPS.length - 1) {
-                        const nextId = FLOW_STEPS[sIdx+1].id;
-                        // RAG_AGENT는 실제 데이터에 'RAG' 또는 'AGENT'로 저장됨
-                        let nextStepData = incidentWorkflowSteps.find(s => s.id === nextId);
-                        if (!nextStepData && nextId === 'RAG_AGENT') {
-                          nextStepData = incidentWorkflowSteps.find(s => s.id === 'RAG') ||
-                                         incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                        }
-                        if (nextStepData) {
-                          const diff = new Date(nextStepData.timestamp) - new Date(stepData.timestamp);
-                          const m = Math.floor(diff / 60000);
-                          const sec = Math.floor((diff % 60000) / 1000);
-                          intervalMinutes = m;
-                          intervalText = m > 60
-                            ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요`
-                            : m > 0
-                            ? `⏱ ${m}분 ${sec}초 소요`
-                            : `⏱ ${sec}초 소요`;
-                        } else if (sIdx === firstPendingIdx - 1) {
-                          // Next step is in progress, show elapsed since this step
-                          const diff = currentTime - new Date(stepData.timestamp);
-                          const m = Math.floor(diff / 60000);
-                          const sec = Math.floor((diff % 60000) / 1000);
-                          intervalMinutes = m;
-                          intervalText = m > 60
-                            ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과`
-                            : m > 0
-                            ? `⏱ ${m}분 ${sec}초 경과`
-                            : `⏱ ${sec}초 경과`;
-                        }
-                      }
-
-                      // 소요시간에 비례한 동적 paddingBottom (선형, 분당 0.25px, 최소 32 ~ 최대 200px)
-                      const dynamicPb = intervalMinutes === 0
-                        ? 32
-                        : Math.min(200, Math.max(32, Math.round(32 + intervalMinutes * 0.25)));
+                      const phases = [
+                        { label: '인지', time: calcDiff(smsStep, ragStep), done: !!ragStep },
+                        { label: '분석', time: calcDiff(ragStep, warStep), done: !!warStep },
+                        { label: '워룸', time: calcDiff(warStep, knwStep), done: !!knwStep },
+                        { label: '완료', time: calcDiff(warStep || ragStep || smsStep, knwStep), done: !!knwStep },
+                      ];
 
                       return (
-                        <div key={step.id} className="relative pl-14 group" style={{ paddingBottom: `${dynamicPb}px` }}>
-                          {/* Connecting Line - 배지 없이 순수 라인만 */}
-                          {sIdx < FLOW_STEPS.length - 1 && (
-                            <div className={`absolute left-[11px] top-7 bottom-[-24px] w-[2px] transition-colors duration-500
-                              ${isCompleted ? 'bg-blue-600' : 'bg-white/5'}`} />
-                          )}
-
-                          {/* Node Circle */}
-                          <div className={`absolute left-0 top-0 w-6 h-6 rounded-full border-2 border-[#1a1f2e] z-10 flex items-center justify-center transition-all duration-700
-                            ${isCompleted ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.5)]' : 
-                              (isNextStep ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.2)]' : 'bg-gray-800 border-white/5')}`}>
-                            
-                            {isCompleted ? (
-                               <CheckCircle2 className="w-3.5 h-3.5 text-white animate-in zoom-in duration-300" />
-                            ) : (
-                               isNextStep ? (
-                                 <div className="relative flex h-3 w-3">
-                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                   <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                                 </div>
-                               ) : (
-                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
-                               )
-                            )}
-                          </div>
-
-                          <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
-                            <div className="flex items-center gap-3 mb-1.5">
-                              <h4 className={`font-black tracking-tight text-base ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-gray-500')}`}>
-                                {step.label}
-                                {isNextStep && (
-                                  <div className="flex items-center gap-3 ml-3">
-                                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500 text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]">
-                                      In Progress
-                                    </span>
-                                    {(() => {
-                                      const prevStepData = sIdx > 0 ? incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) : null;
-                                      if (prevStepData) {
-                                        const diff = currentTime - new Date(prevStepData.timestamp);
-                                        const m = Math.floor(diff / 60000);
-                                        const s = Math.floor((diff % 60000) / 1000);
-                                        return (
-                                          <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-0.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.1)]">
-                                            <span className="text-[8px] font-black text-blue-400/60 uppercase tracking-tighter">Current Stage Elapsed</span>
-                                            <span className="text-xs font-black font-mono text-blue-400 tabular-nums">
-                                              {String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
-                                            </span>
-                                          </div>
-                                        );
-                                      }
-                                      return null;
-                                    })()}
-                                  </div>
-                                )}
-                              </h4>
-                              {isCompleted && (
-                                <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
-                                  {formatYYMMDD(stepData.timestamp)}
-                                </span>
-                              )}
+                        <div className="space-y-1.5 mt-1">
+                          {/* 탐지 + MTTR */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">탐지</span>
+                              <span className="text-[11px] font-black font-mono text-white bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                                {formatYYMMDD(startTime)}
+                              </span>
                             </div>
-                            <p className={`text-xs max-w-xl leading-relaxed ${isCompleted ? 'text-slate-400' : (isNextStep ? 'text-slate-300 font-medium' : 'text-slate-600')}`}>
-                              {isCompleted ? stepData.detail : (isNextStep ? '실시간 데이터 분석 및 대응 절차를 진행 중입니다...' : '업무 단계 대기 중')}
-                            </p>
-
-                            {/* 소요시간 배지 - inline */}
-                            {intervalText && sIdx < FLOW_STEPS.length - 1 && (
-                              <div className="mt-2">
-                                <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                                  intervalMinutes > 60
-                                    ? 'text-orange-400 bg-orange-500/10 border-orange-500/20'
-                                    : intervalMinutes > 10
-                                    ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20'
-                                    : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                                }`}>
-                                  {intervalText}
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">MTTR</span>
+                              <div className="flex items-center gap-1">
+                                <div className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
+                                <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                  {formatDuration(durationMs)}
                                 </span>
                               </div>
-                            )}
-
-                            {(isCompleted || isNextStep) && step.id === 'WARROOM' && (() => {
-                               const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
-                               return roomExists ? (
-                                 <button
-                                   onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)}
-                                   className="mt-2 inline-flex items-center gap-1.5 group/btn text-[11px] font-black text-white border border-blue-500/30 hover:border-blue-400 px-3 py-1.5 rounded-xl bg-blue-600 shadow-[0_0_12px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)] transition-all active:scale-95"
-                                 >
-                                   <Zap className="w-3.5 h-3.5" />
-                                   워룸이동 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
-                                 </button>
-                               ) : (
-                                 <button
-                                   disabled
-                                   className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black text-slate-500 border border-white/5 px-3 py-1.5 rounded-xl bg-white/5 cursor-not-allowed"
-                                 >
-                                   <Users className="w-3.5 h-3.5 opacity-50" />
-                                   워룸 미개설 (이동 불가)
-                                 </button>
-                               );
-                            })()}
+                            </div>
+                          </div>
+                          {/* 4단계 MTTR 요약 바 */}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {[
+                              { label: '인지', from: smsStep, to: ragStep },
+                              { label: '분석', from: ragStep, to: warStep },
+                              { label: '워룸진행', from: warStep, to: knwStep },
+                              { label: '처리완료', from: smsStep, to: knwStep },
+                            ].map(({ label, from, to }) => {
+                              const isDone = label === '처리완료' ? !!knwStep : !!to;
+                              const isActive = !!from && !to;
+                              const ms = from ? ((to ? new Date(to.timestamp) : currentTime) - new Date(from.timestamp)) : 0;
+                              const m = Math.floor(ms / 60000);
+                              const s = Math.floor((ms % 60000) / 1000);
+                              const timeStr = from ? (m > 0 ? `${m}m${s}s` : `${s}s`) : '-';
+                              return (
+                                <div key={label} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black ${
+                                  isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                  : isActive ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                  : 'bg-white/3 border-white/5 text-slate-600'
+                                }`}>
+                                  <span className="text-[8px] opacity-70">{label}</span>
+                                  <span className="font-mono tabular-nums">{timeStr}</span>
+                                  {isActive && <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
-                    });
-                  })()}
+                    })()}
+                  </div>
                 </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-24 opacity-20 grayscale transition-all duration-1000">
-                  <Activity className="w-16 h-16 mb-4 text-blue-400 animate-pulse" />
-                  <h3 className="text-sm font-black tracking-tight text-white mb-2">인시던트 대응 모니터링 활성화 대기 중</h3>
-                  <p className="text-[10px] text-slate-500 max-w-[200px] text-center font-medium leading-relaxed">
-                    좌측 '조치 리스트'에서 인시던트를 선택하시면,<br/>
-                    실시간 MTTR 및 7단계 정밀 대응 흐름이 즉시 활성화됩니다.
-                  </p>
+
+              </div>
+
+
+              <div className="relative">
+                {/* Vertical Line */}
+                <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
+
+                <div className="space-y-8">
+                  {selectedIncidentIdFlow ? (
+                    // Workflow Flow View
+                    <div className="flex flex-col space-y-0 py-6 relative">
+                      {(() => {
+                        const firstPendingIdx = FLOW_STEPS.findIndex(step => {
+                          if (step.id === 'RAG_AGENT') {
+                            return !incidentWorkflowSteps.find(s => s.id === 'RAG') && !incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                          }
+                          return !incidentWorkflowSteps.find(s => s.id === step.id);
+                        });
+
+                        return FLOW_STEPS.map((step, sIdx) => {
+                          let stepData = incidentWorkflowSteps.find(s => s.id === step.id);
+
+                          // Combined RAG/AGENT logic
+                          if (step.id === 'RAG_AGENT') {
+                             const rag = incidentWorkflowSteps.find(s => s.id === 'RAG');
+                             const agent = incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                             if (rag && agent) {
+                               stepData = { 
+                                 ...agent, 
+                                 id: 'RAG_AGENT',
+                                 timestamp: agent.timestamp > rag.timestamp ? agent.timestamp : rag.timestamp, 
+                                 detail: 'AI 에이전트 그룹이 수천 건의 과거 데이터와 내부 지식베이스를 결합하여 인시던트 근본 원인을 입체적으로 분석하고 대응 시나리오를 수립했습니다.' 
+                               };
+                             } else if (rag || agent) {
+                               stepData = { ...(rag || agent), id: 'RAG_AGENT' };
+                             }
+                          }
+
+                          const isCompleted = !!stepData;
+                          const isNextStep = sIdx === firstPendingIdx;
+
+                          // Fix detail for WARROOM if it's 2.0 (replace with user name)
+                          if (step.id === 'WARROOM' && stepData?.detail?.includes('2.0님')) {
+                            stepData.detail = stepData.detail.replace('2.0님', '조경훈님');
+                          }
+
+                          // Calculate interval duration to the NEXT step (the line below this step)
+                          let intervalText = null;
+                          let intervalMinutes = 0;
+                          if (isCompleted && sIdx < FLOW_STEPS.length - 1) {
+                            const nextId = FLOW_STEPS[sIdx+1].id;
+                            // RAG_AGENT는 실제 데이터에 'RAG' 또는 'AGENT'로 저장됨
+                            let nextStepData = incidentWorkflowSteps.find(s => s.id === nextId);
+                            if (!nextStepData && nextId === 'RAG_AGENT') {
+                              nextStepData = incidentWorkflowSteps.find(s => s.id === 'RAG') ||
+                                             incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                            }
+                            if (nextStepData) {
+                              const diff = new Date(nextStepData.timestamp) - new Date(stepData.timestamp);
+                              const m = Math.floor(diff / 60000);
+                              const sec = Math.floor((diff % 60000) / 1000);
+                              intervalMinutes = m;
+                              intervalText = m > 60
+                                ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요`
+                                : m > 0
+                                ? `⏱ ${m}분 ${sec}초 소요`
+                                : `⏱ ${sec}초 소요`;
+                            } else if (sIdx === firstPendingIdx - 1) {
+                              // Next step is in progress, show elapsed since this step
+                              const diff = currentTime - new Date(stepData.timestamp);
+                              const m = Math.floor(diff / 60000);
+                              const sec = Math.floor((diff % 60000) / 1000);
+                              intervalMinutes = m;
+                              intervalText = m > 60
+                                ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과`
+                                : m > 0
+                                ? `⏱ ${m}분 ${sec}초 경과`
+                                : `⏱ ${sec}초 경과`;
+                            }
+                          }
+
+                          // 소요시간에 비례한 동적 paddingBottom (선형, 분당 0.25px, 최소 32 ~ 최대 200px)
+                          const dynamicPb = intervalMinutes === 0
+                            ? 32
+                            : Math.min(200, Math.max(32, Math.round(32 + intervalMinutes * 0.25)));
+
+                          return (
+                            <div key={step.id} className="relative pl-14 group" style={{ paddingBottom: `${dynamicPb}px` }}>
+                              {/* Connecting Line - 배지 없이 순수 라인만 */}
+                              {sIdx < FLOW_STEPS.length - 1 && (
+                                <div className={`absolute left-[11px] top-7 bottom-[-24px] w-[2px] transition-colors duration-500
+                                  ${isCompleted ? 'bg-blue-600' : 'bg-white/5'}`} />
+                              )}
+
+                              {/* Node Circle */}
+                              <div className={`absolute left-0 top-0 w-6 h-6 rounded-full border-2 border-[#1a1f2e] z-10 flex items-center justify-center transition-all duration-700
+                                ${isCompleted ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.5)]' : 
+                                  (isNextStep ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.2)]' : 'bg-gray-800 border-white/5')}`}>
+
+                                {isCompleted ? (
+                                   <CheckCircle2 className="w-3.5 h-3.5 text-white animate-in zoom-in duration-300" />
+                                ) : (
+                                   isNextStep ? (
+                                     <div className="relative flex h-3 w-3">
+                                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                       <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                     </div>
+                                   ) : (
+                                     <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                                   )
+                                )}
+                              </div>
+
+                              <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
+                                <div className="flex items-center gap-3 mb-1.5">
+                                  <h4 className={`font-black tracking-tight text-base ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-gray-500')}`}>
+                                    {step.label}
+                                    {isNextStep && (
+                                      <div className="flex items-center gap-3 ml-3">
+                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500 text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]">
+                                          In Progress
+                                        </span>
+                                        {(() => {
+                                          const prevStepData = sIdx > 0 ? incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) : null;
+                                          if (prevStepData) {
+                                            const diff = currentTime - new Date(prevStepData.timestamp);
+                                            const m = Math.floor(diff / 60000);
+                                            const s = Math.floor((diff % 60000) / 1000);
+                                            return (
+                                              <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-0.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.1)]">
+                                                <span className="text-[8px] font-black text-blue-400/60 uppercase tracking-tighter">Current Stage Elapsed</span>
+                                                <span className="text-xs font-black font-mono text-blue-400 tabular-nums">
+                                                  {String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
+                                                </span>
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
+                                    )}
+                                  </h4>
+                                  {isCompleted && (
+                                    <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                                      {formatYYMMDD(stepData.timestamp)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className={`text-xs max-w-xl leading-relaxed ${isCompleted ? 'text-slate-400' : (isNextStep ? 'text-slate-300 font-medium' : 'text-slate-600')}`}>
+                                  {isCompleted ? stepData.detail : (isNextStep ? '실시간 데이터 분석 및 대응 절차를 진행 중입니다...' : '업무 단계 대기 중')}
+                                </p>
+
+                                {/* 소요시간 배지 - inline */}
+                                {intervalText && sIdx < FLOW_STEPS.length - 1 && (
+                                  <div className="mt-2">
+                                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                                      intervalMinutes > 60
+                                        ? 'text-orange-400 bg-orange-500/10 border-orange-500/20'
+                                        : intervalMinutes > 10
+                                        ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20'
+                                        : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                    }`}>
+                                      {intervalText}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {(isCompleted || isNextStep) && step.id === 'WARROOM' && (() => {
+                                   const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
+                                   return roomExists ? (
+                                     <button
+                                       onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)}
+                                       className="mt-2 inline-flex items-center gap-1.5 group/btn text-[11px] font-black text-white border border-blue-500/30 hover:border-blue-400 px-3 py-1.5 rounded-xl bg-blue-600 shadow-[0_0_12px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)] transition-all active:scale-95"
+                                     >
+                                       <Zap className="w-3.5 h-3.5" />
+                                       워룸이동 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
+                                     </button>
+                                   ) : (
+                                     <button
+                                       disabled
+                                       className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black text-slate-500 border border-white/5 px-3 py-1.5 rounded-xl bg-white/5 cursor-not-allowed"
+                                     >
+                                       <Users className="w-3.5 h-3.5 opacity-50" />
+                                       워룸 미개설 (이동 불가)
+                                     </button>
+                                   );
+                                })()}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-24 opacity-20 grayscale transition-all duration-1000">
+                      <Activity className="w-16 h-16 mb-4 text-blue-400 animate-pulse" />
+                      <h3 className="text-sm font-black tracking-tight text-white mb-2">인시던트 대응 모니터링 활성화 대기 중</h3>
+                      <p className="text-[10px] text-slate-500 max-w-[200px] text-center font-medium leading-relaxed">
+                        좌측 '조치 리스트'에서 인시던트를 선택하시면,<br/>
+                        실시간 MTTR 및 7단계 정밀 대응 흐름이 즉시 활성화됩니다.
+                      </p>
+                    </div>
+                  )}
                 </div>
+              </div>
               )}
             </div>
-          </div>
-          )}
-        </div>
 
-        {/* Handling Progress Area */}
-      </div>
+            </div>
+          </div>{/* end col4 */}
+
+        </div>{/* end grid */}
+      </div>{/* end px-4 pt-4 pb-24 */}
+
+      {/* Handling Progress Area */}
 
       {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
       {/* AI Agent Demo Components - Emergency Modal disabled by user request

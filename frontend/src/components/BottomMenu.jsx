@@ -13,7 +13,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
           { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
-          { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox' },
+          { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox', action: onReportClick },
           { id: 'my', label: 'MY', icon: User, path: '/my-assignments' },
           { id: 'more', label: '더보기', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
         ].map((item) => {
@@ -116,7 +116,9 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'Codebook', sub: 'Metadata', icon: BookOpen, path: '/codebook-management', color: '#eab308' },
                 { label: 'Data\nFlow', sub: 'DFD', icon: Layers, path: '/processing-flow', color: '#3b82f6', adminOnly: true },
                 { label: 'Push\nDiagnostic', sub: 'Notification', icon: Bell, path: '/push-diagnostic', color: '#f59e0b' },
-                { label: 'AI\nReport', sub: '장애 분석서', icon: FileText, path: '/mobile-report-search', color: '#10b981' },
+                { label: 'AI\nReport', sub: '장애 분석서', icon: FileText, action: onReportClick, color: '#3b82f6' },
+                { label: 'AI Report\n(Detail)', sub: '분석서 상세', icon: FileText, path: '/ai-report', color: '#6366f1' },
+                { label: 'Report\nSearch', sub: '통합 검색', icon: Search, path: '/mobile-report-search', color: '#10b981' },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
                 const Icon = item.icon;
                 return (

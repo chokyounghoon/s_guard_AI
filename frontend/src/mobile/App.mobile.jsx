@@ -242,7 +242,7 @@ function AppContent() {
         <Route path="/" element={<LoginPageWithPWA />} />
 
         {/* ── 대시보드: PC DashboardPage 그대로 사용 ── */}
-        <Route path="/dashboard"   element={<PR><DashboardPage onAiClick={() => setShowAIAssistant(true)} /></PR>} />
+        <Route path="/dashboard"   element={<PR><MobileDashboard user={userProfile} /></PR>} />
         <Route path="/activity"    element={<PR><MobileActivity user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
