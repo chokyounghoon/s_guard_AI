@@ -54,6 +54,56 @@ const STATUS_MAP = {
   DEFAULT:    { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)', label: '미확인' },
 };
 
+// ── 인시던트 카드 (훅 규칙 준수: useLongPress를 컴포넌트 레벨에서 호출) ──
+function IncidentCard({ item, idx, onLongPress, onClick }) {
+  const longPressProps = useLongPress(
+    () => onLongPress(item),
+    () => onClick(item)
+  );
+  const s = STATUS_MAP[item.incident_status] || STATUS_MAP.DEFAULT;
+  const isUrgent = item.keyword_detected === 1;
+  return (
+    <div
+      key={item.inc_id}
+      {...longPressProps}
+      onContextMenu={(e) => e.preventDefault()}
+      className={`w-full text-left glass-card rounded-[2rem] p-5 active:scale-[0.98] transition-all group relative overflow-hidden animate-fade-in-up ${isUrgent ? 'border-red-600/20' : ''}`}
+      style={{ animationDelay: `${(idx % 8) * 40}ms` }}
+    >
+      {isUrgent && <div className="absolute top-0 left-0 w-1 h-full bg-red-600/50" />}
+      <div className="flex items-center justify-between mb-3.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[8px] font-black px-2 py-1 rounded-lg border uppercase tracking-wider" style={{ color: s.color, background: s.bg, borderColor: s.border }}>{s.label}</span>
+          {isUrgent && <span className="text-[8px] font-black px-2 py-1 rounded-lg bg-red-600 text-white uppercase tracking-wider">Urgent</span>}
+        </div>
+        <span className="text-[9px] text-slate-500 font-bold font-mono">
+          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
+        </span>
+      </div>
+      <p className="text-[14px] text-slate-100 font-bold leading-snug line-clamp-2 mb-4 pr-2 tracking-tight group-active:text-blue-400 transition-colors">{item.message}</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 overflow-hidden">
+          {item.service_name && (
+            <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 flex items-center gap-1.5 shrink-0">
+              <Activity className="w-2.5 h-2.5 text-blue-500" />
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight truncate max-w-[80px]">{item.service_name}</span>
+            </div>
+          )}
+          {item.error_code && (
+            <div className="px-2 py-0.5 rounded-md bg-orange-500/10 border border-orange-500/10 flex items-center gap-1.5 shrink-0">
+              <Zap className="w-2.5 h-2.5 text-orange-500" />
+              <span className="text-[9px] text-orange-400 font-mono font-bold tracking-tight">{item.error_code}</span>
+            </div>
+          )}
+        </div>
+        <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center group-active:bg-blue-600/20 transition-all">
+          <ChevronRight className="w-4 h-4 text-slate-600 group-active:text-blue-400" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MobileDashboard({ user }) {
   const navigate = useNavigate();
   const [incidents, setIncidents] = useState([]);
@@ -196,57 +246,15 @@ export default function MobileDashboard({ user }) {
             <div className="space-y-3.5 pb-10">
               {incidents
                 .filter(item => !hideCompleted || item.incident_status !== '처리완료')
-                .map((item, idx) => {
-                const s = STATUS_MAP[item.incident_status] || STATUS_MAP.DEFAULT;
-                const isUrgent = item.keyword_detected === 1;
-                
-                // 롱프레스 훅 사용
-                const longPressProps = useLongPress(
-                  () => handleIncidentLongPress(item),
-                  () => handleIncidentClick(item)
-                );
-
-                return (
-                  <div
+                .map((item, idx) => (
+                  <IncidentCard
                     key={item.inc_id}
-                    {...longPressProps}
-                    onContextMenu={(e) => e.preventDefault()} // 기본 메뉴 방지
-                    className={`w-full text-left glass-card rounded-[2rem] p-5 active:scale-[0.98] transition-all group relative overflow-hidden animate-fade-in-up ${isUrgent ? 'border-red-600/20' : ''}`}
-                    style={{ animationDelay: `${(idx % 8) * 40}ms` }}
-                  >
-                    {isUrgent && <div className="absolute top-0 left-0 w-1 h-full bg-red-600/50" />}
-                    <div className="flex items-center justify-between mb-3.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[8px] font-black px-2 py-1 rounded-lg border uppercase tracking-wider" style={{ color: s.color, background: s.bg, borderColor: s.border }}>{s.label}</span>
-                        {isUrgent && <span className="text-[8px] font-black px-2 py-1 rounded-lg bg-red-600 text-white uppercase tracking-wider">Urgent</span>}
-                      </div>
-                      <span className="text-[9px] text-slate-500 font-bold font-mono">
-                        {item.timestamp ? new Date(item.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
-                    </div>
-                    <p className="text-[14px] text-slate-100 font-bold leading-snug line-clamp-2 mb-4 pr-2 tracking-tight group-active:text-blue-400 transition-colors">{item.message}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 overflow-hidden">
-                        {item.service_name && (
-                          <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 flex items-center gap-1.5 shrink-0">
-                            <Activity className="w-2.5 h-2.5 text-blue-500" />
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight truncate max-w-[80px]">{item.service_name}</span>
-                          </div>
-                        )}
-                        {item.error_code && (
-                          <div className="px-2 py-0.5 rounded-md bg-orange-500/10 border border-orange-500/10 flex items-center gap-1.5 shrink-0">
-                            <Zap className="w-2.5 h-2.5 text-orange-500" />
-                            <span className="text-[9px] text-orange-400 font-mono font-bold tracking-tight">{item.error_code}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center group-active:bg-blue-600/20 transition-all">
-                        <ChevronRight className="w-4 h-4 text-slate-600 group-active:text-blue-400" />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    item={item}
+                    idx={idx}
+                    onLongPress={handleIncidentLongPress}
+                    onClick={handleIncidentClick}
+                  />
+                ))}
             </div>
           )}
         </div>
