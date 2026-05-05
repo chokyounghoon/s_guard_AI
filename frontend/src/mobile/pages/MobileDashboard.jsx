@@ -110,12 +110,14 @@ export default function DashboardPage({ onAiClick }) {
 
   // 더보기 서브페이지에서 뒤로가기 시 콘솔 자동 오픈
   useEffect(() => {
-    if (location.state?.openMoreMenu) {
+    const fromState = location.state?.openMoreMenu;
+    const fromStorage = sessionStorage.getItem('console_return_pending') === '1';
+    if (fromState || fromStorage) {
       setShowMoreMenuFromConsole(true);
-      // state 소비 후 초기화 (새로고침 시 재실행 방지)
+      sessionStorage.removeItem('console_return_pending');
       window.history.replaceState({}, '');
     }
-  }, [location.state?.openMoreMenu]);
+  }, [location.key]); // location.key는 매 navigation마다 갱신됨
 
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
@@ -1962,6 +1964,7 @@ export default function DashboardPage({ onAiClick }) {
                 </div>
               )}
             </div>
+          </div>
         </div>
 
         {/* Handling Progress Area */}
@@ -2074,6 +2077,7 @@ export default function DashboardPage({ onAiClick }) {
       {/* Bottom Navigation */}
       <BottomMenu 
         currentPath="/dashboard" 
+        initialOpenMoreMenu={showMoreMenuFromConsole}
         onWarRoomClick={() => {
           fetchWarRooms();
           setShowWarRoomPopup(true);

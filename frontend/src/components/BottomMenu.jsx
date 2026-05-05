@@ -66,7 +66,11 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             {/* Manual Entry - 전체 너비 강조 버튼 */}
             <div style={{ padding: '4px 16px 0' }}>
               <div
-                onClick={() => { setShowMoreMenu(false); navigate('/incident-push', { state: { from: 'system-console' } }); }}
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  sessionStorage.setItem('console_return_pending', '1');
+                  navigate('/incident-push', { state: { from: 'system-console' } });
+                }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
                   padding: '14px 18px',
@@ -127,7 +131,16 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 return (
                   <div
                     key={item.label}
-                    onClick={() => { setShowMoreMenu(false); item.action ? item.action() : navigate(item.path, { state: { from: 'system-console' } }); }}
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (item.action) {
+                        item.action();
+                      } else {
+                        // 콘솔 복귀 플래그: navigate(-1)로 돌아오면 콘솔 자동 재오픈
+                        sessionStorage.setItem('console_return_pending', '1');
+                        navigate(item.path, { state: { from: 'system-console' } });
+                      }
+                    }}
                     style={{
                       background: 'rgba(255,255,255,0.04)',
                       border: '1px solid rgba(255,255,255,0.07)',
