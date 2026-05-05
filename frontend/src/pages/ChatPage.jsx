@@ -1137,7 +1137,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#191919] text-white font-sans flex flex-col relative">
+    <div className="h-full overflow-hidden bg-[#191919] text-white font-sans flex flex-col relative">
       {/* Header */}
       {/* DM Notifications Toast */}
       <div className="fixed top-20 right-4 z-[150] flex flex-col items-end space-y-2 pointer-events-none">

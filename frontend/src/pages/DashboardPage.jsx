@@ -1614,6 +1614,21 @@ export default function DashboardPage({ onAiClick }) {
                     );
                   })()}
 
+                  {/* 재조회 버튼 */}
+                  {selectedSms && (
+                    <button
+                      onClick={() => {
+                        setAgentMessages([]);
+                        setShowAgentPanel(true);
+                        startLiveScenario(selectedSms);
+                      }}
+                      title="AI 에이전트 재조회 (Dify)"
+                      className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-indigo-500/20 hover:text-indigo-400 hover:border-indigo-500/30 active:scale-90 transition-all"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  )}
+
                 </div>
               </div>
 

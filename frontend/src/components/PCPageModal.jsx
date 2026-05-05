@@ -76,8 +76,8 @@ export default function PCPageModal({ children }) {
           </button>
         </div>
 
-        {/* Scrollable Page Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {/* Page Content — each page manages its own scroll */}
+        <div className="flex-1 overflow-hidden flex flex-col">
           {children}
         </div>
       </div>
