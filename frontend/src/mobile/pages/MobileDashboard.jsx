@@ -838,118 +838,132 @@ export default function DashboardPage({ onAiClick }) {
     setIsWarRoomCollapsed(!isWarRoomCollapsed);
   };
 
-  // Helper to parse transcript string into array of message objects
+  // ── PC 버전과 동일한 parseTranscript (DashboardPage.jsx 기준) ──────────────
   const parseTranscript = (text) => {
     if (!text) return [];
 
-    const declarations = [
-      { name: 'Security', keywords: ['Security', '보안', 'System', '시스템', '보안분석'] },
-      { name: 'DB', keywords: ['DB', '데이터베이스', 'Database', 'DATABASE', '쿼리'] },
-      { name: 'DevOps', keywords: ['DevOps', '데브옵스', 'Analyst', '어낼리스트', 'Infra', '인프라', 'App', '애플리케이션'] },
-      { name: 'Leader', keywords: ['Leader', '리더', '최종 조치', '조항 조치', '조치 가이드', '최종판단'] }
-    ];
+    // ── 에이전트 이름 → 정규화 키 매핑
+    const AGENT_ORDER = ['Security', 'DB', 'DevOps', 'Leader'];
 
-    // Find the starting point of the diagnostic section
-    let startIndex = text.indexOf('[전문가별 심층 진단]');
-    if (startIndex === -1) {
-        // Fallback: check for Agent keyword if main header is missing
-        const firstAgentIndex = text.search(/(Security|DB|DevOps|Leader|Agent|에이전트)/i);
-        startIndex = firstAgentIndex !== -1 ? firstAgentIndex : 0;
+    const detectAgentName = (str) => {
+      const s = str.trim();
+      if (/security/i.test(s))             return 'Security';
+      if (/db|database/i.test(s))          return 'DB';
+      if (/devops|infra|analyst/i.test(s)) return 'DevOps';
+      if (/leader/i.test(s))              return 'Leader';
+      return null;
+    };
+
+    // ── [전문가별 심층 진단] 섹션 시작점 찾기
+    const sectionMarkers = ['[전문가별 심층 진단]', '전문가별 심층 진단', '## 전문가', '### 전문가'];
+    let startIndex = -1;
+    for (const marker of sectionMarkers) {
+      const idx = text.indexOf(marker);
+      if (idx !== -1) { startIndex = idx; break; }
     }
-    
-    const diagnosticsText = text.substring(startIndex);
-    const lines = diagnosticsText.split('\n');
-    let currentAgent = null;
+    if (startIndex === -1) startIndex = 0;
+
+    const lines = text.substring(startIndex).split('\n');
     const msgsMap = new Map();
+    let currentAgent = null;
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmedLine = line.trim();
-        if (!trimmedLine) continue;
-        
-        let foundAgent = null;
-        
-        // Robust Header Detection:
-        // 1. Starts with Markdown header prefixes (###, **, -)
-        // 2. OR ends with a colon
-        // 3. AND is compact (< 80 chars)
-        const isHeaderFormat = /^(###?|\*\*|-|\[|[\uD800-\uDBFF][\uDC00-\uDFFF])/.test(trimmedLine) || /:\s*$/.test(trimmedLine);
-        
-        if (isHeaderFormat && trimmedLine.length < 80) {
-            const lowerLine = trimmedLine.toLowerCase();
-            for (const decl of declarations) {
-                // To prevent misidentifying "1. DB 조치" as a new agent if DB is already active,
-                // we prioritize lines containing "Agent" or "에이전트"
-                const hasAgentKeyword = lowerLine.includes('agent') || lowerLine.includes('에이전트') || lowerLine.includes('진단');
-                const hasRoleKeyword = decl.keywords.some(k => lowerLine.includes(k.toLowerCase()));
-                
-                if (hasRoleKeyword && (hasAgentKeyword || trimmedLine.startsWith('###') || trimmedLine.startsWith('**'))) {
-                    foundAgent = decl.name;
-                    break;
-                }
-            }
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // ── 패턴 1: `- **Security Agent**: 내용` 또는 `• Security Agent: 내용`
+      const bulletMatch = trimmed.match(
+        /^[-•\*·\d\.]\\s*\*{0,2}(Security|DB|DevOps|Leader)\s*Agent\*{0,2}\s*[:：]\s*(.+)/i
+      );
+      if (bulletMatch) {
+        const agentName = detectAgentName(bulletMatch[1]);
+        const content = bulletMatch[2].trim();
+        if (agentName && content) {
+          const prev = msgsMap.get(agentName) || '';
+          msgsMap.set(agentName, prev + (prev ? '\n' : '') + content);
+          currentAgent = agentName;
+          continue;
         }
-        
-        if (foundAgent) {
-            currentAgent = foundAgent;
-            continue; 
+      }
+
+      // ── 패턴 2: 헤더 형식 (`### Security Agent`, `**DB Agent**`, `[Security Agent]`)
+      const isHeaderLike = (
+        /^#{1,4}\s/.test(trimmed) ||
+        /^\*{1,2}[^*]/.test(trimmed) ||
+        /^\[.{2,40}\]/.test(trimmed) ||
+        /^\d+[\.]\s/.test(trimmed) ||
+        (/[：:]\s*$/.test(trimmed) && trimmed.length < 60)
+      );
+      if (isHeaderLike && /security|db|database|devops|infra|leader/i.test(trimmed)) {
+        const agentName = detectAgentName(trimmed);
+        if (agentName) {
+          currentAgent = agentName;
+          continue;
         }
-        
-        if (currentAgent) {
-            const existing = msgsMap.get(currentAgent) || '';
-            msgsMap.set(currentAgent, existing + (existing ? '\n' : '') + trimmedLine);
-        }
+      }
+
+      // ── 패턴 3: 이전 에이전트 내용 누적
+      if (currentAgent) {
+        const prev = msgsMap.get(currentAgent) || '';
+        msgsMap.set(currentAgent, prev + (prev ? '\n' : '') + trimmed);
+      }
     }
-    
-    return Array.from(msgsMap.entries()).map(([role, content]) => {
-      // Deep cleanup of residual artifacts
-      let cleanText = content
-          .replace(/^(###?|\*\*)?\s*(Security|DB|DevOps|Leader|Agent|에이전트).*?[:：]\s*/i, '') 
-          .replace(/^[ \t\-\*\#\.,\:\u2022\u00b7]+\s*/gm, '') 
-          .replace(/\n\n+/g, '\n\n')
-          .trim();
-          
-      return { role: role, text: cleanText, delay: 0 };
-    }).filter(msg => msg.text.length > 3);
+
+    // ── 정의된 4개 순서로 결과 반환
+    const result = [];
+    for (const name of AGENT_ORDER) {
+      const raw = msgsMap.get(name);
+      if (!raw) continue;
+
+      let processed = raw;
+
+      // Leader: [리더의 최종 조치 가이드] 이하 제거
+      if (name === 'Leader') {
+        const guidePattern = /(\*{0,2}#{0,4}\s*\[?리더의 최종 조치 가이드\]?\*{0,2})/;
+        const guideMatch = guidePattern.exec(processed);
+        if (guideMatch) processed = processed.substring(0, guideMatch.index);
+      }
+
+      const cleaned = processed
+        .replace(/^#{1,4}\s*/gm, '')
+        .replace(/^\*{1,2}(.*?)\*{1,2}$/gm, '$1')
+        .replace(/^[-•·]\s*/gm, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      if (cleaned.length > 3) {
+        result.push({ role: name, text: cleaned, delay: 0 });
+      }
+    }
+
+    return result;
   };
 
-  // Callback called from AiInsightPanel
+  // Callback called from AiInsightPanel (PC 버전과 동일한 로직)
   const handleAgentContent = (fullTranscript, isDone) => {
-    if (!fullTranscript || fullTranscript.trim().length < 5) return;
-
-    // ① 스트리밍 중(isDone=false)에도 Expert Advisor에 실시간 표시
     const currentMsgs = parseTranscript(fullTranscript);
-    if (currentMsgs.length > 0) {
-      const filtered = currentMsgs.filter(m => m.role !== 'AI분석');
-      setAgentMessages(filtered.map(m => ({ ...m, isCompleted: isDone })));
-    } else {
-      // ② 파싱 실패 폴백: 분석 텍스트 전체를 Leader 메시지로 표시
-      setAgentMessages([{
-        role: 'Leader',
-        text: fullTranscript.trim(),
-        isCompleted: isDone,
-        delay: 0
-      }]);
+    const filteredMsgs = currentMsgs.filter(m => m.role !== 'AI분석');
+
+    if (filteredMsgs.length > 0) {
+      setShowAgentPanel(true);
+      // 순서대로(Security→DB→DevOps→Leader) 즉시 전부 표시
+      setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: isDone })));
     }
 
-    // ③ 완료 시에만 DB 저장
-    if (isDone) {
+    // 완료 시에만 DB 저장
+    if (isDone && currentMsgs.length > 0) {
       const currentIncId = selectedSmsRef.current?.inc_id;
       if (currentIncId) {
-        const msgsToSave = currentMsgs.length > 0
-          ? currentMsgs.filter(m => m.role !== 'AI분석')
-          : [{ role: 'Leader', text: fullTranscript.trim() }];
-
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ incident_id: String(currentIncId), messages: msgsToSave })
+          body: JSON.stringify({ incident_id: String(currentIncId), messages: currentMsgs })
         }).catch(console.error);
 
         setTimeout(() => setShowEmergencyModal(true), 1500);
       }
     }
   };
+
 
   const agentPanelRef = useRef(null);
 
