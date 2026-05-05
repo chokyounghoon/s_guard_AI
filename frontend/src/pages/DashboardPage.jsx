@@ -1366,8 +1366,9 @@ export default function DashboardPage({ onAiClick }) {
           {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
           <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
-          {smsMessages.length > 0 && (
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden custom-scrollbar flex flex-col">
+          <div className="flex-1 overflow-hidden flex flex-col">
+          {smsMessages.length > 0 ? (
+            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col">
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-2 sm:gap-3.5">
                     <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
@@ -1544,7 +1545,8 @@ export default function DashboardPage({ onAiClick }) {
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
+          </div>{/* end flex-1 wrapper */}
 
           </div>{/* end col1 */}
 
