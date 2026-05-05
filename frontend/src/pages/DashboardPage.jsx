@@ -1658,9 +1658,8 @@ export default function DashboardPage({ onAiClick }) {
 
           {/* ── 4/4: 장애 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-y-auto">
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col">
             {/* Activity History Flow Area */}
-            <div className="bg-[#1a1f2e] rounded-3xl p-6 border border-white/5 shadow-xl mt-6">
+            <div className="bg-[#1a1f2e] rounded-3xl p-5 border border-white/5 shadow-xl flex-1 overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <Activity className="w-4 h-4 text-purple-400 shrink-0 group-hover:scale-110 transition-transform" />
@@ -1961,9 +1960,7 @@ export default function DashboardPage({ onAiClick }) {
                 </div>
               </div>
               )}
-            </div>
-
-            </div>
+            </div>{/* end Activity div */}
           </div>{/* end col4 */}
 
         </div>{/* end grid */}
