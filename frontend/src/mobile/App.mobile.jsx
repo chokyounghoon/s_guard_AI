@@ -4,7 +4,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // ── 기존 PC 페이지 전체 그대로 재사용 ───────────────────────────────────────────
 import LoginPage              from '../pages/LoginPage';
-import DashboardPage          from '../pages/DashboardPage';
+// (DashboardPage 미사용 - 모바일은 MobileDashboard 독립적으로 사용)
 import AiReportPage           from '../pages/AiReportPage';
 import AiProcessReportPage    from '../pages/AiProcessReportPage';
 import AssignmentDetailPage   from '../pages/AssignmentDetailPage';
@@ -241,7 +241,7 @@ function AppContent() {
         {/* 로그인 + 하단 PWA 설치 버튼 */}
         <Route path="/" element={<LoginPageWithPWA />} />
 
-        {/* ── 대시보드: PC DashboardPage 그대로 사용 ── */}
+        {/* ── 대시보드: 모바일 전용 MobileDashboard (학 사용) ── */}
         <Route path="/dashboard"   element={<PR><MobileDashboard user={userProfile} /></PR>} />
         <Route path="/activity"    element={<PR><MobileActivity user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
