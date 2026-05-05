@@ -1457,7 +1457,7 @@ export default function DashboardPage({ onAiClick }) {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="p-3 space-y-1.5">
                   {visibleSms.map((msg) => {
                     const isSelected = selectedSms?.inc_id === msg.inc_id;

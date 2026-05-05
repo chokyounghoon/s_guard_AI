@@ -557,7 +557,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
 
   return (
-    <div className={`rounded-3xl p-3 sm:p-6 border shadow-2xl relative overflow-hidden transition-all duration-500
+    <div className={`rounded-3xl p-3 sm:p-6 border shadow-2xl relative h-full overflow-y-auto custom-scrollbar transition-all duration-500
       ${isAnalyzingSms && isCritical
         ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-red-500/40 shadow-red-900/20'
         : selectedSms

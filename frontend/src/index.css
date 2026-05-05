@@ -130,17 +130,24 @@
   border-right-color: transparent;
 }
 
-/* ── 커스텀 얇은 스크롤바 ── */
-.custom-scrollbar::-webkit-scrollbar { width: 3px; height: 3px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.12);
+/* ── 모던 프리미엄 스크롤바 ── */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.02);
   border-radius: 99px;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(99,102,241,0.5) 0%, rgba(59,130,246,0.3) 100%);
+  border-radius: 99px;
+  transition: background 0.2s ease;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(99,102,241,0.8) 0%, rgba(59,130,246,0.6) 100%);
+  box-shadow: 0 0 6px rgba(99,102,241,0.4);
+}
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.12) transparent;
+  scrollbar-color: rgba(99,102,241,0.4) rgba(255,255,255,0.02);
 }
 
 /* ── 코드블록 ── */
