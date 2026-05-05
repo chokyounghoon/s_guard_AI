@@ -241,8 +241,8 @@ function AppContent() {
         {/* 로그인 + 하단 PWA 설치 버튼 */}
         <Route path="/" element={<LoginPageWithPWA />} />
 
-        {/* ── 대시보드: 모바일 전용 MobileDashboard (학 사용) ── */}
-        <Route path="/dashboard"   element={<PR><MobileDashboard user={userProfile} /></PR>} />
+        {/* ── 대시보드: PC DashboardPage와 동일한 파일 사용 ── */}
+        <Route path="/dashboard"   element={<PR><MobileDashboard onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/activity"    element={<PR><MobileActivity user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
