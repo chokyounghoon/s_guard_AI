@@ -1364,10 +1364,10 @@ export default function DashboardPage({ onAiClick }) {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
 
           {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
-          <div className="flex flex-col gap-4 h-full overflow-y-auto">
+          <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
           {smsMessages.length > 0 && (
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
+            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-y-auto custom-scrollbar flex flex-col">
               <div
                 onClick={toggleSmsPanel}
                 className="p-4 sm:p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
@@ -1555,7 +1555,7 @@ export default function DashboardPage({ onAiClick }) {
           </div>{/* end col1 */}
 
           {/* ── 2/4: S-Autopilot Insight Panel ── */}
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full overflow-hidden">
           <AiInsightPanel 
                onLogReceived={handleLogReceived} 
                onShowDetail={handleShowInsight} 
@@ -1567,7 +1567,7 @@ export default function DashboardPage({ onAiClick }) {
           </div>{/* end col2 */}
 
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full overflow-hidden">
 
 
 
@@ -1657,9 +1657,9 @@ export default function DashboardPage({ onAiClick }) {
           </div>{/* end col3 */}
 
           {/* ── 4/4: 장애 처리 현황 ── */}
-          <div className="flex flex-col h-full overflow-y-auto">
+          <div className="flex flex-col h-full overflow-hidden">
             {/* Activity History Flow Area */}
-            <div className="bg-[#1a1f2e] rounded-3xl p-5 border border-white/5 shadow-xl flex-1 overflow-y-auto">
+            <div className="bg-[#1a1f2e] rounded-3xl p-5 border border-white/5 shadow-xl flex-1 overflow-y-auto custom-scrollbar">
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <Activity className="w-4 h-4 text-purple-400 shrink-0 group-hover:scale-110 transition-transform" />
