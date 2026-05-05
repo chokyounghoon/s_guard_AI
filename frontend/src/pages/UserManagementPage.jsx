@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ArrowLeft, Search, User, Shield, RefreshCw,
   Trash2, Mail, Phone, Building2,
@@ -11,6 +12,7 @@ import { SMS_WORKER_URL } from '../config/api';
 
 export default function UserManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -369,7 +371,7 @@ export default function UserManagementPage() {
 
           {/* 좌측: 뒤로 + 타이틀 */}
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => navigate(-1)} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+            <button onClick={() => goBack()} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </button>
             <div className="min-w-0">

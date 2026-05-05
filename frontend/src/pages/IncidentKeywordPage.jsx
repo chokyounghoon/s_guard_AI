@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ArrowLeft, Plus, X, Search, Hash, AlertTriangle, CheckCircle,
   Shield, Trash2, RefreshCw, Smartphone, Wifi, WifiOff,
@@ -27,6 +28,7 @@ function SeverityPill({ severity }) {
 
 export default function IncidentKeywordPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [keywords, setKeywords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -131,7 +133,7 @@ export default function IncidentKeywordPage() {
         <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all">
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </button>
             <div>

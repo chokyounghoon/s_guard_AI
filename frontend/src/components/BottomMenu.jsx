@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell } from 'lucide-react';
 
-export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user }) {
+export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu }) {
   const navigate = useNavigate();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  React.useEffect(() => {
+    if (initialOpenMoreMenu) setShowMoreMenu(true);
+  }, [initialOpenMoreMenu]);
 
   return (
     <>
@@ -13,7 +17,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
           { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
-          { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox', action: onReportClick },
+          { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox' },
           { id: 'my', label: 'MY', icon: User, path: '/my-assignments' },
           { id: 'more', label: '더보기', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
         ].map((item) => {
@@ -62,7 +66,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             {/* Manual Entry - 전체 너비 강조 버튼 */}
             <div style={{ padding: '4px 16px 0' }}>
               <div
-                onClick={() => { setShowMoreMenu(false); navigate('/incident-push'); }}
+                onClick={() => { setShowMoreMenu(false); navigate('/incident-push', { state: { from: 'system-console' } }); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
                   padding: '14px 18px',
@@ -112,7 +116,6 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'Knowledge\nBase', sub: 'RAG Docs', icon: FileText, path: '/knowledge-base', color: '#0ea5e9' },
                 { label: 'Global\nStats', sub: 'Metrics', icon: Activity, path: '/overall-status', color: '#f97316' },
                 { label: 'War-Room\nHub', sub: 'Channels', icon: Shield, path: '/warroom-management', color: '#ef4444' },
-                { label: 'Activity\nLogs', sub: 'Footprints', icon: Activity, path: '/activity', color: '#06b6d4' },
                 { label: 'Codebook', sub: 'Metadata', icon: BookOpen, path: '/codebook-management', color: '#eab308' },
                 { label: 'Data\nFlow', sub: 'DFD', icon: Layers, path: '/processing-flow', color: '#3b82f6', adminOnly: true },
                 { label: 'Push\nDiagnostic', sub: 'Notification', icon: Bell, path: '/push-diagnostic', color: '#f59e0b' },
@@ -124,7 +127,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 return (
                   <div
                     key={item.label}
-                    onClick={() => { setShowMoreMenu(false); item.action ? item.action() : navigate(item.path); }}
+                    onClick={() => { setShowMoreMenu(false); item.action ? item.action() : navigate(item.path, { state: { from: 'system-console' } }); }}
                     style={{
                       background: 'rgba(255,255,255,0.04)',
                       border: '1px solid rgba(255,255,255,0.07)',

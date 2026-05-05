@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { ArrowLeft, AlertTriangle, CheckCircle, Compass, BarChart3, TrendingUp, Zap, Shield } from 'lucide-react';
 import { getAuthHeaders } from '../lib/authStore';
 import { Toaster, toast } from 'react-hot-toast';
@@ -126,6 +127,7 @@ function ThresholdBlock({ tier, title, subtitle, icon: Icon, color, bg, border, 
 /* ── 메인 ── */
 export default function AlertMonitorPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -250,7 +252,7 @@ export default function AlertMonitorPage() {
       {/* HEADER */}
       <header style={{ background: 'rgba(2,9,23,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(6,182,212,0.08)' }}
         className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 flex-shrink-0">
-        <button onClick={() => navigate(-1)}
+        <button onClick={() => goBack()}
           style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ArrowLeft style={{ width: 16, height: 16, color: '#64748b' }} />
         </button>

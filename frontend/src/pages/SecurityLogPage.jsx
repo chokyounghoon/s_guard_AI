@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   Shield, ShieldAlert, Download, Search,
   RefreshCw, Globe, Monitor, ChevronLeft, Loader2, CheckCircle, XCircle
@@ -9,6 +10,7 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 const SecurityLogPage = () => {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,7 +81,7 @@ const SecurityLogPage = () => {
         borderBottom: '1px solid rgba(99,102,241,0.12)',
         background: 'rgba(5,8,18,0.95)', backdropFilter: 'blur(20px)',
       }}>
-        <button onClick={() => navigate(-1)} style={{
+        <button onClick={() => goBack()} style={{
           width: 36, height: 36, borderRadius: 10,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',

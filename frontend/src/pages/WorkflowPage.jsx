@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar,
          ChevronRight, ChevronDown, User, Clock, Terminal, Printer,
@@ -52,6 +53,7 @@ const parseMciFields = (msg) => {
 export default function WorkflowPage() {
   const { inc_id } = useParams();
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [incidentData, setIncidentData] = useState(null);
   const [workflowLogs, setWorkflowLogs] = useState([]);
   const [assignees, setAssignees] = useState([]);
@@ -472,7 +474,7 @@ export default function WorkflowPage() {
       <header className="sticky top-0 z-50 bg-[#0a0c14]/80 backdrop-blur-2xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors">
+            <button onClick={() => goBack()} className="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors">
               <ArrowLeft className="w-5 h-5 text-slate-300" />
             </button>
             <div>

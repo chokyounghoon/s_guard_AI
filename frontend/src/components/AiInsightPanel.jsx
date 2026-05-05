@@ -555,14 +555,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   // War-Room 개설 버튼 (분석 완료 시 표시, 이미 개설된 경우 텍스트를 변경해서 표시)
   const showWarRoomButton = analysisComplete;
 
-
   return (
-    <div className={`rounded-3xl p-3 sm:p-6 border shadow-2xl relative h-full overflow-y-auto custom-scrollbar transition-all duration-500
+    <div className={`rounded-3xl border shadow-2xl relative h-full flex flex-col transition-all duration-500
       ${isAnalyzingSms && isCritical
         ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-red-500/40 shadow-red-900/20'
         : selectedSms
         ? 'bg-gradient-to-br from-[#1a1b10] to-[#11141d] border-yellow-500/40 shadow-yellow-500/10'
         : 'bg-gradient-to-br from-[#141928] via-[#161c2b] to-[#0e1018] border-blue-500/20 shadow-blue-900/20'}`}>
+      {/* 고정 헤더 영역 */}
+      <div className="shrink-0 px-3 sm:px-6 pt-3 sm:pt-6">
       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/3 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none" />
 
@@ -678,6 +679,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         );
       })()}
+      </div>
 
       {/* Similarity Bottom Sheet */}
       {showSimilaritySheet && (
@@ -754,6 +756,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         </div>
       )}
+
+      {/* 스크롤 가능 영역 */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-6 pb-3 sm:pb-6 min-h-0">
 
       <div className="pb-4 relative">
         
@@ -977,6 +982,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         </div>
       )}
+
+      </div>
 
       </div>
 

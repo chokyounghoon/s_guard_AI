@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ChevronLeft, Plus, Edit3, Trash2, Building2, GitMerge,
   Users, Save, X, Network, Search, Command, User, Loader2, ChevronRight
@@ -18,6 +19,7 @@ const DEPTH_CONFIG = [
 
 export default function OrganizationManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [tree, setTree] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -183,7 +185,7 @@ export default function OrganizationManagementPage() {
         borderBottom: '1px solid rgba(59,130,246,0.1)',
         background: 'rgba(6,10,24,0.95)', backdropFilter: 'blur(20px)',
       }}>
-        <button onClick={() => navigate(-1)} style={{
+        <button onClick={() => goBack()} style={{
           width: 36, height: 36, borderRadius: 10,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',

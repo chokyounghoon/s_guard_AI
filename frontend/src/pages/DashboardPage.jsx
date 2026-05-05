@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, RotateCcw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
@@ -104,7 +104,18 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
 // ── 메인 대시보드 컴포넌트 ───────────────────────
 export default function DashboardPage({ onAiClick }) {
   const navigate = useNavigate();
+  const [showMoreMenuFromConsole, setShowMoreMenuFromConsole] = useState(false);
+  const location = useLocation();
   const [showAgentPanel, setShowAgentPanel] = useState(false);
+
+  // 더보기 서브페이지에서 뒤로가기 시 콘솔 자동 오픈
+  useEffect(() => {
+    if (location.state?.openMoreMenu) {
+      setShowMoreMenuFromConsole(true);
+      // state 소비 후 초기화
+      window.history.replaceState({}, '');
+    }
+  }, [location.state?.openMoreMenu]);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState('ai'); // 'ai' or 'human'
@@ -2086,13 +2097,13 @@ export default function DashboardPage({ onAiClick }) {
       )}
 
 
-      {/* Bottom Navigation */}
       <BottomMenu 
         currentPath="/dashboard" 
         onWarRoomClick={() => {
           fetchWarRooms();
           setShowWarRoomPopup(true);
         }} 
+        initialOpenMoreMenu={showMoreMenuFromConsole}
       />
     </div>
   );

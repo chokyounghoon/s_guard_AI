@@ -1,0 +1,531 @@
+/*
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║   S-GUARD  ·  ORBITAL COMMAND CENTER  ·  sguard_wide_hud.css   ║
+ * ║   Target: @media (min-width: 768px)  ·  PC & Tablet Landscape  ║
+ * ║   ⚑  No functional logic was altered.                          ║
+ * ╚══════════════════════════════════════════════════════════════════╝
+ */
+
+/* ── Web Fonts ──────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@300;400;600;700;900&display=swap');
+
+/* ── Keyframe Animations ────────────────────────────────────────── */
+@keyframes hud-scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes hud-pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: rgba(239,68,68,0.4); }
+  50%       { box-shadow: 0 0 24px 6px rgba(239,68,68,0.35); border-color: rgba(239,68,68,0.9); }
+}
+
+@keyframes hud-flicker {
+  0%,100% { opacity: 1; }
+  92%     { opacity: 1; }
+  93%     { opacity: 0.6; }
+  94%     { opacity: 1; }
+  97%     { opacity: 0.7; }
+  98%     { opacity: 1; }
+}
+
+@keyframes hud-sine-wave {
+  0%   { d: path("M0,10 C8,2 16,18 24,10 C32,2 40,18 48,10 C56,2 64,18 72,10"); }
+  50%  { d: path("M0,10 C8,18 16,2 24,10 C32,18 40,2 48,10 C56,18 64,2 72,10"); }
+  100% { d: path("M0,10 C8,2 16,18 24,10 C32,2 40,18 48,10 C56,2 64,18 72,10"); }
+}
+
+@keyframes hud-arc-spin {
+  from { stroke-dashoffset: 280; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes hud-terminal-cursor {
+  0%,100% { opacity: 1; }
+  50%     { opacity: 0; }
+}
+
+@keyframes hud-neon-flow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes hud-ping-soft {
+  0%,100% { transform: scale(1); opacity: 0.8; }
+  50%     { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes hud-grid-drift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 40px 40px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WIDE VIEWPORT OVERRIDES — 768px 이상에만 적용
+   ══════════════════════════════════════════════════════════════════ */
+@media (min-width: 768px) {
+
+  /* ── 1. Root Background: Deep Navy + Radial + Animated Grid ──── */
+  .h-screen.overflow-hidden.bg-\[#0f1421\] {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(37,99,235,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 90% 90%, rgba(99,102,241,0.08) 0%, transparent 60%),
+      #020617 !important;
+    font-family: 'Outfit', 'Pretendard Variable', sans-serif !important;
+  }
+
+  /* Animated grid overlay (pseudo — applied via body::before trick on the flex container) */
+  .h-screen.overflow-hidden.bg-\[#0f1421\]::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: hud-grid-drift 8s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline sweep */
+  .h-screen.overflow-hidden.bg-\[#0f1421\]::after {
+    content: '';
+    position: fixed;
+    left: 0; right: 0;
+    height: 120px;
+    background: linear-gradient(to bottom, transparent 0%, rgba(37,99,235,0.05) 50%, transparent 100%);
+    animation: hud-scanline 6s linear infinite;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── 2. Top Navigation: Glassmorphism Command Bar ────────────── */
+  nav.flex.justify-between.items-center {
+    background: rgba(2,6,23,0.75) !important;
+    backdrop-filter: blur(24px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+    border-bottom: 0.5px solid rgba(37,99,235,0.3) !important;
+    box-shadow:
+      0 1px 0 0 rgba(37,99,235,0.15),
+      0 4px 32px rgba(0,0,0,0.5) !important;
+    position: relative;
+    z-index: 30;
+  }
+
+  /* Logo: S-GUARD AI title */
+  nav .text-lg.font-black.tracking-widest {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.18em !important;
+    font-size: 1.1rem !important;
+    text-shadow: 0 0 20px rgba(37,99,235,0.5) !important;
+    position: relative;
+  }
+
+  /* Sine wave SVG injected via CSS content trick — logo area glow */
+  nav .flex.items-center.cursor-pointer::after {
+    content: '';
+    display: inline-block;
+    width: 48px;
+    height: 12px;
+    margin-left: 10px;
+    background: linear-gradient(90deg,
+      rgba(37,99,235,0) 0%,
+      rgba(37,99,235,0.7) 30%,
+      rgba(99,102,241,0.7) 60%,
+      rgba(37,99,235,0) 100%);
+    background-size: 200% 100%;
+    animation: hud-neon-flow 2s linear infinite;
+    border-radius: 99px;
+    vertical-align: middle;
+    opacity: 0.7;
+  }
+
+  /* ── 3. Main Content Area ───────────────────────────────────── */
+  .flex-1.overflow-hidden.px-4.pt-4.pb-20 {
+    padding: 16px 16px 72px 16px !important; /* Bottom Menu 간격 최소화 */
+    /* Remove static calc() so flex-1 adapts dynamically when Nav collapses */
+    height: auto !important;
+    max-height: none !important;
+    flex-grow: 1 !important;
+    min-height: 0 !important;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ── 4. Main Grid: 4-column Command Layout ───────────────────── */
+  .grid.grid-cols-1.lg\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-template-rows: 1fr !important;
+    gap: 16px !important;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* Ensure all grid columns and their direct container children fill height evenly without stretching */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* ── 5. Glass Card Base: All major panel containers ─────────── */
+  .bg-\[#1a1f2e\].rounded-3xl,
+  .bg-\[#0a0c12\].rounded-3xl,
+  .bg-\[#0f1421\].rounded-3xl,
+  .bg-\[#11141d\].rounded-3xl {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    background: rgba(8,14,30,0.65) !important;
+    backdrop-filter: blur(20px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+    border: 0.5px solid rgba(255,255,255,0.1) !important;
+    border-radius: 20px !important;
+    box-shadow:
+      0 0 0 0.5px rgba(37,99,235,0.12),
+      0 8px 40px rgba(0,0,0,0.55),
+      inset 0 1px 0 rgba(255,255,255,0.06) !important;
+    animation: hud-flicker 12s ease-in-out infinite;
+  }
+
+  /* ── 6. Panel Headers ─────────────────────────────────────────── */
+  .border-b.border-white\/5 {
+    border-bottom-color: rgba(37,99,235,0.2) !important;
+    background: linear-gradient(90deg, rgba(37,99,235,0.06) 0%, transparent 100%);
+  }
+
+  /* Panel title typography */
+  .font-black.text-white.text-base.tracking-tight,
+  .font-black.text-white.text-lg.tracking-tight {
+    font-family: 'Outfit', sans-serif !important;
+    letter-spacing: 0.02em !important;
+    text-shadow: 0 0 12px rgba(147,197,253,0.3) !important;
+  }
+
+  /* Section sub-labels */
+  .text-\[9px\].font-bold.text-slate-500.tracking-widest.uppercase,
+  .text-\[10px\].font-bold.text-slate-500.tracking-widest.uppercase {
+    font-family: 'JetBrains Mono', monospace !important;
+    color: rgba(99,102,241,0.7) !important;
+    letter-spacing: 0.15em !important;
+  }
+
+  /* ── 7. SMS Panel (S-CALERT): Critical Pulsing Cards ────────── */
+  /* SMS card selected = yellow/critical pulse */
+  .rounded-2xl.py-2.px-4.flex.flex-col.group[style*="yellow"] {
+    animation: hud-pulse-red 2s ease-in-out infinite !important;
+  }
+
+  /* SMS message font — JetBrains Mono for precision data */
+  .text-\[13px\].leading-relaxed.font-medium.break-all {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 12px !important;
+    line-height: 1.7 !important;
+    color: rgba(226,232,240,0.9) !important;
+  }
+
+  /* SMS timestamp */
+  .text-\[8px\].text-slate-600.font-bold.font-mono {
+    font-family: 'JetBrains Mono', monospace !important;
+    color: rgba(99,102,241,0.5) !important;
+  }
+
+  /* LIVE / DONE / ANALYZING badges */
+  .text-\[10px\].font-mono.tracking-wider.font-black {
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+
+  /* ── 8. AI Insight Panel (center): Arc Gauge + Terminal Output ─ */
+
+  /* Force AI Panel to stay inside its grid column and preserve its own scrolling */
+  .grid > div:nth-child(2) > div {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  /* ── AiInsightPanel: Sticky Header Layout ───────────────────── */
+  /* 1. 패널 외부 래퍼를 flex-column으로 전환, overflow를 hidden으로 변경 */
+  .grid > div:nth-child(2) .custom-scrollbar.rounded-3xl {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    overflow-x: hidden !important;
+  }
+
+  /* 2. 헤더(제목+버튼) — flex-shrink 0으로 고정 (스크롤에 안 따라감) */
+  .grid > div:nth-child(2) .custom-scrollbar.rounded-3xl
+    > .flex.items-center.justify-between.gap-3.mb-4 {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 20 !important;
+    background: inherit !important;
+  }
+
+  /* 3. Similarity 바 — flex-shrink 0으로 고정 */
+  .grid > div:nth-child(2) .custom-scrollbar.rounded-3xl
+    > .flex.items-center.gap-3.mb-4 {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 20 !important;
+    background: inherit !important;
+  }
+
+  /* 4. 본문 컨텐츠(pb-4 relative) — flex-grow로 남은 영역 채우고 독립 스크롤 */
+  .grid > div:nth-child(2) .custom-scrollbar.rounded-3xl > .pb-4.relative {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    min-height: 0 !important;
+  }
+
+  /* 5. 장애 상세 정보(Detailed Incident Info) — 본문 스크롤 내에서 상단 고정 */
+  .grid > div:nth-child(2) .custom-scrollbar.rounded-3xl .pb-4 > .mb-3 {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background: #121624 !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border-radius: 16px !important;
+  }
+
+  /* AI panel container — brightest glow */
+  .flex-1.overflow-hidden.flex.flex-col > .bg-\[#0a0c12\].rounded-3xl,
+  div:nth-child(2) > .bg-\[#0a0c12\].rounded-3xl {
+    border-color: rgba(99,102,241,0.35) !important;
+    box-shadow:
+      0 0 0 0.5px rgba(99,102,241,0.2),
+      0 0 60px rgba(99,102,241,0.08),
+      0 8px 40px rgba(0,0,0,0.55),
+      inset 0 1px 0 rgba(255,255,255,0.07) !important;
+  }
+
+  /* Agent message bubbles — terminal typing effect via mono font */
+  .agent-bubble,
+  [class*="agent"],
+  [class*="discussion"] p,
+  [class*="AgentDiscussion"] p {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 12px !important;
+    line-height: 1.75 !important;
+  }
+
+  /* ── 9. Expert Advisor Panel (col 3) ─────────────────────────── */
+  /* Highlight the header icon area */
+  .bg-indigo-500\/10.border.border-indigo-500\/20.p-2.rounded-xl {
+    background: rgba(99,102,241,0.15) !important;
+    border-color: rgba(99,102,241,0.4) !important;
+    box-shadow: 0 0 12px rgba(99,102,241,0.25) !important;
+  }
+
+  /* ── 10. Timeline / Processing Flow (col 4): Neon Line ────────── */
+
+  /* Vertical connecting line — neon glow */
+  .absolute.left-\[11px\].top-7.bottom-\[-24px\].w-\[2px\] {
+    background: linear-gradient(to bottom,
+      rgba(37,99,235,0.9),
+      rgba(99,102,241,0.5),
+      rgba(37,99,235,0.1)) !important;
+    box-shadow: 0 0 6px rgba(37,99,235,0.6) !important;
+    width: 2px !important;
+  }
+
+  /* Main gradient timeline line */
+  .absolute.left-\[11px\].top-4.bottom-4.w-\[2px\] {
+    background: linear-gradient(to bottom,
+      rgba(37,99,235,0.8) 0%,
+      rgba(99,102,241,0.6) 50%,
+      transparent 100%) !important;
+    box-shadow:
+      0 0 8px rgba(37,99,235,0.5),
+      0 0 2px rgba(99,102,241,0.8) !important;
+  }
+
+  /* Timeline node circles — completed */
+  .absolute.left-0.top-0.w-6.h-6.rounded-full.border-2 {
+    box-shadow: 0 0 16px rgba(37,99,235,0.5) !important;
+  }
+
+  /* Completed step: enhanced neon dot */
+  .bg-blue-600.border-blue-400 {
+    background: radial-gradient(circle, #3b82f6 0%, #1d4ed8 100%) !important;
+    box-shadow:
+      0 0 0 3px rgba(37,99,235,0.2),
+      0 0 20px rgba(37,99,235,0.6) !important;
+  }
+
+  /* Step labels */
+  h4.font-black.tracking-tight.text-base {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 800 !important;
+  }
+
+  /* MTTR timer — JetBrains Mono monospaced */
+  .text-\[13px\].font-black.font-mono.tabular-nums {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 15px !important;
+    letter-spacing: 0.05em !important;
+    text-shadow: 0 0 10px currentColor !important;
+  }
+
+  .text-\[11px\].font-black.font-mono.text-white {
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+
+  /* ── 11. Icon Badge Containers ────────────────────────────────── */
+  .bg-blue-600\/20.p-2\.5.rounded-xl,
+  .bg-blue-600\/20.p-2.rounded-xl,
+  .bg-purple-500\/10.border.border-purple-500\/20.p-2.rounded-xl {
+    box-shadow: 0 0 10px rgba(37,99,235,0.25) !important;
+  }
+
+  /* ── 12. Buttons: Neon hover enhancement ─────────────────────── */
+  button.h-8.w-8.flex.items-center.justify-center.rounded-lg:hover,
+  button[title]:hover {
+    box-shadow: 0 0 12px rgba(99,102,241,0.35) !important;
+  }
+
+  /* War-Room navigate button */
+  button.mt-2.inline-flex.items-center.gap-1\.5 {
+    box-shadow:
+      0 0 12px rgba(37,99,235,0.3),
+      inset 0 1px 0 rgba(255,255,255,0.1) !important;
+  }
+  button.mt-2.inline-flex.items-center.gap-1\.5:hover {
+    box-shadow:
+      0 0 24px rgba(37,99,235,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.15) !important;
+    transform: translateY(-1px);
+    transition: all 0.2s ease !important;
+  }
+
+  /* ── 13. Status / Severity Badges ────────────────────────────── */
+  .bg-red-500\/20.text-red-500.border-red-500\/30,
+  .bg-red-500\/10.text-red-500.border-red-500\/30 {
+    box-shadow: 0 0 8px rgba(239,68,68,0.3) !important;
+    animation: hud-pulse-red 2.5s ease-in-out infinite !important;
+  }
+
+  .bg-emerald-500\/10.text-emerald-400.border-emerald-500\/20 {
+    box-shadow: 0 0 6px rgba(52,211,153,0.25) !important;
+  }
+
+  .bg-blue-500\/10.text-blue-400.border-blue-500\/20,
+  .bg-blue-500\/10.text-blue-400.border-blue-500\/30 {
+    box-shadow: 0 0 6px rgba(37,99,235,0.2) !important;
+  }
+
+  /* ── 14. Scrollbar: Neon thin ─────────────────────────────────── */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 3px !important;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(2,6,23,0.3) !important;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(37,99,235,0.7) 0%, rgba(99,102,241,0.4) 100%) !important;
+    border-radius: 99px !important;
+    box-shadow: 0 0 4px rgba(37,99,235,0.5) !important;
+  }
+
+  /* ── 15. Notification / War-Room Popup Panels ─────────────────── */
+  .w-full.max-w-sm.bg-\[#1a1f2e\].h-full {
+    background: rgba(4,8,20,0.9) !important;
+    backdrop-filter: blur(32px) !important;
+    -webkit-backdrop-filter: blur(32px) !important;
+    border-left: 0.5px solid rgba(37,99,235,0.3) !important;
+  }
+
+  .bg-\[#1a1f2e\].w-full.max-w-xl.rounded-t-\[2\.5rem\] {
+    background: rgba(4,8,20,0.92) !important;
+    backdrop-filter: blur(32px) !important;
+    -webkit-backdrop-filter: blur(32px) !important;
+    border-top: 0.5px solid rgba(37,99,235,0.3) !important;
+  }
+
+  /* ── 16. Profile Modal ─────────────────────────────────────────── */
+  .relative.w-full.max-w-lg.bg-gradient-to-b {
+    background: linear-gradient(to bottom, rgba(8,14,30,0.95), rgba(2,6,23,0.98)) !important;
+    backdrop-filter: blur(40px) !important;
+    -webkit-backdrop-filter: blur(40px) !important;
+    border: 0.5px solid rgba(37,99,235,0.3) !important;
+    box-shadow: 0 0 60px rgba(37,99,235,0.15), 0 24px 80px rgba(0,0,0,0.7) !important;
+  }
+
+  /* ── 17. Input Fields: Deep HUD style ─────────────────────────── */
+  .w-full.bg-\[#1a1f2e\].border.border-blue-500\/20.rounded-xl {
+    background: rgba(2,6,23,0.8) !important;
+    border-color: rgba(37,99,235,0.25) !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+  }
+  .w-full.bg-\[#1a1f2e\].border.border-blue-500\/20.rounded-xl:focus {
+    border-color: rgba(37,99,235,0.7) !important;
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.15), 0 0 12px rgba(37,99,235,0.2) !important;
+    outline: none !important;
+  }
+
+  /* ── 18. Threshold control area ───────────────────────────────── */
+  .bg-blue-600\/5.border-y.border-white\/5 {
+    background: rgba(37,99,235,0.04) !important;
+    border-color: rgba(37,99,235,0.15) !important;
+  }
+
+  /* ── 19. Float elements: z-layer assurance ─────────────────────── */
+  .fixed.inset-0.z-\[100\],
+  .fixed.inset-0.z-\[110\] {
+    z-index: 200 !important;
+  }
+
+  /* ── 20. Bottom Navigation: Glassmorphism dock ─────────────────── */
+  /* BottomMenu is inside the page; target it generically */
+  nav + div > div.fixed,
+  .fixed.bottom-0 {
+    background: rgba(2,6,23,0.8) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border-top: 0.5px solid rgba(37,99,235,0.2) !important;
+  }
+
+  /* ── 21. Live dot indicators ──────────────────────────────────── */
+  .animate-ping {
+    animation: hud-ping-soft 1.4s cubic-bezier(0,0,0.2,1) infinite !important;
+  }
+
+  /* ── 22. Number / mono data values: JetBrains Mono globally ───── */
+  .font-mono,
+  [class*="tabular-nums"] {
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+
+  /* ── 23. Neon border accent: top of workspace ────────────────── */
+  .flex-1.overflow-hidden.px-4.pt-4.pb-20::before {
+    content: '';
+    display: block;
+    height: 0;
+  }
+
+  /* ── 24. Col-4 "처리현황" special panel ──────────────────────── */
+  .bg-\[#0f1421\].rounded-3xl.border.border-white\/5.shadow-xl.flex-1 {
+    border-color: rgba(99,102,241,0.2) !important;
+    box-shadow:
+      0 0 0 0.5px rgba(99,102,241,0.1),
+      0 8px 40px rgba(0,0,0,0.5) !important;
+  }
+
+  /* ── 25. Elapsed / interval time badges ──────────────────────── */
+  .inline-flex.items-center.gap-1.text-\[9px\].font-bold.px-2.py-0\.5.rounded-full.border {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.05em !important;
+  }
+
+} /* end @media (min-width: 768px) */

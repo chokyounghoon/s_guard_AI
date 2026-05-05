@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useCodebook } from '../context/CodebookContext';
 import { ChevronLeft, Plus, Search, BookOpen, Trash2, Edit2, CheckCircle2, XCircle, Layers, Loader2, X } from 'lucide-react';
 
@@ -8,6 +9,7 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function CodebookManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [search, setSearch] = useState('');
   const { allCodes: codes, isLoading: loading, refreshCodes } = useCodebook();
   const [selectedCat, setSelectedCat] = useState('ALL');
@@ -62,7 +64,7 @@ export default function CodebookManagementPage() {
 
       {/* 헤더 */}
       <header style={{ flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px 16px', borderBottom:'1px solid rgba(129,140,248,.12)', background:'rgba(5,8,15,.96)', backdropFilter:'blur(20px)' }}>
-        <button onClick={() => navigate(-1)} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+        <button onClick={() => goBack()} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
           <ChevronLeft size={18} color="#64748b" />
         </button>
         <div style={{ textAlign:'center' }}>

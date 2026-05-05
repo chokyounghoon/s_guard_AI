@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -58,6 +59,7 @@ const agentColors = {
 
 export default function AiReportPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const location = useLocation();
   const params = useParams();
   
@@ -241,7 +243,7 @@ export default function AiReportPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 sticky top-0 bg-[#0a0d14]/90 backdrop-blur-lg z-50 border-b border-white/5">
         <div className="max-w-5xl mx-auto w-full flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+          <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/5 transition-colors">
             <ArrowLeft className="w-5 h-5 text-slate-400" />
           </button>
           <div className="flex flex-col items-center flex-1 mx-3">

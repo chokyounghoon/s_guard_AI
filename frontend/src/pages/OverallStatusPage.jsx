@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   Shield, Zap, Database, MessageSquare, Users, CheckCircle2,
   BarChart3, Clock, Sparkles, Activity, FileSearch, Brain,
@@ -22,6 +23,7 @@ const TABS = ['개요', '카테고리', '기여자', '피드'];
 
 export default function OverallStatusPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState(EMPTY_STATS);
@@ -124,7 +126,7 @@ export default function OverallStatusPage() {
         borderBottom: '1px solid rgba(129,140,248,0.12)',
         background: 'rgba(4,6,15,0.96)', backdropFilter: 'blur(20px)',
       }}>
-        <button onClick={() => navigate(-1)} style={{
+        <button onClick={() => goBack()} style={{
           width: 36, height: 36, borderRadius: 10,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',

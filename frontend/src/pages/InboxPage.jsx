@@ -135,9 +135,9 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-200 pb-28 font-sans">
-      {/* Immersive Header */}
-      <header className="relative pt-10 pb-20 px-6 overflow-hidden">
+    <div className="h-screen bg-[#07090e] text-slate-200 font-sans flex flex-col overflow-hidden">
+      {/* Header - Shrink-0 고정 */}
+      <header className="shrink-0 relative pt-10 pb-20 px-6 overflow-hidden">
         {/* Background Blobs */}
         <div className="absolute top-0 left-0 w-full h-full">
           <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-blue-600/20 blur-[100px] rounded-full" />
@@ -212,8 +212,8 @@ export default function InboxPage() {
         </div>
       </header>
 
-      {/* Message Feed Area */}
-      <main className="px-6 -mt-10 relative z-20 space-y-4">
+      {/* Message Feed Area - 독립 스크롤 */}
+      <main className="flex-1 overflow-y-auto px-6 -mt-10 relative z-20 space-y-4 pb-28">
         {loading && messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-500 rounded-full animate-spin" />

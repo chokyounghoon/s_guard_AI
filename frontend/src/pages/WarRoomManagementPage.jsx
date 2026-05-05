@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ChevronLeft, Search, AlertTriangle, Shield, Clock,
   MessageSquare, Users, LogIn, Filter, X, RefreshCw,
@@ -32,6 +33,7 @@ function formatTime(iso) {
 
 export default function WarRoomManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [rooms, setRooms]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,7 +122,7 @@ export default function WarRoomManagementPage() {
         borderBottom: '1px solid rgba(239,68,68,0.12)',
         background: 'rgba(5,8,16,0.96)', backdropFilter: 'blur(20px)',
       }}>
-        <button onClick={() => navigate(-1)} style={{
+        <button onClick={() => goBack()} style={{
           width: 36, height: 36, borderRadius: 10,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { Search, Calendar, SlidersHorizontal, CheckCircle2, ChevronRight, User, ArrowLeft } from 'lucide-react';
 
 export default function ActivityPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
 
   const [activities, setActivities] = useState([]);
   const [userData, setUserData] = useState([]);
@@ -91,11 +93,11 @@ export default function ActivityPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-24">
+    <div className="h-screen bg-[#0f1421] text-white font-sans flex flex-col overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between p-5 sticky top-0 bg-[#0f1421]/90 backdrop-blur-md z-40">
         <div className="flex items-center space-x-4">
-          <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
+          <button onClick={() => goBack()} className="p-1 rounded-full hover:bg-white/10 transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
           <h1 className="text-2xl font-bold tracking-tight">장애 처리 현황</h1>
@@ -105,7 +107,7 @@ export default function ActivityPage() {
         </div>
       </header>
 
-      <main className="flex-1 space-y-2">
+      <main className="flex-1 overflow-y-auto space-y-2 pb-28 min-h-0">
         {/* Search & Filters */}
         <div className="px-5 pb-4 flex items-center space-x-3">
           <div className="flex-1 relative">
@@ -169,7 +171,7 @@ export default function ActivityPage() {
       {/* Floating Back Button */}
       <div className="fixed bottom-24 left-0 w-full px-5 z-40 pointer-events-none">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => goBack()}
           className="w-full bg-slate-800/80 backdrop-blur-md border border-white/10 h-14 rounded-2xl flex items-center justify-center space-x-2 transition-all active:scale-[0.98] shadow-2xl pointer-events-auto"
         >
           <ArrowLeft className="w-5 h-5 text-slate-300" />

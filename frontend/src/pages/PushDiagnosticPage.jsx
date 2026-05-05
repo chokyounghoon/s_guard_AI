@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, RefreshCw, Bell, Server, Cpu, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { getAccessToken } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -58,6 +59,7 @@ function Card({ title, children, accent = '#3b82f6' }) {
 
 export default function PushDiagnosticPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [status, setStatus] = useState(null);
   const [serverSubs, setServerSubs] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -263,7 +265,7 @@ export default function PushDiagnosticPage() {
       }}>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 10%, rgba(255,255,255,0.1), transparent 60%)' }} />
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => goBack()}
           style={{ position: 'absolute', top: 52, left: 20, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 10, padding: '8px 12px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700 }}
         >
           <ArrowLeft size={14} /> Back

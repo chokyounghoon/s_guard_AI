@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutDashboard, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { getAuthHeaders } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function KnowledgeBasePage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [knowledge, setKnowledge] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

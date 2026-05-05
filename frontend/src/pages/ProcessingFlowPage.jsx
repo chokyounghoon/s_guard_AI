@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ChevronLeft, ShieldCheck, Database, Cpu, MessageSquare,
   Lock, EyeOff, Terminal, Layers, Activity, ChevronDown, ChevronUp
@@ -51,6 +52,7 @@ const STEPS = [
 
 export default function ProcessingFlowPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [expanded, setExpanded] = useState(null);
 
   return (
@@ -59,7 +61,7 @@ export default function ProcessingFlowPage() {
 
       {/* 헤더 */}
       <header style={{ flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', background:'rgba(4,6,15,.96)', backdropFilter:'blur(20px)' }}>
-        <button onClick={() => navigate(-1)} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+        <button onClick={() => goBack()} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
           <ChevronLeft size={18} color="#64748b" />
         </button>
         <div style={{ textAlign:'center' }}>

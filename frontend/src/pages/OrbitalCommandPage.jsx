@@ -3,9 +3,11 @@ import { RefreshCw, Zap, Search, Compass, CheckCircle2, Loader2, Database, Shiel
 import { toast, Toaster } from 'react-hot-toast';
 import { getAuthHeaders } from '../lib/authStore';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 
 export default function OrbitalCommandPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [threshold, setThreshold] = useState(0.80);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
@@ -163,7 +165,7 @@ export default function OrbitalCommandPage() {
         backdropFilter: 'blur(20px)',
         flexShrink: 0,
       }}>
-        <button onClick={() => navigate(-1)} style={{
+        <button onClick={() => goBack()} style={{
           width: 34, height: 34, borderRadius: 10,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'

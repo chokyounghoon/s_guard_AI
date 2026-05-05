@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ChevronLeft, Search, Save, Shield, Star,
   Users, Trash2, TrendingDown, User, Zap, ChevronUp, ChevronDown,
@@ -35,6 +36,7 @@ const nodeColors = (index, total) => {
 
 export default function ReportLineManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [availableMembers, setAvailableMembers] = useState([]);
   const [reportLines, setReportLines] = useState([]);
@@ -128,7 +130,7 @@ export default function ReportLineManagementPage() {
         borderBottom: '1px solid rgba(168,85,247,0.1)',
         background: 'rgba(7,3,15,0.9)', backdropFilter: 'blur(20px)',
       }}>
-        <button onClick={() => navigate(-1)} style={{
+        <button onClick={() => goBack()} style={{
           width: 34, height: 34, borderRadius: 10,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
