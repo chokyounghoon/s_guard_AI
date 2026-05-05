@@ -1381,7 +1381,7 @@ export default function DashboardPage({ onAiClick }) {
                         ) : (
                           <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
                         )}
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${n.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-400'}`}>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${n.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 bloom-red' : 'bg-blue-500/20 text-blue-400 bloom-cyan'}`}>
                           {n.type}
                         </span>
                       </div>
@@ -1788,7 +1788,7 @@ export default function DashboardPage({ onAiClick }) {
                               <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">MTTR</span>
                               <div className="flex items-center gap-1">
                                 <div className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
-                                <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400 bloom-green' : 'text-blue-400 bloom-cyan'}`}>
                                   {formatDuration(durationMs)}
                                 </span>
                               </div>
@@ -2092,7 +2092,7 @@ export default function DashboardPage({ onAiClick }) {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${room.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-orange-500/20 text-orange-500 border-orange-500/30'
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${room.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500 border-red-500/30 bloom-red' : 'bg-orange-500/20 text-orange-500 border-orange-500/30 bloom-orange'}
                         }`}>
                         {room.severity}
                       </span>

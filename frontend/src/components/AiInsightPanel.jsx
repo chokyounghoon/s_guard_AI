@@ -700,16 +700,27 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               const score = insightData.similarity_score ?? 0;
               const pct = Math.min(100, score * 100);
               const barColor = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-yellow-500' : 'bg-orange-500';
-              const numColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-yellow-400' : 'text-orange-400';
+              const numColor = score > 0.8 ? 'text-emerald-400 bloom-green' : score > 0.6 ? 'text-yellow-400 bloom-orange' : 'text-orange-400';
+              const containerExtra = score > 0.8 ? 'bloom-green-box' : score > 0.6 ? 'bloom-orange-box' : '';
               return (
-                <div className="flex items-center gap-3 mb-5 p-3 bg-white/[0.03] rounded-2xl border border-white/5">
+                <div className={`flex items-center gap-3 mb-5 p-3 bg-white/[0.03] rounded-2xl border border-white/5 transition-all duration-700 ${containerExtra}`}>
                   <div className="flex-1">
                     <div className="flex justify-between mb-1.5">
                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vector Cosine Similarity</span>
                       <span className={`text-sm font-black font-mono ${numColor}`}>{pct.toFixed(2)}%</span>
                     </div>
                     <div className="h-2 bg-white/[0.05] rounded-full overflow-hidden">
-                      <div className={`h-full ${barColor} rounded-full transition-all duration-1000`} style={{ width: `${pct}%` }} />
+                      <div
+                        className={`h-full ${barColor} rounded-full transition-all duration-1000`}
+                        style={{
+                          width: `${pct}%`,
+                          boxShadow: score > 0.8
+                            ? '0 0 8px rgba(52,211,153,0.7), 0 0 16px rgba(52,211,153,0.35)'
+                            : score > 0.6
+                            ? '0 0 8px rgba(251,146,60,0.7), 0 0 16px rgba(251,146,60,0.3)'
+                            : 'none'
+                        }}
+                      />
                     </div>
                   </div>
                 </div>

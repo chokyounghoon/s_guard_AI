@@ -303,3 +303,62 @@
   background: rgba(6,182,212,0.6);
   animation: nodePulse 4s ease-in-out infinite;
 }
+
+/* ── Adaptive Glow & Bloom System ── */
+
+/* 시안 블룸 — 유사도, 분석 중 상태 */
+.bloom-cyan {
+  text-shadow: 0 0 8px rgba(6,182,212,0.8), 0 0 20px rgba(6,182,212,0.4), 0 0 40px rgba(6,182,212,0.15);
+  filter: drop-shadow(0 0 4px rgba(6,182,212,0.6));
+}
+.bloom-cyan-box {
+  box-shadow: 0 0 10px rgba(6,182,212,0.35), 0 0 24px rgba(6,182,212,0.15), inset 0 0 12px rgba(6,182,212,0.05);
+}
+
+/* 레드 블룸 — CRITICAL 상태 */
+.bloom-red {
+  text-shadow: 0 0 8px rgba(248,113,113,0.9), 0 0 20px rgba(248,113,113,0.5), 0 0 40px rgba(248,113,113,0.2);
+  filter: drop-shadow(0 0 5px rgba(248,113,113,0.7));
+}
+.bloom-red-box {
+  box-shadow: 0 0 12px rgba(248,113,113,0.4), 0 0 28px rgba(248,113,113,0.2), inset 0 0 14px rgba(248,113,113,0.06);
+}
+
+/* 오렌지 블룸 — MAJOR 상태 */
+.bloom-orange {
+  text-shadow: 0 0 8px rgba(251,146,60,0.8), 0 0 20px rgba(251,146,60,0.4), 0 0 36px rgba(251,146,60,0.15);
+  filter: drop-shadow(0 0 4px rgba(251,146,60,0.6));
+}
+.bloom-orange-box {
+  box-shadow: 0 0 10px rgba(251,146,60,0.35), 0 0 24px rgba(251,146,60,0.15), inset 0 0 12px rgba(251,146,60,0.05);
+}
+
+/* 그린 블룸 — NORMAL / 완료 상태 */
+.bloom-green {
+  text-shadow: 0 0 8px rgba(52,211,153,0.8), 0 0 20px rgba(52,211,153,0.4), 0 0 36px rgba(52,211,153,0.15);
+  filter: drop-shadow(0 0 4px rgba(52,211,153,0.5));
+}
+.bloom-green-box {
+  box-shadow: 0 0 10px rgba(52,211,153,0.3), 0 0 24px rgba(52,211,153,0.12), inset 0 0 12px rgba(52,211,153,0.04);
+}
+
+/* 퍼플 블룸 — AI/인사이트 패널 */
+.bloom-purple {
+  text-shadow: 0 0 8px rgba(139,92,246,0.8), 0 0 20px rgba(139,92,246,0.4);
+  filter: drop-shadow(0 0 4px rgba(139,92,246,0.6));
+}
+.bloom-purple-box {
+  box-shadow: 0 0 10px rgba(139,92,246,0.35), 0 0 24px rgba(139,92,246,0.15), inset 0 0 12px rgba(139,92,246,0.05);
+}
+
+/* 고유사도(≥80%) 숫자 강조 */
+.bloom-high-score {
+  text-shadow: 0 0 12px rgba(6,182,212,1), 0 0 28px rgba(6,182,212,0.6), 0 0 56px rgba(6,182,212,0.25);
+  filter: drop-shadow(0 0 6px rgba(6,182,212,0.8));
+  animation: bloomPulse 3s ease-in-out infinite;
+}
+
+@keyframes bloomPulse {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(6,182,212,0.8)); }
+  50%       { filter: drop-shadow(0 0 12px rgba(6,182,212,1)) drop-shadow(0 0 24px rgba(139,92,246,0.5)); }
+}
