@@ -192,6 +192,7 @@ const authMiddleware = async (c, next) => {
     path === '/auth/agree-terms' || 
     path === '/sms/receive' || 
     path === '/retrieval' ||
+    path === '/upsert' ||          // ⚡ Dify Knowledge Tool — 자체 DIFY_TOOL_KEY 인증 사용
     path.startsWith('/warroom/asset/') ||  // ⚡ R2 파일 서빙 — <img src> 직접 접근이므로 JWT 불가
     path.startsWith('/warroom/ws/') ||     // ⚡ WebSocket 업그레이드 — 브라우저 SDK 전용 (헤더 불가)
     path.startsWith('/debug/') ||
