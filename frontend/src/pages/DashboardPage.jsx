@@ -1652,7 +1652,7 @@ export default function DashboardPage({ onAiClick }) {
           </div>
           </div>{/* end col3 */}
 
-          {/* ── 4/4: 장애 처리 현황 ── */}
+          {/* ── 4/4: 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-hidden">
             {/* Activity History Flow Area */}
             <div className="bg-[#0f1421] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden flex flex-col">
@@ -1663,7 +1663,7 @@ export default function DashboardPage({ onAiClick }) {
                     <Activity className="w-4 h-4 text-purple-400" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-black text-white text-base tracking-tight">장애 처리 현황</h3>
+                    <h3 className="font-black text-white text-base tracking-tight">처리 현황</h3>
                     <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Incident Handling Progress</span>
                   </div>
                 </div>
