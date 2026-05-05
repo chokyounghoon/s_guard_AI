@@ -1448,7 +1448,7 @@ export default function DashboardPage({ onAiClick }) {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
 
           {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
           <div className="flex flex-col h-full overflow-hidden">
