@@ -161,7 +161,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               // ⚡ DB 캐시 히트 — 타자기 효과 없이 즉시 전체 렌더링 (시간이 생명)
               stopTypewriter();
               setDisplayedText(data.content);
-              const critical = data.severity === 'CRITICAL';
+              const critical = isCriticalAnalysis(data.content, selectedSms?.message, selectedSms);
                setIsCritical(critical);
                setIncidentCategory(data.category || getCategoryFromAnalysis(data.content, selectedSms?.message));
                setAnalysisComplete(true);

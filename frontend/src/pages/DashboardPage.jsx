@@ -1664,55 +1664,8 @@ export default function DashboardPage({ onAiClick }) {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* LIVE / DONE 배지: selectedSms.is_analyzed 기준 */}
-                  {(() => {
-                    const isDone = selectedSms && Number(selectedSms.is_analyzed) >= 1;
-                    return (
-                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-500 ${
-                        isDone
-                          ? 'bg-white/[0.03] border-white/10 opacity-40'
-                          : showAgentPanel && agentMessages.length > 0
-                          ? 'bg-emerald-500/10 border-emerald-500/20'
-                          : 'bg-white/5 border-white/10'
-                      }`}>
-                        <span className="relative flex h-1.5 w-1.5">
-                          {!isDone && showAgentPanel && agentMessages.length > 0 && (
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          )}
-                          <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
-                            isDone ? 'bg-slate-600' : showAgentPanel && agentMessages.length > 0 ? 'bg-emerald-500' : 'bg-slate-600'
-                          }`}></span>
-                        </span>
-                        <span className={`text-[9px] font-black uppercase tracking-widest ${
-                          isDone ? 'text-slate-500' : showAgentPanel && agentMessages.length > 0 ? 'text-emerald-400' : 'text-slate-600'
-                        }`}>
-                          {isDone ? 'DONE' : showAgentPanel && agentMessages.length > 0 ? 'LIVE' : 'IDLE'}
-                        </span>
-                      </div>
-                    );
-                  })()}
-
-                  {/* 재조회 버튼 */}
-                  {selectedSms && (
-                    <button
-                      onClick={() => {
-                        setAgentMessages([]);
-                        setShowAgentPanel(true);
-                        // insightSms 리셋 → AiInsightPanel useEffect 재트리거 → 재분석
-                        const currentSms = selectedSms;
-                        setInsightSms(null);
-                        setTimeout(() => setInsightSms(currentSms), 50);
-                      }}
-                      title="AI 에이전트 재조회 (Dify)"
-                      className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-indigo-500/20 hover:text-indigo-400 hover:border-indigo-500/30 active:scale-90 transition-all"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                  )}
 
 
-                </div>
               </div>
 
               <div className="flex-1 overflow-hidden">
