@@ -17,9 +17,9 @@ const API_BASE_URL = getApiUrl('');
 
 const DEFAULT_CRITICAL_THRESHOLDS = { errorCount: 10, errorRate: 50 };
 
-// alert-monitor 페이지의 classify() 와 동일한 로직
-// received_count >= critical.errorCount  OR  errorRate >= critical.errorRate
-const isCriticalAnalysis = (_analysisText, _message, smsItem, errorRate = 0) => {
+// per-incident CRITICAL 판정: received_count vs alert-monitor 임계치
+// errorRate는 200건 기준 전체 지표라 소량 SMS 목록에서는 오탐 발생 → 제외
+const isCriticalAnalysis = (_analysisText, _message, smsItem) => {
   let thresholds = DEFAULT_CRITICAL_THRESHOLDS;
   try {
     const saved = localStorage.getItem('sguard_alert_thresholds_v3');
@@ -30,7 +30,7 @@ const isCriticalAnalysis = (_analysisText, _message, smsItem, errorRate = 0) => 
   } catch { /* 파싱 실패 시 기본값 사용 */ }
 
   const vol = Number(smsItem?.received_count) || 1;
-  return vol >= thresholds.errorCount || errorRate >= thresholds.errorRate;
+  return vol >= thresholds.errorCount;
 };
 
 const getCategoryFromAnalysis = (analysisText, message) => {
@@ -47,7 +47,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
   return 'report';
 };
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, alertErrorRate = 0 }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms }) {
   
   const formatYYMMDD = (dateStr) => {
     if (!dateStr) return '';
@@ -265,7 +265,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             const dataStr = line.slice(5).trim();
             if (!dataStr) continue;
             if (dataStr === '[DONE]') {
-              const critical = isCriticalAnalysis(finalText, selectedSms.message, selectedSms, alertErrorRate);
+              const critical = isCriticalAnalysis(finalText, selectedSms.message, selectedSms);
               setIsCritical(critical);
               setAnalysisComplete(true);
               setIsAnalyzingSms(false);
@@ -894,7 +894,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
               : warRoomExists
               ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/30'
-              : (isCritical || incidentCategory === 'critical')
+              : isCritical
               ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30 animate-pulse'
               : incidentCategory === 'security'
               ? 'bg-purple-500 hover:bg-purple-400 text-white shadow-lg shadow-purple-500/30'

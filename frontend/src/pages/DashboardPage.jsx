@@ -1638,11 +1638,6 @@ export default function DashboardPage({ onAiClick }) {
                onOpenWarRoom={handleOpenWarRoomFromInsight} 
                onAgentContent={handleAgentContent}
                warRooms={warRooms}
-               alertErrorRate={(() => {
-                 const total = smsMessages.length;
-                 const unresolved = smsMessages.filter(m => m.incident_status !== '처리완료').length;
-                 return total > 0 ? Math.round((unresolved / total) * 100) : 0;
-               })()}
             />
           </div>{/* end col2 */}
 
