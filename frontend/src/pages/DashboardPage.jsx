@@ -1417,10 +1417,10 @@ export default function DashboardPage({ onAiClick }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden px-4 pt-4 pb-20">
+      <div className="flex-1 overflow-hidden px-4 pt-4 pb-20 flex flex-col">
 
         {/* ── 3컬럼 메인 그리드 ── */}
-        <div className="relative">
+        <div className="relative flex-1 h-full">
 
           {/* ── 데이터 스트림 커넥터: 중앙 빛 흐름 (lg 이상에서만 표시) ── */}
           <div className="hidden lg:block absolute inset-0 pointer-events-none z-10" aria-hidden="true">
