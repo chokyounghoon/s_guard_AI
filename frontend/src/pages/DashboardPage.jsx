@@ -1422,28 +1422,22 @@ export default function DashboardPage({ onAiClick }) {
         {/* ── 3컬럼 메인 그리드 ── */}
         <div className="relative">
 
-          {/* ── 데이터 스트림 커넥터: 카드 사이 빛 흐름 (lg 이상에서만 표시) ── */}
+          {/* ── 데이터 스트림 커넥터: 중앙 빛 흐름 (lg 이상에서만 표시) ── */}
           <div className="hidden lg:block absolute inset-0 pointer-events-none z-10" aria-hidden="true">
-            {/* 스트림 라인 1 — 상단 */}
-            {[22, 45, 68].map((pct, i) => (
-              <div key={i} className="absolute left-0 right-0" style={{ top: `${pct}%`, height: 1 }}>
-                <div style={{
-                  width: '100%', height: '1px',
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(6,182,212,0.04) 15%, rgba(6,182,212,0.22) 48%, rgba(139,92,246,0.22) 52%, rgba(139,92,246,0.04) 85%, transparent 100%)',
-                }} />
-                {/* 흐르는 빛 입자 */}
-                <div className="stream-particle" style={{
-                  animationDelay: `${i * 1.1}s`,
-                  animationDuration: `${2.8 + i * 0.4}s`,
-                }} />
-              </div>
-            ))}
-            {/* 컬럼 연결 글로우 노드 (1/3, 2/3 지점) */}
-            {[33.33, 66.66].map((x, i) => (
+            {/* 중앙 스트림 라인 1개 */}
+            <div className="absolute left-0 right-0" style={{ top: '50%', height: 1 }}>
+              <div style={{
+                width: '100%', height: '1px',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(6,182,212,0.04) 15%, rgba(6,182,212,0.18) 48%, rgba(139,92,246,0.18) 52%, rgba(139,92,246,0.04) 85%, transparent 100%)',
+              }} />
+              <div className="stream-particle" />
+            </div>
+            {/* 컬럼 연결 글로우 노드 */}
+            {[25, 50, 75].map((x, i) => (
               <div key={i} className="node-pulse" style={{
                 position: 'absolute', left: `calc(${x}% - 3px)`, top: '50%',
                 transform: 'translateY(-50%)',
-                animationDelay: `${i * 0.7}s`,
+                animationDelay: `${i * 0.8}s`,
               }} />
             ))}
           </div>
