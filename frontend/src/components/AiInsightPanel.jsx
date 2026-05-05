@@ -15,13 +15,22 @@ const getApiUrl = (endpoint) => {
 
 const API_BASE_URL = getApiUrl('');
 
-const isCriticalAnalysis = (analysisText, message) => {
-  const combined = ((analysisText || '') + (message || '')).toLowerCase();
-  return combined.includes('critical') || combined.includes('escalation') ||
-         combined.includes('에스컬레이션') || combined.includes('war-room') ||
-         combined.includes('워룸') || combined.includes('db') ||
-         combined.includes('데이터베이스') || combined.includes('서버 다운') ||
-         combined.includes('down');
+const DEFAULT_CRITICAL_THRESHOLDS = { errorCount: 10, errorRate: 50 };
+
+const isCriticalAnalysis = (_analysisText, _message, smsItem) => {
+  // alert-monitor 페이지와 동일한 로직으로 CRITICAL 판정
+  // 임계치: localStorage(sguard_alert_thresholds_v3) → 기본값
+  let thresholds = DEFAULT_CRITICAL_THRESHOLDS;
+  try {
+    const saved = localStorage.getItem('sguard_alert_thresholds_v3');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      thresholds = { ...DEFAULT_CRITICAL_THRESHOLDS, ...(parsed.critical || {}) };
+    }
+  } catch { /* 파싱 실패 시 기본값 사용 */ }
+
+  const vol = Number(smsItem?.received_count) || 1;
+  return vol >= thresholds.errorCount;
 };
 
 const getCategoryFromAnalysis = (analysisText, message) => {
@@ -256,7 +265,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             const dataStr = line.slice(5).trim();
             if (!dataStr) continue;
             if (dataStr === '[DONE]') {
-              const critical = isCriticalAnalysis(finalText, selectedSms.message);
+              const critical = isCriticalAnalysis(finalText, selectedSms.message, selectedSms);
               setIsCritical(critical);
               setAnalysisComplete(true);
               setIsAnalyzingSms(false);
@@ -600,55 +609,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         </div>
 
-        {/* 오른쪽: 버튼들 */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* LIVE / 분석중 / 완료 뱃지 */}
-          {(() => {
-            const isDone = analysisComplete && !isAnalyzingSms;
-            const badgeStyle = isDone
-              ? 'bg-white/[0.03] border-white/10 opacity-50'
-              : isAnalyzingSms && isCritical
-              ? 'bg-red-500/20 border-red-400/50 shadow-[0_0_12px_rgba(239,68,68,0.4)]'
-              : isAnalyzingSms
-              ? 'bg-yellow-500/10 border-yellow-500/30'
-              : 'bg-blue-500/10 border-blue-500/20';
-            const dotColor = isDone ? 'bg-slate-600'
-              : isAnalyzingSms && isCritical ? 'bg-red-500'
-              : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500';
-            const pingColor = isDone ? '' : isAnalyzingSms && isCritical ? 'bg-red-400'
-              : isAnalyzingSms ? 'bg-yellow-400' : 'bg-blue-400';
-            const textColor = isDone ? 'text-slate-500'
-              : isAnalyzingSms && isCritical ? 'text-red-400'
-              : isAnalyzingSms ? 'text-yellow-400' : 'text-blue-400';
-            const label = isDone ? 'DONE'
-              : isAnalyzingSms && isCritical ? 'CRIT'
-              : isAnalyzingSms ? 'ANL' : 'LIVE';
-            return (
-              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-500 ${badgeStyle}`}>
-                <span className="relative flex h-1.5 w-1.5">
-                  {!isDone && (
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pingColor}`}></span>
-                  )}
-                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotColor}`}></span>
-                </span>
-                <span className={`text-[9px] font-black uppercase tracking-widest ${textColor}`}>{label}</span>
-              </div>
-            );
-          })()}
-
-          {/* 재분석 버튼 */}
-          <button
-            onClick={handleManualAnalyze}
-            disabled={isAnalyzingSms}
-            className={`h-8 w-8 flex items-center justify-center rounded-lg border transition-all ${
-              isAnalyzingSms
-                ? 'border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50'
-                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-blue-400 active:scale-90'}`}
-            title="AI 재분석 (수동)"
-          >
-            <RotateCcw className={`w-4 h-4 ${isAnalyzingSms ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        {/* 오른쪽: 분석 중 스피너만 표시 */}
+        {isAnalyzingSms && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
       </div>
 
       {/* Similarity Score Indicator - 분석 완료 시 항상 표시 (null = 0%) */}
@@ -829,7 +795,20 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         <div className="w-full relative z-10">
           <div className={`leading-relaxed w-full ${textColor}`}>
               {displayedText ? (
-                <MarkdownViewer text={displayedText} />
+                <MarkdownViewer text={(() => {
+                  const diagMarker   = '[전문가별 심층 진단]';
+                  const leaderMarker = '[리더의 최종 조치 가이드]';
+                  const diagIdx   = displayedText.indexOf(diagMarker);
+                  const leaderIdx = displayedText.indexOf(leaderMarker);
+                  if (diagIdx !== -1 && leaderIdx !== -1 && leaderIdx > diagIdx) {
+                    // 진단 섹션 앞 + 리더 가이드 이하 연결
+                    return displayedText.substring(0, diagIdx).trim() + '\n\n' + displayedText.substring(leaderIdx).trim();
+                  } else if (diagIdx !== -1) {
+                    // 리더 가이드 없으면 진단 섹션 앞까지만
+                    return displayedText.substring(0, diagIdx).trim();
+                  }
+                  return displayedText;
+                })()} />
               ) : (
                 <span className="text-slate-500 font-bold tracking-tight animate-pulse flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>

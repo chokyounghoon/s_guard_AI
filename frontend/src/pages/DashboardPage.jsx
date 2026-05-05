@@ -925,7 +925,18 @@ export default function DashboardPage({ onAiClick }) {
     for (const name of AGENT_ORDER) {
       const raw = msgsMap.get(name);
       if (!raw) continue;
-      const cleaned = raw
+
+      let processed = raw;
+
+      // Leader: [리더의 최종 조치 가이드] 이하 제거 (Expert Advisor에는 발언만 표시)
+      if (name === 'Leader') {
+        // 다양한 마크다운 포맷(볼드·헤더·대괄호 유무 등)을 모두 처리
+        const guidePattern = /(\*{0,2}#{0,4}\s*\[?리더의 최종 조치 가이드\]?\*{0,2})/;
+        const guideMatch = guidePattern.exec(processed);
+        if (guideMatch) processed = processed.substring(0, guideMatch.index);
+      }
+
+      const cleaned = processed
         .replace(/^#{1,4}\s*/gm, '')
         .replace(/^\*{1,2}(.*?)\*{1,2}$/gm, '$1')
         .replace(/^[-•·]\s*/gm, '')
@@ -935,6 +946,7 @@ export default function DashboardPage({ onAiClick }) {
         result.push({ role: name, text: cleaned, delay: 0 });
       }
     }
+
 
     console.log('[parseTranscript] result:', result.map(r => `${r.role}(${r.text.length}chars)`));
     return result;

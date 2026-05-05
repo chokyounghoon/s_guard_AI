@@ -167,14 +167,11 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
           return (
             <div
               key={idx}
-              className="flex w-full fade-in justify-start mb-1"
-              style={{
-                animation: 'fadeSlideIn 0.4s ease-out both',
-                animationDelay: `${idx * 0.05}s`  // 이미 타이머로 순차 추가되므로 최소 delay
-              }}
+              className={`flex w-full fade-in mb-1 ${isLeader ? 'justify-end' : 'justify-start'}`}
+              style={{ animation: 'fadeSlideIn 0.4s ease-out both', animationDelay: `${idx * 0.05}s` }}
             >
 
-              <div className="flex max-w-[90%] flex-row items-start gap-2">
+              <div className={`flex max-w-[90%] items-start gap-2 ${isLeader ? 'flex-row-reverse' : 'flex-row'}`}>
 
                 {/* Avatar */}
                 <div className="shrink-0 mt-5">
@@ -182,32 +179,45 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                 </div>
 
                 {/* Message Content */}
-                <div className="flex flex-col items-start gap-0.5">
+                <div className={`flex flex-col gap-0.5 ${isLeader ? 'items-end' : 'items-start'}`}>
                   {/* Name */}
                   <span className={`text-[10px] px-1 font-bold ${roleColor}`}>
                     {msg.role.toLowerCase().includes('agent') ? msg.role : `${msg.role} Agent`}
                   </span>
 
                   {/* Bubble + Time */}
-                  <div className="flex items-end gap-1.5">
+                  <div className={`flex items-end gap-1.5 ${isLeader ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className="relative">
-                      {/* 카카오톡 스타일 꼬리 */}
-                      <div style={{
-                        position: 'absolute',
-                        left: '-7px',
-                        top: '12px',
-                        width: 0,
-                        height: 0,
-                        borderTop: '7px solid transparent',
-                        borderRight: `7px solid ${tailColor}`,
-                        borderBottom: '7px solid transparent',
-                      }} />
+                      {/* 말풍선 꼬리 */}
+                      {isLeader ? (
+                        <div style={{
+                          position: 'absolute',
+                          right: '-7px',
+                          top: '12px',
+                          width: 0,
+                          height: 0,
+                          borderTop: '7px solid transparent',
+                          borderLeft: `7px solid rgba(37,99,235,0.35)`,
+                          borderBottom: '7px solid transparent',
+                        }} />
+                      ) : (
+                        <div style={{
+                          position: 'absolute',
+                          left: '-7px',
+                          top: '12px',
+                          width: 0,
+                          height: 0,
+                          borderTop: '7px solid transparent',
+                          borderRight: `7px solid ${tailColor}`,
+                          borderBottom: '7px solid transparent',
+                        }} />
+                      )}
                       {/* 말풍선 본체 */}
                       <div
                         className="px-4 py-3 text-[13px] leading-relaxed shadow-[0_8px_30px_rgba(0,0,0,0.3)] whitespace-pre-wrap break-words select-none backdrop-blur-md transition-all active:scale-[0.98]"
                         style={{
                           ...bubbleBg,
-                          borderRadius: '0 24px 24px 24px',
+                          borderRadius: isLeader ? '24px 0 24px 24px' : '0 24px 24px 24px',
                           border: `1px solid ${bubbleBg.borderColor}`,
                           color: isLeader ? '#ffffff' : '#e2e8f0',
                           fontWeight: 500
