@@ -1962,8 +1962,6 @@ export default function DashboardPage({ onAiClick }) {
                 </div>
               )}
             </div>
-          </div>
-          )}
         </div>
 
         {/* Handling Progress Area */}
