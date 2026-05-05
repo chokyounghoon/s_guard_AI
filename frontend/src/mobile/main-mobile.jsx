@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import '../index.css'; // 공유 CSS (Tailwind)
-import '../mobile-overrides.css'; // 📱 Mobile-specific layout overrides
+import './index.mobile.css'; // 📱 모바일 전용 CSS (PC/태블릿 index.css와 완전 독립)
 import MobileApp from './App.mobile.jsx';
 import { getAccessToken, setAccessToken, clearSession, getGhostToken, setGhostToken } from '../lib/authStore';
 
