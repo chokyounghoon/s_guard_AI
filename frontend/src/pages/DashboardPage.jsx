@@ -1245,7 +1245,7 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-[#0f1421] text-white font-sans relative flex flex-col">
+    <div className="h-screen overflow-hidden text-white font-sans relative flex flex-col" style={{ background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)' }}>
       {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
       {isNavCollapsed && (
         <div className="fixed top-3 left-4 z-50">
