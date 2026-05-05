@@ -37,6 +37,7 @@ import AlertMonitorPage from './pages/AlertMonitorPage';
 import IncidentKeywordPage from './pages/IncidentKeywordPage';
 import UserKeywordPage from './pages/UserKeywordPage';
 import ConsentModal from './components/ConsentModal';
+import PCPageModal from './components/PCPageModal';
 
 // ── 모바일 최적화 페이지 (PC에서도 사용 — 사이즈만 다름) ──
 import MobileActivity     from './mobile/pages/MobileActivity';
@@ -293,39 +294,40 @@ function AppContent() {
         <Route path="/" element={<LoginPage />} />
 
         {/* 🔒 Protected Routes: 인증 필수 */}
+        {/* 대시보드는 항상 렌더링 (모달 배경) */}
         <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage onAiClick={() => setShowAIAssistant(true)} /></ErrorBoundary></ProtectedRoute>} />
         <Route path="/activity"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileActivity      user={userProfile} /></ProtectedRoute>} />
         <Route path="/inbox"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileInbox         user={userProfile} /></ProtectedRoute>} />
         <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><MobileIncidentPush  user={userProfile} /></ProtectedRoute>} />
-        <Route path="/ai-report/:incidentId?"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiReportPage /></ProtectedRoute>} />
-        <Route path="/assignment-detail"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentDetailPage /></ProtectedRoute>} />
-        <Route path="/chat/:incidentId?"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ChatPage /></ProtectedRoute>} />
-        <Route path="/chat-summary/:incidentId" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ChatSummaryPage /></ProtectedRoute>} />
-        <Route path="/ai-process-report"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AiProcessReportPage /></ProtectedRoute>} />
-        <Route path="/report-publish"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportPublishPage /></ProtectedRoute>} />
-        <Route path="/activity-detail"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ActivityDetailPage /></ProtectedRoute>} />
-        <Route path="/assignments"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
-        <Route path="/my-assignments"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AssignmentsPage /></ProtectedRoute>} />
-        <Route path="/overall-status"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OverallStatusPage /></ProtectedRoute>} />
-        <Route path="/search"                  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
-        <Route path="/mobile-report-search"    element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SearchPage /></ProtectedRoute>} />
-        <Route path="/incident-list"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentListPage /></ProtectedRoute>} />
-        <Route path="/keyword-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KeywordManagementPage /></ProtectedRoute>} />
-        <Route path="/report-line-management"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportLineManagementPage /></ProtectedRoute>} />
-        <Route path="/security-logs"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SecurityLogPage /></ProtectedRoute>} />
-        <Route path="/processing-flow"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ProcessingFlowPage /></ProtectedRoute>} />
-        <Route path="/push-diagnostic"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PushDiagnosticPage /></ProtectedRoute>} />
-        <Route path="/knowledge-base"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><KnowledgeBasePage /></ProtectedRoute>} />
-        <Route path="/user-management"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><UserManagementPage /></ProtectedRoute>} />
-        <Route path="/organization-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrganizationManagementPage /></ProtectedRoute>} />
-        <Route path="/warroom-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WarRoomManagementPage /></ProtectedRoute>} />
-        <Route path="/codebook-management"     element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><CodebookManagementPage /></ProtectedRoute>} />
-        <Route path="/workflow/:inc_id"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><WorkflowPage /></ProtectedRoute>} />
-        <Route path="/report/:incId"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ReportViewPage /></ProtectedRoute>} />
-        <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrbitalCommandPage /></ProtectedRoute>} />
-        <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><AlertMonitorPage /></ProtectedRoute>} />
-        <Route path="/incident-keyword"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><IncidentKeywordPage /></ProtectedRoute>} />
-        <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><UserKeywordPage /></ProtectedRoute>} />
+        <Route path="/ai-report/:incidentId?"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AiReportPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/assignment-detail"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AssignmentDetailPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/chat/:incidentId?"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ChatPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/chat-summary/:incidentId" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ChatSummaryPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/ai-process-report"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AiProcessReportPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/report-publish"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ReportPublishPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/activity-detail"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ActivityDetailPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/assignments"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AssignmentsPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/my-assignments"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AssignmentsPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/overall-status"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OverallStatusPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/search"                  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SearchPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/mobile-report-search"    element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SearchPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/incident-list"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><IncidentListPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/keyword-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><KeywordManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/report-line-management"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ReportLineManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/security-logs"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SecurityLogPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/processing-flow"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ProcessingFlowPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/push-diagnostic"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><PushDiagnosticPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/knowledge-base"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><KnowledgeBasePage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/user-management"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/organization-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OrganizationManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/warroom-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><WarRoomManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/codebook-management"     element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><CodebookManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/workflow/:inc_id"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><WorkflowPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/report/:incId"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ReportViewPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OrbitalCommandPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AlertMonitorPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/incident-keyword"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><IncidentKeywordPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
       </Routes>
 
       {/* ⚖️ Governance & Mandatory Consent Guard */}
