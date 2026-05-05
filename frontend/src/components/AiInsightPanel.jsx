@@ -593,14 +593,16 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       <div className="flex items-center justify-between gap-3 mb-4 relative z-10">
         {/* 왼쪽: 아이콘 + 타이틀 */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`p-2.5 rounded-xl border shrink-0 ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : isAnalyzingSms ? 'bg-yellow-500/20 border-yellow-500/30' : 'bg-blue-600/20 border-blue-500/30'}`}>
-            {isAnalyzingSms && isCritical
-              ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
-              : isAnalyzingSms
-              ? <MessageSquare className="w-5 h-5 text-yellow-400 animate-pulse" />
-              : <Brain className="w-5 h-5 text-blue-400" />
-            }
-          </div>
+          <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
+            <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : isAnalyzingSms ? 'bg-yellow-500/20 border-yellow-500/30' : 'bg-blue-600/20 border-blue-500/30'}`}>
+              {isAnalyzingSms && isCritical
+                ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
+                : isAnalyzingSms
+                ? <MessageSquare className="w-5 h-5 text-yellow-400 animate-pulse" />
+                : <Brain className="w-5 h-5 text-blue-400" />
+              }
+            </div>
+          </span>
           <div className="min-w-0">
             <h2 className="font-black text-white text-base sm:text-lg tracking-tight">
               S-Autopilot Insight

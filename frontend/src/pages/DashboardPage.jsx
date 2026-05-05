@@ -1448,7 +1448,8 @@ export default function DashboardPage({ onAiClick }) {
           <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
           <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col">
+          <div className={`bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col hud-card hud-corners
+            ${(() => { const v = Number(selectedSms?.received_count); const t = (() => { try { const s = localStorage.getItem('sguard_alert_thresholds_v3'); if (s) { const p = JSON.parse(s); return p.critical?.errorCount || 10; } } catch{} return 10; })(); return v > t ? 'sms-pulse-critical' : v > 3 ? 'sms-pulse-major' : ''; })()}`}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-2 sm:gap-3.5">
                     <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
@@ -1670,7 +1671,7 @@ export default function DashboardPage({ onAiClick }) {
 
           {/* AI War-Room Situation Log (Section 2) */}
           <div className="flex-1 overflow-hidden flex flex-col">
-            <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
+            <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 hud-card hud-corners ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
               {/* Header */}
               <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
@@ -1728,7 +1729,7 @@ export default function DashboardPage({ onAiClick }) {
           {/* ── 4/4: 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-hidden">
             {/* Activity History Flow Area */}
-            <div className="bg-[#0f1421] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden flex flex-col">
+            <div className="bg-[#0f1421] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden flex flex-col hud-card hud-corners">
               {/* Header */}
               <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
@@ -1920,11 +1921,10 @@ export default function DashboardPage({ onAiClick }) {
                                   ${isCompleted ? 'bg-blue-600' : 'bg-white/5'}`} />
                               )}
 
-                              {/* Node Circle */}
-                              <div className={`absolute left-0 top-0 w-6 h-6 rounded-full border-2 border-[#1a1f2e] z-10 flex items-center justify-center transition-all duration-700
-                                ${isCompleted ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.5)]' : 
-                                  (isNextStep ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.2)]' : 'bg-gray-800 border-white/5')}`}>
-
+                              {/* Glowing Core Node */}
+                              <div className={`glowing-core absolute left-0 top-0 z-10 border-2 border-[#1a1f2e] transition-all duration-700
+                                ${isCompleted ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.6)] glowing-core-done' :
+                                  (isNextStep ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-gray-800 border-white/5 glowing-core-pending')}`}>
                                 {isCompleted ? (
                                    <CheckCircle2 className="w-3.5 h-3.5 text-white animate-in zoom-in duration-300" />
                                 ) : (
