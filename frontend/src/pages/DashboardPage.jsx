@@ -1186,7 +1186,7 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans overflow-x-clip relative">
+    <div className="h-screen overflow-hidden bg-[#0f1421] text-white font-sans relative flex flex-col">
       {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
       {isNavCollapsed && (
         <div className="fixed top-3 left-4 z-50">
@@ -1358,10 +1358,10 @@ export default function DashboardPage({ onAiClick }) {
         </div>
       )}
 
-      <div className="px-4 pt-4 pb-24">
+      <div className="flex-1 overflow-hidden px-4 pt-4 pb-20">
 
         {/* ── 3컬럼 메인 그리드 ── */}
-        <div className={`grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch ${isNavCollapsed ? 'h-[calc(100vh-1.5rem)]' : 'h-[calc(100vh-5rem)]'}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
 
           {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
           <div className="flex flex-col gap-4 h-full overflow-y-auto">
