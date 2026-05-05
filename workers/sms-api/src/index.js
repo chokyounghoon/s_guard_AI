@@ -1057,7 +1057,11 @@ ${detailedInfo}`;
           },
           signal: controller.signal,
           body: JSON.stringify({ 
-            inputs: {}, 
+            inputs: {
+              admin_threshold_value: effectiveThreshold,
+              technical_threshold: technicalThreshold,
+              casual_threshold: casualThreshold
+            }, 
             query: prompt, 
             response_mode: 'blocking', 
             user: 'sguard-worker-bg' 
@@ -1083,7 +1087,13 @@ ${detailedInfo}`;
             },
             signal: wfController.signal,
             body: JSON.stringify({ 
-               inputs: { query: prompt, chat_log: prompt }, 
+               inputs: {
+                 query: prompt,
+                 chat_log: prompt,
+                 admin_threshold_value: effectiveThreshold,
+                 technical_threshold: technicalThreshold,
+                 casual_threshold: casualThreshold
+               }, 
                response_mode: 'blocking', 
                user: 'sguard-worker-bg' 
             })
@@ -6558,13 +6568,26 @@ app.post('/retrieval', async (c) => {
     const query = body.query || "";
     const retrieval_setting = body.retrieval_setting;
     const top_k = retrieval_setting?.top_k || 5;
-    
-    // Fetch Global RAG Threshold if Dify sends 0.0 or undefined - Support 'threshold' key from custom nodes
-    if (score_threshold === 0.0 && c.env.SMS_STORAGE) {
-       const kvThresh = await c.env.SMS_STORAGE.get('config:rag_threshold');
-       if (kvThresh) score_threshold = parseFloat(kvThresh);
-       else score_threshold = 0.80;
+
+    // Dify 파라미터 우선순위: score_threshold → threshold → technical_threshold → KV → 기본값 0.80
+    let score_threshold =
+      retrieval_setting?.score_threshold ||
+      retrieval_setting?.threshold ||
+      retrieval_setting?.technical_threshold ||
+      0.0;
+
+    // score_threshold가 0이거나 없으면 KV에서 전역 설정값 로드
+    if (!score_threshold || score_threshold === 0.0) {
+      if (c.env.SMS_STORAGE) {
+        const kvThresh = await c.env.SMS_STORAGE.get('config:rag_threshold');
+        score_threshold = kvThresh ? parseFloat(kvThresh) : 0.80;
+      } else {
+        score_threshold = 0.80;
+      }
     }
+
+    console.log(`[Retrieval] top_k=${top_k} score_threshold=${score_threshold} query="${query.substring(0,40)}"`);
+
 
     const db = c.env.DB;
     const vectorIndex = c.env.WARROOM_INDEX;

@@ -1,0 +1,466 @@
+/*
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║   S-GUARD  ·  ORBITAL STREAM HUD  ·  sguard_orbital_stream.css  ║
+ * ║   "Left-to-right data stream + neon sparkle effects"            ║
+ * ║   PC / Tablet ONLY  (@media min-width: 768px)                   ║
+ * ║   Zero HTML/JS modifications — CSS overlay only                 ║
+ * ╚══════════════════════════════════════════════════════════════════╝
+ *
+ * I have implemented the left-to-right data stream and neon sparkle
+ * effects without changing any logic.
+ */
+
+/* ─────────────────────────────────────────────
+   1. KEYFRAME LIBRARY
+───────────────────────────────────────────── */
+
+
+@keyframes orb-scan-line {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes orb-neon-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0), 0 0 8px 2px rgba(59,130,246,0.15); }
+  50%       { box-shadow: 0 0 0 4px rgba(59,130,246,0.08), 0 0 20px 6px rgba(59,130,246,0.30); }
+}
+
+@keyframes orb-neon-pulse-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0), 0 0 8px 2px rgba(251,191,36,0.1); }
+  50%       { box-shadow: 0 0 0 4px rgba(251,191,36,0.08), 0 0 20px 6px rgba(251,191,36,0.25); }
+}
+
+@keyframes orb-ring-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes orb-sine-wave {
+  0%   { d: path("M0 10 Q5 0, 10 10 Q15 20, 20 10 Q25 0, 30 10 Q35 20, 40 10 Q45 0, 50 10 Q55 20, 60 10"); }
+  50%  { d: path("M0 10 Q5 20, 10 10 Q15 0, 20 10 Q25 20, 30 10 Q35 0, 40 10 Q45 20, 50 10 Q55 0, 60 10"); }
+  100% { d: path("M0 10 Q5 0, 10 10 Q15 20, 20 10 Q25 0, 30 10 Q35 20, 40 10 Q45 0, 50 10 Q55 20, 60 10"); }
+}
+
+@keyframes orb-scanner-bounce {
+  0%, 100% { left: -60%; }
+  50%       { left: 110%; }
+}
+
+@keyframes orb-core-breathe {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%       { transform: scale(1.35); opacity: 0.6; }
+}
+
+@keyframes orb-glow-text {
+  0%, 100% { text-shadow: 0 0 6px rgba(99,179,237,0.4); }
+  50%       { text-shadow: 0 0 16px rgba(99,179,237,0.9), 0 0 32px rgba(99,179,237,0.3); }
+}
+
+@keyframes orb-energy-flow {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes orb-timeline-node-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99,179,237,0.6); }
+  50%       { box-shadow: 0 0 0 6px rgba(99,179,237,0); }
+}
+
+@keyframes orb-fade-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+
+
+/* ─────────────────────────────────────────────
+   2. GLOBAL HUD ATMOSPHERE  (768px+)
+───────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+
+  /* Root atmosphere — subtle grid overlay */
+  .h-screen.overflow-hidden.bg-\[#0f1421\] {
+    background-image:
+      radial-gradient(ellipse 80% 40% at 50% -10%, rgba(59,130,246,0.07) 0%, transparent 70%),
+      linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+    background-size: 100% 100%, 48px 48px, 48px 48px;
+    background-position: center, -1px -1px, -1px -1px;
+  }
+
+  /* ─── NAV / COMMAND BAR ───────────────────── */
+  nav.sticky.top-0 {
+    background: linear-gradient(135deg, rgba(15,20,33,0.97) 0%, rgba(12,17,28,0.97) 100%) !important;
+    border-bottom: 1px solid rgba(59,130,246,0.18) !important;
+    box-shadow: 0 1px 0 rgba(59,130,246,0.08), 0 4px 24px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Digital sine-wave decoration next to logo */
+  nav.sticky.top-0::before {
+    content: '';
+    position: absolute;
+    left: 130px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 80px;
+    height: 20px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 20'%3E%3Cpath d='M0 10 Q10 2,20 10 Q30 18,40 10 Q50 2,60 10 Q70 18,80 10' stroke='%233b82f6' stroke-width='1.5' fill='none' stroke-dasharray='4 3' opacity='0.45'/%3E%3C/svg%3E") no-repeat center/cover;
+    opacity: 0.6;
+    animation: orb-energy-flow 3s linear infinite;
+    background-size: 200% auto;
+  }
+
+  /* Holographic ring on profile avatar */
+  nav .ring-2.ring-blue-500\/20 {
+    position: relative;
+  }
+  nav .ring-2.ring-blue-500\/20::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(99,179,237,0.4);
+    border-top-color: rgba(99,179,237,0.9);
+    animation: orb-ring-spin 3s linear infinite;
+    pointer-events: none;
+  }
+
+  /* ─── MAIN GRID ───────────────────────────── */
+  /* Stream connector lines between columns */
+  .grid.grid-cols-1.lg\:grid-cols-4 {
+    position: relative;
+    gap: 1.25rem !important;
+  }
+
+  /* ─── COLUMN CONNECTOR LINES (섹션 커넥터) ── */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1),
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2),
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) {
+    position: relative;
+  }
+
+  /* col1 우측 — 파란 세로 커넥터 라인 */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1)::after {
+    content: '';
+    position: absolute;
+    right: -0.65rem;
+    top: 8%; bottom: 8%;
+    width: 1px;
+    background: linear-gradient(180deg, transparent 0%, rgba(59,130,246,0.7) 30%, rgba(139,92,246,0.9) 50%, rgba(59,130,246,0.7) 70%, transparent 100%);
+    background-size: 100% 200%;
+    animation: orb-energy-flow 3s linear infinite;
+    pointer-events: none; z-index: 10;
+  }
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1)::before {
+    content: '';
+    position: absolute;
+    right: -0.74rem; top: 50%;
+    transform: translateY(-50%);
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #63b3ed;
+    box-shadow: 0 0 8px 3px rgba(99,179,237,0.6), 0 0 20px 8px rgba(99,179,237,0.2);
+    animation: orb-core-breathe 2s ease-in-out infinite;
+    pointer-events: none; z-index: 11;
+  }
+
+  /* col2 우측 — 퍼플 세로 커넥터 라인 */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2)::after {
+    content: '';
+    position: absolute;
+    right: -0.65rem;
+    top: 8%; bottom: 8%;
+    width: 1px;
+    background: linear-gradient(180deg, transparent 0%, rgba(99,102,241,0.6) 30%, rgba(168,85,247,0.9) 50%, rgba(99,102,241,0.6) 70%, transparent 100%);
+    background-size: 100% 200%;
+    animation: orb-energy-flow 2.5s linear infinite 0.5s;
+    pointer-events: none; z-index: 10;
+  }
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2)::before {
+    content: '';
+    position: absolute;
+    right: -0.74rem; top: 50%;
+    transform: translateY(-50%);
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #a855f7;
+    box-shadow: 0 0 8px 3px rgba(168,85,247,0.6), 0 0 20px 8px rgba(168,85,247,0.2);
+    animation: orb-core-breathe 2s ease-in-out infinite 0.5s;
+    pointer-events: none; z-index: 11;
+  }
+
+  /* col3 우측 — 에메랄드 세로 커넥터 라인 */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3)::after {
+    content: '';
+    position: absolute;
+    right: -0.65rem;
+    top: 8%; bottom: 8%;
+    width: 1px;
+    background: linear-gradient(180deg, transparent 0%, rgba(52,211,153,0.6) 30%, rgba(16,185,129,0.8) 50%, rgba(52,211,153,0.6) 70%, transparent 100%);
+    background-size: 100% 200%;
+    animation: orb-energy-flow 3.5s linear infinite 1s;
+    pointer-events: none; z-index: 10;
+  }
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3)::before {
+    content: '';
+    position: absolute;
+    right: -0.74rem; top: 50%;
+    transform: translateY(-50%);
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 8px 3px rgba(52,211,153,0.6), 0 0 20px 8px rgba(52,211,153,0.2);
+    animation: orb-core-breathe 2s ease-in-out infinite 1s;
+    pointer-events: none; z-index: 11;
+  }
+
+  /* ─── COLUMN 1: SMS PANEL ─────────────────── */
+
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl {
+    border-color: rgba(59,130,246,0.22) !important;
+    position: relative;
+    overflow: hidden;
+    animation: orb-neon-pulse 4s ease-in-out infinite;
+    transition: border-color 0.3s;
+  }
+
+  /* Scan line — SMS panel */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(180deg, transparent 0%, rgba(59,130,246,0.05) 50%, transparent 100%);
+    top: -60px;
+    animation: orb-scan-line 6s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* SMS card items — selected amber glow */
+  .bg-yellow-500\/5.ring-1.ring-yellow-500\/30 {
+    animation: orb-neon-pulse-amber 2.5s ease-in-out infinite;
+    border-color: rgba(251,191,36,0.4) !important;
+  }
+
+  /* Match % badge — outer glow */
+  .bg-emerald-500\/10.text-emerald-400.border-emerald-500\/20 {
+    filter: drop-shadow(0 0 6px rgba(52,211,153,0.55));
+  }
+  .bg-blue-500\/10.text-blue-400.border-blue-500\/20 {
+    filter: drop-shadow(0 0 5px rgba(59,130,246,0.45));
+  }
+
+  /* ─── COLUMN 2: AI INSIGHT PANEL ────────── */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) {
+    position: relative;
+  }
+
+  /* Top scanner bar on AiInsightPanel cards */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) .rounded-3xl {
+    position: relative;
+    overflow: hidden;
+    border-color: rgba(99,102,241,0.25) !important;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.08), 0 8px 32px rgba(0,0,0,0.45);
+  }
+
+  /* Horizontal scanner bounce on top of ai insight card */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) .rounded-3xl::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 60%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(99,102,241,0.8), transparent);
+    animation: orb-scanner-bounce 3.5s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+    border-radius: 0 0 4px 4px;
+  }
+
+  /* Root Cause / ROOT CAUSE amber card — rotating orange glow */
+  .bg-amber-500\/10, .bg-amber-500\/5, [class*="amber"][class*="bg"] {
+    position: relative;
+    overflow: hidden;
+  }
+  .bg-amber-500\/10::after, .bg-amber-500\/5::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 120% 80% at 50% 50%, rgba(251,146,60,0.12) 0%, transparent 70%);
+    animation: orb-neon-pulse-amber 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── COLUMN 3: EXPERT ADVISOR ───────────── */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl {
+    border-color: rgba(234,179,8,0.25) !important;
+    box-shadow: 0 0 0 1px rgba(234,179,8,0.06), 0 8px 40px rgba(0,0,0,0.5), inset 0 0 40px rgba(234,179,8,0.02);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Scan line — expert advisor */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(180deg, transparent 0%, rgba(234,179,8,0.04) 50%, transparent 100%);
+    top: -80px;
+    animation: orb-scan-line 7s ease-in-out infinite 1.5s;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Agent message items — fade-slide in */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) [class*="rounded"][class*="p-"] {
+    animation: orb-fade-slide-in 0.4s ease-out both;
+  }
+
+  /* ─── COLUMN 4: 처리 현황 / TIMELINE ─────── */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) {
+    position: relative;
+  }
+
+  /* Timeline node dots — glowing core */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) .w-3.h-3.rounded-full,
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) .w-2\.5.h-2\.5.rounded-full,
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) .w-2.h-2.rounded-full {
+    animation: orb-core-breathe 2s ease-in-out infinite, orb-timeline-node-pulse 2s ease-in-out infinite;
+    position: relative;
+  }
+
+  /* Timeline energy line */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) .w-px,
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) [class*="w-0\.5"] {
+    background: linear-gradient(180deg, rgba(59,130,246,0.7) 0%, rgba(139,92,246,0.5) 50%, rgba(59,130,246,0.2) 100%) !important;
+    background-size: 100% 200% !important;
+    animation: orb-energy-flow 2.5s linear infinite;
+    position: relative;
+  }
+
+  /* ─── GLOBAL GLOW METRICS ─────────────────── */
+  /* Similarity / key metric text values */
+  [class*="similarity"], [class*="Similarity"],
+  .font-mono.font-black.text-emerald-300,
+  .font-mono.font-black.text-blue-300 {
+    animation: orb-glow-text 3s ease-in-out infinite;
+  }
+
+  /* Status badges — outer glow not box-shadow */
+  .bg-emerald-500\/10.border.border-emerald-500\/20 {
+    filter: drop-shadow(0 0 5px rgba(52,211,153,0.4));
+  }
+  .bg-red-500\/10.border.border-red-500\/20 {
+    filter: drop-shadow(0 0 5px rgba(239,68,68,0.4));
+  }
+  .bg-yellow-500\/10.border.border-yellow-500\/20 {
+    filter: drop-shadow(0 0 5px rgba(234,179,8,0.35));
+  }
+  .bg-indigo-500\/10.border.border-indigo-500\/20 {
+    filter: drop-shadow(0 0 5px rgba(99,102,241,0.4));
+  }
+
+
+
+  /* ─── WARROOM / ASSIGNED CARDS ───────────── */
+  .bg-\[#11141d\].hover\:border-blue-500\/30,
+  .bg-\[#11141d\].hover\:border-yellow-500\/30 {
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.15s;
+  }
+  .bg-\[#11141d\].hover\:border-blue-500\/30:hover {
+    border-color: rgba(59,130,246,0.4) !important;
+    box-shadow: 0 0 16px rgba(59,130,246,0.12), 0 4px 20px rgba(0,0,0,0.4);
+    transform: translateX(2px);
+  }
+
+  /* ─── FLOW STEP INDICATORS ────────────────── */
+  .bg-emerald-500\/5.border-emerald-500\/20 {
+    position: relative;
+    overflow: hidden;
+  }
+  .bg-emerald-500\/5.border-emerald-500\/20::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.08) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: orb-energy-flow 2s linear infinite;
+    pointer-events: none;
+  }
+
+  .bg-blue-500\/5.border-blue-500\/20 {
+    position: relative;
+    overflow: hidden;
+  }
+  .bg-blue-500\/5.border-blue-500\/20::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.08) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: orb-energy-flow 2s linear infinite 0.5s;
+    pointer-events: none;
+  }
+
+  /* ─── AUTOPILOT INSIGHT HEADER BAR SCANNER ── */
+  /* Progress scanner on central insight card */
+  div[class*="AiInsight"] .rounded-3xl > div:first-child,
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) [class*="border-b"] {
+    position: relative;
+    overflow: hidden;
+  }
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) [class*="border-b"]::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: -100%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(99,102,241,0.8), rgba(139,92,246,0.6), transparent);
+    animation: orb-scanner-bounce 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  /* ─── PANEL CARD BORDERS — STREAM SOURCE/DEST ─ */
+  /* Left panel (source) — blue neon */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .rounded-3xl {
+    border-left: 2px solid rgba(59,130,246,0.35) !important;
+  }
+  /* Right panel (destination) — green completion */
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) [class*="rounded"] {
+    border-right: 2px solid rgba(52,211,153,0.25) !important;
+  }
+
+  /* ─── LIVE BADGE ENHANCEMENT ─────────────── */
+  .bg-blue-500\/10.border-blue-500\/30 .animate-ping {
+    animation-duration: 1.2s !important;
+  }
+  .bg-blue-500\/10.border-blue-500\/30 {
+    box-shadow: 0 0 12px rgba(59,130,246,0.3) !important;
+  }
+
+  /* ─── SCROLLBAR ORBITAL THEME ─────────────── */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(59,130,246,0.5), rgba(139,92,246,0.5));
+    border-radius: 99px;
+  }
+
+  /* ─── COMMAND BAR RIGHT SECTION ──────────── */
+  nav .flex.items-center.space-x-4 {
+    position: relative;
+  }
+
+
+} /* end @media (min-width: 768px) */

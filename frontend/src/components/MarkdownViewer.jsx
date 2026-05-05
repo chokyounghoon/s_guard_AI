@@ -54,16 +54,16 @@ const MarkdownViewer = ({ text }) => {
     .replace(/\n{3,}/g, '\n\n');
 
   return (
-    <div className="prose prose-invert max-w-none space-y-1 pb-2">
+    <div className="prose prose-invert max-w-none space-y-2 pb-2">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => (
-            <h1 className="mb-2 text-lg font-black text-white tracking-tight">{children}</h1>
+            <h1 className="mb-2 text-xl font-black text-white tracking-tight">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mb-1 mt-4 text-base font-black text-white flex items-center gap-2">
-              <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
+            <h2 className="mb-2 mt-5 text-[15px] font-black text-white flex items-center gap-2 pb-1.5 border-b border-white/5">
+              <div className="w-2 h-4 bg-blue-500 rounded-full" />
               {children}
             </h2>
           ),
@@ -77,11 +77,11 @@ const MarkdownViewer = ({ text }) => {
             // 💡 핵심 원인 (Root Cause)
             if (contentStr.includes('💡 핵심 원인') || contentStr.includes('Root Cause:')) {
               return (
-                <div className="my-2 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                <div className="my-3 flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                   <TriangleAlert className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                   <div>
-                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-0.5">Root Cause</span>
-                    <div className="text-amber-50/90 text-sm leading-relaxed">{children}</div>
+                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Root Cause</span>
+                    <div className="text-amber-50/90 text-[14px] leading-relaxed">{children}</div>
                   </div>
                 </div>
               );
@@ -90,21 +90,21 @@ const MarkdownViewer = ({ text }) => {
             // ✅ 최종 조치 결과 (Resolution)
             if (contentStr.includes('✅ 최종 조치 결과') || contentStr.includes('Resolution:')) {
               return (
-                <div className="my-2 flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                <div className="my-3 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
                   <CircleCheckBig className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                   <div>
-                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-0.5">Resolution</span>
-                    <div className="text-emerald-50/90 text-sm leading-relaxed">{children}</div>
+                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Resolution</span>
+                    <div className="text-emerald-50/90 text-[14px] leading-relaxed">{children}</div>
                   </div>
                 </div>
               );
             }
 
-            return <div className="mb-1 text-slate-300 leading-snug text-[13px]">{children}</div>;
+            return <div className="mb-1.5 text-slate-200 leading-relaxed text-[14px]">{children}</div>;
           },
 
-          ol: ({ children }) => <div className="space-y-0.5 my-1">{children}</div>,
-          ul: ({ children }) => <div className="space-y-0.5 my-1">{children}</div>,
+          ol: ({ children }) => <div className="space-y-1 my-2">{children}</div>,
+          ul: ({ children }) => <div className="space-y-1 my-2">{children}</div>,
 
           li: ({ children }) => {
             const extractText = (node) => {
@@ -124,21 +124,21 @@ const MarkdownViewer = ({ text }) => {
               const text = content.replace(fullMatch, '').replace(/^[:\s\-~]+/, '').trim();
 
               return (
-                <div className="flex items-start gap-2 py-0.5 group">
-                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                  <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono text-[10px] font-black border border-blue-500/20 shrink-0">
+                <div className="flex items-start gap-2 py-1 group">
+                  <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                  <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono text-[11px] font-black border border-blue-500/20 shrink-0">
                     {timestamp}
                   </span>
-                  <span className="text-slate-300 text-[13px] leading-snug">{text}</span>
+                  <span className="text-slate-200 text-[14px] leading-relaxed">{text}</span>
                 </div>
               );
             }
 
             // Regular List Item
             return (
-              <div className="flex items-start gap-2 py-0.5">
-                <div className="mt-1.5 w-1 h-1 rounded-full bg-blue-500/60 shrink-0" />
-                <span className="text-slate-300 text-[13px] leading-snug">{content}</span>
+              <div className="flex items-start gap-2 py-1">
+                <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500/70 shrink-0" />
+                <span className="text-slate-200 text-[14px] leading-relaxed">{content}</span>
               </div>
             );
           },
@@ -154,21 +154,21 @@ const MarkdownViewer = ({ text }) => {
           },
 
           blockquote: ({ children }) => (
-            <div className="relative my-2 pl-3 border-l-2 border-blue-500/50">
-              <div className="text-[13px] text-blue-100/80 italic leading-relaxed">{children}</div>
+            <div className="relative my-3 pl-4 border-l-2 border-blue-500/60 bg-blue-500/5 py-2 rounded-r-lg">
+              <div className="text-[14px] text-blue-100/85 italic leading-relaxed">{children}</div>
             </div>
           ),
 
           table: ({ children }) => (
-            <div className="my-2 overflow-hidden rounded-xl border border-white/10 bg-[#1a1f2e]/40 shadow-xl">
-              <table className="w-full border-collapse text-left text-[11px]">{children}</table>
+            <div className="my-3 overflow-hidden rounded-xl border border-white/10 bg-[#1a1f2e]/40 shadow-xl">
+              <table className="w-full border-collapse text-left text-[12px]">{children}</table>
             </div>
           ),
           th: ({ children }) => (
-            <th className="bg-white/5 px-3 py-2 font-black text-white uppercase tracking-wide border-b border-white/10 text-[10px]">{children}</th>
+            <th className="bg-white/5 px-3 py-2.5 font-black text-white uppercase tracking-wide border-b border-white/10 text-[11px]">{children}</th>
           ),
           td: ({ children }) => (
-            <td className="px-3 py-1.5 text-slate-300 border-b border-white/5 text-[13px]">{children}</td>
+            <td className="px-3 py-2 text-slate-200 border-b border-white/5 text-[14px]">{children}</td>
           ),
           img: ({ src, alt }) => {
             if (src && (src.includes('aitopia.ai') || src.includes('logo.svg'))) {

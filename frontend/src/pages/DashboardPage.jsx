@@ -840,110 +840,146 @@ export default function DashboardPage({ onAiClick }) {
   const parseTranscript = (text) => {
     if (!text) return [];
 
-    const declarations = [
-      { name: 'Security', keywords: ['Security', '보안', 'System', '시스템', '보안분석'] },
-      { name: 'DB', keywords: ['DB', '데이터베이스', 'Database', 'DATABASE', '쿼리'] },
-      { name: 'DevOps', keywords: ['DevOps', '데브옵스', 'Analyst', '어낼리스트', 'Infra', '인프라', 'App', '애플리케이션'] },
-      { name: 'Leader', keywords: ['Leader', '리더', '최종 조치', '조항 조치', '조치 가이드', '최종판단'] }
-    ];
+    // ── 디버그: 전체 텍스트 확인
+    console.log('[parseTranscript] full text:\n', text);
 
-    // Find the starting point of the diagnostic section
-    let startIndex = text.indexOf('[전문가별 심층 진단]');
+    // ── 에이전트 이름 → 정규화 키 매핑
+    const AGENT_ORDER = ['Security', 'DB', 'DevOps', 'Leader'];
+
+    const detectAgentName = (str) => {
+      const s = str.trim();
+      if (/security/i.test(s))             return 'Security';
+      if (/db|database/i.test(s))          return 'DB';
+      if (/devops|infra|analyst/i.test(s)) return 'DevOps';
+      if (/leader/i.test(s))              return 'Leader';
+      return null;
+    };
+
+    // ── [전문가별 심층 진단] 섹션 시작점 찾기
+    const sectionMarkers = ['[전문가별 심층 진단]', '전문가별 심층 진단', '## 전문가', '### 전문가'];
+    let startIndex = -1;
+    for (const marker of sectionMarkers) {
+      const idx = text.indexOf(marker);
+      if (idx !== -1) {
+        console.log('[parseTranscript] section marker found:', marker, 'at index', idx);
+        startIndex = idx;
+        break;
+      }
+    }
     if (startIndex === -1) {
-        // Fallback: check for Agent keyword if main header is missing
-        const firstAgentIndex = text.search(/(Security|DB|DevOps|Leader|Agent|에이전트)/i);
-        startIndex = firstAgentIndex !== -1 ? firstAgentIndex : 0;
+      console.log('[parseTranscript] no section marker found — scanning entire text');
+      startIndex = 0;
     }
-    
-    const diagnosticsText = text.substring(startIndex);
-    const lines = diagnosticsText.split('\n');
-    let currentAgent = null;
-    const msgsMap = new Map();
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmedLine = line.trim();
-        if (!trimmedLine) continue;
-        
-        let foundAgent = null;
-        
-        // Robust Header Detection:
-        // 1. Starts with Markdown header prefixes (###, **, -)
-        // 2. OR ends with a colon
-        // 3. AND is compact (< 80 chars)
-        const isHeaderFormat = /^(###?|\*\*|-|\[|[\uD800-\uDBFF][\uDC00-\uDFFF])/.test(trimmedLine) || /:\s*$/.test(trimmedLine);
-        
-        if (isHeaderFormat && trimmedLine.length < 80) {
-            const lowerLine = trimmedLine.toLowerCase();
-            for (const decl of declarations) {
-                // To prevent misidentifying "1. DB 조치" as a new agent if DB is already active,
-                // we prioritize lines containing "Agent" or "에이전트"
-                const hasAgentKeyword = lowerLine.includes('agent') || lowerLine.includes('에이전트') || lowerLine.includes('진단');
-                const hasRoleKeyword = decl.keywords.some(k => lowerLine.includes(k.toLowerCase()));
-                
-                if (hasRoleKeyword && (hasAgentKeyword || trimmedLine.startsWith('###') || trimmedLine.startsWith('**'))) {
-                    foundAgent = decl.name;
-                    break;
-                }
-            }
+    const lines = text.substring(startIndex).split('\n');
+    const msgsMap = new Map();
+    let currentAgent = null;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // ── 패턴 1: `- **Security Agent**: 내용` 또는 `• Security Agent: 내용`
+      // **볼드** 마커를 포함/미포함 모두 지원
+      const bulletMatch = trimmed.match(
+        /^[-•\*·\d\.]\s*\*{0,2}(Security|DB|DevOps|Leader)\s*Agent\*{0,2}\s*[:：]\s*(.+)/i
+      );
+      if (bulletMatch) {
+        const agentName = detectAgentName(bulletMatch[1]);
+        const content = bulletMatch[2].trim();
+        console.log('[parseTranscript] bullet match:', agentName, '→', content.substring(0, 30));
+        if (agentName && content) {
+          const prev = msgsMap.get(agentName) || '';
+          msgsMap.set(agentName, prev + (prev ? '\n' : '') + content);
+          currentAgent = agentName;
+          continue;
         }
-        
-        if (foundAgent) {
-            currentAgent = foundAgent;
-            continue; 
+      }
+
+      // ── 패턴 2: 헤더 형식 (`### Security Agent`, `**DB Agent**`, `[Security Agent]`)
+      const isHeaderLike = (
+        /^#{1,4}\s/.test(trimmed) ||
+        /^\*{1,2}[^*]/.test(trimmed) ||
+        /^\[.{2,40}\]/.test(trimmed) ||
+        /^\d+[\.\)]\s/.test(trimmed) ||
+        (/[：:]\s*$/.test(trimmed) && trimmed.length < 60)
+      );
+      if (isHeaderLike && /security|db|database|devops|infra|leader/i.test(trimmed)) {
+        const agentName = detectAgentName(trimmed);
+        if (agentName) {
+          console.log('[parseTranscript] header match:', agentName, '←', trimmed);
+          currentAgent = agentName;
+          continue;
         }
-        
-        if (currentAgent) {
-            const existing = msgsMap.get(currentAgent) || '';
-            msgsMap.set(currentAgent, existing + (existing ? '\n' : '') + trimmedLine);
-        }
+      }
+
+      // ── 패턴 3: 이전 에이전트 내용 누적
+      if (currentAgent) {
+        const prev = msgsMap.get(currentAgent) || '';
+        msgsMap.set(currentAgent, prev + (prev ? '\n' : '') + trimmed);
+      }
     }
-    
-    return Array.from(msgsMap.entries()).map(([role, content]) => {
-      // Deep cleanup of residual artifacts
-      let cleanText = content
-          .replace(/^(###?|\*\*)?\s*(Security|DB|DevOps|Leader|Agent|에이전트).*?[:：]\s*/i, '') 
-          .replace(/^[ \t\-\*\#\.,\:\u2022\u00b7]+\s*/gm, '') 
-          .replace(/\n\n+/g, '\n\n')
-          .trim();
-          
-      return { role: role, text: cleanText, delay: 0 };
-    }).filter(msg => msg.text.length > 3);
+
+    // ── 정의된 4개 순서로 결과 반환
+    const result = [];
+    for (const name of AGENT_ORDER) {
+      const raw = msgsMap.get(name);
+      if (!raw) continue;
+      const cleaned = raw
+        .replace(/^#{1,4}\s*/gm, '')
+        .replace(/^\*{1,2}(.*?)\*{1,2}$/gm, '$1')
+        .replace(/^[-•·]\s*/gm, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      if (cleaned.length > 3) {
+        result.push({ role: name, text: cleaned, delay: 0 });
+      }
+    }
+
+    console.log('[parseTranscript] result:', result.map(r => `${r.role}(${r.text.length}chars)`));
+    return result;
   };
+
+
+
+
+
+
 
   // Callback called from AiInsightPanel
   const handleAgentContent = (fullTranscript, isDone) => {
-    // 진행 중인 스트리밍 찌꺼기(랜더링 전 텍스트)를 화면에 보이지 않게 하고, 완료 시에만 파싱 결과를 업데이트
-    if (isDone) {
-      const currentMsgs = parseTranscript(fullTranscript);
-      if (currentMsgs.length > 0) {
-        // FILTER: Remove any legacy 'AI분석' role messages that might be in history
-        const filteredMsgs = currentMsgs.filter(m => m.role !== 'AI분석');
-        const completedMsgs = filteredMsgs.map(m => ({ ...m, isCompleted: true }));
-        setAgentMessages(completedMsgs);
-      }
+    const currentMsgs = parseTranscript(fullTranscript);
+    const filteredMsgs = currentMsgs.filter(m => m.role !== 'AI분석');
 
+    console.log('[Expert Advisor] parsed:', filteredMsgs.length, 'agents →', filteredMsgs.map(m => m.role), '| isDone:', isDone);
+
+    if (filteredMsgs.length > 0) {
+      setShowAgentPanel(true);
+      // 순서대로(Security→DB→DevOps→Leader) 즉시 전부 표시
+      setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: isDone })));
+    }
+
+    if (isDone && currentMsgs.length > 0) {
       const currentIncId = selectedSmsRef.current?.inc_id;
-
       if (currentIncId) {
-        console.log(`AI Analysis Done for ${currentIncId}. Saving to DB...`);
-        // Save to DB
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({
-            incident_id: String(currentIncId),
-            messages: currentMsgs
-          })
+          body: JSON.stringify({ incident_id: String(currentIncId), messages: currentMsgs })
         })
         .then(res => res.json())
-        .then(data => console.log("Save complete:", data))
+        .then(data => console.log('Save complete:', data))
         .catch(console.error);
-        
+
         setTimeout(() => setShowEmergencyModal(true), 1500);
       }
     }
   };
+
+
+
+
+
 
   const agentPanelRef = useRef(null);
 
@@ -1378,8 +1414,7 @@ export default function DashboardPage({ onAiClick }) {
           <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
           <div className="flex-1 overflow-hidden flex flex-col">
-          {smsMessages.length > 0 ? (
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col">
+          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col">
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-2 sm:gap-3.5">
                     <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
@@ -1469,94 +1504,115 @@ export default function DashboardPage({ onAiClick }) {
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <div className="p-3 space-y-1.5">
-                  {visibleSms.map((msg) => {
-                    const isSelected = selectedSms?.inc_id === msg.inc_id;
-                    return (
-                      <div
-                        key={`sms-${msg.inc_id}`}
-                        onClick={() => {
-                          const isSelected = selectedSms?.inc_id === msg.inc_id;
-                          setSelectedSms(isSelected ? null : msg);
-                          if (!isSelected) {
-                            startLiveScenario(msg);
-                          } else {
-                            setShowAgentPanel(false);
-                            setAgentMessages([]);
-                          }
-                        }}
-                        style={{ border: `1px solid ${isSelected ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.04)'}` }}
-                        className={`rounded-2xl py-2 px-4 flex flex-col group transition-all cursor-pointer ${
-                          isSelected ? 'bg-yellow-500/5 ring-1 ring-yellow-500/30' : 'bg-[#11141d] hover:border-yellow-500/30'
-                        }`}
-                      >
-                        {/* 상단: 제목 + 배지 */}
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
-                              {msg.keyword_detected
-                                ? <AlertCircle className="w-4 h-4 text-yellow-300" />
-                                : <Info className={`w-4 h-4 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
-                              }
+                {visibleSms.length > 0 ? (
+                  <div className="p-3 space-y-1.5">
+                    {visibleSms.map((msg) => {
+                      const isSelected = selectedSms?.inc_id === msg.inc_id;
+                      return (
+                        <div
+                          key={`sms-${msg.inc_id}`}
+                          onClick={() => {
+                            const isSelected = selectedSms?.inc_id === msg.inc_id;
+                            if (!isSelected) {
+                              // SMS 선택: selectedSms + insightSms 동시 설정 → AiInsightPanel 분석 트리거
+                              setSelectedSms(msg);
+                              selectedSmsRef.current = msg;
+                              setInsightSms(msg);
+                              setAgentMessages([]);
+                              setShowAgentPanel(true);
+                              setActiveLogTab('ai');
+                            } else {
+                              // 선택 해제
+                              setSelectedSms(null);
+                              selectedSmsRef.current = null;
+                              setInsightSms(null);
+                              setShowAgentPanel(false);
+                              setAgentMessages([]);
+                            }
+                          }}
+                          style={{ border: `1px solid ${isSelected ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.04)'}` }}
+                          className={`rounded-2xl py-2 px-4 flex flex-col group transition-all cursor-pointer ${
+                            isSelected ? 'bg-yellow-500/5 ring-1 ring-yellow-500/30' : 'bg-[#11141d] hover:border-yellow-500/30'
+                          }`}
+                        >
+                          {/* 상단: 제목 + 배지 */}
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
+                                {msg.keyword_detected
+                                  ? <AlertCircle className="w-4 h-4 text-yellow-300" />
+                                  : <Info className={`w-4 h-4 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
+                                }
+                              </div>
+                              <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-yellow-400' : 'text-white'}`}>
+                                {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
+                              </h4>
                             </div>
-                            <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-yellow-400' : 'text-white'}`}>
-                              {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
-                            </h4>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                              className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 whitespace-nowrap"
-                            >
-                              진행상태 <ExternalLink className="w-2.5 h-2.5" />
-                            </button>
-                            <span className={`h-6 flex items-center px-2 rounded-lg border text-[8.5px] font-black whitespace-nowrap transition-all ${
-                              msg.incident_status === '처리완료'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : Number(msg.is_analyzed) >= 1
-                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                  : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'
-                            }`}>
-                              {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
-                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
+                                className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 whitespace-nowrap"
+                              >
+                                진행상태 <ExternalLink className="w-2.5 h-2.5" />
+                              </button>
+                              <span className={`h-6 flex items-center px-2 rounded-lg border text-[8.5px] font-black whitespace-nowrap transition-all ${
+                                msg.incident_status === '처리완료'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : Number(msg.is_analyzed) >= 1
+                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'
+                              }`}>
+                                {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
+                              </span>
 
-                          </div>
-                        </div>
-
-                        {/* 중단: 발신자 + 사번 */}
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <p className="text-[8.5px] text-slate-500 font-bold">발신: <span className="text-slate-400 font-mono">{msg.sender}</span></p>
-                          {msg.employee_id && (
-                            <span className="h-5 flex items-center gap-1 bg-blue-500/10 px-1.5 rounded-md border border-blue-500/20 text-[8.5px] text-blue-400 font-mono font-black">
-                              {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* 하단: 메시지 본문 + 타임스탬프 */}
-                        <div className="flex flex-col gap-1">
-                          <p className={`text-[13px] leading-relaxed font-medium break-all whitespace-pre-wrap transition-colors ${isSelected ? 'text-yellow-100' : 'text-slate-300'}`}>
-                            {msg.message}
-                          </p>
-                          {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
-                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[8px] font-black uppercase w-fit ${
-                              msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            }`}>
-                              <Zap className="w-2 h-2" />
-                              Match {(msg.similarity_score * 100).toFixed(1)}%
                             </div>
-                          )}
-                          <div className="flex justify-end border-t border-white/5 pt-1 mt-0.5">
-                            <span className="text-[8px] text-slate-600 font-bold font-mono opacity-50">{formatYYMMDD(msg.timestamp)}</span>
+                          </div>
+
+                          {/* 중단: 발신자 + 사번 */}
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <p className="text-[8.5px] text-slate-500 font-bold">발신: <span className="text-slate-400 font-mono">{msg.sender}</span></p>
+                            {msg.employee_id && (
+                              <span className="h-5 flex items-center gap-1 bg-blue-500/10 px-1.5 rounded-md border border-blue-500/20 text-[8.5px] text-blue-400 font-mono font-black">
+                                {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 하단: 메시지 본문 + 타임스탬프 */}
+                          <div className="flex flex-col gap-1">
+                            <p className={`text-[13px] leading-relaxed font-medium break-all whitespace-pre-wrap transition-colors ${isSelected ? 'text-yellow-100' : 'text-slate-300'}`}>
+                              {msg.message}
+                            </p>
+                            {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
+                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[8px] font-black uppercase w-fit ${
+                                msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                              }`}>
+                                <Zap className="w-2 h-2" />
+                                Match {(msg.similarity_score * 100).toFixed(1)}%
+                              </div>
+                            )}
+                            <div className="flex justify-end border-t border-white/5 pt-1 mt-0.5">
+                              <span className="text-[8px] text-slate-600 font-bold font-mono opacity-50">{formatYYMMDD(msg.timestamp)}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-blue-500/10 flex items-center justify-center">
+                      <MessageSquare className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-wider">수신된 SMS 없음</p>
+                      <p className="text-[10px] text-slate-600">장애 SMS가 수신되면 여기에 표시됩니다</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          ) : null}
+
           </div>{/* end flex-1 wrapper */}
 
           </div>{/* end col1 */}
@@ -1631,7 +1687,10 @@ export default function DashboardPage({ onAiClick }) {
                       onClick={() => {
                         setAgentMessages([]);
                         setShowAgentPanel(true);
-                        startLiveScenario(selectedSms);
+                        // insightSms 리셋 → AiInsightPanel useEffect 재트리거 → 재분석
+                        const currentSms = selectedSms;
+                        setInsightSms(null);
+                        setTimeout(() => setInsightSms(currentSms), 50);
                       }}
                       title="AI 에이전트 재조회 (Dify)"
                       className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-indigo-500/20 hover:text-indigo-400 hover:border-indigo-500/30 active:scale-90 transition-all"
@@ -1640,43 +1699,44 @@ export default function DashboardPage({ onAiClick }) {
                     </button>
                   )}
 
+
                 </div>
               </div>
 
-
-                <div className="flex-1 overflow-hidden">
-                  {showAgentPanel || selectedSms ? (
-                    <div className="h-full flex flex-col overflow-hidden">
-                      {activeLogTab === 'ai' ? (
-                        <AgentDiscussionPanel
-                          messages={agentMessages}
-                          isVisible={true}
-                          embedded={true}
-                          incident={selectedSms}
-                          onClose={() => {
-                            setShowAgentPanel(false);
-                            setSelectedSms(null);
-                          }}
-                        />
-                      ) : (
-                        <WarRoomChatPanel
-                          incidentId={selectedSms?.inc_id}
-                          currentUser={userProfile || {}}
-                          isVisible={true}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
-                      <Brain className="w-10 h-10" />
-                      <p className="text-xs font-bold uppercase tracking-wider">Select an incident to analyze</p>
-                    </div>
-                  )}
-                </div>
+              <div className="flex-1 overflow-hidden">
+                {showAgentPanel || selectedSms ? (
+                  <div className="h-full flex flex-col overflow-hidden">
+                    {activeLogTab === 'ai' ? (
+                      <AgentDiscussionPanel
+                        messages={agentMessages}
+                        isVisible={true}
+                        embedded={true}
+                        incident={selectedSms}
+                        onClose={() => {
+                          setShowAgentPanel(false);
+                          setSelectedSms(null);
+                        }}
+                      />
+                    ) : (
+                      <WarRoomChatPanel
+                        incidentId={selectedSms?.inc_id}
+                        currentUser={userProfile || {}}
+                        isVisible={true}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
+                    <Brain className="w-10 h-10" />
+                    <p className="text-xs font-bold uppercase tracking-wider">Select an incident to analyze</p>
+                  </div>
+                )}
+              </div>
 
             </div>
           </div>
           </div>{/* end col3 */}
+
 
           {/* ── 4/4: 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-hidden">

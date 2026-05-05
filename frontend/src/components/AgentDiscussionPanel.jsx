@@ -165,7 +165,15 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
           const tailColor = isLeader ? 'rgba(37,99,235,0.2)' : 'rgba(26,31,46,0.8)';
 
           return (
-            <div key={idx} className="flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 justify-start mb-1">
+            <div
+              key={idx}
+              className="flex w-full fade-in justify-start mb-1"
+              style={{
+                animation: 'fadeSlideIn 0.4s ease-out both',
+                animationDelay: `${idx * 0.05}s`  // 이미 타이머로 순차 추가되므로 최소 delay
+              }}
+            >
+
               <div className="flex max-w-[90%] flex-row items-start gap-2">
 
                 {/* Avatar */}
