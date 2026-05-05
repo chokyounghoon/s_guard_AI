@@ -1468,12 +1468,7 @@ export default function DashboardPage({ onAiClick }) {
                         onClick={() => {
                           const isSelected = selectedSms?.inc_id === msg.inc_id;
                           setSelectedSms(isSelected ? null : msg);
-                          if (!isSelected) {
-                            startLiveScenario(msg);
-                          } else {
-                            setShowAgentPanel(false);
-                            setAgentMessages([]);
-                          }
+                          // startLiveScenario는 useEffect([selectedSms])가 처리 — 직접 호출 시 이중 실행으로 agentMessages 덮어쓰기 버그 발생
                         }}
                         style={{ border: `1px solid ${isSelected ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.04)'}` }}
                         className={`rounded-2xl py-2 px-4 flex flex-col group transition-all cursor-pointer ${
