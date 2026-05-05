@@ -913,33 +913,37 @@ export default function DashboardPage({ onAiClick }) {
 
   // Callback called from AiInsightPanel
   const handleAgentContent = (fullTranscript, isDone) => {
-    // 진행 중인 스트리밍 찌꺼기(랜더링 전 텍스트)를 화면에 보이지 않게 하고, 완료 시에만 파싱 결과를 업데이트
+    if (!fullTranscript || fullTranscript.trim().length < 5) return;
+
+    // ① 스트리밍 중(isDone=false)에도 Expert Advisor에 실시간 표시
+    const currentMsgs = parseTranscript(fullTranscript);
+    if (currentMsgs.length > 0) {
+      const filtered = currentMsgs.filter(m => m.role !== 'AI분석');
+      setAgentMessages(filtered.map(m => ({ ...m, isCompleted: isDone })));
+    } else {
+      // ② 파싱 실패 폴백: 분석 텍스트 전체를 Leader 메시지로 표시
+      setAgentMessages([{
+        role: 'Leader',
+        text: fullTranscript.trim(),
+        isCompleted: isDone,
+        delay: 0
+      }]);
+    }
+
+    // ③ 완료 시에만 DB 저장
     if (isDone) {
-      const currentMsgs = parseTranscript(fullTranscript);
-      if (currentMsgs.length > 0) {
-        // FILTER: Remove any legacy 'AI분석' role messages that might be in history
-        const filteredMsgs = currentMsgs.filter(m => m.role !== 'AI분석');
-        const completedMsgs = filteredMsgs.map(m => ({ ...m, isCompleted: true }));
-        setAgentMessages(completedMsgs);
-      }
-
       const currentIncId = selectedSmsRef.current?.inc_id;
-
       if (currentIncId) {
-        console.log(`AI Analysis Done for ${currentIncId}. Saving to DB...`);
-        // Save to DB
+        const msgsToSave = currentMsgs.length > 0
+          ? currentMsgs.filter(m => m.role !== 'AI분석')
+          : [{ role: 'Leader', text: fullTranscript.trim() }];
+
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({
-            incident_id: String(currentIncId),
-            messages: currentMsgs
-          })
-        })
-        .then(res => res.json())
-        .then(data => console.log("Save complete:", data))
-        .catch(console.error);
-        
+          body: JSON.stringify({ incident_id: String(currentIncId), messages: msgsToSave })
+        }).catch(console.error);
+
         setTimeout(() => setShowEmergencyModal(true), 1500);
       }
     }
@@ -951,8 +955,7 @@ export default function DashboardPage({ onAiClick }) {
     if (!smsMessage) return;
     setSystemStatus('critical');
     setShowAgentPanel(true);
-    setAgentMessages([{ role: 'Security', text: '🔍 새로운 장애 로그 감지. AI 에이전트 분석을 시작합니다...', delay: 0 }]);
-
+    // 초기 메시지는 클릭 핸들러에서 이미 세팅 — 여기서 덮어쓰지 않음
 
     // Update both state and ref
     setSelectedSms(smsMessage);
@@ -1467,8 +1470,16 @@ export default function DashboardPage({ onAiClick }) {
                         key={`sms-${msg.inc_id}`}
                         onClick={() => {
                           const isSelected = selectedSms?.inc_id === msg.inc_id;
-                          setSelectedSms(isSelected ? null : msg);
-                          // startLiveScenario는 useEffect([selectedSms])가 처리 — 직접 호출 시 이중 실행으로 agentMessages 덮어쓰기 버그 발생
+                          if (isSelected) {
+                            setSelectedSms(null);
+                            setShowAgentPanel(false);
+                            setAgentMessages([]);
+                          } else {
+                            setSelectedSms(msg);
+                            setShowAgentPanel(true); // 즉시 Expert Advisor 영역 표시
+                            setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]);
+                          }
+                          // startLiveScenario는 useEffect([selectedSms])가 처리
                         }}
                         style={{ border: `1px solid ${isSelected ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.04)'}` }}
                         className={`rounded-2xl py-2 px-4 flex flex-col group transition-all cursor-pointer ${
