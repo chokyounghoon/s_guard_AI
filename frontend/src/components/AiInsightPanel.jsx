@@ -596,9 +596,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
             <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : isAnalyzingSms ? 'bg-yellow-500/20 border-yellow-500/30' : 'bg-blue-600/20 border-blue-500/30'}`}>
               {isAnalyzingSms && isCritical
-                ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
+                ? <AlertTriangle className="w-5 h-5 text-red-400" />
                 : isAnalyzingSms
-                ? <MessageSquare className="w-5 h-5 text-yellow-400 animate-pulse" />
+                ? <MessageSquare className="w-5 h-5 text-yellow-400" />
                 : <Brain className="w-5 h-5 text-blue-400" />
               }
             </div>

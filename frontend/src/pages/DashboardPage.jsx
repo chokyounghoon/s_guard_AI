@@ -1451,12 +1451,14 @@ export default function DashboardPage({ onAiClick }) {
           <div className={`bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col hud-card hud-corners
             ${(() => { const v = Number(selectedSms?.received_count); const t = (() => { try { const s = localStorage.getItem('sguard_alert_thresholds_v3'); if (s) { const p = JSON.parse(s); return p.critical?.errorCount || 10; } } catch{} return 10; })(); return v > t ? 'sms-pulse-critical' : v > 3 ? 'sms-pulse-major' : ''; })()}`}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
-                  <div className="flex items-center gap-2 sm:gap-3.5">
-                    <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
-                      <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
-                    </div>
+                  <div className="flex items-center gap-3.5">
+                    <span className="data-ring-wrapper shrink-0">
+                      <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30 shadow-sm shrink-0">
+                        <MessageSquare className="w-5 h-5 text-blue-400" />
+                      </div>
+                    </span>
                     <div>
-                      <h3 className="font-black text-white text-base sm:text-lg tracking-tight">실시간 SMS수신내역</h3>
+                      <h3 className="font-black text-white text-lg tracking-tight">실시간 SMS수신내역</h3>
                     </div>
                   </div>
                 <div className="flex items-center gap-2 sm:gap-4">
@@ -1675,9 +1677,11 @@ export default function DashboardPage({ onAiClick }) {
               {/* Header */}
               <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="bg-indigo-500/10 border border-indigo-500/20 p-2 rounded-xl shrink-0">
-                    <Sparkles className="w-4 h-4 text-indigo-300" />
-                  </div>
+                  <span className="data-ring-wrapper shrink-0">
+                    <div className="bg-indigo-500/20 border border-indigo-500/30 p-2.5 rounded-xl shrink-0">
+                      <Sparkles className="w-5 h-5 text-indigo-300" />
+                    </div>
+                  </span>
                   <div className="min-w-0">
                     <h3 className="font-black text-white text-base tracking-tight">
                       S-Autopilot Expert Advisor
@@ -1733,9 +1737,11 @@ export default function DashboardPage({ onAiClick }) {
               {/* Header */}
               <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded-xl shrink-0">
-                    <Activity className="w-4 h-4 text-purple-400" />
-                  </div>
+                  <span className="data-ring-wrapper shrink-0">
+                    <div className="bg-purple-500/20 border border-purple-500/30 p-2.5 rounded-xl shrink-0">
+                      <Activity className="w-5 h-5 text-purple-400" />
+                    </div>
+                  </span>
                   <div className="min-w-0">
                     <h3 className="font-black text-white text-base tracking-tight">처리 현황</h3>
                     <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Incident Handling Progress</span>
