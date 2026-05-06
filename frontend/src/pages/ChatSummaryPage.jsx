@@ -57,6 +57,7 @@ export default function ChatSummaryPage() {
   const [selectedLines, setSelectedLines] = useState([]);
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [incidentStatus, setIncidentStatus] = useState('');
+  const retryCountRef = useRef(0);
   
   const abortControllerRef = useRef(null);
   const [loadingStatus, setLoadingStatus] = useState('Dify AI 엔진에 분석을 요청하고 있습니다...');
@@ -82,17 +83,21 @@ export default function ChatSummaryPage() {
   };
 
   useEffect(() => {
-    const fetchSummary = async () => {
+    retryCountRef.current = 0;
+
+    const fetchSummary = async (isRetry = false) => {
       setIsLoading(true);
       setIsStreaming(true);
       setError(null);
-      setSummary('');
+      if (!isRetry) setSummary('');
       let currentController;
       try {
         currentController = new AbortController();
         abortControllerRef.current = currentController;
 
         const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
+
+        if (isRetry) setLoadingStatus(`재시도 중... (${retryCountRef.current}/2)`);
 
         const response = await fetch(getApiUrl('/ai/summarize-chat'), {
           method: 'POST',
@@ -106,12 +111,16 @@ export default function ChatSummaryPage() {
         });
 
         if (!response.ok || !response.body) {
-          throw new Error('Failed to fetch summary');
+          throw new Error(`HTTP ${response.status}: Dify 응답 실패`);
         }
+
+        // 성공하면 retry 카운터 리셋
+        retryCountRef.current = 0;
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let receivedAny = false;
 
         while (true) {
           const { value, done } = await reader.read();
@@ -134,12 +143,10 @@ export default function ChatSummaryPage() {
                   setLoadingStatus(data.status);
                 }
                 if (data.answer) {
+                  receivedAny = true;
                   setSummary(prev => {
                     const newText = prev + data.answer;
-                    // Auto-hide overall loader once we actually have some readable text!
-                    if (newText.length > 5 && isLoading) {
-                      setIsLoading(false);
-                    }
+                    if (newText.length > 5) setIsLoading(false);
                     return newText;
                   });
                 }
@@ -152,13 +159,31 @@ export default function ChatSummaryPage() {
             }
           }
         }
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error('Summary fetch error:', err);
-          setError('요약 생성 중 오류가 발생했습니다.');
+
+        // 스트림은 끝났지만 아무 데이터도 없었으면 재시도
+        if (!receivedAny && retryCountRef.current < 2) {
+          throw new Error('Empty response from Dify');
         }
+
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('Summary fetch error:', err);
+
+        // 자동 재시도 (최대 2회)
+        if (retryCountRef.current < 2) {
+          retryCountRef.current += 1;
+          console.log(`[ChatSummary] Retrying ${retryCountRef.current}/2 in 2s...`);
+          setLoadingStatus(`Dify 응답 실패 — ${retryCountRef.current}회 재시도 중...`);
+          await new Promise(res => setTimeout(res, 2000));
+          // 현재 controller가 여전히 유효하면 재시도
+          if (abortControllerRef.current === currentController) {
+            return fetchSummary(true);
+          }
+          return;
+        }
+
+        setError('요약 생성 중 오류가 발생했습니다. 재분석 버튼을 눌러 다시 시도해 주세요.');
       } finally {
-        // Prevent aborted fetches in Strict Mode from resetting the active stream state
         if (abortControllerRef.current === currentController) {
           setIsLoading(false);
           setIsStreaming(false);
@@ -654,7 +679,7 @@ export default function ChatSummaryPage() {
   };
 
   return (
-    <div className="min-h-0 max-h-full bg-[#0f1421] text-white font-sans flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col" style={{ height: '100dvh' }}>
 
       {/* ── 헤더 (고정) ── */}
       <header className="shrink-0 bg-[#0f1421]/95 backdrop-blur-md border-b border-white/5 z-50 print:hidden">
@@ -874,10 +899,57 @@ export default function ChatSummaryPage() {
               {error && (
                 <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl flex items-center space-x-6 animate-in slide-in-from-top-4">
                   <div className="p-4 bg-red-500/20 rounded-2xl"><CircleAlert className="w-8 h-8 text-red-500" /></div>
-                  <div>
+                  <div className="flex-1">
                     <h4 className="text-red-400 text-lg font-black uppercase tracking-tight mb-1">오류 발생</h4>
                     <p className="text-sm text-red-300/70 leading-relaxed">{error}</p>
-                    <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-500/30 transition-all">Retry Analysis</button>
+                    <button
+                      onClick={() => {
+                        retryCountRef.current = 0;
+                        setSummary(''); setError(null); setIsLoading(true); setIsStreaming(true);
+                        setLoadingStatus('Dify AI 엔진에 재분석을 요청하고 있습니다...');
+                        const controller = new AbortController();
+                        abortControllerRef.current = controller;
+                        (async () => {
+                          try {
+                            const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.`;
+                            const response = await fetch(getApiUrl('/ai/summarize-chat'), {
+                              method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ incident_id: incidentId, instructions: reportInstruction, prompt: reportInstruction }),
+                              signal: controller.signal
+                            });
+                            if (!response.ok || !response.body) throw new Error('재분석 요청 실패');
+                            const reader = response.body.getReader();
+                            const decoder = new TextDecoder();
+                            let buffer = '';
+                            while (true) {
+                              const { value, done } = await reader.read();
+                              if (done) break;
+                              buffer += decoder.decode(value, { stream: true });
+                              const events = buffer.split('\n\n');
+                              buffer = events.pop() || '';
+                              for (const evt of events) {
+                                for (const line of evt.split('\n')) {
+                                  if (!line.trim().startsWith('data:')) continue;
+                                  const dataStr = line.replace(/^data:\s*/, '').trim();
+                                  if (dataStr === '[DONE]') continue;
+                                  try {
+                                    const data = JSON.parse(dataStr);
+                                    if (data.status) setLoadingStatus(data.status);
+                                    if (data.answer) setSummary(prev => { const t = prev + data.answer; if (t.length > 5) setIsLoading(false); return t; });
+                                    if (data.error) setError(data.error);
+                                  } catch {}
+                                }
+                              }
+                            }
+                          } catch (err) {
+                            if (err.name !== 'AbortError') setError('재분석 중 오류가 발생했습니다.');
+                          } finally { setIsLoading(false); setIsStreaming(false); }
+                        })();
+                      }}
+                      className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-500/30 transition-all flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> 재분석
+                    </button>
                   </div>
                 </div>
               )}

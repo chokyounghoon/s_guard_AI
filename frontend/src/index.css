@@ -508,3 +508,19 @@
   background: radial-gradient(circle, rgba(52,211,153,0.35) 0%, transparent 70%);
 }
 .glowing-core-pending::before { display: none; }
+
+/* ── 처리 현황 플로우 스텝 — 소형 스피닝 링 ── */
+.data-ring-sm::before {
+  inset: -4px;
+  border-width: 1.5px;
+  border-top-color: rgba(234,179,8,0.85);
+  border-right-color: rgba(234,179,8,0.25);
+  border-radius: 10px;  /* 사각형 아이콘에 맞춤 */
+}
+.data-ring-sm::after {
+  inset: -7px;
+  border-width: 1px;
+  border-bottom-color: rgba(251,146,60,0.5);
+  border-left-color: rgba(251,146,60,0.15);
+  border-radius: 13px;
+}

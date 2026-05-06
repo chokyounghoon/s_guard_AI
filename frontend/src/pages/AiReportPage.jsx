@@ -13,35 +13,108 @@ import { getAuthHeaders } from '../lib/authStore';
 const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
 const mdComponents = {
-  h1: ({children}) => <h1 className="text-lg font-black text-white mt-3 mb-1.5 border-b border-white/10 pb-1">{children}</h1>,
-  h2: ({children}) => <h2 className="text-sm font-bold text-blue-300 mt-3 mb-1 uppercase tracking-wide">{children}</h2>,
-  h3: ({children}) => <h3 className="text-sm font-bold text-slate-200 mt-2 mb-0.5">{children}</h3>,
-  p:  ({children}) => <div className="text-[13px] text-slate-300 leading-normal mb-1 break-all overflow-wrap-anywhere">{children}</div>,
-  strong: ({children}) => <strong className="text-white font-bold">{children}</strong>,
-  em: ({children}) => <em className="text-slate-400 italic">{children}</em>,
-  blockquote: ({children}) => <blockquote className="border-l-2 border-blue-500/50 pl-3 my-2 text-slate-400 italic text-[12px]">{children}</blockquote>,
-  code: ({inline, children}) => inline
-    ? <code className="bg-slate-800 text-emerald-400 text-[11px] px-1.5 py-0.5 rounded font-mono">{children}</code>
-    : <pre className="bg-slate-900 border border-white/5 rounded-xl p-3 my-2 overflow-x-auto text-[11px] text-emerald-300 font-mono whitespace-pre-wrap">{children}</pre>,
-  ul: ({children}) => <ul className="list-outside ml-5 space-y-0.5 my-1 text-[13px] text-slate-300">{children}</ul>,
-  ol: ({children}) => <ol className="list-decimal list-outside ml-5 space-y-0.5 my-1 text-[13px] text-slate-300">{children}</ol>,
-  li: ({children}) => <li className="leading-normal mb-0.5 break-all overflow-wrap-anywhere">{children}</li>,
-  hr: () => <hr className="border-white/10 my-3" />,
-  table: ({children}) => <div className="overflow-x-auto my-3"><table className="w-full text-[12px] border-collapse">{children}</table></div>,
-  thead: ({children}) => <thead>{children}</thead>,
-  th: ({children}) => <th className="border border-white/10 bg-slate-800 px-3 py-1.5 text-left font-bold text-slate-200">{children}</th>,
-  td: ({children}) => <td className="border border-white/10 px-3 py-1.5 text-slate-300">{children}</td>,
-  tr: ({children}) => <tr className="even:bg-slate-900/30">{children}</tr>,
+  h1: ({ children }) => (
+    <div style={{ margin: '28px 0 12px', paddingBottom: 10, borderBottom: '1px solid rgba(59,130,246,0.2)' }}>
+      <h1 style={{ fontSize: 17, fontWeight: 900, color: '#f1f5f9', letterSpacing: '-0.01em', lineHeight: 1.3, margin: 0 }}>
+        {children}
+      </h1>
+    </div>
+  ),
+  h2: ({ children }) => (
+    <div style={{ margin: '22px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ width: 3, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#3b82f6,#6366f1)', flexShrink: 0 }} />
+      <h2 style={{ fontSize: 13, fontWeight: 800, color: '#93c5fd', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
+        {children}
+      </h2>
+    </div>
+  ),
+  h3: ({ children }) => (
+    <h3 style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', margin: '16px 0 6px', paddingLeft: 8, borderLeft: '2px solid rgba(99,102,241,0.5)' }}>
+      {children}
+    </h3>
+  ),
+  p: ({ children }) => (
+    <p style={{ fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word' }}>
+      {children}
+    </p>
+  ),
+  strong: ({ children }) => (
+    <strong style={{ color: '#f8fafc', fontWeight: 700, background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: 4 }}>
+      {children}
+    </strong>
+  ),
+  em: ({ children }) => (
+    <em style={{ color: '#94a3b8', fontStyle: 'italic' }}>{children}</em>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote style={{
+      margin: '12px 0', padding: '10px 14px',
+      background: 'rgba(59,130,246,0.06)', borderLeft: '3px solid #3b82f6',
+      borderRadius: '0 8px 8px 0', color: '#94a3b8', fontSize: 13,
+    }}>
+      {children}
+    </blockquote>
+  ),
+  code: ({ inline, children }) => inline
+    ? <code style={{ background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', fontSize: 11.5, padding: '2px 6px', borderRadius: 5, fontFamily: 'monospace', border: '1px solid rgba(16,185,129,0.2)' }}>{children}</code>
+    : (
+      <pre style={{ background: '#0a0e1a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '14px 16px', margin: '12px 0', overflowX: 'auto', fontSize: 11.5, color: '#6ee7b7', fontFamily: 'monospace', lineHeight: 1.7 }}>
+        <code>{children}</code>
+      </pre>
+    ),
+  ul: ({ children }) => (
+    <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol style={{ listStyleType: 'decimal', paddingLeft: 20, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {children}
+    </ol>
+  ),
+  li: ({ children }) => (
+    <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.7 }}>
+      <span style={{ marginTop: 6, width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, display: 'inline-block' }} />
+      <span style={{ flex: 1, wordBreak: 'break-word' }}>{children}</span>
+    </li>
+  ),
+  hr: () => (
+    <div style={{ margin: '20px 0', height: 1, background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)' }} />
+  ),
+  table: ({ children }) => (
+    <div style={{ overflowX: 'auto', margin: '16px 0', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead style={{ background: 'rgba(30,41,59,0.8)' }}>{children}</thead>,
+  th: ({ children }) => (
+    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#93c5fd', fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td style={{ padding: '9px 14px', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.04)', verticalAlign: 'top' }}>
+      {children}
+    </td>
+  ),
+  tr: ({ children }) => (
+    <tr style={{ transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background=''}>
+      {children}
+    </tr>
+  ),
 };
 
 function MarkdownBlock({ text }) {
-  if (!text) return <span className="text-slate-500">-</span>;
+  if (!text) return <span style={{ color: '#475569' }}>-</span>;
+  // 별표 아티팩트 정리
+  const clean = text.replace(/\*{3,}/g, '').replace(/^\*\s*/gm, '');
   return (
-    <div className="text-[13px] break-words whitespace-pre-wrap leading-normal overflow-wrap-anywhere">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{text}</ReactMarkdown>
+    <div style={{ fontSize: 13.5, lineHeight: 1.8, wordBreak: 'break-word' }}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{clean}</ReactMarkdown>
     </div>
   );
 }
+
 
 const severityColors = {
   CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/40',
@@ -74,6 +147,7 @@ export default function AiReportPage() {
   const [modalStep, setModalStep] = useState(null);
   const [selectedLines, setSelectedLines] = useState([]);
   const [activeTab, setActiveTab] = useState('summary');
+  const [showShareTooltip, setShowShareTooltip] = useState(false);
   // Dify AI report generation
   const [aiGenText, setAiGenText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -240,59 +314,160 @@ export default function AiReportPage() {
 
   return (
     <div className="h-screen bg-[#0a0d14] text-white font-sans flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2 sticky top-0 bg-[#0a0d14]/90 backdrop-blur-lg z-50 border-b border-white/5">
-        <div className="max-w-5xl mx-auto w-full flex items-center justify-between">
-          <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+      {/* Header — 2줄 풀-width */}
+      <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5">
+        {/* Row 1: 네비게이션 + 타이틀 */}
+        <div className="max-w-5xl mx-auto w-full flex items-center gap-2 px-3 py-2">
+          <button onClick={() => goBack()} className="shrink-0 p-2 rounded-full hover:bg-white/5 transition-colors">
             <ArrowLeft className="w-5 h-5 text-slate-400" />
           </button>
-          <div className="flex flex-col items-center flex-1 mx-3">
+
+          {/* 중앙 타이틀 영역: severity+ID 한 줄, 제목 별도 줄로 wrap */}
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
             {report ? (
               <>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter ${sevClass}`}>
+                {/* Severity + ID */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter ${sevClass}`}>
                     {sev}
                   </span>
-                  <span className="text-[11px] text-slate-500 font-mono">{incidentId?.slice(-10)}</span>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    INC-{incidentId}
+                  </span>
+                  {report.similarity_score != null && (
+                    <span className="flex items-center gap-1 text-[10px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg">
+                      <Zap className="w-2.5 h-2.5 fill-blue-400/30" />
+                      {Math.round(report.similarity_score * 100)}%
+                    </span>
+                  )}
                 </div>
-                <h1 className="font-bold text-sm text-slate-200 text-center px-4 leading-snug">
-                  {report.title}
+                {/* 제목: 풀텍스트, 줄바꿈 허용 */}
+                <h1 className="font-bold text-sm text-slate-100 leading-snug break-words whitespace-normal">
+                  {(report.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '')}
                 </h1>
               </>
             ) : (
               <span className="text-sm text-slate-400">장애 보고서</span>
             )}
           </div>
-          <button className="p-2 rounded-full hover:bg-white/5 transition-colors">
-            <Share2 className="w-5 h-5 text-slate-400" />
-          </button>
+
+          {/* 공유 버튼 + 툴팁 */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => {
+                setShowShareTooltip(true);
+                setTimeout(() => setShowShareTooltip(false), 2500);
+              }}
+              className="p-2 rounded-full hover:bg-white/5 transition-colors"
+            >
+              <Share2 className="w-5 h-5 text-slate-400" />
+            </button>
+            {showShareTooltip && (
+              <div style={{
+                position: 'absolute', top: '110%', right: 0,
+                background: 'rgba(15,18,32,0.97)', backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 12, padding: '10px 14px', minWidth: 180,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 200,
+              }}>
+                <p style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>공유 옵션</p>
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowShareTooltip(false); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                    padding: '7px 8px', borderRadius: 8, border: 'none',
+                    background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', marginBottom: 4,
+                  }}
+                >
+                  🔗 링크 복사
+                </button>
+                <button
+                  onClick={() => { window.print(); setShowShareTooltip(false); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                    padding: '7px 8px', borderRadius: 8, border: 'none',
+                    background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  🖨️ 인쇄 / PDF 저장
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Row 2: 메타데이터 풀-width */}
+        {report && (
+          <div className="max-w-5xl mx-auto w-full flex items-stretch divide-x divide-white/5 bg-[#0d1220] border-t border-white/5">
+            {/* 담당자: ID + 이름 + 조직 */}
+            {report.who && (
+              <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
+                <Users className="w-3 h-3 text-blue-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">담당자</p>
+                  <p className="text-[11px] text-slate-300 font-semibold leading-none">
+                    {report.who}
+                    {(report.who_name || report.creator_name) && (
+                      <span className="text-slate-400 font-normal"> ({report.who_name || report.creator_name})</span>
+                    )}
+                  </p>
+                  {report.who_org && (
+                    <p className="text-[10px] text-slate-500 font-normal leading-none mt-0.5 truncate">{report.who_org}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* 발생 일시 */}
+            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
+              <Clock className="w-3 h-3 text-purple-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">발생일시</p>
+                <p className="text-[11px] text-slate-300 font-semibold truncate leading-none">{report.created_at?.slice(0, 16) || '-'}</p>
+              </div>
+            </div>
+            {/* 대상 시스템 */}
+            {report.where && (
+              <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
+                <Server className="w-3 h-3 text-teal-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">대상시스템</p>
+                  <p className="text-[11px] text-slate-300 font-semibold truncate leading-none">{report.where}</p>
+                </div>
+              </div>
+            )}
+            {/* 채팅 건수 */}
+            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
+              <MessageSquare className="w-3 h-3 text-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">채팅</p>
+                <p className="text-[11px] text-slate-300 font-semibold leading-none">{report.message_count ?? '-'}건</p>
+              </div>
+            </div>
+            {/* 첨부파일 */}
+            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
+              <Paperclip className="w-3 h-3 text-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">첨부</p>
+                <p className="text-[11px] text-slate-300 font-semibold leading-none">{report.attachment_count ?? '-'}건</p>
+              </div>
+            </div>
+            {/* 소요시간 */}
+            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
+              <Activity className="w-3 h-3 text-red-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">소요시간</p>
+                <p className="text-[11px] text-slate-300 font-semibold leading-none">{report.duration_min ?? '-'}분</p>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* Stats Bar */}
-      {report && (
-        <div className="flex items-center justify-around px-4 py-2 bg-[#0f1421] border-b border-white/5 text-xs text-slate-400">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-blue-400" />
-            <span>{report.created_at?.slice(0, 16) || '-'}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-            <span>채팅 {report.message_count}건</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Paperclip className="w-3.5 h-3.5 text-purple-400" />
-            <span>첨부 {report.attachment_count}건</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Activity className="w-3.5 h-3.5 text-amber-400" />
-            <span>{report.duration_min}분 소요</span>
-          </div>
-        </div>
-      )}
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto border-b border-white/5 bg-[#0a0d14] sticky top-[49px] z-40 justify-center">
+      <div className="flex overflow-x-auto border-b border-white/5 bg-[#0a0d14] justify-center shrink-0">
         <div className="flex max-w-5xl w-full">
           {tabs.map(t => (
             <button
@@ -311,7 +486,7 @@ export default function AiReportPage() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-36 overflow-y-auto custom-scrollbar">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-8 overflow-y-auto custom-scrollbar">
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
             <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
@@ -487,47 +662,65 @@ export default function AiReportPage() {
 
             {/* ── AI 종합보고서 ── */}
             {activeTab === 'ai_report' && (
-              <div className="space-y-3 animate-in fade-in duration-300 overflow-visible">
+              <div className="space-y-4 animate-in fade-in duration-300">
                 {!aiGenText && !isGenerating && (
                   <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
-                    <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center animate-pulse">
-                      <Sparkles className="w-6 h-6 text-blue-400" />
+                    <div style={{ width: 56, height: 56, borderRadius: 18, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Sparkles style={{ width: 26, height: 26, color: '#60a5fa' }} />
                     </div>
                     <p className="text-sm font-medium">데이터 분석을 바탕으로 종합 보고서를 생성합니다...</p>
                   </div>
                 )}
                 {isGenerating && !aiGenText && (
                   <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-400">
-                    <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                    <p className="text-sm">Dify AI가 분석 및 보고서 작성 중...</p>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.2)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' }} />
+                    <p className="text-sm">Dify AI 전문가 분석 진행 중...</p>
                   </div>
                 )}
                 {aiGenText && (
-                  <section className="bg-[#0f1421]/60 rounded-2xl border border-blue-500/10 overflow-visible shadow-2xl shadow-blue-500/5">
-                    <div className="px-4 py-2.5 flex items-center justify-between border-b border-white/5 bg-blue-500/5">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-blue-400" />
-                        <span className="text-xs font-bold text-blue-400">AI 종합 장애 보고서 (Dify 전문가 분석)</span>
+                  <section style={{ background: 'linear-gradient(180deg, rgba(13,18,36,0.9) 0%, rgba(10,13,20,0.95) 100%)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(59,130,246,0.05)' }}>
+                    {/* 헤더 */}
+                    <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(59,130,246,0.1)', background: 'rgba(59,130,246,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Sparkles style={{ width: 15, height: 15, color: '#60a5fa' }} />
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 800, color: '#93c5fd', margin: 0 }}>AI 종합 장애 보고서</p>
+                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Dify 전문가 멀티에이전트 분석 결과</p>
+                        </div>
                         {isGenerating && (
-                          <div className="flex items-center gap-1.5 ml-3 px-2 py-0.5 bg-blue-500/20 rounded-full border border-blue-500/30">
-                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-ping" />
-                            <span className="text-[10px] text-blue-300 font-medium">분석 진행 중...</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8, padding: '3px 10px', background: 'rgba(59,130,246,0.15)', borderRadius: 20, border: '1px solid rgba(59,130,246,0.25)' }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', animation: 'ping 1s ease-in-out infinite' }} />
+                            <span style={{ fontSize: 10, color: '#93c5fd', fontWeight: 600 }}>분석 중...</span>
                           </div>
                         )}
                       </div>
                       <button
                         onClick={generateAiReport}
                         disabled={isGenerating}
-                        className="text-[10px] text-slate-500 hover:text-blue-400 flex items-center gap-1 transition-colors disabled:opacity-30"
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#64748b', fontSize: 11, fontWeight: 600, cursor: isGenerating ? 'not-allowed' : 'pointer', opacity: isGenerating ? 0.4 : 1, transition: 'all 0.2s' }}
                       >
-                        <RefreshCw className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} />
+                        <RefreshCw style={{ width: 11, height: 11, animation: isGenerating ? 'spin 1s linear infinite' : 'none' }} />
                         재생성
                       </button>
                     </div>
-                    <div className="p-5 md:p-6 overflow-visible min-h-[400px]">
+
+                    {/* 본문 */}
+                    <div style={{ padding: '24px 28px', minHeight: 400 }}>
                       <MarkdownBlock text={aiGenText} />
-                      {isGenerating && <span className="inline-block w-1.5 h-4 bg-blue-400 animate-pulse align-middle ml-2" />}
+                      {isGenerating && (
+                        <span style={{ display: 'inline-block', width: 2, height: 18, background: '#3b82f6', animation: 'pulse 1s ease-in-out infinite', marginLeft: 4, verticalAlign: 'middle', borderRadius: 1 }} />
+                      )}
                     </div>
+
+                    {/* 푸터 */}
+                    {!isGenerating && (
+                      <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>S-Guard AI · Dify 전문가 분석</span>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>{new Date().toLocaleString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    )}
                   </section>
                 )}
               </div>
@@ -610,24 +803,7 @@ export default function AiReportPage() {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="shrink-0 p-4 bg-gradient-to-t from-[#0a0d14] to-transparent pt-8 flex gap-3 z-50">
-        <button
-          onClick={() => navigate(`/chat/${incidentId}`)}
-          className="flex-1 h-13 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center gap-2 transition-all border border-white/5 py-3"
-        >
-          <MessageSquare className="w-4 h-4 text-slate-300" />
-          <span className="font-bold text-slate-300 text-sm">War-Room 바로가기</span>
-        </button>
-        <button
-          onClick={() => report && setModalStep('preview')}
-          disabled={!report}
-          className="flex-[1.2] h-13 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/20 text-white disabled:opacity-40 py-3"
-        >
-          <Send className="w-4 h-4" />
-          <span className="font-bold text-sm">보고서 전송 및 지식DB 저장</span>
-        </button>
-      </footer>
+
     </div>
   );
 }

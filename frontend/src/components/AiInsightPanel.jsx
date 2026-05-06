@@ -181,7 +181,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               data.content.includes('인증 오류') ||
               data.content.includes('엔드포인트 오류') ||
               data.content.includes('대기 시간 초과') ||
-              data.content.includes('Dify API 오류')
+              data.content.includes('Dify API 오류') ||
+              data.content.includes('분석 품질 향상을 위해 대기 시간') ||
+              data.content.includes('AI 엔진 인증 오류') ||
+              data.content.includes('AI 엔진 엔드포인트 오류') ||
+              data.content.startsWith('🤖') ||
+              data.content.startsWith('⚠️ 분석 대기')
             );
 
             if (data.content && !isErrorMessage) {
@@ -215,6 +220,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                  }));
                }
                return; // Exit if cache found
+            }
+            // 에러 캐시인 경우 — 실시간 재분석으로 fallthrough (onLogReceived 호출 안 함)
+            if (isErrorMessage) {
+              console.log('[AiInsightPanel] Stale error cache detected — forcing live re-analysis');
             }
           }
         } catch (e) {

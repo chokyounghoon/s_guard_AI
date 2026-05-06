@@ -880,7 +880,7 @@ export default function DashboardPage({ onAiClick }) {
 
       // ── 패턴 1: `- **Security Agent**: 내용` 또는 `• Security Agent: 내용`
       const bulletMatch = trimmed.match(
-        /^[-•\*·\d\.]\\s*\*{0,2}(Security|DB|DevOps|Leader)\s*Agent\*{0,2}\s*[:：]\s*(.+)/i
+        /^[-•*·\d.]\s*\*{0,4}(Security|DB|DevOps|Leader)\s*Agent\*{0,4}\s*[:：]\s*(.+)/i
       );
       if (bulletMatch) {
         const agentName = detectAgentName(bulletMatch[1]);

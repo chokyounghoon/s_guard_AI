@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, Search, Calendar, User, Briefcase, 
-  Filter, FileText, ChevronRight, Activity, X, ChevronDown
+import {
+  ArrowLeft, Search, Calendar, User, Briefcase,
+  Filter, FileText, ChevronRight, Activity, X,
+  ChevronDown, AlertTriangle, CheckCircle2, Clock,
+  ShieldAlert, Zap
 } from 'lucide-react';
 import { getAuthHeaders } from '../../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
-// 조직 트리를 평탄화해서 목록으로 만들기
 function flattenTree(nodes, depth = 0, result = []) {
   for (const node of nodes) {
     result.push({ ...node, depth });
@@ -17,7 +18,7 @@ function flattenTree(nodes, depth = 0, result = []) {
   return result;
 }
 
-// 조직 선택 팝업
+/* ── Org Picker ──────────────────────────────────────────────── */
 function OrgPickerModal({ onSelect, onClose }) {
   const [orgs, setOrgs] = useState([]);
   const [q, setQ] = useState('');
@@ -31,351 +32,403 @@ function OrgPickerModal({ onSelect, onClose }) {
       .finally(() => setLoadingOrgs(false));
   }, []);
 
-  const filtered = q
-    ? orgs.filter(o => o.name?.includes(q))
-    : orgs;
+  const filtered = q ? orgs.filter(o => o.name?.includes(q)) : orgs;
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: 'rgba(0,0,0,0.75)' }}>
-      {/* 바텀 시트 */}
-      <div className="mt-auto bg-[#0f1219] rounded-t-3xl border-t border-white/10 flex flex-col max-h-[70vh]">
-        {/* 핸들 */}
+    <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}>
+      <div className="mt-auto rounded-t-3xl border-t border-white/10 flex flex-col max-h-[72vh]"
+        style={{ background: 'linear-gradient(180deg, #0d1117 0%, #080c14 100%)' }}>
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-white/20 rounded-full" />
         </div>
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-4 pb-3 pt-1 border-b border-white/10">
-          <p className="text-sm font-black text-white">조직 선택</p>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/10">
+        <div className="flex items-center justify-between px-4 pb-3 pt-1 border-b border-white/8">
+          <p className="text-sm font-black text-white tracking-tight">조직 선택</p>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
             <X className="w-4 h-4 text-slate-400" />
           </button>
         </div>
-        {/* 검색 */}
         <div className="px-4 py-2.5 border-b border-white/5">
-          <div className="flex items-center bg-black/50 border border-white/10 rounded-lg px-3">
-            <Search className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
+          <div className="flex items-center bg-black/50 border border-white/10 rounded-xl px-3 focus-within:border-emerald-500/40 transition-colors">
+            <Search className="w-3.5 h-3.5 text-emerald-400/60 mr-2 shrink-0" />
             <input
-              autoFocus
-              type="text"
-              placeholder="조직명 검색..."
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              className="w-full bg-transparent py-2 text-xs text-white placeholder-slate-600 focus:outline-none"
+              autoFocus type="text" placeholder="조직명 검색..."
+              value={q} onChange={e => setQ(e.target.value)}
+              className="w-full bg-transparent py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none"
             />
           </div>
         </div>
-        {/* 목록 */}
         <div className="overflow-y-auto flex-1 px-2 py-2">
           {loadingOrgs ? (
-            <div className="py-8 flex justify-center">
+            <div className="py-10 flex justify-center">
               <div className="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-center text-xs text-slate-500 py-8">검색 결과 없음</p>
-          ) : (
-            filtered.map(org => (
-              <button
-                key={org.id || org.code}
-                onClick={() => { onSelect(org.name, org.code); onClose(); }}
-                className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors"
-              >
-                <span className="text-slate-600 text-[10px] w-4 shrink-0">
-                  {'└'.repeat(org.depth)}
-                </span>
-                <span className={`text-xs font-bold ${org.depth === 0 ? 'text-emerald-400' : org.depth === 1 ? 'text-sky-400' : org.depth === 2 ? 'text-violet-400' : 'text-slate-300'}`}>
-                  {org.name}
-                </span>
-                {org.code && (
-                  <span className="ml-auto text-[9px] text-slate-600 font-mono shrink-0">{org.code}</span>
-                )}
-              </button>
-            ))
-          )}
+            <p className="text-center text-xs text-slate-500 py-10">검색 결과 없음</p>
+          ) : filtered.map(org => (
+            <button
+              key={org.id || org.code}
+              onClick={() => { onSelect(org.name, org.code); onClose(); }}
+              className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors"
+            >
+              <span className="text-slate-700 text-[10px] w-4 shrink-0">{'└'.repeat(org.depth)}</span>
+              <span className={`text-xs font-bold ${
+                org.depth === 0 ? 'text-emerald-400' :
+                org.depth === 1 ? 'text-sky-400' :
+                org.depth === 2 ? 'text-violet-400' : 'text-slate-300'
+              }`}>{org.name}</span>
+              {org.code && <span className="ml-auto text-[9px] text-slate-600 font-mono shrink-0">{org.code}</span>}
+            </button>
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
+/* ── Status Badge ─────────────────────────────────────────────── */
+function StatusBadge({ status }) {
+  const isComplete = status === 'Completed' || status === '처리완료';
+  const isProgress = status === '처리중' || status === 'In Progress';
+  return (
+    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border tracking-wide ${
+      isComplete ? 'bg-emerald-500/12 text-emerald-400 border-emerald-500/25' :
+      isProgress ? 'bg-blue-500/12 text-blue-400 border-blue-500/25' :
+                   'bg-amber-500/12 text-amber-400 border-amber-500/25'
+    }`}>
+      {status || '완료'}
+    </span>
+  );
+}
+
+/* ── Report Card (grid item) ──────────────────────────────────── */
+function ReportCard({ report, onClick }) {
+  const isComplete = report.status === 'Completed' || report.status === '처리완료';
+  const accent = isComplete ? '#10b981' : '#3b82f6';
+  const date = report.created_at
+    ? new Date(report.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
+    : '';
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
+        transition: 'all 0.2s',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+        display: 'flex', flexDirection: 'column',
+      }}
+      onTouchStart={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+      onTouchEnd={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
+    >
+      {/* accent top bar */}
+      <div style={{ height: 2, background: `linear-gradient(90deg, transparent, ${accent}80, transparent)`, flexShrink: 0 }} />
+
+      <div style={{ padding: '12px 12px 10px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* status + date */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+          <StatusBadge status={report.status} />
+          {date && (
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>{date}</span>
+          )}
+        </div>
+
+        {/* title */}
+        <h3 style={{
+          fontSize: 12, fontWeight: 800, color: '#fff',
+          lineHeight: 1.45, flex: 1,
+          display: '-webkit-box', WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {report.title}
+        </h3>
+
+        {/* inc_id */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>
+            {report.code || report.inc_id}
+          </span>
+          <ChevronRight size={12} color={`${accent}80`} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Skeleton ─────────────────────────────────────────────────── */
+function SkeletonCard() {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.025)',
+      border: '1px solid rgba(255,255,255,0.05)',
+      borderRadius: 16, overflow: 'hidden', height: 130,
+    }}>
+      <div style={{ height: 2, background: 'rgba(255,255,255,0.05)' }} />
+      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ width: '50%', height: 14, background: 'rgba(255,255,255,0.06)', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div style={{ width: '100%', height: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite 0.1s' }} />
+        <div style={{ width: '80%', height: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite 0.2s' }} />
+        <div style={{ width: '35%', height: 8, background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginTop: 4, animation: 'pulse 1.5s ease-in-out infinite 0.3s' }} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Main ─────────────────────────────────────────────────────── */
 export default function MobileReportSearch() {
   const navigate = useNavigate();
-  
-  const getTodayStr = () => {
-    const d = new Date();
-    return d.toISOString().split('T')[0];
-  };
 
-  const getOneYearAgoStr = () => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 1);
-    return d.toISOString().split('T')[0];
-  };
+  const today        = () => new Date().toISOString().split('T')[0];
+  const oneYearAgo   = () => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().split('T')[0]; };
 
-  const [keyword, setKeyword] = useState('');
-  const [startDate, setStartDate] = useState(getOneYearAgoStr());
-  const [endDate, setEndDate] = useState(getTodayStr());
-  const [orgName, setOrgName] = useState('');   // 표시용 이름
-  const [orgCode, setOrgCode] = useState('');   // 실제 검색용 코드
-  const [assignee, setAssignee] = useState('');
-  const [showOrgPicker, setShowOrgPicker] = useState(false);
+  const [keyword,   setKeyword]   = useState('');
+  const [startDate, setStartDate] = useState(oneYearAgo());
+  const [endDate,   setEndDate]   = useState(today());
+  const [orgName,   setOrgName]   = useState('');
+  const [orgCode,   setOrgCode]   = useState('');
+  const [assignee,  setAssignee]  = useState('');
+  const [showOrg,   setShowOrg]   = useState(false);
 
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [reports,  setReports]  = useState([]);
+  const [loading,  setLoading]  = useState(false);
   const [searched, setSearched] = useState(false);
 
   const handleSearch = useCallback(async () => {
-    setLoading(true);
-    setSearched(true);
+    setLoading(true); setSearched(true);
     try {
-      const params = new URLSearchParams();
-      // keyword는 inc_id(번호) 또는 제목/설명으로 검색
-      if (keyword.trim()) params.append('keyword', keyword.trim());
-      if (keyword.trim() && /^\d+$/.test(keyword.trim())) params.append('inc_id', keyword.trim());
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-      if (orgCode) params.append('orgCode', orgCode);
-      if (orgName.trim() && !orgCode) params.append('orgName', orgName.trim());
-      if (assignee.trim()) params.append('assignee', assignee.trim());
-      params.append('limit', '50');
+      const p = new URLSearchParams();
+      if (keyword.trim()) p.append('keyword', keyword.trim());
+      if (keyword.trim() && /^\d+$/.test(keyword.trim())) p.append('inc_id', keyword.trim());
+      if (startDate) p.append('startDate', startDate);
+      if (endDate)   p.append('endDate', endDate);
+      if (orgCode)   p.append('orgCode', orgCode);
+      if (orgName.trim() && !orgCode) p.append('orgName', orgName.trim());
+      if (assignee.trim()) p.append('assignee', assignee.trim());
+      p.append('limit', '50');
 
-      const res = await fetch(`${API_BASE}/incidents?${params.toString()}`, {
-        headers: getAuthHeaders()
-      });
+      const res  = await fetch(`${API_BASE}/incidents?${p.toString()}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      // /incidents 는 {incidents:[]} 또는 [] 형태 모두 처리
-      const list = Array.isArray(data) ? data : (data.incidents || []);
-      setReports(list);
+      setReports(Array.isArray(data) ? data : (data.incidents || []));
     } catch (err) {
-      console.error('[MobileReportSearch] search error:', err);
+      console.error('[MobileReportSearch]', err);
     } finally {
       setLoading(false);
     }
-  }, [keyword, startDate, endDate, orgCode, assignee]);
+  }, [keyword, startDate, endDate, orgCode, orgName, assignee]);
 
-  // 초기 로드 (전체 조회)
   useEffect(() => { handleSearch(); }, []); // eslint-disable-line
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') handleSearch();
-  };
 
   const clearOrg = () => { setOrgName(''); setOrgCode(''); };
 
   return (
-    <div className="min-h-screen bg-[#06080c] text-slate-200 pb-24 font-sans">
-      {/* 헤더 */}
-      <header className="sticky top-0 z-50 bg-[#0f1219]/90 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-white/10">
-          <ArrowLeft className="w-5 h-5 text-slate-300" />
-        </button>
-        <div>
-          <h1 className="text-base font-black text-white tracking-tight flex items-center gap-2">
-            <FileText className="w-4 h-4 text-emerald-400" />
-            AI Report Search
-          </h1>
-          <p className="text-[10px] text-emerald-500 font-bold tracking-widest uppercase">
-            장애 보고서 통합 검색
-          </p>
-        </div>
-      </header>
+    <div style={{
+      height: '100dvh',
+      display: 'flex', flexDirection: 'column',
+      background: 'radial-gradient(ellipse 130% 80% at 50% 0%, #0d1528 0%, #080e1a 50%, #050a15 100%)',
+      color: '#fff',
+      fontFamily: "'Inter', 'Noto Sans KR', sans-serif",
+      overflow: 'hidden',
+    }}>
 
-      <main className="p-4 space-y-3">
-
-        {/* ── 검색 폼 카드 ── */}
-        <div className="relative p-[1px] rounded-xl overflow-hidden shadow-lg">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-transparent to-teal-500/10" />
-          <div className="relative bg-[#0b0e14]/95 backdrop-blur-xl p-3 rounded-xl border border-white/5 flex flex-col gap-2">
-
-            {/* 키워드 */}
-            <div className="flex items-center bg-black/50 border border-white/10 rounded-lg overflow-hidden focus-within:border-emerald-500/40 transition-colors">
-              <div className="pl-3 pr-2 py-[9px]">
-                <Search className="w-3.5 h-3.5 text-emerald-400/60" />
-              </div>
-              <input
-                type="text"
-                placeholder="제목·ID 키워드 검색"
-                value={keyword}
-                onChange={e => setKeyword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-full bg-transparent py-[9px] pr-3 text-xs text-white placeholder-slate-600 focus:outline-none"
-              />
-              {keyword && (
-                <button onClick={() => setKeyword('')} className="pr-2.5">
-                  <X className="w-3.5 h-3.5 text-slate-500" />
-                </button>
-              )}
-            </div>
-
-            {/* 조직 + 작성자 (한 줄) */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* 조직 */}
-              <div className="flex items-center bg-black/50 border border-white/10 rounded-lg overflow-hidden focus-within:border-emerald-500/40 transition-colors">
-                <div className="pl-2.5 pr-1.5 py-[9px]">
-                  <Briefcase className="w-3.5 h-3.5 text-slate-500" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="조직명"
-                  value={orgName}
-                  onChange={e => { setOrgName(e.target.value); setOrgCode(''); }}
-                  onKeyDown={handleKeyDown}
-                  className="w-full bg-transparent py-[9px] text-xs text-white placeholder-slate-600 focus:outline-none"
-                />
-                {orgName ? (
-                  <button onClick={clearOrg} className="pr-2 text-slate-500 hover:text-red-400 transition-colors shrink-0">
-                    <X className="w-3 h-3" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowOrgPicker(true)}
-                    className="pr-2.5 pl-1.5 py-2 border-l border-white/10 text-emerald-500 hover:text-emerald-400 shrink-0 transition-colors"
-                  >
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-              {/* 작성자 */}
-              <div className="flex items-center bg-black/50 border border-white/10 rounded-lg overflow-hidden focus-within:border-emerald-500/40 transition-colors">
-                <div className="pl-2.5 pr-1.5 py-[9px]">
-                  <User className="w-3.5 h-3.5 text-slate-500" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="작성자/사번"
-                  value={assignee}
-                  onChange={e => setAssignee(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="w-full bg-transparent py-[9px] pr-2 text-xs text-white placeholder-slate-600 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* 날짜 From → To (한 줄) */}
-            <div className="flex items-center gap-2 bg-black/50 border border-white/10 rounded-lg px-3 py-[9px]">
-              <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="flex-1 bg-transparent text-[11px] text-white focus:outline-none min-w-0"
-                style={{ colorScheme: 'dark' }}
-              />
-              <span className="text-slate-600 text-xs shrink-0">→</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="flex-1 bg-transparent text-[11px] text-white focus:outline-none min-w-0"
-                style={{ colorScheme: 'dark' }}
-              />
-              {(startDate || endDate) && (
-                <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-slate-500 hover:text-red-400 ml-1 shrink-0">
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            {/* 검색 버튼 */}
-            <button
-              onClick={handleSearch}
-              disabled={loading}
-              className="w-full relative overflow-hidden rounded-lg active:scale-95 transition-all"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-500" />
-              <div className="relative flex items-center justify-center gap-1.5 py-2.5 text-white font-bold text-[13px]">
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Filter className="w-3.5 h-3.5" />
-                    조회하기
-                  </>
-                )}
-              </div>
-            </button>
-
+      {/* ── Sticky Header ─────────────────────────────────────── */}
+      <div style={{
+        flexShrink: 0,
+        paddingTop: 'env(safe-area-inset-top)',
+        background: 'rgba(8,14,26,0.92)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        zIndex: 50,
+      }}>
+        {/* Title bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 10px' }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            }}
+          >
+            <ArrowLeft size={15} color="#94a3b8" />
+          </button>
+          <div>
+            <h1 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-0.01em', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <FileText size={14} color="#10b981" />
+              AI Report Search
+            </h1>
+            <p style={{ fontSize: 9, color: '#10b981', fontWeight: 700, letterSpacing: '0.12em', margin: 0, textTransform: 'uppercase' }}>
+              장애 보고서 통합 검색
+            </p>
           </div>
         </div>
 
-        {/* 결과 수 */}
-        {searched && !loading && (
-          <div className="flex items-center justify-between px-0.5">
-            <span className="text-xs font-bold text-slate-400">
-              검색 결과 <strong className="text-emerald-400">{reports.length}</strong>건
-            </span>
-            <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-1 rounded-full">최신순</span>
-          </div>
-        )}
+        {/* Search form */}
+        <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
 
-        {/* 결과 리스트 */}
-        <div className="space-y-2.5">
+          {/* Keyword */}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12, overflow: 'hidden',
+          }}>
+            <div style={{ padding: '0 10px 0 12px' }}><Search size={13} color="rgba(16,185,129,0.6)" /></div>
+            <input
+              type="text" placeholder="제목 · ID 키워드 검색"
+              value={keyword} onChange={e => setKeyword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '9px 0', fontSize: 12, color: '#fff', fontFamily: 'inherit' }}
+            />
+            {keyword && (
+              <button onClick={() => setKeyword('')} style={{ padding: '0 10px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                <X size={12} color="#64748b" />
+              </button>
+            )}
+          </div>
+
+          {/* Org + Assignee 2-col */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+            {/* Org */}
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 12, overflow: 'hidden',
+            }}>
+              <div style={{ padding: '0 8px 0 10px' }}><Briefcase size={12} color="#64748b" /></div>
+              <input
+                type="text" placeholder="조직명"
+                value={orgName} onChange={e => { setOrgName(e.target.value); setOrgCode(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '9px 0', fontSize: 11, color: '#fff', fontFamily: 'inherit', minWidth: 0 }}
+              />
+              {orgName ? (
+                <button onClick={clearOrg} style={{ padding: '0 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                  <X size={11} color="#64748b" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowOrg(true)}
+                  style={{ padding: '0 8px', background: 'transparent', borderLeft: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '100%' }}
+                >
+                  <ChevronDown size={13} color="#10b981" />
+                </button>
+              )}
+            </div>
+            {/* Assignee */}
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 12, overflow: 'hidden',
+            }}>
+              <div style={{ padding: '0 8px 0 10px' }}><User size={12} color="#64748b" /></div>
+              <input
+                type="text" placeholder="작성자/사번"
+                value={assignee} onChange={e => setAssignee(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '9px 4px 9px 0', fontSize: 11, color: '#fff', fontFamily: 'inherit', minWidth: 0 }}
+              />
+            </div>
+          </div>
+
+          {/* Date range */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12, padding: '0 10px', height: 38,
+          }}>
+            <Calendar size={12} color="#64748b" style={{ flexShrink: 0 }} />
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 11, color: '#fff', minWidth: 0, colorScheme: 'dark', fontFamily: 'inherit' }} />
+            <span style={{ fontSize: 10, color: '#334155', flexShrink: 0 }}>→</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 11, color: '#fff', minWidth: 0, colorScheme: 'dark', fontFamily: 'inherit' }} />
+            {(startDate || endDate) && (
+              <button onClick={() => { setStartDate(''); setEndDate(''); }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0, padding: 0 }}>
+                <X size={11} color="#64748b" />
+              </button>
+            )}
+          </div>
+
+          {/* Search button */}
+          <button
+            onClick={handleSearch} disabled={loading}
+            style={{
+              width: '100%', padding: '10px', borderRadius: 12, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+              background: loading ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #059669, #0d9488)',
+              color: loading ? 'rgba(255,255,255,0.3)' : '#fff',
+              fontSize: 13, fontWeight: 800, letterSpacing: '0.02em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              boxShadow: loading ? 'none' : '0 4px 16px rgba(5,150,105,0.3)',
+              transition: 'all 0.2s',
+            }}
+          >
+            {loading
+              ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> 조회 중...</>
+              : <><Filter size={13} /> 조회하기</>
+            }
+          </button>
+        </div>
+      </div>
+
+      {/* ── Scrollable Results ─────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ padding: '12px 12px calc(80px + env(safe-area-inset-bottom))' }}>
+
+          {/* result count */}
+          {searched && !loading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                검색 결과 <strong style={{ color: '#10b981' }}>{reports.length}</strong>건
+              </span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.04)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.07)' }}>
+                최신순
+              </span>
+            </div>
+          )}
+
+          {/* 2-grid results */}
           {loading ? (
-            [1,2,3].map(i => (
-              <div key={i} className="bg-[#11141d] p-4 rounded-xl border border-white/5 h-24 animate-pulse flex flex-col justify-between">
-                <div className="w-2/3 h-3.5 bg-white/10 rounded" />
-                <div className="w-full h-2.5 bg-white/5 rounded" />
-                <div className="w-1/3 h-2.5 bg-white/5 rounded" />
-              </div>
-            ))
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[1,2,3,4,5,6].map(i => <SkeletonCard key={i} />)}
+            </div>
           ) : reports.length > 0 ? (
-            reports.map(report => (
-              <div
-                key={report.code || report.inc_id}
-                onClick={() => navigate(`/report/${(report.code || report.inc_id || '').replace('INC-', '')}`)}
-                className="bg-[#11141d] p-4 rounded-xl border border-white/5 active:bg-white/5 transition-colors cursor-pointer"
-              >
-                <div className="flex items-start justify-between mb-1.5 gap-3">
-                  <h3 className="text-sm font-bold text-white leading-snug line-clamp-2 flex-1">
-                    {report.title}
-                  </h3>
-                  <span className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                    report.status === 'Completed' || report.status === '처리완료'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                  }`}>
-                    {report.status || '완료'}
-                  </span>
-                </div>
-                {report.description && (
-                  <p className="text-[11px] text-slate-400 line-clamp-1 mb-2 leading-relaxed">
-                    {report.description}
-                  </p>
-                )}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-[10px] text-slate-600 font-mono flex items-center gap-1">
-                      <Activity className="w-3 h-3" />
-                      {report.code || report.inc_id}
-                    </span>
-                    {report.created_at && (
-                      <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-slate-600" />
-                        {new Date(report.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-emerald-500/40" />
-                </div>
-              </div>
-            ))
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {reports.map(r => (
+                <ReportCard
+                  key={r.code || r.inc_id}
+                  report={r}
+                  onClick={() => navigate(`/report/${(r.code || r.inc_id || '').replace('INC-', '')}`)}
+                />
+              ))}
+            </div>
           ) : searched ? (
-            <div className="text-center py-14 bg-[#11141d] rounded-xl border border-white/5">
-              <FileText className="w-10 h-10 text-slate-600 mx-auto mb-2.5 opacity-50" />
-              <p className="text-slate-400 text-sm font-bold">검색 결과가 없습니다</p>
-              <p className="text-slate-500 text-xs mt-1">조건을 변경해 다시 조회해 보세요</p>
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '48px 20px',
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 20,
+            }}>
+              <FileText size={36} color="rgba(255,255,255,0.12)" style={{ marginBottom: 12 }} />
+              <p style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.4)', margin: '0 0 4px' }}>검색 결과가 없습니다</p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', margin: 0 }}>조건을 변경해 다시 조회해 보세요</p>
             </div>
           ) : null}
         </div>
-      </main>
+      </div>
 
-      {/* 조직 선택 팝업 */}
-      {showOrgPicker && (
+      {showOrg && (
         <OrgPickerModal
           onSelect={(name, code) => { setOrgName(name); setOrgCode(code); }}
-          onClose={() => setShowOrgPicker(false)}
+          onClose={() => setShowOrg(false)}
         />
       )}
+
+      <style>{`
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); opacity:0.5; }
+      `}</style>
     </div>
   );
 }

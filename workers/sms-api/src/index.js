@@ -1045,27 +1045,28 @@ ${detailedInfo}`;
         logId = logRes?.id;
       } catch (le) {}
 
-      // 1. Attempt Chat API with Timeout
+      // 1. Chat API — streaming 모드로 SSE 읽기 (Advanced Chat 앱은 blocking 미지원)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s safe limit
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       try {
         const difyRes = await fetch(`${api_base}/chat-messages`, {
           method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${api_key}`, 
+          headers: {
+            'Authorization': `Bearer ${api_key}`,
             'Content-Type': 'application/json'
           },
           signal: controller.signal,
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             inputs: {
-              admin_threshold_value: effectiveThreshold,
-              technical_threshold: technicalThreshold,
-              casual_threshold: casualThreshold
-            }, 
-            query: prompt, 
-            response_mode: 'blocking', 
-            user: 'sguard-worker-bg' 
+              admin_threshold_value: Number(effectiveThreshold) || 0.85,
+              technical_threshold:   Number(technicalThreshold) || 0.85,
+              casual_threshold:      Number(casualThreshold)    || 0.95
+            },
+            query: prompt,
+            response_mode: 'streaming',
+            conversation_id: '',
+            user: 'sguard-worker-bg'
           })
         });
 
@@ -1073,47 +1074,58 @@ ${detailedInfo}`;
         resultStatus = difyRes.status;
 
         if (difyRes.ok) {
-          resultData = await difyRes.json();
-          fullOutput = resultData.answer || resultData.data?.outputs?.text || resultData.text || resultData.message || "";
-        } else {
-          // Switch to Workflow if Chat fails
-          const wfController = new AbortController();
-          const wfTimeout = setTimeout(() => wfController.abort(), 30000); 
-          
-          const wfRes = await fetch(`${api_base}/workflows/run`, {
-            method: 'POST',
-            headers: { 
-              'Authorization': `Bearer ${api_key}`, 
-              'Content-Type': 'application/json'
-            },
-            signal: wfController.signal,
-            body: JSON.stringify({ 
-               inputs: {
-                 query: prompt,
-                 chat_log: prompt,
-                 admin_threshold_value: effectiveThreshold,
-                 technical_threshold: technicalThreshold,
-                 casual_threshold: casualThreshold
-               }, 
-               response_mode: 'blocking', 
-               user: 'sguard-worker-bg' 
-            })
-          });
+          // SSE 스트림 읽기 — answer 이벤트 누적
+          const reader = difyRes.body.getReader();
+          const decoder = new TextDecoder();
+          let lineBuffer = '';
+          let accumulated = '';
 
-          clearTimeout(wfTimeout);
-          resultStatus = wfRes.status;
-          if (wfRes.ok) {
-            resultData = await wfRes.json();
-            const outputs = resultData.data?.outputs;
-            fullOutput = outputs?.text || outputs?.result || outputs?.output || 
-                         (Object.values(outputs || {}).find(v => typeof v === 'string') || "");
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            lineBuffer += decoder.decode(value, { stream: true });
+            const lines = lineBuffer.split('\n');
+            lineBuffer = lines.pop(); // 마지막 미완성 라인 보존
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data: ')) continue;
+              const dataStr = trimmed.substring(6);
+              if (dataStr === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.event === 'message' || parsed.event === 'agent_message') {
+                  accumulated += (parsed.answer || '');
+                }
+                if (parsed.event === 'message_end') break;
+              } catch {}
+            }
+          }
+
+          fullOutput = accumulated;
+          console.log(`[Dify Chat Streaming] OK — output length: ${fullOutput.length}`);
+
+          if (logId) {
+            try {
+              await db.prepare(`UPDATE dify_debug_logs SET status_code=200 WHERE id=?`).bind(logId).run();
+            } catch {}
+          }
+        } else {
+          let errBody = '';
+          try { errBody = await difyRes.text(); } catch {}
+          console.error(`[Dify Chat] Failed ${difyRes.status}: ${errBody.slice(0, 300)}`);
+
+          if (logId) {
+            try {
+              await db.prepare(`UPDATE dify_debug_logs SET status_code=?, error_message=? WHERE id=?`)
+                .bind(difyRes.status, `Chat failed: ${errBody.slice(0, 200)}`, logId).run();
+            } catch {}
           }
         }
       } catch (fe) {
         console.error(`[Background Dify] Error or timeout:`, fe.message);
         resultStatus = fe.name === 'AbortError' ? 408 : 500;
         clearTimeout(timeoutId);
-        // Fallback message will be determined in the next block
       }
 
       // 🔍 Log Trace Update (Success or Failure)
@@ -4701,19 +4713,34 @@ ${feedbackContext}`
       if (sms_id && !force) {
         const cached = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
         if (cached && cached.content) {
-          console.log(`[Cache Hit] Serving cached insight for ${sms_id}`);
-          
-          if (cached.similarity_score) {
-            await writer.write(encode(`data: ${JSON.stringify({ similarity_score: cached.similarity_score, similarity_reason: cached.similarity_reason })}\n\n`));
+          // 🛑 에러 캐시는 무시하고 실시간 재분석
+          const isStaleError = (
+            cached.content.startsWith('🤖') ||
+            cached.content.startsWith('⚠️ 분석 대기') ||
+            cached.content.includes('AI 엔진 서버 오류') ||
+            cached.content.includes('Dify 측 서버 상태가 불안정') ||
+            cached.content.includes('분석 품질 향상을 위해 대기 시간') ||
+            cached.content.includes('인증 오류') ||
+            cached.content.includes('엔드포인트 오류') ||
+            cached.content.includes('대기 시간 초과')
+          );
+
+          if (isStaleError) {
+            console.log(`[Cache Skip] Stale error cache for ${sms_id} — proceeding to live analysis`);
+          } else {
+            console.log(`[Cache Hit] Serving cached insight for ${sms_id}`);
+            if (cached.similarity_score) {
+              await writer.write(encode(`data: ${JSON.stringify({ similarity_score: cached.similarity_score, similarity_reason: cached.similarity_reason })}\n\n`));
+            }
+            const chars = Array.from(cached.content);
+            const chunkSize = 50;
+            for (let i = 0; i < chars.length; i += chunkSize) {
+              const chunk = chars.slice(i, i + chunkSize).join('');
+              await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
+            }
+            await writer.write(encode('data: [DONE]\n\n'));
+            return;
           }
-          const chars = Array.from(cached.content);
-          const chunkSize = 50;
-          for (let i = 0; i < chars.length; i += chunkSize) {
-            const chunk = chars.slice(i, i + chunkSize).join('');
-            await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
-          }
-          await writer.write(encode('data: [DONE]\n\n'));
-          return;
         }
       }
 
@@ -6004,6 +6031,21 @@ app.get('/warroom/report/:id', async (c) => {
     "SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE REPLACE(inc_id,'INC-','') = ? ORDER BY seq ASC"
   ).bind(rawId).all()
 
+  // 5-1. Creator name from users table
+  let creatorName = null
+  let creatorOrg = null
+  if (wr.creator_id) {
+    const creatorRow = await db.prepare(
+      "SELECT name, company, honbu, team, position FROM users WHERE employee_id = ? LIMIT 1"
+    ).bind(wr.creator_id).first()
+    if (creatorRow) {
+      creatorName = creatorRow.name
+      // 조직 정보: honbu > team 순서로 의미있는 값 사용
+      const orgParts = [creatorRow.honbu, creatorRow.team].filter(Boolean)
+      creatorOrg = orgParts.length > 0 ? orgParts.join(' / ') : (creatorRow.company || null)
+    }
+  }
+
   // 6. Find leader summary (from warroom_list first, fallback to aichat_history)
   const leaderRow = (agentLogs || []).find(r => r.agent_role === 'Leader')
   const leaderSummary = (wr.leader_summary && wr.leader_summary.trim()) 
@@ -6034,6 +6076,8 @@ app.get('/warroom/report/:id', async (c) => {
 
     // 6W1H - derived from available data
     who: wr.creator_id || '-',
+    who_name: creatorName || null,
+    who_org: creatorOrg || null,
     when: wr.reg_dt || '-',
     where: (wr.title || '').split('|').slice(-1)[0]?.trim() || '-',
     what: wr.title || '-',
@@ -8847,10 +8891,28 @@ export class WarRoom {
 
 // ── S-callert: PDS 장애 자동 호출 관리 ──────────────────────────────────────────
 
-// 1. 전략 목록 조회
+// 1. 전략 목록 조회 (테이블 없으면 자동 생성)
 app.get('/scallert/strategies', async (c) => {
   const db = c.env.DB;
   try {
+    // 테이블 없을 경우 자동 생성
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_STRATEGY_MST (
+      STRATEGY_ID TEXT PRIMARY KEY, STRATEGY_NM TEXT NOT NULL, STRATEGY_CONT TEXT NOT NULL DEFAULT '1',
+      APPLY_START_DT TEXT, APPLY_END_DT TEXT, MAX_CALL_CNT INTEGER NOT NULL DEFAULT 3,
+      USE_YN TEXT NOT NULL DEFAULT 'Y', REG_ID TEXT, REG_DT TEXT, MOD_ID TEXT, MOD_DT TEXT
+    )`).run();
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_TARGET_INFO (
+      SEQ_NO INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT NOT NULL,
+      EMP_ID TEXT NOT NULL, EMP_NM TEXT NOT NULL, MOBILE_NO TEXT NOT NULL,
+      SORT_ORD INTEGER DEFAULT 0, USE_YN TEXT NOT NULL DEFAULT 'Y',
+      REG_ID TEXT, REG_DT TEXT, MOD_ID TEXT, MOD_DT TEXT
+    )`).run();
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_CALL_HIST (
+      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT, INC_ID TEXT, IGW_TXN_ID TEXT,
+      EMP_ID TEXT, EMP_NM TEXT, MOBILE_NO TEXT, ATTEMPT_SEQ INTEGER DEFAULT 1,
+      PDS_RESULT_CD TEXT, CALL_DT TEXT, REG_DT TEXT
+    )`).run();
+
     const { results } = await db.prepare("SELECT * FROM TB_SCL_STRATEGY_MST ORDER BY STRATEGY_ID ASC").all();
     return c.json(results || []);
   } catch (e) {
@@ -9042,6 +9104,144 @@ app.post('/scallert/igw-event', async (c) => {
   } catch (e) {
     return c.json({ error: e.message }, 500);
   }
+});
+
+// ── PDS API 설정 관리 ─────────────────────────────────────────────────────────
+
+// 9. PDS Config 조회 (전략별)
+app.get('/scallert/strategies/:id/config', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_PDS_CONFIG (
+      CONFIG_ID    INTEGER PRIMARY KEY AUTOINCREMENT,
+      STRATEGY_ID  TEXT NOT NULL,
+      API_URL      TEXT NOT NULL DEFAULT '',
+      API_METHOD   TEXT NOT NULL DEFAULT 'POST',
+      API_HEADERS  TEXT DEFAULT '{}',
+      API_PARAMS   TEXT DEFAULT '{}',
+      TIMEOUT_SEC  INTEGER DEFAULT 10,
+      USE_YN       TEXT NOT NULL DEFAULT 'Y',
+      REG_ID TEXT, REG_DT TEXT, MOD_ID TEXT, MOD_DT TEXT
+    )`).run();
+    const row = await db.prepare("SELECT * FROM TB_SCL_PDS_CONFIG WHERE STRATEGY_ID = ? AND USE_YN = 'Y' ORDER BY CONFIG_ID DESC LIMIT 1").bind(id).first();
+    return c.json(row || null);
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// 10. PDS Config 저장 (upsert)
+app.post('/scallert/strategies/:id/config', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const now = getKst();
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_PDS_CONFIG (
+      CONFIG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT NOT NULL,
+      API_URL TEXT NOT NULL DEFAULT '', API_METHOD TEXT NOT NULL DEFAULT 'POST',
+      API_HEADERS TEXT DEFAULT '{}', API_PARAMS TEXT DEFAULT '{}',
+      TIMEOUT_SEC INTEGER DEFAULT 10, USE_YN TEXT NOT NULL DEFAULT 'Y',
+      REG_ID TEXT, REG_DT TEXT, MOD_ID TEXT, MOD_DT TEXT
+    )`).run();
+
+    const existing = await db.prepare("SELECT CONFIG_ID FROM TB_SCL_PDS_CONFIG WHERE STRATEGY_ID = ? ORDER BY CONFIG_ID DESC LIMIT 1").bind(id).first();
+    if (existing) {
+      await db.prepare(`UPDATE TB_SCL_PDS_CONFIG SET API_URL=?,API_METHOD=?,API_HEADERS=?,API_PARAMS=?,TIMEOUT_SEC=?,MOD_ID=?,MOD_DT=? WHERE CONFIG_ID=?`)
+        .bind(body.api_url||'', body.api_method||'POST', JSON.stringify(body.api_headers||{}), JSON.stringify(body.api_params||{}),
+              body.timeout_sec||10, body.reg_id||'SYSTEM', now, existing.CONFIG_ID).run();
+      return c.json({ success: true, config_id: existing.CONFIG_ID });
+    } else {
+      const res = await db.prepare(`INSERT INTO TB_SCL_PDS_CONFIG (STRATEGY_ID,API_URL,API_METHOD,API_HEADERS,API_PARAMS,TIMEOUT_SEC,USE_YN,REG_ID,REG_DT,MOD_ID,MOD_DT) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+        .bind(id, body.api_url||'', body.api_method||'POST', JSON.stringify(body.api_headers||{}), JSON.stringify(body.api_params||{}),
+              body.timeout_sec||10, 'Y', body.reg_id||'SYSTEM', now, body.reg_id||'SYSTEM', now).run();
+      return c.json({ success: true, config_id: res.meta.last_row_id });
+    }
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// 11. PDS 테스트 콜 실행
+app.post('/scallert/strategies/:id/test-call', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const now = getKst();
+  const startMs = Date.now();
+
+  // 설정 로드 (요청 body 우선, 없으면 DB)
+  let apiUrl     = body.api_url;
+  let apiMethod  = body.api_method || 'POST';
+  let apiHeaders = body.api_headers || {};
+  let apiParams  = body.api_params  || {};
+  let timeoutSec = body.timeout_sec || 10;
+
+  if (!apiUrl) {
+    try {
+      const cfg = await db.prepare("SELECT * FROM TB_SCL_PDS_CONFIG WHERE STRATEGY_ID = ? AND USE_YN = 'Y' ORDER BY CONFIG_ID DESC LIMIT 1").bind(id).first();
+      if (cfg) {
+        apiUrl     = cfg.API_URL;
+        apiMethod  = cfg.API_METHOD || 'POST';
+        apiHeaders = JSON.parse(cfg.API_HEADERS || '{}');
+        apiParams  = JSON.parse(cfg.API_PARAMS  || '{}');
+        timeoutSec = cfg.TIMEOUT_SEC || 10;
+      }
+    } catch {}
+  }
+
+  if (!apiUrl) return c.json({ error: 'API URL이 설정되지 않았습니다.' }, 400);
+
+  let statusCode = 0, responseBody = '', success = false;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutSec * 1000);
+    const fetchOpts = {
+      method: apiMethod,
+      headers: { 'Content-Type': 'application/json', ...apiHeaders },
+      signal: controller.signal,
+    };
+    if (apiMethod !== 'GET') fetchOpts.body = JSON.stringify(apiParams);
+    const url = apiMethod === 'GET' && Object.keys(apiParams).length
+      ? `${apiUrl}?${new URLSearchParams(apiParams).toString()}`
+      : apiUrl;
+
+    const res = await fetch(url, fetchOpts);
+    clearTimeout(timer);
+    statusCode = res.status;
+    responseBody = await res.text();
+    success = res.ok;
+  } catch (e) {
+    responseBody = e.name === 'AbortError' ? `Timeout (>${timeoutSec}s)` : e.message;
+  }
+
+  const elapsed = Date.now() - startMs;
+
+  // 로그 저장
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_TEST_LOG (
+      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT, API_URL TEXT,
+      API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
+      ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
+    )`).run();
+    await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID,API_URL,API_METHOD,REQ_PARAMS,STATUS_CODE,RESPONSE_BODY,ELAPSED_MS,SUCCESS,TESTED_BY,TESTED_AT) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      .bind(id, apiUrl, apiMethod, JSON.stringify(apiParams), statusCode, responseBody.substring(0,2000), elapsed, success?'Y':'N', body.tested_by||'SYSTEM', now).run();
+  } catch {}
+
+  return c.json({ success, status_code: statusCode, response: responseBody, elapsed_ms: elapsed, tested_at: now });
+});
+
+// 12. 테스트 콜 로그 조회
+app.get('/scallert/strategies/:id/test-logs', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const limit = Number(c.req.query('limit') || 20);
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_TEST_LOG (
+      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT, API_URL TEXT,
+      API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
+      ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
+    )`).run();
+    const { results } = await db.prepare("SELECT * FROM TB_SCL_TEST_LOG WHERE STRATEGY_ID = ? ORDER BY LOG_ID DESC LIMIT ?").bind(id, limit).all();
+    return c.json(results || []);
+  } catch (e) { return c.json({ error: e.message }, 500); }
 });
 
 // ── WebSocket Upgrade Route ──────────────────────────────────────────────────

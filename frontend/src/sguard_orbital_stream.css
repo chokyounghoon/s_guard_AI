@@ -152,7 +152,11 @@
     background: linear-gradient(180deg, transparent 0%, rgba(59,130,246,0.7) 30%, rgba(139,92,246,0.9) 50%, rgba(59,130,246,0.7) 70%, transparent 100%);
     background-size: 100% 200%;
     animation: orb-energy-flow 3s linear infinite;
+    animation-play-state: paused;
     pointer-events: none; z-index: 10;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1)::after {
+    animation-play-state: running;
   }
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1)::before {
     content: '';
@@ -163,7 +167,11 @@
     background: #63b3ed;
     box-shadow: 0 0 8px 3px rgba(99,179,237,0.6), 0 0 20px 8px rgba(99,179,237,0.2);
     animation: orb-core-breathe 2s ease-in-out infinite;
+    animation-play-state: paused;
     pointer-events: none; z-index: 11;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1)::before {
+    animation-play-state: running;
   }
 
   /* col2 우측 — 퍼플 세로 커넥터 라인 */
@@ -176,7 +184,11 @@
     background: linear-gradient(180deg, transparent 0%, rgba(99,102,241,0.6) 30%, rgba(168,85,247,0.9) 50%, rgba(99,102,241,0.6) 70%, transparent 100%);
     background-size: 100% 200%;
     animation: orb-energy-flow 2.5s linear infinite 0.5s;
+    animation-play-state: paused;
     pointer-events: none; z-index: 10;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2)::after {
+    animation-play-state: running;
   }
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2)::before {
     content: '';
@@ -187,7 +199,11 @@
     background: #a855f7;
     box-shadow: 0 0 8px 3px rgba(168,85,247,0.6), 0 0 20px 8px rgba(168,85,247,0.2);
     animation: orb-core-breathe 2s ease-in-out infinite 0.5s;
+    animation-play-state: paused;
     pointer-events: none; z-index: 11;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2)::before {
+    animation-play-state: running;
   }
 
   /* col3 우측 — 에메랄드 세로 커넥터 라인 */
@@ -200,7 +216,11 @@
     background: linear-gradient(180deg, transparent 0%, rgba(52,211,153,0.6) 30%, rgba(16,185,129,0.8) 50%, rgba(52,211,153,0.6) 70%, transparent 100%);
     background-size: 100% 200%;
     animation: orb-energy-flow 3.5s linear infinite 1s;
+    animation-play-state: paused;
     pointer-events: none; z-index: 10;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3)::after {
+    animation-play-state: running;
   }
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3)::before {
     content: '';
@@ -211,7 +231,11 @@
     background: #34d399;
     box-shadow: 0 0 8px 3px rgba(52,211,153,0.6), 0 0 20px 8px rgba(52,211,153,0.2);
     animation: orb-core-breathe 2s ease-in-out infinite 1s;
+    animation-play-state: paused;
     pointer-events: none; z-index: 11;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3)::before {
+    animation-play-state: running;
   }
 
   /* ─── COLUMN 1: SMS PANEL ─────────────────── */
@@ -234,8 +258,12 @@
     background: linear-gradient(180deg, transparent 0%, rgba(59,130,246,0.05) 50%, transparent 100%);
     top: -60px;
     animation: orb-scan-line 6s ease-in-out infinite;
+    animation-play-state: paused;
     pointer-events: none;
     z-index: 1;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl::before {
+    animation-play-state: running;
   }
 
   /* SMS card items — selected amber glow */
@@ -275,9 +303,13 @@
     height: 2px;
     background: linear-gradient(90deg, transparent, rgba(99,102,241,0.8), transparent);
     animation: orb-scanner-bounce 3.5s ease-in-out infinite;
+    animation-play-state: paused;
     pointer-events: none;
     z-index: 10;
     border-radius: 0 0 4px 4px;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) .rounded-3xl::before {
+    animation-play-state: running;
   }
 
   /* Root Cause / ROOT CAUSE amber card — rotating orange glow */
@@ -313,8 +345,12 @@
     background: linear-gradient(180deg, transparent 0%, rgba(234,179,8,0.04) 50%, transparent 100%);
     top: -80px;
     animation: orb-scan-line 7s ease-in-out infinite 1.5s;
+    animation-play-state: paused;
     pointer-events: none;
     z-index: 1;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl::before {
+    animation-play-state: running;
   }
 
   /* Agent message items — fade-slide in */
@@ -424,7 +460,11 @@
     height: 2px;
     background: linear-gradient(90deg, transparent, rgba(99,102,241,0.8), rgba(139,92,246,0.6), transparent);
     animation: orb-scanner-bounce 4s ease-in-out infinite;
+    animation-play-state: paused;
     pointer-events: none;
+  }
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) [class*="border-b"]::after {
+    animation-play-state: running;
   }
 
   /* ─── PANEL CARD BORDERS — STREAM SOURCE/DEST ─ */

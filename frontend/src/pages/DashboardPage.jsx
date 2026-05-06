@@ -880,7 +880,13 @@ export default function DashboardPage({ onAiClick }) {
     };
 
     // ── [전문가별 심층 진단] 섹션 시작점 찾기
-    const sectionMarkers = ['[전문가별 심층 진단]', '전문가별 심층 진단', '## 전문가', '### 전문가'];
+    const sectionMarkers = [
+      '[전문가별 심층 진단]', '전문가별 심층 진단',
+      '## 전문가', '### 전문가',
+      '**전문가별', '[전문가', '전문가 에이전트',
+      // 영어 fallback
+      'Expert Analysis', 'Agent Analysis', '## Agent',
+    ];
     let startIndex = -1;
     for (const marker of sectionMarkers) {
       const idx = text.indexOf(marker);
@@ -906,7 +912,7 @@ export default function DashboardPage({ onAiClick }) {
       // ── 패턴 1: `- **Security Agent**: 내용` 또는 `• Security Agent: 내용`
       // **볼드** 마커를 포함/미포함 모두 지원
       const bulletMatch = trimmed.match(
-        /^[-•\*·\d\.]\s*\*{0,2}(Security|DB|DevOps|Leader)\s*Agent\*{0,2}\s*[:：]\s*(.+)/i
+        /^[-•*·\d.]\s*\*{0,4}(Security|DB|DevOps|Leader)\s*Agent\*{0,4}\s*[:：]\s*(.+)/i
       );
       if (bulletMatch) {
         const agentName = detectAgentName(bulletMatch[1]);
@@ -952,12 +958,25 @@ export default function DashboardPage({ onAiClick }) {
 
       let processed = raw;
 
-      // Leader: [리더의 최종 조치 가이드] 이하 제거 (Expert Advisor에는 발언만 표시)
+      // Leader: [리더의 최종 조치 가이드] 마커 이후 내용을 Leader 메시지로 사용
       if (name === 'Leader') {
-        // 다양한 마크다운 포맷(볼드·헤더·대괄호 유무 등)을 모두 처리
-        const guidePattern = /(\*{0,2}#{0,4}\s*\[?리더의 최종 조치 가이드\]?\*{0,2})/;
+        const guidePattern = /(\*{0,2}#{0,4}\s*\[?리더의 최종 조치 가이드\]?\*{0,2}[\s:：]?)/;
         const guideMatch = guidePattern.exec(processed);
-        if (guideMatch) processed = processed.substring(0, guideMatch.index);
+        if (guideMatch) {
+          // 마커 이후 텍스트를 Leader 내용으로
+          const afterMarker = processed.substring(guideMatch.index + guideMatch[0].length).trim();
+          // 마커 이전 텍스트도 있으면 합치기 (Agent 발언 + 가이드)
+          const beforeMarker = processed.substring(0, guideMatch.index).trim();
+          processed = [beforeMarker, afterMarker].filter(Boolean).join('\n\n');
+        }
+        // Leader 섹션에 아무 것도 없으면, 전체 텍스트에서 [리더의 최종 조치 가이드] 블록 직접 탐색
+        if (!processed.trim()) {
+          const fullGuideMatch = guidePattern.exec(text);
+          if (fullGuideMatch) {
+            processed = text.substring(fullGuideMatch.index + fullGuideMatch[0].length)
+              .split(/\n(?=#{1,4}\s|\[|---|\*{2}[A-Z가-힣])/)[0].trim();
+          }
+        }
       }
 
       const cleaned = processed
@@ -999,19 +1018,27 @@ export default function DashboardPage({ onAiClick }) {
 
     console.log('[Expert Advisor] parsed:', filteredMsgs.length, 'agents →', filteredMsgs.map(m => m.role), '| isDone:', isDone);
 
-    if (filteredMsgs.length > 0) {
-      setShowAgentPanel(true);
-      // 순서대로(Security→DB→DevOps→Leader) 즉시 전부 표시
-      setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: isDone })));
+    if (isDone) {
+      // 완료 시: 결과가 있으면 업데이트, 없으면 현재 상태 유지
+      if (filteredMsgs.length > 0) {
+        setShowAgentPanel(true);
+        setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: true })));
+      }
+    } else {
+      // 스트리밍 중: 2개 이상 파싱됐을 때만 중간 업데이트 (깜빡임 방지)
+      if (filteredMsgs.length >= 2) {
+        setShowAgentPanel(true);
+        setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: false })));
+      }
     }
 
-    if (isDone && currentMsgs.length > 0) {
+    if (isDone && filteredMsgs.length > 0) {
       const currentIncId = selectedSmsRef.current?.inc_id;
       if (currentIncId) {
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ incident_id: String(currentIncId), messages: currentMsgs })
+          body: JSON.stringify({ incident_id: String(currentIncId), messages: filteredMsgs })
         })
         .then(res => res.json())
         .then(data => console.log('Save complete:', data))
@@ -1280,7 +1307,7 @@ export default function DashboardPage({ onAiClick }) {
 
   return (
     <>
-    <div className="h-screen overflow-hidden text-white font-sans relative flex flex-col" style={{ background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)' }}>
+    <div className={`h-screen overflow-hidden text-white font-sans relative flex flex-col${isSmsSpinning || isAiAnalyzing || isFlowSpinning ? ' hud-fetching' : ''}`} style={{ background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)' }}>
       {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
       {isNavCollapsed && (
         <div className="fixed top-3 left-4 z-50">
@@ -1457,25 +1484,37 @@ export default function DashboardPage({ onAiClick }) {
         {/* ── 3컬럼 메인 그리드 ── */}
         <div className="relative flex-1 h-full">
 
-          {/* ── 데이터 스트림 커넥터: 중앙 빛 흐름 (lg 이상에서만 표시) ── */}
-          <div className="hidden lg:block absolute inset-0 pointer-events-none z-10" aria-hidden="true">
-            {/* 중앙 스트림 라인 1개 */}
-            <div className="absolute left-0 right-0" style={{ top: '50%', height: 1 }}>
-              <div style={{
-                width: '100%', height: '1px',
-                background: 'linear-gradient(90deg, transparent 0%, rgba(6,182,212,0.04) 15%, rgba(6,182,212,0.18) 48%, rgba(139,92,246,0.18) 52%, rgba(139,92,246,0.04) 85%, transparent 100%)',
-              }} />
-              <div className="stream-particle" />
-            </div>
-            {/* 컬럼 연결 글로우 노드 */}
-            {[25, 50, 75].map((x, i) => (
-              <div key={i} className="node-pulse" style={{
-                position: 'absolute', left: `calc(${x}% - 3px)`, top: '50%',
-                transform: 'translateY(-50%)',
-                animationDelay: `${i * 0.8}s`,
-              }} />
-            ))}
-          </div>
+          {/* ── 데이터 스트림 커넥터: 중앙 빛 흐름 (lg 이상에서만 표시, 처리완료 시 중지) ── */}
+          {(() => {
+            const isCompleted = selectedSms?.incident_status === '처리완료' || selectedSms?.incident_status === 'Completed' || selectedSms?.status === '처리완료' || selectedSms?.status === 'Completed';
+            return (
+              <div className="hidden lg:block absolute inset-0 pointer-events-none z-10" aria-hidden="true">
+                {/* 중앙 스트림 라인 1개 */}
+                <div className="absolute left-0 right-0" style={{ top: '50%', height: 1 }}>
+                  <div style={{
+                    width: '100%', height: '1px',
+                    background: isCompleted
+                      ? 'linear-gradient(90deg, transparent 0%, rgba(16,185,129,0.06) 15%, rgba(16,185,129,0.14) 48%, rgba(16,185,129,0.14) 52%, rgba(16,185,129,0.06) 85%, transparent 100%)'
+                      : 'linear-gradient(90deg, transparent 0%, rgba(6,182,212,0.04) 15%, rgba(6,182,212,0.18) 48%, rgba(139,92,246,0.18) 52%, rgba(139,92,246,0.04) 85%, transparent 100%)',
+                  }} />
+                  {/* 처리완료 시 stream-particle 숨김 */}
+                  {!isCompleted && <div className="stream-particle" />}
+                </div>
+                {/* 컬럼 연결 글로우 노드 — 처리완료 시 정지 */}
+                {[25, 50, 75].map((x, i) => (
+                  <div key={i} className={isCompleted ? '' : 'node-pulse'} style={{
+                    position: 'absolute', left: `calc(${x}% - 3px)`, top: '50%',
+                    transform: 'translateY(-50%)',
+                    ...(isCompleted ? {
+                      width: 5, height: 5, borderRadius: '50%',
+                      background: 'rgba(16,185,129,0.25)',
+                      boxShadow: '0 0 6px rgba(16,185,129,0.3)',
+                    } : { animationDelay: `${i * 0.8}s` }),
+                  }} />
+                ))}
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
 
@@ -1880,14 +1919,16 @@ export default function DashboardPage({ onAiClick }) {
                           return (
                             <React.Fragment key={step.id}>
                               <div className="relative pl-12 group shrink-0">
-                                <div className={`absolute left-0 top-0 z-10 w-7 h-7 rounded-lg flex items-center justify-center border transition-all duration-700
-                                  ${isCompleted 
-                                    ? 'bg-blue-600/30 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110' 
-                                    : isNextStep 
-                                    ? 'bg-yellow-500/20 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.3)] animate-pulse' 
-                                    : 'bg-white/5 border-white/10 opacity-40'}`}>
-                                  <step.icon className={`w-3.5 h-3.5 ${isCompleted ? 'text-blue-400' : isNextStep ? 'text-yellow-400' : 'text-slate-500'}`} />
-                                </div>
+                                <span className={`data-ring-wrapper data-ring-sm absolute left-0 top-0 z-10 ${isNextStep ? 'data-ring-spinning' : ''}`} style={{ width: 28, height: 28 }}>
+                                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all duration-700
+                                    ${isCompleted 
+                                      ? 'bg-blue-600/30 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110' 
+                                      : isNextStep 
+                                      ? 'bg-yellow-500/20 border-transparent shadow-[0_0_10px_rgba(234,179,8,0.3)]' 
+                                      : 'bg-white/5 border-white/10 opacity-40'}`}>
+                                    <step.icon className={`w-3.5 h-3.5 ${isCompleted ? 'text-blue-400' : isNextStep ? 'text-yellow-400' : 'text-slate-500'}`} />
+                                  </div>
+                                </span>
                                 <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
                                   <div className="flex items-center gap-3 mb-1">
                                     <h4 className={`font-black tracking-tight text-sm ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-gray-500')}`}>

@@ -124,7 +124,6 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'Data\nFlow', sub: 'DFD', icon: Layers, path: '/processing-flow', color: '#3b82f6', adminOnly: true },
                 { label: 'Push\nDiagnostic', sub: 'Notification', icon: Bell, path: '/push-diagnostic', color: '#f59e0b' },
                 { label: 'AI\nReport', sub: '장애 분석서', icon: FileText, action: onReportClick, color: '#3b82f6' },
-                { label: 'AI Report\n(Detail)', sub: '분석서 상세', icon: FileText, path: '/ai-report', color: '#6366f1' },
                 { label: 'Report\nSearch', sub: '통합 검색', icon: Search, path: '/mobile-report-search', color: '#10b981' },
                 { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
