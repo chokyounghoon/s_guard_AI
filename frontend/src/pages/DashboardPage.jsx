@@ -1320,13 +1320,40 @@ export default function DashboardPage({ onAiClick }) {
       )}
       {/* Top Navigation */}
       <nav className={`flex justify-between items-center p-4 px-5 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'flex'}`}>
+        {/* ── 좌: 로고 ── */}
         <div
-          className="flex items-center cursor-pointer group"
+          className="flex items-center cursor-pointer group min-w-[120px]"
           onClick={() => window.location.reload()}
         >
           <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
         </div>
-        <div className="flex items-center space-x-4">
+
+        {/* ── 가운데: 임계값 설정 버튼 ── */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(v => !v); }}
+          className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-2xl border transition-all ${
+            showThresholdSettings
+              ? 'bg-blue-600/15 border-blue-500/40 shadow-[0_0_18px_rgba(6,182,212,0.15)]'
+              : 'bg-white/[0.03] border-white/8 hover:bg-white/[0.06] hover:border-white/15'
+          }`}
+          title="유사도 임계값 설정"
+        >
+          <Settings className={`w-4 h-4 transition-all ${
+            showThresholdSettings ? 'text-blue-400 rotate-45' : 'text-slate-400'
+          } ${isSavingThreshold ? 'animate-spin' : ''}`} />
+          <div className="flex items-center gap-2">
+            <span className={`text-[8px] font-black uppercase tracking-widest leading-none ${
+              showThresholdSettings ? 'text-blue-400' : 'text-slate-500'
+            }`}>Technical threshold</span>
+            <span className="text-[8px] text-slate-600">/</span>
+            <span className={`text-[8px] font-black uppercase tracking-widest leading-none ${
+              showThresholdSettings ? 'text-purple-400' : 'text-slate-500'
+            }`}>Casual Match</span>
+          </div>
+        </button>
+
+        {/* ── 우: 액션 버튼 ── */}
+        <div className="flex items-center space-x-3 min-w-[120px] justify-end">
           <div 
             className={`p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group ${isRefreshing ? 'opacity-50' : ''}`}
             onClick={handleManualRefresh}
@@ -1334,8 +1361,6 @@ export default function DashboardPage({ onAiClick }) {
           >
             <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
           </div>
-
-          {/* AI Assistant Button matching MobileInbox */}
           <button
             onClick={onAiClick}
             className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
@@ -1343,7 +1368,7 @@ export default function DashboardPage({ onAiClick }) {
             <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
           </button>
           <div
-            className="flex items-center space-x-3 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
+            className="flex items-center space-x-2 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
             onClick={() => setShowProfileModal(true)}
           >
             {userProfile && (
@@ -1360,7 +1385,7 @@ export default function DashboardPage({ onAiClick }) {
             </div>
           </div>
           <button onClick={() => setIsNavCollapsed(true)}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all ml-1 group">
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
             <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white" />
           </button>
         </div>
@@ -1536,13 +1561,6 @@ export default function DashboardPage({ onAiClick }) {
                     </div>
                   </div>
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
-                    className={`p-2 rounded-xl border transition-all ${showThresholdSettings ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'}`}
-                    title="유사도 임계값 설정"
-                  >
-                    <Settings className={`w-4 h-4 ${isSavingThreshold ? 'animate-spin' : ''}`} />
-                  </button>
 
                   <label 
                     onClick={(e) => e.stopPropagation()} 

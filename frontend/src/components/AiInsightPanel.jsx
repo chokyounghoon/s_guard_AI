@@ -845,18 +845,14 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           <div className={`leading-relaxed w-full ${textColor}`}>
               {displayedText ? (
                 <MarkdownViewer text={(() => {
-                  const diagMarker   = '[전문가별 심층 진단]';
-                  const leaderMarker = '[리더의 최종 조치 가이드]';
-                  const diagIdx   = displayedText.indexOf(diagMarker);
-                  const leaderIdx = displayedText.indexOf(leaderMarker);
-                  if (diagIdx !== -1 && leaderIdx !== -1 && leaderIdx > diagIdx) {
-                    // 진단 섹션 앞 + 리더 가이드 이하 연결
-                    return displayedText.substring(0, diagIdx).trim() + '\n\n' + displayedText.substring(leaderIdx).trim();
-                  } else if (diagIdx !== -1) {
-                    // 리더 가이드 없으면 진단 섹션 앞까지만
-                    return displayedText.substring(0, diagIdx).trim();
-                  }
-                  return displayedText;
+                  let t = displayedText;
+                  // [전문가별 심층 진단] 이하 제거
+                  const dIdx = t.indexOf('[전문가별 심층 진단]');
+                  if (dIdx !== -1) t = t.substring(0, dIdx).trim();
+                  // [리더의 최종 조치 가이드] 이하 제거 (Expert Advisor에서만 표시)
+                  const lIdx = t.indexOf('[리더의 최종 조치 가이드]');
+                  if (lIdx !== -1) t = t.substring(0, lIdx).trim();
+                  return t || displayedText;
                 })()} />
               ) : (
                 <span className="text-slate-500 font-bold tracking-tight animate-pulse flex items-center gap-2">
