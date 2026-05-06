@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, RotateCcw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, RotateCcw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Cpu, BellDot, Keyboard, Network, BookOpen, Layers, Save } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
@@ -1319,79 +1319,128 @@ export default function DashboardPage({ onAiClick }) {
         </div>
       )}
       {/* Top Navigation */}
-      <nav className={`flex items-center gap-3 p-4 px-5 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'flex'}`}>
+      <nav className={`flex flex-col bg-[#0f1421] border-b border-white/10 sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'block'}`}>
 
-        {/* ── 좌: 로고 + 설정버튼 (SMS 패널 너비 ~1/4) ── */}
-        <div className="flex items-center gap-3 lg:w-1/4 shrink-0">
-          <div
-            className="flex items-center cursor-pointer group shrink-0"
-            onClick={() => window.location.reload()}
-          >
-            <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
-          </div>
+        {/* ── 1행: 로고 + 설정버튼 + 우측액션 ── */}
+        <div className="flex items-center gap-3 px-5 py-3">
 
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(v => !v); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 ${
-              showThresholdSettings
-                ? 'bg-blue-600/15 border-blue-500/40 shadow-[0_0_14px_rgba(6,182,212,0.12)]'
-                : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20'
-            }`}
-            title="유사도 임계값 설정"
-          >
-            <Settings className={`w-3.5 h-3.5 shrink-0 transition-all ${
-              showThresholdSettings ? 'text-blue-400 rotate-45' : 'text-slate-400'
-            } ${isSavingThreshold ? 'animate-spin' : ''}`} />
-            <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
-              showThresholdSettings ? 'text-blue-400' : 'text-slate-400'
-            }`}>Technical threshold</span>
-            <span className="text-[9px] text-slate-600">/</span>
-            <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
-              showThresholdSettings ? 'text-purple-400' : 'text-slate-400'
-            }`}>Casual Match Strictness</span>
-          </button>
-        </div>
-
-        {/* ── 중앙 공백 ── */}
-        <div className="flex-1" />
-
-        {/* ── 우: 액션 버튼 ── */}
-        <div className="flex items-center space-x-3 min-w-[120px] justify-end">
-          <div 
-            className={`p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group ${isRefreshing ? 'opacity-50' : ''}`}
-            onClick={handleManualRefresh}
-            title="데이터 새로고침"
-          >
-            <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
-          </div>
-          <button
-            onClick={onAiClick}
-            className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
-          </button>
-          <div
-            className="flex items-center space-x-2 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
-            onClick={() => setShowProfileModal(true)}
-          >
-            {userProfile && (
-              <span className="text-xs font-bold text-slate-300 hidden sm:inline-block group-hover:text-blue-400">
-                {userProfile.name}
-              </span>
-            )}
-            <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all">
-              {userProfile?.profile_picture ? (
-                <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-5 h-5 text-slate-300 group-hover:text-blue-400" />
-              )}
+          {/* 좌: 로고 + 설정버튼 */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div
+              className="flex items-center cursor-pointer group shrink-0"
+              onClick={() => window.location.reload()}
+            >
+              <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
             </div>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(v => !v); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 ${
+                showThresholdSettings
+                  ? 'bg-blue-600/15 border-blue-500/40 shadow-[0_0_14px_rgba(6,182,212,0.12)]'
+                  : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20'
+              }`}
+              title="유사도 임계값 설정"
+            >
+              <Settings className={`w-3.5 h-3.5 shrink-0 transition-all ${
+                showThresholdSettings ? 'text-blue-400 rotate-45' : 'text-slate-400'
+              } ${isSavingThreshold ? 'animate-spin' : ''}`} />
+              <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
+                showThresholdSettings ? 'text-blue-400' : 'text-slate-400'
+              }`}>Technical threshold</span>
+              <span className="text-[9px] text-slate-600">/</span>
+              <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
+                showThresholdSettings ? 'text-purple-400' : 'text-slate-400'
+              }`}>Casual Match Strictness</span>
+            </button>
           </div>
-          <button onClick={() => setIsNavCollapsed(true)}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
-            <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white" />
-          </button>
+
+          <div className="flex-1" />
+
+          {/* 우: 액션 */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div
+              className={`p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group ${isRefreshing ? 'opacity-50' : ''}`}
+              onClick={handleManualRefresh}
+              title="데이터 새로고침"
+            >
+              <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+            </div>
+            <button
+              onClick={onAiClick}
+              className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
+            </button>
+            <div
+              className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
+              onClick={() => setShowProfileModal(true)}
+            >
+              {userProfile && (
+                <span className="text-xs font-bold text-slate-300 hidden sm:inline-block group-hover:text-blue-400">
+                  {userProfile.name}
+                </span>
+              )}
+              <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all">
+                {userProfile?.profile_picture ? (
+                  <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-5 h-5 text-slate-300 group-hover:text-blue-400" />
+                )}
+              </div>
+            </div>
+            <button onClick={() => setIsNavCollapsed(true)}
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
+              <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white" />
+            </button>
+          </div>
         </div>
+
+        {/* ── 2행: PC/태블릿 전용 메뉴 링크 (lg 이상) ── */}
+        <div className="hidden lg:flex items-stretch border-t border-white/5">
+          {[
+            { label: 'Orbital Command', icon: Cpu,         path: '/orbital-command',        color: '#06b6d4' },
+            { label: 'Alert Monitor',   icon: BellDot,     path: '/alert-monitor',          color: '#ef4444' },
+            { label: 'Incident KW',     icon: Hash,        path: '/incident-keyword',       color: '#22d3ee' },
+            { label: 'Personal KW',     icon: Keyboard,    path: '/user-keyword',           color: '#06b6d4' },
+            { label: 'Report Line',     icon: Users,       path: '/report-line-management', color: '#a855f7' },
+            { label: 'Accounts',        icon: User,        path: '/user-management',        color: '#3b82f6' },
+            { label: 'Security Logs',   icon: Shield,      path: '/security-logs',          color: '#6366f1', adminOnly: true },
+            { label: 'Organization',    icon: Network,     path: '/organization-management',color: '#10b981' },
+            { label: 'Knowledge Base',  icon: FileText,    path: '/knowledge-base',         color: '#0ea5e9' },
+            { label: 'Global Stats',    icon: Activity,    path: '/overall-status',         color: '#f97316' },
+            { label: 'War-Room Hub',    icon: Shield,      path: '/warroom-management',     color: '#ef4444' },
+            { label: 'Codebook',        icon: BookOpen,    path: '/codebook-management',    color: '#eab308' },
+            { label: 'Data Flow',       icon: Layers,      path: '/processing-flow',        color: '#3b82f6', adminOnly: true },
+            { label: 'Push Diagnostic', icon: Bell,        path: '/push-diagnostic',        color: '#f59e0b' },
+            { label: 'AI Report',       icon: FileText,    action: () => onAiClick?.(),     color: '#3b82f6' },
+            { label: 'Report Search',   icon: Search,      path: '/mobile-report-search',   color: '#10b981' },
+          ].filter(m => !m.adminOnly || userProfile?.is_admin === 1 || userProfile?.role === 'admin')
+           .map((item, idx, arr) => {
+            const Icon = item.icon;
+            const isActive = window.location.pathname === item.path;
+            return (
+              <button
+                key={item.label}
+                onClick={() => item.action ? item.action() : navigate(item.path)}
+                className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-bold transition-all relative
+                  ${idx < arr.length - 1 ? 'border-r border-white/5' : ''}
+                  ${isActive
+                    ? 'bg-white/8 text-white'
+                    : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+                  }`}
+                style={{ color: isActive ? item.color : undefined }}
+              >
+                {isActive && (
+                  <span className="absolute top-0 left-0 right-0 h-[2px] rounded-b" style={{ background: item.color }} />
+                )}
+                <Icon size={14} style={{ color: item.color, opacity: isActive ? 1 : 0.55 }} />
+                <span className="whitespace-nowrap tracking-wide">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
       </nav>
 
       {/* Top Banner Messages */}

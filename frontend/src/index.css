@@ -524,3 +524,7 @@
   border-left-color: rgba(251,146,60,0.15);
   border-radius: 13px;
 }
+
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

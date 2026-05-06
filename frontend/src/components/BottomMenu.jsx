@@ -106,25 +106,9 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
               </div>
             </div>
 
-            {/* 그리드: 2열 (Manual Entry 제외) */}
+            {/* 그리드: 2열 (incident-push, s-callert 만) */}
             <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {[
-                { label: 'Orbital\nCommand', sub: 'RAG Control', icon: Cpu, path: '/orbital-command', color: '#06b6d4' },
-                { label: 'Alert\nMonitor', sub: '임계치 분류', icon: BellDot, path: '/alert-monitor', color: '#ef4444' },
-                { label: 'Incident\nKeyword', sub: 'Global Match', icon: Hash, path: '/incident-keyword', color: '#22d3ee' },
-                { label: 'Personal\nKeyword', sub: 'My Watchlist', icon: Keyboard, path: '/user-keyword', color: '#06b6d4' },
-                { label: 'Report\nLine', sub: 'Approval', icon: Users, path: '/report-line-management', color: '#a855f7' },
-                { label: 'Accounts', sub: 'Security Admin', icon: User, path: '/user-management', color: '#3b82f6' },
-                { label: 'Security\nLogs', sub: 'Audit Trails', icon: Shield, path: '/security-logs', color: '#6366f1', adminOnly: true },
-                { label: 'Organization', sub: 'Org Hierarchy', icon: Network, path: '/organization-management', color: '#10b981' },
-                { label: 'Knowledge\nBase', sub: 'RAG Docs', icon: FileText, path: '/knowledge-base', color: '#0ea5e9' },
-                { label: 'Global\nStats', sub: 'Metrics', icon: Activity, path: '/overall-status', color: '#f97316' },
-                { label: 'War-Room\nHub', sub: 'Channels', icon: Shield, path: '/warroom-management', color: '#ef4444' },
-                { label: 'Codebook', sub: 'Metadata', icon: BookOpen, path: '/codebook-management', color: '#eab308' },
-                { label: 'Data\nFlow', sub: 'DFD', icon: Layers, path: '/processing-flow', color: '#3b82f6', adminOnly: true },
-                { label: 'Push\nDiagnostic', sub: 'Notification', icon: Bell, path: '/push-diagnostic', color: '#f59e0b' },
-                { label: 'AI\nReport', sub: '장애 분석서', icon: FileText, action: onReportClick, color: '#3b82f6' },
-                { label: 'Report\nSearch', sub: '통합 검색', icon: Search, path: '/mobile-report-search', color: '#10b981' },
                 { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
                 const Icon = item.icon;
