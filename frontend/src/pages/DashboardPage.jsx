@@ -168,10 +168,10 @@ export default function DashboardPage({ onAiClick }) {
   }, [refreshCodes]);
 
   const FLOW_STEPS = [
-    { id: 'SMS', label: 'SMS 수신 및 장애 인지' },
-    { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료' },
-    { id: 'WARROOM', label: '워룸생성 및 할당완료' },
-    { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료' }
+    { id: 'SMS', label: 'SMS 수신 및 장애 인지', icon: Bell },
+    { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료', icon: Brain },
+    { id: 'WARROOM', label: '워룸생성 및 할당완료', icon: Users },
+    { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', icon: CheckCircle }
   ];
 
   // Helper for Date/Duration Formatting
@@ -1674,7 +1674,7 @@ export default function DashboardPage({ onAiClick }) {
 
           {/* ── 2/4: S-Autopilot Insight Panel ── */}
           <div className="flex flex-col h-full overflow-hidden">
-          <AiInsightPanel 
+            <AiInsightPanel 
                onLogReceived={handleLogReceived} 
                onShowDetail={handleShowInsight} 
                selectedSms={insightSms} 
@@ -1687,67 +1687,55 @@ export default function DashboardPage({ onAiClick }) {
 
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
           <div className="flex flex-col h-full overflow-hidden">
-
-
-
-          {/* AI War-Room Situation Log (Section 2) */}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 hud-card hud-corners ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
-              {/* Header */}
-              <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
-                    <div className={`bg-indigo-500/20 border border-indigo-500/30 p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
-                      <Sparkles className="w-5 h-5 text-indigo-300" />
-                    </div>
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="font-black text-white text-base tracking-tight">
-                      S-Autopilot Expert Advisor
-                    </h3>
-                    <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase">
-                      Real-time AI Response Engine
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 hud-card hud-corners ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
+                {/* Header */}
+                <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
+                      <div className={`bg-indigo-500/20 border border-indigo-500/30 p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
+                        <Sparkles className="w-5 h-5 text-indigo-300" />
+                      </div>
                     </span>
+                    <div className="min-w-0">
+                      <h3 className="font-black text-white text-base tracking-tight">S-Autopilot Expert Advisor</h3>
+                      <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Real-time AI Response Engine</span>
+                    </div>
                   </div>
                 </div>
 
-
+                <div className="flex-1 overflow-hidden">
+                  {showAgentPanel || selectedSms ? (
+                    <div className="h-full flex flex-col overflow-hidden">
+                      {activeLogTab === 'ai' ? (
+                        <AgentDiscussionPanel
+                          messages={agentMessages}
+                          isVisible={true}
+                          embedded={true}
+                          incident={selectedSms}
+                          onClose={() => {
+                            setShowAgentPanel(false);
+                            setSelectedSms(null);
+                          }}
+                        />
+                      ) : (
+                        <WarRoomChatPanel
+                          incidentId={selectedSms?.inc_id}
+                          currentUser={userProfile || {}}
+                          isVisible={true}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
+                      <Brain className="w-10 h-10" />
+                      <p className="text-xs font-bold uppercase tracking-wider">Select an incident to analyze</p>
+                    </div>
+                  )}
+                </div>
               </div>
-
-              <div className="flex-1 overflow-hidden">
-                {showAgentPanel || selectedSms ? (
-                  <div className="h-full flex flex-col overflow-hidden">
-                    {activeLogTab === 'ai' ? (
-                      <AgentDiscussionPanel
-                        messages={agentMessages}
-                        isVisible={true}
-                        embedded={true}
-                        incident={selectedSms}
-                        onClose={() => {
-                          setShowAgentPanel(false);
-                          setSelectedSms(null);
-                        }}
-                      />
-                    ) : (
-                      <WarRoomChatPanel
-                        incidentId={selectedSms?.inc_id}
-                        currentUser={userProfile || {}}
-                        isVisible={true}
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
-                    <Brain className="w-10 h-10" />
-                    <p className="text-xs font-bold uppercase tracking-wider">Select an incident to analyze</p>
-                  </div>
-                )}
-              </div>
-
             </div>
-          </div>
           </div>{/* end col3 */}
-
 
           {/* ── 4/4: 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-hidden">
@@ -1786,7 +1774,6 @@ export default function DashboardPage({ onAiClick }) {
 
                       return (
                         <div className="flex flex-col gap-1 mt-1">
-                          {/* 탐지 + MTTR */}
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
                               <span className="text-[8px] uppercase tracking-tight text-slate-500 font-bold">DET</span>
@@ -1804,7 +1791,6 @@ export default function DashboardPage({ onAiClick }) {
                               </div>
                             </div>
                           </div>
-                          {/* 4단계 MTTR 요약 바 */}
                           <div className="flex items-center gap-1">
                             {[
                               { label: '인지', from: smsStep, to: ragStep },
@@ -1834,195 +1820,97 @@ export default function DashboardPage({ onAiClick }) {
                       );
                     })()}
                 </div>
-              </div>{/* end header */}
+              </div>
 
-              {/* Body (Non-scrollable HUD style) */}
               <div className="flex-1 overflow-hidden p-5">
-              <div className="relative">
-                {/* Vertical Line */}
-                <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
+                <div className="relative h-full">
+                  <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
 
-                <div className="space-y-6">
                   {selectedIncidentIdFlow ? (
-                    // Workflow Flow View
-                    <div className="flex flex-col space-y-0 py-2 relative">
+                    <div className="flex flex-col h-full relative" style={{ minHeight: '100%' }}>
                       {(() => {
-                        const firstPendingIdx = FLOW_STEPS.findIndex(step => {
-                          if (step.id === 'RAG_AGENT') {
-                            return !incidentWorkflowSteps.find(s => s.id === 'RAG') && !incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                        const stepTimestamps = FLOW_STEPS.map(step => {
+                          let sData = incidentWorkflowSteps.find(s => s.id === step.id);
+                          if (!sData && step.id === 'RAG_AGENT') {
+                            sData = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
                           }
-                          return !incidentWorkflowSteps.find(s => s.id === step.id);
+                          return sData ? new Date(sData.timestamp) : null;
                         });
 
+                        const durations = FLOW_STEPS.slice(0, -1).map((_, i) => {
+                          const start = stepTimestamps[i];
+                          const next  = stepTimestamps[i+1];
+                          if (!start) return 0;
+                          const end = next || (i === FLOW_STEPS.findIndex(t => !stepTimestamps[FLOW_STEPS.indexOf(t)]) - 1 ? currentTime : start);
+                          return Math.max(0, end - start);
+                        });
+
+                        const totalDuration = durations.reduce((a, b) => a + b, 0) || 1;
+
                         return FLOW_STEPS.map((step, sIdx) => {
-                          let stepData = incidentWorkflowSteps.find(s => s.id === step.id);
-
-                          // Combined RAG/AGENT logic
-                          if (step.id === 'RAG_AGENT') {
-                             const rag = incidentWorkflowSteps.find(s => s.id === 'RAG');
-                             const agent = incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                             if (rag && agent) {
-                               stepData = { 
-                                 ...agent, 
-                                 id: 'RAG_AGENT',
-                                 timestamp: agent.timestamp > rag.timestamp ? agent.timestamp : rag.timestamp, 
-                                 detail: 'AI 에이전트 그룹이 수천 건의 과거 데이터와 내부 지식베이스를 결합하여 인시던트 근본 원인을 입체적으로 분석하고 대응 시나리오를 수립했습니다.' 
-                               };
-                             } else if (rag || agent) {
-                               stepData = { ...(rag || agent), id: 'RAG_AGENT' };
-                             }
-                          }
-
+                          const stepData = incidentWorkflowSteps.find(s => s.id === step.id) || 
+                                           (step.id === 'RAG_AGENT' ? (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')) : null);
                           const isCompleted = !!stepData;
-                          const isNextStep = sIdx === firstPendingIdx;
+                          const isNextStep = !isCompleted && (sIdx === 0 || !!(incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) || (FLOW_STEPS[sIdx-1].id === 'RAG_AGENT' && (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')))));
 
-                          // Fix detail for WARROOM if it's 2.0 (replace with user name)
-                          if (step.id === 'WARROOM' && stepData?.detail?.includes('2.0님')) {
-                            stepData.detail = stepData.detail.replace('2.0님', '조경훈님');
-                          }
-
-                          // Calculate interval duration to the NEXT step (the line below this step)
-                          let intervalText = null;
-                          let intervalMinutes = 0;
-                          if (isCompleted && sIdx < FLOW_STEPS.length - 1) {
-                            const nextId = FLOW_STEPS[sIdx+1].id;
-                            // RAG_AGENT는 실제 데이터에 'RAG' 또는 'AGENT'로 저장됨
-                            let nextStepData = incidentWorkflowSteps.find(s => s.id === nextId);
-                            if (!nextStepData && nextId === 'RAG_AGENT') {
-                              nextStepData = incidentWorkflowSteps.find(s => s.id === 'RAG') ||
-                                             incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                            }
-                            if (nextStepData) {
-                              const diff = new Date(nextStepData.timestamp) - new Date(stepData.timestamp);
-                              const m = Math.floor(diff / 60000);
-                              const sec = Math.floor((diff % 60000) / 1000);
-                              intervalMinutes = m;
-                              intervalText = m > 60
-                                ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요`
-                                : m > 0
-                                ? `⏱ ${m}분 ${sec}초 소요`
-                                : `⏱ ${sec}초 소요`;
-                            } else if (sIdx === firstPendingIdx - 1) {
-                              // Next step is in progress, show elapsed since this step
-                              const diff = currentTime - new Date(stepData.timestamp);
-                              const m = Math.floor(diff / 60000);
-                              const sec = Math.floor((diff % 60000) / 1000);
-                              intervalMinutes = m;
-                              intervalText = m > 60
-                                ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과`
-                                : m > 0
-                                ? `⏱ ${m}분 ${sec}초 경과`
-                                : `⏱ ${sec}초 경과`;
-                            }
-                          }
-
-                          // 소요시간에 비례한 동적 paddingBottom (더욱 압축됨: 최소 16 ~ 최대 100px)
-                          const dynamicPb = intervalMinutes === 0
-                            ? 16
-                            : Math.min(100, Math.max(16, Math.round(16 + intervalMinutes * 0.1)));
+                          const rawWeight = sIdx < FLOW_STEPS.length - 1 ? (durations[sIdx] / totalDuration) : 0;
+                          const flexWeight = sIdx < FLOW_STEPS.length - 1 ? (0.2 + rawWeight * 0.8) : 0;
 
                           return (
-                            <div key={step.id} className="relative pl-14 group" style={{ paddingBottom: `${dynamicPb}px` }}>
-                              {/* Connecting Line - 배지 없이 순수 라인만 */}
-                              {sIdx < FLOW_STEPS.length - 1 && (
-                                <div className={`absolute left-[11px] top-7 bottom-[-24px] w-[2px] transition-colors duration-500
-                                  ${isCompleted ? 'bg-blue-600' : 'bg-white/5'}`} />
-                              )}
-
-                              {/* Glowing Core Node */}
-                              <div className={`glowing-core absolute left-0 top-0 z-10 border-2 border-[#1a1f2e] transition-all duration-700
-                                ${isCompleted ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.6)] glowing-core-done' :
-                                  (isNextStep ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-gray-800 border-white/5 glowing-core-pending')}`}>
-                                {isCompleted ? (
-                                   <CheckCircle2 className="w-3.5 h-3.5 text-white animate-in zoom-in duration-300" />
-                                ) : (
-                                   isNextStep ? (
-                                     <div className="relative flex h-3 w-3">
-                                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                       <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                                     </div>
-                                   ) : (
-                                     <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
-                                   )
-                                )}
-                              </div>
-
-                              <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
-                                <div className="flex items-center gap-3 mb-1.5">
-                                  <h4 className={`font-black tracking-tight text-base ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-gray-500')}`}>
-                                    {step.label}
-                                    {isNextStep && (
-                                      <div className="flex items-center gap-3 ml-3">
-                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500 text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]">
-                                          In Progress
-                                        </span>
-                                        {(() => {
-                                          const prevStepData = sIdx > 0 ? incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) : null;
-                                          if (prevStepData) {
-                                            const diff = currentTime - new Date(prevStepData.timestamp);
-                                            const m = Math.floor(diff / 60000);
-                                            const s = Math.floor((diff % 60000) / 1000);
-                                            return (
-                                              <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-0.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.1)]">
-                                                <span className="text-[8px] font-black text-blue-400/60 uppercase tracking-tighter">Current Stage Elapsed</span>
-                                                <span className="text-xs font-black font-mono text-blue-400 tabular-nums">
-                                                  {String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
-                                                </span>
-                                              </div>
-                                            );
-                                          }
-                                          return null;
-                                        })()}
-                                      </div>
+                            <React.Fragment key={step.id}>
+                              <div className="relative pl-12 group shrink-0">
+                                <div className={`absolute left-0 top-0 z-10 w-7 h-7 rounded-lg flex items-center justify-center border transition-all duration-700
+                                  ${isCompleted 
+                                    ? 'bg-blue-600/30 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110' 
+                                    : isNextStep 
+                                    ? 'bg-yellow-500/20 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.3)] animate-pulse' 
+                                    : 'bg-white/5 border-white/10 opacity-40'}`}>
+                                  <step.icon className={`w-3.5 h-3.5 ${isCompleted ? 'text-blue-400' : isNextStep ? 'text-yellow-400' : 'text-slate-500'}`} />
+                                </div>
+                                <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <h4 className={`font-black tracking-tight text-sm ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-gray-500')}`}>
+                                      {step.label}
+                                    </h4>
+                                    {isCompleted && (
+                                      <span className="text-[9px] text-white/50 font-mono">
+                                        {formatYYMMDD(stepData.timestamp)}
+                                      </span>
                                     )}
-                                  </h4>
-                                  {isCompleted && (
-                                    <span className="text-[10px] text-white font-black font-mono bg-white/10 px-2 py-0.5 rounded whitespace-nowrap shadow-[0_0_10px_rgba(255,255,255,0.1)]">
-                                      {formatYYMMDD(stepData.timestamp)}
-                                    </span>
+                                  </div>
+                                  <p className={`text-[11px] leading-snug ${isCompleted ? 'text-slate-400' : (isNextStep ? 'text-slate-300' : 'text-slate-600')}`}>
+                                    {isCompleted ? (stepData.detail?.length > 60 ? stepData.detail.slice(0,60)+'...' : stepData.detail) : (isNextStep ? '분석 진행 중...' : '대기 중')}
+                                  </p>
+                                </div>
+                              </div>
+                              {sIdx < FLOW_STEPS.length - 1 && (
+                                <div className="relative ml-[13px] flex-1 min-h-[20px]" style={{ flexGrow: flexWeight }}>
+                                  <div className={`absolute left-0 top-0 bottom-0 w-[2px] transition-colors duration-500
+                                    ${isCompleted ? 'bg-blue-600' : 'bg-white/5'}`} />
+                                  {/* Interval Time Badge (Dynamic Color & Active State) */}
+                                  {durations[sIdx] > 10000 && (
+                                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded border flex items-center gap-1.5 transition-all duration-500 z-20
+                                      ${durations[sIdx] > 300000 
+                                        ? 'bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
+                                        : durations[sIdx] > 60000 
+                                        ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.2)]' 
+                                        : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}
+                                      ${(isCompleted && !stepTimestamps[sIdx+1]) ? 'animate-pulse scale-110 border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : ''}`}>
+                                      <Clock className={`w-2.5 h-2.5 ${(isCompleted && !stepTimestamps[sIdx+1]) || durations[sIdx] > 60000 ? 'animate-spin' : ''}`} />
+                                      <span className={`text-[9px] font-mono font-black ${(isCompleted && !stepTimestamps[sIdx+1]) ? 'text-[10px]' : ''}`}>
+                                        {formatDuration(durations[sIdx])}
+                                      </span>
+                                      {(isCompleted && !stepTimestamps[sIdx+1]) && (
+                                        <span className="flex h-1.5 w-1.5 relative">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
-                                <p className={`text-xs max-w-xl leading-relaxed ${isCompleted ? 'text-slate-400' : (isNextStep ? 'text-slate-300 font-medium' : 'text-slate-600')}`}>
-                                  {isCompleted ? stepData.detail : (isNextStep ? '실시간 데이터 분석 및 대응 절차를 진행 중입니다...' : '업무 단계 대기 중')}
-                                </p>
-
-                                {/* 소요시간 배지 - inline */}
-                                {intervalText && sIdx < FLOW_STEPS.length - 1 && (
-                                  <div className="mt-2">
-                                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                                      intervalMinutes > 60
-                                        ? 'text-orange-400 bg-orange-500/10 border-orange-500/20'
-                                        : intervalMinutes > 10
-                                        ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20'
-                                        : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                                    }`}>
-                                      {intervalText}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {(isCompleted || isNextStep) && step.id === 'WARROOM' && (() => {
-                                   const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
-                                   return roomExists ? (
-                                     <button
-                                       onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)}
-                                       className="mt-2 inline-flex items-center gap-1.5 group/btn text-[11px] font-black text-white border border-blue-500/30 hover:border-blue-400 px-3 py-1.5 rounded-xl bg-blue-600 shadow-[0_0_12px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)] transition-all active:scale-95"
-                                     >
-                                       <Zap className="w-3.5 h-3.5" />
-                                       워룸이동 <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
-                                     </button>
-                                   ) : (
-                                     <button
-                                       disabled
-                                       className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black text-slate-500 border border-white/5 px-3 py-1.5 rounded-xl bg-white/5 cursor-not-allowed"
-                                     >
-                                       <Users className="w-3.5 h-3.5 opacity-50" />
-                                       워룸 미개설 (이동 불가)
-                                     </button>
-                                   );
-                                })()}
-                              </div>
-                            </div>
+                              )}
+                            </React.Fragment>
                           );
                         });
                       })()}
@@ -2039,12 +1927,10 @@ export default function DashboardPage({ onAiClick }) {
                   )}
                 </div>
               </div>
-              </div>{/* end scrollable body */}
-            </div>{/* end Activity card */}
-          </div>{/* end col4 */}
-
-        </div>{/* end grid */}
-        </div>{/* end stream wrapper */}
+            </div>
+          </div>
+        </div>
+        </div>
       </div>{/* end px-4 pt-4 pb-24 */}
 
       {/* Handling Progress Area */}
