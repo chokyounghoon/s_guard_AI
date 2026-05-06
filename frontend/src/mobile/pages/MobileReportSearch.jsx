@@ -224,17 +224,19 @@ export default function MobileReportSearch() {
 
   return (
     <div style={{
-      height: '100dvh',
+      minHeight: '100dvh',
       display: 'flex', flexDirection: 'column',
       background: 'radial-gradient(ellipse 130% 80% at 50% 0%, #0d1528 0%, #080e1a 50%, #050a15 100%)',
       color: '#fff',
       fontFamily: "'Inter', 'Noto Sans KR', sans-serif",
-      overflow: 'hidden',
+      overflowY: 'auto',
     }}>
 
       {/* ── Sticky Header ─────────────────────────────────────── */}
       <div style={{
         flexShrink: 0,
+        position: 'sticky',
+        top: 0,
         paddingTop: 'env(safe-area-inset-top)',
         background: 'rgba(8,14,26,0.92)',
         backdropFilter: 'blur(12px)',
@@ -372,8 +374,8 @@ export default function MobileReportSearch() {
         </div>
       </div>
 
-      {/* ── Scrollable Results ─────────────────────────────────── */}
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      {/* ── Results Container ─────────────────────────────────── */}
+      <div style={{ WebkitOverflowScrolling: 'touch' }}>
         <div style={{ padding: '12px 12px calc(80px + env(safe-area-inset-bottom))' }}>
 
           {/* result count */}
