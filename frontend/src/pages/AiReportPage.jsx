@@ -236,6 +236,49 @@ export default function AiReportPage() {
 
   const sevCls = { CRITICAL: 'text-red-400 bg-red-500/10 border-red-500/30', HIGH: 'text-orange-400 bg-orange-500/10 border-orange-500/30', NORMAL: 'text-blue-400 bg-blue-500/10 border-blue-500/20', INFO: 'text-slate-400 bg-slate-500/10 border-slate-500/20', MAJOR: 'text-orange-400 bg-orange-500/10 border-orange-500/30' };
 
+  // — 상세 보기용 useEffect들을 조건부 return 앞에 선언 (Hook 규칙) —
+  useEffect(() => () => { if (genAbortRef.current) genAbortRef.current.abort(); }, []);
+
+  useEffect(() => {
+    if (!incidentId) return;
+    const fetchReport = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/warroom/report/${incidentId}`, {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setReport(data);
+      } catch (e) {
+        setError(`데이터 로드 실패: ${e.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReport();
+
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/db/summary/${incidentId}`, {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.summary) setChatSummary(data.summary);
+        }
+      } catch (e) {
+        console.warn('Summary fetch failed:', e);
+      }
+    };
+    fetchSummary();
+  }, [incidentId]);
+
+  useEffect(() => {
+    if (activeTab === 'ai_report' && !aiGenText && !isGenerating && report) {
+      generateAiReport();
+    }
+  }, [activeTab, aiGenText, isGenerating, report]);
+
   if (listMode) {
     return (
       <div className="min-h-screen bg-[#0a0d14] text-white font-sans flex flex-col pb-6">
@@ -493,55 +536,12 @@ export default function AiReportPage() {
     }
   };
 
-  useEffect(() => () => { if (genAbortRef.current) genAbortRef.current.abort(); }, []);
-
   const reportingLines = [
     { id: 'leader',   role: '팀장',  name: '직속 팀장', desc: '직속 상급자' },
     { id: 'director', role: '본부장', name: '부서 본부장', desc: '부서 책임자' },
     { id: 'exec',     role: '상무',  name: '사업부 상무', desc: '사업부 임원' },
   ];
 
-  useEffect(() => {
-    if (!incidentId) return;
-    const fetchReport = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/warroom/report/${incidentId}`, {
-          headers: getAuthHeaders()
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setReport(data);
-      } catch (e) {
-        setError(`데이터 로드 실패: ${e.message}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchReport();
-
-    const fetchSummary = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/db/summary/${incidentId}`, {
-          headers: getAuthHeaders()
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.summary) {
-            setChatSummary(data.summary);
-          }
-        }
-      } catch (e) {
-        console.warn('Summary fetch failed:', e);
-      }
-    };
-    fetchSummary();
-  }, [incidentId]);
-
-  useEffect(() => {
-    if (activeTab === 'ai_report' && !aiGenText && !isGenerating && report) {
-      generateAiReport();
-    }
-  }, [activeTab, aiGenText, isGenerating, report]);
 
   const toggleLine = (id) => {
     setSelectedLines(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
