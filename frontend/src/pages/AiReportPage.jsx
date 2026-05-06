@@ -140,22 +140,103 @@ export default function AiReportPage() {
   const incidentId = rawId ? String(rawId).replace("INC-", "").trim() : null;
   const currentUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
 
+  // — incident가 없으면 목록 모드 —
+  const [listMode, setListMode] = useState(!incidentId);
+  const [incidentList, setIncidentList] = useState([]);
+  const [listLoading, setListLoading] = useState(!incidentId);
+
+  // — 상세 보기 state (항상 선언 — Hook 규칙) —
   const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!incidentId);
   const [error, setError] = useState('');
   const [memo, setMemo] = useState('');
   const [modalStep, setModalStep] = useState(null);
   const [selectedLines, setSelectedLines] = useState([]);
   const [activeTab, setActiveTab] = useState('summary');
   const [showShareTooltip, setShowShareTooltip] = useState(false);
-  // Dify AI report generation
   const [aiGenText, setAiGenText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const genAbortRef = useRef(null);
-  
-  // Incident Summary (Timeline) from DB
   const [chatSummary, setChatSummary] = useState('');
-  
+
+  useEffect(() => {
+    if (!listMode) return;
+    const fetchList = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/incidents?limit=30&status=완료`, {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setIncidentList(Array.isArray(data) ? data : (data.incidents || []));
+      } catch (e) {
+        console.warn('incident list fetch failed:', e);
+      } finally {
+        setListLoading(false);
+      }
+    };
+    fetchList();
+  }, [listMode]);
+
+  const report_sev_cls = { CRITICAL: 'text-red-400 bg-red-500/10 border-red-500/30', HIGH: 'text-orange-400 bg-orange-500/10 border-orange-500/30', NORMAL: 'text-blue-400 bg-blue-500/10 border-blue-500/20', INFO: 'text-slate-400 bg-slate-500/10 border-slate-500/20' };
+
+  if (listMode) {
+    return (
+      <div className="h-screen bg-[#0a0d14] text-white font-sans flex flex-col">
+        <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5">
+          <div className="max-w-3xl mx-auto w-full flex items-center gap-3 px-4 py-3">
+            <button onClick={() => goBack()} className="shrink-0 p-2 rounded-full hover:bg-white/5 transition-colors">
+              <ArrowLeft className="w-5 h-5 text-slate-400" />
+            </button>
+            <div className="flex-1">
+              <h1 className="text-sm font-black text-white">AI 장애 보고서</h1>
+              <p className="text-[10px] text-slate-500">열람할 장애를 선택하세요</p>
+            </div>
+            <Sparkles className="w-5 h-5 text-blue-400" />
+          </div>
+        </header>
+        <main className="flex-1 overflow-y-auto max-w-3xl mx-auto w-full px-4 py-4">
+          {listLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4 text-slate-500">
+              <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+              <span className="text-sm">장애 목록 로드 중...</span>
+            </div>
+          ) : incidentList.length === 0 ? (
+            <div className="text-center py-24 text-slate-500 text-sm">열람할 완료 장애가 없습니다.</div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3">최근 완료 장애 ({incidentList.length})</p>
+              {incidentList.map(inc => {
+                const sev = inc.severity || 'NORMAL';
+                const sevCls = report_sev_cls[sev] || report_sev_cls.NORMAL;
+                return (
+                  <button
+                    key={inc.inc_id || inc.id}
+                    onClick={() => navigate(`/ai-report/${inc.inc_id || inc.id}`)}
+                    className="w-full flex items-start gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 transition-all text-left group"
+                  >
+                    <div className={`shrink-0 mt-0.5 text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tight ${sevCls}`}>{sev}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors truncate">
+                        {(inc.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '') || `INC-${inc.inc_id || inc.id}`}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        INC-{inc.inc_id || inc.id} &nbsp;&middot;&nbsp; {inc.created_at?.slice(0, 16) || '-'}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 shrink-0 mt-1 transition-colors" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  // — 기존 보고서 상세 보기 —
+
   const generateAiReport = async () => {
     if (!incidentId) return;
     if (genAbortRef.current) genAbortRef.current.abort();
@@ -233,11 +314,7 @@ export default function AiReportPage() {
   ];
 
   useEffect(() => {
-    if (!incidentId) {
-      setError('장애 ID가 없습니다. 채팅방에서 다시 접근해주세요.');
-      setLoading(false);
-      return;
-    }
+    if (!incidentId) return;
     const fetchReport = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/warroom/report/${incidentId}`, {

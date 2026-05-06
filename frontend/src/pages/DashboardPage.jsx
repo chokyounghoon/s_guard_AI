@@ -1413,7 +1413,7 @@ export default function DashboardPage({ onAiClick }) {
             { label: 'Codebook',        icon: BookOpen,    path: '/codebook-management',    color: '#eab308' },
             { label: 'Data Flow',       icon: Layers,      path: '/processing-flow',        color: '#3b82f6', adminOnly: true },
             { label: 'Push Diagnostic', icon: Bell,        path: '/push-diagnostic',        color: '#f59e0b' },
-            { label: 'AI Report',       icon: FileText,    action: () => onAiClick?.(),     color: '#3b82f6' },
+            { label: 'AI Report',       icon: FileText,    path: '/ai-report',              color: '#3b82f6' },
             { label: 'Report Search',   icon: Search,      path: '/mobile-report-search',   color: '#10b981' },
           ].filter(m => !m.adminOnly || userProfile?.is_admin === 1 || userProfile?.role === 'admin')
            .map((item, idx, arr) => {
