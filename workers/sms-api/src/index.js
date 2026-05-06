@@ -63,6 +63,13 @@ function maskPII(text) {
   return out
 }
 
+// 🇰🇷 KST 타임존 헬퍼 (YYYY-MM-DD HH:mm:ss 형식)
+function getKst() {
+  const now = new Date();
+  const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  return kst.toISOString().replace('T', ' ').substring(0, 19);
+}
+
 // 🛡️ SECURITY: 기기 지문(Device Fingerprint) 생성 - UA + IP C-Class 해싱
 async function generateDeviceHash(c) {
   const ua = c.req.header('user-agent') || 'unknown';
@@ -8813,6 +8820,205 @@ export class WarRoom {
     }
   }
 }
+
+// ── S-callert: PDS 장애 자동 호출 관리 ──────────────────────────────────────────
+
+// 1. 전략 목록 조회
+app.get('/scallert/strategies', async (c) => {
+  const db = c.env.DB;
+  try {
+    const { results } = await db.prepare("SELECT * FROM TB_SCL_STRATEGY_MST ORDER BY STRATEGY_ID ASC").all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 1.5 전략 등록
+app.post('/scallert/strategies', async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const now = getKst();
+  const strategyId = 'S' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+  try {
+    await db.prepare(`
+      INSERT INTO TB_SCL_STRATEGY_MST (
+        STRATEGY_ID, STRATEGY_NM, STRATEGY_CONT, APPLY_START_DT, APPLY_END_DT, MAX_CALL_CNT, USE_YN, REG_ID, REG_DT, MOD_ID, MOD_DT
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      strategyId, body.strategy_nm, body.strategy_cont || '1', body.apply_start_dt, body.apply_end_dt, 
+      body.max_call_cnt || 3, body.use_yn || 'Y', 
+      body.reg_id || 'SYSTEM', now, body.reg_id || 'SYSTEM', now
+    ).run();
+    return c.json({ success: true, strategy_id: strategyId });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 2. 전략 수정
+app.patch('/scallert/strategies/:id', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const now = getKst();
+
+  try {
+    await db.prepare(`
+      UPDATE TB_SCL_STRATEGY_MST 
+      SET STRATEGY_NM = ?, STRATEGY_CONT = ?, APPLY_START_DT = ?, APPLY_END_DT = ?, MAX_CALL_CNT = ?, USE_YN = ?, MOD_ID = ?, MOD_DT = ?
+      WHERE STRATEGY_ID = ?
+    `).bind(
+      body.strategy_nm, body.strategy_cont, body.apply_start_dt, body.apply_end_dt, 
+      body.max_call_cnt, body.use_yn, body.mod_id || 'SYSTEM', now, id
+    ).run();
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 3. 담당자 목록 조회
+app.get('/scallert/strategies/:id/targets', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  try {
+    const { results } = await db.prepare("SELECT * FROM TB_SCL_TARGET_INFO WHERE STRATEGY_ID = ? ORDER BY SORT_ORD ASC").bind(id).all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 4. 담당자 추가
+app.post('/scallert/strategies/:id/targets', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const now = getKst();
+
+  try {
+    const res = await db.prepare(`
+      INSERT INTO TB_SCL_TARGET_INFO (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, SORT_ORD, REG_ID, REG_DT)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, body.emp_id, body.emp_nm, body.mobile_no, body.sort_ord || 0, body.mod_id || 'SYSTEM', now).run();
+    return c.json({ success: true, seq_no: res.meta.last_row_id });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 5. 담당자 수정
+app.patch('/scallert/targets/:seq', async (c) => {
+  const db = c.env.DB;
+  const seq = c.req.param('seq');
+  const body = await c.req.json();
+  const now = getKst();
+
+  try {
+    await db.prepare(`
+      UPDATE TB_SCL_TARGET_INFO 
+      SET EMP_ID = ?, EMP_NM = ?, MOBILE_NO = ?, SORT_ORD = ?, MOD_ID = ?, MOD_DT = ?
+      WHERE SEQ_NO = ?
+    `).bind(body.emp_id, body.emp_nm, body.mobile_no, body.sort_ord || 0, body.mod_id || 'SYSTEM', now, seq).run();
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 6. 담당자 삭제
+app.delete('/scallert/targets/:seq', async (c) => {
+  const db = c.env.DB;
+  const seq = c.req.param('seq');
+  try {
+    await db.prepare("DELETE FROM TB_SCL_TARGET_INFO WHERE SEQ_NO = ?").bind(seq).run();
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 7. 발신 이력 조회
+app.get('/scallert/strategies/:id/history', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const limit = c.req.query('limit') || 50;
+  try {
+    const { results } = await db.prepare(`
+      SELECT h.*, t.EMP_NM as emp_nm, t.MOBILE_NO as mobile_no
+      FROM TB_SCL_CALL_HIST h
+      LEFT JOIN TB_SCL_TARGET_INFO t ON h.EMP_ID = t.EMP_ID
+      WHERE h.STRATEGY_ID = ? 
+      ORDER BY h.CALL_DT DESC LIMIT ?
+    `).bind(id, limit).all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 8. IGW 이벤트 수신 (실제 발신 로직)
+app.post('/scallert/igw-event', async (c) => {
+  const db = c.env.DB;
+  const igwSecret = c.req.header('x-igw-secret');
+  
+  // IGW 시크릿 검증 (Environment 변수 IGW_SECRET 사용)
+  if (igwSecret !== c.env.IGW_SECRET && c.env.ENVIRONMENT === 'production') {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const payload = await c.req.json();
+  const { igw_txn_id, strategy_id, event_type, inc_id, message, severity } = payload;
+
+  if (!igw_txn_id || !strategy_id) {
+    return c.json({ error: 'Missing required fields' }, 400);
+  }
+
+  if (event_type === 'RECOVER') {
+    return c.json({ ok: true, skipped: true, reason: 'RECOVER' });
+  }
+
+  try {
+    const now = getKst();
+    const strategy = await db.prepare(`
+      SELECT * FROM TB_SCL_STRATEGY_MST 
+      WHERE STRATEGY_ID = ? 
+        AND USE_YN = 'Y' 
+        AND (APPLY_START_DT IS NULL OR APPLY_START_DT <= ?)
+        AND (APPLY_END_DT IS NULL OR APPLY_END_DT >= ?)
+    `).bind(strategy_id, now, now).first();
+    
+    if (!strategy) return c.json({ error: 'Active strategy not found or expired' }, 404);
+
+    const { results: targets } = await db.prepare("SELECT * FROM TB_SCL_TARGET_INFO WHERE STRATEGY_ID = ? ORDER BY SORT_ORD ASC").bind(strategy_id).all();
+    if (!targets || targets.length === 0) return c.json({ error: 'No targets' }, 404);
+    const maxAttempts = strategy.MAX_CALL_CNT || 3;
+    const callResults = [];
+
+    for (let i = 1; i <= maxAttempts; i++) {
+      const target = targets[(i - 1) % targets.length];
+      
+      // PDS API 호출 (Mock or Actual)
+      let pdsStatus = 'SUCCESS'; 
+      // 실제 환경에서는 fetch(c.env.PDS_API_URL, ...) 호출 로직 추가
+      
+      await db.prepare(`
+        INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_ID, REG_DT)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(strategy_id, target.EMP_ID, i, igw_txn_id, pdsStatus, now, inc_id || null, JSON.stringify(payload), 'IGW_SYSTEM', now).run();
+
+      callResults.push({ attempt: i, emp_id: target.EMP_ID, result: pdsStatus });
+      if (pdsStatus === 'SUCCESS') break;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    return c.json({ ok: true, details: callResults });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
 
 // ── WebSocket Upgrade Route ──────────────────────────────────────────────────
 app.get('/warroom/ws/:id', async (c) => {

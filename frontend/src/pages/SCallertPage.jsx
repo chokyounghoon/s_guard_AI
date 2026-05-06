@@ -1,0 +1,706 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
+import {
+  ArrowLeft, Phone, Users, Activity, RefreshCw,
+  Plus, Trash2, Edit3, Check, X, Save,
+  ChevronDown, Zap, Clock, AlertCircle,
+  CheckCircle2, PhoneOff, PhoneMissed, Loader2
+} from 'lucide-react';
+import { getAuthHeaders, getUserProfile } from '../lib/authStore';
+import { SMS_WORKER_URL } from '../config/api';
+
+const API_BASE = SMS_WORKER_URL || 'https://sguardai.khcho0421.workers.dev';
+
+// ─── 전략 유형 옵션 ──────────────────────────────────────────
+const STRATEGY_CONT_OPTIONS = [
+  { id: '1', label: '메시지 수신자별 순차 통화' },
+  { id: '2', label: '메시지 수신자 및 AA, 파트장' },
+  { id: '3', label: '메시지 수신자의 파트 전원' },
+];
+
+// ─── PDS 결과 코드 배지 ────────────────────────────────────────
+function PdsBadge({ code }) {
+  const map = {
+    SUCCESS:  { label: '성공',   cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+    FAIL:     { label: '실패',   cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+    BUSY:     { label: '통화중', cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
+    NOANSWER: { label: '무응답', cls: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
+    PENDING:  { label: '대기',   cls: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+  };
+  const { label, cls } = map[code] || { label: code || '-', cls: 'bg-white/5 text-slate-500 border-white/10' };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+// ─── 인라인 입력 셀 ──────────────────────────────────────────
+function InlineInput({ value, onChange, placeholder, className = '' }) {
+  return (
+    <input
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`bg-transparent border-b border-blue-500/40 focus:border-blue-400 focus:outline-none text-sm text-white placeholder-slate-600 py-0.5 w-full font-mono ${className}`}
+    />
+  );
+}
+
+// ─── 섹션 헤더 ───────────────────────────────────────────────
+function SectionHeader({ icon: Icon, title, sub, color, children }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `${color}20`, border: `1px solid ${color}40` }}>
+          <Icon size={15} color={color} />
+        </div>
+        <div>
+          <p className="text-sm font-black text-white">{title}</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color }}>{sub}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+export default function SCallertPage() {
+  const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
+  const userProfile = getUserProfile();
+
+  // ── 전략 마스터 ─────────────────────────────────
+  const [strategies, setStrategies]       = useState([]);
+  const [selectedSid, setSelectedSid]     = useState('');
+  const [ruleForm, setRuleForm]           = useState(null);
+  const [ruleEditing, setRuleEditing]     = useState(false);
+  const [ruleSaving, setRuleSaving]       = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newStrategy, setNewStrategy]     = useState({
+    strategy_nm: '',
+    strategy_cont: '1',
+    apply_start_dt: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+    apply_end_dt: '2099-12-31T23:59',
+    max_call_cnt: 3,
+  });
+
+  // ── 담당자 목록 ─────────────────────────────────
+  const [targets, setTargets]             = useState([]);
+  const [tgtLoading, setTgtLoading]       = useState(false);
+  const [editRow, setEditRow]             = useState(null);   // { idx, ...fields }
+  const [addRow, setAddRow]               = useState(null);   // { emp_id, emp_nm, mobile_no }
+
+  // ── 발신 이력 ────────────────────────────────────
+  const [hists, setHists]                 = useState([]);
+  const [histLoading, setHistLoading]     = useState(false);
+  const pollRef                           = useRef(null);
+
+  // ── 전략 목록 로드 ───────────────────────────────
+  const fetchStrategies = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/scallert/strategies`, { headers: getAuthHeaders() });
+      if (!r.ok) return;
+      const data = await r.json();
+      const list = data.strategies || data || [];
+      setStrategies(list);
+      if (!selectedSid && list.length > 0) setSelectedSid(list[0].strategy_id);
+    } catch (e) { console.error(e); }
+  }, [selectedSid]);
+
+  // ── 담당자 목록 로드 ─────────────────────────────
+  const fetchTargets = useCallback(async (sid) => {
+    if (!sid) return;
+    setTgtLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/scallert/strategies/${sid}/targets`, { headers: getAuthHeaders() });
+      const data = await r.json();
+      setTargets(data.targets || data || []);
+    } catch (e) { console.error(e); }
+    finally { setTgtLoading(false); }
+  }, []);
+
+  // ── 발신 이력 로드 ───────────────────────────────
+  const fetchHists = useCallback(async (sid) => {
+    if (!sid) return;
+    setHistLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/scallert/strategies/${sid}/history?limit=30`, { headers: getAuthHeaders() });
+      const data = await r.json();
+      setHists(data.history || data || []);
+    } catch (e) { console.error(e); }
+    finally { setHistLoading(false); }
+  }, []);
+
+  // ── 초기 로드 + 전략 선택 변경 ───────────────────
+  useEffect(() => { fetchStrategies(); }, []);
+
+  useEffect(() => {
+    if (!selectedSid) return;
+    const s = strategies.find(s => s.strategy_id === selectedSid);
+    if (s) setRuleForm({ ...s });
+    setRuleEditing(false);
+    fetchTargets(selectedSid);
+    fetchHists(selectedSid);
+
+    // 30초 폴링 (발신 이력 실시간 갱신)
+    clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => fetchHists(selectedSid), 30000);
+    return () => clearInterval(pollRef.current);
+  }, [selectedSid, strategies.length]);
+
+  // ── Rule Save ────────────────────────────────────
+  const handleRuleSave = async () => {
+    if (!ruleForm) return;
+    setRuleSaving(true);
+    try {
+      const r = await fetch(`${API_BASE}/scallert/strategies/${selectedSid}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          strategy_nm:    ruleForm.strategy_nm,
+          strategy_cont:  ruleForm.strategy_cont,
+          apply_start_dt: ruleForm.apply_start_dt,
+          apply_end_dt:   ruleForm.apply_end_dt,
+          max_call_cnt:   Number(ruleForm.max_call_cnt),
+          use_yn:         ruleForm.use_yn,
+          mod_id:         userProfile?.employee_id || 'SYSTEM',
+        }),
+      });
+      if (r.ok) { 
+        setRuleEditing(false); 
+        await fetchStrategies(); 
+        alert('전략 설정이 저장되었습니다.');
+      }
+      else {
+        const err = await r.json();
+        alert(`저장에 실패했습니다: ${err.error || '알 수 없는 오류'}`);
+      }
+    } catch (e) { 
+      console.error(e); 
+      alert('네트워크 오류가 발생했습니다.');
+    }
+    finally { setRuleSaving(false); }
+  };
+
+  // ── Strategy Create ──────────────────────────────
+  const handleCreateStrategy = async () => {
+    if (!newStrategy.strategy_nm) {
+      alert('전략명을 입력해 주세요.');
+      return;
+    }
+    try {
+      const r = await fetch(`${API_BASE}/scallert/strategies`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ...newStrategy,
+          reg_id: userProfile?.employee_id || 'SYSTEM'
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        alert('새로운 전략이 등록되었습니다.');
+        setShowCreateModal(false);
+        setNewStrategy({
+          strategy_nm: '',
+          strategy_cont: '1',
+          apply_start_dt: new Date().toISOString().slice(0, 16),
+          apply_end_dt: '2099-12-31T23:59',
+          max_call_cnt: 3,
+        });
+        await fetchStrategies();
+        setSelectedSid(data.strategy_id);
+      } else {
+        alert('전략 등록에 실패했습니다.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('네트워크 오류가 발생했습니다.');
+    }
+  };
+
+  // ── Target CRUD ──────────────────────────────────
+  const handleTargetSave = async (row) => {
+    if (!row.emp_id || !row.emp_nm || !row.mobile_no) {
+      alert('사번, 성명, 휴대번호는 필수입니다.');
+      return;
+    }
+    const isNew = row.seq_no === undefined;
+    const url   = isNew
+      ? `${API_BASE}/scallert/strategies/${selectedSid}/targets`
+      : `${API_BASE}/scallert/targets/${row.seq_no}`;
+    const method = isNew ? 'POST' : 'PATCH';
+
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ ...row, mod_id: userProfile?.employee_id || 'SYSTEM' }),
+      });
+      if (r.ok) {
+        setEditRow(null); setAddRow(null);
+        fetchTargets(selectedSid);
+      } else alert('저장에 실패했습니다.');
+    } catch (e) { console.error(e); }
+  };
+
+  const handleTargetDelete = async (seq_no) => {
+    if (!window.confirm('담당자를 삭제하시겠습니까?')) return;
+    try {
+      const r = await fetch(`${API_BASE}/scallert/targets/${seq_no}`, {
+        method: 'DELETE', headers: getAuthHeaders(),
+      });
+      if (r.ok) fetchTargets(selectedSid);
+      else alert('삭제에 실패했습니다.');
+    } catch (e) { console.error(e); }
+  };
+
+  const currentStrategy = strategies.find(s => s.strategy_id === selectedSid);
+
+  return (
+    <div
+      className="min-h-screen text-white font-sans pb-24 relative overflow-x-hidden"
+      style={{ background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' }}
+    >
+      {/* 배경 그로우 */}
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-orange-600/5 blur-[160px] rounded-full -z-10 pointer-events-none" />
+      <div className="fixed bottom-0 left-0  w-[400px] h-[400px] bg-red-600/5   blur-[120px] rounded-full -z-10 pointer-events-none" />
+
+      {/* ── 헤더 ───────────────────────────────────── */}
+      <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{ background: 'rgba(4,7,15,0.94)', borderColor: 'rgba(251,146,60,0.15)' }}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => goBack()}
+              style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
+            >
+              <ArrowLeft className="w-4 h-4 text-slate-400" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <Phone size={14} color="#fb923c" />
+                <h1 className="text-base font-black tracking-tight" style={{ background:'linear-gradient(90deg,#f1f5f9,#fb923c)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
+                  S-callert
+                </h1>
+              </div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color:'rgba(251,146,60,0.6)' }}>
+                PDS 장애 자동 호출 관리
+              </p>
+            </div>
+          </div>
+          {/* 전략 선택기 및 추가 버튼 */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <select
+                value={selectedSid}
+                onChange={e => setSelectedSid(e.target.value)}
+                className="appearance-none bg-[#0f1420] border border-orange-500/20 text-orange-300 text-xs font-black rounded-xl px-4 py-2.5 pr-8 focus:outline-none focus:border-orange-500/50 cursor-pointer shadow-[0_0_15px_rgba(251,146,60,0.05)]"
+              >
+                {strategies.length === 0 && <option value="">전략 없음</option>}
+                {strategies.map(s => (
+                  <option key={s.strategy_id} value={s.strategy_id}>{s.strategy_nm}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-orange-400 pointer-events-none" />
+            </div>
+            
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="w-[38px] h-[38px] rounded-xl flex items-center justify-center bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-black transition-all shadow-[0_0_15px_rgba(251,146,60,0.1)] active:scale-95"
+              title="새 전략 추가"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+        {/* ════════════════════════════════════════════
+            1️⃣  RULE SETTING
+        ════════════════════════════════════════════ */}
+        <section className={`relative group transition-all duration-500 rounded-[2rem] overflow-hidden border ${ruleEditing ? 'border-orange-500/40 bg-orange-500/5 shadow-[0_0_40px_rgba(251,146,60,0.1)]' : 'border-white/5 bg-[#0c1020]/60'} backdrop-blur-xl`}>
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-600/[0.03] to-transparent pointer-events-none" />
+          
+          <div className="p-6 relative z-10">
+            <SectionHeader icon={Zap} title="Rule Setting" sub="Strategy Master Config" color="#fb923c">
+              {ruleForm && (
+                !ruleEditing ? (
+                  <button
+                    onClick={() => setRuleEditing(true)}
+                    className="group/btn flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black border border-orange-500/30 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 hover:border-orange-500/50 transition-all active:scale-95 shadow-[0_0_15px_rgba(251,146,60,0.1)]"
+                  >
+                    <Edit3 size={14} className="group-hover/btn:rotate-12 transition-transform" /> 
+                    <span>전략 수정</span>
+                  </button>
+                ) : (
+                  <div className="flex gap-2.5">
+                    <button 
+                      onClick={() => { setRuleEditing(false); setRuleForm(currentStrategy ? { ...currentStrategy } : null); }}
+                      className="px-4 py-2 rounded-xl text-xs font-black border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 transition-all flex items-center gap-2"
+                    >
+                      <X size={14} /> 취소
+                    </button>
+                    <button 
+                      onClick={handleRuleSave} 
+                      disabled={ruleSaving}
+                      className="px-5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-orange-500 to-amber-500 text-black hover:from-orange-400 hover:to-amber-400 transition-all flex items-center gap-2 disabled:opacity-60 shadow-[0_0_20px_rgba(251,146,60,0.3)] active:scale-95"
+                    >
+                      {ruleSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 
+                      <span>변경사항 저장</span>
+                    </button>
+                  </div>
+                )
+              )}
+            </SectionHeader>
+
+            {ruleForm ? (
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-4">
+                {/* 전략 명칭 (Full width on mobile, 2 cols on desktop) */}
+                <div className="md:col-span-2 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 size={10} className="text-orange-500/60" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">전략 명칭</p>
+                  </div>
+                  {ruleEditing ? (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={ruleForm.strategy_nm || ''}
+                        onChange={e => setRuleForm(p => ({ ...p, strategy_nm: e.target.value }))}
+                        className="w-full bg-[#0a0e1a]/80 border border-orange-500/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-slate-700"
+                        placeholder="전략 이름을 입력하세요"
+                      />
+                      <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-orange-500/20 to-transparent" />
+                    </div>
+                  ) : (
+                    <div className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/5">
+                      <p className="text-sm font-black text-white">{ruleForm.strategy_nm || '-'}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 전략 내용 (유형 선택) */}
+                <div className="md:col-span-2 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap size={10} className="text-purple-500/60" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">전략 내용 (유형)</p>
+                  </div>
+                  {ruleEditing ? (
+                    <select
+                      value={ruleForm.strategy_cont || '1'}
+                      onChange={e => setRuleForm(p => ({ ...p, strategy_cont: e.target.value }))}
+                      className="w-full bg-[#0a0e1a]/80 border border-purple-500/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500/60 transition-all"
+                    >
+                      {STRATEGY_CONT_OPTIONS.map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                      <p className="text-sm font-bold text-purple-300">
+                        {STRATEGY_CONT_OPTIONS.find(o => o.id === ruleForm.strategy_cont)?.label || '순차 통화'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 발신 횟수 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Activity size={10} className="text-amber-500/60" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">최대 발신</p>
+                  </div>
+                  {ruleEditing ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={ruleForm.max_call_cnt || ''}
+                        onChange={e => setRuleForm(p => ({ ...p, max_call_cnt: e.target.value }))}
+                        className="w-full bg-[#0a0e1a]/80 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-400 font-black focus:outline-none focus:border-amber-500/60 transition-all font-mono"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">회</span>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-3 rounded-xl bg-amber-500/5 border border-amber-500/10 flex items-center justify-between">
+                      <span className="text-sm font-black text-amber-400 font-mono">{ruleForm.max_call_cnt}</span>
+                      <span className="text-[10px] font-bold text-amber-500/40 uppercase">Times</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 기간 설정 (Date Range) */}
+                <div className="md:col-span-4 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock size={10} className="text-blue-500/60" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">유효 기간 (Start ~ End)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {ruleEditing ? (
+                      <>
+                        <input
+                          type="datetime-local"
+                          value={ruleForm.apply_start_dt || ''}
+                          onChange={e => setRuleForm(p => ({ ...p, apply_start_dt: e.target.value }))}
+                          className="flex-1 bg-[#0a0e1a]/80 border border-blue-500/20 rounded-xl px-3 py-3 text-[11px] text-white focus:outline-none focus:border-blue-500/50 transition-all font-mono"
+                        />
+                        <span className="text-slate-600">~</span>
+                        <input
+                          type="datetime-local"
+                          value={ruleForm.apply_end_dt || ''}
+                          onChange={e => setRuleForm(p => ({ ...p, apply_end_dt: e.target.value }))}
+                          className="flex-1 bg-[#0a0e1a]/80 border border-blue-500/20 rounded-xl px-3 py-3 text-[11px] text-white focus:outline-none focus:border-blue-500/50 transition-all font-mono"
+                        />
+                      </>
+                    ) : (
+                      <div className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/5 font-mono text-[11px] font-bold text-slate-300">
+                        <span>{ruleForm.apply_start_dt?.replace('T', ' ') || '∞'}</span>
+                        <span className="mx-2 text-slate-600">→</span>
+                        <span>{ruleForm.apply_end_dt?.replace('T', ' ') || '∞'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-600 bg-white/[0.02] rounded-3xl border border-dashed border-white/5 mt-4">
+                <AlertCircle size={32} className="opacity-20 text-orange-500" />
+                <div className="text-center">
+                  <p className="text-sm font-black text-white uppercase tracking-widest">등록된 전략이 없습니다</p>
+                  <p className="text-[10px] font-medium text-slate-500 mt-1">상단 바의 명령어를 통해 초기 데이터를 생성해 주세요.</p>
+                </div>
+              </div>
+            )}
+
+            {/* 하단 상태바 (사용여부 및 Audit) */}
+            {ruleForm && (
+              <div className="flex flex-wrap items-center justify-between mt-8 pt-6 border-t border-white/5 gap-4">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-3">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">Status</p>
+                    {ruleEditing ? (
+                      <div className="flex p-1 bg-black/40 rounded-lg border border-white/5">
+                        {['Y', 'N'].map(v => (
+                          <button
+                            key={v}
+                            onClick={() => setRuleForm(p => ({ ...p, use_yn: v }))}
+                            className={`px-3 py-1 rounded-md text-[10px] font-black transition-all ${ruleForm.use_yn === v ? 'bg-orange-500 text-black shadow-lg shadow-orange-500/20' : 'text-slate-500 hover:text-slate-300'}`}
+                          >
+                            {v === 'Y' ? 'ACTIVE' : 'DISABLED'}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black ${ruleForm.use_yn === 'Y' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${ruleForm.use_yn === 'Y' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                        {ruleForm.use_yn === 'Y' ? 'STRATEGY ACTIVE' : 'STRATEGY INACTIVE'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-[9px] font-bold text-slate-600 font-mono italic">
+                  <span>Last Updated: {ruleForm.mod_dt?.replace('T', ' ').slice(0, 19) || 'Unknown'}</span>
+                  <span className="w-[1px] h-3 bg-white/10" />
+                  <span>By: {ruleForm.mod_id || 'SYSTEM'}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ════════════════════════════════════════════
+            2️⃣  INCIDENT CALL TRACKING (장애 ID 기반 발신 현황)
+        ════════════════════════════════════════════ */}
+        <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
+          
+          <SectionHeader icon={Activity} title="Incident Call Tracking" sub="장애 ID별 발신 현황" color="#10b981">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Live Monitoring</span>
+            </div>
+          </SectionHeader>
+
+          {histLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-600">
+              <Loader2 size={24} className="animate-spin opacity-20" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Loading Event Logs...</p>
+            </div>
+          ) : hists.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 bg-black/20 rounded-2xl border border-dashed border-white/5">
+              <PhoneOff size={32} className="opacity-10 text-white" />
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">No Incident Traffic Recorded</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-1 mt-4">
+              {/* 장애 ID별로 그룹화하여 렌더링 */}
+              {Object.entries(
+                hists.reduce((acc, h) => {
+                  const key = h.inc_id || h.igw_txn_id || 'UNKNOWN';
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(h);
+                  return acc;
+                }, {})
+              ).map(([incId, logs]) => (
+                <div key={incId} className="bg-white/[0.02] rounded-3xl border border-white/5 overflow-hidden transition-all hover:border-white/10 shadow-lg">
+                  {/* 그룹 헤더: 장애 ID */}
+                  <div className="px-5 py-4 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-400 font-mono">
+                        ID: {incId}
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Incident Event</span>
+                    </div>
+                    <div className="text-[9px] font-bold text-slate-600 font-mono">
+                      Total {logs.length} Calls
+                    </div>
+                  </div>
+
+                  {/* 그룹 내부: 대상자별 발신 이력 */}
+                  <div className="p-4 space-y-2">
+                    {logs.map((log) => (
+                      <div key={log.log_id} className="flex items-center gap-4 bg-black/20 rounded-2xl px-4 py-3 border border-white/[0.03] hover:bg-white/[0.01] transition-all">
+                        {/* 회차 */}
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                          <span className="text-[10px] font-black text-white font-mono">{log.attempt_seq}</span>
+                        </div>
+
+                        {/* 대상자 정보 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-sm font-black text-slate-200">{log.emp_nm || log.emp_id}</span>
+                            <span className="text-[10px] font-bold text-slate-500 font-mono">{log.mobile_no || '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600 uppercase tracking-tight">
+                            <Clock size={10} />
+                            <span>{log.call_dt?.replace('T', ' ').slice(0, 19)}</span>
+                          </div>
+                        </div>
+
+                        {/* PDS 결과 */}
+                        <div className="shrink-0 flex items-center gap-4">
+                          <div className="w-[1px] h-6 bg-white/5" />
+                          <PdsBadge code={log.pds_result_cd} />
+                          {log.pds_result_cd === 'SUCCESS' && (
+                            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                              <Check size={12} className="text-emerald-400" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+
+      {/* ── 전략 생성 모달 ──────────────────────────── */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#04070f]/80 backdrop-blur-md" onClick={() => setShowCreateModal(false)} />
+          
+          <div className="relative w-full max-w-md bg-[#0c1020] border border-orange-500/30 rounded-[2rem] shadow-[0_0_60px_rgba(251,146,60,0.15)] overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* 상단 글로우 */}
+            <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none" />
+            
+            <div className="px-[33px] py-7 relative z-10">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-white tracking-tight">새 장애 대응 전략</h2>
+                  <p className="text-[10px] font-bold text-orange-500/60 uppercase tracking-widest">Create New Strategy Master</p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">전략 명칭</label>
+                  <input
+                    type="text"
+                    value={newStrategy.strategy_nm}
+                    onChange={e => setNewStrategy(p => ({ ...p, strategy_nm: e.target.value }))}
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-orange-500/50 transition-all placeholder:text-slate-700"
+                    placeholder="예: 실시간 계정계 장애 전파"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">전략 내용 (유형)</label>
+                  <select
+                    value={newStrategy.strategy_cont}
+                    onChange={e => setNewStrategy(p => ({ ...p, strategy_cont: e.target.value }))}
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-purple-500/50 transition-all cursor-pointer"
+                  >
+                    {STRATEGY_CONT_OPTIONS.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">시작일시</label>
+                    <input
+                      type="datetime-local"
+                      value={newStrategy.apply_start_dt}
+                      onChange={e => setNewStrategy(p => ({ ...p, apply_start_dt: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] text-white focus:outline-none focus:border-blue-500/50 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">종료일시</label>
+                    <input
+                      type="datetime-local"
+                      value={newStrategy.apply_end_dt}
+                      onChange={e => setNewStrategy(p => ({ ...p, apply_end_dt: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] text-white focus:outline-none focus:border-blue-500/50 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">최대 발신 횟수</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={newStrategy.max_call_cnt}
+                      onChange={e => setNewStrategy(p => ({ ...p, max_call_cnt: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-3 text-sm text-amber-400 font-black focus:outline-none focus:border-amber-500/50 font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-600 uppercase">Times</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-10">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 py-4 rounded-2xl bg-white/5 text-slate-400 font-black text-xs hover:bg-white/10 transition-all active:scale-95"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleCreateStrategy}
+                  className="flex-[2] py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black text-xs hover:from-orange-400 hover:to-amber-400 transition-all shadow-[0_0_20px_rgba(251,146,60,0.3)] active:scale-95"
+                >
+                  전략 등록하기
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
