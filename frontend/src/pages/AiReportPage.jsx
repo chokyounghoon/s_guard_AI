@@ -140,10 +140,10 @@ export default function AiReportPage() {
   const incidentId = rawId ? String(rawId).replace("INC-", "").trim() : null;
   const currentUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
 
-  // — incident가 없으면 목록 모드 —
-  const [listMode, setListMode] = useState(!incidentId);
+  // — incident가 없으면 목록 모드 (state 아닌 파생값 — params 변경 시 자동 갱신) —
+  const listMode = !incidentId;
   const [incidentList, setIncidentList] = useState([]);
-  const [listLoading, setListLoading] = useState(!incidentId);
+  const [listLoading, setListLoading] = useState(true);
 
   // — 상세 보기 state (항상 선언 — Hook 규칙) —
   const [report, setReport] = useState(null);
