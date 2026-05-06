@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import ReactMarkdown from 'react-markdown';
@@ -6,9 +6,22 @@ import remarkGfm from 'remark-gfm';
 import {
   ArrowLeft, Share2, Sparkles, AlertCircle, MessageSquare,
   FileText, Paperclip, Clock, Users, CheckCircle2, Send, User, Check, ChevronRight, X,
-  Database, Shield, Server, Bot, Activity, RefreshCw, Loader, Zap
+  Database, Shield, Server, Bot, Activity, RefreshCw, Loader, Zap,
+  Search, Filter, Calendar, Building2, AlertTriangle, CheckCircle
 } from 'lucide-react';
 import { getAuthHeaders } from '../lib/authStore';
+import { SMS_WORKER_URL } from '../config/api';
+
+const getDefaultDates = () => {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 30);
+  const tz = end.getTimezoneOffset() * 60000;
+  return {
+    startDate: new Date(start.getTime() - tz).toISOString().split('T')[0],
+    endDate:   new Date(end.getTime()   - tz).toISOString().split('T')[0],
+  };
+};
 
 const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
@@ -140,10 +153,19 @@ export default function AiReportPage() {
   const incidentId = rawId ? String(rawId).replace("INC-", "").trim() : null;
   const currentUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
 
-  // — incident가 없으면 목록 모드 (state 아닌 파생값 — params 변경 시 자동 갱신) —
+  // — 검색 목록 모드 state (항상 선언 — Hook 규칙) —
   const listMode = !incidentId;
-  const [incidentList, setIncidentList] = useState([]);
-  const [listLoading, setListLoading] = useState(true);
+  const dates = useMemo(() => getDefaultDates(), []);
+  const [srchParams, setSrchParams] = useState({
+    incidentId: '', keyword: '',
+    startDate: dates.startDate, endDate: dates.endDate,
+    severity: '', status: '처리완료', assignee: ''
+  });
+  const [allUsers, setAllUsers] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [srchLoading, setSrchLoading] = useState(false);
+  const [srchStats, setSrchStats] = useState({ total: 0, critical: 0, high: 0, normal: 0 });
+  const [didSearch, setDidSearch] = useState(false);
 
   // — 상세 보기 state (항상 선언 — Hook 규칙) —
   const [report, setReport] = useState(null);
@@ -159,75 +181,241 @@ export default function AiReportPage() {
   const genAbortRef = useRef(null);
   const [chatSummary, setChatSummary] = useState('');
 
+  // 사용자 목록 로드
   useEffect(() => {
     if (!listMode) return;
-    const fetchList = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/incidents?limit=30&status=완료`, {
-          headers: getAuthHeaders()
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setIncidentList(Array.isArray(data) ? data : (data.incidents || []));
-      } catch (e) {
-        console.warn('incident list fetch failed:', e);
-      } finally {
-        setListLoading(false);
-      }
-    };
-    fetchList();
+    fetch(`${SMS_WORKER_URL}/users`, { headers: getAuthHeaders() })
+      .then(r => r.json()).then(setAllUsers).catch(() => {});
+    // 초기 검색 (최근 30일 완료)
+    handleListSearch();
   }, [listMode]);
 
-  const report_sev_cls = { CRITICAL: 'text-red-400 bg-red-500/10 border-red-500/30', HIGH: 'text-orange-400 bg-orange-500/10 border-orange-500/30', NORMAL: 'text-blue-400 bg-blue-500/10 border-blue-500/20', INFO: 'text-slate-400 bg-slate-500/10 border-slate-500/20' };
+  const handleListSearch = async (overrideParams) => {
+    setSrchLoading(true);
+    const p = overrideParams || srchParams;
+    const qs = new URLSearchParams();
+    if (p.incidentId) qs.append('inc_id', p.incidentId);
+    if (p.keyword)    qs.append('keyword', p.keyword);
+    if (p.startDate)  qs.append('startDate', p.startDate);
+    if (p.endDate)    qs.append('endDate', p.endDate);
+    if (p.severity)   qs.append('severity', p.severity);
+    if (p.status)     qs.append('status', p.status);
+    if (p.assignee)   qs.append('assignee', p.assignee);
+    try {
+      const res = await fetch(`${SMS_WORKER_URL}/incidents?${qs.toString()}`, { headers: getAuthHeaders() });
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.incidents || []);
+      setSearchResults(list);
+      setSrchStats({
+        total: list.length,
+        critical: list.filter(i => i.severity === 'CRITICAL').length,
+        high: list.filter(i => i.severity === 'HIGH').length,
+        normal: list.filter(i => !['CRITICAL','HIGH'].includes(i.severity)).length,
+      });
+      setDidSearch(true);
+    } catch (e) {
+      console.warn('search failed', e);
+    } finally {
+      setSrchLoading(false);
+    }
+  };
+
+  const handleQuickDate = (days) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    const tz = end.getTimezoneOffset() * 60000;
+    const p = {
+      ...srchParams,
+      startDate: new Date(start.getTime() - tz).toISOString().split('T')[0],
+      endDate:   new Date(end.getTime()   - tz).toISOString().split('T')[0],
+    };
+    setSrchParams(p);
+    handleListSearch(p);
+  };
+
+  const sevCls = { CRITICAL: 'text-red-400 bg-red-500/10 border-red-500/30', HIGH: 'text-orange-400 bg-orange-500/10 border-orange-500/30', NORMAL: 'text-blue-400 bg-blue-500/10 border-blue-500/20', INFO: 'text-slate-400 bg-slate-500/10 border-slate-500/20', MAJOR: 'text-orange-400 bg-orange-500/10 border-orange-500/30' };
 
   if (listMode) {
     return (
-      <div className="h-screen bg-[#0a0d14] text-white font-sans flex flex-col">
+      <div className="min-h-screen bg-[#0a0d14] text-white font-sans flex flex-col pb-6">
+        {/* 헤더 */}
         <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5">
-          <div className="max-w-3xl mx-auto w-full flex items-center gap-3 px-4 py-3">
+          <div className="max-w-5xl mx-auto w-full flex items-center gap-3 px-5 py-3">
             <button onClick={() => goBack()} className="shrink-0 p-2 rounded-full hover:bg-white/5 transition-colors">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div className="flex-1">
-              <h1 className="text-sm font-black text-white">AI 장애 보고서</h1>
-              <p className="text-[10px] text-slate-500">열람할 장애를 선택하세요</p>
+              <h1 className="text-sm font-black text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-blue-400" /> AI 장애 보고서
+              </h1>
+              <p className="text-[10px] text-slate-500">검색 조건을 설정하고 보고서를 열람하세요</p>
             </div>
-            <Sparkles className="w-5 h-5 text-blue-400" />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto max-w-3xl mx-auto w-full px-4 py-4">
-          {listLoading ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-4 text-slate-500">
-              <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-              <span className="text-sm">장애 목록 로드 중...</span>
+
+        <main className="flex-1 max-w-5xl mx-auto w-full px-5 py-5 space-y-5">
+
+          {/* 검색 조건 */}
+          <div className="bg-[#0f1421] rounded-2xl border border-white/5 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-black text-slate-300 flex items-center gap-2 uppercase tracking-widest">
+                <Filter className="w-3.5 h-3.5 text-blue-400" /> 검색 조건
+              </h2>
+              <button
+                onClick={() => { const p = { incidentId:'', keyword:'', ...getDefaultDates(), severity:'', status:'처리완료', assignee:'' }; setSrchParams(p); handleListSearch(p); }}
+                className="text-[10px] text-slate-500 hover:text-white flex items-center gap-1 bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition-all"
+              >
+                <X className="w-3 h-3" /> 초기화
+              </button>
             </div>
-          ) : incidentList.length === 0 ? (
-            <div className="text-center py-24 text-slate-500 text-sm">열람할 완료 장애가 없습니다.</div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3">최근 완료 장애 ({incidentList.length})</p>
-              {incidentList.map(inc => {
-                const sev = inc.severity || 'NORMAL';
-                const sevCls = report_sev_cls[sev] || report_sev_cls.NORMAL;
-                return (
-                  <button
-                    key={inc.inc_id || inc.id}
-                    onClick={() => navigate(`/ai-report/${inc.inc_id || inc.id}`)}
-                    className="w-full flex items-start gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 transition-all text-left group"
-                  >
-                    <div className={`shrink-0 mt-0.5 text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tight ${sevCls}`}>{sev}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors truncate">
-                        {(inc.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '') || `INC-${inc.inc_id || inc.id}`}
-                      </p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        INC-{inc.inc_id || inc.id} &nbsp;&middot;&nbsp; {inc.created_at?.slice(0, 16) || '-'}
-                      </p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 shrink-0 mt-1 transition-colors" />
-                  </button>
-                );
-              })}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* 장애 ID */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">장애 ID</label>
+                <input
+                  type="text" placeholder="INC-번호 입력"
+                  value={srchParams.incidentId}
+                  onChange={e => setSrchParams(p => ({...p, incidentId: e.target.value}))}
+                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+              {/* 키워드 */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">키워드</label>
+                <input
+                  type="text" placeholder="장애명 / 메시지 검색"
+                  value={srchParams.keyword}
+                  onChange={e => setSrchParams(p => ({...p, keyword: e.target.value}))}
+                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+              {/* 처리자 */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">처리자</label>
+                <select
+                  value={srchParams.assignee}
+                  onChange={e => setSrchParams(p => ({...p, assignee: e.target.value}))}
+                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                >
+                  <option value="">전체 담당자</option>
+                  {allUsers.map(u => <option key={u.employee_id} value={u.name}>{u.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* 기간 */}
+            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-blue-400" /> 조회 기간
+                </label>
+                <div className="flex gap-1">
+                  {[[1,'오늘'],[7,'7일'],[30,'30일'],[90,'90일']].map(([d,l]) => (
+                    <button key={d} type="button" onClick={() => handleQuickDate(d)}
+                      className="px-2.5 py-1 text-[9px] font-bold text-slate-500 hover:text-blue-400 bg-white/5 hover:bg-blue-500/10 rounded-lg transition-all">
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="date" value={srchParams.startDate}
+                  onChange={e => setSrchParams(p => ({...p, startDate: e.target.value}))}
+                  className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white" style={{colorScheme:'dark'}} />
+                <input type="date" value={srchParams.endDate}
+                  onChange={e => setSrchParams(p => ({...p, endDate: e.target.value}))}
+                  className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white" style={{colorScheme:'dark'}} />
+              </div>
+            </div>
+
+            {/* 심각도 / 완료 여부 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">심각도</label>
+                <select value={srchParams.severity} onChange={e => setSrchParams(p => ({...p, severity: e.target.value}))}
+                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50">
+                  <option value="">전체</option>
+                  <option value="CRITICAL">CRITICAL</option>
+                  <option value="HIGH">HIGH</option>
+                  <option value="NORMAL">NORMAL</option>
+                  <option value="INFO">INFO</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">처리 상태</label>
+                <select value={srchParams.status} onChange={e => setSrchParams(p => ({...p, status: e.target.value}))}
+                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50">
+                  <option value="">전체</option>
+                  <option value="처리완료">처리완료</option>
+                  <option value="처리중">처리중</option>
+                  <option value="대기">대기</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleListSearch()}
+              disabled={srchLoading}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Search className="w-4 h-4" />
+              {srchLoading ? '검색 중...' : '검색'}
+            </button>
+          </div>
+
+          {/* 검색 결과 */}
+          {didSearch && (
+            <div className="space-y-3">
+              {/* 통계 */}
+              <div className="grid grid-cols-3 gap-3">
+                {[{label:'전체', count:srchStats.total, color:'blue'}, {label:'CRITICAL', count:srchStats.critical, color:'red'}, {label:'HIGH', count:srchStats.high, color:'orange'}].map(s => (
+                  <div key={s.label} className={`bg-${s.color}-500/10 border border-${s.color}-500/20 rounded-xl p-3 text-center`}>
+                    <p className={`text-2xl font-black text-${s.color}-400 font-mono`}>{s.count}</p>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {srchLoading ? (
+                <div className="flex items-center justify-center py-16 gap-3 text-slate-500">
+                  <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                  <span className="text-sm">검색 중...</span>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="text-center py-16 text-slate-500 text-sm">검색 결과가 없습니다.</div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{searchResults.length}건 조회됨</p>
+                  {searchResults.map(inc => {
+                    const sev = inc.severity || 'NORMAL';
+                    const sc = sevCls[sev] || sevCls.NORMAL;
+                    const assignee = inc.assignee_name || inc.assigned_to || '-';
+                    return (
+                      <button
+                        key={inc.inc_id}
+                        onClick={() => navigate(`/ai-report/${inc.inc_id}`)}
+                        className="w-full flex items-start gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-blue-500/20 transition-all text-left group"
+                      >
+                        <div className={`shrink-0 mt-0.5 text-[9px] font-black px-2 py-0.5 rounded border uppercase ${sc}`}>{sev}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-200 group-hover:text-white truncate">
+                            {(inc.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '') || `INC-${inc.inc_id}`}
+                          </p>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            <span className="text-[10px] text-slate-500">INC-{inc.inc_id}</span>
+                            <span className="text-[10px] text-slate-600">{inc.created_at?.slice(0,16)}</span>
+                            {assignee !== '-' && <span className="text-[10px] text-blue-400">담당: {assignee}</span>}
+                            {inc.status && <span className="text-[10px] text-emerald-400">{inc.status}</span>}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 shrink-0 mt-1 transition-colors" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </main>
