@@ -174,7 +174,17 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           });
           if (checkRes.ok) {
             const data = await checkRes.json();
-            if (data.content) {
+            // 🛑 에러 메시지가 캐시된 경우(과거 백그라운드 분석 실패 등)는 무시하고 실시간 재분석 시도
+            const isErrorMessage = data.content && (
+              data.content.includes('AI 엔진 서버 오류') || 
+              data.content.includes('Dify 측 서버 상태가 불안정') ||
+              data.content.includes('인증 오류') ||
+              data.content.includes('엔드포인트 오류') ||
+              data.content.includes('대기 시간 초과') ||
+              data.content.includes('Dify API 오류')
+            );
+
+            if (data.content && !isErrorMessage) {
               // ⚡ DB 캐시 히트 — 타자기 효과 없이 즉시 전체 렌더링 (시간이 생명)
               stopTypewriter();
               setDisplayedText(data.content);

@@ -36,6 +36,7 @@ import PushDiagnosticPage from './pages/PushDiagnosticPage';
 import AlertMonitorPage from './pages/AlertMonitorPage';
 import IncidentKeywordPage from './pages/IncidentKeywordPage';
 import UserKeywordPage from './pages/UserKeywordPage';
+import SCallertPage from './pages/SCallertPage';
 import ConsentModal from './components/ConsentModal';
 import PCPageModal from './components/PCPageModal';
 
@@ -328,6 +329,7 @@ function AppContent() {
         <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AlertMonitorPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/incident-keyword"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><IncidentKeywordPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SCallertPage /></PCPageModal></ProtectedRoute>} />
       </Routes>
 
       {/* ⚖️ Governance & Mandatory Consent Guard */}

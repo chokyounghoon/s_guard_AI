@@ -331,13 +331,6 @@ app.post('/push/notify', async (c) => {
   return c.json({ success: true, target: target_user_id, results });
 });
 
-// Utility for KST Timestamp
-const getKst = () => {
-  const now = new Date()
-  const kstOffset = 9 * 60 * 60 * 1000
-  return new Date(now.getTime() + kstOffset).toISOString().replace('T', ' ').substring(0, 19)
-}
-
 // 🔔 PUSH: Web Push Notification Helper
 const sendPushNotification = async (c, userId, payload) => {
   const db = c.env.DB;
@@ -4245,6 +4238,12 @@ app.get('/warroom/rooms', async (c) => {
   const q = c.req.query('q') || ''
   const statusFilter = c.req.query('status') || ''
 
+  // DB 실제 status 값: NULL(진행중), 'CLOSED'(완료), '최종완료'(완료)
+  // 프론트 기대값: 'Open'(진행중), 'Completed'(완료)
+  // → 필터를 DB 실제값으로 역변환
+  let dbStatusCondition = ''
+  const params = []
+
   let sql = `
     SELECT
       w.inc_id                          AS code,
@@ -4252,8 +4251,8 @@ app.get('/warroom/rooms', async (c) => {
       w.title,
       w.title                           AS msg,
       r.message                         AS sms_message,
-      w.severity,
-      w.status,
+      UPPER(COALESCE(w.severity, 'NORMAL')) AS severity,
+      w.status                          AS raw_status,
       w.creator_id,
       w.leader_summary,
       w.reg_dt,
@@ -4268,14 +4267,35 @@ app.get('/warroom/rooms', async (c) => {
     )
     WHERE 1=1
   `
-  const params = []
+
   if (q) { sql += ` AND (w.title LIKE ? OR w.inc_id LIKE ?)`; params.push(`%${q}%`, `%${q}%`) }
-  if (statusFilter) { sql += ` AND UPPER(w.status) = UPPER(?)`; params.push(statusFilter) }
+
+  // status 필터: 프론트 값 → DB 실제값으로 변환
+  if (statusFilter === 'Completed') {
+    sql += ` AND (UPPER(w.status) = 'CLOSED' OR w.status = '최종완료')`
+  } else if (statusFilter === 'Open') {
+    sql += ` AND (w.status IS NULL OR (UPPER(w.status) != 'CLOSED' AND w.status != '최종완료'))`
+  }
+  // 'all' 또는 파라미터 없으면 전체 반환
+
   sql += ` ORDER BY w.reg_dt DESC LIMIT 50`
 
   const stmt = db.prepare(sql)
   const { results } = await stmt.bind(...params).all()
-  return c.json({ rooms: results || [] })
+
+  // DB status → 프론트 기대값 변환
+  const mapped = (results || []).map(r => {
+    const raw = r.raw_status
+    let status
+    if (!raw || (raw.toUpperCase() !== 'CLOSED' && raw !== '최종완료')) {
+      status = 'Open'
+    } else {
+      status = 'Completed'
+    }
+    return { ...r, status, raw_status: undefined }
+  })
+
+  return c.json({ rooms: mapped })
 })
 
 // Global Search Helper for Hybrid RAG (v2: Rich & Broad Search)
@@ -8015,7 +8035,11 @@ app.get('/ai/warroom/my-rooms', async (c) => {
     ORDER BY w.reg_dt DESC
   `).bind(user_id).all()
   
-  return c.json({ rooms: results || [] })
+  const mapped2 = (results || []).map(r => ({
+    ...r,
+    severity: (r.severity || 'NORMAL').toUpperCase(),
+  }))
+  return c.json({ rooms: mapped2 })
 })
 // ── Direct Messaging (Notes) ────────────────────────────────────────────────
 app.post('/warroom/dm', async (c) => {

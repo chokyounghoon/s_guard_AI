@@ -49,8 +49,9 @@ export default function WarRoomManagementPage() {
     try {
       const p = new URLSearchParams();
       if (q?.trim()) p.append('q', q.trim());
-      if (activeTab === 'active')    p.append('status', 'Open');
-      if (activeTab === 'completed') p.append('status', 'Completed');
+      // status 필터는 API에 전달하지 않음
+      // → Production Worker가 DB 실제값(CLOSED/최종완료)을 처리 못하므로
+      // → 항상 전체 조회 후 클라이언트의 isActive/isCompleted로 탭 필터링
       if (filters.startDate) p.append('start_date', filters.startDate);
       if (filters.endDate)   p.append('end_date',   filters.endDate);
       if (filters.assignee)  p.append('assigned_to', filters.assignee);
@@ -58,7 +59,7 @@ export default function WarRoomManagementPage() {
       if (res.ok) { const d = await res.json(); setRooms(d.rooms || []); }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [activeTab, searchQuery, filters]);
+  }, [searchQuery, filters]);
 
   useEffect(() => { fetchRooms(); }, [fetchRooms]);
 
@@ -82,23 +83,36 @@ export default function WarRoomManagementPage() {
     finally { setJoining(null); }
   };
 
+  // DB 원본값 또는 정규화된 값 모두 처리
+  const isActive = (r) => {
+    const s = (r.status || '').toUpperCase();
+    return !s || s === 'OPEN' || s === 'IN PROGRESS' || (s !== 'CLOSED' && s !== '최종완료' && s !== 'COMPLETED');
+  };
+  const isCompleted = (r) => {
+    const s = (r.status || '').toUpperCase();
+    return s === 'COMPLETED' || s === 'CLOSED' || r.status === '최종완료';
+  };
+  const normSeverity = (r) => (r.severity || 'NORMAL').toUpperCase();
+
   const filtered = rooms.filter(r => {
-    if (activeTab === 'active')    return r.status === 'Open' || r.status === 'In Progress';
-    if (activeTab === 'completed') return r.status === 'Completed';
+    if (activeTab === 'active')    return isActive(r);
+    if (activeTab === 'completed') return isCompleted(r);
     return true;
   }).sort((a, b) => {
-    if (sortBy === 'newest')   return new Date(b.created_at) - new Date(a.created_at);
-    if (sortBy === 'oldest')   return new Date(a.created_at) - new Date(b.created_at);
+    const da = new Date(b.reg_dt || b.created_at || 0);
+    const db2 = new Date(a.reg_dt || a.created_at || 0);
+    if (sortBy === 'newest')   return new Date(b.reg_dt || b.created_at || 0) - new Date(a.reg_dt || a.created_at || 0);
+    if (sortBy === 'oldest')   return new Date(a.reg_dt || a.created_at || 0) - new Date(b.reg_dt || b.created_at || 0);
     if (sortBy === 'messages') return (b.message_count || 0) - (a.message_count || 0);
-    if (sortBy === 'severity') return ({ CRITICAL: 0, MAJOR: 1, NORMAL: 2 }[a.severity] || 2) - ({ CRITICAL: 0, MAJOR: 1, NORMAL: 2 }[b.severity] || 2);
+    if (sortBy === 'severity') return ({ CRITICAL: 0, MAJOR: 1, NORMAL: 2 }[normSeverity(a)] ?? 2) - ({ CRITICAL: 0, MAJOR: 1, NORMAL: 2 }[normSeverity(b)] ?? 2);
     return 0;
   });
 
   const stats = {
     total:     rooms.length,
-    active:    rooms.filter(r => r.status === 'Open' || r.status === 'In Progress').length,
-    critical:  rooms.filter(r => r.severity === 'CRITICAL').length,
-    completed: rooms.filter(r => r.status === 'Completed').length,
+    active:    rooms.filter(r => isActive(r)).length,
+    critical:  rooms.filter(r => normSeverity(r) === 'CRITICAL').length,
+    completed: rooms.filter(r => isCompleted(r)).length,
   };
 
   return (
@@ -163,16 +177,15 @@ export default function WarRoomManagementPage() {
         </div>
       </header>
 
-      {/* ②  통계 4개 */}
+      {/* ②  통계 3개 */}
       <div style={{
-        flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
+        flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
         gap: 8, padding: '10px 16px 0',
       }}>
         {[
-          { label: '전체',     value: stats.total,     color: '#60a5fa',  Icon: Hash },
-          { label: '진행중',   value: stats.active,    color: '#10b981',  Icon: Activity },
-          { label: 'CRITICAL', value: stats.critical,  color: '#f87171',  Icon: AlertTriangle },
-          { label: '완료',     value: stats.completed, color: '#475569',  Icon: CheckCircle2 },
+          { label: '전체',   value: stats.total,     color: '#60a5fa',  Icon: Hash },
+          { label: '진행중', value: stats.active,    color: '#10b981',  Icon: Activity },
+          { label: '완료',   value: stats.completed, color: '#475569',  Icon: CheckCircle2 },
         ].map(({ label, value, color, Icon }) => (
           <div key={label} style={{
             background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
@@ -295,7 +308,7 @@ export default function WarRoomManagementPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(room => {
-              const sev = SEV[room.severity] || SEV.NORMAL;
+              const sev = SEV[normSeverity(room)] || SEV.NORMAL;
               const sts = STS[room.status] || STS.Open;
               const isJoining = joining === room.code;
               return (
@@ -315,19 +328,22 @@ export default function WarRoomManagementPage() {
                   {/* 1행: 코드 + 심각도 + 상태 */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: sev.color, animation: room.status !== 'Completed' ? 'pulse 2s ease infinite' : 'none' }} />
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: sev.color, animation: !isCompleted(room) ? 'pulse 2s ease infinite' : 'none' }} />
                       <span style={{ fontSize: 12, color: sev.color, fontFamily: 'monospace', fontWeight: 700 }}>{room.code}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{
                         fontSize: 11, fontWeight: 800, color: sev.color,
                         background: sev.bg, border: `1px solid ${sev.border}`,
                         borderRadius: 6, padding: '2px 8px',
                       }}>{sev.label}</span>
-                      <span style={{
-                        fontSize: 11, fontWeight: 800, color: sts.color,
-                        background: `${sts.color}15`, borderRadius: 6, padding: '2px 8px',
-                      }}>{sts.label}</span>
+                      {isCompleted(room) && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, color: '#475569',
+                          background: 'rgba(71,85,105,0.12)', border: '1px solid rgba(71,85,105,0.2)',
+                          borderRadius: 6, padding: '2px 8px',
+                        }}>완료</span>
+                      )}
                     </div>
                   </div>
 

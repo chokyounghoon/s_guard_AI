@@ -607,7 +607,7 @@ export default function SCallertPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-[#04070f]/80 backdrop-blur-md" onClick={() => setShowCreateModal(false)} />
           
-          <div className="relative w-full max-w-md bg-[#0c1020] border border-orange-500/30 rounded-[2rem] shadow-[0_0_60px_rgba(251,146,60,0.15)] overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="relative w-full max-w-2xl bg-[#0c1020] border border-orange-500/30 rounded-[2.5rem] shadow-[0_0_80px_rgba(251,146,60,0.15)] overflow-hidden animate-in zoom-in-95 duration-300">
             {/* 상단 글로우 */}
             <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none" />
             
@@ -629,17 +629,17 @@ export default function SCallertPage() {
                     type="text"
                     value={newStrategy.strategy_nm}
                     onChange={e => setNewStrategy(p => ({ ...p, strategy_nm: e.target.value }))}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-orange-500/50 transition-all placeholder:text-slate-700"
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-5 text-base text-white focus:outline-none focus:border-orange-500/50 transition-all placeholder:text-slate-700"
                     placeholder="예: 실시간 계정계 장애 전파"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">전략 내용 (유형)</label>
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">전략 내용 (유형)</label>
                   <select
                     value={newStrategy.strategy_cont}
                     onChange={e => setNewStrategy(p => ({ ...p, strategy_cont: e.target.value }))}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-purple-500/50 transition-all cursor-pointer"
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-5 text-base text-white focus:outline-none focus:border-purple-500/50 transition-all cursor-pointer appearance-none"
                   >
                     {STRATEGY_CONT_OPTIONS.map(opt => (
                       <option key={opt.id} value={opt.id}>{opt.label}</option>
@@ -647,37 +647,37 @@ export default function SCallertPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">시작일시</label>
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">시작일시</label>
                     <input
                       type="datetime-local"
                       value={newStrategy.apply_start_dt}
                       onChange={e => setNewStrategy(p => ({ ...p, apply_start_dt: e.target.value }))}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] text-white focus:outline-none focus:border-blue-500/50 font-mono"
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500/50 font-mono tracking-tighter"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">종료일시</label>
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">종료일시</label>
                     <input
                       type="datetime-local"
                       value={newStrategy.apply_end_dt}
                       onChange={e => setNewStrategy(p => ({ ...p, apply_end_dt: e.target.value }))}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] text-white focus:outline-none focus:border-blue-500/50 font-mono"
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500/50 font-mono tracking-tighter"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">최대 발신 횟수</label>
-                  <div className="flex items-center gap-3">
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">최대 발신 횟수</label>
+                  <div className="flex items-center gap-4">
                     <input
                       type="number"
                       value={newStrategy.max_call_cnt}
                       onChange={e => setNewStrategy(p => ({ ...p, max_call_cnt: e.target.value }))}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-3 text-sm text-amber-400 font-black focus:outline-none focus:border-amber-500/50 font-mono"
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-lg text-amber-400 font-black focus:outline-none focus:border-amber-500/50 font-mono"
                     />
-                    <span className="text-xs font-bold text-slate-600 uppercase">Times</span>
+                    <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Times</span>
                   </div>
                 </div>
               </div>

@@ -29,7 +29,7 @@ export default function PCPageModal({ children }) {
   }, [isPC, handleClose]);
 
   // Mobile Popup Mode Routes
-  const modalPaths = ['/chat-summary/', '/inbox', '/report/', '/ai-report/'];
+  const modalPaths = ['/chat-summary/', '/inbox', '/report/', '/ai-report/', '/incident-push'];
   const isModalPage = modalPaths.some(path => location.pathname.includes(path));
 
   // 모바일: 기본적으로 full-page 렌더링하지만, 특정 페이지들은 팝업 형태로 유지
@@ -40,7 +40,7 @@ export default function PCPageModal({ children }) {
   // PC: 모달 오버레이
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-center justify-center ${isPC ? 'p-6 lg:p-10' : 'p-3 sm:p-6'}`}
+      className={`fixed inset-0 z-[300] flex items-center justify-center ${isPC ? 'p-6 lg:p-10' : 'p-3 sm:p-6'}`}
       onClick={handleClose}
     >
       {/* Backdrop */}

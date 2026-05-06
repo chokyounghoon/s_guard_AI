@@ -245,8 +245,8 @@ export default function AlertMonitorPage() {
   ];
 
   return (
-    <div style={{ minHeight: '100dvh', background: 'linear-gradient(160deg,#020917 0%,#070d1f 50%,#020917 100%)', fontFamily: "'Pretendard','Inter',sans-serif" }}
-      className="flex flex-col text-slate-300">
+    <div style={{ height: '100%', background: 'linear-gradient(160deg,#020917 0%,#070d1f 50%,#020917 100%)', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      className="text-slate-300">
       <Toaster position="top-center" toastOptions={{ style: { background: '#0f172a', color: '#fff', border: '1px solid rgba(6,182,212,0.2)', fontSize: 12 } }} />
 
       {/* HEADER */}
@@ -270,37 +270,40 @@ export default function AlertMonitorPage() {
         </button>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 120 }}>
+      {/* ── 2-COLUMN GRID BODY ── */}
+      <div style={{ flex: 1, overflow: 'hidden', padding: '12px', display: 'grid', gridTemplateColumns: '45% 55%', gap: 12 }}>
 
-        {/* ── 3-ORB STATUS HUD ── */}
+        {/* ── LEFT: 3-ORB STATUS HUD ── */}
         <div style={{
           background: `radial-gradient(ellipse at 50% -20%, ${SC[overallSev].glow} 0%, transparent 65%), rgba(255,255,255,0.02)`,
           border: `1px solid ${SC[overallSev].border}`,
-          borderRadius: 28,
-          padding: '22px 16px 18px',
+          borderRadius: 24,
+          padding: '16px 14px',
           transition: 'all 0.7s ease',
           position: 'relative',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}>
           {/* 스캔라인 */}
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${SC[overallSev].color}, transparent)`, animation: 'slideX 4s linear infinite', opacity: 0.4 }} />
 
-          <p style={{ fontSize: 8, fontWeight: 900, color: 'rgba(100,116,139,0.6)', letterSpacing: '0.3em', textTransform: 'uppercase', textAlign: 'center', marginBottom: 4 }}>
+          <p style={{ fontSize: 8, fontWeight: 900, color: 'rgba(100,116,139,0.6)', letterSpacing: '0.3em', textTransform: 'uppercase', textAlign: 'center', marginBottom: 8 }}>
             Operational Status
           </p>
 
           {/* 현재 등급 배지 */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 99, background: SC[overallSev].bg, border: `1px solid ${SC[overallSev].border}`, boxShadow: `0 0 20px ${SC[overallSev].glow}` }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: SC[overallSev].color, boxShadow: `0 0 10px ${SC[overallSev].color}`, animation: 'blink 1.5s infinite' }} />
               <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.22em', color: SC[overallSev].color }}>{overallSev}</span>
             </div>
           </div>
 
-          {/* 3개 ORB */}
-          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', minHeight: 140, gap: 4 }}>
+          {/* 3개 ORB — flex:1 로 남은 공간 채움 */}
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 4 }}>
             {loading ? (
-              <div style={{ textAlign: 'center', opacity: 0.3, padding: 40 }}>
+              <div style={{ textAlign: 'center', opacity: 0.3 }}>
                 <div style={{ width: 24, height: 24, border: '2px solid #06b6d4', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
               </div>
             ) : (
@@ -313,66 +316,69 @@ export default function AlertMonitorPage() {
           </div>
 
           {/* 요약 수치 바 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: 16, paddingTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: 12, paddingTop: 12 }}>
             {[
               { label: '전체', value: totalCount, unit: '건', color: '#94a3b8' },
               { label: '오류율', value: errorRate, unit: '%', color: errorRate >= thresholds.critical.errorRate ? SC.CRITICAL.color : errorRate >= thresholds.major.errorRate ? SC.MAJOR.color : SC.NORMAL.color },
               { label: '미처리', value: unresolved, unit: '건', color: unresolved > 0 ? SC.MAJOR.color : SC.NORMAL.color },
             ].map(item => (
               <div key={item.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: item.color, fontFamily: 'monospace', lineHeight: 1 }}>{item.value}<span style={{ fontSize: 9, marginLeft: 1, opacity: 0.7 }}>{item.unit}</span></div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: item.color, fontFamily: 'monospace', lineHeight: 1 }}>{item.value}<span style={{ fontSize: 9, marginLeft: 1, opacity: 0.7 }}>{item.unit}</span></div>
                 <div style={{ fontSize: 8, fontWeight: 700, color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 3 }}>{item.label}</div>
               </div>
             ))}
           </div>
 
           {lastUpdated && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
               <span style={{ fontSize: 8, fontFamily: 'monospace', color: 'rgba(71,85,105,0.5)', fontWeight: 700 }}>SYNC {lastUpdated.toLocaleTimeString()}</span>
             </div>
           )}
         </div>
 
-        {/* ── CRITICAL 임계치 ── */}
-        <ThresholdBlock
-          tier="critical" title="CRITICAL 임계치" subtitle="이 값 이상이면 CRITICAL 판정"
-          icon={AlertTriangle} color={SC.CRITICAL.color}
-          bg="rgba(248,113,113,0.03)" border="rgba(248,113,113,0.2)"
-          values={thresholds.critical} sliders={SLIDERS}
-          onChange={(key, val) => setTierVal('critical', key, val)}
-        />
+        {/* ── RIGHT: 임계치 설정 + 판정 우선순위 ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
 
-        {/* ── MAJOR 임계치 ── */}
-        <ThresholdBlock
-          tier="major" title="MAJOR 임계치" subtitle="CRITICAL 미만, NORMAL 초과 구간"
-          icon={Zap} color={SC.MAJOR.color}
-          bg="rgba(251,146,60,0.03)" border="rgba(251,146,60,0.18)"
-          values={thresholds.major} sliders={SLIDERS}
-          onChange={(key, val) => setTierVal('major', key, val)}
-        />
+          {/* ── CRITICAL 임계치 ── */}
+          <ThresholdBlock
+            tier="critical" title="CRITICAL 임계치" subtitle="이 값 이상이면 CRITICAL 판정"
+            icon={AlertTriangle} color={SC.CRITICAL.color}
+            bg="rgba(248,113,113,0.03)" border="rgba(248,113,113,0.2)"
+            values={thresholds.critical} sliders={SLIDERS}
+            onChange={(key, val) => setTierVal('critical', key, val)}
+          />
 
+          {/* ── MAJOR 임계치 ── */}
+          <ThresholdBlock
+            tier="major" title="MAJOR 임계치" subtitle="CRITICAL 미만, NORMAL 초과 구간"
+            icon={Zap} color={SC.MAJOR.color}
+            bg="rgba(251,146,60,0.03)" border="rgba(251,146,60,0.18)"
+            values={thresholds.major} sliders={SLIDERS}
+            onChange={(key, val) => setTierVal('major', key, val)}
+          />
 
-
-        {/* 판정 로직 안내 */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <Shield style={{ width: 16, height: 16, color: '#334155', flexShrink: 0, marginTop: 1 }} />
-          <div>
-            <p style={{ fontSize: 9, fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 8 }}>판정 우선순위</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {[
-                { level: 'CRITICAL', rule: 'CRITICAL 설정치 이상 → 최우선 판정', color: SC.CRITICAL.color },
-                { level: 'MAJOR',    rule: 'MAJOR 설정치 이상, CRITICAL 미만', color: SC.MAJOR.color },
-                { level: 'NORMAL',   rule: 'CRITICAL·MAJOR 미해당 → 자동 분류', color: SC.NORMAL.color },
-              ].map(({ level, rule, color }) => (
-                <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}`, flexShrink: 0 }} />
-                  <span style={{ fontSize: 9, fontWeight: 700, color, letterSpacing: '0.1em', minWidth: 58 }}>{level}</span>
-                  <span style={{ fontSize: 9, color: '#475569' }}>{rule}</span>
-                </div>
-              ))}
+          {/* 판정 로직 안내 */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <Shield style={{ width: 14, height: 14, color: '#334155', flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <p style={{ fontSize: 9, fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>판정 우선순위</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[
+                  { level: 'CRITICAL', rule: 'CRITICAL 설정치 이상 → 최우선 판정', color: SC.CRITICAL.color },
+                  { level: 'MAJOR',    rule: 'MAJOR 설정치 이상, CRITICAL 미만', color: SC.MAJOR.color },
+                  { level: 'NORMAL',   rule: 'CRITICAL·MAJOR 미해당 → 자동 분류', color: SC.NORMAL.color },
+                ].map(({ level, rule, color }) => (
+                  <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}`, flexShrink: 0 }} />
+                    <span style={{ fontSize: 9, fontWeight: 700, color, letterSpacing: '0.1em', minWidth: 58 }}>{level}</span>
+                    <span style={{ fontSize: 9, color: '#475569' }}>{rule}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
+
       </div>
 
       <style>{`

@@ -314,20 +314,27 @@ export default function DashboardPage({ onAiClick }) {
     
     let diagnosisText = '';
     let leaderSummary = '';
+    // AI 분석 텍스트에서 심각도 추출 (CRITICAL / MAJOR / NORMAL)
+    let detectedSeverity = (currentSms?.severity || '').toUpperCase();
     if (analysisText) {
-      // Extract [전문가별 심층 진단] section for incidents description
       const diagnosisMatch = analysisText.match(/\[전문가별 심층 진단\]([\s\S]*?)(\[|$)/);
       if (diagnosisMatch) {
         diagnosisText = diagnosisMatch[1].replace(/(\*\*.+?\*\*|###.+?\n|---)/g, '').trim();
       }
-      // Extract [Leader]: section specifically for the AI ANALYSIS SUMMARY banner
       const leaderMatch = analysisText.match(/\[Leader\][\s\S]*?[:：]\s*([\s\S]*?)(?=\[|$)/);
       if (leaderMatch) {
         leaderSummary = leaderMatch[1].replace(/(\*\*.+?\*\*|###.+?\n|---)/g, '').trim();
       }
-      // Fallback: if full text is short or unmatched, use entire text
       if (!leaderSummary && analysisText.length < 2000) leaderSummary = analysisText.trim();
+      // AI 분석 결과에서 심각도 키워드 추출
+      if (!detectedSeverity) {
+        if (/CRITICAL|크리티컬|심각/i.test(analysisText)) detectedSeverity = 'CRITICAL';
+        else if (/MAJOR|주의|경고/i.test(analysisText))    detectedSeverity = 'MAJOR';
+        else detectedSeverity = 'NORMAL';
+      }
     }
+    const roomSeverity = ['CRITICAL','MAJOR','NORMAL'].includes(detectedSeverity)
+      ? detectedSeverity : 'NORMAL';
 
     // 1. Add to local state
     const newRoom = {
@@ -336,7 +343,7 @@ export default function DashboardPage({ onAiClick }) {
       lastMsg: analysisText ? 'AI분석 완료' : '',
       time: formatYYMMDD(new Date()),
       participants: 1,
-      severity: 'CRITICAL',
+      severity: roomSeverity,
       unread: true
     };
     setWarRooms(prev => [newRoom, ...prev]);
@@ -351,7 +358,7 @@ export default function DashboardPage({ onAiClick }) {
           inc_id: incidentId,
           title: smsTitle,
           creator_id: userProfile?.employee_id || null,
-          severity: 'CRITICAL',
+          severity: roomSeverity,
           leader_summary: leaderSummary
         })
       });
@@ -367,7 +374,7 @@ export default function DashboardPage({ onAiClick }) {
           inc_id: String(incidentId).replace('INC-', ''),
           title: smsTitle,
           description: diagnosisText || 'SMS 장애 상세 분석 대기 중',
-          severity: 'CRITICAL',
+          severity: roomSeverity,
           incident_type: 'SMS',
           source_sms_id: String(currentSms.inc_id).replace('INC-', '')
         })
@@ -941,7 +948,17 @@ export default function DashboardPage({ onAiClick }) {
   // Callback called from AiInsightPanel (PC 버전과 동일한 로직)
   const handleAgentContent = (fullTranscript, isDone) => {
     const currentMsgs = parseTranscript(fullTranscript);
-    const filteredMsgs = currentMsgs.filter(m => m.role !== 'AI분석');
+    
+    // 🛑 Dify 서버 에러 메시지는 전문가 의견으로 처리하지 않음
+    const filteredMsgs = currentMsgs.filter(m => {
+      const isError = m.text && (
+        m.text.includes('AI 엔진 서버 오류') || 
+        m.text.includes('Dify 측 서버 상태가 불안정') ||
+        m.text.includes('인증 오류') ||
+        m.text.includes('엔드포인트 오류')
+      );
+      return m.role !== 'AI분석' && !isError;
+    });
 
     if (filteredMsgs.length > 0) {
       setShowAgentPanel(true);

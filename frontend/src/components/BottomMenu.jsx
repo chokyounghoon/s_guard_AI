@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu }) {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
   return (
     <>
       {/* Flat Bottom Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0f1219]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-[250] bg-[#0f1219]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden">
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
           { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
@@ -51,7 +51,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
 
       {/* More Menu Popup */}
       {showMoreMenu && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center">
+        <div className="fixed inset-0 z-[260] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowMoreMenu(false)} />
           <div className="w-full max-w-xl rounded-t-[2rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col"
             style={{ background: '#0e1118', maxHeight: '85vh' }}>
@@ -126,6 +126,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'AI\nReport', sub: '장애 분석서', icon: FileText, action: onReportClick, color: '#3b82f6' },
                 { label: 'AI Report\n(Detail)', sub: '분석서 상세', icon: FileText, path: '/ai-report', color: '#6366f1' },
                 { label: 'Report\nSearch', sub: '통합 검색', icon: Search, path: '/mobile-report-search', color: '#10b981' },
+                { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
                 const Icon = item.icon;
                 return (

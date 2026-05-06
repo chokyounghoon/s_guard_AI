@@ -315,6 +315,8 @@ export default function DashboardPage({ onAiClick }) {
     
     let diagnosisText = '';
     let leaderSummary = '';
+    // AI 분석 텍스트에서 심각도 추출 (CRITICAL / MAJOR / NORMAL)
+    let detectedSeverity = (currentSms?.severity || '').toUpperCase();
     if (analysisText) {
       // Extract [전문가별 심층 진단] section for incidents description
       const diagnosisMatch = analysisText.match(/\[전문가별 심층 진단\]([\s\S]*?)(\[|$)/);
@@ -328,7 +330,15 @@ export default function DashboardPage({ onAiClick }) {
       }
       // Fallback: if full text is short or unmatched, use entire text
       if (!leaderSummary && analysisText.length < 2000) leaderSummary = analysisText.trim();
+      // AI 분석 결과에서 심각도 키워드 추출
+      if (!detectedSeverity) {
+        if (/CRITICAL|크리티컬|심각/i.test(analysisText)) detectedSeverity = 'CRITICAL';
+        else if (/MAJOR|주의|경고/i.test(analysisText))    detectedSeverity = 'MAJOR';
+        else detectedSeverity = 'NORMAL';
+      }
     }
+    const roomSeverity = ['CRITICAL','MAJOR','NORMAL'].includes(detectedSeverity)
+      ? detectedSeverity : 'NORMAL';
 
     // 1. Add to local state
     const newRoom = {
@@ -337,7 +347,7 @@ export default function DashboardPage({ onAiClick }) {
       lastMsg: analysisText ? 'AI분석 완료' : '',
       time: formatYYMMDD(new Date()),
       participants: 1,
-      severity: 'CRITICAL',
+      severity: roomSeverity,
       unread: true
     };
     setWarRooms(prev => [newRoom, ...prev]);
@@ -352,7 +362,7 @@ export default function DashboardPage({ onAiClick }) {
           inc_id: incidentId,
           title: smsTitle,
           creator_id: userProfile?.employee_id || null,
-          severity: 'CRITICAL',
+          severity: roomSeverity,
           leader_summary: leaderSummary
         })
       });
@@ -368,7 +378,7 @@ export default function DashboardPage({ onAiClick }) {
           inc_id: String(incidentId).replace('INC-', ''),
           title: smsTitle,
           description: diagnosisText || 'SMS 장애 상세 분석 대기 중',
-          severity: 'CRITICAL',
+          severity: roomSeverity,
           incident_type: 'SMS',
           source_sms_id: String(currentSms.inc_id).replace('INC-', '')
         })
@@ -975,7 +985,17 @@ export default function DashboardPage({ onAiClick }) {
   // Callback called from AiInsightPanel
   const handleAgentContent = (fullTranscript, isDone) => {
     const currentMsgs = parseTranscript(fullTranscript);
-    const filteredMsgs = currentMsgs.filter(m => m.role !== 'AI분석');
+    
+    // 🛑 Dify 서버 에러 메시지는 전문가 의견으로 처리하지 않음
+    const filteredMsgs = currentMsgs.filter(m => {
+      const isError = m.text && (
+        m.text.includes('AI 엔진 서버 오류') || 
+        m.text.includes('Dify 측 서버 상태가 불안정') ||
+        m.text.includes('인증 오류') ||
+        m.text.includes('엔드포인트 오류')
+      );
+      return m.role !== 'AI분석' && !isError;
+    });
 
     console.log('[Expert Advisor] parsed:', filteredMsgs.length, 'agents →', filteredMsgs.map(m => m.role), '| isDone:', isDone);
 
@@ -1259,6 +1279,7 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   return (
+    <>
     <div className="h-screen overflow-hidden text-white font-sans relative flex flex-col" style={{ background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)' }}>
       {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
       {isNavCollapsed && (
@@ -1929,23 +1950,20 @@ export default function DashboardPage({ onAiClick }) {
               </div>
             </div>
           </div>
-        </div>
-        </div>
-      </div>{/* end px-4 pt-4 pb-24 */}
 
-      {/* Handling Progress Area */}
+          {/* Handling Progress Area */}
 
-      {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
-      {/* AI Agent Demo Components - Emergency Modal disabled by user request
-      <EmergencyActionModal
-        isOpen={showEmergencyModal}
-        onClose={() => setShowEmergencyModal(false)}
-        onApprove={handleApproveAction}
-      />
-      */}
+          {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
+          {/* AI Agent Demo Components - Emergency Modal disabled by user request
+          <EmergencyActionModal
+            isOpen={showEmergencyModal}
+            onClose={() => setShowEmergencyModal(false)}
+            onApprove={handleApproveAction}
+          />
+          */}
 
-        {renderProfileModal()}
-      {/* <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} /> */}
+          {renderProfileModal()}
+          {/* <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} /> */}
 
       {/* War Room Chat List Popup */}
       {showWarRoomPopup && (
@@ -2037,17 +2055,28 @@ export default function DashboardPage({ onAiClick }) {
           </div>
         </div>
       )}
+      </div>
+      </div>
+      </div>
+    </div>
 
-
-      <BottomMenu 
+    <BottomMenu 
         currentPath="/dashboard" 
+        user={userProfile}
         onWarRoomClick={() => {
           fetchWarRooms();
           setShowWarRoomPopup(true);
         }} 
         initialOpenMoreMenu={showMoreMenuFromConsole}
       />
-    </div>
+      {/* 🚀 Dynamic Save Toast for Thresholds */}
+      {saveStatus && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#1a1f2e] border border-emerald-500/30 text-emerald-400 text-xs font-black px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
+          <CheckCircle className="w-4 h-4 animate-bounce" />
+          <span>{saveStatus}</span>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2583,14 +2612,6 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
           )}
         </div>
       </div>
-      
-      {/* 🚀 Dynamic Save Toast for Thresholds */}
-      {saveStatus && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#1a1f2e] border border-emerald-500/30 text-emerald-400 text-xs font-black px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
-          <CheckCircle className="w-4 h-4 animate-bounce" />
-          <span>{saveStatus}</span>
-        </div>
-      )}
     </div>
   );
 }
