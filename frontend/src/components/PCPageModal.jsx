@@ -29,7 +29,7 @@ export default function PCPageModal({ children }) {
   }, [isPC, handleClose]);
 
   // Mobile Popup Mode Routes
-  const modalPaths = ['/chat-summary/', '/inbox', '/report/', '/ai-report/', '/incident-push'];
+  const modalPaths = ['/chat-summary/', '/inbox', '/report/', '/ai-report/', '/incident-push', '/workflow'];
   const isModalPage = modalPaths.some(path => location.pathname.includes(path));
 
   // 모바일: 기본적으로 full-page 렌더링하지만, 특정 페이지들은 팝업 형태로 유지
@@ -48,12 +48,12 @@ export default function PCPageModal({ children }) {
 
       {/* Modal Panel */}
       <div
-        className="
-          relative z-10 w-full max-w-5xl h-fit
+        className={`
+          relative z-10 w-full ${location.pathname.includes('/workflow') ? 'max-w-[92vw]' : 'max-w-5xl'} h-fit
           bg-[#0f1421] border border-white/10 rounded-[2.5rem] shadow-2xl
           flex flex-col overflow-hidden
           animate-in zoom-in-95 fade-in duration-300
-        "
+        `}
         style={{ maxHeight: isPC ? 'calc(100vh - 4rem)' : 'calc(100vh - 2rem)' }}
         onClick={(e) => e.stopPropagation()}
       >
