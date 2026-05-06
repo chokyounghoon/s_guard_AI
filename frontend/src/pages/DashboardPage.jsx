@@ -1319,38 +1319,41 @@ export default function DashboardPage({ onAiClick }) {
         </div>
       )}
       {/* Top Navigation */}
-      <nav className={`flex justify-between items-center p-4 px-5 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'flex'}`}>
-        {/* ── 좌: 로고 ── */}
-        <div
-          className="flex items-center cursor-pointer group min-w-[120px]"
-          onClick={() => window.location.reload()}
-        >
-          <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
+      <nav className={`flex items-center gap-3 p-4 px-5 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'flex'}`}>
+
+        {/* ── 좌: 로고 + 설정버튼 (SMS 패널 너비 ~1/4) ── */}
+        <div className="flex items-center gap-3 lg:w-1/4 shrink-0">
+          <div
+            className="flex items-center cursor-pointer group shrink-0"
+            onClick={() => window.location.reload()}
+          >
+            <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
+          </div>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(v => !v); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 ${
+              showThresholdSettings
+                ? 'bg-blue-600/15 border-blue-500/40 shadow-[0_0_14px_rgba(6,182,212,0.12)]'
+                : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20'
+            }`}
+            title="유사도 임계값 설정"
+          >
+            <Settings className={`w-3.5 h-3.5 shrink-0 transition-all ${
+              showThresholdSettings ? 'text-blue-400 rotate-45' : 'text-slate-400'
+            } ${isSavingThreshold ? 'animate-spin' : ''}`} />
+            <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
+              showThresholdSettings ? 'text-blue-400' : 'text-slate-400'
+            }`}>Technical threshold</span>
+            <span className="text-[9px] text-slate-600">/</span>
+            <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
+              showThresholdSettings ? 'text-purple-400' : 'text-slate-400'
+            }`}>Casual Match Strictness</span>
+          </button>
         </div>
 
-        {/* ── 가운데: 임계값 설정 버튼 ── */}
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(v => !v); }}
-          className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-2xl border transition-all ${
-            showThresholdSettings
-              ? 'bg-blue-600/15 border-blue-500/40 shadow-[0_0_18px_rgba(6,182,212,0.15)]'
-              : 'bg-white/[0.03] border-white/8 hover:bg-white/[0.06] hover:border-white/15'
-          }`}
-          title="유사도 임계값 설정"
-        >
-          <Settings className={`w-4 h-4 transition-all ${
-            showThresholdSettings ? 'text-blue-400 rotate-45' : 'text-slate-400'
-          } ${isSavingThreshold ? 'animate-spin' : ''}`} />
-          <div className="flex items-center gap-2">
-            <span className={`text-[8px] font-black uppercase tracking-widest leading-none ${
-              showThresholdSettings ? 'text-blue-400' : 'text-slate-500'
-            }`}>Technical threshold</span>
-            <span className="text-[8px] text-slate-600">/</span>
-            <span className={`text-[8px] font-black uppercase tracking-widest leading-none ${
-              showThresholdSettings ? 'text-purple-400' : 'text-slate-500'
-            }`}>Casual Match</span>
-          </div>
-        </button>
+        {/* ── 중앙 공백 ── */}
+        <div className="flex-1" />
 
         {/* ── 우: 액션 버튼 ── */}
         <div className="flex items-center space-x-3 min-w-[120px] justify-end">
