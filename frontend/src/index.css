@@ -463,7 +463,9 @@
   border: 1.5px solid transparent;
   border-top-color: rgba(6,182,212,0.7);
   border-right-color: rgba(6,182,212,0.2);
-  /* animation: ringRotate 3s linear infinite; */
+}
+.data-ring-spinning::before {
+  animation: ringRotate 3s linear infinite;
 }
 .data-ring-wrapper::after {
   content: '';
@@ -473,7 +475,9 @@
   border: 1px solid transparent;
   border-bottom-color: rgba(139,92,246,0.5);
   border-left-color: rgba(139,92,246,0.15);
-  /* animation: ringRotateReverse 5s linear infinite; */
+}
+.data-ring-spinning::after {
+  animation: ringRotateReverse 5s linear infinite;
 }
 .data-ring-active::before { border-top-color: rgba(248,113,113,0.8); border-right-color: rgba(248,113,113,0.25); }
 .data-ring-active::after  { border-bottom-color: rgba(248,113,113,0.5); }

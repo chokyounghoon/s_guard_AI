@@ -60,7 +60,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
   return 'report';
 };
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange }) {
   
   const formatYYMMDD = (dateStr) => {
     if (!dateStr) return '';
@@ -88,9 +88,13 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [isCritical, setIsCritical] = useState(false);
   const [incidentCategory, setIncidentCategory] = useState('report'); // 'critical' | 'security' | 'server' | 'report'
   const [smsAnalysisTitle, setSmsAnalysisTitle] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [insightTimestamp, setInsightTimestamp] = useState(null);
   const [lockingUser, setLockingUser] = useState(null);
+
+  // Sync isAnalyzingSms state to parent if needed
+  useEffect(() => {
+    if (onAnalyzingChange) onAnalyzingChange(isAnalyzingSms);
+  }, [isAnalyzingSms, onAnalyzingChange]);
 
   // Feedback States
   const [feedback, setFeedback] = useState(null); // 'UP', 'DOWN'
@@ -585,20 +589,20 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         ? 'bg-gradient-to-br from-[#1a1b10] to-[#11141d] border-yellow-500/40 shadow-yellow-500/10'
         : 'bg-gradient-to-br from-[#141928] via-[#161c2b] to-[#0e1018] border-blue-500/20 shadow-blue-900/20'}`}>
       {/* 고정 헤더 영역 */}
-      <div className="shrink-0 px-3 sm:px-6 pt-3 sm:pt-6">
+      <div className="shrink-0 p-4 sm:p-5 border-b border-white/5 relative">
       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/3 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none" />
 
       {/* 헤더 - SMS 수신내역과 동일한 구조 */}
-      <div className="flex items-center justify-between gap-3 mb-4 relative z-10">
+      <div className="flex items-center justify-between gap-3 relative z-10">
         {/* 왼쪽: 아이콘 + 타이틀 */}
         <div className="flex items-center gap-3 min-w-0">
-          <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
+          <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms ? 'data-ring-spinning' : ''} ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
             <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : isAnalyzingSms ? 'bg-yellow-500/20 border-yellow-500/30' : 'bg-blue-600/20 border-blue-500/30'}`}>
               {isAnalyzingSms && isCritical
-                ? <AlertTriangle className="w-5 h-5 text-red-400" />
+                ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
                 : isAnalyzingSms
-                ? <MessageSquare className="w-5 h-5 text-yellow-400" />
+                ? <MessageSquare className="w-5 h-5 text-yellow-400 animate-pulse" />
                 : <Brain className="w-5 h-5 text-blue-400" />
               }
             </div>

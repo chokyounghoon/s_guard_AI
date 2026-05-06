@@ -152,6 +152,9 @@ export default function DashboardPage({ onAiClick }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
   const [totalSmsVolume, setTotalSmsVolume] = useState(0);
+  const [isSmsSpinning, setIsSmsSpinning] = useState(false);
+  const [isFlowSpinning, setIsFlowSpinning] = useState(false);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
 
   // MTTR 타이머 실시간 동기화
   useEffect(() => {
@@ -450,6 +453,7 @@ export default function DashboardPage({ onAiClick }) {
     }
 
     const fetchWorkflow = async () => {
+      setIsFlowSpinning(true);
       try {
         const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`, {
           headers: getAuthHeaders()
@@ -460,6 +464,8 @@ export default function DashboardPage({ onAiClick }) {
         console.error('Workflow fetch failed:', e);
         alert("원활한 서비스 조회를 위해 페이지를 새로고침합니다.");
         window.location.reload();
+      } finally {
+        setIsFlowSpinning(false);
       }
     };
 
@@ -680,6 +686,7 @@ export default function DashboardPage({ onAiClick }) {
   const fetchSMSMessages = async () => {
     // 🚫 Don't poll if not authenticated — prevents 401 loop
     if (!getAccessToken() && !localStorage.getItem('sguard_ghost')) return;
+    setIsSmsSpinning(true);
     try {
       const response = await fetch(`${apiBase}/sms/recent?limit=20${hideCompletedSms ? '&excludeCompleted=true' : ''}`, {
         headers: getAuthHeaders()
@@ -720,12 +727,19 @@ export default function DashboardPage({ onAiClick }) {
             setIsAssignmentsCollapsed(false);    
             setIsFlowCollapsed(false);
             setShowAgentPanel(true);             
+            setSelectedIncidentIdFlow(latestMsg.inc_id);
             startLiveScenario(latestMsg);
+
+            // 🚀 Trigger "Lively" animation for SMS panel
+            setIsSmsSpinning(true);
+            setTimeout(() => setIsSmsSpinning(false), 3500);
           }
         }
       }
     } catch (error) {
       console.error('SMS 메시지 로드 실패:', error);
+    } finally {
+      setIsSmsSpinning(false);
     }
   };
 
@@ -1452,8 +1466,8 @@ export default function DashboardPage({ onAiClick }) {
             ${(() => { const v = Number(selectedSms?.received_count); const t = (() => { try { const s = localStorage.getItem('sguard_alert_thresholds_v3'); if (s) { const p = JSON.parse(s); return p.critical?.errorCount || 10; } } catch{} return 10; })(); return v > t ? 'sms-pulse-critical' : v > 3 ? 'sms-pulse-major' : ''; })()}`}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-3.5">
-                    <span className="data-ring-wrapper shrink-0">
-                      <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30 shadow-sm shrink-0">
+                    <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
+                      <div className={`bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30 shadow-sm shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
                         <MessageSquare className="w-5 h-5 text-blue-400" />
                       </div>
                     </span>
@@ -1558,6 +1572,10 @@ export default function DashboardPage({ onAiClick }) {
                               setAgentMessages([]);
                               setShowAgentPanel(true);
                               setActiveLogTab('ai');
+                              setSelectedIncidentIdFlow(msg.inc_id);
+                              
+                              // 🚀 Trigger "Lively" animation for Flow panel
+                              // (setIsFlowSpinning is handled inside fetchWorkflow useEffect)
                             } else {
                               // 선택 해제
                               setSelectedSms(null);
@@ -1663,6 +1681,7 @@ export default function DashboardPage({ onAiClick }) {
                onOpenWarRoom={handleOpenWarRoomFromInsight} 
                onAgentContent={handleAgentContent}
                warRooms={warRooms}
+               onAnalyzingChange={setIsAiAnalyzing}
             />
           </div>{/* end col2 */}
 
@@ -1675,10 +1694,10 @@ export default function DashboardPage({ onAiClick }) {
           <div className="flex-1 overflow-hidden flex flex-col">
             <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 hud-card hud-corners ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
               {/* Header */}
-              <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="data-ring-wrapper shrink-0">
-                    <div className="bg-indigo-500/20 border border-indigo-500/30 p-2.5 rounded-xl shrink-0">
+                  <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
+                    <div className={`bg-indigo-500/20 border border-indigo-500/30 p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
                       <Sparkles className="w-5 h-5 text-indigo-300" />
                     </div>
                   </span>
@@ -1735,10 +1754,10 @@ export default function DashboardPage({ onAiClick }) {
             {/* Activity History Flow Area */}
             <div className="bg-[#0f1421] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden flex flex-col hud-card hud-corners">
               {/* Header */}
-              <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
+              <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="data-ring-wrapper shrink-0">
-                    <div className="bg-purple-500/20 border border-purple-500/30 p-2.5 rounded-xl shrink-0">
+                  <span className={`data-ring-wrapper shrink-0 ${isFlowSpinning ? 'data-ring-spinning' : ''}`}>
+                    <div className={`bg-purple-500/20 border border-purple-500/30 p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
                       <Activity className="w-5 h-5 text-purple-400" />
                     </div>
                   </span>
@@ -1760,70 +1779,53 @@ export default function DashboardPage({ onAiClick }) {
                       const durationMs = (endTime || currentTime) - startTime;
                       const isClosed = !!endTime;
 
-                      // 4단계 MTTR 계산
                       const smsStep     = incidentWorkflowSteps.find(s => s.id === 'SMS');
                       const ragStep     = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
                       const warStep     = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
                       const knwStep     = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
 
-                      const calcDiff = (a, b) => {
-                        if (!a) return null;
-                        const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp);
-                        const m = Math.floor(ms / 60000);
-                        const s = Math.floor((ms % 60000) / 1000);
-                        return m > 0 ? `${m}m ${s}s` : `${s}s`;
-                      };
-
-                      const phases = [
-                        { label: '인지', time: calcDiff(smsStep, ragStep), done: !!ragStep },
-                        { label: '분석', time: calcDiff(ragStep, warStep), done: !!warStep },
-                        { label: '워룸', time: calcDiff(warStep, knwStep), done: !!knwStep },
-                        { label: '완료', time: calcDiff(warStep || ragStep || smsStep, knwStep), done: !!knwStep },
-                      ];
-
                       return (
-                        <div className="space-y-1.5 mt-1">
+                        <div className="flex flex-col gap-1 mt-1">
                           {/* 탐지 + MTTR */}
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">탐지</span>
-                              <span className="text-[11px] font-black font-mono text-white bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[8px] uppercase tracking-tight text-slate-500 font-bold">DET</span>
+                              <span className="text-[10px] font-black font-mono text-white bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
                                 {formatYYMMDD(startTime)}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] uppercase tracking-widest text-slate-500 font-black">MTTR</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[8px] uppercase tracking-tight text-slate-500 font-bold">MTTR</span>
                               <div className="flex items-center gap-1">
-                                <div className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
-                                <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400 bloom-green' : 'text-blue-400 bloom-cyan'}`}>
+                                <div className={`w-1 h-1 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
+                                <span className={`text-[12px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400 bloom-green' : 'text-blue-400 bloom-cyan'}`}>
                                   {formatDuration(durationMs)}
                                 </span>
                               </div>
                             </div>
                           </div>
                           {/* 4단계 MTTR 요약 바 */}
-                          <div className="flex items-center gap-1 flex-wrap">
+                          <div className="flex items-center gap-1">
                             {[
                               { label: '인지', from: smsStep, to: ragStep },
                               { label: '분석', from: ragStep, to: warStep },
-                              { label: '워룸진행', from: warStep, to: knwStep },
-                              { label: '처리완료', from: smsStep, to: knwStep },
+                              { label: '워룸', from: warStep, to: knwStep },
+                              { label: '완료', from: smsStep, to: knwStep },
                             ].map(({ label, from, to }) => {
-                              const isDone = label === '처리완료' ? !!knwStep : !!to;
+                              const isDone = label === '완료' ? !!knwStep : !!to;
                               const isActive = !!from && !to;
                               const ms = from ? ((to ? new Date(to.timestamp) : currentTime) - new Date(from.timestamp)) : 0;
                               const m = Math.floor(ms / 60000);
                               const s = Math.floor((ms % 60000) / 1000);
                               const timeStr = from ? (m > 0 ? `${m}m${s}s` : `${s}s`) : '-';
                               return (
-                                <div key={label} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black ${
+                                <div key={label} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[8px] font-black ${
                                   isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                                   : isActive ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                                   : 'bg-white/3 border-white/5 text-slate-600'
                                 }`}>
-                                  <span className="text-[8px] opacity-70">{label}</span>
-                                  <span className="font-mono tabular-nums">{timeStr}</span>
-                                  {isActive && <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />}
+                                  <span className="opacity-60">{label}</span>
+                                  <span className="font-mono">{timeStr}</span>
                                 </div>
                               );
                             })}
@@ -1834,16 +1836,16 @@ export default function DashboardPage({ onAiClick }) {
                 </div>
               </div>{/* end header */}
 
-              {/* Scrollable body */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
+              {/* Body (Non-scrollable HUD style) */}
+              <div className="flex-1 overflow-hidden p-5">
               <div className="relative">
                 {/* Vertical Line */}
                 <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
 
-                <div className="space-y-8">
+                <div className="space-y-6">
                   {selectedIncidentIdFlow ? (
                     // Workflow Flow View
-                    <div className="flex flex-col space-y-0 py-6 relative">
+                    <div className="flex flex-col space-y-0 py-2 relative">
                       {(() => {
                         const firstPendingIdx = FLOW_STEPS.findIndex(step => {
                           if (step.id === 'RAG_AGENT') {
@@ -1914,10 +1916,10 @@ export default function DashboardPage({ onAiClick }) {
                             }
                           }
 
-                          // 소요시간에 비례한 동적 paddingBottom (선형, 분당 0.25px, 최소 32 ~ 최대 200px)
+                          // 소요시간에 비례한 동적 paddingBottom (더욱 압축됨: 최소 16 ~ 최대 100px)
                           const dynamicPb = intervalMinutes === 0
-                            ? 32
-                            : Math.min(200, Math.max(32, Math.round(32 + intervalMinutes * 0.25)));
+                            ? 16
+                            : Math.min(100, Math.max(16, Math.round(16 + intervalMinutes * 0.1)));
 
                           return (
                             <div key={step.id} className="relative pl-14 group" style={{ paddingBottom: `${dynamicPb}px` }}>
