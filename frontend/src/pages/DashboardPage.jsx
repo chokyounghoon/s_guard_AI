@@ -1353,6 +1353,22 @@ export default function DashboardPage({ onAiClick }) {
                 showThresholdSettings ? 'text-purple-400' : 'text-slate-400'
               }`}>Casual Match Strictness</span>
             </button>
+
+            {/* S-callert 바로가기 - 관리자 전용 */}
+            {(userProfile?.is_admin === 1 || userProfile?.role === 'admin') && (
+              <button
+                onClick={() => navigate('/s-callert')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 group"
+                style={{
+                  background: 'rgba(251,146,60,0.06)',
+                  border: '1px solid rgba(251,146,60,0.25)',
+                }}
+                title="S-callert PDS 자동호출"
+              >
+                <Phone className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors" style={{ filter: 'drop-shadow(0 0 4px rgba(251,146,60,0.5))' }} />
+                <span className="text-[9px] font-black uppercase tracking-wide text-orange-400 group-hover:text-orange-300 transition-colors whitespace-nowrap">S-callert</span>
+              </button>
+            )}
           </div>
 
           <div className="flex-1" />
