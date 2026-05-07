@@ -4606,8 +4606,11 @@ app.post('/ai/chat', async (c) => {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       }
     })
+
   } catch (e) {
     console.error(`[AI Chat] Failed to fetch:`, e)
     return c.json({ response: `AI 서버 연결 실패: ${e.message}` }, 500)
