@@ -1448,12 +1448,12 @@ export default function DashboardPage({ onAiClick }) {
       <div className="px-3 pt-3 pb-28 space-y-3">
 
         {/* ── PANEL 1: SMS FEED ── */}
-        <div style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16 }}>
+        <div style={{ background: '#0d1117', border: `1px solid ${smsMessages.some(m => m.severity === 'CRITICAL' || m.severity === 'MAJOR') ? 'rgba(239,68,68,0.6)' : 'rgba(59,130,246,0.5)'}`, borderRadius: 16 }}>
 
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="flex items-center gap-2.5">
-              <MessageSquare size={14} style={{ color: '#3b82f6' }} />
+              <MessageSquare size={14} style={{ color: smsMessages.some(m => m.severity === 'CRITICAL' || m.severity === 'MAJOR') ? '#ef4444' : '#3b82f6' }} />
               <span className="text-[11px] font-bold text-white uppercase tracking-[0.15em]">실시간 SMS 수신내역</span>
             </div>
             <div className="flex items-center gap-3">
@@ -1590,7 +1590,7 @@ export default function DashboardPage({ onAiClick }) {
 
         {/* ── PANEL 2: AI Insight (SMS 있을 때만) ── */}
         {visibleSms.length > 0 && (
-          <div style={{ background: '#0d1117', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ background: '#0d1117', border: '1px solid rgba(168,85,247,0.5)', borderRadius: 16, overflow: 'hidden' }}>
             <AiInsightPanel
               onLogReceived={handleLogReceived}
               onShowDetail={handleShowInsight}
@@ -1604,10 +1604,10 @@ export default function DashboardPage({ onAiClick }) {
 
 
         {/* ── PANEL 3: Expert Advisor ── */}
-        <div style={{ background: '#0d1117', border: `1px solid ${selectedSms ? 'rgba(234,179,8,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 16, overflow: 'hidden', transition: 'border-color 0.3s' }}>
+        <div style={{ background: '#0d1117', border: '1px solid rgba(45,212,191,0.5)', borderRadius: 16, overflow: 'hidden' }}>
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="flex items-center gap-2.5">
-              <Sparkles size={14} style={{ color: '#818cf8' }} />
+              <Sparkles size={14} style={{ color: '#2dd4bf' }} />
               <span className="text-[11px] font-bold text-white uppercase tracking-[0.15em]">Expert Advisor</span>
             </div>
             <div className="flex items-center gap-1">
@@ -1659,10 +1659,10 @@ export default function DashboardPage({ onAiClick }) {
         </div>
 
         {/* ── PANEL 4: 장애 처리 현황 ── */}
-        <div style={{ background: '#0d1117', border: '1px solid rgba(168,85,247,0.15)', borderRadius: 16 }}>
+        <div style={{ background: '#0d1117', border: `1px solid ${selectedIncidentIdFlow ? 'rgba(16,185,129,0.5)' : 'rgba(148,163,184,0.3)'}`, borderRadius: 16 }}>
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="flex items-center gap-2.5">
-              <Activity size={14} style={{ color: '#a855f7' }} />
+              <Activity size={14} style={{ color: selectedIncidentIdFlow ? '#10b981' : '#94a3b8' }} />
               <span className="text-[11px] font-bold text-white uppercase tracking-[0.15em]">장애 처리 현황</span>
             </div>
             {selectedIncidentIdFlow && (() => {
