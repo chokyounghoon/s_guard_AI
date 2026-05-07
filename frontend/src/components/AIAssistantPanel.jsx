@@ -380,33 +380,55 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
           <div ref={messagesEndRef} />
         </div>
 
-        {/* ── Input ── always pinned at bottom */}
-        <div className="shrink-0 px-4 py-3"
+        {/* ── Input ── pill-shaped chat style, always pinned at bottom */}
+        <div className="shrink-0 px-3 pt-2 pb-3"
           style={{
-            background: '#0a0d14',
-            borderTop: '1px solid rgba(255,255,255,0.07)',
-            paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))'
+            background: 'linear-gradient(to top, #0a0d14 85%, transparent)',
+            paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
           }}>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-2xl"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(168,85,247,0.25)', boxShadow: '0 0 0 0 rgba(168,85,247,0)' }}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={userInput}
-              onChange={e => setUserInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAIMessage(userInput)}
-              placeholder="AI에게 질문하세요..."
-              className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none"
-            />
+          <div className="flex items-end gap-2">
+            {/* pill input */}
+            <div className="flex-1 flex items-center gap-2 px-4 py-2.5"
+              style={{
+                background: 'rgba(255,255,255,0.07)',
+                border: `1px solid ${userInput.trim() ? 'rgba(168,85,247,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 28,
+                boxShadow: userInput.trim() ? '0 0 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.05)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                transition: 'all 0.2s ease',
+                minHeight: 44,
+              }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={userInput}
+                onChange={e => setUserInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAIMessage(userInput)}
+                placeholder="메시지를 입력하세요..."
+                className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none leading-relaxed"
+                style={{ caretColor: '#a855f7' }}
+              />
+            </div>
+
+            {/* circle send button */}
             <button
               onClick={() => handleAIMessage(userInput)}
               disabled={!userInput.trim() || isAiThinking}
-              className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 disabled:opacity-40"
-              style={{ background: 'linear-gradient(135deg, #a855f7, #6366f1)', boxShadow: userInput.trim() ? '0 0 10px rgba(168,85,247,0.5)' : 'none' }}>
-              <Send size={14} className="text-white" />
+              className="shrink-0 flex items-center justify-center transition-all active:scale-90 disabled:opacity-30"
+              style={{
+                width: 44, height: 44,
+                borderRadius: '50%',
+                background: userInput.trim()
+                  ? 'linear-gradient(135deg, #a855f7, #6366f1)'
+                  : 'rgba(255,255,255,0.08)',
+                border: userInput.trim() ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                boxShadow: userInput.trim() ? '0 0 16px rgba(168,85,247,0.6), 0 4px 12px rgba(99,102,241,0.3)' : 'none',
+                transition: 'all 0.25s ease',
+              }}>
+              <Send size={16} className="text-white" style={{ transform: 'translateX(1px)' }} />
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
