@@ -1252,47 +1252,80 @@ export default function DashboardPage({ onAiClick }) {
             <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
           </div>
           
-          <div className="flex items-center space-x-2 ml-2">
+          <div className="flex items-center space-x-2.5 ml-2.5">
             <button 
               onClick={() => navigate('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')}
               onPointerUp={handleTooltipEnd}
               onPointerLeave={handleTooltipEnd}
-              className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, rgba(6,182,212,0.15) 0%, rgba(6,182,212,0.05) 100%)',
+                border: '1px solid rgba(6,182,212,0.3)',
+                boxShadow: '0 4px 12px -2px rgba(6,182,212,0.15)'
+              }}
               title="Orbital Command"
             >
-              <Cpu size={16} color="#06b6d4" />
+              <div className="absolute inset-0 bg-[#06b6d4]/10 opacity-0 group-active:opacity-100 transition-opacity" />
+              <Cpu size={18} className="text-[#06b6d4] drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
             </button>
+
             <button 
               onClick={() => navigate('/alert-monitor')}
               onPointerDown={() => handleTooltipStart('Alert Monitor')}
               onPointerUp={handleTooltipEnd}
               onPointerLeave={handleTooltipEnd}
-              className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                boxShadow: '0 4px 12px -2px rgba(239,68,68,0.15)'
+              }}
               title="Alert Monitor"
             >
-              <BellDot size={16} color="#ef4444" />
+              <div className="absolute inset-0 bg-[#ef4444]/10 opacity-0 group-active:opacity-100 transition-opacity" />
+              <BellDot size={18} className="text-[#ef4444] drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
             </button>
+
             <button 
               onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
               onPointerDown={() => handleTooltipStart('Threshold Settings')}
               onPointerUp={handleTooltipEnd}
               onPointerLeave={handleTooltipEnd}
-              className={`p-1.5 rounded-lg border transition-all ${showThresholdSettings ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden`}
+              style={{
+                background: showThresholdSettings 
+                  ? 'linear-gradient(135deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 100%)' 
+                  : 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+                border: showThresholdSettings 
+                  ? '1px solid rgba(59,130,246,0.5)' 
+                  : '1px solid rgba(255,255,255,0.1)',
+                boxShadow: showThresholdSettings 
+                  ? '0 0 15px rgba(59,130,246,0.25)' 
+                  : 'none'
+              }}
               title="유사도 임계값 설정"
             >
-              <Settings className={`w-4 h-4 ${isSavingThreshold ? 'animate-spin' : ''}`} />
+              <div className="absolute inset-0 bg-white/5 opacity-0 group-active:opacity-100 transition-opacity" />
+              <Settings className={`w-4 h-4 transition-all duration-500 ${showThresholdSettings ? 'text-blue-400 rotate-45' : 'text-slate-400'} ${isSavingThreshold ? 'animate-spin' : ''}`} />
             </button>
+
             {(userProfile?.is_admin === 1 || userProfile?.role === 'admin') && (
               <button 
                 onClick={() => navigate('/s-callert')}
                 onPointerDown={() => handleTooltipStart('S-callert (PDS)')}
                 onPointerUp={handleTooltipEnd}
                 onPointerLeave={handleTooltipEnd}
-                className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(251,146,60,0.15) 0%, rgba(251,146,60,0.05) 100%)',
+                  border: '1px solid rgba(251,146,60,0.3)',
+                  boxShadow: '0 4px 12px -2px rgba(251,146,60,0.15)'
+                }}
                 title="S-callert (PDS 자동호출)"
               >
-                <Phone size={16} color="#fb923c" />
+                <div className="absolute inset-0 bg-[#fb923c]/10 opacity-0 group-active:opacity-100 transition-opacity" />
+                <Phone size={17} className="text-[#fb923c] drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]" />
               </button>
             )}
           </div>
@@ -1304,9 +1337,15 @@ export default function DashboardPage({ onAiClick }) {
             onPointerDown={() => handleTooltipStart('AI Assistant')}
             onPointerUp={handleTooltipEnd}
             onPointerLeave={handleTooltipEnd}
-            className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden"
+            style={{
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.05) 100%)',
+              border: '1px solid rgba(168,85,247,0.4)',
+              boxShadow: '0 0 15px rgba(168,85,247,0.2)'
+            }}
           >
-            <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
+            <div className="absolute inset-0 bg-[#a855f7]/10 opacity-0 group-active:opacity-100 transition-opacity" />
+            <Bot size={20} className="text-[#a855f7] drop-shadow-[0_0_10px_rgba(168,85,247,0.6)]" />
           </button>
           <div
             className="flex items-center space-x-3 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
@@ -1369,8 +1408,13 @@ export default function DashboardPage({ onAiClick }) {
           <div className="w-full max-w-sm bg-[#1a1f2e] h-full shadow-2xl relative z-10 animate-in slide-in-from-right duration-500 flex flex-col border-l border-white/10">
             <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-600/20 p-2 rounded-xl">
-                  <Bell className="w-5 h-5 text-blue-400" />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden shrink-0"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 100%)',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                    boxShadow: '0 4px 12px -2px rgba(59,130,246,0.15)'
+                  }}>
+                  <Bell className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-lg">알림 센터</h3>
@@ -1467,8 +1511,13 @@ export default function DashboardPage({ onAiClick }) {
                 className="p-4 sm:p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
               >
                   <div className="flex items-center gap-2 sm:gap-3.5">
-                    <div className="bg-blue-600/20 p-2 sm:p-2.5 rounded-xl border border-blue-500/20 shadow-sm shrink-0">
-                      <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden shrink-0"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.05) 100%)',
+                        border: '1px solid rgba(59,130,246,0.4)',
+                        boxShadow: '0 4px 12px -2px rgba(59,130,246,0.2)'
+                      }}>
+                      <MessageSquare className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                     </div>
                     <div>
                       <h3 className="font-black text-white text-base sm:text-lg tracking-tight">실시간 SMS수신내역</h3>
@@ -2084,8 +2133,13 @@ export default function DashboardPage({ onAiClick }) {
             {/* Header */}
             <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
               <div className="flex items-center space-x-3">
-                <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30">
-                  <MessageSquare className="w-5 h-5 text-blue-400" />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden shrink-0"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.05) 100%)',
+                    border: '1px solid rgba(59,130,246,0.4)',
+                    boxShadow: '0 4px 12px -2px rgba(59,130,246,0.2)'
+                  }}>
+                  <MessageSquare className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-white">참여 중인 War-Room</h3>

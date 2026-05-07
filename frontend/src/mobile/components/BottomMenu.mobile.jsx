@@ -28,20 +28,20 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             <button
               key={item.id}
               onClick={() => item.action ? item.action() : navigate(item.path)}
-              className={`flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all duration-200 relative min-w-[48px] ${
-                isActive ? 'text-blue-400' : 'text-slate-500'
+              className={`flex flex-col items-center gap-1.5 px-2 py-1.5 rounded-2xl transition-all duration-300 relative min-w-[56px] ${
+                isActive ? 'bg-blue-500/10 scale-105' : 'hover:bg-white/5 opacity-70 hover:opacity-100'
               }`}
             >
               {isActive && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-400 rounded-full shadow-[0_0_12px_rgba(59,130,246,1)]" />
               )}
               <div className="relative">
-                <Icon className={`w-5 h-5 transition-all duration-200 ${isActive ? 'drop-shadow-[0_0_6px_rgba(59,130,246,0.6)]' : ''}`} />
+                <Icon className={`w-5 h-5 transition-all duration-300 ${isActive ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'text-slate-400'}`} />
                 {item.isAi && showAiPulse && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border border-[#0f111a] animate-pulse" />
+                  <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-purple-500 rounded-full border-2 border-[#0f1219] animate-pulse shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
                 )}
               </div>
-              <span className={`text-[9px] font-bold tracking-tight leading-none ${isActive ? 'text-blue-400' : 'text-slate-600'}`}>
+              <span className={`text-[9px] font-black tracking-widest leading-none uppercase ${isActive ? 'text-blue-400' : 'text-slate-500'}`}>
                 {item.label}
               </span>
             </button>
@@ -53,18 +53,19 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
       {showMoreMenu && (
         <div className="fixed inset-0 z-[260] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowMoreMenu(false)} />
-          <div className="w-full max-w-xl rounded-t-[2rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col"
+          <div className="w-full max-w-xl rounded-t-[2.5rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col animate-in slide-in-from-bottom-full duration-500"
             style={{ background: '#0e1118', maxHeight: '85vh' }}>
 
             {/* 헤더 */}
-            <div className="pt-4 pb-3 px-6 flex flex-col items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="w-10 h-1 rounded-full mb-4" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <h3 className="text-lg font-black text-white tracking-tight">System Console</h3>
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] mt-0.5" style={{ color: '#3b82f6' }}>Management & Intelligence</p>
+            <div className="pt-6 pb-4 px-6 flex flex-col items-center relative overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-blue-600/10 blur-[60px] rounded-full pointer-events-none" />
+              <div className="w-12 h-1.5 rounded-full mb-5 bg-white/10" />
+              <h3 className="text-xl font-black text-white tracking-tight">System Console</h3>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-1 text-blue-500">Management & Intelligence</p>
             </div>
 
             {/* Manual Entry - 전체 너비 강조 버튼 */}
-            <div style={{ padding: '4px 16px 0' }}>
+            <div style={{ padding: '16px 20px 8px' }}>
               <div
                 onClick={() => {
                   setShowMoreMenu(false);
@@ -72,42 +73,43 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                   navigate('/incident-push', { state: { from: 'system-console' } });
                 }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '14px 18px',
-                  background: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.06) 100%)',
-                  border: '1px solid rgba(16,185,129,0.25)',
-                  borderRadius: 16, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  padding: '18px 20px',
+                  background: 'linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(5,150,105,0.08) 100%)',
+                  border: '1px solid rgba(16,185,129,0.3)',
+                  borderRadius: 20, cursor: 'pointer',
                   position: 'relative', overflow: 'hidden',
+                  boxShadow: '0 8px 24px -6px rgba(0,0,0,0.4), 0 0 12px rgba(16,185,129,0.1)'
                 }}
               >
                 <div style={{
-                  position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
+                  position: 'absolute', top: 0, left: 0, bottom: 0, width: 4,
                   background: 'linear-gradient(180deg, #10b981, #059669)',
-                  borderRadius: '16px 0 0 16px',
                 }} />
                 <div style={{
-                  width: 40, height: 40, borderRadius: 12,
-                  background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
+                  width: 44, height: 44, borderRadius: 14,
+                  background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  boxShadow: 'inset 0 0 10px rgba(16,185,129,0.2)'
                 }}>
-                  <MessageSquare size={18} color="#10b981" />
+                  <MessageSquare size={20} color="#10b981" style={{ filter: 'drop-shadow(0 0 8px rgba(16,185,129,0.6))' }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#e2e8f0', letterSpacing: '0.01em' }}>Manual Entry</div>
-                  <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, letterSpacing: '0.06em', opacity: 0.8 }}>INCIDENT INJECTION · 장애 수동 접수</div>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: '#f8fafc', letterSpacing: '0.01em' }}>Manual Entry</div>
+                  <div style={{ fontSize: 10, color: '#10b981', fontWeight: 800, letterSpacing: '0.08em', opacity: 0.9 }}>INCIDENT INJECTION · 장애 수동 접수</div>
                 </div>
                 <div style={{
-                  width: 28, height: 28, borderRadius: 9,
-                  background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)',
+                  width: 32, height: 32, borderRadius: 10,
+                  background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <span style={{ fontSize: 14, color: '#10b981', fontWeight: 900 }}>›</span>
+                  <span style={{ fontSize: 16, color: '#10b981', fontWeight: 900 }}>›</span>
                 </div>
               </div>
             </div>
 
             {/* 그리드: 2열 (전체 시스템 콘솔 메뉴 복구) */}
-            <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            <div className="flex-1 overflow-y-auto p-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
               {[
                 { label: 'Incident\nKW', sub: '장애 키워드', icon: Hash, path: '/incident-keyword', color: '#22d3ee' },
                 { label: 'Personal\nKW', sub: '개인 키워드', icon: Keyboard, path: '/user-keyword', color: '#06b6d4' },
@@ -139,32 +141,35 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                       }
                     }}
                     style={{
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.07)',
-                      borderRadius: 16,
-                      padding: '14px 8px 12px',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      borderRadius: 20,
+                      padding: '16px 12px 14px',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       textAlign: 'center',
-                      gap: 6,
-                      transition: 'background 0.2s',
+                      gap: 8,
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 15px -5px rgba(0,0,0,0.3)'
                     }}
+                    className="hover:bg-white/5 active:scale-95 group"
                   >
                     <div style={{
-                      width: 40, height: 40, borderRadius: 12,
-                      background: `${item.color}18`,
-                      border: `1px solid ${item.color}30`,
+                      width: 44, height: 44, borderRadius: 14,
+                      background: `linear-gradient(135deg, ${item.color}25 0%, ${item.color}08 100%)`,
+                      border: `1px solid ${item.color}40`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0,
+                      boxShadow: `0 0 15px ${item.color}15`
                     }}>
-                      <Icon size={18} color={item.color} />
+                      <Icon size={20} color={item.color} style={{ filter: `drop-shadow(0 0 8px ${item.color}60)` }} />
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', lineHeight: 1.3, whiteSpace: 'pre-line' }}>
+                    <span style={{ fontSize: 12, fontWeight: 900, color: '#f1f5f9', lineHeight: 1.25, whiteSpace: 'pre-line', letterSpacing: '-0.01em' }}>
                       {item.label}
                     </span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
                       {item.sub}
                     </span>
                   </div>
