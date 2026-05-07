@@ -36,7 +36,7 @@ export default defineConfig({
       'react-markdown',
       '@react-oauth/google',
     ],
-    force: true, // 에러 방지를 위해 강제 재번들 활성화
+    force: false, // 🚀 force:true 제거 → 초기 로딩 속도 개선 (캐시 재사용)
   },
   build: {
     outDir: 'dist-mobile',
