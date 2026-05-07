@@ -7,8 +7,7 @@ import {
   ShieldAlert, Zap
 } from 'lucide-react';
 import { getAuthHeaders } from '../../lib/authStore';
-
-const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+import { SMS_WORKER_URL as API_BASE } from '../../config/api';
 
 function flattenTree(nodes, depth = 0, result = []) {
   for (const node of nodes) {
@@ -143,6 +142,11 @@ function ReportCard({ report, onClick }) {
         }}>
           {report.title}
         </h3>
+        {report.report_title && (
+          <div className="text-[10px] text-emerald-500/80 font-bold truncate">
+            📝 {report.report_title}
+          </div>
+        )}
 
         {/* inc_id */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
@@ -179,8 +183,13 @@ function SkeletonCard() {
 export default function MobileReportSearch() {
   const navigate = useNavigate();
 
-  const today        = () => new Date().toISOString().split('T')[0];
-  const oneYearAgo   = () => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().split('T')[0]; };
+  const getLocalDate = (date) => {
+    const offset = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().split('T')[0];
+  };
+  const today        = () => getLocalDate(new Date());
+  const oneYearAgo   = () => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return getLocalDate(d); };
 
   const [keyword,   setKeyword]   = useState('');
   const [startDate, setStartDate] = useState(oneYearAgo());
@@ -205,12 +214,17 @@ export default function MobileReportSearch() {
       if (orgCode)   p.append('orgCode', orgCode);
       if (orgName.trim() && !orgCode) p.append('orgName', orgName.trim());
       if (assignee.trim()) p.append('assignee', assignee.trim());
-      p.append('limit', '50');
+      // 보고서 검색 페이지이므로 보고서가 있는 항목만 필터링하거나 우선적으로 보여주기 위해 파라미터 전달 가능
+      // (현재 백엔드 incidents 엔드포인트는 has_report 정보를 반환함)
+      p.append('limit', '100');
 
       const res  = await fetch(`${API_BASE}/incidents?${p.toString()}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      setReports(Array.isArray(data) ? data : (data.incidents || []));
+      const list = Array.isArray(data) ? data : (data.incidents || []);
+      // 보고서 검색 페이지이므로 보고서가 있는 항목만 필터링 (사용자 요구사항에 따라 조절 가능)
+      const filtered = list.filter(r => r.has_report === 1 || r.status === 'Completed' || r.status === '처리완료');
+      setReports(filtered);
     } catch (err) {
       console.error('[MobileReportSearch]', err);
     } finally {

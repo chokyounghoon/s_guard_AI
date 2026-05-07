@@ -3785,8 +3785,11 @@ app.get('/incidents', async (c) => {
       COALESCE(ua.team, uaa.team) as team,
       COALESCE(ua.part, uaa.part) as part,
       COALESCE(ua.subpart, uaa.subpart) as subpart,
-      (SELECT COUNT(1) FROM autopilot_insight ai WHERE REPLACE(ai.inc_id, 'INC-', '') = REPLACE(i.inc_id, 'INC-', '')) as is_analyzed
+      (SELECT COUNT(1) FROM autopilot_insight ai WHERE REPLACE(ai.inc_id, 'INC-', '') = REPLACE(i.inc_id, 'INC-', '')) as is_analyzed,
+      rp.title as report_title,
+      CASE WHEN rp.id IS NOT NULL THEN 1 ELSE 0 END as has_report
     FROM incidents i
+    LEFT JOIN (SELECT * FROM reports GROUP BY inc_id) rp ON (REPLACE(i.inc_id, 'INC-', '') = REPLACE(rp.inc_id, 'INC-', ''))
     LEFT JOIN users ua ON i.assigned_to = ua.employee_id
     LEFT JOIN incident_assignments ia ON i.inc_id = ia.inc_id
     LEFT JOIN users uaa ON ia.user_id = uaa.employee_id
@@ -3802,18 +3805,18 @@ app.get('/incidents', async (c) => {
   }
   
   if (keyword) {
-    query += " AND (i.title LIKE ? OR i.description LIKE ?)"
-    params.push(`%${keyword}%`, `%${keyword}%`)
+    query += " AND (i.title LIKE ? OR i.description LIKE ? OR rp.title LIKE ? OR rp.content LIKE ?)"
+    params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`)
   }
   
   if (startDate) {
-    query += " AND i.created_at >= ?"
-    params.push(startDate + " 00:00:00")
+    query += " AND date(i.created_at) >= date(?)"
+    params.push(startDate)
   }
   
   if (endDate) {
-    query += " AND i.created_at <= ?"
-    params.push(endDate + " 23:59:59")
+    query += " AND date(i.created_at) <= date(?)"
+    params.push(endDate)
   }
   
   if (orgCode) {

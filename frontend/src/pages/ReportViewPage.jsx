@@ -243,16 +243,104 @@ export default function ReportViewPage() {
             </div>
           </div>
 
-          {/* Original SMS Card */}
+          {/* Original SMS Timeline Item */}
           {report?.sms_message && (
-            <div className="relative overflow-hidden rounded-[2rem] border border-blue-500/20 bg-blue-500/5 p-6">
-              <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-blue-500" />
-              <div className="flex items-center gap-2 mb-4">
-                <MessageSquare className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">수신 문자 원문</span>
-              </div>
-              <div className="text-[13px] text-slate-300 leading-relaxed font-medium bg-black/20 p-4 rounded-2xl border border-white/5 whitespace-pre-wrap">
-                {report.sms_message || ''}
+            <div className="relative group">
+              {/* Timeline Connector - Adjusted to be more subtle and aligned with card edge */}
+              <div className="absolute -left-3 top-10 bottom-[-24px] w-[1px] bg-gradient-to-b from-blue-500/30 to-transparent hidden md:block" />
+              
+              <div className="relative overflow-hidden rounded-[2rem] border border-blue-500/20 bg-blue-500/5 p-6 md:p-8 transition-all hover:bg-blue-500/10">
+                {/* Internal Timeline Dot Indicator */}
+                <div className="absolute top-8 left-0 w-1.5 h-10 bg-blue-500 rounded-r-full shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                      <MessageSquare className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Initial Alert SMS</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {report.sender && (
+                      <span className="text-[10px] text-slate-500 font-bold bg-white/5 px-2.5 py-1 rounded-lg border border-white/5">
+                        FROM: {report.sender}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <Clock className="w-3 h-3 opacity-50" />
+                      <span className="text-[10px] font-bold font-mono">
+                        {report.timestamp ? new Date(report.timestamp).toLocaleString('ko-KR') : '시간 정보 없음'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-black/40 rounded-2xl border border-white/5 p-5 relative overflow-hidden">
+                  {/* Glass highlight effect */}
+                  <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full" />
+                  
+                  <div className="space-y-2.5">
+                    {(() => {
+                      const text = report.sms_message || '';
+                      // ▶ 기호로 분리하되, 첫 번째 조각은 제목/헤더로 취급
+                      const parts = text.split('▶').map(p => p.trim()).filter(Boolean);
+                      if (parts.length === 0) return <p className="text-[12px] text-slate-400">데이터 없음</p>;
+
+                      const header = text.startsWith('▶') ? null : parts[0];
+                      const items = text.startsWith('▶') ? parts : parts.slice(1);
+
+                      return (
+                        <>
+                          {header && (
+                            <div className="pb-3 mb-3 border-b border-white/5">
+                              <p className="text-[13px] font-black text-white leading-relaxed">
+                                {header}
+                              </p>
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            {items.map((item, idx) => {
+                              const colonIdx = item.indexOf(':');
+                              if (colonIdx > -1) {
+                                const key = item.substring(0, colonIdx).trim();
+                                const val = item.substring(colonIdx + 1).trim();
+                                return (
+                                  <div key={idx} className="flex items-start gap-2 group/item">
+                                    <span className="text-blue-500 font-black mt-0.5 shrink-0 text-[10px]">▶</span>
+                                    <div className="flex flex-wrap items-baseline gap-x-2">
+                                      <span className="text-[11px] font-bold text-slate-400 shrink-0">{key} :</span>
+                                      <span className={`text-[12px] font-black break-all ${
+                                        key.includes('현재오류율') || key.includes('오류율') 
+                                          ? 'text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-md border border-red-500/20 shadow-[0_0_8px_rgba(239,68,68,0.3)]' 
+                                          : 'text-emerald-400'
+                                      }`}>
+                                        {val}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div key={idx} className="flex items-start gap-2">
+                                  <span className="text-blue-500 font-black mt-0.5 shrink-0 text-[10px]">▶</span>
+                                  <p className="text-[12px] text-slate-300 leading-relaxed">{item}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+                
+                {report.keyword_detected && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[9px] font-black text-blue-400 uppercase tracking-widest">
+                      Detected Keyword: {report.keyword_detected}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
