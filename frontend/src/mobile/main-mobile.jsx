@@ -14,6 +14,10 @@ let isRefreshingPromise = null;
 window.fetch = async (...args) => {
   const [url, config = {}] = args;
   const urlString = String(url);
+
+  // 🚀 AI 스트리밍 엔드포인트는 인터셉터 처리 최소화 (CORS preflight 방지)
+  // credentials: 'include' 와 401 스트림 분석이 스트리밍 속도를 심각하게 저하시킴
+  const isAiStream = urlString.includes('/ai/');
   
   const isApiRequest = urlString.includes(API_BASE) || 
                        urlString.includes(API_BASE_DOMAIN) ||
@@ -60,12 +64,19 @@ window.fetch = async (...args) => {
       }
       config.headers = headers;
     }
-    config.credentials = 'include';
+
+    // 🚀 AI 스트리밍 요청에는 credentials를 붙이지 않음
+    // credentials: 'include'는 쿠키가 필요한 /auth/ 경로에만 사용
+    if (!isAiStream) {
+      config.credentials = 'include';
+    }
   }
 
   let response = await originalFetch(url, config);
 
-  if (response.status === 401 && isApiRequest && 
+  // 🚀 AI 스트리밍 응답은 401 분석을 건너뜀
+  // response.clone().text()는 전체 스트림을 버퍼링하여 스트리밍 지연을 유발
+  if (!isAiStream && response.status === 401 && isApiRequest && 
       !urlString.includes('/auth/login') && 
       !urlString.includes('/auth/verify') && 
       !urlString.includes('/auth/init') && 
