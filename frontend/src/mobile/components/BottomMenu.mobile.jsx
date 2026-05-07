@@ -143,33 +143,33 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                     style={{
                       background: 'rgba(255,255,255,0.03)',
                       border: '1px solid rgba(255,255,255,0.06)',
-                      borderRadius: 20,
-                      padding: '16px 12px 14px',
+                      borderRadius: 18,
+                      padding: '12px 8px 10px',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       textAlign: 'center',
-                      gap: 8,
+                      gap: 6,
                       transition: 'all 0.3s ease',
                       boxShadow: '0 4px 15px -5px rgba(0,0,0,0.3)'
                     }}
                     className="hover:bg-white/5 active:scale-95 group"
                   >
                     <div style={{
-                      width: 44, height: 44, borderRadius: 14,
+                      width: 38, height: 38, borderRadius: 12,
                       background: `linear-gradient(135deg, ${item.color}25 0%, ${item.color}08 100%)`,
                       border: `1px solid ${item.color}40`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0,
-                      boxShadow: `0 0 15px ${item.color}15`
+                      boxShadow: `0 0 12px ${item.color}15`
                     }}>
-                      <Icon size={20} color={item.color} style={{ filter: `drop-shadow(0 0 8px ${item.color}60)` }} />
+                      <Icon size={17} color={item.color} style={{ filter: `drop-shadow(0 0 6px ${item.color}60)` }} />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 900, color: '#f1f5f9', lineHeight: 1.25, whiteSpace: 'pre-line', letterSpacing: '-0.01em' }}>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: '#f1f5f9', lineHeight: 1.2, whiteSpace: 'pre-line', letterSpacing: '-0.01em' }}>
                       {item.label}
                     </span>
-                    <span style={{ fontSize: 9, fontWeight: 800, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                    <span style={{ fontSize: 8.5, fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', lineHeight: 1.2 }}>
                       {item.sub}
                     </span>
                   </div>
