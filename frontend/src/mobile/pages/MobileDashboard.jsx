@@ -1448,7 +1448,16 @@ export default function DashboardPage({ onAiClick }) {
       <div className="px-3 pt-3 pb-28 space-y-3">
 
         {/* ── PANEL 1: SMS FEED ── */}
-        <div style={{ background: '#0d1117', border: `1px solid ${smsMessages.some(m => m.severity === 'CRITICAL' || m.severity === 'MAJOR') ? 'rgba(239,68,68,0.6)' : 'rgba(59,130,246,0.5)'}`, borderRadius: 16 }}>
+        {(() => {
+          const isCrit = smsMessages.some(m => m.severity === 'CRITICAL' || m.severity === 'MAJOR');
+          const smsColor = isCrit ? '239,68,68' : '59,130,246';
+          return (
+        <div style={{
+          background: '#0d1117',
+          border: `1px solid rgba(${smsColor},0.45)`,
+          borderRadius: 16,
+          boxShadow: `0 0 12px rgba(${smsColor},0.18), 0 0 24px rgba(${smsColor},0.08), inset 0 0 10px rgba(${smsColor},0.06)`
+        }}>
 
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1590,7 +1599,13 @@ export default function DashboardPage({ onAiClick }) {
 
         {/* ── PANEL 2: AI Insight (SMS 있을 때만) ── */}
         {visibleSms.length > 0 && (
-          <div style={{ background: '#0d1117', border: '1px solid rgba(168,85,247,0.5)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{
+            background: '#0d1117',
+            border: '1px solid rgba(168,85,247,0.4)',
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: '0 0 12px rgba(168,85,247,0.2), 0 0 28px rgba(168,85,247,0.08), inset 0 0 12px rgba(168,85,247,0.06)'
+          }}>
             <AiInsightPanel
               onLogReceived={handleLogReceived}
               onShowDetail={handleShowInsight}
@@ -1604,7 +1619,13 @@ export default function DashboardPage({ onAiClick }) {
 
 
         {/* ── PANEL 3: Expert Advisor ── */}
-        <div style={{ background: '#0d1117', border: '1px solid rgba(45,212,191,0.5)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{
+          background: '#0d1117',
+          border: '1px solid rgba(45,212,191,0.4)',
+          borderRadius: 16,
+          overflow: 'hidden',
+          boxShadow: '0 0 12px rgba(45,212,191,0.18), 0 0 28px rgba(45,212,191,0.07), inset 0 0 12px rgba(45,212,191,0.05)'
+        }}>
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="flex items-center gap-2.5">
               <Sparkles size={14} style={{ color: '#2dd4bf' }} />
@@ -1659,7 +1680,18 @@ export default function DashboardPage({ onAiClick }) {
         </div>
 
         {/* ── PANEL 4: 장애 처리 현황 ── */}
-        <div style={{ background: '#0d1117', border: `1px solid ${selectedIncidentIdFlow ? 'rgba(16,185,129,0.5)' : 'rgba(148,163,184,0.3)'}`, borderRadius: 16 }}>
+        {(() => {
+          const isActive = !!selectedIncidentIdFlow;
+          const flowRgb = isActive ? '16,185,129' : '148,163,184';
+          return (
+        <div style={{
+          background: '#0d1117',
+          border: `1px solid rgba(${flowRgb},${isActive ? '0.45' : '0.3'})`,
+          borderRadius: 16,
+          boxShadow: isActive
+            ? `0 0 14px rgba(${flowRgb},0.22), 0 0 30px rgba(${flowRgb},0.08), inset 0 0 12px rgba(${flowRgb},0.06)`
+            : `0 0 8px rgba(${flowRgb},0.1), inset 0 0 6px rgba(${flowRgb},0.03)`
+        }}>
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="flex items-center gap-2.5">
               <Activity size={14} style={{ color: selectedIncidentIdFlow ? '#10b981' : '#94a3b8' }} />
