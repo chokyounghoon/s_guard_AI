@@ -1614,13 +1614,20 @@ export default function DashboardPage({ onAiClick }) {
                   </div>
                 <div className="flex items-center gap-2 sm:gap-4">
 
-                  <label 
-                    onClick={(e) => e.stopPropagation()} 
-                    className="flex items-center gap-1.5 cursor-pointer bg-white/5 hover:bg-white/10 px-2 sm:px-3 py-1.5 rounded-xl border border-white/5 transition-colors"
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHideCompletedSms(!hideCompletedSms);
+                    }}
+                    className="flex items-center gap-2 cursor-pointer group select-none"
                   >
-                    <input type="checkbox" checked={hideCompletedSms} onChange={() => setHideCompletedSms(!hideCompletedSms)} className="w-3.5 h-3.5 sm:w-4 sm:h-4 accent-blue-500 rounded border-white/20" />
-                    <span className="text-[10px] sm:text-xs font-bold text-slate-300">완료숨김</span>
-                  </label>
+                    <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${hideCompletedSms ? 'text-blue-400' : 'text-slate-500'}`}>
+                      Hide Done
+                    </span>
+                    <div className={`w-10 h-5 rounded-full p-1 transition-all duration-300 relative ${hideCompletedSms ? 'bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]' : 'bg-slate-800'}`}>
+                      <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-md ${hideCompletedSms ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </div>
 
 
                   {/* LIVE: is_analyzed=0 → Dify 미처리(깜빡), 1이상 → 처리완료(DONE) */}
