@@ -19,20 +19,21 @@ export default function MobileExpertAdvisor({ user }) {
   const [warRooms, setWarRooms] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch incident SMS data
+  // Fetch incident data directly by ID
   const fetchIncident = useCallback(async () => {
     if (!incidentId) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/sms/recent?limit=50`, { headers: getAuthHeaders() });
-      if (!res.ok) throw new Error('Failed');
+      // Use direct incident endpoint for better performance on mobile
+      const cleanId = String(incidentId).startsWith('INC-') ? incidentId : `INC-${incidentId}`;
+      const res = await fetch(`${API_BASE}/ai/incident/${cleanId}`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch incident');
       const data = await res.json();
-      const found = (data.messages || []).find(m =>
-        String(m.inc_id).replace('INC-', '') === String(incidentId).replace('INC-', '')
-      );
-      if (found) setSmsData(found);
+      if (data.incident) {
+        setSmsData(data.incident);
+      }
     } catch (e) {
-      console.error('[MobileExpertAdvisor]', e);
+      console.error('[MobileExpertAdvisor] Fetch error:', e);
     } finally {
       setLoading(false);
     }

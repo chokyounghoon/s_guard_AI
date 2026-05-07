@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Send, Loader2, Bot, User,
-  AlertTriangle, Mic, Square, Wifi, WifiOff
+  AlertTriangle, Mic, Square, Wifi, WifiOff, Plus, Sparkles
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import ReactMarkdown from 'react-markdown';
@@ -39,7 +39,6 @@ export default function MobileChat({ user }) {
     if (!incidentId) { setLoading(false); return; }
 
     const token = getAccessToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const normId = String(incidentId).replace('INC-', '');
 
     Promise.all([
@@ -171,8 +170,6 @@ export default function MobileChat({ user }) {
 
     connect();
 
-    // 📱 Page Visibility API: Tell the DO when user leaves/returns
-    // This allows the DO to detect who is "offline" for push notifications
     const handleVisibilityChange = () => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
       wsRef.current.send(JSON.stringify({
@@ -191,15 +188,11 @@ export default function MobileChat({ user }) {
   }, [incidentId, user]);
 
   // 스크롤 하단 유지
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
-  // textarea 자동 높이
-  const adjustHeight = () => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  };
+  useEffect(() => {
+    if (messages.length > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -211,7 +204,7 @@ export default function MobileChat({ user }) {
     const normId = String(incidentId).replace('INC-', '');
     setSending(true);
     setInput('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    if (textareaRef.current) textareaRef.current.style.height = '14px';
 
     // 로컬에 즉시 표시
     const tempMsg = {
@@ -238,7 +231,6 @@ export default function MobileChat({ user }) {
 
     // DB에도 저장
     try {
-      const token = getAccessToken();
       await fetch(`${API_BASE}/warroom/chat`, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -252,25 +244,7 @@ export default function MobileChat({ user }) {
       });
     } catch (_) {}
     setSending(false);
-  }, [input, sending, incidentId, user]);
-
-  // STT
-  const toggleSTT = () => {
-    if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return; }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert('이 브라우저는 음성 인식을 지원하지 않습니다.'); return; }
-    const rec = new SR();
-    rec.lang = 'ko-KR'; rec.interimResults = true; rec.continuous = false;
-    rec.onstart = () => setIsListening(true);
-    rec.onresult = (e) => {
-      const t = Array.from(e.results).map(r => r[0].transcript).join('');
-      setInput(t);
-    };
-    rec.onend = () => setIsListening(false);
-    rec.onerror = () => setIsListening(false);
-    recognitionRef.current = rec;
-    rec.start();
-  };
+  }, [input, sending, incidentId, user, participants.length]);
 
   return (
     <div className="flex flex-col bg-[#191919] overflow-hidden" style={{ height: '100dvh' }}>
@@ -292,11 +266,22 @@ export default function MobileChat({ user }) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {isConnected
-            ? <><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /><span className="text-[10px] text-green-400 font-mono">LIVE</span></>
-            : <><WifiOff className="w-3.5 h-3.5 text-red-400" /><span className="text-[10px] text-red-400 font-mono">재연결 중</span></>
-          }
+        <div className="flex items-center gap-2 shrink-0">
+          {/* W/R 분석 버튼 추가 - PC 버전과 동일한 스트리밍 페이지로 연결 */}
+          <button
+            onClick={() => navigate(`/chat-summary/${incidentId}`)}
+            className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center active:scale-95 transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+            title="W/R 분석"
+          >
+            <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+          </button>
+
+          <div className="flex flex-col items-end gap-0.5 ml-1">
+            {isConnected
+              ? <><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /><span className="text-[10px] text-green-400 font-mono">LIVE</span></>
+              : <><WifiOff className="w-3.5 h-3.5 text-red-400" /><span className="text-[10px] text-red-400 font-mono">OFFLINE</span></>
+            }
+          </div>
         </div>
       </header>
 
@@ -359,39 +344,54 @@ export default function MobileChat({ user }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* 입력 영역 */}
-      <div className="bg-[#191919] border-t border-[#242424] px-3 py-2 shrink-0"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
-        <div className="flex items-end gap-2">
-          <button onClick={toggleSTT} className={`p-3 rounded-2xl transition-all shrink-0 ${
-            isListening ? 'bg-red-500/30 border border-red-500/40 text-red-400' : 'bg-white/5 border border-white/10 text-slate-500'
-          }`}>
-            {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+      {/* 입력 영역 (초슬림 모바일 버전) */}
+      <div className="bg-[#191919] border-t border-[#242424] px-2 py-1.5 shrink-0"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}>
+        <div className="flex items-end gap-1">
+          {/* 파일 첨부/기능 (Plus) */}
+          <button className="flex items-center justify-center rounded-full bg-[#2A2A2A] border border-white/10 text-slate-300 transition-all active:scale-90 flex-none mb-0.5"
+            style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}>
+            <Plus className="w-5 h-5" />
           </button>
-          <div className="flex-1 bg-[#2A2A2A] rounded-3xl flex items-end overflow-hidden">
+
+          {/* 입력 필드 (Pill - 수직 중앙 정렬 items-center) */}
+          <div className="flex-1 bg-[#2A2A2A] border border-white/10 rounded-[18px] flex items-center overflow-hidden" style={{ minHeight: 36 }}>
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={(e) => { setInput(e.target.value); adjustHeight(); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault(); sendMessage();
+                }
+              }}
               placeholder={isConnected ? '메시지를 입력하세요...' : '연결 중...'}
               rows={1}
               disabled={!isConnected}
-              className="flex-1 bg-transparent px-4 py-2.5 text-[14px] text-white placeholder:text-[#666666] resize-none focus:outline-none leading-relaxed disabled:opacity-50"
-              style={{ maxHeight: '120px' }}
+              className="flex-1 bg-transparent px-4 py-[7px] text-[14px] text-white placeholder:text-[#666666] resize-none focus:outline-none leading-tight disabled:opacity-50"
+              style={{ minHeight: 32, maxHeight: 120 }}
             />
+            {/* 이모지 버튼 (2xl 확대) */}
+            <button className="flex items-center justify-center w-9 h-9 mr-1 rounded-full text-2xl leading-none shrink-0 text-slate-400 hover:text-white transition-all">
+              😊
+            </button>
           </div>
+
+          {/* 전송 버튼 (독립 배치) */}
           <button id="mobile-chat-send" onClick={sendMessage} disabled={sending || !input.trim() || !isConnected}
-            className="w-12 h-12 bg-[#00236e] hover:bg-blue-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-all active:scale-90 shrink-0 shadow-lg shadow-blue-900/30">
-            {sending ? <Loader2 className="w-5 h-5 animate-spin text-white" /> : <Send className="w-5 h-5 text-white fill-white" />}
+            className={`flex items-center justify-center rounded-full transition-all active:scale-95 flex-none shadow-lg mb-0.5
+              ${sending || !input.trim() || !isConnected
+                ? 'bg-slate-800 text-slate-600 opacity-50'
+                : 'bg-blue-600 text-white shadow-blue-900/30'
+              }`}
+            style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}>
+            {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 fill-current" />}
           </button>
         </div>
-        {isListening && (
-          <div className="flex items-center gap-2 mt-2 px-1">
-            <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-xs text-red-400">음성 인식 중...</span>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -388,7 +388,7 @@ export default function SCallertPage() {
               <select
                 value={selectedSid}
                 onChange={e => setSelectedSid(e.target.value)}
-                className="appearance-none bg-[#0f1420] border border-orange-500/20 text-orange-300 text-xs font-black rounded-xl px-4 py-2.5 pr-8 focus:outline-none focus:border-orange-500/50 cursor-pointer shadow-[0_0_15px_rgba(251,146,60,0.05)]"
+                className="appearance-none bg-[#0f1420] border border-orange-500/20 text-orange-300 text-xs font-black rounded-xl px-3 py-2.5 pr-7 focus:outline-none focus:border-orange-500/50 cursor-pointer shadow-[0_0_15px_rgba(251,146,60,0.05)] max-w-[150px] truncate"
               >
                 {strategies.length === 0
                   ? <option value="">전략 없음</option>

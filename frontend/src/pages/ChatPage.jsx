@@ -1676,7 +1676,7 @@ export default function ChatPage() {
               </div>
             )}
 
-            <div className="px-1 py-0.5 flex flex-col gap-1">
+            <div className="px-1 py-0 flex flex-col gap-0.5">
               {isResolved ? (
                 <div className="rounded-2xl py-3 px-5 border border-[#242424] bg-[#1e1e1e] flex items-center justify-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
@@ -1734,7 +1734,7 @@ export default function ChatPage() {
                   )}
 
                   {/* 입력 바 */}
-                  <div className="flex items-end gap-2">
+                  <div className="flex items-end gap-1 max-w-5xl mx-auto w-full">
                     {/* 파일 첨부 (외부) */}
                     <input ref={fileInputRef} type="file" multiple
                       accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
@@ -1749,8 +1749,10 @@ export default function ChatPage() {
                         e.target.value = '';
                       }} />
                     <button onClick={() => fileInputRef.current?.click()}
-                      className="p-2.5 rounded-full bg-[#2A2A2A] border border-white/10 hover:bg-[#333333] active:scale-90 transition-all shrink-0 mb-0.5 shadow-sm">
-                      <Paperclip className="w-5 h-5 text-slate-200" />
+                      className="flex items-center justify-center rounded-full bg-[#2A2A2A] border border-white/10 hover:bg-[#333333] active:scale-90 transition-all flex-none mb-0.5 shadow-sm"
+                      style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
+                    >
+                      <Plus className="w-6 h-6 text-slate-200" />
                     </button>
 
                     {/* 입력 필드 컨테이너 (pill 형태) */}
@@ -1766,8 +1768,8 @@ export default function ChatPage() {
                         </div>
                       )}
 
-                      {/* pill 입력창 */}
-                      <div className={`flex items-end bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all ${replyTo ? 'rounded-b-3xl rounded-t-none' : 'rounded-3xl'}`}>
+                      {/* pill 입력창 (수직 중앙 정렬: items-center) */}
+                      <div className={`flex items-center bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all px-1 ${replyTo ? 'rounded-b-[18px] rounded-t-none' : 'rounded-[18px]'}`} style={{ minHeight: 36 }}>
                         {/* textarea */}
                         <textarea ref={textareaRef} id="main-chat-input" rows={1}
                           disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료'}
@@ -1780,35 +1782,37 @@ export default function ChatPage() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault(); handleSendMessage();
-                              if (textareaRef.current) textareaRef.current.style.height = 'auto';
+                              if (textareaRef.current) textareaRef.current.style.height = '24px';
                             }
                           }}
                           onFocus={() => setShowEmojiPicker(false)}
                           placeholder={(roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료') ? '종료된 워룸은 입력할 수 없습니다' : '메시지를 입력하세요...'}
-                          className="flex-1 bg-transparent py-0.5 pl-2.5 pr-1 text-[14px] text-white focus:outline-none placeholder:text-[#666666] resize-none overflow-hidden leading-relaxed"
-                          style={{minHeight:27, maxHeight:120}}
+                          className="flex-1 bg-transparent py-[7px] pl-3 pr-1 text-[14px] text-white focus:outline-none placeholder:text-[#666666] resize-none overflow-y-auto leading-tight"
+                          style={{ minHeight: 32, maxHeight: 120 }}
                         />
 
                         {/* 이모지 버튼 (전송 버튼 좌측) */}
                         <button onClick={() => setShowEmojiPicker(p => !p)}
-                          className={`p-1.5 m-0.5 rounded-full transition-all active:scale-90 text-2xl leading-none shrink-0 ${showEmojiPicker ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}>
+                          className={`flex items-center justify-center w-8 h-8 mx-0.5 rounded-full transition-all active:scale-90 text-2xl leading-none shrink-0 ${showEmojiPicker ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}>
                           😊
-                        </button>
-
-                        {/* 전송 버튼 */}
-                        <button onClick={handleSendMessage}
-                          disabled={(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile}
-                          className={`p-2.5 m-0.5 rounded-full transition-all active:scale-95 shrink-0 shadow-lg
-                            ${(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile
-                              ? 'bg-slate-800 text-slate-600 opacity-50 cursor-not-allowed'
-                              : 'bg-[#00236e] text-white shadow-blue-900/40 hover:bg-[#002a85] hover:scale-105'
-                            }`}>
-                          {uploadingFile
-                            ? <div className="w-6 h-6 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
-                            : <Send className="w-6 h-6 fill-current" />}
                         </button>
                       </div>
                     </div>
+
+                    {/* 전송 버튼 (36px 시원한 사이즈) */}
+                    <button onClick={handleSendMessage}
+                      disabled={(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile}
+                      className={`flex items-center justify-center rounded-full transition-all active:scale-95 flex-none shadow-lg mb-0.5
+                        ${(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile
+                          ? 'bg-slate-800 text-slate-600 opacity-50 cursor-not-allowed'
+                          : 'bg-blue-600 text-white shadow-blue-900/40 hover:bg-blue-500 hover:scale-105'
+                        }`}
+                      style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
+                    >
+                      {uploadingFile
+                        ? <div className="w-5 h-5 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
+                        : <Send className="w-5 h-5 fill-current" />}
+                    </button>
                   </div>
                 </>
               )}
@@ -2323,7 +2327,7 @@ export default function ChatPage() {
                   onChange={(e) => setDmInput(e.target.value)}
                   onKeyPress={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendDM(); }}}
                   placeholder="쪽지를 입력하세요..."
-                  className="w-full bg-[#191919] border border-white/10 rounded-2xl py-3 px-4 pr-12 text-sm focus:outline-none focus:border-blue-500/50 resize-none min-h-[80px]"
+                  className="w-full bg-[#191919] border border-white/10 rounded-2xl py-0.5 px-4 pr-12 text-sm focus:outline-none focus:border-blue-500/50 resize-none min-h-[28px] h-[28px] flex items-center"
                 />
                 <button 
                   onClick={handleSendDM}

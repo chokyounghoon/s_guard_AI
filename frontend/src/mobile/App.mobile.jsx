@@ -35,6 +35,7 @@ import ReportViewPage        from '../pages/ReportViewPage';
 import AlertMonitorPage      from '../pages/AlertMonitorPage';
 import IncidentKeywordPage   from '../pages/IncidentKeywordPage';
 import UserKeywordPage       from '../pages/UserKeywordPage';
+import SCallertPage          from '../pages/SCallertPage';
 
 
 // ── 모바일 전용 페이지 (카드 기반, 네이티브 UX) ────────────────────────────────
@@ -47,6 +48,7 @@ import MobileLoginPage        from './pages/MobileLoginPage';
 import MobileMyAssignments    from './pages/MobileMyAssignments';
 import MobileReportSearch     from './pages/MobileReportSearch';
 import MobileExpertAdvisor    from './pages/MobileExpertAdvisor';
+import MobileAlertMonitor     from './pages/MobileAlertMonitor';
 
 // ── 기존 PC 공통 컴포넌트 그대로 재사용 ─────────────────────────────────────────
 import SMSNotification        from '../components/SMSNotification';
@@ -275,9 +277,10 @@ function AppContent() {
         <Route path="/workflow/:inc_id"        element={<PR><WorkflowPage /></PR>} />
         <Route path="/orbital-command"         element={<PR><OrbitalCommandPage /></PR>} />
         <Route path="/report/:incId"           element={<PR><ReportViewPage /></PR>} />
-        <Route path="/alert-monitor"           element={<PR><AlertMonitorPage /></PR>} />
+        <Route path="/alert-monitor"           element={<PR><MobileAlertMonitor /></PR>} />
         <Route path="/incident-keyword"         element={<PR><IncidentKeywordPage /></PR>} />
         <Route path="/user-keyword"             element={<PR><UserKeywordPage /></PR>} />
+        <Route path="/s-callert"                element={<PR><SCallertPage /></PR>} />
       </Routes>
 
       {/* Consent Modal */}
