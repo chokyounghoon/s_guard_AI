@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info } from 'lucide-react';
+import { getAccessToken } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
