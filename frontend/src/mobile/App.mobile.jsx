@@ -52,7 +52,7 @@ import MobileExpertAdvisor    from './pages/MobileExpertAdvisor';
 import SMSNotification        from '../components/SMSNotification';
 import ErrorBoundary          from '../components/ErrorBoundary';
 import ConsentModal           from '../components/ConsentModal';
-import BottomMenu             from '../components/BottomMenu';      // PC BottomMenu 그대로!
+import BottomMenu             from './components/BottomMenu.mobile';      // 모바일 전용 BottomMenu!
 import AIAssistantPanel       from '../components/AIAssistantPanel';
 import { CodebookProvider }   from '../context/CodebookContext';
 

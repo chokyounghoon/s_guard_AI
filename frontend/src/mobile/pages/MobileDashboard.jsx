@@ -8,7 +8,7 @@ import WarRoomChatPanel from '../../components/WarRoomChatPanel';
 
 import ErrorBoundary from '../../components/ErrorBoundary';
 import AIInsightModal from '../../components/AIInsightModal';
-import BottomMenu from '../../components/BottomMenu';
+import BottomMenu from '../components/BottomMenu.mobile';
 import { useCodebook } from '../../context/CodebookContext';
 import { getAccessToken, clearSession, getAuthHeaders } from '../../lib/authStore';
 
@@ -2114,6 +2114,14 @@ export default function DashboardPage({ onAiClick }) {
           setShowWarRoomPopup(true);
         }} 
       />
+
+      {/* 🚀 Dynamic Save Toast for Thresholds */}
+      {saveStatus && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#1a1f2e] border border-emerald-500/30 text-emerald-400 text-xs font-black px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
+          <CheckCircle className="w-4 h-4 animate-bounce" />
+          <span>{saveStatus}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -2650,14 +2658,6 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
           )}
         </div>
       </div>
-      
-      {/* 🚀 Dynamic Save Toast for Thresholds */}
-      {saveStatus && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#1a1f2e] border border-emerald-500/30 text-emerald-400 text-xs font-black px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
-          <CheckCircle className="w-4 h-4 animate-bounce" />
-          <span>{saveStatus}</span>
-        </div>
-      )}
     </div>
   );
 }
