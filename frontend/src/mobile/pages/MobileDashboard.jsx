@@ -909,6 +909,15 @@ export default function DashboardPage({ onAiClick }) {
         }
       }
 
+      // ── 패턴 2.5: [리더의 최종 조치 가이드] 마커 → currentAgent를 Leader로 강제 전환
+      // DevOps 등 다른 에이전트가 currentAgent인 상태에서 이 마커가 나오면 Leader 블록으로 귀속시킴
+      if (/\[?리더의 최종 조치 가이드\]?/.test(trimmed)) {
+        currentAgent = 'Leader';
+        const leaderPrev = msgsMap.get('Leader') || '';
+        msgsMap.set('Leader', leaderPrev + (leaderPrev ? '\n' : '') + trimmed);
+        continue;
+      }
+
       // ── 패턴 3: 이전 에이전트 내용 누적
       if (currentAgent) {
         const prev = msgsMap.get(currentAgent) || '';
@@ -924,11 +933,15 @@ export default function DashboardPage({ onAiClick }) {
 
       let processed = raw;
 
-      // Leader: [리더의 최종 조치 가이드] 이하 제거
+      // Leader: [리더의 최종 조치 가이드] 마커 이후 내용을 Leader 메시지로 사용
       if (name === 'Leader') {
-        const guidePattern = /(\*{0,2}#{0,4}\s*\[?리더의 최종 조치 가이드\]?\*{0,2})/;
+        const guidePattern = /(\*{0,2}#{0,4}\s*\[?리더의 최종 조치 가이드\]?\*{0,2}[\s:：]?)/;
         const guideMatch = guidePattern.exec(processed);
-        if (guideMatch) processed = processed.substring(0, guideMatch.index);
+        if (guideMatch) {
+          const afterMarker = processed.substring(guideMatch.index + guideMatch[0].length).trim();
+          const beforeMarker = processed.substring(0, guideMatch.index).trim();
+          processed = [beforeMarker, afterMarker].filter(Boolean).join('\n\n');
+        }
       }
 
       const cleaned = processed

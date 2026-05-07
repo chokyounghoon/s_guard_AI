@@ -943,6 +943,15 @@ export default function DashboardPage({ onAiClick }) {
         }
       }
 
+      // ── 패턴 2.5: [리더의 최종 조치 가이드] 마커 → currentAgent를 Leader로 강제 전환
+      // DevOps 등 다른 에이전트가 currentAgent인 상태에서 이 마커가 나오면 Leader 블록으로 귀속시킴
+      if (/\[?리더의 최종 조치 가이드\]?/.test(trimmed)) {
+        currentAgent = 'Leader';
+        const leaderPrev = msgsMap.get('Leader') || '';
+        msgsMap.set('Leader', leaderPrev + (leaderPrev ? '\n' : '') + trimmed);
+        continue;
+      }
+
       // ── 패턴 3: 이전 에이전트 내용 누적
       if (currentAgent) {
         const prev = msgsMap.get(currentAgent) || '';
