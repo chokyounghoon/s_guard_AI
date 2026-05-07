@@ -370,15 +370,15 @@ export default function SCallertPage() {
             >
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </button>
-            <div>
+            <div className="shrink-0">
               <div className="flex items-center gap-2">
                 <Phone size={14} color="#fb923c" />
-                <h1 className="text-base font-black tracking-tight" style={{ background:'linear-gradient(90deg,#f1f5f9,#fb923c)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
+                <h1 className="text-base font-black tracking-tight whitespace-nowrap" style={{ background:'linear-gradient(90deg,#f1f5f9,#fb923c)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
                   S-callert
                 </h1>
               </div>
               <p className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color:'rgba(251,146,60,0.6)' }}>
-                PDS 장애 자동 호출 관리
+                PDS 자동호출관리
               </p>
             </div>
           </div>
@@ -388,7 +388,7 @@ export default function SCallertPage() {
               <select
                 value={selectedSid}
                 onChange={e => setSelectedSid(e.target.value)}
-                className="appearance-none bg-[#0f1420] border border-orange-500/20 text-orange-300 text-xs font-black rounded-xl px-3 py-2.5 pr-7 focus:outline-none focus:border-orange-500/50 cursor-pointer shadow-[0_0_15px_rgba(251,146,60,0.05)] max-w-[150px] truncate"
+                className="appearance-none bg-[#0f1420] border border-orange-500/20 text-orange-300 text-xs font-black rounded-xl px-3 py-2.5 pr-7 focus:outline-none focus:border-orange-500/50 cursor-pointer shadow-[0_0_15px_rgba(251,146,60,0.05)] max-w-[130px] truncate"
               >
                 {strategies.length === 0
                   ? <option value="">전략 없음</option>
@@ -425,7 +425,7 @@ export default function SCallertPage() {
                 !ruleEditing ? (
                   <button
                     onClick={() => setRuleEditing(true)}
-                    className="group/btn flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black border border-orange-500/30 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 hover:border-orange-500/50 transition-all active:scale-95 shadow-[0_0_15px_rgba(251,146,60,0.1)]"
+                    className="group/btn flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black border border-orange-500/30 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 hover:border-orange-500/50 transition-all active:scale-95 shadow-[0_0_15px_rgba(251,146,60,0.1)] whitespace-nowrap"
                   >
                     <Edit3 size={14} className="group-hover/btn:rotate-12 transition-transform" /> 
                     <span>전략 수정</span>
@@ -434,14 +434,14 @@ export default function SCallertPage() {
                   <div className="flex gap-2.5">
                     <button 
                       onClick={() => { setRuleEditing(false); setRuleForm(currentStrategy ? { ...currentStrategy } : null); }}
-                      className="px-4 py-2 rounded-xl text-xs font-black border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 transition-all flex items-center gap-2"
+                      className="px-4 py-2 rounded-xl text-xs font-black border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 transition-all flex items-center gap-2 whitespace-nowrap"
                     >
                       <X size={14} /> 취소
                     </button>
                     <button 
                       onClick={handleRuleSave} 
                       disabled={ruleSaving}
-                      className="px-5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-orange-500 to-amber-500 text-black hover:from-orange-400 hover:to-amber-400 transition-all flex items-center gap-2 disabled:opacity-60 shadow-[0_0_20px_rgba(251,146,60,0.3)] active:scale-95"
+                      className="px-5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-orange-500 to-amber-500 text-black hover:from-orange-400 hover:to-amber-400 transition-all flex items-center gap-2 disabled:opacity-60 shadow-[0_0_20px_rgba(251,146,60,0.3)] active:scale-95 whitespace-nowrap"
                     >
                       {ruleSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 
                       <span>변경사항 저장</span>
@@ -708,13 +708,13 @@ export default function SCallertPage() {
                 <Settings size={15} color="#06b6d4" />
               </div>
               <div>
-                <p className="text-sm font-black text-white">PDS API 설정</p>
-                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color:'#06b6d4' }}>Endpoint Config & Test</p>
+                <p className="text-sm font-black text-white whitespace-nowrap">PDS API 설정</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap" style={{ color:'#06b6d4' }}>Endpoint Config & Test</p>
               </div>
             </div>
             <div className="flex gap-2">
               {!cfgEditing ? (
-                <button onClick={()=>setCfgEditing(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black border transition-all" style={{ background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#06b6d4' }}>
+                <button onClick={()=>setCfgEditing(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap" style={{ background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#06b6d4' }}>
                   <Edit3 size={13} /> 설정 편집
                 </button>
               ) : (
@@ -727,7 +727,7 @@ export default function SCallertPage() {
               )}
               <button
                 onClick={handleTestCall} disabled={testLoading || !pdsConfig.api_url}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black border transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap"
                 style={{
                   background: testLoading||!pdsConfig.api_url ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#10b981,#059669)',
                   border: '1px solid rgba(16,185,129,0.3)', color: testLoading||!pdsConfig.api_url ? '#334155' : '#fff',
