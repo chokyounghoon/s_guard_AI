@@ -6060,9 +6060,46 @@ app.get('/warroom/report/:id', async (c) => {
   const agentText = (agentLogs || []).map(r => `[${r.agent_role}]\n${r.content}`).join('\n\n')
   const combinedAnalysis = (leaderSummary || insightText || agentText || '').slice(0, 4000)
 
-  // Extract metadata
+  // 8. SMS 수신 시각 & 처리완료 시각 → 정확한 MTTR 계산
+  const smsRow = await db.prepare(
+    "SELECT timestamp FROM received_messages WHERE REPLACE(inc_id,'INC-','') = ? LIMIT 1"
+  ).bind(rawId).first()
+  const doneRow = await db.prepare(
+    "SELECT MAX(updated_at) as done_at FROM incident_assignments WHERE REPLACE(inc_id,'INC-','') = ? AND status = '처리완료'"
+  ).bind(rawId).first()
+
+  // MTTR: SMS 수신 → 처리완료, fallback: firstChat → lastChat
   const firstChat = (chatLogs || [])[0]
-  const lastChat = (chatLogs || []).slice(-1)[0]
+  const lastChat  = (chatLogs || []).slice(-1)[0]
+  let durationMin = null
+  if (smsRow?.timestamp && doneRow?.done_at) {
+    const ms = new Date(doneRow.done_at) - new Date(smsRow.timestamp)
+    if (ms > 0) durationMin = Math.round(ms / 60000)
+  } else if (firstChat && lastChat && firstChat.timestamp !== lastChat.timestamp) {
+    const ms = new Date(lastChat.timestamp) - new Date(firstChat.timestamp)
+    if (ms > 0) durationMin = Math.round(ms / 60000)
+  }
+
+  // 9. chat_logs sender → 이름 매핑
+  const senderIds = [...new Set((chatLogs || [])
+    .map(c => c.sender)
+    .filter(s => s && s !== 'SYSTEM')
+  )]
+  let userNameMap = {}
+  if (senderIds.length > 0) {
+    const placeholders = senderIds.map(() => '?').join(',')
+    const { results: userRows } = await db.prepare(
+      `SELECT employee_id, name FROM users WHERE employee_id IN (${placeholders})`
+    ).bind(...senderIds).all()
+    ;(userRows || []).forEach(u => { userNameMap[u.employee_id] = u.name })
+  }
+  const enrichedChatLogs = (chatLogs || []).map(c => ({
+    ...c,
+    sender_display: c.sender === 'SYSTEM' ? 'SYSTEM'
+      : userNameMap[c.sender]
+        ? `${c.sender} (${userNameMap[c.sender]})`
+        : c.sender
+  }))
 
   return c.json({
     inc_id: fullId,
@@ -6089,15 +6126,17 @@ app.get('/warroom/report/:id', async (c) => {
 
     // Related records
     agent_logs: agentLogs || [],
-    chat_logs: chatLogs || [],
+    chat_logs: enrichedChatLogs,
     attachments: attachments || [],
-    
+
     // Stats
     message_count: (chatLogs || []).length,
     attachment_count: (attachments || []).length,
-    duration_min: firstChat && lastChat
-      ? Math.round((new Date(lastChat.timestamp) - new Date(firstChat.timestamp)) / 60000) 
-      : 0,
+    duration_min: durationMin,
+    duration_label: durationMin === null ? '-'
+      : durationMin < 1    ? '1분 미만'
+      : durationMin < 60   ? `${durationMin}분`
+      : `${Math.floor(durationMin / 60)}시간 ${durationMin % 60}분`,
   })
 })
 
