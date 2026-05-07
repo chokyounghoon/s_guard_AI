@@ -1504,12 +1504,10 @@ export default function DashboardPage({ onAiClick }) {
 
         <div className="flex flex-col gap-6 mb-6">
           {/* 실시간 SMS 수신 내역 패널 (접기/펼치기 가능) */}
-          {smsMessages.length > 0 && (
-            <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
-              <div
-                onClick={toggleSmsPanel}
-                className="p-4 sm:p-6 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors"
-              >
+          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl w-full pb-10">
+            <div
+              className="p-4 sm:p-6 flex justify-between items-center transition-colors"
+            >
                   <div className="flex items-center gap-2 sm:gap-3.5">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden shrink-0"
                       style={{
@@ -1558,8 +1556,8 @@ export default function DashboardPage({ onAiClick }) {
                       </div>
                     );
                   })()}
-                  <div className={`transition-transform duration-300 ${isSmsPanelCollapsed ? '' : 'rotate-180'}`}>
-                    <ChevronRight className="w-5 h-5 text-slate-400 rotate-90" />
+                  <div className="opacity-10">
+                    <ChevronRight className="w-5 h-5 text-slate-700 rotate-90" />
                   </div>
                 </div>
               </div>
@@ -1607,108 +1605,121 @@ export default function DashboardPage({ onAiClick }) {
 
               <div className={`transition-all duration-500 ease-in-out ${isSmsPanelCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[500px] border-t border-white/5'}`}>
                 <div className="p-3 space-y-1.5 overflow-y-auto max-h-[500px] scrollbar-thin">
-                  {visibleSms.map((msg) => {
-                    const isSelected = selectedSms?.inc_id === msg.inc_id;
-                    return (
-                      <div
-                        key={`sms-${msg.inc_id}`}
-                        onClick={() => {
-                          const isSelected = selectedSms?.inc_id === msg.inc_id;
-                          if (isSelected) {
-                            setSelectedSms(null);
-                            setShowAgentPanel(false);
-                            setAgentMessages([]);
-                          } else {
-                            setSelectedSms(msg);
-                            setShowAgentPanel(true); // 즉시 Expert Advisor 영역 표시
-                            setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]);
-                          }
-                          // startLiveScenario는 useEffect([selectedSms])가 처리
-                        }}
-                        style={{ border: `1px solid ${isSelected ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.04)'}` }}
-                        className={`rounded-2xl py-2 px-4 flex flex-col group transition-all cursor-pointer ${
-                          isSelected ? 'bg-yellow-500/5 ring-1 ring-yellow-500/30' : 'bg-[#11141d] hover:border-yellow-500/30'
-                        }`}
-                      >
-                        {/* 상단: 제목 + 배지 */}
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
-                              {msg.keyword_detected
-                                ? <AlertCircle className="w-4 h-4 text-yellow-300" />
-                                : <Info className={`w-4 h-4 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
-                              }
+                  {visibleSms.length > 0 ? (
+                    visibleSms.map((msg) => {
+                      const isSelected = selectedSms?.inc_id === msg.inc_id;
+                      return (
+                        <div
+                          key={`sms-${msg.inc_id}`}
+                          onClick={() => {
+                            const isSelected = selectedSms?.inc_id === msg.inc_id;
+                            if (isSelected) {
+                              setSelectedSms(null);
+                              setShowAgentPanel(false);
+                              setAgentMessages([]);
+                            } else {
+                              setSelectedSms(msg);
+                              setShowAgentPanel(true); // 즉시 Expert Advisor 영역 표시
+                              setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]);
+                            }
+                            // startLiveScenario는 useEffect([selectedSms])가 처리
+                          }}
+                          style={{ border: `1px solid ${isSelected ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.04)'}` }}
+                          className={`rounded-2xl py-2 px-4 flex flex-col group transition-all cursor-pointer ${
+                            isSelected ? 'bg-yellow-500/5 ring-1 ring-yellow-500/30' : 'bg-[#11141d] hover:border-yellow-500/30'
+                          }`}
+                        >
+                          {/* 상단: 제목 + 배지 */}
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
+                                {msg.keyword_detected
+                                  ? <AlertCircle className="w-4 h-4 text-yellow-300" />
+                                  : <Info className={`w-4 h-4 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
+                                }
+                              </div>
+                              <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-yellow-400' : 'text-white'}`}>
+                                {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
+                              </h4>
                             </div>
-                            <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-yellow-400' : 'text-white'}`}>
-                              {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
-                            </h4>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                              className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 whitespace-nowrap"
-                            >
-                              진행상태 <ExternalLink className="w-2.5 h-2.5" />
-                            </button>
-                            <span className={`h-6 flex items-center px-2 rounded-lg border text-[8.5px] font-black whitespace-nowrap transition-all ${
-                              msg.incident_status === '처리완료'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : Number(msg.is_analyzed) >= 1
-                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                  : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'
-                            }`}>
-                              {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
-                            </span>
-
-                          </div>
-                        </div>
-
-                        {/* 중단: 발신자 + 사번 */}
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <p className="text-[8.5px] text-slate-500 font-bold">발신: <span className="text-slate-400 font-mono">{msg.sender}</span></p>
-                          {msg.employee_id && (
-                            <span className="h-5 flex items-center gap-1 bg-blue-500/10 px-1.5 rounded-md border border-blue-500/20 text-[8.5px] text-blue-400 font-mono font-black">
-                              {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* 하단: 메시지 본문 + 타임스탬프 */}
-                        <div className="flex flex-col gap-1">
-                          <p className={`text-[13px] leading-relaxed font-medium break-all whitespace-pre-wrap transition-colors ${isSelected ? 'text-yellow-100' : 'text-slate-300'}`}>
-                            {msg.message}
-                          </p>
-                          {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
-                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[8px] font-black uppercase w-fit ${
-                              msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            }`}>
-                              <Zap className="w-2 h-2" />
-                              Match {(msg.similarity_score * 100).toFixed(1)}%
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
+                                className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 whitespace-nowrap"
+                              >
+                                진행상태 <ExternalLink className="w-2.5 h-2.5" />
+                              </button>
+                              <span className={`h-6 flex items-center px-2 rounded-lg border text-[8.5px] font-black whitespace-nowrap transition-all ${
+                                msg.incident_status === '처리완료'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : Number(msg.is_analyzed) >= 1
+                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'
+                              }`}>
+                                {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
+                              </span>
                             </div>
-                          )}
-                          <div className="flex justify-end border-t border-white/5 pt-1 mt-0.5">
-                            <span className="text-[8px] text-slate-600 font-bold font-mono opacity-50">{formatYYMMDD(msg.timestamp)}</span>
+                          </div>
+
+                          {/* 중단: 발신자 + 사번 */}
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <p className="text-[8.5px] text-slate-500 font-bold">발신: <span className="text-slate-400 font-mono">{msg.sender}</span></p>
+                            {msg.employee_id && (
+                              <span className="h-5 flex items-center gap-1 bg-blue-500/10 px-1.5 rounded-md border border-blue-500/20 text-[8.5px] text-blue-400 font-mono font-black">
+                                {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 하단: 메시지 본문 + 타임스탬프 */}
+                          <div className="flex flex-col gap-1">
+                            <p className={`text-[13px] leading-relaxed font-medium break-all whitespace-pre-wrap transition-colors ${isSelected ? 'text-yellow-100' : 'text-slate-300'}`}>
+                              {msg.message}
+                            </p>
+                            {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
+                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[8px] font-black uppercase w-fit ${
+                                msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                              }`}>
+                                <Zap className="w-2 h-2" />
+                                Match {(msg.similarity_score * 100).toFixed(1)}%
+                              </div>
+                            )}
+                            <div className="flex justify-end border-t border-white/5 pt-1 mt-0.5">
+                              <span className="text-[8px] text-slate-600 font-bold font-mono opacity-50">{formatYYMMDD(msg.timestamp)}</span>
+                            </div>
                           </div>
                         </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 gap-4 opacity-30">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-blue-500/10 flex items-center justify-center">
+                        <MessageSquare className="w-6 h-6 text-blue-400" />
                       </div>
-                    );
-                  })}
+                      <div className="text-center space-y-1">
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-wider">수신된 SMS 없음</p>
+                        <p className="text-[10px] text-slate-600">장애 SMS가 수신되면 여기에 표시됩니다</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-
-          {/* AI Autopilot Insight Panel (항상 최신 SMS만 분석하도록 insightSms 적용) */}
-          <div className="w-full">
-            <AiInsightPanel 
-               onLogReceived={handleLogReceived} 
-               onShowDetail={handleShowInsight} 
-               selectedSms={insightSms} 
-               onOpenWarRoom={handleOpenWarRoomFromInsight} 
-               onAgentContent={handleAgentContent}
-               warRooms={warRooms}
-            />
           </div>
+
+          {/* AI Autopilot Insight Panel (실시간 SMS가 있을 때만 표시) */}
+          {visibleSms.length > 0 && (
+            <div className="w-full">
+              <AiInsightPanel 
+                 onLogReceived={handleLogReceived} 
+                 onShowDetail={handleShowInsight} 
+                 selectedSms={insightSms} 
+                 onOpenWarRoom={handleOpenWarRoomFromInsight} 
+                 onAgentContent={handleAgentContent}
+                 warRooms={warRooms}
+              />
+            </div>
+          )}
 
         </div>
 
@@ -2109,20 +2120,10 @@ export default function DashboardPage({ onAiClick }) {
           </div>
         </div>
 
-        {/* Handling Progress Area */}
-      </div>
 
-      {/* AI Agent Demo Components - Emergency Modal Only (Panel is now embedded) */}
-      {/* AI Agent Demo Components - Emergency Modal disabled by user request
-      <EmergencyActionModal
-        isOpen={showEmergencyModal}
-        onClose={() => setShowEmergencyModal(false)}
-        onApprove={handleApproveAction}
-      />
-      */}
-
-        {renderProfileModal()}
-      {/* <AIInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} /> */}
+      {/* EmergencyActionModal - disabled by user request */}
+      {renderProfileModal()}
+      {/* AIInsightModal - disabled */}
 
       {/* War Room Chat List Popup */}
       {showWarRoomPopup && (
@@ -2426,7 +2427,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
   // 전화번호 자동 포맷: 숫자만 추출 → XXX-XXXX-XXXX
   const handlePhoneChange = (e) => {
-    const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+    const digits = e.target.value.replace(/\D/g, '');
     let formatted = digits;
     if (digits.length > 3 && digits.length <= 7) {
       formatted = `${digits.slice(0,3)}-${digits.slice(3)}`;
