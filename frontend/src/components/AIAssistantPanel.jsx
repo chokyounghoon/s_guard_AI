@@ -25,6 +25,20 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
   const [userInput, setUserInput] = useState('');
   const [isAiThinking, setIsAiThinking] = useState(false);
 
+  // 현재 선택된 장애 컨텍스트 (localStorage 실시간 동기화)
+  const [currentIncident, setCurrentIncident] = useState(null);
+  const readIncident = () => {
+    try { const s = localStorage.getItem('sguard_current_incident'); return s ? JSON.parse(s) : null; } catch { return null; }
+  };
+  useEffect(() => {
+    if (!isOpen) return;
+    setCurrentIncident(readIncident());
+    // 대시보드에서 SMS 선택이 바뀔 때 동기화
+    const onStorage = () => setCurrentIncident(readIncident());
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [isOpen]);
+
   const aiAbortRef = useRef(null);
   const aiTypingTimerRef = useRef(null);
   const aiQueueRef = useRef('');
@@ -92,9 +106,9 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
   };
 
   const quickActions = [
-    { id: 'error',   label: '에러 원인 분석',   icon: TriangleAlert, color: '#ef4444' },
-    { id: 'history', label: '유사 장애 이력',    icon: FileText,      color: '#3b82f6' },
-    { id: 'action',  label: '조치 방법 추천',    icon: Zap,           color: '#10b981' },
+    { id: 'error',   label: '에러 원인 분석',   icon: TriangleAlert, color: '#ef4444', needCtx: true },
+    { id: 'history', label: '유사 장애 이력',    icon: FileText,      color: '#3b82f6', needCtx: true },
+    { id: 'action',  label: '조치 방법 추천',    icon: Zap,           color: '#10b981', needCtx: true },
   ];
 
   const handleAIMessage = async (message, hiddenPrompt = '', contextObj = null) => {
@@ -174,9 +188,18 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
   };
 
   const handleQuickAction = (action) => {
+    const ctx = readIncident();
+    if (action.needCtx && !ctx) {
+      // 컨텍스트 없이 장애 분석 불가 → 안내 메시지를 채팅으로 표시
+      setAiMessages(prev => [...prev, {
+        type: 'ai',
+        text: '⚠️ 분석할 장애를 먼저 선택해 주세요.\n\n대시보드에서 SMS 장애 항목을 클릭하면 해당 장애 정보가 여기에 연결됩니다.',
+        timestamp: new Date()
+      }]);
+      return;
+    }
     const hints = { error: ' (get_incident_history 도구로 에러 원인 분석)', history: ' (get_incident_history 도구로 유사 이력 검색)', action: ' (get_incident_solutions 도구로 조치 방법 추천)' };
-    let ctx = null;
-    try { const s = localStorage.getItem('sguard_current_incident'); if (s) ctx = JSON.parse(s); } catch(e) {}
+    setCurrentIncident(ctx); // 클릭 시점 재동기화
     handleAIMessage(action.label, hints[action.id] || '', ctx);
   };
 
@@ -260,18 +283,42 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
           </button>
         </div>
 
+        {/* ── Context Badge / Warning ── */}
+        {currentIncident ? (
+          <div className="mx-4 mt-2.5 mb-0 px-3 py-2 rounded-xl shrink-0 flex items-center gap-2"
+            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" style={{ boxShadow: '0 0 6px rgba(16,185,129,0.8)' }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 leading-none">분석 대상 장애</p>
+              <p className="text-[11px] font-bold text-white truncate mt-0.5">[{currentIncident.id}] {currentIncident.title}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mx-4 mt-2.5 mb-0 px-3 py-2 rounded-xl shrink-0 flex items-center gap-2"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <span className="text-amber-400 text-xs shrink-0">⚠️</span>
+            <p className="text-[10px] font-bold text-amber-300">대시보드에서 SMS 장애를 선택하면 빠른 분석이 활성화됩니다</p>
+          </div>
+        )}
+
         {/* ── Quick Actions (horizontal scroll chips) ── */}
         <div className="px-4 py-2.5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">빠른 질문</p>
           <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {quickActions.map(action => (
-              <button key={action.id} onClick={() => handleQuickAction(action)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0 active:scale-95 transition-all"
-                style={{ background: `${action.color}15`, border: `1px solid ${action.color}35`, color: action.color }}>
-                <action.icon size={11} />
-                <span className="text-[10px] font-bold whitespace-nowrap">{action.label}</span>
-              </button>
-            ))}
+            {quickActions.map(action => {
+              const disabled = action.needCtx && !currentIncident;
+              return (
+                <button key={action.id} onClick={() => handleQuickAction(action)}
+                  title={disabled ? '장애를 먼저 선택해 주세요' : action.label}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0 transition-all ${
+                    disabled ? 'opacity-35 cursor-not-allowed' : 'active:scale-95 cursor-pointer'
+                  }`}
+                  style={{ background: `${action.color}15`, border: `1px solid ${action.color}${disabled ? '20' : '35'}`, color: action.color }}>
+                  <action.icon size={11} />
+                  <span className="text-[10px] font-bold whitespace-nowrap">{action.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
