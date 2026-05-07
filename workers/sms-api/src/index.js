@@ -4885,12 +4885,27 @@ ${feedbackContext}
 
         let difyRes = await fetchDify('chat', effectiveKey);
 
+        // 🚀 Retry once on transient server errors (5xx / 429) before falling back
+        if (!difyRes.ok && (difyRes.status >= 500 || difyRes.status === 429)) {
+          const retryDelay = difyRes.status === 429 ? 3000 : 2000;
+          console.warn(`[AI Analyze] Chat API transient error (${difyRes.status}), retrying in ${retryDelay}ms...`);
+          await new Promise(r => setTimeout(r, retryDelay));
+          difyRes = await fetchDify('chat', effectiveKey);
+        }
+
         if (!difyRes.ok) {
           const status = difyRes.status;
           console.warn(`[AI Analyze] Chat API failed (Status: ${status}), trying Workflow...`);
           
           // Switch to Workflow if Chat fails (typical for mixed app types)
           difyRes = await fetchDify('workflow', api_key);
+
+          // Retry Workflow once on transient errors too
+          if (!difyRes.ok && (difyRes.status >= 500 || difyRes.status === 429)) {
+            console.warn(`[AI Analyze] Workflow transient error (${difyRes.status}), retrying...`);
+            await new Promise(r => setTimeout(r, 2000));
+            difyRes = await fetchDify('workflow', api_key);
+          }
           
           if (!difyRes.ok) {
             const finalStatus = difyRes.status;
