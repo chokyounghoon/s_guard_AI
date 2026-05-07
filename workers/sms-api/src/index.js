@@ -5445,13 +5445,26 @@ app.post('/ai/summarize-chat', async (c) => {
         return rawPatterns.some(p => p.test(val));
       };
 
+      const isStaleError = (val) => {
+        if (!val) return false;
+        return (
+          val.startsWith('🤖') ||
+          val.startsWith('⚠️') ||
+          val.includes('AI 엔진 서버 오류') ||
+          val.includes('Dify 측 서버 상태가 불안정') ||
+          val.includes('인증 오류') ||
+          val.includes('엔드포인트 오류') ||
+          val.includes('대기 시간 초과')
+        );
+      };
+
       // For finalized incidents, strictly serve from DB (Prevent Dify call)
       if (isFinal) {
         console.log(`[Re-Analysis Prevented] Incident ${incident_id} is final. Attempting DB read...`);
         
         // Priority 1: knowledge_base (finalized reports)
         const kb = await db.prepare("SELECT content FROM knowledge_base WHERE inc_id = ? AND category = 'REPORT'").bind(incident_id).first();
-        if (kb && kb.content && !isRaw(kb.content)) {
+        if (kb && kb.content && !isRaw(kb.content) && !isStaleError(kb.content)) {
           console.log(`[Cache Hit] Serving finalized knowledge_base report for ${incident_id}`);
           // Send immediately without typewriter delay or status message to avoid confusion
           await writer.write(encode(`data: ${JSON.stringify({ answer: kb.content })}\n\n`));
@@ -5460,7 +5473,7 @@ app.post('/ai/summarize-chat', async (c) => {
         }
 
         // Priority 2: chat_summaries
-        if (cached && cached.summary && !isRaw(cached.summary)) {
+        if (cached && cached.summary && !isRaw(cached.summary) && !isStaleError(cached.summary)) {
           console.log(`[Cache Hit] Serving cached summary for finalized incident ${incident_id}`);
           await writer.write(encode(`data: ${JSON.stringify({ answer: cached.summary })}\n\n`));
           await writer.write(encode('data: [DONE]\n\n'));
@@ -5489,7 +5502,7 @@ app.post('/ai/summarize-chat', async (c) => {
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(r => setTimeout(r, 1000));
             const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first();
-            if (polled && polled.summary) {
+            if (polled && polled.summary && !isStaleError(polled.summary)) {
               const chars = Array.from(polled.summary);
               for (let i = 0; i < chars.length; i += 50) {
                 await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
