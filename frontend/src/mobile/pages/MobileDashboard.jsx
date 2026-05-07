@@ -1129,9 +1129,6 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   const handleLogReceived = (log, counts) => {
-
-    
-
     console.log("Log received in Dashboard:", log);
     const uniqueId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setAllNotifications(prev => [{
@@ -1142,11 +1139,22 @@ export default function DashboardPage({ onAiClick }) {
       severity: log.severity,
       time: formatYYMMDD(new Date())
     }, ...prev]);
-    // Optionally show a temporary message in the top banner for critical logs
-    if (log.severity === 'CRITICAL') {
-      // 사용자 요청으로 긴급 분석 결과 전체 텍스트 팝업(상단 빨간 배너) 비활성화
-      // setMessages(prev => [...prev, { id: `msg-${Date.now()}-${Math.random()}`, type: 'error', text: log.message }]);
-    }
+  };
+
+  // ── Tooltip Logic for Header ─────────────────────
+  const [activeTooltip, setActiveTooltip] = useState(null);
+  const tooltipTimerRef = useRef(null);
+
+  const handleTooltipStart = (text) => {
+    // 200ms 이상 누르고 있으면 툴팁 노출
+    tooltipTimerRef.current = setTimeout(() => {
+      setActiveTooltip(text);
+    }, 200);
+  };
+
+  const handleTooltipEnd = () => {
+    if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    setActiveTooltip(null);
   };
 
   const renderProfileModal = () => {
@@ -1247,6 +1255,9 @@ export default function DashboardPage({ onAiClick }) {
           <div className="flex items-center space-x-2 ml-2">
             <button 
               onClick={() => navigate('/orbital-command')}
+              onPointerDown={() => handleTooltipStart('Orbital Command')}
+              onPointerUp={handleTooltipEnd}
+              onPointerLeave={handleTooltipEnd}
               className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
               title="Orbital Command"
             >
@@ -1254,6 +1265,9 @@ export default function DashboardPage({ onAiClick }) {
             </button>
             <button 
               onClick={() => navigate('/alert-monitor')}
+              onPointerDown={() => handleTooltipStart('Alert Monitor')}
+              onPointerUp={handleTooltipEnd}
+              onPointerLeave={handleTooltipEnd}
               className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
               title="Alert Monitor"
             >
@@ -1261,6 +1275,9 @@ export default function DashboardPage({ onAiClick }) {
             </button>
             <button 
               onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
+              onPointerDown={() => handleTooltipStart('Threshold Settings')}
+              onPointerUp={handleTooltipEnd}
+              onPointerLeave={handleTooltipEnd}
               className={`p-1.5 rounded-lg border transition-all ${showThresholdSettings ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
               title="유사도 임계값 설정"
             >
@@ -1269,6 +1286,9 @@ export default function DashboardPage({ onAiClick }) {
             {(userProfile?.is_admin === 1 || userProfile?.role === 'admin') && (
               <button 
                 onClick={() => navigate('/s-callert')}
+                onPointerDown={() => handleTooltipStart('S-callert (PDS)')}
+                onPointerUp={handleTooltipEnd}
+                onPointerLeave={handleTooltipEnd}
                 className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
                 title="S-callert (PDS 자동호출)"
               >
@@ -1281,6 +1301,9 @@ export default function DashboardPage({ onAiClick }) {
           {/* AI Assistant Button matching MobileInbox */}
           <button
             onClick={onAiClick}
+            onPointerDown={() => handleTooltipStart('AI Assistant')}
+            onPointerUp={handleTooltipEnd}
+            onPointerLeave={handleTooltipEnd}
             className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
           >
             <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
@@ -1303,6 +1326,18 @@ export default function DashboardPage({ onAiClick }) {
             </div>
           </div>
         </div>
+
+        {/* Floating Tooltip UI */}
+        {activeTooltip && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in zoom-in duration-200">
+            <div className="bg-blue-600 px-4 py-2 rounded-xl shadow-2xl border border-blue-400/30 flex items-center gap-2">
+              <Sparkles className="w-3 h-3 text-white animate-pulse" />
+              <span className="text-xs font-black text-white tracking-widest uppercase">{activeTooltip}</span>
+            </div>
+            {/* Arrow pointing up */}
+            <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-blue-600 mx-auto -mt-[30px]" />
+          </div>
+        )}
       </nav>
 
       {/* Top Banner Messages */}
