@@ -1454,7 +1454,7 @@ export default function DashboardPage({ onAiClick }) {
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="flex items-center gap-2.5">
               <MessageSquare size={14} style={{ color: '#3b82f6' }} />
-              <span className="text-[11px] font-bold text-white uppercase tracking-[0.15em]">SMS 수신내역</span>
+              <span className="text-[11px] font-bold text-white uppercase tracking-[0.15em]">실시간 SMS 수신내역</span>
             </div>
             <div className="flex items-center gap-3">
               {/* Hide Done toggle */}
@@ -2227,10 +2227,33 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             <div>
               <h3 className="text-lg font-bold text-white leading-tight">{formData.name}</h3>
               <p className="text-xs text-slate-400">{profile.email}</p>
+              {(profile.employee_id || profile.id) && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <IdCard className="w-3 h-3 text-slate-500" />
+                  <span className="text-[11px] font-mono text-slate-400">사번 {profile.employee_id || profile.id}</span>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            {/* 사번 (읽기 전용) */}
+            {(profile.employee_id || profile.id) && (
+              <div>
+                <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">사번 (Employee ID)</label>
+                <div className="relative">
+                  <IdCard className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    readOnly
+                    type="text"
+                    value={profile.employee_id || profile.id}
+                    className="w-full bg-slate-900/60 border border-white/5 rounded-xl py-3.5 pl-11 pr-4 text-sm text-slate-400 cursor-not-allowed appearance-none select-all font-mono"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-600 ml-1 mt-1">사번은 관리자만 변경할 수 있습니다.</p>
+              </div>
+            )}
+
             {/* 이름 */}
             <div>
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">이름 *</label>
