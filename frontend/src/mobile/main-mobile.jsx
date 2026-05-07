@@ -4,6 +4,8 @@ import './index.mobile.css'; // 📱 모바일 전용 CSS (PC/태블릿 index.cs
 import MobileApp from './App.mobile.jsx';
 import { getAccessToken, setAccessToken, clearSession, getGhostToken, setGhostToken } from '../lib/authStore';
 
+console.log('🚀 [Mobile] S-Guard AI v1.2.0 - Performance Optimized & Cache Bypass Active');
+
 // 📱 S-Guard AI Mobile PWA Entry Point - Unified Fetch Interceptor
 const originalFetch = window.fetch;
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -15,8 +17,7 @@ window.fetch = async (...args) => {
   const [url, config = {}] = args;
   const urlString = String(url);
 
-  // 🚀 AI 스트리밍 엔드포인트는 인터셉터 처리 최소화 (CORS preflight 방지)
-  // credentials: 'include' 와 401 스트림 분석이 스트리밍 속도를 심각하게 저하시킴
+  // 🚀 AI 스트리밍 엔드포인트 감지 (지연 방지용)
   const isAiStream = urlString.includes('/ai/');
   
   const isApiRequest = urlString.includes(API_BASE) || 
@@ -28,35 +29,9 @@ window.fetch = async (...args) => {
                        urlString.startsWith('/sms/') || 
                        urlString.startsWith('/ai/');
 
+  // 1. Authorization 헤더 추가 및 Credentials 설정
   if (isApiRequest) {
-    let jwt = getAccessToken();
-    
-    // ⚡ [Proactive Refresh] 토큰은 없는데 Ghost Token이 있다면 즉시 리프레시 시도
-    if (!jwt && !urlString.includes('/auth/login') && !urlString.includes('/auth/refresh')) {
-      const ghost = getGhostToken();
-      if (ghost && !isRefreshingPromise) {
-        isRefreshingPromise = (async () => {
-          try {
-            const r = await originalFetch(`${API_BASE}/auth/refresh`, {
-              method: 'GET',
-              headers: { 'Authorization': `Bearer ${ghost}` }
-            });
-            if (r.ok) {
-              const d = await r.json();
-              if (d.access_token) {
-                setAccessToken(d.access_token);
-                if (d.ghost_token) setGhostToken(d.ghost_token);
-                return d.access_token;
-              }
-            }
-          } catch {}
-          return null;
-        })();
-        jwt = await isRefreshingPromise;
-        isRefreshingPromise = null;
-      }
-    }
-
+    const jwt = getAccessToken();
     if (jwt) {
       const headers = new Headers(config.headers || {});
       if (!headers.has('Authorization')) {
@@ -64,18 +39,14 @@ window.fetch = async (...args) => {
       }
       config.headers = headers;
     }
-
-    // 🚀 AI 스트리밍 요청에는 credentials를 붙이지 않음
-    // credentials: 'include'는 쿠키가 필요한 /auth/ 경로에만 사용
-    if (!isAiStream) {
-      config.credentials = 'include';
-    }
+    // 세션 유지를 위해 모든 API 요청에 credentials: 'include' 적용
+    config.credentials = 'include';
   }
 
   let response = await originalFetch(url, config);
 
-  // 🚀 AI 스트리밍 응답은 401 분석을 건너뜀
-  // response.clone().text()는 전체 스트림을 버퍼링하여 스트리밍 지연을 유발
+  // 2. 401 Unauthorized 처리 (Silent Refresh)
+  // AI 스트리밍 응답은 clone().text() 시 버퍼링이 발생하므로 401 분석을 건너뜀
   if (!isAiStream && response.status === 401 && isApiRequest && 
       !urlString.includes('/auth/login') && 
       !urlString.includes('/auth/verify') && 

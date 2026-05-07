@@ -121,6 +121,8 @@ export default function ChatSummaryPage() {
         const decoder = new TextDecoder();
         let buffer = '';
         let receivedAny = false;
+        let accumulatedAnswer = '';
+        let lastUpdateTime = Date.now();
 
         while (true) {
           const { value, done } = await reader.read();
@@ -144,11 +146,17 @@ export default function ChatSummaryPage() {
                 }
                 if (data.answer) {
                   receivedAny = true;
-                  setSummary(prev => {
-                    const newText = prev + data.answer;
-                    if (newText.length > 5) setIsLoading(false);
-                    return newText;
-                  });
+                  accumulatedAnswer += data.answer;
+                  const now = Date.now();
+                  if (now - lastUpdateTime > 50) {
+                    setSummary(prev => {
+                      const newText = prev + accumulatedAnswer;
+                      if (newText.length > 5) setIsLoading(false);
+                      return newText;
+                    });
+                    accumulatedAnswer = '';
+                    lastUpdateTime = now;
+                  }
                 }
                 if (data.error) {
                   setError(data.error);
@@ -158,6 +166,14 @@ export default function ChatSummaryPage() {
               }
             }
           }
+        }
+
+        if (accumulatedAnswer) {
+          setSummary(prev => {
+            const newText = prev + accumulatedAnswer;
+            if (newText.length > 5) setIsLoading(false);
+            return newText;
+          });
         }
 
         // 스트림은 끝났지만 아무 데이터도 없었으면 재시도
@@ -182,7 +198,11 @@ export default function ChatSummaryPage() {
           return;
         }
 
-        setError('요약 생성 중 오류가 발생했습니다. 재분석 버튼을 눌러 다시 시도해 주세요.');
+        // 🚑 로컬 비상 요약 엔진 (AI 장애 시 작동)
+        const localSummary = `# [🛠️ 로컬 비상 장애 요약]\n\n현재 AI 리포트 생성 엔진이 일시적으로 응답하지 않아 시스템 기본 정보로 요약되었습니다.\n\n### 🚨 장애 개요\n- **인시던트 ID:** INC-${incidentId}\n- **분석 상태:** AI 자동 요약 지연 (Dify API Time-out)\n\n### 📝 주요 내용\n해당 인시던트에 대한 상세 대화 내역 및 조치 사항은 워룸(War-Room) 채널에서 직접 확인이 필요합니다.\n\n### 💡 조치 권고\n1. 관련 파트 담당자 소집 확인\n2. 장애 전파 및 유관 부서 공지\n3. 시스템 로그 및 모니터링 대시보드 집중 관측\n\n*정상 복구 시 AI 심층 요약 리포트가 자동으로 생성됩니다.*`;
+        
+        setSummary(localSummary);
+        setLoadingStatus('비상 분석 완료');
       } finally {
         if (abortControllerRef.current === currentController) {
           setIsLoading(false);
@@ -715,6 +735,8 @@ export default function ChatSummaryPage() {
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let buffer = '';
+                    let accumulatedAnswer = '';
+                    let lastUpdateTime = Date.now();
                     while (true) {
                       const { value, done } = await reader.read();
                       if (done) break;
@@ -729,11 +751,22 @@ export default function ChatSummaryPage() {
                           try {
                             const data = JSON.parse(dataStr);
                             if (data.status) setLoadingStatus(data.status);
-                            if (data.answer) setSummary(prev => { const t = prev + data.answer; if (t.length > 5) setIsLoading(false); return t; });
+                            if (data.answer) {
+                              accumulatedAnswer += data.answer;
+                              const now = Date.now();
+                              if (now - lastUpdateTime > 50) {
+                                setSummary(prev => { const t = prev + accumulatedAnswer; if (t.length > 5) setIsLoading(false); return t; });
+                                accumulatedAnswer = '';
+                                lastUpdateTime = now;
+                              }
+                            }
                             if (data.error) setError(data.error);
                           } catch {}
                         }
                       }
+                    }
+                    if (accumulatedAnswer) {
+                      setSummary(prev => { const t = prev + accumulatedAnswer; if (t.length > 5) setIsLoading(false); return t; });
                     }
                   } catch (err) {
                     if (err.name !== 'AbortError') setError('재분석 중 오류가 발생했습니다.');

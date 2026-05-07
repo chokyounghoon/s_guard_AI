@@ -18,6 +18,8 @@ let isRefreshingPromise = null;
 window.fetch = async (...args) => {
   const [url, config = {}] = args;
   const urlString = String(url);
+  // 🚀 AI 스트리밍 엔드포인트 감지 (지연 방지용)
+  const isAiStream = urlString.includes('/ai/');
   // Detect if it's an API request (Cloudflare Worker or Local FastAPI)
   const isApiRequest = urlString.includes(API_BASE) || 
                        urlString.includes(API_BASE_DOMAIN) ||
@@ -46,7 +48,8 @@ window.fetch = async (...args) => {
   let response = await originalFetch(url, config);
 
   // 3. Handle 401 Unauthorized (except for login/verify/refresh itself)
-  if (response.status === 401 && isApiRequest && 
+  // AI 스트리밍 응답은 clone() 시 버퍼링이 발생하므로 401 분석을 건너뜀
+  if (!isAiStream && response.status === 401 && isApiRequest && 
       !urlString.includes('/auth/login') && 
       !urlString.includes('/auth/verify') && 
       !urlString.includes('/auth/init') && 

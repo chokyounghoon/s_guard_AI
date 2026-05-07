@@ -1142,12 +1142,20 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   const handleLogReceived = (log, counts) => {
+    // 🛡️ SECURITY: Dify 서버 에러나 기술적 오류 문구가 포함된 로그는 대시보드에 노출하지 않음
+    const errorRegex = /(AI 엔진 서버 오류|Dify 측 서버 상태|인증 오류|엔드포인트 오류|대기 시간 초과|Dify API 오류|🤖|⚠️)/i;
+    const logContent = log.message || log.text || '';
+    if (logContent && errorRegex.test(logContent)) {
+      console.warn('[Dashboard] Blocked technical error log from UI:', logContent);
+      return; 
+    }
+
     console.log("Log received in Dashboard:", log);
     const uniqueId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setAllNotifications(prev => [{
       id: uniqueId,
       title: log.title || 'AI Log',
-      content: log.message || log.text,
+      content: logContent,
       type: 'AI',
       severity: log.severity,
       time: formatYYMMDD(new Date())

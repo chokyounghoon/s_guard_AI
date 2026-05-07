@@ -133,10 +133,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     typingQueueRef.current += text;
     if (typingTimerRef.current) return;
 
-    // 모바일(좁은 화면)에서는 한 번에 여러 글자 출력 → 체감 속도 개선
+    // 모바일(좁은 화면)에서는 ReactMarkdown 잦은 렌더링으로 인한 끊김 방지 (간격 늘리고 한 번에 많이)
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const charsPerTick = isMobile ? 6 : 1;
-    const interval = isMobile ? 16 : 18;
+    const charsPerTick = isMobile ? 12 : 2; 
+    const interval = isMobile ? 60 : 25;
 
     typingTimerRef.current = setInterval(() => {
       if (!typingQueueRef.current.length) {
@@ -175,19 +175,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           if (checkRes.ok) {
             const data = await checkRes.json();
             // 🛑 에러 메시지가 캐시된 경우(과거 백그라운드 분석 실패 등)는 무시하고 실시간 재분석 시도
-            const isErrorMessage = data.content && (
-              data.content.includes('AI 엔진 서버 오류') || 
-              data.content.includes('Dify 측 서버 상태가 불안정') ||
-              data.content.includes('인증 오류') ||
-              data.content.includes('엔드포인트 오류') ||
-              data.content.includes('대기 시간 초과') ||
-              data.content.includes('Dify API 오류') ||
-              data.content.includes('분석 품질 향상을 위해 대기 시간') ||
-              data.content.includes('AI 엔진 인증 오류') ||
-              data.content.includes('AI 엔진 엔드포인트 오류') ||
-              data.content.startsWith('🤖') ||
-              data.content.startsWith('⚠️ 분석 대기')
-            );
+            const errorRegex = /(AI 엔진 서버 오류|Dify 측 서버 상태|인증 오류|엔드포인트 오류|대기 시간 초과|Dify API 오류|분석 품질 향상|분석 대기|🤖|⚠️)/i;
+            const isErrorMessage = data.content && errorRegex.test(data.content);
 
             if (data.content && !isErrorMessage) {
               // ⚡ DB 캐시 히트 — 타자기 효과 없이 즉시 전체 렌더링 (시간이 생명)
@@ -344,7 +333,26 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             try {
               const data = JSON.parse(dataStr);
               if (data.error) {
-                showDelayOnce();
+                console.warn('[AiInsightPanel] Live analysis failed, triggering local fail-safe:', data.error);
+                
+                // 🚑 로컬 비상 분석 엔진 (AI 장애 시 작동)
+                const localInsight = `[🛠️ 로컬 비상 분석 결과]\n\n현재 AI 엔진 연결이 불안정하여 시스템 기본 규칙에 따라 분석되었습니다.\n\n**장애 요약:** ${selectedSms.message.substring(0, 50)}...\n**조치 권고:** 발신자(${selectedSms.sender}) 정보를 바탕으로 해당 파트의 시스템 로그를 즉시 확인해 주시기 바랍니다.\n\n*정상 복구 시 AI 심층 진단이 자동으로 재시도됩니다.*`;
+                
+                stopTypewriter();
+                setDisplayedText(localInsight);
+                setIsCritical(selectedSms.message.toLowerCase().includes('critical') || selectedSms.message.includes('장애'));
+                setAnalysisComplete(true);
+                setIsAnalyzingSms(false);
+                
+                if (onLogReceivedRef.current) {
+                  onLogReceivedRef.current({
+                    title: `[비상] SMS 장애 분석: ${selectedSms.sender}`,
+                    text: localInsight,
+                    message: localInsight,
+                    severity: 'MAJOR',
+                    category: 'system'
+                  });
+                }
                 return;
               }
               if (data.status === 'searching' || data.status === 'analyzing') {

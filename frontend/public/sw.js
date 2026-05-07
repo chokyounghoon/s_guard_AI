@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v11'; // bumped to force cache invalidation after auth header fix
+const CACHE_NAME = 'sguard-v12'; // force cache invalidation for interceptor fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
