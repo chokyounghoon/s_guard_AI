@@ -69,6 +69,7 @@ export default function ChatSummaryPage() {
 
 
 
+  const getApiUrl = (endpoint) => {
     // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보 및 스트리밍 성능 최적화)
     // Vite Proxy를 거치지 않고 직접 호출하여 스트리밍 지연을 최소화합니다.
     const workerBase = 'https://sguardai.khcho0421.workers.dev';
