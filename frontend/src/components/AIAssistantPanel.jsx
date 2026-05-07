@@ -210,10 +210,20 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
-      {/* Panel — full-height right drawer */}
+      {/* 애니메이션 keyframes 인라인 정의 */}
+      <style>{`
+        @keyframes ai-progress {
+          0%   { transform: translateX(-100%); }
+          50%  { transform: translateX(60%); }
+          100% { transform: translateX(200%); }
+        }
+        .ai-progress-bar { animation: ai-progress 1.6s ease-in-out infinite; }
+      `}</style>
+
+      {/* Panel — full-height right drawer, 100dvh for mobile browsers */}
       <div
         className="relative ml-auto flex flex-col animate-in slide-in-from-right duration-300"
-        style={{ width: '100%', maxWidth: 480, background: '#0a0d14', height: '100%' }}
+        style={{ width: '100%', maxWidth: 480, background: '#0a0d14', height: '100dvh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* ── History Sidebar overlay ── */}
@@ -400,14 +410,28 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
             background: 'linear-gradient(to top, #0a0d14 85%, transparent)',
             paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
           }}>
+
+          {/* 응답 중 진행 표시바 */}
+          {isAiThinking && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <div className="flex-1 h-0.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <div className="ai-progress-bar h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500"
+                  style={{ width: '40%' }} />
+              </div>
+              <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest shrink-0 animate-pulse">
+                AI 응답 중...
+              </span>
+            </div>
+          )}
+
           <div className="flex items-end gap-2">
             {/* pill input */}
             <div className="flex-1 flex items-center gap-2 px-4 py-2.5"
               style={{
-                background: 'rgba(255,255,255,0.07)',
-                border: `1px solid ${userInput.trim() ? 'rgba(168,85,247,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                background: isAiThinking ? 'rgba(168,85,247,0.06)' : 'rgba(255,255,255,0.07)',
+                border: `1px solid ${isAiThinking ? 'rgba(168,85,247,0.3)' : userInput.trim() ? 'rgba(168,85,247,0.45)' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: 28,
-                boxShadow: userInput.trim() ? '0 0 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.05)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                boxShadow: userInput.trim() && !isAiThinking ? '0 0 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.05)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
                 transition: 'all 0.2s ease',
                 minHeight: 44,
               }}>
@@ -416,30 +440,47 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
                 type="text"
                 value={userInput}
                 onChange={e => setUserInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAIMessage(userInput)}
-                placeholder="메시지를 입력하세요..."
-                className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none leading-relaxed"
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !isAiThinking && handleAIMessage(userInput)}
+                placeholder={isAiThinking ? 'AI가 답변 중입니다...' : '메시지를 입력하세요...'}
+                disabled={isAiThinking}
+                className="flex-1 bg-transparent text-sm text-white placeholder:text-purple-400/50 focus:outline-none leading-relaxed disabled:cursor-not-allowed"
                 style={{ caretColor: '#a855f7' }}
               />
             </div>
 
-            {/* circle send button */}
-            <button
-              onClick={() => handleAIMessage(userInput)}
-              disabled={!userInput.trim() || isAiThinking}
-              className="shrink-0 flex items-center justify-center transition-all active:scale-90 disabled:opacity-30"
-              style={{
-                width: 44, height: 44,
-                borderRadius: '50%',
-                background: userInput.trim()
-                  ? 'linear-gradient(135deg, #a855f7, #6366f1)'
-                  : 'rgba(255,255,255,0.08)',
-                border: userInput.trim() ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                boxShadow: userInput.trim() ? '0 0 16px rgba(168,85,247,0.6), 0 4px 12px rgba(99,102,241,0.3)' : 'none',
-                transition: 'all 0.25s ease',
-              }}>
-              <Send size={16} className="text-white" style={{ transform: 'translateX(1px)' }} />
-            </button>
+            {/* 처리중: 중단 버튼 / 대기중: 전송 버튼 */}
+            {isAiThinking ? (
+              <button
+                onClick={() => { if (aiAbortRef.current) aiAbortRef.current.abort(); setIsAiThinking(false); stopTypewriter(); }}
+                className="shrink-0 flex items-center justify-center transition-all active:scale-90"
+                title="응답 중단"
+                style={{
+                  width: 44, height: 44,
+                  borderRadius: '50%',
+                  background: 'rgba(239,68,68,0.15)',
+                  border: '1px solid rgba(239,68,68,0.4)',
+                  boxShadow: '0 0 12px rgba(239,68,68,0.25)',
+                }}>
+                <div className="w-3.5 h-3.5 rounded-sm bg-red-400" />
+              </button>
+            ) : (
+              <button
+                onClick={() => handleAIMessage(userInput)}
+                disabled={!userInput.trim()}
+                className="shrink-0 flex items-center justify-center transition-all active:scale-90 disabled:opacity-30"
+                style={{
+                  width: 44, height: 44,
+                  borderRadius: '50%',
+                  background: userInput.trim()
+                    ? 'linear-gradient(135deg, #a855f7, #6366f1)'
+                    : 'rgba(255,255,255,0.08)',
+                  border: userInput.trim() ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: userInput.trim() ? '0 0 16px rgba(168,85,247,0.6), 0 4px 12px rgba(99,102,241,0.3)' : 'none',
+                  transition: 'all 0.25s ease',
+                }}>
+                <Send size={16} className="text-white" style={{ transform: 'translateX(1px)' }} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -447,3 +488,4 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
     </div>
   );
 }
+
