@@ -1596,6 +1596,8 @@ export default function DashboardPage({ onAiClick }) {
             )}
           </div>
         </div>
+          );
+        })()}
 
         {/* ── PANEL 2: AI Insight (SMS 있을 때만) ── */}
         {visibleSms.length > 0 && (
@@ -1792,6 +1794,8 @@ export default function DashboardPage({ onAiClick }) {
             )}
           </div>
         </div>
+          );
+        })()}
 
       </div>
 
