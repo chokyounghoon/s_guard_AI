@@ -1,9 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Sparkles, Server, Activity } from 'lucide-react';
 
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'https://sguardai.khcho0421.workers.dev'
-  : 'https://sguard-sms-api.khcho0421.workers.dev';
+const isLocalDev = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1' ||
+  window.location.port === '5173' ||
+  window.location.port === '5174'
+);
+
+const API_BASE_URL = isLocalDev ? '' : 'https://sguardai.khcho0421.workers.dev';
 
 export default function AiChatWidget() {
   const [isOpen, setIsOpen] = useState(false);

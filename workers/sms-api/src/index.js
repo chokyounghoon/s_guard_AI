@@ -4564,14 +4564,24 @@ app.post('/ai/chat', async (c) => {
   }
 
   try {
-    const response = await fetch(`${api_base}/chat-messages`, {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${api_key}`, 
-        'Content-Type': 'application/json' 
-      },
-      body: JSON.stringify(payload)
-    })
+    // 🚀 Retry once on transient Dify errors (5xx / 429)
+    let response = null
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      response = await fetch(`${api_base}/chat-messages`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${api_key}`, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(payload)
+      })
+      if (response.ok) break
+      if (attempt < 2 && (response.status >= 500 || response.status === 429)) {
+        const delay = response.status === 429 ? 3000 : 2000
+        console.warn(`[AI Chat] Dify transient error (${response.status}), retrying in ${delay}ms...`)
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -4582,16 +4592,13 @@ app.post('/ai/chat', async (c) => {
     // SSE Streaming Proxy to the Frontend (Maintains real-time response)
     const { readable, writable } = new TransformStream()
     const writer = writable.getWriter()
-    const encoder = new TextEncoder()
 
     ;(async () => {
       try {
         const reader = response.body.getReader()
-        const decoder = new TextDecoder()
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          // Directly proxy the chunk from Dify
           await writer.write(value)
         }
       } catch(e) {
@@ -4616,6 +4623,7 @@ app.post('/ai/chat', async (c) => {
     return c.json({ response: `AI 서버 연결 실패: ${e.message}` }, 500)
   }
 })
+
 
 // [DELETE] 피드백 삭제
 app.delete('/ai/feedback/:id', async (c) => {

@@ -27,7 +27,12 @@ const getApiUrl = (endpoint, isWs = false) => {
   // Use the remote worker by default to ensure reliability across environments.
   // Change to 'true' only if you are explicitly running the local python-api on port 8000.
   const useLocalApi = false; 
-  const isLocalDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && useLocalApi;
+  const isLocalDev = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.port === '5173' ||
+    window.location.port === '5174'
+  ) && useLocalApi;
   
   if (isLocalDev) {
     return `http://127.0.0.1:8000${endpoint}`;

@@ -71,7 +71,12 @@ export default function ChatSummaryPage() {
 
   const getApiUrl = (endpoint) => {
     // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보)
-    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isLocalDev = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' ||
+      window.location.port === '5173' ||
+      window.location.port === '5174'
+    );
     
     // DB 동기화가 필요한 특정 API만 로컬 백엔드 이용
     if (isLocalDev && endpoint.startsWith('/api/v1/db-sync')) {

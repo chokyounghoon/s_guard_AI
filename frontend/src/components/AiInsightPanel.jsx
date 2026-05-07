@@ -8,7 +8,9 @@ const getApiUrl = (endpoint) => {
   // (외부 HTTPS 왕복 제거 → PC/모바일 동일 속도)
   const isLocalDev = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1'
+    window.location.hostname === '127.0.0.1' ||
+    window.location.port === '5173' ||
+    window.location.port === '5174'
   );
   if (isLocalDev) {
     return endpoint; // 상대경로 → Vite proxy 처리

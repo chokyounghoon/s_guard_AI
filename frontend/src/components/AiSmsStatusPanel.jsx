@@ -2,9 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Brain, MessageSquare, Activity, Shield, CircleCheckBig, Clock, PlayCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'https://sguardai.khcho0421.workers.dev'
-  : 'https://sguardai.khcho0421.workers.dev';
+const isLocalDev = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1' ||
+  window.location.port === '5173' ||
+  window.location.port === '5174'
+);
+
+const API_BASE_URL = isLocalDev ? '' : 'https://sguardai.khcho0421.workers.dev';
 
 const AiSmsStatusPanel = () => {
   const navigate = useNavigate();

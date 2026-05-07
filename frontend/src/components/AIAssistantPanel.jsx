@@ -6,7 +6,12 @@ import { getAccessToken } from '../lib/authStore';
 
 // 로컬에서는 Vite proxy 경유, 프로덕션은 Worker 직접
 const getApiUrl = (endpoint) => {
-  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocalDev = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.port === '5173' ||
+    window.location.port === '5174'
+  );
   if (isLocalDev) return endpoint;
   return 'https://sguardai.khcho0421.workers.dev' + endpoint;
 };
