@@ -723,7 +723,9 @@ export default function AiReportPage() {
               <Activity className="w-3 h-3 text-red-400 shrink-0" />
               <div className="min-w-0">
                 <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">소요시간</p>
-                <p className="text-[11px] text-slate-300 font-semibold leading-none">{report.duration_min ?? '-'}분</p>
+                <p className="text-[11px] text-slate-300 font-semibold leading-none">
+                  {report.duration_label ?? (report.duration_min != null ? `${report.duration_min}분` : '-')}
+                </p>
               </div>
             </div>
           </div>
@@ -837,7 +839,7 @@ export default function AiReportPage() {
             {activeTab === '6w1h' && (
               <div className="space-y-2.5 animate-in fade-in duration-300">
                 {[
-                  { label: 'WHO (담당자)', value: report.who, color: 'text-blue-400' },
+                  { label: 'WHO (담당자)',      value: report.who ? `${report.who}${report.who_name ? ` (${report.who_name})` : ''}` : '-', color: 'text-blue-400' },
                   { label: 'WHEN (발생 일시)', value: report.when, color: 'text-purple-400' },
                   { label: 'WHERE (대상 시스템)', value: report.where, color: 'text-teal-400' },
                   { label: 'WHAT (장애 현상)', value: report.what, color: 'text-yellow-400' },
