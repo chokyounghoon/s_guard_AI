@@ -1241,7 +1241,7 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   return (
-    <div className="min-h-screen text-white font-sans overflow-x-clip relative" style={{ background: '#080c14' }}>
+    <div className="text-white font-sans overflow-x-clip relative" style={{ background: '#080c14', minHeight: '100dvh' }}>
 
       {/* ── TOP NAV ──────────────────────────────────── */}
       <nav className="flex justify-between items-center px-4 h-14 sticky top-0 z-30"
@@ -1445,7 +1445,7 @@ export default function DashboardPage({ onAiClick }) {
 
 
       {/* ── MAIN SCROLL ───────────────────────────────── */}
-      <div className="px-3 pt-3 pb-28 space-y-3">
+      <div className="px-3 pt-3 space-y-3" style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 16px)' }}>
 
         {/* ── PANEL 1: SMS FEED ── */}
         {(() => {
