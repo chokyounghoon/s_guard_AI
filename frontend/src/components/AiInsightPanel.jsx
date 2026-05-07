@@ -4,13 +4,17 @@ import MarkdownViewer from './MarkdownViewer';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 
 const getApiUrl = (endpoint) => {
-  const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  if (isLocalDev && (endpoint.startsWith('/ai/') || endpoint.startsWith('/db/'))) {
-    return `http://127.0.0.1:8000${endpoint}`;
+  // 로컬 개발 시 상대경로 반환 → Vite dev server proxy가 Worker로 포워딩
+  // (외부 HTTPS 왕복 제거 → PC/모바일 동일 속도)
+  const isLocalDev = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  );
+  if (isLocalDev) {
+    return endpoint; // 상대경로 → Vite proxy 처리
   }
-  // Production Worker API Base
-  const apiBase = 'https://sguardai.khcho0421.workers.dev';
-  return `${apiBase}${endpoint}`;
+  // Production
+  return `https://sguardai.khcho0421.workers.dev${endpoint}`;
 };
 
 const API_BASE_URL = getApiUrl('');

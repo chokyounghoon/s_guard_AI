@@ -3,8 +3,6 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // 📱 S-Guard AI Mobile PWA Build Config
-// This produces a separate optimized bundle for mobile browsers.
-// Deploy to a separate Cloudflare Pages project: sguard-mobile
 export default defineConfig({
   plugins: [
     react(),
@@ -21,23 +19,13 @@ export default defineConfig({
     }
   ],
   root: '.',
-  // 🔑 캐시 충돌 완벽 차단을 위해 새로운 캐시 디렉터리 사용
   cacheDir: 'node_modules/.vite-mobile-final',
+
+  // 🚀 PC와 동일하게 단순 설정 (auto-detect 사용)
   optimizeDeps: {
-    // 주요 의존성을 미리 명시해 504 Outdated Dep 에러 방지
-    include: [
-      'react',
-      'react-dom',
-      'react-dom/client',
-      'react/jsx-dev-runtime',
-      'react/jsx-runtime',
-      'react-router-dom',
-      'lucide-react',
-      'react-markdown',
-      '@react-oauth/google',
-    ],
-    force: false, // 🚀 force:true 제거 → 초기 로딩 속도 개선 (캐시 재사용)
+    force: false,
   },
+
   build: {
     outDir: 'dist-mobile',
     emptyOutDir: true,
@@ -45,14 +33,47 @@ export default defineConfig({
       input: path.resolve(__dirname, 'index.mobile.html'),
     },
   },
+
   server: {
     host: '0.0.0.0',
     port: 5174,
-    // 개발 서버도 모바일 캐시 폴더 사용
     hmr: {
       protocol: 'ws',
       host: 'localhost',
       port: 5174,
+    },
+    // 🚀 로컬 개발 시 Worker API를 프록시 → 외부 HTTPS 왕복 제거 (PC와 동일한 응답속도)
+    proxy: {
+      '/ai': {
+        target: 'https://sguardai.khcho0421.workers.dev',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/db': {
+        target: 'https://sguardai.khcho0421.workers.dev',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/sms': {
+        target: 'https://sguardai.khcho0421.workers.dev',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/warroom': {
+        target: 'https://sguardai.khcho0421.workers.dev',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/incidents': {
+        target: 'https://sguardai.khcho0421.workers.dev',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/users': {
+        target: 'https://sguardai.khcho0421.workers.dev',
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
 })
