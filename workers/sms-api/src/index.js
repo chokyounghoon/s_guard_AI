@@ -1045,88 +1045,112 @@ ${detailedInfo}`;
         logId = logRes?.id;
       } catch (le) {}
 
-      // 1. Chat API — streaming 모드로 SSE 읽기 (Advanced Chat 앱은 blocking 미지원)
+      // 1. Chat API — 재시도 로직 포함 (최대 3회, 지수 백오프)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 3회 재시도 고려 타임아웃 연장
 
-      try {
-        const difyRes = await fetch(`${api_base}/chat-messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${api_key}`,
-            'Content-Type': 'application/json'
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            inputs: {
-              admin_threshold_value: Number(effectiveThreshold) || 0.85,
-              technical_threshold:   Number(technicalThreshold) || 0.85,
-              casual_threshold:      Number(casualThreshold)    || 0.95
+      const MAX_RETRIES = 3;
+      let lastError = null;
+      
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const difyRes = await fetch(`${api_base}/chat-messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${api_key}`,
+              'Content-Type': 'application/json'
             },
-            query: prompt,
-            response_mode: 'streaming',
-            conversation_id: '',
-            user: 'sguard-worker-bg'
-          })
-        });
+            signal: controller.signal,
+            body: JSON.stringify({
+              inputs: {
+                admin_threshold_value: Number(effectiveThreshold) || 0.85,
+                technical_threshold:   Number(technicalThreshold) || 0.85,
+                casual_threshold:      Number(casualThreshold)    || 0.95
+              },
+              query: prompt,
+              response_mode: 'streaming',
+              conversation_id: '',
+              user: 'sguard-worker-bg'
+            })
+          });
 
-        clearTimeout(timeoutId);
-        resultStatus = difyRes.status;
+          resultStatus = difyRes.status;
 
-        if (difyRes.ok) {
-          // SSE 스트림 읽기 — answer 이벤트 누적
-          const reader = difyRes.body.getReader();
-          const decoder = new TextDecoder();
-          let lineBuffer = '';
-          let accumulated = '';
+          if (difyRes.ok) {
+            // SSE 스트림 읽기 — answer 이벤트 누적
+            const reader = difyRes.body.getReader();
+            const decoder = new TextDecoder();
+            let lineBuffer = '';
+            let accumulated = '';
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            lineBuffer += decoder.decode(value, { stream: true });
-            const lines = lineBuffer.split('\n');
-            lineBuffer = lines.pop(); // 마지막 미완성 라인 보존
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              lineBuffer += decoder.decode(value, { stream: true });
+              const lines = lineBuffer.split('\n');
+              lineBuffer = lines.pop(); // 마지막 미완성 라인 보존
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith('data: ')) continue;
-              const dataStr = trimmed.substring(6);
-              if (dataStr === '[DONE]') break;
-              try {
-                const parsed = JSON.parse(dataStr);
-                if (parsed.event === 'message' || parsed.event === 'agent_message') {
-                  accumulated += (parsed.answer || '');
-                }
-                if (parsed.event === 'message_end') break;
-              } catch {}
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data: ')) continue;
+                const dataStr = trimmed.substring(6);
+                if (dataStr === '[DONE]') break;
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  if (parsed.event === 'message' || parsed.event === 'agent_message') {
+                    accumulated += (parsed.answer || '');
+                  }
+                  if (parsed.event === 'message_end') break;
+                } catch {}
+              }
+            }
+
+            fullOutput = accumulated;
+            console.log(`[Dify Chat Streaming] OK (attempt ${attempt}) — output length: ${fullOutput.length}`);
+            lastError = null;
+            break; // 성공 시 루프 탈출
+
+          } else {
+            let errBody = '';
+            try { errBody = await difyRes.text(); } catch {}
+            console.warn(`[Dify Chat] Attempt ${attempt}/${MAX_RETRIES} failed ${difyRes.status}: ${errBody.slice(0, 200)}`);
+            lastError = { status: difyRes.status, body: errBody };
+
+            // 재시도 가능한 에러에만 대기 후 재시도 (5xx, 429)
+            if (attempt < MAX_RETRIES && (difyRes.status >= 500 || difyRes.status === 429)) {
+              const delay = difyRes.status === 429 ? 5000 : (attempt * 3000);
+              console.log(`[Dify Chat] Retrying in ${delay}ms...`);
+              await new Promise(r => setTimeout(r, delay));
+            } else {
+              break; // 4xx 에러는 재시도 불필요
             }
           }
-
-          fullOutput = accumulated;
-          console.log(`[Dify Chat Streaming] OK — output length: ${fullOutput.length}`);
-
-          if (logId) {
-            try {
-              await db.prepare(`UPDATE dify_debug_logs SET status_code=200 WHERE id=?`).bind(logId).run();
-            } catch {}
-          }
-        } else {
-          let errBody = '';
-          try { errBody = await difyRes.text(); } catch {}
-          console.error(`[Dify Chat] Failed ${difyRes.status}: ${errBody.slice(0, 300)}`);
-
-          if (logId) {
-            try {
-              await db.prepare(`UPDATE dify_debug_logs SET status_code=?, error_message=? WHERE id=?`)
-                .bind(difyRes.status, `Chat failed: ${errBody.slice(0, 200)}`, logId).run();
-            } catch {}
+        } catch (fe) {
+          console.error(`[Background Dify] Attempt ${attempt}/${MAX_RETRIES} error:`, fe.message);
+          lastError = { status: fe.name === 'AbortError' ? 408 : 500 };
+          resultStatus = lastError.status;
+          if (attempt < MAX_RETRIES && fe.name !== 'AbortError') {
+            await new Promise(r => setTimeout(r, attempt * 3000));
+          } else {
+            break;
           }
         }
-      } catch (fe) {
-        console.error(`[Background Dify] Error or timeout:`, fe.message);
-        resultStatus = fe.name === 'AbortError' ? 408 : 500;
-        clearTimeout(timeoutId);
       }
+
+      clearTimeout(timeoutId);
+
+      // 최종 실패 상태 반영
+      if (!fullOutput && lastError) {
+        resultStatus = lastError.status || 500;
+      }
+
+      if (logId) {
+        try {
+          await db.prepare(`UPDATE dify_debug_logs SET status_code=?, error_message=? WHERE id=?`)
+            .bind(resultStatus, !fullOutput ? `Chat failed after ${MAX_RETRIES} attempts: status ${resultStatus}` : null, logId).run();
+        } catch {}
+      }
+
 
       // 🔍 Log Trace Update (Success or Failure)
       if (logId) {
