@@ -1244,7 +1244,7 @@ export default function DashboardPage({ onAiClick }) {
     <div className="text-white font-sans overflow-x-clip relative" style={{ background: '#080c14', minHeight: '100dvh' }}>
 
       {/* ── TOP NAV ──────────────────────────────────── */}
-      <nav className="flex justify-between items-center px-4 h-14 sticky top-0 z-30"
+      <nav className="mobile-top-nav flex justify-between items-center px-4 sticky top-0 z-30"
         style={{ background: '#080c14', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
 
         {/* Left: logo + icon buttons */}
