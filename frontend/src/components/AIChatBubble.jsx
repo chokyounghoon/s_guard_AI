@@ -9,7 +9,7 @@ export default function AIChatBubble({ message, query, incidentId, onCopy, onSha
   const [correction, setCorrection] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!message.text && (!message.logs || message.logs.length === 0) && !message.metrics) {
+  if (message.text == null && (!message.logs || message.logs.length === 0) && !message.metrics) {
     return null;
   }
 

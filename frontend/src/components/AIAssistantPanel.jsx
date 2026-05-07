@@ -356,17 +356,31 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
                     </div>
                     <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">AI Assistant</span>
                   </div>
-                  <AIChatBubble
-                    message={msg}
-                    query={i > 0 ? aiMessages[i - 1].text : ''}
-                    incidentId={incidentId || (msg.context ? msg.context.id : null)}
-                    onCopy={(text) => navigator.clipboard.writeText(text)}
-                    onShare={onShareToTeam}
-                  />
+                  {/* 스트리밍 중(text 비어있음)이거나 텍스트가 있으면 항상 표시 */}
+                  {msg.text ? (
+                    <AIChatBubble
+                      message={msg}
+                      query={i > 0 ? aiMessages[i - 1].text : ''}
+                      incidentId={incidentId || (msg.context ? msg.context.id : null)}
+                      onCopy={(text) => navigator.clipboard.writeText(text)}
+                      onShare={onShareToTeam}
+                    />
+                  ) : (
+                    /* 스트리밍 시작 직후 text='' 일 때 빈 버블 표시 */
+                    <div className="max-w-[88%] px-4 py-3 rounded-2xl rounded-tl-sm text-sm text-slate-300 leading-relaxed whitespace-pre-wrap"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span className="inline-flex gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ))}
+
 
           {isAiThinking && (
             <div className="flex items-center gap-2">
