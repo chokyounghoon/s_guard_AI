@@ -109,8 +109,6 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             {/* 그리드: 2열 (전체 시스템 콘솔 메뉴 복구) */}
             <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {[
-                { label: 'Orbital\nCommand', sub: '지휘 통제', icon: Cpu, path: '/orbital-command', color: '#06b6d4' },
-                { label: 'Alert\nMonitor', sub: '알림 현황', icon: BellDot, path: '/alert-monitor', color: '#ef4444' },
                 { label: 'Incident\nKW', sub: '장애 키워드', icon: Hash, path: '/incident-keyword', color: '#22d3ee' },
                 { label: 'Personal\nKW', sub: '개인 키워드', icon: Keyboard, path: '/user-keyword', color: '#06b6d4' },
                 { label: 'Report\nLine', sub: '결재선 관리', icon: Users, path: '/report-line-management', color: '#a855f7' },
@@ -125,7 +123,6 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'Push\nDiagnostic', sub: '푸시 진단', icon: Bell, path: '/push-diagnostic', color: '#f59e0b' },
                 { label: 'AI Report', sub: 'AI 리포트', icon: FileText, path: '/ai-report', color: '#3b82f6' },
                 { label: 'Report\nSearch', sub: '리포트 검색', icon: Search, path: '/mobile-report-search', color: '#10b981' },
-                { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
                 const Icon = item.icon;
                 return (

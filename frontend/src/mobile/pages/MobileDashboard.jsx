@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot } from 'lucide-react';
 import AgentDiscussionPanel from '../../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../../components/EmergencyActionModal';
 import AiInsightPanel from '../../components/AiInsightPanel';
@@ -1236,21 +1236,48 @@ export default function DashboardPage({ onAiClick }) {
     <div className="min-h-screen bg-[#0f1421] text-white font-sans overflow-x-clip relative">
       {/* Top Navigation */}
       <nav className="flex justify-between items-center p-4 bg-[#0f1421] border-b border-white/10 sticky top-0 z-30">
-        <div
-          className="flex items-center cursor-pointer group"
-          onClick={() => window.location.reload()}
-        >
-          <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
+        <div className="flex items-center space-x-4">
+          <div
+            className="flex items-center cursor-pointer group"
+            onClick={() => window.location.reload()}
+          >
+            <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
+          </div>
+          
+          <div className="flex items-center space-x-2 ml-2">
+            <button 
+              onClick={() => navigate('/orbital-command')}
+              className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+              title="Orbital Command"
+            >
+              <Cpu size={16} color="#06b6d4" />
+            </button>
+            <button 
+              onClick={() => navigate('/alert-monitor')}
+              className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+              title="Alert Monitor"
+            >
+              <BellDot size={16} color="#ef4444" />
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
+              className={`p-1.5 rounded-lg border transition-all ${showThresholdSettings ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
+              title="유사도 임계값 설정"
+            >
+              <Settings className={`w-4 h-4 ${isSavingThreshold ? 'animate-spin' : ''}`} />
+            </button>
+            {(userProfile?.is_admin === 1 || userProfile?.role === 'admin') && (
+              <button 
+                onClick={() => navigate('/s-callert')}
+                className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                title="S-callert (PDS 자동호출)"
+              >
+                <Phone size={16} color="#fb923c" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center space-x-4">
-          <div 
-            className={`p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group ${isRefreshing ? 'opacity-50' : ''}`}
-            onClick={handleManualRefresh}
-            title="데이터 새로고침"
-          >
-            <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
-          </div>
-
           {/* AI Assistant Button matching MobileInbox */}
           <button
             onClick={onAiClick}
@@ -1413,13 +1440,6 @@ export default function DashboardPage({ onAiClick }) {
                     </div>
                   </div>
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
-                    className={`p-2 rounded-xl border transition-all ${showThresholdSettings ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'}`}
-                    title="유사도 임계값 설정"
-                  >
-                    <Settings className={`w-4 h-4 ${isSavingThreshold ? 'animate-spin' : ''}`} />
-                  </button>
 
                   <label 
                     onClick={(e) => e.stopPropagation()} 
