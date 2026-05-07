@@ -5,13 +5,10 @@ import AIThinkingIndicator from './AIThinkingIndicator';
 import ServerStatusChart from './chat/ServerStatusChart';
 import { getAccessToken } from '../lib/authStore';
 
-// API URL helper: /ai/ endpoints go to local FastAPI, others to Cloudflare Worker
+// API URL helper: localhost에서는 상대경로 반환 → Vite proxy가 Worker로 포워딩
 const getApiUrl = (endpoint) => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  // Use Worker for AI Chat to bypass local backend issues and leverage streaming
-  if (isLocalDev && endpoint.startsWith('/ai/') && endpoint !== '/ai/chat') {
-    return `http://127.0.0.1:8000${endpoint}`;
-  }
+  if (isLocalDev) return endpoint; // Vite dev proxy 처리
   return 'https://sguardai.khcho0421.workers.dev' + endpoint;
 };
 
