@@ -138,6 +138,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     typingQueueRef.current += text;
     if (typingTimerRef.current) return;
 
+    // 모바일(좁은 화면)에서는 한 번에 여러 글자 출력 → 체감 속도 개선
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const charsPerTick = isMobile ? 6 : 1;
+    const interval = isMobile ? 16 : 18;
+
     typingTimerRef.current = setInterval(() => {
       if (!typingQueueRef.current.length) {
         clearInterval(typingTimerRef.current);
@@ -145,10 +150,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         if (onDone) onDone();
         return;
       }
-      const nextChar = typingQueueRef.current[0];
-      typingQueueRef.current = typingQueueRef.current.slice(1);
-      setDisplayedText(prev => prev + nextChar);
-    }, 18);
+      const chunk = typingQueueRef.current.slice(0, charsPerTick);
+      typingQueueRef.current = typingQueueRef.current.slice(charsPerTick);
+      setDisplayedText(prev => prev + chunk);
+    }, interval);
   }, [stopTypewriter]);
 
   // 🚀 Core Analysis Function (Force-able)
