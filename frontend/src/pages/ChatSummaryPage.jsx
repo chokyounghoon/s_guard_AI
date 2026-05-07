@@ -69,20 +69,8 @@ export default function ChatSummaryPage() {
 
 
 
-  const getApiUrl = (endpoint) => {
-    // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보)
-    const isLocalDev = typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' || 
-      window.location.hostname === '127.0.0.1' ||
-      window.location.port === '5173' ||
-      window.location.port === '5174'
-    );
-    
-    // DB 동기화가 필요한 특정 API만 로컬 백엔드 이용
-    if (isLocalDev && endpoint.startsWith('/api/v1/db-sync')) {
-      return `http://127.0.0.1:8000${endpoint}`;
-    }
-    
+    // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보 및 스트리밍 성능 최적화)
+    // Vite Proxy를 거치지 않고 직접 호출하여 스트리밍 지연을 최소화합니다.
     const workerBase = 'https://sguardai.khcho0421.workers.dev';
     return `${workerBase}${endpoint}`;
   };

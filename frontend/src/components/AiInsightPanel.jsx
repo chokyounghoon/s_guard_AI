@@ -4,18 +4,7 @@ import MarkdownViewer from './MarkdownViewer';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 
 const getApiUrl = (endpoint) => {
-  // 로컬 개발 시 상대경로 반환 → Vite dev server proxy가 Worker로 포워딩
-  // (외부 HTTPS 왕복 제거 → PC/모바일 동일 속도)
-  const isLocalDev = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    window.location.port === '5173' ||
-    window.location.port === '5174'
-  );
-  if (isLocalDev) {
-    return endpoint; // 상대경로 → Vite proxy 처리
-  }
-  // Production
+  // 🚀 AI 스트리밍 성능 최적화: Vite Proxy를 거치지 않고 Worker로 직접 호출합니다.
   return `https://sguardai.khcho0421.workers.dev${endpoint}`;
 };
 

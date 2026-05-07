@@ -5537,30 +5537,50 @@ ${timelineCtx.join('\n')}
 
       await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
 
-      // 🚀 Add AbortController for 20s timeout protection
+      // 🚀 Add AbortController for timeout protection
       const totalTimeoutController = new AbortController();
       const totalTimeoutId = setTimeout(() => {
         totalTimeoutController.abort();
       }, 60000); // 60 seconds hard limit
 
-      const difyRes = await fetch(`${api_base}/workflows/run`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${api_key}`, 
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-        },
-        signal: totalTimeoutController.signal,
-        body: JSON.stringify({ 
-          inputs: { chat_log: chatLogForDify, incident_images: [] }, 
-          response_mode: 'streaming', 
-          user: 'sguard-worker' 
-        })
-      })
+      let difyRes = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          difyRes = await fetch(`${api_base}/workflows/run`, {
+            method: 'POST',
+            headers: { 
+              'Authorization': `Bearer ${api_key}`, 
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream'
+            },
+            signal: totalTimeoutController.signal,
+            body: JSON.stringify({ 
+              inputs: { chat_log: chatLogForDify, incident_images: [] }, 
+              response_mode: 'streaming', 
+              user: 'sguard-worker' 
+            })
+          });
+
+          if (difyRes.ok) break;
+
+          if (attempt < 2 && (difyRes.status >= 500 || difyRes.status === 429)) {
+            const delay = difyRes.status === 429 ? 3000 : 2000;
+            console.warn(`[AI Summarize] Dify transient error (${difyRes.status}), retrying in ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
+          }
+        } catch (e) {
+          if (attempt === 2) throw e;
+          console.warn(`[AI Summarize] Fetch failed, retrying...`, e);
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
 
       clearTimeout(totalTimeoutId);
 
-      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
+      if (!difyRes || !difyRes.ok) {
+        throw new Error(`Dify API error: ${difyRes?.status || 'Unknown'}`);
+      }
+
       
       const reader = difyRes.body.getReader()
       const decoder = new TextDecoder()

@@ -24,20 +24,12 @@ const getApiUrl = (endpoint, isWs = false) => {
     return `${workerWsBase}${endpoint}`;
   }
 
-  // Use the remote worker by default to ensure reliability across environments.
-  // Change to 'true' only if you are explicitly running the local python-api on port 8000.
   const useLocalApi = false; 
-  const isLocalDev = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' ||
-    window.location.port === '5173' ||
-    window.location.port === '5174'
-  ) && useLocalApi;
-  
-  if (isLocalDev) {
+  if (useLocalApi) {
     return `http://127.0.0.1:8000${endpoint}`;
   }
 
+  // 🚀 AI 스트리밍 성능 최적화: Vite Proxy를 거치지 않고 Worker로 직접 호출합니다.
   let baseHost = 'sguardai.khcho0421.workers.dev';
   return `https://${baseHost}${endpoint}`;
 };

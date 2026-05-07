@@ -4,16 +4,11 @@ import AIChatBubble from './AIChatBubble';
 import AIThinkingIndicator from './AIThinkingIndicator';
 import { getAccessToken } from '../lib/authStore';
 
-// 로컬에서는 Vite proxy 경유, 프로덕션은 Worker 직접
+// 🚀 AI 스트리밍 성능 최적화: Vite Proxy를 거치지 않고 Worker로 직접 호출합니다.
+// (모바일 기기에서 프록시 지연 및 스트리밍 끊김 문제를 방지하기 위함)
 const getApiUrl = (endpoint) => {
-  const isLocalDev = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    window.location.port === '5173' ||
-    window.location.port === '5174'
-  );
-  if (isLocalDev) return endpoint;
-  return 'https://sguardai.khcho0421.workers.dev' + endpoint;
+  const workerBase = 'https://sguardai.khcho0421.workers.dev';
+  return `${workerBase}${endpoint}`;
 };
 
 const formatTime = (d) => {

@@ -15,14 +15,14 @@ window.fetch = async (...args) => {
   const [url, config = {}] = args;
   const urlString = String(url);
   
-  const isApiRequest = urlString.includes(API_BASE) || 
+  const isApiRequest = (urlString.includes(API_BASE) || 
                        urlString.includes(API_BASE_DOMAIN) ||
                        urlString.includes('localhost:8000') || 
                        urlString.includes('127.0.0.1:8000') ||
                        urlString.startsWith('/auth/') || 
                        urlString.startsWith('/api/') ||
                        urlString.startsWith('/sms/') || 
-                       urlString.startsWith('/ai/');
+                       urlString.startsWith('/ai/')) && !urlString.includes('/ai/'); // 🚀 AI Streaming bypass interceptor
 
   if (isApiRequest) {
     let jwt = getAccessToken();
