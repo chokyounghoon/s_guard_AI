@@ -33,7 +33,13 @@ import {
 import MarkdownViewer from '../components/MarkdownViewer';
 import html2pdf from 'html2pdf.js';
 import BottomMenu from '../components/BottomMenu';
+import { getAccessToken } from '../lib/authStore';
 import './ChatSummaryPage.css';
+
+const getAuthHeader = () => {
+  const token = getAccessToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
 
 // ** , __SH__ 등 불필요한 마크다운 심볼 제거 유틸
 const cleanAiText = (str = '') => {
@@ -95,7 +101,7 @@ export default function ChatSummaryPage() {
 
         const response = await fetch(getApiUrl('/ai/summarize-chat'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
           body: JSON.stringify({ 
             incident_id: incidentId,
             instructions: reportInstruction,
@@ -697,7 +703,7 @@ export default function ChatSummaryPage() {
                   try {
                     const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
                     const response = await fetch(getApiUrl('/ai/summarize-chat'), {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
                       body: JSON.stringify({ 
                         incident_id: incidentId,
                         instructions: reportInstruction,
