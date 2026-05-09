@@ -10,11 +10,23 @@ export default defineConfig({
       name: 'configure-server',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          if (req.url === '/') {
-            req.url = '/index.mobile.html'
+          const url = req.url || '';
+          const accept = req.headers.accept || '';
+
+          // SPA Fallback Logic:
+          // 1. Root path (/)
+          // 2. Paths that accept HTML (browser navigation)
+          // 3. AND are not internal Vite paths (/@vite, /@fs, etc.)
+          // 4. AND are not API/Auth calls
+          const isHtmlRequest = accept.includes('text/html');
+          const isViteInternal = url.startsWith('/@');
+          const isApiRequest = url.startsWith('/api/') || url.startsWith('/auth/') || url.startsWith('/sms/') || url.startsWith('/ai/');
+
+          if (url === '/' || (isHtmlRequest && !isViteInternal && !isApiRequest)) {
+            req.url = '/index.mobile.html';
           }
-          next()
-        })
+          next();
+        });
       }
     }
   ],

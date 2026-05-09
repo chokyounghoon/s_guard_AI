@@ -1202,14 +1202,9 @@ ${detailedInfo}`;
           errorReason = "서버 오류 (5xx)";
         }
 
-        await db.prepare(`
-          INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
-          VALUES (?, ?, 'CRITICAL', 'SYSTEM', ?, 'SYSTEM', ?, 0, ?)
-          ON CONFLICT(inc_id) DO UPDATE SET 
-            content=excluded.content, 
-            mod_dt=excluded.mod_dt,
-            similarity_reason=excluded.similarity_reason
-        `).bind(String(sms_id), errorMsg, now, now, errorReason).run();
+        // 🛡️ SECURITY: 기술적 에러는 DB에 저장하지 않고 로그만 남김 (캐시 오염 방지)
+        console.error(`[AI Background] Analysis Failed: ${sms_id} - ${errorReason}: ${errorMsg}`);
+        // DB 저장을 건너뛰어 대시보드가 항상 신선한 데이터를 요구하게 함
         
         await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
       }
@@ -4793,7 +4788,22 @@ ${feedbackContext}`
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(r => setTimeout(r, 1000));
             const polled = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
-            if (polled && polled.content) {
+            
+            const isStaleError = (val) => {
+              if (!val) return false;
+              return (
+                val.startsWith('🤖') ||
+                val.startsWith('⚠️ 분석 대기') ||
+                val.includes('AI 엔진 서버 오류') ||
+                val.includes('Dify 측 서버 상태가 불안정') ||
+                val.includes('분석 품질 향상을 위해 대기 시간') ||
+                val.includes('인증 오류') ||
+                val.includes('엔드포인트 오류') ||
+                val.includes('대기 시간 초과')
+              );
+            };
+
+            if (polled && polled.content && !isStaleError(polled.content)) {
               // Send similarity score first if available
               if (polled.similarity_score !== null && polled.similarity_score !== undefined) {
                 await writer.write(encode(`data: ${JSON.stringify({ similarity_score: polled.similarity_score, similarity_reason: polled.similarity_reason })}\n\n`));
@@ -4898,7 +4908,9 @@ ${detailedInfo}
 ${feedbackContext}
 
 응답은 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 섹션으로 구성하고, 전문가 의견은 간결하게 작성해 주세요.`
-        const effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
+        
+        let effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
+        const fallbackKey = c.env.DIFY_API_KEY_SUMMARIZER || c.env.DIFY_API_KEY;
         
         // Helper to perform Dify call
         const fetchDify = async (mode, key) => {
@@ -4923,9 +4935,10 @@ ${feedbackContext}
         // 🚀 Retry once on transient server errors (5xx / 429) before falling back
         if (!difyRes.ok && (difyRes.status >= 500 || difyRes.status === 429)) {
           const retryDelay = difyRes.status === 429 ? 3000 : 2000;
-          console.warn(`[AI Analyze] Chat API transient error (${difyRes.status}), retrying in ${retryDelay}ms...`);
+          console.warn(`[AI Analyze] Chat API transient error (${difyRes.status}), switching to fallback key...`);
           await new Promise(r => setTimeout(r, retryDelay));
-          difyRes = await fetchDify('chat', effectiveKey);
+          // Use fallbackKey for retry
+          difyRes = await fetchDify('chat', fallbackKey || effectiveKey);
         }
 
         if (!difyRes.ok) {
@@ -5425,6 +5438,10 @@ app.post('/ai/summarize-chat', async (c) => {
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
+  
+  // ID Normalization: Frontend might send "INC-1234" or "1234"
+  const cleanId = String(incident_id).startsWith('INC-') ? incident_id.slice(4) : incident_id;
+  const fullId = `INC-${cleanId}`;
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -5433,8 +5450,8 @@ app.post('/ai/summarize-chat', async (c) => {
   ;(async () => {
     try {
       // 1. Check D1 Cache & Incident Status
-      const incident = await db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(incident_id).first();
-      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first();
+      const incident = await db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(fullId).first();
+      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(fullId).first();
       
       const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료'];
       const isFinal = finalStatuses.includes(incident?.status || 'Open');
@@ -5487,21 +5504,21 @@ app.post('/ai/summarize-chat', async (c) => {
       }
 
       if (cached && cached.summary && !isFinal) {
-        console.log(`[Re-Analysis] Incident ${incident_id} is still active. Bypassing cache to update summary...`);
+        console.log(`[Re-Analysis] Incident ${fullId} is still active. Bypassing cache to update summary...`);
         await writer.write(encode(`data: ${JSON.stringify({ status: '대화 내용을 반영하여 리포트를 최신화하고 있습니다...' })}\n\n`));
       }
 
 
       // 2. Concurrency Lock check (KV)
-      const lockKey = `lock:summarize-chat:${incident_id}`;
+      const lockKey = `lock:summarize-chat:${fullId}`;
       if (kv) {
         let lock = await kv.get(lockKey);
         if (lock === 'processing') {
-          console.log(`[Concurrency] Another user is summarizing chat for ${incident_id}. Waiting...`);
+          console.log(`[Concurrency] Another user is summarizing chat for ${fullId}. Waiting...`);
           await writer.write(encode(`data: ${JSON.stringify({ status: '다른 사용자가 분석 중입니다. 대기 중...' })}\n\n`));
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(r => setTimeout(r, 1000));
-            const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(incident_id).first();
+            const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(fullId).first();
             if (polled && polled.summary && !isStaleError(polled.summary)) {
               const chars = Array.from(polled.summary);
               for (let i = 0; i < chars.length; i += 50) {
@@ -5517,15 +5534,15 @@ app.post('/ai/summarize-chat', async (c) => {
       }
 
       // 3. Fetch ONLY user chat history (excluding AI and system messages)
-      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(incident_id).all()
+      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(fullId).all()
       
       // ── 인시던트 핵심 이벤트 타임라인 수집 ──
       const incDetail = await db.prepare(
         "SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?"
-      ).bind(incident_id).first();
+      ).bind(fullId).first();
       const { results: wfLogs } = await db.prepare(
         "SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC"
-      ).bind(incident_id).all().catch(() => ({ results: [] }));
+      ).bind(fullId).all().catch(() => ({ results: [] }));
 
       const toKST = (dt) => {
         if (!dt) return null;
@@ -5581,12 +5598,17 @@ ${timelineCtx.join('\n')}
       }, 60000); // 60 seconds hard limit
 
       let difyRes = null;
+      const primaryKey = api_key;
+      const fallbackKey = c.env.DIFY_API_KEY_DASHBOARD;
+
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
+          const currentKey = (attempt === 2 && fallbackKey) ? fallbackKey : primaryKey;
+          
           difyRes = await fetch(`${api_base}/workflows/run`, {
             method: 'POST',
             headers: { 
-              'Authorization': `Bearer ${api_key}`, 
+              'Authorization': `Bearer ${currentKey}`, 
               'Content-Type': 'application/json',
               'Accept': 'text/event-stream'
             },
@@ -5602,7 +5624,7 @@ ${timelineCtx.join('\n')}
 
           if (attempt < 2 && (difyRes.status >= 500 || difyRes.status === 429)) {
             const delay = difyRes.status === 429 ? 3000 : 2000;
-            console.warn(`[AI Summarize] Dify transient error (${difyRes.status}), retrying in ${delay}ms...`);
+            console.warn(`[AI Summarize] Dify transient error (${difyRes.status}), switching to fallback key...`);
             await new Promise(r => setTimeout(r, delay));
           }
         } catch (e) {

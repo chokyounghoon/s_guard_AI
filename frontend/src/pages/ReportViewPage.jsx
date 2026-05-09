@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import BottomMenu from '../components/BottomMenu';
+import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 
 const getApiUrl = (path) => `https://sguardai.khcho0421.workers.dev${path}`;
 
@@ -18,9 +19,9 @@ export default function ReportViewPage() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
 
-  const getAccessToken = () => {
+  const fetchToken = () => {
     try {
-      return localStorage.getItem('sguard_access_token');
+      return getAccessToken();
     } catch (e) {
       return null;
     }

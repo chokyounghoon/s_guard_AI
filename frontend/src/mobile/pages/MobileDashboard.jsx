@@ -219,6 +219,7 @@ export default function DashboardPage({ onAiClick }) {
   const [hideCompletedSms, setHideCompletedSms] = useState(true);
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
+  const lastProcessedLogIncId = useRef(null);
   const selectedSmsRef = useRef(null);
   const [lastAutoTriggeredKey, setLastAutoTriggeredKey] = useState(null);
   const lastAutoTriggeredKeyRef = useRef(null);
@@ -1146,11 +1147,18 @@ export default function DashboardPage({ onAiClick }) {
     const errorRegex = /(AI 엔진 서버 오류|Dify 측 서버 상태|인증 오류|엔드포인트 오류|대기 시간 초과|Dify API 오류|🤖|⚠️)/i;
     const logContent = log.message || log.text || '';
     if (logContent && errorRegex.test(logContent)) {
-      console.warn('[Dashboard] Blocked technical error log from UI:', logContent);
+      // 🔇 Silent block for technical errors
       return; 
     }
 
-    console.log("Log received in Dashboard:", log);
+    const currentIncId = selectedSms?.inc_id;
+    if (currentIncId && lastProcessedLogIncId.current === currentIncId && logContent.length <= (lastProcessedLogIncId.current_len || 0)) {
+      return; 
+    }
+    lastProcessedLogIncId.current = currentIncId;
+    lastProcessedLogIncId.current_len = logContent.length;
+
+    // console.log("Log received in Dashboard:", log);
     const uniqueId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setAllNotifications(prev => [{
       id: uniqueId,

@@ -57,6 +57,7 @@ import ConsentModal           from '../components/ConsentModal';
 import BottomMenu             from './components/BottomMenu.mobile';      // 모바일 전용 BottomMenu!
 import AIAssistantPanel       from '../components/AIAssistantPanel';
 import { CodebookProvider }   from '../context/CodebookContext';
+import { PushManager }       from '../lib/pushManager';
 
 // ── Auth Store ────────────────────────────────────────────────────────────────
 import {
@@ -112,18 +113,31 @@ function AppContent() {
   );
   const [isRefreshing, setIsRefreshing] = useState(true);
 
-  // Auth listener
   useEffect(() => {
     return addAuthListener(({ userProfile: u }) => setUserProfile(u));
   }, []);
+
+  // 🔔 AUTO PUSH SUBSCRIBE: 세션 복원(Silent Refresh) 후 구독 재동기화
+  useEffect(() => {
+    if (!userProfile || isRefreshing) return;
+    PushManager.subscribe(API_BASE).then(result => {
+      if (result.success) {
+        console.log('[Push] Session-restore subscribe success ✅');
+      } else if (result.error !== 'Notification permission denied' && result.error !== 'No auth token — login first') {
+        console.warn('[Push] Session-restore subscribe failed:', result.error);
+      }
+    });
+  }, [userProfile?.employee_id, isRefreshing]);
 
   // Silent Refresh (PC App.jsx와 완전히 동일)
   useEffect(() => {
     const checkSession = async () => {
       if (sessionStorage.getItem('s_logged_out') === '1') {
+        console.log('[Auth] Logged out flag detected — skipping session restore.');
         setIsRefreshing(false);
         return;
       }
+      console.log('[Auth-Debug] Browser Cookie Enabled:', navigator.cookieEnabled);
       try {
         const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
           method: 'GET',
@@ -141,6 +155,7 @@ function AppContent() {
         }
 
         const ghostToken = getGhostToken();
+        console.log('[Auth-Debug] Local Ghost Token Found:', ghostToken ? 'YES' : 'NO');
         if (ghostToken) {
           const ghostRes = await fetch(`${API_BASE}/auth/refresh`, {
             method: 'GET',
@@ -171,16 +186,12 @@ function AppContent() {
 
         setAccessToken(null);
         setStoreUserProfile(null);
-        // 🔒 세션 복구 실패 시 (토큰 없음): 강제 로그아웃 및 로그인 페이지행
         if (!isAuthPage) {
           console.warn('[Session] Restoration failed, redirecting to login');
           navigate('/', { replace: true });
         }
       } catch (e) {
         console.error('[Session-Error]', e);
-        setAccessToken(null);
-        setStoreUserProfile(null);
-        if (!isAuthPage) navigate('/', { replace: true });
       } finally {
         setIsRefreshing(false);
       }
@@ -189,9 +200,16 @@ function AppContent() {
     checkSession();
   }, [navigate, isAuthPage]);
 
-  // 로그인 상태에서 로그인 페이지 접근 시 대시보드로
+  // 🛡️ Debug: Governance Guard Status
+  useEffect(() => {
+    if (userProfile && !isAuthPage) {
+      console.log(`[Governance-Debug] Page: ${location.pathname}, Terms Agreed At: "${userProfile.terms_agreed_at}", Should Show Modal: ${(!userProfile.terms_agreed_at && !isAuthPage)}`);
+    }
+  }, [userProfile, location.pathname, isAuthPage]);
+
   useEffect(() => {
     if (!isRefreshing && userProfile && isAuthPage) {
+      console.log('[Auth] Authenticated user detected on login page. Redirecting to dashboard.');
       navigate('/dashboard', { replace: true });
     }
   }, [isRefreshing, userProfile, isAuthPage, navigate]);

@@ -419,10 +419,13 @@ export default function ChatPage() {
     let isMounted = true;
 
     const connect = () => {
-      if (!isMounted) return;
+      if (!isMounted || !incidentId || !currentUser.employee_id) {
+        console.warn("[WS] Skipping connection - missing ID or user profile.");
+        return;
+      }
       
       const wsUrl = getApiUrl(`/warroom/ws/${incidentId}`, true);
-      console.log(`Connecting to WebSocket: ${wsUrl}`);
+      console.log(`[WS] Connecting to WebSocket: ${wsUrl}`);
       socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 

@@ -220,6 +220,7 @@ export default function DashboardPage({ onAiClick }) {
   const [hideCompletedSms, setHideCompletedSms] = useState(true);
   const [selectedSms, setSelectedSms] = useState(null);
   const [insightSms, setInsightSms] = useState(null);
+  const lastProcessedLogIncId = useRef(null);
   const selectedSmsRef = useRef(null);
   const [lastAutoTriggeredKey, setLastAutoTriggeredKey] = useState(null);
   const lastAutoTriggeredKeyRef = useRef(null);
@@ -864,8 +865,8 @@ export default function DashboardPage({ onAiClick }) {
   const parseTranscript = (text) => {
     if (!text) return [];
 
-    // ── 디버그: 전체 텍스트 확인
-    console.log('[parseTranscript] full text:\n', text);
+    // ── 디버그: 전체 텍스트 확인 (필요 시에만 활성화)
+    // console.log('[parseTranscript] full text:\n', text);
 
     // ── 에이전트 이름 → 정규화 키 매핑
     const AGENT_ORDER = ['Security', 'DB', 'DevOps', 'Leader'];
@@ -891,13 +892,13 @@ export default function DashboardPage({ onAiClick }) {
     for (const marker of sectionMarkers) {
       const idx = text.indexOf(marker);
       if (idx !== -1) {
-        console.log('[parseTranscript] section marker found:', marker, 'at index', idx);
+        // console.log('[parseTranscript] section marker found:', marker, 'at index', idx);
         startIndex = idx;
         break;
       }
     }
     if (startIndex === -1) {
-      console.log('[parseTranscript] no section marker found — scanning entire text');
+      // console.log('[parseTranscript] no section marker found — scanning entire text');
       startIndex = 0;
     }
 
@@ -917,7 +918,7 @@ export default function DashboardPage({ onAiClick }) {
       if (bulletMatch) {
         const agentName = detectAgentName(bulletMatch[1]);
         const content = bulletMatch[2].trim();
-        console.log('[parseTranscript] bullet match:', agentName, '→', content.substring(0, 30));
+        // console.log('[parseTranscript] bullet match:', agentName, '→', content.substring(0, 30));
         if (agentName && content) {
           const prev = msgsMap.get(agentName) || '';
           msgsMap.set(agentName, prev + (prev ? '\n' : '') + content);
@@ -937,7 +938,7 @@ export default function DashboardPage({ onAiClick }) {
       if (isHeaderLike && /security|db|database|devops|infra|leader/i.test(trimmed)) {
         const agentName = detectAgentName(trimmed);
         if (agentName) {
-          console.log('[parseTranscript] header match:', agentName, '←', trimmed);
+          // console.log('[parseTranscript] header match:', agentName, '←', trimmed);
           currentAgent = agentName;
           continue;
         }
@@ -1000,7 +1001,7 @@ export default function DashboardPage({ onAiClick }) {
     }
 
 
-    console.log('[parseTranscript] result:', result.map(r => `${r.role}(${r.text.length}chars)`));
+    // console.log('[parseTranscript] result:', result.map(r => `${r.role}(${r.text.length}chars)`));
     return result;
   };
 
@@ -1025,7 +1026,7 @@ export default function DashboardPage({ onAiClick }) {
       return m.role !== 'AI분석' && !isError;
     });
 
-    console.log('[Expert Advisor] parsed:', filteredMsgs.length, 'agents →', filteredMsgs.map(m => m.role), '| isDone:', isDone);
+    // console.log('[Expert Advisor] parsed:', filteredMsgs.length, 'agents →', filteredMsgs.map(m => m.role), '| isDone:', isDone);
 
     if (isDone) {
       // 완료 시: 결과가 있으면 업데이트, 없으면 현재 상태 유지
@@ -1214,7 +1215,15 @@ export default function DashboardPage({ onAiClick }) {
 
     
 
-    console.log("Log received in Dashboard:", log);
+    const logContent = log.message || log.text || '';
+    const currentIncId = selectedSms?.inc_id;
+    if (currentIncId && lastProcessedLogIncId.current === currentIncId && logContent.length <= (lastProcessedLogIncId.current_len || 0)) {
+      return; 
+    }
+    lastProcessedLogIncId.current = currentIncId;
+    lastProcessedLogIncId.current_len = logContent.length;
+
+    // console.log("Log received in Dashboard:", log);
     const uniqueId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setAllNotifications(prev => [{
       id: uniqueId,

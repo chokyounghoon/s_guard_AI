@@ -170,7 +170,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         try {
           const token = getAccessToken();
           const checkRes = await fetch(`${API_BASE_URL}/ai/insight/${selectedSms.inc_id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { ...getAuthHeaders() }
           });
           if (checkRes.ok) {
             const data = await checkRes.json();
@@ -232,7 +232,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...getAuthHeaders()
         },
         body: JSON.stringify({ 
           sender: selectedSms.sender, 
@@ -302,7 +302,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
+                  ...getAuthHeaders()
                 },
                 body: JSON.stringify({
                   incident_id: String(selectedSms.inc_id),
@@ -409,7 +409,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...getAuthHeaders()
         },
         body: JSON.stringify({
           inc_id: selectedSms.inc_id,

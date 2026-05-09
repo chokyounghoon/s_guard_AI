@@ -33,13 +33,19 @@ window.fetch = async (...args) => {
   // 1. Add Authorization header if it's an API request
   if (isApiRequest) {
     const jwt = getAccessToken();
-    if (jwt) {
-      const headers = new Headers(config.headers || {});
-      if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${jwt}`);
-      }
-      config.headers = headers;
+    const headers = new Headers(config.headers || {});
+    
+    // 🛡️ SECURITY: 'Bearer null'이나 'Bearer undefined'가 포함된 잘못된 헤더 제거 (컴포넌트의 실수 방지)
+    const existingAuth = headers.get('Authorization');
+    if (existingAuth && (existingAuth.includes('null') || existingAuth.includes('undefined'))) {
+      headers.delete('Authorization');
     }
+
+    if (jwt && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${jwt}`);
+    }
+    config.headers = headers;
+    
     // Always include credentials (for refresh token cookie)
     config.credentials = 'include';
   }
@@ -48,35 +54,16 @@ window.fetch = async (...args) => {
   let response = await originalFetch(url, config);
 
   // 3. Handle 401 Unauthorized (except for login/verify/refresh itself)
-  // AI 스트리밍 응답은 clone() 시 버퍼링이 발생하므로 401 분석을 건너뜀
-  if (!isAiStream && response.status === 401 && isApiRequest && 
+  if (response.status === 401 && isApiRequest && 
       !urlString.includes('/auth/login') && 
       !urlString.includes('/auth/verify') && 
       !urlString.includes('/auth/init') && 
       !urlString.includes('/auth/refresh')) {
-    try {
-      const errorData = await response.clone().json();
+    
+    // Check if refresh is already in progress
       
-      // 🔍 4. If the error is specifically about the token being invalid, missing or expired
-      if (errorData.code === 'AUTH_INVALID_TOKEN' || 
-          errorData.code === 'AUTH_TOKEN_EXPIRED' || 
-          errorData.code === 'AUTH_TOKEN_MISSING' || 
-          errorData.code === 'AUTH_NO_PAYLOAD') {
-        
-        console.warn(`[Security] 401 Unauthorized (${errorData.code}). Handling recovery...`);
-
-        // 🚫 Short-circuit: No credentials at all — skip refresh to prevent infinite loop
-        const currentToken = getAccessToken();
-        const currentGhostToken = getGhostToken();
-        if (!currentToken && !currentGhostToken) {
-          console.warn('[Security] No access token or ghost token available. Skipping refresh. Please log in.');
-          clearSession();
-          return response; // Return the 401 as-is — App.jsx will handle redirect
-        }
-
-        // Check if a refresh is already in progress
-        if (!isRefreshingPromise) {
-          isRefreshingPromise = (async () => {
+    if (!isRefreshingPromise) {
+      isRefreshingPromise = (async () => {
             console.log('[Security] Initiating shared silent refresh...');
             try {
               let refreshRes = await originalFetch(`${API_BASE}/auth/refresh`, {
@@ -116,22 +103,17 @@ window.fetch = async (...args) => {
           })();
         }
 
-        const newToken = await isRefreshingPromise;
+    const newToken = await isRefreshingPromise;
 
-        if (newToken) {
-          console.info(`[Security] Retrying request for: ${url.split('/').pop()}`);
-          const retryHeaders = new Headers(config.headers || {});
-          retryHeaders.set('Authorization', `Bearer ${newToken}`);
-          config.headers = retryHeaders;
-          return await originalFetch(url, config);
-        } else {
-          // Refresh failed -> Session truly expired
-          console.warn('[Security] Session truly expired. Clearing local state.');
-          clearSession();
-        }
-      }
-    } catch (e) {
-      console.error('[Security] Error during 401 handling:', e);
+    if (newToken) {
+      console.info(`[Security] Retrying request for: ${urlString.split('/').pop()}`);
+      const retryHeaders = new Headers(config.headers || {});
+      retryHeaders.set('Authorization', `Bearer ${newToken}`);
+      config.headers = retryHeaders;
+      return await originalFetch(url, config);
+    } else {
+      console.warn('[Security] Session expired. Clearing state.');
+      clearSession();
     }
   }
 

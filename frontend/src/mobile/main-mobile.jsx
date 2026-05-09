@@ -32,13 +32,19 @@ window.fetch = async (...args) => {
   // 1. Authorization 헤더 추가 및 Credentials 설정
   if (isApiRequest) {
     const jwt = getAccessToken();
-    if (jwt) {
-      const headers = new Headers(config.headers || {});
-      if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${jwt}`);
-      }
-      config.headers = headers;
+    const headers = new Headers(config.headers || {});
+    
+    // 🛡️ SECURITY: 'Bearer null'이나 'Bearer undefined'가 포함된 잘못된 헤더 제거 (컴포넌트의 실수 방지)
+    const existingAuth = headers.get('Authorization');
+    if (existingAuth && (existingAuth.includes('null') || existingAuth.includes('undefined'))) {
+      headers.delete('Authorization');
     }
+
+    if (jwt && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${jwt}`);
+    }
+    config.headers = headers;
+    
     // 세션 유지를 위해 모든 API 요청에 credentials: 'include' 적용
     config.credentials = 'include';
   }
@@ -46,21 +52,13 @@ window.fetch = async (...args) => {
   let response = await originalFetch(url, config);
 
   // 2. 401 Unauthorized 처리 (Silent Refresh)
-  // AI 스트리밍 응답은 clone().text() 시 버퍼링이 발생하므로 401 분석을 건너뜀
-  if (!isAiStream && response.status === 401 && isApiRequest && 
+  if (response.status === 401 && isApiRequest && 
       !urlString.includes('/auth/login') && 
       !urlString.includes('/auth/verify') && 
       !urlString.includes('/auth/init') && 
       !urlString.includes('/auth/refresh')) {
-    try {
-      const errorText = await response.clone().text();
-      let errorData = {};
-      try { errorData = JSON.parse(errorText); } catch(e) {}
-      
-      if (errorData.code === 'AUTH_INVALID_TOKEN' || 
-          errorData.code === 'AUTH_TOKEN_EXPIRED' || 
-          errorData.code === 'AUTH_TOKEN_MISSING' || 
-          errorData.code === 'AUTH_NO_PAYLOAD') {
+    
+    // Check if refresh is already in progress
         
         if (!isRefreshingPromise) {
           isRefreshingPromise = (async () => {
@@ -97,18 +95,16 @@ window.fetch = async (...args) => {
           })();
         }
 
-        const newToken = await isRefreshingPromise;
+    const newToken = await isRefreshingPromise;
 
-        if (newToken) {
-          const retryHeaders = new Headers(config.headers || {});
-          retryHeaders.set('Authorization', `Bearer ${newToken}`);
-          config.headers = retryHeaders;
-          return await originalFetch(url, config);
-        } else {
-          clearSession();
-        }
-      }
-    } catch (e) {}
+    if (newToken) {
+      const retryHeaders = new Headers(config.headers || {});
+      retryHeaders.set('Authorization', `Bearer ${newToken}`);
+      config.headers = retryHeaders;
+      return await originalFetch(url, config);
+    } else {
+      clearSession();
+    }
   }
 
   return response;
