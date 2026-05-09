@@ -1340,7 +1340,42 @@ export default function DashboardPage({ onAiClick }) {
         </div>
 
         {/* Right: AI button + profile */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {/* 🚀 War-Room Global Action (Compact Icon Version) */}
+          {selectedSms && (() => {
+              const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
+              const incidentId = String(selectedSms.inc_id || selectedSms.id || '').replace('INC-', '');
+              const roomExists = warRooms.some(r => String(r.id) === incidentId);
+              
+              const btnStyle = roomExists 
+                ? { border: '1px solid rgba(59,130,246,0.4)', background: 'rgba(59,130,246,0.08)' }
+                : sev === 'CRITICAL' ? { border: '1px solid rgba(239,68,68,0.6)', background: 'rgba(239,68,68,0.2)' }
+                : sev === 'MAJOR'    ? { border: '1px solid rgba(249,115,22,0.5)', background: 'rgba(249,115,22,0.15)' }
+                :                      { border: '1px solid rgba(16,185,129,0.5)', background: 'rgba(16,185,129,0.15)' };
+
+              const iconColor = roomExists ? '#60a5fa' : sev === 'CRITICAL' ? '#f87171' : sev === 'MAJOR' ? '#fb923c' : '#34d399';
+
+              return (
+                <button
+                  key="wr-btn"
+                  onClick={() => handleOpenWarRoomFromInsight(selectedSms)}
+                  disabled={isOpeningWarRoom}
+                  onPointerDown={() => handleTooltipStart(roomExists ? 'Move to War-Room' : 'Open War-Room')} 
+                  onPointerUp={handleTooltipEnd} 
+                  onPointerLeave={handleTooltipEnd}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center active:scale-95 transition-all ${isOpeningWarRoom ? 'opacity-50' : ''}`}
+                  style={btnStyle}
+                >
+                  {isOpeningWarRoom ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Users size={15} style={{ color: iconColor }} className={sev === 'CRITICAL' && !roomExists ? 'animate-pulse' : ''} />
+                  )}
+                </button>
+              );
+            })()
+          }
+
           <button onClick={onAiClick}
             onPointerDown={() => handleTooltipStart('AI Assistant')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
             className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
