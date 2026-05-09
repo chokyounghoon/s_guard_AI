@@ -73,6 +73,7 @@ export default function ChatPage() {
   const markedReadSeqs = useRef(new Set()); // ✅ 이미 MARK_READ 보낸 seq 추적
   const [longPressMsg, setLongPressMsg] = useState(null); // 길게 누른 메시지
   const [showAiPanel, setShowAiPanel] = useState(false);  // AI Summary 패널 (헤더 버튼)
+  const [summaryLockOwner, setSummaryLockOwner] = useState(null);
 
   const isResolved = ['CLOSED', '최종완료', '처리완료', 'Completed', '완료'].includes(roomStatus);
 
@@ -108,6 +109,25 @@ export default function ChatPage() {
       } catch (e) { console.error("User parse error", e); }
     }
   }, []);
+
+  // 🚀 AI Summary Lock Polling
+  useEffect(() => {
+    if (!incidentId) return;
+    const checkLock = async () => {
+      try {
+        const res = await fetch(getApiUrl(`/ai/summarize/lock/${incidentId}`), {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSummaryLockOwner(data.locked ? data.owner : null);
+        }
+      } catch (e) {}
+    };
+    checkLock();
+    const timer = setInterval(checkLock, 5000);
+    return () => clearInterval(timer);
+  }, [incidentId]);
 
 
 
@@ -539,6 +559,9 @@ export default function ChatPage() {
       };
 
       socket.onerror = (err) => {
+        // 🔇 묵시적 종료나 이미 닫힌 상태에서의 에러는 무시하여 로그 정리
+        if (!isMounted || socket.readyState === WebSocket.CLOSED) return;
+        
         console.error("WebSocket error details:", {
           url: wsUrl,
           readyState: socket.readyState,
@@ -547,10 +570,12 @@ export default function ChatPage() {
       };
     };
 
-    connect();
+    // ⚡ 페이지 진입 직후 세션 안정화를 위해 500ms 지연 후 연결
+    const initialTimer = setTimeout(connect, 500);
 
     return () => {
       isMounted = false;
+      clearTimeout(initialTimer);
       clearTimeout(reconnectTimer);
       if (socket) {
         // Prevent "closed before connection established" error
@@ -1205,16 +1230,21 @@ export default function ChatPage() {
             <div className="flex items-center space-x-2 sm:space-x-3 relative ml-auto justify-end">
               {/* WAR-ROOM 분석 버튼 (명칭 변경) */}
               <button
-                onClick={() => isResolved || !isAssignedToMe ? null : navigate(`/chat-summary/${incidentId}`)}
-                disabled={isResolved || !isAssignedToMe}
+                onClick={() => {
+                  if (isResolved || !isAssignedToMe || summaryLockOwner) return;
+                  navigate(`/chat-summary/${incidentId}`);
+                }}
+                disabled={isResolved || !isAssignedToMe || !!summaryLockOwner}
                 className={`flex items-center px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-extrabold transition-all duration-300 ${
-                  isResolved || !isAssignedToMe
+                  isResolved || !isAssignedToMe || summaryLockOwner
                     ? 'bg-slate-800 text-slate-500 border border-[#242424] cursor-not-allowed opacity-60'
                     : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 shadow-[0_0_12px_rgba(59,130,246,0.5)] hover:shadow-[0_0_20px_rgba(59,130,246,0.8)] hover:scale-105'
                 }`}
               >
-                <Sparkles className={`w-3.5 h-3.5 mr-1 ${(isResolved || !isAssignedToMe) ? 'text-slate-600' : 'animate-pulse'}`} />
-                <span className="whitespace-nowrap">W/R 분석</span>
+                <Sparkles className={`w-3.5 h-3.5 mr-1 ${(isResolved || !isAssignedToMe || summaryLockOwner) ? 'text-slate-600' : 'animate-pulse'}`} />
+                <span className="whitespace-nowrap">
+                  {summaryLockOwner ? `분석 중 (${summaryLockOwner})` : 'W/R 분석'}
+                </span>
               </button>
 
               {/* Moved Status Indicator */}

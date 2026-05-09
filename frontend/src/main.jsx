@@ -60,7 +60,12 @@ window.fetch = async (...args) => {
       !urlString.includes('/auth/init') && 
       !urlString.includes('/auth/refresh')) {
     
-    // Check if refresh is already in progress
+    // 🛡️ SECURITY: 이미 재시도한 요청인 경우 무한 루프 방지 (세션 만료 처리)
+    if (config._retry) {
+      console.warn('[Security] Retry failed with 401 - clearing session.');
+      clearSession();
+      return response;
+    }
       
     if (!isRefreshingPromise) {
       isRefreshingPromise = (async () => {
@@ -110,6 +115,7 @@ window.fetch = async (...args) => {
       const retryHeaders = new Headers(config.headers || {});
       retryHeaders.set('Authorization', `Bearer ${newToken}`);
       config.headers = retryHeaders;
+      config._retry = true; // 🛡️ Mark as retried
       return await originalFetch(url, config);
     } else {
       console.warn('[Security] Session expired. Clearing state.');

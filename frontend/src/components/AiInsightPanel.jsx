@@ -55,7 +55,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
   return 'report';
 };
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false }) {
   
   const formatYYMMDD = (dateStr) => {
     if (!dateStr) return '';
@@ -124,6 +124,28 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     typingQueueRef.current = '';
   }, []);
 
+  // 🚀 Reset state when selectedSms becomes null (Incident List Cleared)
+  useEffect(() => {
+    if (!selectedSms) {
+      setInsightData({
+        status: 'active',
+        current_log: { type: 'info', text: '인시던트를 선택해주세요.' },
+        prediction_counts: { critical: 0, server: 0, security: 0, report: 0 },
+        similarity_score: null,
+        similarity_reason: null,
+        vector_id: null
+      });
+      setDisplayedText('');
+      setIsAnalyzingSms(false);
+      setAnalysisComplete(false);
+      setIsCritical(false);
+      setSmsAnalysisTitle('');
+      setInsightTimestamp(null);
+      stopTypewriter();
+      if (abortRef.current) abortRef.current.abort();
+    }
+  }, [selectedSms, stopTypewriter]);
+
   const enqueueText = useCallback((text, { reset = false, onDone } = {}) => {
     if (reset) {
       stopTypewriter();
@@ -160,6 +182,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     setIsCritical(false);
     delayShownRef.current = false;
     setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
+
+    // 🛡️ Cancel previous request if still running
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    abortRef.current = new AbortController();
     
     const displaySender = selectedSms.sender === 'Manual Entry' ? 'Manual Entry' : `"${selectedSms.sender}" 발신 SMS`;
     setSmsAnalysisTitle(force ? `Manual Recovery: ${displaySender}` : `분석중입니다: ${displaySender}`);
@@ -656,11 +684,13 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         </div>
 
         {/* 오른쪽: 분석 중 스피너만 표시 */}
-        {isAnalyzingSms && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isAnalyzingSms && (
+            <div className="flex items-center gap-1.5 px-1.5">
+              <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Similarity Score Indicator - 분석 완료 시 항상 표시 (null = 0%) */}
@@ -921,47 +951,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         )}
 
-        {/* War-Room 개설 버튼 — CRITICAL/MAJOR/NORMAL 3단계 색상 */}
-      {(() => {
-        const sev = getSeverityLevel(selectedSms);
-        const ready = analysisComplete && !isAnalyzingSms && displayedText && displayedText.length >= 30;
-        const blocked = lockingUser && !warRoomExists;
-        const containerCls = !ready
-          ? 'bg-slate-800/30 border-slate-700/30'
-          : sev === 'CRITICAL' ? 'bg-red-500/5 border-red-500/25 shadow-lg shadow-red-900/10'
-          : sev === 'MAJOR'    ? 'bg-orange-500/5 border-orange-500/25 shadow-lg shadow-orange-900/10'
-          :                      'bg-emerald-500/5 border-emerald-500/20 shadow-lg shadow-emerald-900/5';
-        const textCls = !ready || blocked ? 'text-slate-500 animate-pulse'
-          : sev === 'CRITICAL' ? 'text-red-300'
-          : sev === 'MAJOR'    ? 'text-orange-300'
-          :                      'text-emerald-300/90';
-        const btnCls = !ready || blocked
-          ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-          : warRoomExists ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/30'
-          : sev === 'CRITICAL' ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30 animate-pulse'
-          : sev === 'MAJOR'    ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-lg shadow-orange-500/30'
-          :                      'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20';
-        const msgText = !ready
-          ? '⏳ AI 에이전트가 분석중입니다. 분석 완료 후 개설 가능합니다...'
-          : blocked   ? `⚠️ ${lockingUser} 매니저가 현재 War-Room 개설 작업을 진행 중입니다...`
-          : warRoomExists ? '💡 해당 장애 건에 대해 이미 War-Room이 개설되어 진행 중입니다.'
-          : sev === 'CRITICAL' ? '⚠️ CRITICAL 장애가 감지되었습니다. 즉시 팀 전체가 참여하는 War-Room을 개설하세요.'
-          : sev === 'MAJOR'    ? '⚡ MAJOR 장애가 감지되었습니다. 담당팀과 War-Room에서 상황을 공유하세요.'
-          :                      '💡 분석이 완료되었습니다. 필요 시 War-Room을 개설하여 팀과 상황을 공유하세요.';
-        return (
-          <div className={`mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 p-5 rounded-2xl border transition-all duration-500 ${containerCls}`}>
-            <div className={`flex-1 text-xs leading-relaxed ${textCls}`}>{msgText}</div>
-            <button
-              onClick={handleOpenWarRoom}
-              disabled={!ready || blocked}
-              className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black text-sm whitespace-nowrap transition-all active:scale-95 ${btnCls}`}
-            >
-              <Users className="w-4 h-4" />
-              {blocked ? '다른 사용자 처리 중' : warRoomExists ? '해당 War-Room 이동' : 'War-Room 개설'}
-            </button>
-          </div>
-        );
-      })()}
       </div>
 
       {/* Detailed Feedback Modal (Popup) */}

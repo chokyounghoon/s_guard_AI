@@ -72,8 +72,8 @@ export default function ChatSummaryPage() {
   const [reportingLines, setReportingLines] = useState([]);
   const [incidentMessage, setIncidentMessage] = useState('');     // 장애 SMS 문자 내용
   const [workflowSteps, setWorkflowSteps] = useState([]);          // 장애처리현황 단계
-
-
+  const hasTriggeredRef = useRef(null); // 🚀 중복 호출 방지용 락
+  const [elapsedTime, setElapsedTime] = useState(0); // 🚀 분석 소요 시간 타이머
 
   const getApiUrl = (endpoint) => {
     // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보 및 스트리밍 성능 최적화)
@@ -83,13 +83,34 @@ export default function ChatSummaryPage() {
   };
 
   useEffect(() => {
+    // 🛡️ Strict Concurrency Lock: incidentId가 있을 때만 작동하며, 이미 트리거된 경우 중복 호출 방지
+    if (!incidentId) return;
+    
+    if (hasTriggeredRef.current === incidentId) {
+      console.log(`[ChatSummary] Skipping redundant trigger for ${incidentId}`);
+      return;
+    }
+    
+    console.log(`[ChatSummary] 🚀 Starting analysis for ${incidentId}`);
+    hasTriggeredRef.current = incidentId;
+
     retryCountRef.current = 0;
 
     const fetchSummary = async (isRetry = false) => {
+      console.log(`[ChatSummary] fetchSummary(isRetry=${isRetry}) started`);
       setIsLoading(true);
       setIsStreaming(true);
       setError(null);
+      setLoadingStatus('AI 분석 준비 중...');
+      setElapsedTime(0);
       if (!isRetry) setSummary('');
+
+      // 타이머 시작
+      const startTime = Date.now();
+      const timerId = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+
       let currentController;
       try {
         currentController = new AbortController();
@@ -97,6 +118,43 @@ export default function ChatSummaryPage() {
 
         const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
 
+        // 🚀 Lock Acquisition (Concurrency Control)
+        if (!isRetry) {
+          console.log(`[ChatSummary] Attempting to acquire lock for ${incidentId}...`);
+          setLoadingStatus('중복 분석 여부를 확인하고 있습니다...');
+          const userStr = localStorage.getItem('sguard_user');
+          const user = JSON.parse(userStr || '{}');
+          
+          // ID에서 'INC-' 접두사 제거 (백엔드 매칭용)
+          const cleanId = incidentId.replace('INC-', '');
+
+          try {
+            // 🛡️ Fail-safe: Manual timeout for better compatibility
+            const lockController = new AbortController();
+            const lockTimeout = setTimeout(() => lockController.abort(), 3500);
+
+            const lockRes = await fetch(getApiUrl(`/ai/summarize/lock/${cleanId}`), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+              body: JSON.stringify({ user_name: user.name || 'Unknown User' }),
+              signal: lockController.signal
+            });
+            clearTimeout(lockTimeout);
+
+            const lockData = await lockRes.json();
+            console.log(`[ChatSummary] Lock acquisition result:`, lockData);
+            if (!lockData.success) {
+              setLoadingStatus(`${lockData.owner} 매니저님이 이미 처리 중입니다.`);
+              setIsStreaming(false);
+              return;
+            }
+          } catch (e) { 
+            console.warn("[ChatSummary] Lock acquisition failed/skipped:", e.name === 'AbortError' ? 'Timeout' : e.message); 
+          }
+        }
+
+        console.log(`[ChatSummary] Calling /ai/summarize-chat API for ${incidentId}...`);
+        setLoadingStatus('Dify AI 엔진에 분석 요청을 전송했습니다...');
         if (isRetry) setLoadingStatus(`재시도 중... (${retryCountRef.current}/2)`);
 
         const response = await fetch(getApiUrl('/ai/summarize-chat'), {
@@ -109,6 +167,8 @@ export default function ChatSummaryPage() {
           }),
           signal: currentController.signal
         });
+
+        setLoadingStatus('AI 엔진 연결 성공! 데이터를 분석하고 있습니다...');
 
         if (!response.ok || !response.body) {
           throw new Error(`HTTP ${response.status}: Dify 응답 실패`);
@@ -204,9 +264,15 @@ export default function ChatSummaryPage() {
         setSummary(localSummary);
         setLoadingStatus('비상 분석 완료');
       } finally {
+        if (timerId) clearInterval(timerId); // 타이머 종료
         if (abortControllerRef.current === currentController) {
           setIsLoading(false);
           setIsStreaming(false);
+          // 🚀 Unlock (Cleanup)
+          fetch(getApiUrl(`/ai/summarize/lock/${incidentId}`), { 
+            method: 'DELETE',
+            headers: getAuthHeader() 
+          }).catch(() => {});
         }
       }
     };
@@ -699,7 +765,7 @@ export default function ChatSummaryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col" style={{ height: '100dvh' }}>
+    <div className="fixed inset-0 z-[70] bg-[#0f1421] text-white font-sans flex flex-col" style={{ height: '100dvh' }}>
 
       {/* ── 헤더 (고정) ── */}
       <header className="shrink-0 bg-[#0f1421]/95 backdrop-blur-md border-b border-white/5 z-50 print:hidden">
@@ -812,7 +878,7 @@ export default function ChatSummaryPage() {
       </header>
 
       {/* ── 단일 스크롤 영역 ── */}
-      <main className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 pb-8 custom-scrollbar">
+      <main className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 pb-32 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-4">
 
           {/* 메타데이터 카드 */}
@@ -909,22 +975,25 @@ export default function ChatSummaryPage() {
           </div>
 
           {/* AI 리포트 카드 */}
-          <div id="report-content" className="bg-[#1a1f2e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl print:shadow-none print:border-slate-200">
+          <div id="report-content" className="bg-[#1a1f2e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl print:shadow-none print:border-slate-200 min-h-[500px] flex flex-col">
             <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
-            <div className="p-4 sm:p-6">
+            <div className="flex-1 flex flex-col p-4 sm:p-6 min-h-[450px]">
               {isLoading && !summary && (
-                <div className="flex flex-col items-center justify-center py-20 space-y-6 animate-in fade-in zoom-in-95 duration-700">
+                <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-in fade-in zoom-in-95 duration-700">
                   <div className="relative">
                     <div className="w-20 h-20 border-[6px] border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Brain className="w-8 h-8 text-indigo-400 animate-pulse" />
                     </div>
                   </div>
-                  <div className="text-center space-y-2">
-                    <p className="text-sm font-bold text-indigo-300 tracking-wide animate-pulse">
+                  <div className="text-center space-y-3">
+                    <p className="text-base font-bold text-indigo-300 tracking-wide animate-pulse">
                       {loadingStatus || 'Dify AI가 분석 중입니다...'}
                     </p>
-                    <p className="text-xs text-slate-600">분석이 완료되면 보고서가 자동으로 표시됩니다</p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-slate-500 font-mono">분석 시작 후 {elapsedTime}초 경과</p>
+                      <p className="text-xs text-slate-600">분석이 완료되면 보고서가 자동으로 표시됩니다</p>
+                    </div>
                   </div>
                 </div>
               )}

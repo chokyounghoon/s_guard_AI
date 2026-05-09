@@ -308,6 +308,7 @@ export default function DashboardPage({ onAiClick }) {
       const lockData = await lockRes.json();
       if (!lockData.success) {
         alert(`이미 ${lockData.owner} 매니저님이 워룸 개설을 진행 중입니다.`);
+        setIsOpeningWarRoom(false);
         return;
       }
     } catch (lockError) {
@@ -504,11 +505,13 @@ export default function DashboardPage({ onAiClick }) {
     fetchMyAssignments();
     fetchUserActivityHistory();
     fetchSettings(); // 🚀 Load thresholds on start
-    const smsInterval = setInterval(fetchSMSMessages, 5000);
-    const wrInterval = setInterval(fetchWarRooms, 8000);
-    const activityInterval = setInterval(fetchActivityLogs, 10000);
-    const assignmentInterval = setInterval(fetchMyAssignments, 10000);
-    const historyInterval = setInterval(fetchUserActivityHistory, 15000);
+    const pollIntervalMultiplier = isAiAnalyzing ? 4 : 1; // 4x slower during analysis
+
+    const smsInterval = setInterval(fetchSMSMessages, 5000 * pollIntervalMultiplier);
+    const wrInterval = isAiAnalyzing ? null : setInterval(fetchWarRooms, 8000);
+    const activityInterval = isAiAnalyzing ? null : setInterval(fetchActivityLogs, 10000);
+    const assignmentInterval = isAiAnalyzing ? null : setInterval(fetchMyAssignments, 10000);
+    const historyInterval = isAiAnalyzing ? null : setInterval(fetchUserActivityHistory, 15000);
 
     // 🚀 NEW: Real-time SMS Stream (SSE) — use real JWT for query param auth
     const token = getAccessToken();
@@ -527,14 +530,14 @@ export default function DashboardPage({ onAiClick }) {
     };
 
     return () => {
-      clearInterval(smsInterval);
-      clearInterval(wrInterval);
-      clearInterval(activityInterval);
-      clearInterval(assignmentInterval);
-      clearInterval(historyInterval);
+      if (smsInterval) clearInterval(smsInterval);
+      if (wrInterval) clearInterval(wrInterval);
+      if (activityInterval) clearInterval(activityInterval);
+      if (assignmentInterval) clearInterval(assignmentInterval);
+      if (historyInterval) clearInterval(historyInterval);
       sse.close();
     };
-  }, [userProfile, assignmentDateRange, hideCompletedSms]);
+  }, [userProfile, assignmentDateRange, hideCompletedSms, isAiAnalyzing]);
 
   // SMS 선택 시 에이전트 토론 자동 시작
    useEffect(() => {
@@ -563,7 +566,12 @@ export default function DashboardPage({ onAiClick }) {
           severity: room.severity || 'NORMAL',
           unread: false
         }));
-        setWarRooms(mapped);
+        setWarRooms(prev => {
+          const prevSig = (prev || []).map(r => `${r.inc_id}_${r.status}`).join('|');
+          const nextSig = mapped.map(r => `${r.inc_id}_${r.status}`).join('|');
+          if (prevSig === nextSig) return prev;
+          return mapped;
+        });
       }
     } catch (err) {
       console.error("Failed to fetch War-Rooms:", err);
@@ -717,7 +725,12 @@ export default function DashboardPage({ onAiClick }) {
         });
         
         const finalMsgs = Array.from(uniqueMap.values());
-        setSmsMessages(finalMsgs);
+        setSmsMessages(prev => {
+          const prevIds = (prev || []).map(m => `${m.inc_id}_${m.received_count}`).join(',');
+          const nextIds = finalMsgs.map(m => `${m.inc_id}_${m.received_count}`).join(',');
+          if (prevIds === nextIds) return prev;
+          return finalMsgs;
+        });
 
         const totalVolume = finalMsgs.reduce((acc, m) => acc + (Number(m.received_count) || 1), 0);
         setTotalSmsVolume(totalVolume);
@@ -729,7 +742,9 @@ export default function DashboardPage({ onAiClick }) {
           if (latestKey !== lastAutoTriggeredKeyRef.current) {
             lastAutoTriggeredKeyRef.current = latestKey;
             setLastAutoTriggeredKey(latestMsg.inc_id);
-            setSelectedSms(latestMsg);
+            if (!selectedSmsRef.current || selectedSmsRef.current.inc_id !== latestMsg.inc_id) {
+              setSelectedSms(latestMsg);
+            }
             
             // Auto-expand and start analysis
             setIsSmsPanelCollapsed(false);       
@@ -1373,19 +1388,38 @@ export default function DashboardPage({ onAiClick }) {
             </button>
 
             {/* S-callert 바로가기 - 관리자 전용 */}
-            {(userProfile?.is_admin === 1 || userProfile?.role === 'admin') && (
-              <button
-                onClick={() => navigate('/s-callert')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 group"
-                style={{
-                  background: 'rgba(251,146,60,0.06)',
-                  border: '1px solid rgba(251,146,60,0.25)',
-                }}
-                title="S-callert PDS 자동호출"
-              >
-                <Phone className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors" style={{ filter: 'drop-shadow(0 0 4px rgba(251,146,60,0.5))' }} />
-                <span className="text-[9px] font-black uppercase tracking-wide text-orange-400 group-hover:text-orange-300 transition-colors whitespace-nowrap">S-callert</span>
-              </button>
+            {/* 🚀 War-Room Button (Moved to Left) */}
+            {insightSms && (
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const sev = (insightSms.severity || 'NORMAL').toUpperCase();
+                  const incidentId = String(insightSms.inc_id || insightSms.id || '').replace('INC-', '');
+                  const roomExists = warRooms.some(r => String(r.id) === incidentId);
+                  
+                  const btnCls = roomExists 
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30'
+                    : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)] animate-pulse'
+                    : sev === 'MAJOR'    ? 'bg-orange-600 text-white shadow-[0_0_10px_rgba(249,115,22,0.3)]'
+                    :                      'bg-emerald-600 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]';
+
+                  return (
+                    <button
+                      onClick={() => handleOpenWarRoomFromInsight(insightSms)}
+                      disabled={isOpeningWarRoom}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-[10px] transition-all active:scale-95 border border-white/5 ${btnCls} disabled:opacity-50`}
+                    >
+                      {isOpeningWarRoom ? (
+                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Users className="w-3 h-3" />
+                      )}
+                      <span>
+                        {isOpeningWarRoom ? '개설중...' : roomExists ? '워룸 이동' : 'War-Room 개설'}
+                      </span>
+                    </button>
+                  );
+                })()}
+              </div>
             )}
           </div>
 
@@ -1423,6 +1457,20 @@ export default function DashboardPage({ onAiClick }) {
                 )}
               </div>
             </div>
+
+            {/* 🚀 S-CALLERT Button moved to Right side */}
+            {selectedSms && (
+              <button 
+                onClick={() => {
+                  setSelectedSmsForCall(selectedSms);
+                  setShowCallModal(true);
+                }}
+                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 hover:border-orange-500/30 transition-all active:scale-95"
+              >
+                <Phone className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors" style={{ filter: 'drop-shadow(0 0 4px rgba(251,146,60,0.5))' }} />
+                <span className="text-[9px] font-black uppercase tracking-wide text-orange-400 group-hover:text-orange-300 transition-colors whitespace-nowrap">S-callert</span>
+              </button>
+            )}
             <button onClick={() => setIsNavCollapsed(true)}
               className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
               <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white" />
@@ -1853,6 +1901,7 @@ export default function DashboardPage({ onAiClick }) {
                onAgentContent={handleAgentContent}
                warRooms={warRooms}
                onAnalyzingChange={setIsAiAnalyzing}
+               isOpening={isOpeningWarRoom}
             />
           </div>{/* end col2 */}
 

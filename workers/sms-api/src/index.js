@@ -5861,6 +5861,36 @@ app.delete('/ai/warroom/lock/:inc_id', async (c) => {
   return c.json({ success: true });
 });
 
+// AI Chat Summary Concurrency Locking (KV based)
+app.get('/ai/summarize/lock/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id');
+  const kv = c.env.SMS_STORAGE;
+  if (!kv) return c.json({ locked: false });
+  const owner = await kv.get(`lock:summary:${inc_id}`);
+  return c.json({ locked: !!owner, owner });
+});
+
+app.post('/ai/summarize/lock/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id');
+  const { user_name } = await c.req.json();
+  const kv = c.env.SMS_STORAGE;
+  if (!kv) return c.json({ success: true });
+  const existing = await kv.get(`lock:summary:${inc_id}`);
+  if (existing && existing !== user_name) {
+    return c.json({ success: false, owner: existing });
+  }
+  // Summary takes longer (up to 2-3 mins), so 180s TTL
+  await kv.put(`lock:summary:${inc_id}`, user_name, { expirationTtl: 180 });
+  return c.json({ success: true });
+});
+
+app.delete('/ai/summarize/lock/:inc_id', async (c) => {
+  const inc_id = c.req.param('inc_id');
+  const kv = c.env.SMS_STORAGE;
+  if (kv) await kv.delete(`lock:summary:${inc_id}`);
+  return c.json({ success: true });
+});
+
 // War-Room Tracking
 app.get('/ai/warroom/list', async (c) => {
   const db = c.env.DB

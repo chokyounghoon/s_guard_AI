@@ -14,10 +14,18 @@ const notify = () => {
 
 export const setAccessToken = (token) => {
   accessToken = token;
+  if (token) {
+    sessionStorage.setItem('sguard_access_token', token);
+  } else {
+    sessionStorage.removeItem('sguard_access_token');
+  }
   notify();
 };
 
 export const getAccessToken = () => {
+  if (!accessToken) {
+    accessToken = sessionStorage.getItem('sguard_access_token');
+  }
   return accessToken;
 };
 

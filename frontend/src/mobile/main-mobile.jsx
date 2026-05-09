@@ -58,42 +58,47 @@ window.fetch = async (...args) => {
       !urlString.includes('/auth/init') && 
       !urlString.includes('/auth/refresh')) {
     
-    // Check if refresh is already in progress
+    // 🛡️ SECURITY: 이미 재시도한 요청인 경우 무한 루프 방지 (세션 만료 처리)
+    if (config._retry) {
+      console.warn('[Auth] Retry failed with 401 - clearing session.');
+      clearSession();
+      return response;
+    }
         
-        if (!isRefreshingPromise) {
-          isRefreshingPromise = (async () => {
-            try {
-              let refreshRes = await originalFetch(`${API_BASE}/auth/refresh`, {
+    if (!isRefreshingPromise) {
+      isRefreshingPromise = (async () => {
+        try {
+          let refreshRes = await originalFetch(`${API_BASE}/auth/refresh`, {
+            method: 'GET',
+            credentials: 'include'
+          });
+
+          if (!refreshRes.ok) {
+            const ghostToken = getGhostToken();
+            if (ghostToken) {
+              refreshRes = await originalFetch(`${API_BASE}/auth/refresh`, {
                 method: 'GET',
-                credentials: 'include'
+                headers: { 'Authorization': `Bearer ${ghostToken}` }
               });
-
-              if (!refreshRes.ok) {
-                const ghostToken = getGhostToken();
-                if (ghostToken) {
-                  refreshRes = await originalFetch(`${API_BASE}/auth/refresh`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${ghostToken}` }
-                  });
-                }
-              }
-
-              if (refreshRes.ok) {
-                const data = await refreshRes.json();
-                if (data.access_token) {
-                  setAccessToken(data.access_token);
-                  if (data.ghost_token) setGhostToken(data.ghost_token);
-                  return data.access_token;
-                }
-              }
-              return null;
-            } catch (err) {
-              return null;
-            } finally {
-              isRefreshingPromise = null;
             }
-          })();
+          }
+
+          if (refreshRes.ok) {
+            const data = await refreshRes.json();
+            if (data.access_token) {
+              setAccessToken(data.access_token);
+              if (data.ghost_token) setGhostToken(data.ghost_token);
+              return data.access_token;
+            }
+          }
+          return null;
+        } catch (err) {
+          return null;
+        } finally {
+          isRefreshingPromise = null;
         }
+      })();
+    }
 
     const newToken = await isRefreshingPromise;
 
@@ -101,6 +106,7 @@ window.fetch = async (...args) => {
       const retryHeaders = new Headers(config.headers || {});
       retryHeaders.set('Authorization', `Bearer ${newToken}`);
       config.headers = retryHeaders;
+      config._retry = true; // 🛡️ Mark as retried
       return await originalFetch(url, config);
     } else {
       clearSession();

@@ -224,6 +224,7 @@ export default function DashboardPage({ onAiClick }) {
   const [lastAutoTriggeredKey, setLastAutoTriggeredKey] = useState(null);
   const lastAutoTriggeredKeyRef = useRef(null);
   const [saveStatus, setSaveStatus] = useState('');
+  const [isAnalyzingActive, setIsAnalyzingActive] = useState(false);
 
   useEffect(() => {
     if (selectedSms) {
@@ -294,6 +295,7 @@ export default function DashboardPage({ onAiClick }) {
     const existingRoom = warRooms.find(r => r.id === incidentId);
     if (existingRoom) {
       navigate(`/chat/${incidentId}`);
+      setIsOpeningWarRoom(false);
       return;
     }
 
@@ -307,6 +309,7 @@ export default function DashboardPage({ onAiClick }) {
       const lockData = await lockRes.json();
       if (!lockData.success) {
         alert(`이미 ${lockData.owner} 매니저님이 워룸 개설을 진행 중입니다.`);
+        setIsOpeningWarRoom(false);
         return;
       }
     } catch (lockError) {
@@ -410,6 +413,8 @@ export default function DashboardPage({ onAiClick }) {
         method: 'DELETE',
         headers: getAuthHeaders()
       }).catch(() => {});
+    } finally {
+      setIsOpeningWarRoom(false);
     }
   };
 
@@ -497,11 +502,14 @@ export default function DashboardPage({ onAiClick }) {
     fetchMyAssignments();
     fetchUserActivityHistory();
     fetchSettings(); // 🚀 Load thresholds on start
-    const smsInterval = setInterval(fetchSMSMessages, 5000);
-    const wrInterval = setInterval(fetchWarRooms, 8000);
-    const activityInterval = setInterval(fetchActivityLogs, 10000);
-    const assignmentInterval = setInterval(fetchMyAssignments, 10000);
-    const historyInterval = setInterval(fetchUserActivityHistory, 15000);
+    // 🚀 Performance Optimization: Reduce polling pressure during active AI analysis
+    const pollIntervalMultiplier = isAnalyzingActive ? 4 : 1; // 4x slower during analysis
+
+    const smsInterval = setInterval(fetchSMSMessages, 10000 * pollIntervalMultiplier);
+    const wrInterval = isAnalyzingActive ? null : setInterval(fetchWarRooms, 15000);
+    const activityInterval = isAnalyzingActive ? null : setInterval(fetchActivityLogs, 20000);
+    const assignmentInterval = isAnalyzingActive ? null : setInterval(fetchMyAssignments, 20000);
+    const historyInterval = isAnalyzingActive ? null : setInterval(fetchUserActivityHistory, 30000);
 
     // 🚀 NEW: Real-time SMS Stream (SSE) — use real JWT for query param auth
     const token = getAccessToken();
@@ -524,10 +532,10 @@ export default function DashboardPage({ onAiClick }) {
       clearInterval(wrInterval);
       clearInterval(activityInterval);
       clearInterval(assignmentInterval);
-      clearInterval(historyInterval);
+      if (historyInterval) clearInterval(historyInterval);
       sse.close();
     };
-  }, [userProfile, assignmentDateRange, hideCompletedSms]);
+  }, [userProfile, assignmentDateRange, hideCompletedSms, isAnalyzingActive]);
 
   // SMS 선택 시 에이전트 토론 자동 시작
    useEffect(() => {
@@ -556,7 +564,12 @@ export default function DashboardPage({ onAiClick }) {
           severity: room.severity || 'NORMAL',
           unread: false
         }));
-        setWarRooms(mapped);
+        setWarRooms(prev => {
+          const prevSig = (prev || []).map(r => `${r.inc_id}_${r.status}`).join('|');
+          const nextSig = mapped.map(r => `${r.inc_id}_${r.status}`).join('|');
+          if (prevSig === nextSig) return prev;
+          return mapped;
+        });
       }
     } catch (err) {
       console.error("Failed to fetch War-Rooms:", err);
@@ -709,7 +722,14 @@ export default function DashboardPage({ onAiClick }) {
         });
         
         const finalMsgs = Array.from(uniqueMap.values());
-        setSmsMessages(finalMsgs);
+        
+        // 🛡️ Deduplication: Only update if the list has actually changed
+        setSmsMessages(prev => {
+          const prevIds = (prev || []).map(m => `${m.inc_id}_${m.received_count}`).join(',');
+          const nextIds = finalMsgs.map(m => `${m.inc_id}_${m.received_count}`).join(',');
+          if (prevIds === nextIds) return prev;
+          return finalMsgs;
+        });
 
         const totalVolume = finalMsgs.reduce((acc, m) => acc + (Number(m.received_count) || 1), 0);
         setTotalSmsVolume(totalVolume);
@@ -721,16 +741,12 @@ export default function DashboardPage({ onAiClick }) {
           if (latestKey !== lastAutoTriggeredKeyRef.current) {
             lastAutoTriggeredKeyRef.current = latestKey;
             setLastAutoTriggeredKey(latestMsg.inc_id);
-            setSelectedSms(latestMsg);
             
-            // Auto-expand and start analysis
-            setIsSmsPanelCollapsed(false);       
-            setIsLiveStreamCollapsed(false);    
-            setIsWarRoomCollapsed(false);       
-            setIsAssignmentsCollapsed(false);    
-            setIsFlowCollapsed(false);
-            setShowAgentPanel(true);             
-            startLiveScenario(latestMsg);
+            // 🛡️ Deduplication: Only auto-select if nothing is selected or it's a DIFFERENT incident
+            if (!selectedSmsRef.current || selectedSmsRef.current.inc_id !== latestMsg.inc_id) {
+              setSelectedSms(latestMsg);
+              startLiveScenario(latestMsg);
+            }
           }
         }
       }
@@ -1559,10 +1575,10 @@ export default function DashboardPage({ onAiClick }) {
                   className="rounded-xl p-3 cursor-pointer active:opacity-70"
                   style={{
                     background: isSel ? 'rgba(234,179,8,0.04)' : '#0d1117',
-                    borderLeft: `2px solid ${accentColor}`,
-                    border: `1px solid ${isSel ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                    borderLeftColor: accentColor,
-                    borderLeftWidth: 3,
+                    borderTop: `1px solid ${isSel ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                    borderRight: `1px solid ${isSel ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                    borderBottom: `1px solid ${isSel ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                    borderLeft: `3px solid ${accentColor}`,
                     borderRadius: 10
                   }}>
                   {/* Row 1: type + badges */}
@@ -1642,6 +1658,8 @@ export default function DashboardPage({ onAiClick }) {
               onShowDetail={handleShowInsight}
               selectedSms={insightSms}
               onOpenWarRoom={handleOpenWarRoomFromInsight}
+              onAnalyzingChange={setIsAnalyzingActive}
+              isOpening={isOpeningWarRoom}
               onAgentContent={handleAgentContent}
               warRooms={warRooms}
             />
@@ -1800,13 +1818,19 @@ export default function DashboardPage({ onAiClick }) {
                           {(isCompleted||isNextStep)&&step.id==='WARROOM'&&(()=>{
                             const roomExists=warRooms.some(r=>String(r.id)===String(selectedIncidentIdFlow)||String(r.inc_id)===String(selectedIncidentIdFlow));
                             return roomExists?(
-                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded active:opacity-60 text-[11px] font-bold" style={{ color: '#e2e8f0', border: '1px solid rgba(59,130,246,0.5)', background: 'rgba(59,130,246,0.1)' }}>
+                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded active:opacity-60 text-[11px] font-bold" style={{ color: "#e2e8f0", border: "1px solid rgba(59,130,246,0.5)", background: "rgba(59,130,246,0.1)" }}>
                                 <Zap size={11} />워룸 이동<ChevronRight size={11} />
                               </button>
                             ):(
-                              <button disabled className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold" style={{ color: '#334155', border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', cursor:'not-allowed' }}>
-                                <Users size={11} />워룸 미개설
-                              </button>
+                               <button 
+                                 onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
+                                 disabled={isOpeningWarRoom}
+                                 className={`mt-1.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded active:opacity-60 text-[11px] font-bold ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                                 style={{ color: "#60a5fa", border: "1px solid rgba(96,165,250,0.5)", background: "rgba(59,130,246,0.1)" }} 
+                               > 
+                                 <Users size={11} />
+                                 {isOpeningWarRoom ? '개설 진행 중...' : '워룸 개설하기'} 
+                               </button>
                             );
                           })()}
                         </div>
