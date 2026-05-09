@@ -82,6 +82,11 @@ export default function ChatSummaryPage() {
     return `${workerBase}${endpoint}`;
   };
 
+  // 🚀 Monitoring: Log state changes to debug "Dark Screen" issue
+  useEffect(() => {
+    console.log(`[ChatSummary-State] isLoading: ${isLoading}, hasSummary: ${!!summary}, error: ${error}`);
+  }, [isLoading, summary, error]);
+
   useEffect(() => {
     // 🛡️ Strict Concurrency Lock: incidentId가 있을 때만 작동하며, 이미 트리거된 경우 중복 호출 방지
     if (!incidentId) return;
@@ -97,7 +102,11 @@ export default function ChatSummaryPage() {
     retryCountRef.current = 0;
 
     const fetchSummary = async (isRetry = false) => {
-      console.log(`[ChatSummary] fetchSummary(isRetry=${isRetry}) started`);
+      // 🛡️ Robust ID Normalization: Strip existing INC- and re-apply it consistently
+      const rawId = String(incidentId || '').replace(/^INC-/i, '');
+      const cleanIdForAi = `INC-${rawId}`;
+      
+      console.log(`[ChatSummary] fetchSummary(isRetry=${isRetry}) started for ${cleanIdForAi}`);
       setIsLoading(true);
       setIsStreaming(true);
       setError(null);
@@ -153,25 +162,32 @@ export default function ChatSummaryPage() {
           }
         }
 
-        console.log(`[ChatSummary] Calling /ai/summarize-chat API for ${incidentId}...`);
+        console.log(`[ChatSummary] >> Requesting /ai/summarize-chat for ${cleanIdForAi}...`);
         setLoadingStatus('Dify AI 엔진에 분석 요청을 전송했습니다...');
         if (isRetry) setLoadingStatus(`재시도 중... (${retryCountRef.current}/2)`);
+
+        // ⏱️ Add a fetch timeout for better feedback
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(() => timeoutController.abort(), 15000); 
 
         const response = await fetch(getApiUrl('/ai/summarize-chat'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
           body: JSON.stringify({ 
-            incident_id: incidentId,
+            incident_id: cleanIdForAi,
             instructions: reportInstruction,
             prompt: reportInstruction
           }),
-          signal: currentController.signal
+          signal: timeoutController.signal
         });
 
+        clearTimeout(timeoutId);
+        console.log(`[ChatSummary] << Response received: HTTP ${response.status} ${response.statusText}`);
         setLoadingStatus('AI 엔진 연결 성공! 데이터를 분석하고 있습니다...');
 
         if (!response.ok || !response.body) {
-          throw new Error(`HTTP ${response.status}: Dify 응답 실패`);
+          const errText = await response.text().catch(() => 'No error body');
+          throw new Error(`HTTP ${response.status}: ${errText}`);
         }
 
         // 성공하면 retry 카운터 리셋
@@ -242,8 +258,15 @@ export default function ChatSummaryPage() {
         }
 
       } catch (err) {
-        if (err.name === 'AbortError') return;
-        console.error('Summary fetch error:', err);
+        if (err.name === 'AbortError') {
+          // If we are already retrying or it's a stale controller, just ignore
+          if (abortControllerRef.current !== currentController) return;
+          console.error('[ChatSummary] Fetch Aborted (Timeout/Cancel)');
+          setError('AI 엔진 응답 대기 시간이 초과되었습니다. (15초)');
+        } else {
+          console.error('[ChatSummary] Summary fetch error:', err);
+          setError(`분석 오류: ${err.message}`);
+        }
 
         // 자동 재시도 (최대 2회)
         if (retryCountRef.current < 2) {
@@ -264,12 +287,14 @@ export default function ChatSummaryPage() {
         setSummary(localSummary);
         setLoadingStatus('비상 분석 완료');
       } finally {
+        console.log(`[ChatSummary] fetchSummary finally block reached. controller: ${currentController === abortControllerRef.current ? 'current' : 'stale'}`);
         if (timerId) clearInterval(timerId); // 타이머 종료
         if (abortControllerRef.current === currentController) {
           setIsLoading(false);
           setIsStreaming(false);
           // 🚀 Unlock (Cleanup)
-          fetch(getApiUrl(`/ai/summarize/lock/${incidentId}`), { 
+          const cleanIdForUnlock = `INC-${String(incidentId || '').replace(/^INC-/i, '')}`;
+          fetch(getApiUrl(`/ai/summarize/lock/${cleanIdForUnlock}`), { 
             method: 'DELETE',
             headers: getAuthHeader() 
           }).catch(() => {});
@@ -285,7 +310,9 @@ export default function ChatSummaryPage() {
       if (!savedUser.employee_id) return;
       
       try {
-        const res = await fetch(getApiUrl(`/api/v1/report-lines?user_id=${savedUser.employee_id}`));
+        const res = await fetch(getApiUrl(`/api/v1/report-lines?user_id=${savedUser.employee_id}`), {
+          headers: getAuthHeader()
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.report_lines?.length > 0) {
@@ -311,7 +338,10 @@ export default function ChatSummaryPage() {
     // Fetch Incident Metadata (Status)
     const fetchIncidentStatus = async () => {
       try {
-        const res = await fetch(getApiUrl(`/ai/incident/${incidentId.startsWith('INC-') ? incidentId : `INC-${incidentId}`}`));
+        const cleanId = String(incidentId || '').replace(/^INC-/i, '');
+        const res = await fetch(getApiUrl(`/ai/incident/${cleanId}`), {
+          headers: getAuthHeader()
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.incident) {
@@ -331,8 +361,10 @@ export default function ChatSummaryPage() {
     // Fetch Incident SMS Message & Workflow Steps
     const fetchIncidentData = async () => {
       try {
-        const cleanId = incidentId.startsWith('INC-') ? incidentId : `INC-${incidentId}`;
-        const res = await fetch(getApiUrl(`/ai/incident/${cleanId}`));
+        const cleanId = String(incidentId || '').replace(/^INC-/i, '');
+        const res = await fetch(getApiUrl(`/ai/incident/${cleanId}`), {
+          headers: getAuthHeader()
+        });
         if (res.ok) {
           const data = await res.json();
           const inc = data.incident;
@@ -348,7 +380,10 @@ export default function ChatSummaryPage() {
       } catch (e) { console.error('Failed to fetch incident message:', e); }
 
       try {
-        const res = await fetch(getApiUrl(`/ai/incident/workflow-details?inc_id=${incidentId}`));
+        const cleanIdForWf = `INC-${String(incidentId || '').replace(/^INC-/i, '')}`;
+        const res = await fetch(getApiUrl(`/ai/incident/workflow-details?inc_id=${cleanIdForWf}`), {
+          headers: getAuthHeader()
+        });
         if (res.ok) {
           const data = await res.json();
           setWorkflowSteps(data.steps || []);
@@ -788,10 +823,11 @@ export default function ChatSummaryPage() {
                 (async () => {
                   try {
                     const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
+                    const cleanIdForAi = String(incidentId || '').replace(/^INC-/i, '');
                     const response = await fetch(getApiUrl('/ai/summarize-chat'), {
                       method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
                       body: JSON.stringify({ 
-                        incident_id: incidentId,
+                        incident_id: cleanIdForAi,
                         instructions: reportInstruction,
                         prompt: reportInstruction
                       }), 

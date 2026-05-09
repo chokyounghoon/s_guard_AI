@@ -951,6 +951,39 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         )}
 
+        {/* 🚀 War-Room Action (Original Position Restored) */}
+        {analysisComplete && selectedSms && (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-700 delay-150">
+             {(() => {
+                const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
+                const incidentId = String(selectedSms.inc_id || selectedSms.id || '').replace('INC-', '');
+                const roomExists = (warRooms || []).some(r => String(r.id) === incidentId);
+                
+                const btnCls = roomExists 
+                  ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600/30'
+                  : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)] animate-pulse'
+                  : sev === 'MAJOR'    ? 'bg-orange-600 text-white shadow-[0_0_10px_rgba(249,115,22,0.3)]'
+                  :                      'bg-emerald-600 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]';
+
+                return (
+                  <button
+                    onClick={() => onOpenWarRoom(selectedSms)}
+                    disabled={isOpening}
+                    className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] border border-white/10 ${btnCls} disabled:opacity-50`}
+                  >
+                    {isOpening ? (
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Users className="w-5 h-5" />
+                    )}
+                    <span>
+                      {isOpening ? '개설 진행 중...' : roomExists ? 'War-Room으로 이동' : 'War-Room 개설하기'}
+                    </span>
+                  </button>
+                );
+             })()}
+          </div>
+        )}
       </div>
 
       {/* Detailed Feedback Modal (Popup) */}

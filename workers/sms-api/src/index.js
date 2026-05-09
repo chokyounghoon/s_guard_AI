@@ -5439,9 +5439,9 @@ app.post('/ai/summarize-chat', async (c) => {
 
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
   
-  // ID Normalization: Frontend might send "INC-1234" or "1234"
-  const cleanId = String(incident_id).startsWith('INC-') ? incident_id.slice(4) : incident_id;
-  const fullId = `INC-${cleanId}`;
+  // ID Normalization: Use raw numeric ID (no INC- prefix) for database operations
+  const cleanId = String(incident_id || '').replace(/^INC-/i, '');
+  const fullId = cleanId; // Use cleanId directly as the primary identifier
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -5449,9 +5449,9 @@ app.post('/ai/summarize-chat', async (c) => {
 
   ;(async () => {
     try {
-      // 1. Check D1 Cache & Incident Status
-      const incident = await db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(fullId).first();
-      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(fullId).first();
+      // 1. Check D1 Cache & Incident Status - Using cleanId (numeric)
+      const incident = await db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(cleanId).first();
+      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first();
       
       const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료'];
       const isFinal = finalStatuses.includes(incident?.status || 'Open');
@@ -5477,12 +5477,12 @@ app.post('/ai/summarize-chat', async (c) => {
 
       // For finalized incidents, strictly serve from DB (Prevent Dify call)
       if (isFinal) {
-        console.log(`[Re-Analysis Prevented] Incident ${incident_id} is final. Attempting DB read...`);
+        console.log(`[Re-Analysis Prevented] Incident ${cleanId} is final. Attempting DB read...`);
         
         // Priority 1: knowledge_base (finalized reports)
-        const kb = await db.prepare("SELECT content FROM knowledge_base WHERE inc_id = ? AND category = 'REPORT'").bind(incident_id).first();
+        const kb = await db.prepare("SELECT content FROM knowledge_base WHERE inc_id = ? AND category = 'REPORT'").bind(cleanId).first();
         if (kb && kb.content && !isRaw(kb.content) && !isStaleError(kb.content)) {
-          console.log(`[Cache Hit] Serving finalized knowledge_base report for ${incident_id}`);
+          console.log(`[Cache Hit] Serving finalized knowledge_base report for ${cleanId}`);
           // Send immediately without typewriter delay or status message to avoid confusion
           await writer.write(encode(`data: ${JSON.stringify({ answer: kb.content })}\n\n`));
           await writer.write(encode('data: [DONE]\n\n'));
@@ -5491,7 +5491,7 @@ app.post('/ai/summarize-chat', async (c) => {
 
         // Priority 2: chat_summaries
         if (cached && cached.summary && !isRaw(cached.summary) && !isStaleError(cached.summary)) {
-          console.log(`[Cache Hit] Serving cached summary for finalized incident ${incident_id}`);
+          console.log(`[Cache Hit] Serving cached summary for finalized incident ${cleanId}`);
           await writer.write(encode(`data: ${JSON.stringify({ answer: cached.summary })}\n\n`));
           await writer.write(encode('data: [DONE]\n\n'));
           return;
@@ -5504,21 +5504,21 @@ app.post('/ai/summarize-chat', async (c) => {
       }
 
       if (cached && cached.summary && !isFinal) {
-        console.log(`[Re-Analysis] Incident ${fullId} is still active. Bypassing cache to update summary...`);
+        console.log(`[Re-Analysis] Incident ${cleanId} is still active. Bypassing cache to update summary...`);
         await writer.write(encode(`data: ${JSON.stringify({ status: '대화 내용을 반영하여 리포트를 최신화하고 있습니다...' })}\n\n`));
       }
 
 
       // 2. Concurrency Lock check (KV)
-      const lockKey = `lock:summarize-chat:${fullId}`;
+      const lockKey = `lock:summarize-chat:${cleanId}`;
       if (kv) {
         let lock = await kv.get(lockKey);
         if (lock === 'processing') {
-          console.log(`[Concurrency] Another user is summarizing chat for ${fullId}. Waiting...`);
+          console.log(`[Concurrency] Another user is summarizing chat for ${cleanId}. Waiting...`);
           await writer.write(encode(`data: ${JSON.stringify({ status: '다른 사용자가 분석 중입니다. 대기 중...' })}\n\n`));
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(r => setTimeout(r, 1000));
-            const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(fullId).first();
+            const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first();
             if (polled && polled.summary && !isStaleError(polled.summary)) {
               const chars = Array.from(polled.summary);
               for (let i = 0; i < chars.length; i += 50) {
@@ -5533,16 +5533,16 @@ app.post('/ai/summarize-chat', async (c) => {
         await kv.put(lockKey, 'processing', { expirationTtl: 60 });
       }
 
-      // 3. Fetch ONLY user chat history (excluding AI and system messages)
-      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(fullId).all()
+      // 3. Fetch ONLY user chat history - Using numeric ID
+      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(cleanId).all()
       
       // ── 인시던트 핵심 이벤트 타임라인 수집 ──
       const incDetail = await db.prepare(
         "SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?"
-      ).bind(fullId).first();
+      ).bind(cleanId).first();
       const { results: wfLogs } = await db.prepare(
         "SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC"
-      ).bind(fullId).all().catch(() => ({ results: [] }));
+      ).bind(cleanId).all().catch(() => ({ results: [] }));
 
       const toKST = (dt) => {
         if (!dt) return null;
@@ -5712,7 +5712,7 @@ ${timelineCtx.join('\n')}
           INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
           VALUES (?, ?, 'dify-workflow', CURRENT_TIMESTAMP)
           ON CONFLICT(inc_id) DO UPDATE SET summary = excluded.summary, mod_dt = CURRENT_TIMESTAMP
-        `).bind(incident_id, fullContent).run();
+        `).bind(fullId, fullContent).run();
       }
 
       if (kv) await kv.delete(lockKey);
