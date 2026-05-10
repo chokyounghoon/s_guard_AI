@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v32'; // Force SW update - enhanced debug
+const CACHE_NAME = 'sguard-v33'; // Push payload fix - SubtleCrypto RFC 8291
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -92,28 +92,19 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 🚀 [SW-v32] Robust Push Notification Handler (Enhanced Debug)
+// 🚀 [SW-v33] Push Notification Handler
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push Event received:', event);
-  console.log('[SW] event.data exists:', !!event.data);
-  if (event.data) {
-    console.log('[SW] event.data methods:', Object.keys(Object.getPrototypeOf(event.data)));
-  }
-
   let pushData = {
-    title: 'S-Guard AI (Default)',
-    body: '새로운 시스템 이벤트가 감지되었습니다. (데이터 없음)',
+    title: 'S-Guard AI',
+    body: '새로운 알림이 수신되었습니다.',
     url: '/',
     tag: 'sguard-alert',
     vibrate: [100, 50, 100]
   };
 
   if (event.data) {
-    const rawText = event.data.text();
-    console.log('[SW] Raw payload text:', rawText);
     try {
-      const data = JSON.parse(rawText);
-      console.log('[SW] Parsed JSON:', data);
+      const data = JSON.parse(event.data.text());
       if (data && typeof data === 'object') {
         pushData.title = data.title || pushData.title;
         pushData.body  = data.body  || data.message || pushData.body;
@@ -122,13 +113,10 @@ self.addEventListener('push', (event) => {
         if (Array.isArray(data.vibrate)) pushData.vibrate = data.vibrate;
       }
     } catch (e) {
-      console.warn('[SW] Parsing error or plain text:', e.message);
-      if (rawText) pushData.body = rawText;
+      const text = event.data.text();
+      if (text) pushData.body = text;
     }
-  } else {
-    console.warn('[SW] Push event has NO data payload.');
   }
-  console.log('[SW] Final notification to show:', pushData);
 
   const options = {
     body: pushData.body,
@@ -137,15 +125,12 @@ self.addEventListener('push', (event) => {
     vibrate: pushData.vibrate,
     tag: `${pushData.tag}-${Date.now()}`,
     renotify: true,
-    data: { 
-      url: pushData.url,
-      receivedAt: Date.now()
-    }
+    data: { url: pushData.url }
   };
 
   event.waitUntil(
     self.registration.showNotification(pushData.title, options)
-      .catch(err => console.error('[SW] Notification Error:', err))
+      .catch(err => console.error('[SW] Notification error:', err))
   );
 });
 
