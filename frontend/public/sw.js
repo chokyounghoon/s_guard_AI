@@ -92,20 +92,43 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 🚀 [SW-v20] 푸시 알림 수신 및 데이터 파싱
+// 🚀 [SW-v21] 푸시 알림 수신 및 데이터 파싱
 self.addEventListener('push', (event) => {
+  let pushData = {
+    title: 'S-Guard AI 알림',
+    body: '새로운 시스템 이벤트가 감지되었습니다.',
+    url: '/',
+    tag: 'sguard-alert',
+    vibrate: [100, 50, 100]
+  };
+
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      pushData = {
+        title: data.title || pushData.title,
+        body: data.body || data.message || pushData.body,
+        url: data.url || data.link || pushData.url,
+        tag: data.tag || pushData.tag,
+        vibrate: data.vibrate || pushData.vibrate
+      };
+    } catch (e) {
+      pushData.body = event.data.text();
+    }
+  }
+
   const options = {
-    body: body,
+    body: pushData.body,
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    vibrate: vibrate,
-    tag: `${tag}-${Date.now()}`, // 매번 새로운 알림으로 표시
+    vibrate: pushData.vibrate,
+    tag: `${pushData.tag}-${Date.now()}`,
     renotify: true,
-    data: { url: url }
+    data: { url: pushData.url }
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    self.registration.showNotification(pushData.title, options)
   );
 });
 
