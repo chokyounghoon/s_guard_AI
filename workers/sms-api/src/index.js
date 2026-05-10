@@ -821,6 +821,79 @@ const extractSearchMetadata = (text) => {
 }
 
 
+// 📧 EMAIL: Unified Email Sender (Resend + Brevo Fallback)
+const sendEmail = async (c, { to, subject, html, fromName, fromEmail, replyTo }) => {
+  const resendApiKey = c.env.RESEND_API_KEY;
+  const brevoApiKey = c.env.BREVO_API_KEY;
+  
+  const mailFrom = fromEmail || 'noreply@chokerslab.store';
+  const mailFromName = fromName || 'S-Guard AI Security';
+
+  let success = false;
+
+  // 1. Try Resend First (Primary)
+  if (resendApiKey) {
+    try {
+      const rsRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${resendApiKey}`, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({
+          from: `${mailFromName} <${mailFrom}>`,
+          to: Array.isArray(to) ? to : [to],
+          reply_to: replyTo,
+          subject,
+          html: html + '<br/><br/><div style="font-size:10px; color:#ccc; opacity: 0.5;">(R)</div>'
+        })
+      });
+      if (rsRes.ok) {
+        console.log('[Email] Sent via Resend (Primary)');
+        success = true;
+      } else {
+        const errorDetail = await rsRes.text();
+        console.warn(`[Email] Resend failed with status ${rsRes.status}: ${errorDetail}`);
+      }
+    } catch (e) {
+      console.error('[Email] Resend Error:', e.message);
+    }
+  }
+
+  // 2. Try Brevo as Fallback
+  if (!success && brevoApiKey) {
+    try {
+      const bvRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': brevoApiKey,
+          'x-sib-api-key': brevoApiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: mailFromName, email: mailFrom },
+          to: (Array.isArray(to) ? to : [to]).map(email => ({ email })),
+          replyTo: replyTo ? { email: replyTo } : undefined,
+          subject,
+          htmlContent: html + '<br/><br/><div style="font-size:10px; color:#ccc; opacity: 0.5;">(B)</div>'
+        })
+      });
+      if (bvRes.ok) {
+        console.log('[Email] Sent via Brevo (Fallback)');
+        success = true;
+      } else {
+        const errorDetail = await bvRes.text();
+        console.warn(`[Email] Brevo failed with status ${bvRes.status}: ${errorDetail}`);
+      }
+    } catch (e) {
+      console.error('[Email] Brevo Error:', e.message);
+    }
+  }
+
+  return success;
+};
+
+
 // ==========================================
 // AI Background Analysis (Eager Loading)
 // ==========================================
@@ -1325,38 +1398,24 @@ app.post('/auth/init', async (c) => {
       <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
         <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${otp}</span>
       </div>
-      <p style="margin-top:20px;font-size:13px;color:#94a3b8;">유효 시간: <strong>10분</strong> / 타인에게 절대 공유하지 마세요.</p>
+      <p style="margin-top:20px;font-size:13px;color:#94a3b8;">유효 시간: <strong>3분</strong> / 타인에게 절대 공유하지 마세요.</p>
     </div>
   `;
 
-  let mailSent = false;
-  const resendApiKey = c.env.RESEND_API_KEY;
+  // 6. 통합 메일 발송 (Resend -> Brevo Fallback)
+  const mailSent = await sendEmail(c, {
+    to: user.email,
+    subject,
+    html: htmlBody,
+    fromName: mailFromName,
+    fromEmail: mailFrom,
+    replyTo: 'khcho0421@gmail.com'
+  });
 
-  if (!resendApiKey) {
-    return c.json({ detail: '메일 발송 설정이 누락되었습니다.', code: 'CONFIG_ERROR' }, 500);
-  }
-
-  try {
-    const rsRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: `${mailFromName} <${mailFrom}>`,
-        to: [user.email],
-        reply_to: 'khcho0421@gmail.com',
-        subject,
-        html: htmlBody
-      })
-    });
-    if (rsRes.ok) mailSent = true;
-  } catch (e) {
-    console.error('[auth/init] Resend fetch error:', e.message);
-  }
-
-  // 7. 발송 성공 시에만 KV 저장 (10분 TTL)
+  // 7. 발송 성공 시에만 KV 저장 (3분 TTL)
   if (mailSent && kv) {
     const kvKey = `otp:${empId}`;
-    await kv.put(kvKey, otp, { expirationTtl: 600 });
+    await kv.put(kvKey, otp, { expirationTtl: 180 });
   }
 
   if (!mailSent) {
@@ -2220,32 +2279,22 @@ app.post('/auth/reset/request', async (c) => {
   const [userPart, domainPart] = email.split('@');
   const maskedEmail = userPart.slice(0, 2) + '*'.repeat(userPart.length - 2) + '@' + domainPart;
 
-  // 🛡️ Resend API로 인증 코드 발송
-  const resendApiKey = c.env.RESEND_API_KEY;
-  if (resendApiKey) {
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: 'S-Guard AI 보안팀 <noreply@chokerslab.store>',
-        to: [user.email],
-        subject: '[S-Guard] 비밀번호 초기화 인증 코드',
-        html: `
-          <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
-            <h2 style="color:#38bdf8;margin-bottom:8px;">🛡️ 비밀번호 초기화</h2>
-            <p style="margin-bottom:24px;">${user.name || employee_id}님, 요청하신 비밀번호 초기화를 위한 인증번호입니다.</p>
-            <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
-              <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${code}</span>
-            </div>
-            <p style="margin-top:20px;font-size:13px;color:#94a3b8;">본인이 요청하지 않았다면 보안 담당자에게 즉시 연락 바랍니다.</p>
-          </div>
-        `
-      })
-    });
-  }
+  // 🛡️ 통합 메일 발송 (Resend -> Brevo Fallback)
+  await sendEmail(c, {
+    to: user.email,
+    subject: '[S-Guard] 비밀번호 초기화 인증 코드',
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
+        <h2 style="color:#38bdf8;margin-bottom:8px;">🛡️ 비밀번호 초기화</h2>
+        <p style="margin-bottom:24px;">${user.name || employee_id}님, 요청하신 비밀번호 초기화를 위한 인증번호입니다.</p>
+        <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
+          <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${code}</span>
+        </div>
+        <p style="margin-top:20px;font-size:13px;color:#94a3b8;">본인이 요청하지 않았다면 보안 담당자에게 즉시 연락 바랍니다.</p>
+      </div>
+    `,
+    fromName: 'S-Guard AI 보안팀'
+  });
 
   return c.json({ status: "success", message: `인증코드가 발송되었습니다. 수신함을 확인해 주세요.`, masked_email: maskedEmail })
 })
@@ -2282,27 +2331,20 @@ app.post('/auth/reset/verify', async (c) => {
       .run()
 
     // 🛡️ 성공 안내 메일 발송
-    const resendApiKey = c.env.RESEND_API_KEY;
-    if (resendApiKey) {
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: 'S-Guard AI 보안팀 <noreply@chokerslab.store>',
-          to: [email],
-          subject: '[S-Guard] 비밀번호 변경 완료 안내',
-          html: `
-            <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
-              <h2 style="color:#22c55e;margin-bottom:8px;">✅ 비밀번호 변경 완료</h2>
-              <p style="margin-bottom:24px;">${userRecord.name || '사용자'}님, 요청하신 비밀번호 변경이 성공적으로 완료되었습니다.</p>
-              <div style="padding:16px;background:rgba(34, 197, 94, 0.1);border-radius:8px;font-size:13px;color:#4ade80;">
-                이제 새로운 비밀번호로 시스템에 로그인하실 수 있습니다. 본인이 요청한 작업이 아니라면 즉시 보안팀에 문의하세요.
-              </div>
-            </div>
-          `
-        })
-      });
-    }
+    await sendEmail(c, {
+      to: email,
+      subject: '[S-Guard] 비밀번호 변경 완료 안내',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
+          <h2 style="color:#22c55e;margin-bottom:8px;">✅ 비밀번호 변경 완료</h2>
+          <p style="margin-bottom:24px;">${userRecord.name || '사용자'}님, 요청하신 비밀번호 변경이 성공적으로 완료되었습니다.</p>
+          <div style="padding:16px;background:rgba(34, 197, 94, 0.1);border-radius:8px;font-size:13px;color:#4ade80;">
+            이제 새로운 비밀번호로 시스템에 로그인하실 수 있습니다. 본인이 요청한 작업이 아니라면 즉시 보안팀에 문의하세요.
+          </div>
+        </div>
+      `,
+      fromName: 'S-Guard AI 보안팀'
+    });
     return c.json({ status: "success", message: "Password updated successfully" })
   } else {
     // 하위 호환성을 위해 임시 비번 로직 유지
@@ -2313,28 +2355,21 @@ app.post('/auth/reset/verify', async (c) => {
       .bind(hashedTempPassword, modDt, 'SYSTEM', employee_id.trim())
       .run()
 
-    const resendApiKey = c.env.RESEND_API_KEY;
-    if (resendApiKey) {
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: 'S-Guard AI 보안팀 <noreply@chokerslab.store>',
-          to: [email],
-          subject: '[S-Guard] 임시 비밀번호 발급 안내',
-          html: `
-            <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
-              <h2 style="color:#ef4444;margin-bottom:8px;">⚠️ 임시 비밀번호 발급</h2>
-              <p style="margin-bottom:24px;">${userRecord.name || '사용자'}님, 요청하신 임시 비밀번호가 발급되었습니다.</p>
-              <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
-                <span style="font-size:24px;font-weight:700;color:#ef4444;letter-spacing:1px;">${temp_password}</span>
-              </div>
-              <p style="font-size:12px;color:#94a3b8;margin-top:16px;">로그인 후 즉시 비밀번호를 변경하세요.</p>
-            </div>
-          `
-        })
-      });
-    }
+    await sendEmail(c, {
+      to: email,
+      subject: '[S-Guard] 임시 비밀번호 발급 안내',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
+          <h2 style="color:#ef4444;margin-bottom:8px;">⚠️ 임시 비밀번호 발급</h2>
+          <p style="margin-bottom:24px;">${userRecord.name || '사용자'}님, 요청하신 임시 비밀번호가 발급되었습니다.</p>
+          <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
+            <span style="font-size:24px;font-weight:700;color:#ef4444;letter-spacing:1px;">${temp_password}</span>
+          </div>
+          <p style="font-size:12px;color:#94a3b8;margin-top:16px;">로그인 후 즉시 비밀번호를 변경하세요.</p>
+        </div>
+      `,
+      fromName: 'S-Guard AI 보안팀'
+    });
     return c.json({ status: "success", temp_sent: true })
   }
 })
@@ -3287,15 +3322,15 @@ app.get('/sms/recent', async (c) => {
     SELECT * FROM (
       SELECT r.*, u.name, u.role, u.team, u.part,
              ai.similarity_score, ai.similarity_reason,
-             (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE TRIM(REPLACE(ai2.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))) as is_analyzed,
+             (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE ai2.inc_id = r.inc_id) as is_analyzed,
              COALESCE(
-               (SELECT '처리완료' FROM warroom_list wl WHERE TRIM(REPLACE(wl.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) AND (wl.status = 'CLOSED' OR wl.status = '최종완료') LIMIT 1),
-               (SELECT status FROM incident_assignments ia WHERE TRIM(REPLACE(ia.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', '')) ORDER BY updated_at DESC LIMIT 1),
+               (SELECT '처리완료' FROM warroom_list wl WHERE wl.inc_id = r.inc_id AND (wl.status = 'CLOSED' OR wl.status = '최종완료') LIMIT 1),
+               (SELECT status FROM incident_assignments ia WHERE ia.inc_id = r.inc_id ORDER BY updated_at DESC LIMIT 1),
                '미처리'
              ) as incident_status
       FROM received_messages r
       LEFT JOIN users u ON r.employee_id = u.employee_id
-      LEFT JOIN autopilot_insight ai ON TRIM(REPLACE(ai.inc_id, 'INC-', '')) = TRIM(REPLACE(r.inc_id, 'INC-', ''))
+      LEFT JOIN autopilot_insight ai ON ai.inc_id = r.inc_id
     )
     WHERE 1=1
   `
@@ -3803,23 +3838,23 @@ app.get('/incidents', async (c) => {
       COALESCE(ua.team, uaa.team) as team,
       COALESCE(ua.part, uaa.part) as part,
       COALESCE(ua.subpart, uaa.subpart) as subpart,
-      (SELECT COUNT(1) FROM autopilot_insight ai WHERE REPLACE(ai.inc_id, 'INC-', '') = REPLACE(i.inc_id, 'INC-', '')) as is_analyzed,
+      (SELECT COUNT(1) FROM autopilot_insight ai WHERE ai.inc_id = i.inc_id) as is_analyzed,
       rp.title as report_title,
       CASE WHEN rp.id IS NOT NULL THEN 1 ELSE 0 END as has_report
     FROM incidents i
-    LEFT JOIN (SELECT * FROM reports GROUP BY inc_id) rp ON (REPLACE(i.inc_id, 'INC-', '') = REPLACE(rp.inc_id, 'INC-', ''))
+    LEFT JOIN (SELECT * FROM reports GROUP BY inc_id) rp ON i.inc_id = rp.inc_id
     LEFT JOIN users ua ON i.assigned_to = ua.employee_id
     LEFT JOIN incident_assignments ia ON i.inc_id = ia.inc_id
     LEFT JOIN users uaa ON ia.user_id = uaa.employee_id
-    LEFT JOIN received_messages r ON (REPLACE(i.inc_id, 'INC-', '') = REPLACE(r.inc_id, 'INC-', '') OR REPLACE(i.source_sms_id, 'INC-', '') = REPLACE(r.inc_id, 'INC-', ''))
+    LEFT JOIN received_messages r ON (i.inc_id = r.inc_id OR i.source_sms_id = r.inc_id)
     LEFT JOIN users us ON (r.employee_id = us.employee_id OR r.sender = us.phone)
     WHERE 1=1
   `
   const params = []
   
   if (inc_id) {
-    query += " AND i.inc_id LIKE ?"
-    params.push(`%${inc_id}%`)
+    query += " AND i.inc_id = ?"
+    params.push(inc_id)
   }
   
   if (keyword) {
@@ -3925,8 +3960,8 @@ app.post('/incidents', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  const rawId = String(data.inc_id).replace('INC-', '')
-  const inc_id = `INC-${rawId}`
+  const inc_id = String(data.inc_id).replace('INC-', '')
+  const rawId = inc_id
 
   // Fetch actual message from received_messages
   const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
@@ -4295,9 +4330,7 @@ app.get('/warroom/rooms', async (c) => {
       (SELECT u_msg.name FROM warroom_chats wc2 LEFT JOIN users u_msg ON wc2.sender = u_msg.employee_id WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
       (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
     FROM warroom_list w
-    LEFT JOIN received_messages r ON (
-      LOWER(TRIM(REPLACE(w.inc_id, 'INC-', ''))) = LOWER(TRIM(REPLACE(r.inc_id, 'INC-', '')))
-    )
+    LEFT JOIN received_messages r ON w.inc_id = r.inc_id
     WHERE 1=1
   `
 
@@ -5994,15 +6027,14 @@ app.post('/ai/warroom/open', async (c) => {
   }
 
   // Update assignment status to '처리중' for all assignees of this incident
-  await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-    .bind(now, now, creator_id || 'SYSTEM', normId, `INC-${normId}`).run()
+  await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, now, creator_id || 'SYSTEM', normId).run()
 
   // Release Lock if exists (KV cleanup)
   const kv = c.env.SMS_STORAGE;
   if (kv) {
     try {
       await kv.delete(`lock:warroom:${normId}`);
-      await kv.delete(`lock:warroom:INC-${normId}`);
     } catch (e) {
       console.error("Lock release error:", e);
     }
@@ -6012,8 +6044,8 @@ app.post('/ai/warroom/open', async (c) => {
   c.executionCtx.waitUntil((async () => {
     try {
       const { results: assignees } = await db.prepare(
-        "SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ? OR inc_id = ?"
-      ).bind(normId, `INC-${normId}`).all();
+        "SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ?"
+      ).bind(normId).all();
 
       const absentUserIds = assignees
         .map(a => a.user_id)
@@ -6124,10 +6156,10 @@ app.post('/ai/report/save', async (c) => {
 
   // 4. 보고서 저장 완료 → 해당 incident 모든 담당자 일괄 처리완료 + SMS 상태 동기화
   if (normId) {
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-      .bind(now, now, empId, normId, `INC-${normId}`).run()
-    await db.prepare("UPDATE received_messages SET status = '처리완료', mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-      .bind(now, empId, normId, `INC-${normId}`).run()
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, now, empId, normId).run()
+    await db.prepare("UPDATE received_messages SET status = '처리완료', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, empId, normId).run()
   }
 
   return c.json({ status: 'saved', knowledge_synced: !!embeddingValue })
@@ -6140,34 +6172,33 @@ app.get('/warroom/report/:id', async (c) => {
   const idParam = c.req.param('id')
   const db = c.env.DB
 
-  // 양쪽 포맷 모두 준비 (INC-xxx / xxx)
-  const rawId  = idParam.replace('INC-', '');
-  const fullId = 'INC-' + rawId;
+  // ID Normalization
+  const rawId = idParam.replace('INC-', '');
 
   // 1. War-Room base info — inc_id 가 어떤 형태로 저장됐든 매칭
   const wr = await db.prepare(
-    "SELECT * FROM warroom_list WHERE REPLACE(inc_id,'INC-','') = ?"
+    "SELECT * FROM warroom_list WHERE inc_id = ?"
   ).bind(rawId).first()
   if (!wr) return c.json({ error: 'War-Room not found' }, 404)
 
   // 2. S-Autopilot Insight (full AI analysis)
   const insight = await db.prepare(
-    "SELECT content, severity, category FROM autopilot_insight WHERE REPLACE(inc_id,'INC-','') = ?"
+    "SELECT content, severity, category FROM autopilot_insight WHERE inc_id = ?"
   ).bind(rawId).first()
 
   // 3. AI Agent Discussion log (aichat_history)
   const { results: agentLogs } = await db.prepare(
-    "SELECT agent_role, content, reg_dt FROM aichat_history WHERE REPLACE(inc_id,'INC-','') = ? ORDER BY id ASC"
+    "SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC"
   ).bind(rawId).all()
 
   // 4. War-Room chat history
   const { results: chatLogs } = await db.prepare(
-    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE REPLACE(wc.inc_id,'INC-','') = ? ORDER BY wc.timestamp ASC"
+    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
   ).bind(rawId).all()
 
   // 5. Attachments
   const { results: attachments } = await db.prepare(
-    "SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE REPLACE(inc_id,'INC-','') = ? ORDER BY seq ASC"
+    "SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC"
   ).bind(rawId).all()
 
   // 5-1. Creator name from users table
@@ -6198,10 +6229,10 @@ app.get('/warroom/report/:id', async (c) => {
 
   // 8. SMS 수신 시각 & 처리완료 시각 → 정확한 MTTR 계산
   const smsRow = await db.prepare(
-    "SELECT timestamp FROM received_messages WHERE REPLACE(inc_id,'INC-','') = ? LIMIT 1"
+    "SELECT timestamp FROM received_messages WHERE inc_id = ? LIMIT 1"
   ).bind(rawId).first()
   const doneRow = await db.prepare(
-    "SELECT MAX(updated_at) as done_at FROM incident_assignments WHERE REPLACE(inc_id,'INC-','') = ? AND status = '처리완료'"
+    "SELECT MAX(updated_at) as done_at FROM incident_assignments WHERE inc_id = ? AND status = '처리완료'"
   ).bind(rawId).first()
 
   // MTTR: SMS 수신 → 처리완료, fallback: firstChat → lastChat
@@ -6862,13 +6893,13 @@ app.post('/retrieval', async (c) => {
         const isLongId = cleanId.length > 10;
 
         if (isLongId) {
-          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = ?").bind(cleanId).first();
+          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ?").bind(cleanId).first();
         } else {
           kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE CAST(id AS TEXT) = ?").bind(cleanId).first();
         }
 
         if (!kbResult && isLongId) {
-          const sms = await db.prepare("SELECT message, sender, timestamp FROM received_messages WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = ?").bind(cleanId).first();
+          const sms = await db.prepare("SELECT message, sender, timestamp FROM received_messages WHERE inc_id = ?").bind(cleanId).first();
           if (sms) {
             kbResult = {
               content: sms.message,
@@ -7048,8 +7079,8 @@ app.post('/warroom/resolve-only', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
     .bind(user_id, now, normId).run();
   
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-    .bind(now, now, user_id, normId, `INC-${normId}`).run();
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, now, user_id, normId).run();
 
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '장애 완료', '보고서 없이 장애가 처리 완료되었습니다.', ?)")
     .bind(normId, normId, user_id, now).run();
@@ -7067,8 +7098,8 @@ app.post('/ai/warroom/close', async (c) => {
     .bind(now, normId).run()
     
   // Cascading update for all participants
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-    .bind(now, now, user_id || 'SYSTEM', normId, `INC-${normId}`).run();
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, now, user_id || 'SYSTEM', normId).run();
     
   // Log termination
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '워룸 종료', '워룸이 종료되고 인시던트 처리가 완료되었습니다.', ?)")
@@ -7134,8 +7165,8 @@ app.post('/ai/incident/status', async (c) => {
   await db.prepare(`
     UPDATE incident_assignments 
     SET status = ?, updated_at = ?, mod_dt = ?, mod_id = ?
-    WHERE user_id = ? AND (inc_id = ? OR inc_id = ?)
-  `).bind(status, now, now, user_id || 'SYSTEM', user_id, normId, `INC-${normId}`).run()
+    WHERE user_id = ? AND inc_id = ?
+  `).bind(status, now, now, user_id || 'SYSTEM', user_id, normId).run()
   
   return c.json({ status: 'updated', user_id, inc_id: normId, new_status: status })
 })
@@ -7173,17 +7204,17 @@ app.get('/ai/incident/my-assignments', async (c) => {
       (SELECT GROUP_CONCAT(u2.name, ', ') 
        FROM incident_assignments a2 
        JOIN users u2 ON a2.user_id = u2.employee_id 
-       WHERE a2.inc_id = a.inc_id OR REPLACE(a2.inc_id, 'INC-', '') = a.inc_id) as assignees
+       WHERE a2.inc_id = a.inc_id) as assignees
     FROM incident_assignments a
-    LEFT JOIN received_messages m ON (a.inc_id = m.inc_id OR REPLACE(a.inc_id, 'INC-', '') = m.inc_id)
+    LEFT JOIN received_messages m ON a.inc_id = m.inc_id
     LEFT JOIN users u1 ON m.employee_id = u1.employee_id
-    LEFT JOIN autopilot_insight insight ON (a.inc_id = insight.inc_id OR REPLACE(a.inc_id, 'INC-', '') = insight.inc_id)
-    LEFT JOIN warroom_list wl ON TRIM(REPLACE(a.inc_id, 'INC-', '')) = TRIM(REPLACE(wl.inc_id, 'INC-', ''))
+    LEFT JOIN autopilot_insight insight ON a.inc_id = insight.inc_id
+    LEFT JOIN warroom_list wl ON a.inc_id = wl.inc_id
     LEFT JOIN (
       SELECT inc_id, COUNT(*) as cnt
       FROM warroom_chats
       GROUP BY inc_id
-    ) chat_counts ON (a.inc_id = chat_counts.inc_id OR REPLACE(a.inc_id, 'INC-', '') = chat_counts.inc_id)
+    ) chat_counts ON a.inc_id = chat_counts.inc_id
     WHERE a.user_id = ?
   `
   const params = [user_id]
@@ -7215,18 +7246,17 @@ app.get('/ai/incident/workflow-details', async (c) => {
 
   const inc_id_str = String(inc_id_param).trim();
   const rawId = inc_id_str.replace('INC-', '');
-  const fullId = `INC-${rawId}`;
 
   // Aggregate steps from various tables
   const steps = [];
 
   try {
     // 1. SMS 수신 (received_messages)
-    const sms = await db.prepare("SELECT timestamp FROM received_messages WHERE inc_id = ? OR inc_id = ?").bind(rawId, fullId).first();
+    const sms = await db.prepare("SELECT timestamp FROM received_messages WHERE inc_id = ?").bind(rawId).first();
     if (sms) steps.push({ id: 'SMS', label: 'SMS 수신 및 장애 인지', timestamp: sms.timestamp, detail: '시스템에 장애 메시지가 수신되었습니다.' });
 
     // 2. RAG 분석 완료 (autopilot_insight)
-    const rag = await db.prepare("SELECT reg_dt FROM autopilot_insight WHERE inc_id = ? OR inc_id = ?").bind(rawId, fullId).first();
+    const rag = await db.prepare("SELECT reg_dt FROM autopilot_insight WHERE inc_id = ?").bind(rawId).first();
     if (rag) steps.push({ id: 'RAG', label: 'RAG 분석 완료', timestamp: rag.reg_dt, detail: 'AI 엔진이 과거 사례 및 지식베이스를 바탕으로 초기 분석을 마쳤습니다.' });
 
     // 3. AI AGENT 분석 완료 (same as RAG)
@@ -7255,7 +7285,7 @@ app.get('/ai/incident/workflow-details', async (c) => {
     }
 
     // 6. 지식화/장애/보고 처리완료 (knowledge_base)
-    const kn = await db.prepare("SELECT reg_dt FROM knowledge_base WHERE inc_id = ? OR inc_id = ?").bind(rawId, fullId).first();
+    const kn = await db.prepare("SELECT reg_dt FROM knowledge_base WHERE inc_id = ?").bind(rawId).first();
     if (kn) steps.push({ id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', timestamp: kn.reg_dt, detail: '인시던트 대응 지식이 지식베이스(RAG)에 저장되고 최종 보고 및 장애 처리가 완료되었습니다.' });
 
     // 7. Get all assignees from incident_assignments
@@ -7312,7 +7342,7 @@ app.get('/ai/incident/:inc_id', async (c) => {
     LEFT JOIN received_messages r ON (r.inc_id = ? OR r.inc_id = ?)
     WHERE i.inc_id = ? OR i.inc_id = ?
     LIMIT 1
-  `).bind(normId, 'INC-' + normId, normId, 'INC-' + normId).first()
+  `).bind(normId, normId, normId, normId).first()
   
   if (!incident) return c.json({ error: "Not found" }, 404)
   return c.json({ incident })
@@ -7330,8 +7360,7 @@ app.post('/warroom/leave', async (c) => {
 app.patch('/incidents/:id', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
-  const rawId = id.startsWith('INC-') ? id.slice(4) : id
-  const fullId = `INC-${rawId}`
+  const rawId = id.replace('INC-', '');
   const data = await c.req.json()
   const now = getKst()
   
@@ -7559,7 +7588,6 @@ app.post('/incidents', async (c) => {
   const { inc_id, title, description, severity, incident_type, source_sms_id } = await c.req.json()
   const db = c.env.DB
   const rawId = String(inc_id).replace('INC-', '')
-  const fullId = `INC-${rawId}`
 
   const existing = await db.prepare("SELECT inc_id FROM incidents WHERE inc_id = ?").bind(rawId).first()
   if (existing) return c.json({ status: 'exists', inc_id: rawId })
@@ -7606,13 +7634,12 @@ app.get('/warroom/chat/:id', async (c) => {
   const idParam = c.req.param('id')
   const db = c.env.DB
 
-  // INC- 접두사 유무 모두 처리
+  // ID Normalization
   const rawId  = idParam.replace('INC-', '')
-  const fullId = 'INC-' + rawId
 
   // Always pull title and leader_summary from warroom_list
   const wr = await db.prepare(
-    "SELECT title, status, leader_summary FROM warroom_list WHERE REPLACE(inc_id,'INC-','') = ?"
+    "SELECT title, status, leader_summary FROM warroom_list WHERE inc_id = ?"
   ).bind(rawId).first()
   let title = (wr && wr.title) ? wr.title : rawId
   let status = (wr && wr.status) ? wr.status : 'OPEN'
@@ -7621,7 +7648,7 @@ app.get('/warroom/chat/:id', async (c) => {
 
   // Supplement description from incidents if warroom_list has none
   const inc = await db.prepare(
-    "SELECT description, status FROM incidents WHERE REPLACE(inc_id,'INC-','') = ?"
+    "SELECT description, status FROM incidents WHERE inc_id = ?"
   ).bind(rawId).first()
   const sms_body = (inc && inc.description) ? inc.description : ''   // ← 원본 SMS 텍스트
   if (inc) {
@@ -7631,10 +7658,10 @@ app.get('/warroom/chat/:id', async (c) => {
 
   // Get messages
   const { results: aiResults } = await db.prepare(
-    "SELECT * FROM aichat_history WHERE REPLACE(inc_id,'INC-','') = ? ORDER BY id ASC"
+    "SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC"
   ).bind(rawId).all()
   const { results: wrResults } = await db.prepare(
-    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE REPLACE(wc.inc_id,'INC-','') = ? ORDER BY wc.timestamp ASC"
+    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
   ).bind(rawId).all()
 
   // Format AI messages
@@ -7788,8 +7815,8 @@ app.post('/warroom/resolve', async (c) => {
       .bind(now, normId).run();
 
     // 3. Update ALL incident assignments to '처리완료' (check both ID formats)
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-      .bind(now, now, 'SYSTEM', normId, `INC-${normId}`).run();
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, now, 'SYSTEM', normId).run();
 
     return c.json({ success: true, status: '최종완료' });
   } catch (err) {
@@ -7873,8 +7900,8 @@ app.post('/ai/send-report-email', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
     .bind(now, normId).run();
     
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-    .bind(now, now, 'SYSTEM', normId, `INC-${normId}`).run();
+  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, now, 'SYSTEM', normId).run();
 
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, 'SYSTEM', '인시던트 종료', '분석 보고서가 최종 전송되어 장애가 처리 완료되었습니다.', ?)")
     .bind(normId, normId, now).run();
@@ -8095,17 +8122,17 @@ app.post('/ai/governance/approve', async (c) => {
     const normId = String(incident_id).replace('INC-', '');
 
     // 6. Update ALL assignments for this incident to '처리완료'
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ? OR inc_id = ?")
-      .bind(now, now, 'SYSTEM', normId, `INC-${normId}`).run();
+    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, now, 'SYSTEM', normId).run();
 
     // 7. Auto-update War-Room Status here to prevent sync issues
-    await db.prepare("UPDATE warroom_list SET status = '최종완료', mod_dt = ? WHERE inc_id = ? OR inc_id = ?")
-      .bind(now, normId, `INC-${normId}`).run();
+    await db.prepare("UPDATE warroom_list SET status = '최종완료', mod_dt = ? WHERE inc_id = ?")
+      .bind(now, normId).run();
 
     // 8. Auto-notify assigned users in their inbox
     try {
-      const assignedUsers = await db.prepare("SELECT user_id FROM incident_assignments WHERE inc_id = ? OR inc_id = ?")
-        .bind(normId, `INC-${normId}`).all();
+      const assignedUsers = await db.prepare("SELECT user_id FROM incident_assignments WHERE inc_id = ?")
+        .bind(normId).all();
       
       if (assignedUsers.results && assignedUsers.results.length > 0) {
         const inboxStmt = db.prepare(`
@@ -8322,9 +8349,7 @@ app.get('/inbox', async (c) => {
       u.part AS sender_part,
       u.team AS sender_team
     FROM inbox_items i
-    LEFT JOIN received_messages r ON (
-      LOWER(TRIM(REPLACE(i.inc_id, 'INC-', ''))) = LOWER(TRIM(REPLACE(r.inc_id, 'INC-', '')))
-    )
+    LEFT JOIN received_messages r ON i.inc_id = r.inc_id
     LEFT JOIN users u ON i.sender_id = u.employee_id
     WHERE i.user_id = ?
   `
@@ -8387,18 +8412,18 @@ app.post('/api/v1/reports/submit', async (c) => {
 
     // 1. Update Incident Status to '처리완료'
     await db.prepare(`
-      UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ? OR inc_id = ?
-    `).bind(now, normId, incIdWithPrefix).run()
+      UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ?
+    `).bind(now, normId).run()
 
     // 1-1. Update WarRoom Status to 'CLOSED'
     await db.prepare(`
-      UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ? OR inc_id = ?
-    `).bind(now, normId, incIdWithPrefix).run()
+      UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?
+    `).bind(now, normId).run()
 
     // 1-2. Update All Assignees Status to '처리완료'
     await db.prepare(`
-      UPDATE incident_assignments SET status = '처리완료' WHERE inc_id = ? OR inc_id = ?
-    `).bind(normId, incIdWithPrefix).run()
+      UPDATE incident_assignments SET status = '처리완료' WHERE inc_id = ?
+    `).bind(normId).run()
     
     // 2. Generate embedding for Vector Search
     const ai = c.env.AI;
@@ -8544,8 +8569,8 @@ app.get('/reports/:inc_id', async (c) => {
   let report = null
   try {
     report = await db.prepare(
-      "SELECT * FROM reports WHERE inc_id = ? OR inc_id = ? ORDER BY id DESC LIMIT 1"
-    ).bind(normId, 'INC-' + normId).first()
+      "SELECT * FROM reports WHERE inc_id = ? ORDER BY id DESC LIMIT 1"
+    ).bind(normId).first()
   } catch (e) {
     console.warn('[reports GET] reports table error:', e.message)
   }
@@ -8554,8 +8579,8 @@ app.get('/reports/:inc_id', async (c) => {
   if (!report) {
     try {
       const inbox = await db.prepare(
-        "SELECT * FROM inbox_items WHERE (inc_id = ? OR inc_id = ?) AND type = 'REPORT' ORDER BY id DESC LIMIT 1"
-      ).bind(normId, 'INC-' + normId).first()
+        "SELECT * FROM inbox_items WHERE inc_id = ? AND type = 'REPORT' ORDER BY id DESC LIMIT 1"
+      ).bind(normId).first()
       if (inbox) {
         report = {
           id: inbox.id,
@@ -8577,7 +8602,7 @@ app.get('/reports/:inc_id', async (c) => {
   let smsMessage = null
   try {
     const sms = await db.prepare(
-      "SELECT message FROM received_messages WHERE LOWER(TRIM(REPLACE(inc_id,'INC-',''))) = LOWER(TRIM(REPLACE(?,'INC-',''))) LIMIT 1"
+      "SELECT message FROM received_messages WHERE inc_id = ? LIMIT 1"
     ).bind(normId).first()
     smsMessage = sms?.message || null
   } catch (e) { /* ignore */ }
@@ -8784,8 +8809,8 @@ export class WarRoom {
         let initialReadCount = 0;
         try {
           const memberCount = await db.prepare(
-            "SELECT COUNT(DISTINCT user_id) as cnt FROM incident_assignments WHERE inc_id = ? OR inc_id = ?"
-          ).bind(String(data.incident_id), String(data.incident_id).replace('INC-', '')).first();
+            "SELECT COUNT(DISTINCT user_id) as cnt FROM incident_assignments WHERE inc_id = ?"
+          ).bind(String(data.incident_id).replace('INC-', '')).first();
           initialReadCount = Math.max(0, (memberCount?.cnt || 0) - 1); // 발신자 제외
         } catch (_) {
           initialReadCount = Math.max(0, this.sessions.size - 1); // fallback
@@ -8833,8 +8858,8 @@ export class WarRoom {
             
             // Get all room members from D1 (incident_assignments)
             const { results: members } = await db.prepare(`
-              SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ? OR inc_id = ?
-            `).bind(String(incId), String(incId).replace('INC-', '')).all();
+              SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ?
+            `).bind(String(incId).replace('INC-', '')).all();
             
             // Get all push subscriptions for members NOT currently in the room
             const absentUserIds = members

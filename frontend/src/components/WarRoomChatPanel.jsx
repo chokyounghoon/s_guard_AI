@@ -143,7 +143,9 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
     return () => {
       isMounted = false;
       clearTimeout(reconnectTimer);
-      if (socket) socket.close();
+      if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+        socket.close();
+      }
     };
   }, [incidentId, isVisible, currentUser.employee_id, currentUser.name]);
 

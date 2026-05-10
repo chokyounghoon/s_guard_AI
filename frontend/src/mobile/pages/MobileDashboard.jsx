@@ -286,7 +286,7 @@ export default function DashboardPage({ onAiClick }) {
     // to match aichat_history.
     const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
     
-    const formattedUiId = `INC-${incidentId}`; // Display prefix
+    const formattedUiId = incidentId; // Display prefix
     const rawMsg = currentSms.message || currentSms.error_message || "SMS 장애 감지";
     const truncatedMsg = rawMsg.length > 50 ? rawMsg.substring(0, 50) + "..." : rawMsg;
     const smsTitle = `${formattedUiId} | ${truncatedMsg}`;
@@ -1910,7 +1910,7 @@ export default function DashboardPage({ onAiClick }) {
                   </div>
 
                   <h4 className="font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-relaxed line-clamp-2">
-                    {room.sms_message ? `INC-${room.id} | ${room.sms_message}` : room.title}
+                    {room.sms_message ? `${room.id} | ${room.sms_message}` : room.title}
                   </h4>
                   {room.lastMsg && <p className="text-xs text-slate-400 truncate mb-3">{room.lastMsg}</p>}
 
@@ -2268,7 +2268,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[#0f111a]/80 backdrop-blur-sm" onClick={() => {
         if (profile.dept && profile.team) onClose();
       }}></div>
@@ -2325,7 +2325,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
           </div>
 
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: 'calc(85vh - 140px)' }}>
             {/* 사번 (읽기 전용) */}
             {(profile.employee_id || profile.id) && (
               <div>
@@ -2439,7 +2439,6 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                 onChange={handleChange('subpart')}
               />
             </div>
-            </div>
 
             {/* 비밀번호 변경 섹션 */}
             <div className="pt-4 mt-2 border-t border-white/5">
@@ -2527,6 +2526,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               * 서비스 이용을 위해 필수 정보를 모두 입력해 주세요.
             </p>
           )}
+          </div>
         </div>
       </div>
     </div>

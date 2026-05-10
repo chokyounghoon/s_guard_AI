@@ -14,6 +14,7 @@ DIFY_API_BASE = "https://api.dify.ai/v1"
 DIFY_TOOL_KEY = "!QweAsd1018"
 VAPID_PUBLIC_KEY = "BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY"
 SHORTCUT_SECRET = "sguard-shortcut-secure-key-2026"
+# BREVO_API_KEY is managed as a Cloudflare secret
 
 [ai]
 binding = "AI"

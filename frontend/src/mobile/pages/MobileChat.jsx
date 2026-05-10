@@ -183,7 +183,9 @@ export default function MobileChat({ user }) {
       isMounted.current = false;
       clearTimeout(reconnectTimer.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (wsRef.current) wsRef.current.close();
+      if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+        wsRef.current.close();
+      }
     };
   }, [incidentId, user]);
 

@@ -286,7 +286,7 @@ export default function DashboardPage({ onAiClick }) {
     // to match aichat_history.
     const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
     
-    const formattedUiId = `INC-${incidentId}`; // Display prefix
+    const formattedUiId = incidentId; // Display prefix
     const rawMsg = currentSms.message || currentSms.error_message || "SMS 장애 감지";
     const truncatedMsg = rawMsg.length > 50 ? rawMsg.substring(0, 50) + "..." : rawMsg;
     const smsTitle = `${formattedUiId} | ${truncatedMsg}`;
@@ -2183,7 +2183,7 @@ export default function DashboardPage({ onAiClick }) {
                   </div>
 
                   <h4 className="font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-relaxed line-clamp-2">
-                    {room.sms_message ? `INC-${room.id} | ${room.sms_message}` : room.title}
+                    {room.sms_message ? `${room.id} | ${room.sms_message}` : room.title}
                   </h4>
                   {room.lastMsg && <p className="text-xs text-slate-400 truncate mb-3">{room.lastMsg}</p>}
 
@@ -2543,7 +2543,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[#0f111a]/80 backdrop-blur-sm" onClick={() => {
         if (profile.dept && profile.team) onClose();
       }}></div>
@@ -2562,39 +2562,40 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </button>
           </div>
 
-          <div className="flex items-center space-x-4 mb-8 bg-slate-900/40 p-4 rounded-2xl border border-white/5 relative">
-            <div 
-              className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-amber-500 animate-pulse' : 'border-blue-500/30'} overflow-hidden shadow-lg shrink-0 group cursor-pointer`}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {profilePreview ? (
-                <img src={profilePreview} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <User className="w-8 h-8 text-slate-500" />
+          <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: 'calc(85vh - 120px)' }}>
+            <div className="flex items-center space-x-4 mb-4 bg-slate-900/40 p-4 rounded-2xl border border-white/5 relative">
+              <div 
+                className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-amber-500 animate-pulse' : 'border-blue-500/30'} overflow-hidden shadow-lg shrink-0 group cursor-pointer`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {profilePreview ? (
+                  <img src={profilePreview} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <User className="w-8 h-8 text-slate-500" />
+                  </div>
+                )}
+                {/* Hover Overlay */}
+                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="w-5 h-5 text-white/80" />
                 </div>
-              )}
-              {/* Hover Overlay */}
-              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="w-5 h-5 text-white/80" />
+              </div>
+              
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+              />
+  
+              <div>
+                <h3 className="text-lg font-bold text-white leading-tight">{formData.name}</h3>
+                <p className="text-xs text-slate-400">{profile.email}</p>
               </div>
             </div>
-            
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*" 
-              onChange={handleImageUpload} 
-            />
 
-            <div>
-              <h3 className="text-lg font-bold text-white leading-tight">{formData.name}</h3>
-              <p className="text-xs text-slate-400">{profile.email}</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-4">
             {/* 이름 */}
             <div>
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">이름 *</label>
@@ -2691,7 +2692,6 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                 onChange={handleChange('subpart')}
               />
             </div>
-            </div>
 
             {/* 비밀번호 변경 섹션 */}
             <div className="pt-4 mt-2 border-t border-white/5">
@@ -2758,29 +2758,32 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
 
 
-          <div className="mt-8 flex flex-col space-y-3">
-            <button
-              onClick={handleSave}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/40 transition-all transform active:scale-[0.98]"
-            >
-              저장하기 (Save)
-            </button>
-            <button
-              onClick={handleLogout}
-              className="w-full bg-white/5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1"
-            >
-              <LogIn className="w-4 h-4 rotate-180" />
-              <span>Logout</span>
-            </button>
-          </div>
 
-          {(!formData.company || !formData.honbu || !formData.team || !formData.part) && (
-            <p className="text-[10px] text-yellow-500/70 text-center mt-4 italic">
-              * 서비스 이용을 위해 필수 정보를 모두 입력해 주세요.
-            </p>
-          )}
+            <div className="mt-8 flex flex-col space-y-3 pb-4">
+              <button
+                onClick={handleSave}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/40 transition-all transform active:scale-[0.98]"
+              >
+                저장하기 (Save)
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full bg-white/5 hover:bg-red-500/10 text-slate-300 hover:text-red-400 font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1 border border-white/5"
+              >
+                <LogIn className="w-4 h-4 rotate-180" />
+                <span>Logout</span>
+              </button>
+            </div>
+
+            {(!formData.company || !formData.honbu || !formData.team || !formData.part) && (
+              <p className="text-[10px] text-yellow-500/70 text-center mt-2 mb-4 italic">
+                * 서비스 이용을 위해 필수 정보를 모두 입력해 주세요.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
+  </div>
   );
 }

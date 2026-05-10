@@ -467,7 +467,7 @@ export default function LoginPage() {
           <span style={{ color:'rgba(255,255,255,0.35)', fontSize:12 }}>유효시간</span>
           {otpExpired
             ? <span style={{ color:'#f87171', fontSize:13, fontWeight:700 }}>만료됨</span>
-            : <Timer timerKey={timerKey} secs={600} onExpire={()=>setOtpExpired(true)} />
+            : <Timer timerKey={timerKey} secs={180} onExpire={()=>setOtpExpired(true)} />
           }
         </div>
         <button type="button" onClick={state?.startsWith?.('RESET') ? handleRequestReset : handleResend} disabled={loading||resendCnt>=3}
