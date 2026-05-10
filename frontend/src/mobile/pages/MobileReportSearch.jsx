@@ -415,7 +415,7 @@ export default function MobileReportSearch() {
                 <ReportCard
                   key={r.code || r.inc_id}
                   report={r}
-                  onClick={() => navigate(`/report/${(r.code || r.inc_id || '').replace('INC-', '')}`)}
+                  onClick={() => navigate(`/report/${(r.code || r.inc_id || '')}`)}
                 />
               ))}
             </div>

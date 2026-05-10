@@ -225,6 +225,8 @@ export default function DashboardPage({ onAiClick }) {
   const lastAutoTriggeredKeyRef = useRef(null);
   const [saveStatus, setSaveStatus] = useState('');
   const [isAnalyzingActive, setIsAnalyzingActive] = useState(false);
+  const [isInsightComplete, setIsInsightComplete] = useState(false);
+  const [insightContent, setInsightContent] = useState('');
 
   useEffect(() => {
     if (selectedSms) {
@@ -276,7 +278,7 @@ export default function DashboardPage({ onAiClick }) {
   const [isMyAssignOpen, setIsMyAssignOpen] = useState(true);
   const [isOpeningWarRoom, setIsOpeningWarRoom] = useState(false);
 
-  const handleOpenWarRoomFromInsight = async (smsMessage, analysisText) => {
+  const handleOpenWarRoomFromInsight = useCallback(async (smsMessage, analysisText) => {
     if (isOpeningWarRoom) return;
     const currentSms = smsMessage || selectedSmsRef.current;
     if (!currentSms) return;
@@ -284,7 +286,7 @@ export default function DashboardPage({ onAiClick }) {
 
     // The raw received SMS ID (e.g. 20231026154512345) MUST be the primary key DB identifier
     // to match aichat_history.
-    const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
+    const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`);
     
     const formattedUiId = incidentId; // Display prefix
     const rawMsg = currentSms.message || currentSms.error_message || "SMS 장애 감지";
@@ -375,33 +377,14 @@ export default function DashboardPage({ onAiClick }) {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          inc_id: String(incidentId).replace('INC-', ''),
+          inc_id: String(incidentId),
           title: smsTitle,
           description: diagnosisText || 'SMS 장애 상세 분석 대기 중',
           severity: roomSeverity,
           incident_type: 'SMS',
-          source_sms_id: String(currentSms.inc_id).replace('INC-', '')
+          source_sms_id: String(currentSms.inc_id)
         })
       });
-
-      // AI Analysis Pinned Message - DEPRECATED as it messes up the clean Agent Discussion flow
-      /*
-      if (analysisText) {
-        await fetch(`${apiBase}/warroom/chat`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            incident_id: incidentId,
-            sender: 'AI Autopilot',
-            role: 'AI분석',
-            type: 'ai_analysis',
-            text: analysisText
-          })
-        });
-      }
-      */
-
-      // System intro user message is now only handled on the UI layer.
 
       await fetchWarRooms();
       setShowEmergencyModal(false);
@@ -416,7 +399,7 @@ export default function DashboardPage({ onAiClick }) {
     } finally {
       setIsOpeningWarRoom(false);
     }
-  };
+  }, [isOpeningWarRoom, warRooms, navigate, userProfile, apiBase]);
 
   // Initialize data from localStorage (or fetch from API if missing)
   useEffect(() => {
@@ -485,10 +468,12 @@ export default function DashboardPage({ onAiClick }) {
   // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
   useEffect(() => {
     if (visibleSms.length > 0) {
-      if (!selectedSms) {
-        setSelectedSms(visibleSms[0]);
-      }
-      setInsightSms(selectedSms || visibleSms[0]);
+      const targetSms = selectedSms || visibleSms[0];
+      setInsightSms(prev => {
+        // 객체 참조 변경 방지 (무한 리렌더링 및 API 재조회 루프 방지)
+        if (prev && prev.inc_id === targetSms.inc_id) return prev;
+        return targetSms;
+      });
     } else {
       setInsightSms(null);
     }
@@ -601,7 +586,7 @@ export default function DashboardPage({ onAiClick }) {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
           ...inc,
-          inc_id: String(inc.inc_id).replace('INC-', '')
+          inc_id: String(inc.inc_id)
         }));
         setMyAssignments(mapped);
       }
@@ -736,7 +721,7 @@ export default function DashboardPage({ onAiClick }) {
 
         if (finalMsgs.length > 0) {
           const latestMsg = finalMsgs[0];
-          const latestKey = `${latestMsg.inc_id}_${latestMsg.timestamp}`;
+          const latestKey = String(latestMsg.inc_id); // timestamp 변경으로 인한 불필요한 재트리거 방지
           
           if (latestKey !== lastAutoTriggeredKeyRef.current) {
             lastAutoTriggeredKeyRef.current = latestKey;
@@ -976,7 +961,7 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   // Callback called from AiInsightPanel (PC 버전과 동일한 로직)
-  const handleAgentContent = (fullTranscript, isDone) => {
+  const handleAgentContent = useCallback((fullTranscript, isDone) => {
     const currentMsgs = parseTranscript(fullTranscript);
     
     // 🛑 Dify 서버 에러 메시지는 전문가 의견으로 처리하지 않음
@@ -1009,7 +994,7 @@ export default function DashboardPage({ onAiClick }) {
         setTimeout(() => setShowEmergencyModal(true), 1500);
       }
     }
-  };
+  }, [apiBase, parseTranscript]);
 
 
   const agentPanelRef = useRef(null);
@@ -1034,7 +1019,7 @@ export default function DashboardPage({ onAiClick }) {
     setSelectedIncidentIdFlow(smsMessage.inc_id); // Ensure the flow panel displays its data
 
     // Filter inc_id to strictly numeric if it has INC- prefix
-    const cleanIncId = String(smsMessage.inc_id).replace('INC-', '');
+    const cleanIncId = String(smsMessage.inc_id);
 
     // Trigger Assignment to the current user
     if (userProfile?.employee_id) {
@@ -1044,7 +1029,7 @@ export default function DashboardPage({ onAiClick }) {
         body: JSON.stringify({
           user_id: userProfile.employee_id,
           login_id: userProfile.email,
-          inc_id: String(smsMessage.inc_id).replace('INC-', ''),
+          inc_id: String(smsMessage.inc_id),
           incident_title: 'SMS 수신 확인'
         })
       })
@@ -1104,7 +1089,7 @@ export default function DashboardPage({ onAiClick }) {
           body: JSON.stringify({
             title: reportTitle,
             content: reportContent,
-            inc_id: String(selectedSms?.inc_id || selectedIncidentIdFlow).replace('INC-', ''),
+            inc_id: String(selectedSms?.inc_id || selectedIncidentIdFlow),
             user_id: userProfile?.email || 'khcho0421@gmail.com'
           })
         });
@@ -1150,15 +1135,20 @@ export default function DashboardPage({ onAiClick }) {
     similarCases: 37
   };
 
-  const handleShowInsight = (type) => {
+  const handleShowInsight = useCallback((type) => {
     // In a real app, we would fetch data based on type using the API
     // For now, we use the demo data matching the screenshot
     // setSelectedInsightData(demoInsightData);
     // setShowInsightModal(true);
     console.log("AI Insight Modal disabled by user request");
-  };
+  }, []);
 
-  const handleLogReceived = (log, counts) => {
+  const handleAnalysisComplete = useCallback((done, content) => {
+    setIsInsightComplete(done);
+    if (done) setInsightContent(content);
+  }, []);
+
+  const handleLogReceived = useCallback((log, counts) => {
     // 🛡️ SECURITY: Dify 서버 에러나 기술적 오류 문구가 포함된 로그는 대시보드에 노출하지 않음
     const errorRegex = /(AI 엔진 서버 오류|Dify 측 서버 상태|인증 오류|엔드포인트 오류|대기 시간 초과|Dify API 오류|🤖|⚠️)/i;
     const logContent = log.message || log.text || '';
@@ -1184,7 +1174,7 @@ export default function DashboardPage({ onAiClick }) {
       severity: log.severity,
       time: formatYYMMDD(new Date())
     }, ...prev]);
-  };
+  }, [selectedSms]);
 
   // ── Tooltip Logic for Header ─────────────────────
   const [activeTooltip, setActiveTooltip] = useState(null);
@@ -1293,13 +1283,58 @@ export default function DashboardPage({ onAiClick }) {
         style={{ background: '#080c14', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
 
         {/* Left: logo + icon buttons */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 shrink-0">
           <button onClick={() => window.location.reload()}
-            className="text-sm font-black tracking-[0.2em] uppercase text-white">
+            className="text-xs font-black tracking-[0.1em] uppercase text-white whitespace-nowrap">
             S-GUARD <span style={{ color: '#3b82f6' }}>AI</span>
           </button>
+        </div>
 
-          <div className="flex items-center gap-1.5">
+        {/* Center: War-Room Action Button (Filling remaining space) */}
+        <div className="flex-1 mx-2">
+          {insightSms && isInsightComplete && (
+            <div className="animate-in fade-in zoom-in duration-500">
+               {(() => {
+                  const sev = (insightSms.severity || 'NORMAL').toUpperCase();
+                  const incidentId = String(insightSms.inc_id || insightSms.id || '');
+                  const roomExists = (warRooms || []).some(r => String(r.id) === incidentId);
+                  
+                  const btnCls = roomExists 
+                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/30'
+                    : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+                    : sev === 'MAJOR'    ? 'bg-orange-600 text-white'
+                    :                      'bg-emerald-600 text-white';
+
+                  return (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (isOpeningWarRoom) return;
+                        handleOpenWarRoomFromInsight(insightSms, insightContent);
+                      }}
+                      disabled={isOpeningWarRoom}
+                      className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-black text-[10px] transition-all border border-white/10 ${btnCls} disabled:opacity-50 truncate`}
+                    >
+                      {isOpeningWarRoom ? (
+                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Users size={12} />
+                      )}
+                      <span className="truncate">
+                        {isOpeningWarRoom ? '진행중' : roomExists ? '이동' : 'WAR-ROOM 개설'}
+                      </span>
+                    </button>
+                  );
+               })()}
+            </div>
+          )}
+        </div>
+
+
+        {/* Right: Icon buttons + AI button + profile */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 mr-1">
             {/* Orbital Command */}
             <button onClick={() => navigate('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
@@ -1326,21 +1361,8 @@ export default function DashboardPage({ onAiClick }) {
               }}>
               <Settings size={15} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#60a5fa' : '#64748b', transition: 'transform 0.3s' }} />
             </button>
-
-            {/* S-Callert (admin only) */}
-            {(userProfile?.is_admin === 1 || userProfile?.role === 'admin') && (
-              <button onClick={() => navigate('/s-callert')}
-                onPointerDown={() => handleTooltipStart('S-Callert')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-                className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
-                style={{ border: '1px solid rgba(251,146,60,0.4)', background: 'transparent' }}>
-                <Phone size={15} style={{ color: '#fb923c' }} />
-              </button>
-            )}
           </div>
-        </div>
 
-        {/* Right: AI button + profile */}
-        <div className="flex items-center gap-3">
           <button onClick={onAiClick}
             onPointerDown={() => handleTooltipStart('AI Assistant')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
             className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
@@ -1569,8 +1591,8 @@ export default function DashboardPage({ onAiClick }) {
               return (
                 <div key={`sms-${msg.inc_id}`}
                   onClick={() => {
-                    if (selectedSms?.inc_id === msg.inc_id) { setSelectedSms(null); setShowAgentPanel(false); setAgentMessages([]); }
-                    else { setSelectedSms(msg); setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
+                    if (selectedSms?.inc_id === msg.inc_id) { setSelectedSms(null); selectedSmsRef.current = null; setShowAgentPanel(false); setAgentMessages([]); }
+                    else { setSelectedSms(msg); selectedSmsRef.current = msg; setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
                   }}
                   className="rounded-xl p-3 cursor-pointer active:opacity-70"
                   style={{
@@ -1644,8 +1666,8 @@ export default function DashboardPage({ onAiClick }) {
           );
         })()}
 
-        {/* ── PANEL 2: AI Insight (SMS 있을 때만) ── */}
-        {visibleSms.length > 0 && (
+        {/* ── PANEL 2: AI Insight ── */}
+        {(visibleSms.length > 0 || selectedSms) && (
           <div style={{
             background: '#0d1117',
             border: '1px solid rgba(168,85,247,0.4)',
@@ -1662,6 +1684,8 @@ export default function DashboardPage({ onAiClick }) {
               isOpening={isOpeningWarRoom}
               onAgentContent={handleAgentContent}
               warRooms={warRooms}
+              hideWarRoomButton={true}
+              onAnalysisComplete={handleAnalysisComplete}
             />
           </div>
         )}

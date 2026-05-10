@@ -12,7 +12,14 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 const formatTime = (ts) => {
   if (!ts) return '';
   const d = new Date(ts.replace ? ts.replace(' ', 'T') : ts);
-  return isNaN(d) ? '' : d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  if (isNaN(d.getTime())) return '';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 };
 
 const formatDate = (ts) => {
@@ -148,7 +155,7 @@ export default function MobileActivity({ user, onAiClick }) {
               <button key={item.id} id={`activity-${item.id}`}
                 onClick={() => {
                   if (!item.incId) return;
-                  const cleanId = String(item.incId).replace('INC-', '');
+                  const cleanId = String(item.incId);
                   // 타입이 AI 리포트이거나 이미 완료된 건인 경우 리포트 페이지로 이동
                   if (item.type === 'AI 리포트' || item.action === '완료') {
                     navigate(`/report/${cleanId}`);

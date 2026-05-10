@@ -104,9 +104,9 @@ export default function SearchPage() {
          const processed = incidentData.map(inc => {
             const st = inc.status || '대기';
             let cat = '미확인';
-            if (st.includes('미확인') || st === '대기' || st === '발생') cat = '미확인';
-            else if (st.includes('처리') || st.includes('진행')) cat = '분석중입니다';
-            if (st.includes('완료') || st === '정상' || st === 'GOVERNED') cat = '조치완료';
+            if (st.includes('미확인') || st === '대기' || st === '발생' || st === 'INC_001' || st === 'OPEN') cat = '미확인';
+            else if (st.includes('처리') || st.includes('진행') || st === 'INC_002') cat = '분석중입니다';
+            if (st.includes('완료') || st === '정상' || st === 'GOVERNED' || st === 'INC_003' || st === 'CLOSED') cat = '조치완료';
 
             const mainAssignee = inc.assignee_name || inc.assigned_to;
             const others = inc.assignment_list ? inc.assignment_list.split(',').filter(name => name !== mainAssignee) : [];
@@ -207,9 +207,9 @@ export default function SearchPage() {
       const processed = incidentData.map(inc => {
          const st = inc.status || '대기';
          let cat = '미확인';
-         if (st.includes('미확인') || st === '대기' || st === '발생') cat = '미확인';
-         else if (st.includes('처리') || st.includes('진행')) cat = '분석중입니다';
-         if (st.includes('완료') || st === '정상' || st === 'GOVERNED') cat = '조치완료';
+         if (st.includes('미확인') || st === '대기' || st === '발생' || st === 'INC_001' || st === 'OPEN') cat = '미확인';
+         else if (st.includes('처리') || st.includes('진행') || st === 'INC_002') cat = '분석중입니다';
+         if (st.includes('완료') || st === '정상' || st === 'GOVERNED' || st === 'INC_003' || st === 'CLOSED') cat = '조치완료';
 
          const mainAssignee = inc.assignee_name || inc.assigned_to;
          const others = inc.assignment_list ? inc.assignment_list.split(',').filter(name => name !== mainAssignee) : [];
@@ -395,9 +395,9 @@ export default function SearchPage() {
                     <div 
                       key={i} 
                       onClick={() => {
-                        const cleanId = String(incident.id).replace('INC-', '');
+                        const cleanId = String(incident.id);
                         // 조치완료(처리완료) 상태인 경우 리포트 페이지로, 그 외는 채팅방으로 이동
-                        if (incident.category === '조치완료' || incident.status === '처리완료') {
+                        if (incident.category === '조치완료' || incident.status === '처리완료' || incident.status === 'INC_003') {
                           navigate(`/report/${cleanId}`);
                         } else {
                           navigate('/chat/' + cleanId);
@@ -478,7 +478,7 @@ export default function SearchPage() {
                         </div>
                         <div className="flex items-center gap-2">
                            <span className="px-2 py-1 rounded-lg text-[10px] font-black border bg-slate-800 text-slate-300 border-slate-700 tracking-tight">
-                             <span>{incident.status === '분석중입니다' ? '분석중입니다...' : (incident.status === '조치완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}</span>
+                             <span>{incident.category === '분석중입니다' ? '분석중입니다...' : (incident.category === '조치완료') ? '처리 완료됨' : '지식화/장애/보고/완료 처리'}</span>
                            </span>
                         </div>
                       </div>

@@ -363,8 +363,25 @@ const sendPushNotification = async (c, userId, payload) => {
           }
         };
 
+        // Web Push 표준: { notification: { title, body, ... }, data: { ... } } 구조로 래핑
+        const notificationPayload = {
+          notification: {
+            title: payload.title || '[S-GUARD]',
+            body:  payload.body  || '',
+            icon:  '/icons/icon-192x192.png',
+            badge: '/icons/badge-72x72.png',
+            tag:   payload.tag  || 'sguard-alert',
+            vibrate: [200, 100, 200],
+            requireInteraction: (payload.priority || 50) >= 80,
+            data: {
+              url:    payload.url    || '/inbox',
+              inc_id: payload.inc_id || null
+            }
+          }
+        };
+
         const pushPayload = await buildPushPayload(
-          JSON.stringify(payload),
+          JSON.stringify(notificationPayload),
           subscription,
           {
             subject: vapidSubject,
@@ -940,8 +957,9 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
     isTechnicalSignal = technicalPatterns.some(pattern => pattern.test(sms.message || ''));
 
     let messageVector = null;
+    let cleanedMessage = "";
     if (env.WARROOM_INDEX || env.AI) {
-      const cleanedMessage = cleanMessageForEmbedding(sms.message);
+      cleanedMessage = cleanMessageForEmbedding(sms.message || '');
       messageVector = await generateEmbedding(cleanedMessage, env);
       
       if (messageVector && messageVector.length === 768 && env.WARROOM_INDEX) {
@@ -1030,19 +1048,23 @@ ${detailedInfo}`;
 
           if (similarityScore >= 0.7) {
             let kbMatch;
+            let sourceDB = "";
             if (matchId.startsWith('kn-')) {
               const qp = matchId.replace('kn-', '');
               kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE id = ?").bind(qp).first();
+              sourceDB = "knowledge_base 테이블 (지식베이스)";
             } else {
               const possibleId = matchId.split('_')[0].replace('inc-', '').replace('gov-', '');
-              kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE TRIM(REPLACE(inc_id, 'INC-', '')) = TRIM(REPLACE(?, 'INC-', '')) OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
+              kbMatch = await db.prepare("SELECT content, title FROM knowledge_base WHERE inc_id = ? OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
+              sourceDB = "knowledge_base 테이블 (과거 인시던트 연동)";
             }
             if (kbMatch) {
               matchedContent = kbMatch.content;
               matchedTitle = kbMatch.title;
               
-              // No extra AI call for rationale - prioritize speed
-              similarityReason = isTechnicalSignal ? "기술 지능형 매칭" : "관제 지식 기반 매칭";
+              const matchType = isTechnicalSignal ? "기술 지능형 매칭" : "관제 지식 기반 매칭";
+              const inputSnippet = cleanedMessage.length > 150 ? cleanedMessage.substring(0, 150) + "..." : cleanedMessage;
+              similarityReason = `[${matchType}] 유사도 분석 완료\n- 출처 DB: ${sourceDB} (매칭 ID: ${matchId})\n- 매칭 기준 항목 제목: ${matchedTitle}\n- 분석에 사용된 입력값: "${inputSnippet}"`;
             }
           }
         }
@@ -1059,16 +1081,17 @@ ${detailedInfo}`;
 
     if (similarityScore !== undefined && similarityScore !== null) {
       // 🚀 Dynamic config from DB: similarity thresholds + alert thresholds
-      let technicalThreshold = 0.85, casualThreshold = 0.95;
+      let technicalThreshold = 0.85, casualThreshold = 0.95, adminThreshold = 0.85;
       let alertCriticalCount = 100, alertMajorCount = 51; // 안전한 기본값 (높게)
 
       try {
         const configs = await db.prepare(
-          "SELECT config_key, config_value FROM system_config WHERE config_key IN ('similarity_threshold_technical','similarity_threshold_casual','alert_critical_error_count','alert_major_error_count')"
+          "SELECT config_key, config_value FROM system_config WHERE config_key IN ('similarity_threshold_technical','similarity_threshold_casual','similarity_threshold_admin','alert_critical_error_count','alert_major_error_count')"
         ).all();
         configs.results.forEach(c => {
           if (c.config_key === 'similarity_threshold_technical') technicalThreshold = parseFloat(c.config_value);
           if (c.config_key === 'similarity_threshold_casual')    casualThreshold    = parseFloat(c.config_value);
+          if (c.config_key === 'similarity_threshold_admin')     adminThreshold     = parseFloat(c.config_value);
           if (c.config_key === 'alert_critical_error_count')     alertCriticalCount = parseFloat(c.config_value);
           if (c.config_key === 'alert_major_error_count')        alertMajorCount    = parseFloat(c.config_value);
         });
@@ -1136,7 +1159,7 @@ ${detailedInfo}`;
             signal: controller.signal,
             body: JSON.stringify({
               inputs: {
-                admin_threshold_value: Number(effectiveThreshold) || 0.85,
+                admin_threshold_value: Number(adminThreshold) || 0.85,
                 technical_threshold:   Number(technicalThreshold) || 0.85,
                 casual_threshold:      Number(casualThreshold)    || 0.95
               },
@@ -3056,9 +3079,10 @@ app.post('/sms/receive', async (c) => {
     c.executionCtx.waitUntil(performBackgroundAiAnalysis(existing.inc_id, c.env).catch(e => console.error(e)));
 
     // 🔔 즉시 푸시 - 중복 수신 시에도 본인 + 모든 담당자에게 일괄 전송
+    const dupMsgPreview = (message || '내용 없음').substring(0, 80);
     const dupPushPayload = {
       title: `[S-GUARD] 🔁 반복 장애 알림 (×${newCount})`,
-      body: `📨 발신: ${sender || '알 수 없음'}\n${message || '내용 없음'}`,
+      body: `발신: ${sender || '알 수 없음'} | ${dupMsgPreview}`,
       inc_id: String(existing.inc_id),
       priority: 70,
       url: `/inbox`,
@@ -3182,9 +3206,10 @@ app.post('/sms/receive', async (c) => {
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
   // 🔔 즉시 푸시 - 할당된 모든 사용자에게 일괄 전송
+  const msgPreview = (message || '내용 없음').substring(0, 80);
   const immediatePushPayload = {
     title: detectedCount > 0 ? `🚨 [S-GUARD] 키워드 감지됨` : `📩 [S-GUARD] 새 문자 수신`,
-    body: `📨 발신: ${sender || '알 수 없음'}\n${message || '내용 없음'}`,
+    body: `발신: ${sender || '알 수 없음'} | ${msgPreview}`,
     inc_id: String(newIncId),
     priority: detectedCount > 0 ? 90 : 50,
     url: `/inbox`,
@@ -3383,7 +3408,7 @@ app.get('/sms/recent', async (c) => {
 app.delete('/sms/:id', async (c) => {
   const inc_id = c.req.param('id');
   const db = c.env.DB;
-  const normId = String(inc_id).replace('INC-', '');
+  const normId = String(inc_id);
   try {
     await db.prepare("DELETE FROM received_messages WHERE inc_id = ?").bind(normId).run();
     await db.prepare("DELETE FROM incident_assignments WHERE inc_id = ?").bind(normId).run();
@@ -3397,7 +3422,7 @@ app.delete('/sms/:id', async (c) => {
 app.post('/sms/delete/:id', async (c) => {
   const inc_id = c.req.param('id');
   const db = c.env.DB;
-  const normId = String(inc_id).replace('INC-', '');
+  const normId = String(inc_id);
   try {
     await db.prepare("DELETE FROM received_messages WHERE inc_id = ?").bind(normId).run();
     await db.prepare("DELETE FROM incident_assignments WHERE inc_id = ?").bind(normId).run();
@@ -3461,7 +3486,7 @@ app.get('/api/v1/system/status', async (c) => {
   try {
     // 해당 서버와 관련된 진행 중인(장애) 인시던트가 있는지 확인
     const activeIncidents = await db.prepare(
-      "SELECT * FROM incidents WHERE status != '처리완료' AND (title LIKE ? OR description LIKE ?)"
+      "SELECT * FROM incidents WHERE status != 'INC_003' AND (title LIKE ? OR description LIKE ?)"
     ).bind(`%${serverName}%`, `%${serverName}%`).all();
 
     const isHealthy = activeIncidents.results.length === 0;
@@ -3960,13 +3985,13 @@ app.post('/incidents', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  const inc_id = String(data.inc_id).replace('INC-', '')
+  const inc_id = String(data.inc_id)
   const rawId = inc_id
 
   // Fetch actual message from received_messages
   const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
   const msg = sms ? sms.message : (data.title || 'SMS 장애 감지')
-  const finalTitle = `${inc_id} | ${msg}`
+  const finalTitle = `INC-${inc_id} | ${msg}`
   
   const res = await db.prepare(`
     INSERT INTO incidents (
@@ -3975,7 +4000,7 @@ app.post('/incidents', async (c) => {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     rawId, finalTitle, data.description || null, data.severity || 'NORMAL', 
-    data.status || 'Open', data.incident_type || 'AI', data.assigned_to || null,
+    data.status || 'INC_001', data.incident_type || 'AI', data.assigned_to || null,
     data.source_sms_id || null, data.ai_insight || null,
     'SYSTEM', now, 'SYSTEM', now, now, now
   ).run()
@@ -4098,15 +4123,28 @@ app.post('/ai/feedback', async (c) => {
               }
               console.log(`[Self-Healing-Strong] KB-${kbId} upgraded to v${nextVersion} (Priority Score: 0.8)`);
             } else {
-              // ...
+              // B. [SOFT-PENALIZE] 교정값 없는 단순 부정 피드백 → fail_count 자동 증가
+              const newFail = (kbEntry.fail_count || 0) + 1;
+              await db.prepare(
+                "UPDATE knowledge_base SET fail_count = ?, mod_dt = ? WHERE id = ?"
+              ).bind(newFail, now, kbId).run();
+              console.log(`[Soft-Penalize] KB-${kbId} fail_count → ${newFail}`);
+
+              // 3회 이상 누적 시 자동 격리 (FAIL 상태로 강등)
+              if (newFail >= 3) {
+                await db.prepare(
+                  "UPDATE knowledge_base SET status = 'FAIL', priority_score = 0.1, mod_dt = ? WHERE id = ?"
+                ).bind(now, kbId).run();
+                console.log(`[Auto-Isolation] KB-${kbId} isolated (fail_count=${newFail} ≥ 3)`);
+              }
             }
           }
           
           // Cross-Reference: Strong boost for SMS incident
           if (vector_id?.startsWith('inc-') && user_correction) {
             const incId = vector_id.split('_')[0].replace('inc-', '');
-            await db.prepare("UPDATE received_messages SET priority_flag = 1, priority_score = 0.8 WHERE inc_id = ? OR CAST(id AS TEXT) = ?")
-              .bind(incId, incId).run();
+            await db.prepare("UPDATE received_messages SET priority_flag = 1, priority_score = 0.8 WHERE inc_id = ?")
+              .bind(incId).run();
             console.log(`[Boosting-Strong] SMS Incident ${incId} marked as high-reliability reference (0.8).`);
           }
         } catch (err) {
@@ -4131,6 +4169,71 @@ app.post('/ai/feedback', async (c) => {
           }
         } catch (ve) {
           console.error("[Few-shot] Vectorization failed:", ve.message);
+        }
+      })());
+    }
+
+    // 🌟 [Positive Reinforcement] 👍 UP 피드백 → 매칭된 지식/인시던트 우선순위 자동 부스팅
+    if (feedback_type === 'UP' && vector_id) {
+      c.executionCtx.waitUntil((async () => {
+        try {
+          const now = getKst();
+
+          if (vector_id.startsWith('kn-')) {
+            // 지식베이스 항목 우선순위 점수 상승 (최대 1.0 상한선)
+            const kbId = vector_id.replace('kn-', '');
+            const kb = await db.prepare("SELECT priority_score, fail_count FROM knowledge_base WHERE id = ?").bind(kbId).first();
+            if (kb) {
+              // fail_count도 1 감소시켜 격리 위험 완화
+              const newScore = Math.min(1.0, (kb.priority_score || 0.5) + 0.05);
+              const newFail  = Math.max(0, (kb.fail_count || 0) - 1);
+              await db.prepare(
+                "UPDATE knowledge_base SET priority_score = ?, fail_count = ?, priority_flag = 1, mod_dt = ? WHERE id = ?"
+              ).bind(newScore, newFail, now, kbId).run();
+              console.log(`[Positive-Reinforcement] KB-${kbId} boosted → priority_score ${newScore.toFixed(2)}, fail_count ${newFail}`);
+            }
+
+          } else if (vector_id.startsWith('inc-')) {
+            // SMS 인시던트 항목 우선순위 점수 상승
+            const incId = vector_id.split('_')[0].replace('inc-', '');
+            const msg = await db.prepare("SELECT priority_score FROM received_messages WHERE inc_id = ?").bind(incId).first();
+            if (msg) {
+              const newScore = Math.min(1.0, (msg.priority_score || 0.5) + 0.05);
+              await db.prepare(
+                "UPDATE received_messages SET priority_score = ?, priority_flag = 1 WHERE inc_id = ?"
+              ).bind(newScore, incId).run();
+              console.log(`[Positive-Reinforcement] Incident ${incId} boosted → priority_score ${newScore.toFixed(2)}`);
+            }
+
+          } else if (vector_id.startsWith('fb-')) {
+            // 기존 Few-shot 피드백 항목도 신뢰도 상승 표시
+            const fbId = vector_id.replace('fb-', '');
+            await db.prepare(
+              "UPDATE ai_feedback SET is_golden = 1, mod_dt = ? WHERE id = ?"
+            ).bind(now, fbId).run();
+            console.log(`[Positive-Reinforcement] Feedback fb-${fbId} marked as golden`);
+          }
+
+          // Vectorize 메타데이터도 부스트 반영 (검색 시 우선 노출)
+          if (c.env.WARROOM_INDEX) {
+            try {
+              const existing = await c.env.WARROOM_INDEX.getByIds([vector_id]);
+              if (existing && existing.length > 0) {
+                const meta = existing[0].metadata || {};
+                await c.env.WARROOM_INDEX.upsert([{
+                  id: vector_id,
+                  values: existing[0].values,
+                  metadata: { ...meta, priority: Math.min(1.0, (meta.priority || 0.5) + 0.05), positively_reinforced: true }
+                }]);
+                console.log(`[Positive-Reinforcement] Vectorize metadata updated for ${vector_id}`);
+              }
+            } catch (ve) {
+              // Vectorize getByIds 미지원 시 조용히 스킵
+              console.log(`[Positive-Reinforcement] Vectorize meta update skipped (${ve.message})`);
+            }
+          }
+        } catch (err) {
+          console.error('[Positive-Reinforcement] Error:', err.message);
         }
       })());
     }
@@ -4285,7 +4388,7 @@ app.post('/activity-logs', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  const inc_id = data.incident_code ? String(data.incident_code).replace('INC-', '') : null
+  const inc_id = data.incident_code ? String(data.incident_code) : null
   
   await db.prepare(`
     INSERT INTO activity_logs (
@@ -4479,7 +4582,7 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
             // Check D1 for latest score/tags if needed
             if (m.id.startsWith('inc-')) {
               const possibleId = m.id.split('_')[0].replace('inc-', '');
-              const msg = await db.prepare("SELECT priority_score, tags FROM received_messages WHERE inc_id = ? OR CAST(id AS TEXT) = ?").bind(possibleId, possibleId).first();
+              const msg = await db.prepare("SELECT priority_score, tags FROM received_messages WHERE inc_id = ?").bind(possibleId).first();
               if (msg) {
                 pScore = msg.priority_score || 0;
                 tags = msg.tags || "";
@@ -4535,7 +4638,7 @@ app.get('/ai/insight', async (c) => {
 
   if (recent_sms) {
     // Normalize ID for lookup
-    const norm_id = String(recent_sms.inc_id).replace('INC-', '').trim()
+    const norm_id = String(recent_sms.inc_id).trim()
     current_log_id = `KMS-${norm_id}`
     timestamp = recent_sms.timestamp
     
@@ -4574,9 +4677,11 @@ app.post('/ai/insight/save', async (c) => {
   const db = c.env.DB
   const now = getKst()
   
-  const norm_id = String(incident_id || '').replace('INC-', '').trim()
+  const norm_id = String(incident_id || '').trim()
   
   await db.prepare(`
+    INSERT OR REPLACE INTO autopilot_insight 
+    (inc_id, content, severity, category, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(norm_id, content, severity, category, user_id || 'SYSTEM', now, user_id || 'SYSTEM', now, (similarity_score !== undefined && similarity_score !== null) ? similarity_score : null, (similarity_reason !== undefined && similarity_reason !== null) ? similarity_reason : null).run()
   
@@ -4585,7 +4690,7 @@ app.post('/ai/insight/save', async (c) => {
 
 app.get('/ai/insight/:id', async (c) => {
   const raw_id = c.req.param('id')
-  const inc_id = String(raw_id).replace('INC-', '').trim()
+  const inc_id = String(raw_id).trim()
   const db = c.env.DB
   try {
     const insight = await db.prepare("SELECT * FROM autopilot_insight WHERE inc_id = ?").bind(inc_id).first()
@@ -4859,6 +4964,7 @@ ${feedbackContext}`
       let matchedContent = null;
       let matchedTitle = null;
       let matches = [];
+      let similarityReason = null;
 
       if (message) {
         try {
@@ -4869,7 +4975,11 @@ ${feedbackContext}`
 
           if (matches.length > 0) {
             similarityScore = matches[0].score;
-            await writer.write(encode(`data: ${JSON.stringify({ similarity_score: similarityScore, vector_id: matches[0].id, hybrid_metadata: hybrid.metadata })}\n\n`));
+            matchedTitle = matches[0].title || matches[0].id;
+            const inputSnippet = message.length > 150 ? message.substring(0, 150) + "..." : message;
+            similarityReason = `[지능형 하이브리드 검색] 유사도 분석 완료\n- 출처 DB: Vectorize & SQL Hybrid (매칭 ID: ${matches[0].id})\n- 매칭 기준 제목: ${matchedTitle}\n- 분석에 사용된 입력값(검색어): "${inputSnippet}"`;
+            
+            await writer.write(encode(`data: ${JSON.stringify({ similarity_score: similarityScore, similarity_reason: similarityReason, vector_id: matches[0].id, hybrid_metadata: hybrid.metadata })}\n\n`));
 
             // 🚀 [Phase 8] Context Tiering: Separate Verified(KB) vs Reference(SMS)
             const verifiedKB = [];
@@ -5060,7 +5170,7 @@ ${feedbackContext}
               mod_dt=excluded.mod_dt, 
               similarity_score=COALESCE(excluded.similarity_score, autopilot_insight.similarity_score),
               similarity_reason=COALESCE(excluded.similarity_reason, autopilot_insight.similarity_reason)
-          `).bind(String(sms_id), fullContent, severity, now, now, similarityScore ?? null, matchedTitle || null).run();
+          `).bind(String(sms_id), fullContent, severity, now, now, similarityScore ?? null, similarityReason || matchedTitle || null).run();
         }
       }
 
@@ -5434,7 +5544,7 @@ app.get('/ai/agent-discussion/:id', async (c) => {
 // --- Chat Summary Database Endpoints ---
 app.get('/db/summary/:inc_id', async (c) => {
   const raw_id = c.req.param('inc_id')
-  const inc_id = String(raw_id).replace('INC-', '').trim()
+  const inc_id = String(raw_id).trim()
   const db = c.env.DB
   try {
     const res = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(inc_id).first()
@@ -5473,7 +5583,7 @@ app.post('/ai/summarize-chat', async (c) => {
   
   // ID Normalization: Use raw numeric ID (no INC- prefix) for database operations
   const cleanId = String(incident_id || '').replace(/^INC-/i, '');
-  const fullId = cleanId; // Use cleanId directly as the primary identifier
+   // Use cleanId directly as the primary identifier
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -5481,11 +5591,16 @@ app.post('/ai/summarize-chat', async (c) => {
 
   ;(async () => {
     try {
-      // 1. Check D1 Cache & Incident Status - Using cleanId (numeric)
-      const incident = await db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(cleanId).first();
-      const cached = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first();
+      // 1. Parallel DB fetch - incident status + cache + timeline data
+      const [incident, cached, incDetail, wfLogsResult] = await Promise.all([
+        db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
+        db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first(),
+        db.prepare("SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
+        db.prepare("SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC").bind(cleanId).all().catch(() => ({ results: [] }))
+      ]);
+      const wfLogs = wfLogsResult?.results || [];
       
-      const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료'];
+      const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료', 'INC_003'];
       const isFinal = finalStatuses.includes(incident?.status || 'Open');
 
       const isRaw = (val) => {
@@ -5568,13 +5683,8 @@ app.post('/ai/summarize-chat', async (c) => {
       // 3. Fetch ONLY user chat history - Using numeric ID
       const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(cleanId).all()
       
-      // ── 인시던트 핵심 이벤트 타임라인 수집 ──
-      const incDetail = await db.prepare(
-        "SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?"
-      ).bind(cleanId).first();
-      const { results: wfLogs } = await db.prepare(
-        "SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC"
-      ).bind(cleanId).all().catch(() => ({ results: [] }));
+      // (incDetail and wfLogs already fetched above in parallel)
+      const wfLogs_data = wfLogs;
 
       const toKST = (dt) => {
         if (!dt) return null;
@@ -5589,7 +5699,7 @@ app.post('/ai/summarize-chat', async (c) => {
         const t = toKST(incDetail.reg_dt || incDetail.created_at);
         if (t) timelineCtx.push(`[${t}] SMS 수신 및 장애 인지`);
       }
-      for (const wf of (wfLogs || [])) {
+      for (const wf of wfLogs_data) {
         const t = toKST(wf.completed_at);
         const label = wf.step_id === 'RAG' || wf.step_id === 'AGENT' ? 'AI 분석 완료'
           : wf.step_id === 'WARROOM' ? '워룸 생성 및 담당자 배정'
@@ -5623,11 +5733,20 @@ ${timelineCtx.join('\n')}
 
       await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
 
+      // 🚀 Heartbeat: Dify 응답 대기 중 5초마다 keep-alive ping → 프론트 타임아웃 방지
+      let heartbeatStopped = false;
+      const heartbeatId = setInterval(async () => {
+        if (heartbeatStopped) return;
+        try {
+          await writer.write(encode(`data: ${JSON.stringify({ status: '⏳ AI 분석 처리 중...' })}\n\n`));
+        } catch {}
+      }, 5000);
+
       // 🚀 Add AbortController for timeout protection
       const totalTimeoutController = new AbortController();
       const totalTimeoutId = setTimeout(() => {
         totalTimeoutController.abort();
-      }, 60000); // 60 seconds hard limit
+      }, 90000); // 90 seconds hard limit (Dify workflow can be slow)
 
       let difyRes = null;
       const primaryKey = api_key;
@@ -5667,6 +5786,8 @@ ${timelineCtx.join('\n')}
       }
 
       clearTimeout(totalTimeoutId);
+      heartbeatStopped = true;
+      clearInterval(heartbeatId);
 
       if (!difyRes || !difyRes.ok) {
         throw new Error(`Dify API error: ${difyRes?.status || 'Unknown'}`);
@@ -5744,7 +5865,7 @@ ${timelineCtx.join('\n')}
           INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
           VALUES (?, ?, 'dify-workflow', CURRENT_TIMESTAMP)
           ON CONFLICT(inc_id) DO UPDATE SET summary = excluded.summary, mod_dt = CURRENT_TIMESTAMP
-        `).bind(fullId, fullContent).run();
+        `).bind(cleanId, fullContent).run();
       }
 
       if (kv) await kv.delete(lockKey);
@@ -5895,7 +6016,7 @@ app.delete('/ai/warroom/lock/:inc_id', async (c) => {
 
 // AI Chat Summary Concurrency Locking (KV based)
 app.get('/ai/summarize/lock/:inc_id', async (c) => {
-  const inc_id = c.req.param('inc_id');
+  const inc_id = String(c.req.param('inc_id')).replace(/^INC-/i, '');
   const kv = c.env.SMS_STORAGE;
   if (!kv) return c.json({ locked: false });
   const owner = await kv.get(`lock:summary:${inc_id}`);
@@ -5903,7 +6024,7 @@ app.get('/ai/summarize/lock/:inc_id', async (c) => {
 });
 
 app.post('/ai/summarize/lock/:inc_id', async (c) => {
-  const inc_id = c.req.param('inc_id');
+  const inc_id = String(c.req.param('inc_id')).replace(/^INC-/i, '');
   const { user_name } = await c.req.json();
   const kv = c.env.SMS_STORAGE;
   if (!kv) return c.json({ success: true });
@@ -5917,7 +6038,7 @@ app.post('/ai/summarize/lock/:inc_id', async (c) => {
 });
 
 app.delete('/ai/summarize/lock/:inc_id', async (c) => {
-  const inc_id = c.req.param('inc_id');
+  const inc_id = String(c.req.param('inc_id')).replace(/^INC-/i, '');
   const kv = c.env.SMS_STORAGE;
   if (kv) await kv.delete(`lock:summary:${inc_id}`);
   return c.json({ success: true });
@@ -5980,9 +6101,10 @@ app.post('/ai/warroom/open', async (c) => {
   const db = c.env.DB
   const now = getKst()
   
-  const normId = String(inc_id).replace('INC-', '');
-  // 🛡️ Remove 'INC-' from title as requested
-  const cleanTitle = String(title || '').replace(/INC-/g, '');
+  const normId = String(inc_id);
+  // 🛡️ Add 'INC-' to title as requested
+  const safeTitle = String(title || normId);
+  const cleanTitle = safeTitle.startsWith('INC-') ? safeTitle : `INC-${safeTitle}`;
 
   // Prevent duplicate creation
   const existing = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ?").bind(normId).first()
@@ -6081,11 +6203,11 @@ app.post('/ai/report/save', async (c) => {
   const vectorIndex = c.env.WARROOM_INDEX
   const now = getKst()
   
-  const normId = String(inc_id).replace('INC-', '');
+  const normId = String(inc_id);
   const empId = user_id || 'SYSTEM'
   
   // 1. Log activity
-  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '보고서 생성', ?, 'AI 리포트', ?)")
+  await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '보고서 생성', ?, ?)")
     .bind(normId, normId, empId, `리포트 생성됨: ${title}`, now)
     .run()
 
@@ -6120,7 +6242,7 @@ app.post('/ai/report/save', async (c) => {
       await vectorIndex.upsert([{
         id: `kn-${normId}`, // 🚀 Changed from 'inc-' to 'kn-' to prevent overwriting raw SMS and count correctly
         values: vector,
-        metadata: { title, type: 'knowledge', inc_id: normId }
+        metadata: { title: safeTitle, type: 'knowledge', inc_id: normId }
       }]);
       status = 'SUCCESS';
     } catch (e) {
@@ -6146,7 +6268,7 @@ app.post('/ai/report/save', async (c) => {
       error_log = excluded.error_log
   `).bind(
     normId, 
-    title || `Report: ${inc_id}`, 
+    safeTitle, 
     content, 
     empId, now, empId, now, 
     embeddingValue,
@@ -6173,7 +6295,8 @@ app.get('/warroom/report/:id', async (c) => {
   const db = c.env.DB
 
   // ID Normalization
-  const rawId = idParam.replace('INC-', '');
+  const rawId = idParam;
+  
 
   // 1. War-Room base info — inc_id 가 어떤 형태로 저장됐든 매칭
   const wr = await db.prepare(
@@ -6239,12 +6362,25 @@ app.get('/warroom/report/:id', async (c) => {
   const firstChat = (chatLogs || [])[0]
   const lastChat  = (chatLogs || []).slice(-1)[0]
   let durationMin = null
-  if (smsRow?.timestamp && doneRow?.done_at) {
-    const ms = new Date(doneRow.done_at) - new Date(smsRow.timestamp)
-    if (ms > 0) durationMin = Math.round(ms / 60000)
-  } else if (firstChat && lastChat && firstChat.timestamp !== lastChat.timestamp) {
-    const ms = new Date(lastChat.timestamp) - new Date(firstChat.timestamp)
-    if (ms > 0) durationMin = Math.round(ms / 60000)
+  
+  try {
+    const parseDate = (d) => d ? new Date(String(d).replace(' ', 'T')) : null;
+    const smsTime = parseDate(smsRow?.timestamp);
+    const doneTime = parseDate(doneRow?.done_at);
+    
+    if (smsTime && doneTime && !isNaN(smsTime) && !isNaN(doneTime)) {
+      const ms = doneTime - smsTime;
+      if (ms > 0) durationMin = Math.round(ms / 60000);
+    } else if (firstChat && lastChat) {
+      const fTime = parseDate(firstChat.timestamp);
+      const lTime = parseDate(lastChat.timestamp);
+      if (fTime && lTime && !isNaN(fTime) && !isNaN(lTime)) {
+        const ms = lTime - fTime;
+        if (ms > 0) durationMin = Math.round(ms / 60000);
+      }
+    }
+  } catch (e) {
+    console.warn('[MTTR Calc Error]', e.message);
   }
 
   // 9. chat_logs sender → 이름 매핑
@@ -6269,8 +6405,8 @@ app.get('/warroom/report/:id', async (c) => {
   }))
 
   return c.json({
-    inc_id: fullId,
-    title: wr.title || fullId,
+    inc_id: rawId,
+    title: wr.title || rawId,
     severity: wr.severity || 'NORMAL',
     status: wr.status || 'OPEN',
     creator_id: wr.creator_id || '',
@@ -6310,7 +6446,7 @@ app.get('/warroom/report/:id', async (c) => {
 app.get('/warroom/participants/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
-  const normId = String(id).replace('INC-', '')
+  const normId = String(id)
   const { results } = await db.prepare(`
     SELECT 
       u.name, u.employee_id, u.role, u.company, u.position, u.phone,
@@ -6320,15 +6456,15 @@ app.get('/warroom/participants/:id', async (c) => {
     JOIN users u ON uw.user_id = u.employee_id
     LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
     LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
-    WHERE uw.inc_id = ? OR uw.inc_id = ?
-  `).bind(normId, id).all()
+    WHERE uw.inc_id = ?
+  `).bind(normId).all()
   return c.json({ participants: results || [] })
 })
 
 app.post('/warroom/join', async (c) => {
   const { incident_id, user_id, name, inviter_name } = await c.req.json()
   const db = c.env.DB
-  const normId = String(incident_id).replace('INC-', '')
+  const normId = String(incident_id)
   
   if (!user_id || !incident_id) {
     return c.json({ status: 'error', message: 'user_id and incident_id are required' }, 400)
@@ -6722,7 +6858,7 @@ app.post('/ai/knowledge/save', async (c) => {
       const user = await db.prepare("SELECT employee_id FROM users WHERE employee_id = ?").bind(String(user_id)).first()
       const empId = user ? user.employee_id : user_id
       await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
-      .bind(String(body.inc_id).replace('INC-', ''), String(body.inc_id).replace('INC-', ''), empId, getKst())
+      .bind(String(body.inc_id), String(body.inc_id), empId, getKst())
       .run()
     } catch(e) {}
   }
@@ -6850,21 +6986,31 @@ app.post('/retrieval', async (c) => {
     const retrieval_setting = body.retrieval_setting;
     const top_k = retrieval_setting?.top_k || 5;
 
-    // Dify 파라미터 우선순위: score_threshold → threshold → technical_threshold → KV → 기본값 0.80
-    let score_threshold =
-      retrieval_setting?.score_threshold ||
-      retrieval_setting?.threshold ||
-      retrieval_setting?.technical_threshold ||
-      0.0;
+    // 🔍 Identify technical signals in the query
+    const technicalPatterns = [/error/i, /fail/i, /critical/i, /timeout/i, /장애/i, /오류/i, /batch/i];
+    const isTechnicalSignal = technicalPatterns.some(pattern => pattern.test(query));
 
-    // score_threshold가 0이거나 없으면 KV에서 전역 설정값 로드
-    if (!score_threshold || score_threshold === 0.0) {
-      if (c.env.SMS_STORAGE) {
-        const kvThresh = await c.env.SMS_STORAGE.get('config:rag_threshold');
-        score_threshold = kvThresh ? parseFloat(kvThresh) : 0.80;
-      } else {
-        score_threshold = 0.80;
-      }
+    // 💡 최신 지능형 RAG 동적 경계(Dynamic Boundary) 알고리즘 적용
+    // 고정된 가중치(상수) 없이 오직 DB에서 넘어온 파라미터 값들만으로 최종 커트라인을 계산합니다.
+    let admin_base = parseFloat(retrieval_setting?.threshold) || 0.85;
+    let tech_mod   = parseFloat(retrieval_setting?.technical_threshold) || 0.85;
+    let casual_mod = parseFloat(retrieval_setting?.casual_threshold) || 0.95;
+
+    let score_threshold = admin_base;
+
+    if (isTechnicalSignal) {
+      // 장애 문맥: 기준값(admin)과 기술 설정값(tech) 중 더 낮은(관대한) 값 채택
+      // 이유: 긴급 상황이므로 가급적 넓은 범위의 지식베이스를 끌어와 단서를 놓치지 않기 위함
+      score_threshold = Math.min(admin_base, tech_mod);
+    } else {
+      // 일상 대화: 기준값(admin)과 일상 설정값(casual) 중 더 높은(엄격한) 값 채택
+      // 이유: 단순 인사말 등에 장애 매뉴얼이 오탐지되어 출력되는 Hallucination(환각) 방지
+      score_threshold = Math.max(admin_base, casual_mod);
+    }
+
+    // 하드코딩된 score_threshold가 명시적으로 지정되었다면 (예: 테스트용) 강제 덮어쓰기
+    if (retrieval_setting?.score_threshold && retrieval_setting.score_threshold !== 0.0) {
+      score_threshold = parseFloat(retrieval_setting.score_threshold);
     }
 
     console.log(`[Retrieval] top_k=${top_k} score_threshold=${score_threshold} query="${query.substring(0,40)}"`);
@@ -6895,7 +7041,7 @@ app.post('/retrieval', async (c) => {
         if (isLongId) {
           kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE inc_id = ?").bind(cleanId).first();
         } else {
-          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE CAST(id AS TEXT) = ?").bind(cleanId).first();
+          kbResult = await db.prepare("SELECT content, title, category, tags, inc_id FROM knowledge_base WHERE id = ?").bind(cleanId).first();
         }
 
         if (!kbResult && isLongId) {
@@ -7074,7 +7220,7 @@ app.post('/warroom/resolve-only', async (c) => {
   const { inc_id, user_id } = await c.req.json();
   const db = c.env.DB;
   const now = getKst();
-  const normId = String(inc_id).replace('INC-', '');
+  const normId = String(inc_id);
 
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
     .bind(user_id, now, normId).run();
@@ -7093,9 +7239,9 @@ app.post('/ai/warroom/close', async (c) => {
   const db = c.env.DB
   const now = getKst()
   
-  const normId = String(inc_id).replace('INC-', '');
-  await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
-    .bind(now, normId).run()
+  const normId = String(inc_id);
+  await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, user_id || 'SYSTEM', normId).run()
     
   // Cascading update for all participants
   await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
@@ -7118,7 +7264,7 @@ app.post('/ai/incident/assign', async (c) => {
   const db = c.env.DB
   const now = getKst()
   
-  const normId = String(inc_id).replace('INC-', '');
+  const normId = String(inc_id);
   try {
     // 1. Verify User Exists in 'users' table
     let user = await db.prepare("SELECT employee_id, name FROM users WHERE employee_id = ? OR email = ?")
@@ -7160,7 +7306,7 @@ app.post('/ai/incident/status', async (c) => {
   const { user_id, inc_id, status } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  const normId = String(inc_id).replace('INC-', '');
+  const normId = String(inc_id);
 
   await db.prepare(`
     UPDATE incident_assignments 
@@ -7245,7 +7391,8 @@ app.get('/ai/incident/workflow-details', async (c) => {
   const db = c.env.DB
 
   const inc_id_str = String(inc_id_param).trim();
-  const rawId = inc_id_str.replace('INC-', '');
+  const rawId = inc_id_str;
+  
 
   // Aggregate steps from various tables
   const steps = [];
@@ -7271,9 +7418,9 @@ app.get('/ai/incident/workflow-details', async (c) => {
         u.name as creator_name
       FROM warroom_list w
       LEFT JOIN users u ON w.creator_id = u.employee_id
-      WHERE w.inc_id = ? OR w.inc_id = ?
+      WHERE w.inc_id = ? 
       LIMIT 1
-    `).bind(rawId, fullId).first();
+    `).bind(rawId).first();
     
     if (wr) {
       steps.push({ 
@@ -7297,13 +7444,13 @@ app.get('/ai/incident/workflow-details', async (c) => {
         u.name,
         COALESCE(ot.name, u.team) as team_name,
         COALESCE(op.name, u.part) as part_name,
-        (SELECT COUNT(*) FROM warroom_chats wc WHERE (wc.inc_id = ? OR wc.inc_id = ?) AND wc.sender = ia.user_id) as chat_count
+        (SELECT COUNT(*) FROM warroom_chats wc WHERE (wc.inc_id = ? ) AND wc.sender = ia.user_id) as chat_count
       FROM incident_assignments ia
       LEFT JOIN users u ON ia.user_id = u.employee_id
       LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
       LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
-      WHERE ia.inc_id = ? OR ia.inc_id = ?
-    `).bind(rawId, fullId, rawId, fullId).all();
+      WHERE ia.inc_id = ? 
+    `).bind(rawId, rawId).all();
     const isWarroomClosed = wr && ['CLOSED', '최종완료', '처리완료', 'Completed', '완료'].includes(wr.status);
 
     const finalizedAssignees = (assigneesRes.results || []).map(a => {
@@ -7319,7 +7466,7 @@ app.get('/ai/incident/workflow-details', async (c) => {
     return c.json({ 
       inc_id: inc_id_str, 
       steps: steps.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)), 
-      all_logs: (await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_code = ? OR incident_code = ?").bind(rawId, fullId).all()).results || [],
+      all_logs: (await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_code = ? ").bind(rawId).all()).results || [],
       assignees: finalizedAssignees
     });
   } catch (e) {
@@ -7331,7 +7478,7 @@ app.get('/ai/incident/workflow-details', async (c) => {
 // 3. 특정 인시던트 상세 (와일드카드 - 가장 마지막에 정의)
 app.get('/ai/incident/:inc_id', async (c) => {
   const rawId = c.req.param('inc_id')
-  const normId = String(rawId).replace('INC-', '')
+  const normId = String(rawId)
   const db = c.env.DB
   
   const incident = await db.prepare(`
@@ -7339,10 +7486,10 @@ app.get('/ai/incident/:inc_id', async (c) => {
            r.message as sms_message, r.sender as sms_sender
     FROM incidents i 
     LEFT JOIN users u ON i.assigned_to = u.employee_id 
-    LEFT JOIN received_messages r ON (r.inc_id = ? OR r.inc_id = ?)
-    WHERE i.inc_id = ? OR i.inc_id = ?
+    LEFT JOIN received_messages r ON r.inc_id = ?
+    WHERE i.inc_id = ? 
     LIMIT 1
-  `).bind(normId, normId, normId, normId).first()
+  `).bind(normId, normId).first()
   
   if (!incident) return c.json({ error: "Not found" }, 404)
   return c.json({ incident })
@@ -7360,14 +7507,15 @@ app.post('/warroom/leave', async (c) => {
 app.patch('/incidents/:id', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
-  const rawId = id.replace('INC-', '');
+  const rawId = id;
+  
   const data = await c.req.json()
   const now = getKst()
   
   let finalTitle = data.title;
   if (!finalTitle || finalTitle === 'SMS 장애 감지') {
     const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
-    if (sms) finalTitle = `${fullId} | ${sms.message}`
+    if (sms) finalTitle = `${rawId} | ${sms.message}`
   }
 
   await db.prepare(`
@@ -7377,9 +7525,10 @@ app.patch('/incidents/:id', async (c) => {
         severity = COALESCE(?, severity),
         status = COALESCE(?, status),
         assigned_to = COALESCE(?, assigned_to),
-        mod_dt = ?
+        mod_dt = ?,
+        mod_id = ?
     WHERE inc_id = ?
-  `).bind(finalTitle || null, data.description || null, data.severity || null, data.status || null, data.assigned_to || null, now, rawId).run()
+  `).bind(finalTitle || null, data.description || null, data.severity || null, data.status || null, data.assigned_to || null, now, data.user_id || 'SYSTEM', rawId).run()
   
   return c.json({ status: "success", id: rawId, title: finalTitle })
 })
@@ -7587,7 +7736,8 @@ app.post('/auth/agree-terms', async (c) => {
 app.post('/incidents', async (c) => {
   const { inc_id, title, description, severity, incident_type, source_sms_id } = await c.req.json()
   const db = c.env.DB
-  const rawId = String(inc_id).replace('INC-', '')
+  const rawId = String(inc_id)
+  
 
   const existing = await db.prepare("SELECT inc_id FROM incidents WHERE inc_id = ?").bind(rawId).first()
   if (existing) return c.json({ status: 'exists', inc_id: rawId })
@@ -7596,7 +7746,7 @@ app.post('/incidents', async (c) => {
   const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
   const rawMsg = sms ? sms.message : (title || 'SMS 장애 감지')
   const truncatedMsg = rawMsg.length > 50 ? rawMsg.substring(0, 50) + "..." : rawMsg;
-  const finalTitle = `${fullId} | ${truncatedMsg}`
+  const finalTitle = `${rawId} | ${truncatedMsg}`
 
   const now = getKst()
   await db.prepare(
@@ -7605,7 +7755,7 @@ app.post('/incidents', async (c) => {
       reg_id, reg_dt, mod_id, mod_dt, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    rawId, finalTitle, description, severity, 'OPEN', incident_type, source_sms_id || null, 
+    rawId, finalTitle, description, severity, 'INC_001', incident_type, source_sms_id || null, 
     'SYSTEM', now, 'SYSTEM', now, now
   ).run()
   return c.json({ status: 'created', inc_id: rawId, title: finalTitle })
@@ -7635,14 +7785,14 @@ app.get('/warroom/chat/:id', async (c) => {
   const db = c.env.DB
 
   // ID Normalization
-  const rawId  = idParam.replace('INC-', '')
+  const rawId  = idParam
 
   // Always pull title and leader_summary from warroom_list
   const wr = await db.prepare(
     "SELECT title, status, leader_summary FROM warroom_list WHERE inc_id = ?"
   ).bind(rawId).first()
   let title = (wr && wr.title) ? wr.title : rawId
-  let status = (wr && wr.status) ? wr.status : 'OPEN'
+  let status = (wr && wr.status) ? wr.status : 'INC_001'
   const leader_summary_db = (wr && wr.leader_summary) ? wr.leader_summary : ''
   let description = leader_summary_db
 
@@ -7653,7 +7803,7 @@ app.get('/warroom/chat/:id', async (c) => {
   const sms_body = (inc && inc.description) ? inc.description : ''   // ← 원본 SMS 텍스트
   if (inc) {
     if (!description && inc.description) description = inc.description
-    if (inc.status && inc.status !== 'OPEN') status = inc.status
+    if (inc.status && inc.status !== 'INC_001') status = inc.status
   }
 
   // Get messages
@@ -7803,7 +7953,7 @@ app.post('/warroom/resolve', async (c) => {
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400);
 
   const now = getKst();
-  const normId = String(incident_id).replace('INC-', '');
+  const normId = String(incident_id);
 
   try {
     // 1. Update War-Room Status
@@ -7811,7 +7961,7 @@ app.post('/warroom/resolve', async (c) => {
       .bind(now, incident_id).run();
 
     // 2. Update Incident Status to '처리완료'
-    await db.prepare("UPDATE incidents SET status = '처리완료', mod_dt = ? WHERE inc_id = ?")
+    await db.prepare("UPDATE incidents SET status = 'INC_003', mod_dt = ? WHERE inc_id = ?")
       .bind(now, normId).run();
 
     // 3. Update ALL incident assignments to '처리완료' (check both ID formats)
@@ -7896,7 +8046,7 @@ app.post('/ai/send-report-email', async (c) => {
 
   // 3. Finalize Incident Status (Cascading)
   const db = c.env.DB;
-  const normId = String(incident_id).replace('INC-', '');
+  const normId = String(incident_id);
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
     .bind(now, normId).run();
     
@@ -8116,10 +8266,10 @@ app.post('/ai/governance/approve', async (c) => {
     }
 
     // 5. Update Incident Status to '처리완료'
-    await db.prepare("UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ?")
+    await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ? WHERE inc_id = ?")
       .bind(now, incident_id).run();
 
-    const normId = String(incident_id).replace('INC-', '');
+    const normId = String(incident_id);
 
     // 6. Update ALL assignments for this incident to '처리완료'
     await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
@@ -8407,12 +8557,12 @@ app.post('/api/v1/reports/submit', async (c) => {
   try {
     const now = getKst()
     
-    const normId = String(incident_id).replace('INC-', '');
+    const normId = String(incident_id);
     const incIdWithPrefix = `INC-${normId}`;
 
     // 1. Update Incident Status to '처리완료'
     await db.prepare(`
-      UPDATE incidents SET status = '처리완료', updated_at = ? WHERE inc_id = ?
+      UPDATE incidents SET status = 'INC_003', updated_at = ? WHERE inc_id = ?
     `).bind(now, normId).run()
 
     // 1-1. Update WarRoom Status to 'CLOSED'
@@ -8548,7 +8698,7 @@ app.post('/api/v1/reports/submit', async (c) => {
 // GET /reports/:incId - 저장된 보고서 조회 (링크 직접 열람용)
 app.get('/reports/:inc_id', async (c) => {
   const rawId = c.req.param('inc_id')
-  const normId = String(rawId).replace('INC-', '')
+  const normId = String(rawId)
   const db = c.env.DB
 
   // reports 테이블 없으면 생성
@@ -8810,7 +8960,7 @@ export class WarRoom {
         try {
           const memberCount = await db.prepare(
             "SELECT COUNT(DISTINCT user_id) as cnt FROM incident_assignments WHERE inc_id = ?"
-          ).bind(String(data.incident_id).replace('INC-', '')).first();
+          ).bind(String(data.incident_id)).first();
           initialReadCount = Math.max(0, (memberCount?.cnt || 0) - 1); // 발신자 제외
         } catch (_) {
           initialReadCount = Math.max(0, this.sessions.size - 1); // fallback
@@ -8859,7 +9009,7 @@ export class WarRoom {
             // Get all room members from D1 (incident_assignments)
             const { results: members } = await db.prepare(`
               SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ?
-            `).bind(String(incId).replace('INC-', '')).all();
+            `).bind(String(incId)).all();
             
             // Get all push subscriptions for members NOT currently in the room
             const absentUserIds = members

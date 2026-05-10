@@ -284,7 +284,7 @@ export default function DashboardPage({ onAiClick }) {
 
     // The raw received SMS ID (e.g. 20231026154512345) MUST be the primary key DB identifier
     // to match aichat_history.
-    const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`).replace('INC-', '');
+    const incidentId = String(currentSms.inc_id || currentSms.id || `${Date.now()}`);
     
     const formattedUiId = incidentId; // Display prefix
     const rawMsg = currentSms.message || currentSms.error_message || "SMS 장애 감지";
@@ -377,12 +377,12 @@ export default function DashboardPage({ onAiClick }) {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          inc_id: String(incidentId).replace('INC-', ''),
+          inc_id: String(incidentId),
           title: smsTitle,
           description: diagnosisText || 'SMS 장애 상세 분석 대기 중',
           severity: roomSeverity,
           incident_type: 'SMS',
-          source_sms_id: String(currentSms.inc_id).replace('INC-', '')
+          source_sms_id: String(currentSms.inc_id)
         })
       });
 
@@ -603,7 +603,7 @@ export default function DashboardPage({ onAiClick }) {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
           ...inc,
-          inc_id: String(inc.inc_id).replace('INC-', '')
+          inc_id: String(inc.inc_id)
         }));
         setMyAssignments(mapped);
       }
@@ -1102,7 +1102,7 @@ export default function DashboardPage({ onAiClick }) {
     setSelectedIncidentIdFlow(smsMessage.inc_id); // Ensure the flow panel displays its data
 
     // Filter inc_id to strictly numeric if it has INC- prefix
-    const cleanIncId = String(smsMessage.inc_id).replace('INC-', '');
+    const cleanIncId = String(smsMessage.inc_id);
 
     // Trigger Assignment to the current user
     if (userProfile?.employee_id) {
@@ -1112,7 +1112,7 @@ export default function DashboardPage({ onAiClick }) {
         body: JSON.stringify({
           user_id: userProfile.employee_id,
           login_id: userProfile.email,
-          inc_id: String(smsMessage.inc_id).replace('INC-', ''),
+          inc_id: String(smsMessage.inc_id),
           incident_title: 'SMS 수신 확인'
         })
       })
@@ -1172,7 +1172,7 @@ export default function DashboardPage({ onAiClick }) {
           body: JSON.stringify({
             title: reportTitle,
             content: reportContent,
-            inc_id: String(selectedSms?.inc_id || selectedIncidentIdFlow).replace('INC-', ''),
+            inc_id: String(selectedSms?.inc_id || selectedIncidentIdFlow),
             user_id: userProfile?.email || 'khcho0421@gmail.com'
           })
         });
@@ -1945,8 +1945,8 @@ export default function DashboardPage({ onAiClick }) {
                 <div className="flex items-center gap-2 shrink-0">
                     {/* 시간 정보: DETECTION + MTTR 한 줄 */}
                     {selectedIncidentIdFlow && (() => {
-                      const assignment = myAssignments.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', '')) ||
-                                         smsMessages.find(a => String(a.inc_id).replace('INC-', '') === String(selectedIncidentIdFlow).replace('INC-', ''));
+                      const assignment = myAssignments.find(a => String(a.inc_id) === String(selectedIncidentIdFlow)) ||
+                                         smsMessages.find(a => String(a.inc_id) === String(selectedIncidentIdFlow));
                       const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
                       const endStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
                       const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);

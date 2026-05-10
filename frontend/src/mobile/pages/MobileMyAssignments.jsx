@@ -58,7 +58,7 @@ export default function MobileMyAssignments({ user, onAiClick }) {
         const data = await res.json();
         const mapped = (data.assignments || []).map(inc => ({
           ...inc,
-          inc_id: String(inc.inc_id).replace('INC-', '')
+          inc_id: String(inc.inc_id)
         }));
         setMyAssignments(mapped);
       }
@@ -310,7 +310,7 @@ export default function MobileMyAssignments({ user, onAiClick }) {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (isUnconfirmed) { alert("해당 워룸이 존재하지 않습니다."); return; }
-                      const cleanId = String(item.inc_id).replace('INC-', '');
+                      const cleanId = String(item.inc_id);
                       if (item.status === '처리완료' || item.status === '조치완료') {
                         navigate(`/report/${cleanId}`);
                       } else {

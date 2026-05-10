@@ -39,7 +39,7 @@ export default function MobileChat({ user }) {
     if (!incidentId) { setLoading(false); return; }
 
     const token = getAccessToken();
-    const normId = String(incidentId).replace('INC-', '');
+    const normId = String(incidentId);
 
     Promise.all([
       fetch(`${API_BASE}/sms/${normId}`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -67,7 +67,7 @@ export default function MobileChat({ user }) {
   const fetchParticipants = useCallback(async () => {
     if (!incidentId) return;
     try {
-      const normId = String(incidentId).replace('INC-', '');
+      const normId = String(incidentId);
       const res = await fetch(`${API_BASE}/warroom/participants/${normId}`, {
         headers: getAuthHeaders()
       });
@@ -85,7 +85,7 @@ export default function MobileChat({ user }) {
   // Auto-mark as read
   useEffect(() => {
     if (messages.length > 0 && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const normId = String(incidentId).replace('INC-', '');
+      const normId = String(incidentId);
       messages.forEach(msg => {
         if (msg.read_count > 0 && msg.role !== 'user' && msg.seq) {
           wsRef.current.send(JSON.stringify({
@@ -102,7 +102,7 @@ export default function MobileChat({ user }) {
   // WebSocket 연결
   useEffect(() => {
     if (!incidentId || !user?.employee_id) return;
-    const normId = String(incidentId).replace('INC-', '');
+    const normId = String(incidentId);
 
     const connect = () => {
       if (!isMounted.current) return;
@@ -203,7 +203,7 @@ export default function MobileChat({ user }) {
       alert('연결이 끊어졌습니다. 잠시 후 다시 시도해 주세요.');
       return;
     }
-    const normId = String(incidentId).replace('INC-', '');
+    const normId = String(incidentId);
     setSending(true);
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = '14px';

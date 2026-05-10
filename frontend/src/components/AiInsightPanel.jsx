@@ -55,7 +55,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
   return 'report';
 };
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete }) {
   
   const formatYYMMDD = (dateStr) => {
     if (!dateStr) return '';
@@ -215,6 +215,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                setIsCritical(critical);
                setIncidentCategory(data.category || getCategoryFromAnalysis(data.content, selectedSms?.message));
                setAnalysisComplete(true);
+               if (onAnalysisComplete) onAnalysisComplete(true, data.content);
                setInsightTimestamp(data.reg_dt);
                setIsAnalyzingSms(false);
               
@@ -356,6 +357,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                 if (onAgentContentRef.current) {
                   onAgentContentRef.current(finalText, true);
                 }
+              if (onAnalysisComplete) onAnalysisComplete(true, finalText);
               return;
             }
 
@@ -485,8 +487,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
       return;
     }
+    if (onAnalysisComplete) onAnalysisComplete(false, '');
     runAnalysis(false);
-  }, [selectedSms, runAnalysis]);
+  }, [selectedSms, runAnalysis, onAnalysisComplete]);
 
 
 
@@ -794,8 +797,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             {/* Reason */}
             <div className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4">
               <p className="text-[9px] font-black text-blue-400/70 uppercase tracking-widest mb-2">AI Matching Reason</p>
-              <p className="text-sm text-slate-200 leading-relaxed italic">
-                &ldquo;{insightData.similarity_reason || '사유 정보가 없습니다.'}&rdquo;
+              <p className="text-sm text-slate-200 leading-relaxed italic whitespace-pre-wrap">
+                {insightData.similarity_reason || '사유 정보가 없습니다.'}
               </p>
             </div>
 
@@ -891,7 +894,17 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   // [리더의 최종 조치 가이드] 이하 제거 (Expert Advisor에서만 표시)
                   const lIdx = t.indexOf('[리더의 최종 조치 가이드]');
                   if (lIdx !== -1) t = t.substring(0, lIdx).trim();
-                  return t || displayedText;
+                  
+                  let finalResult = t || displayedText;
+                  
+                  // 지식베이스 유사도 정보가 있으면 텍스트 맨 위에 눈에 띄게 삽입
+                  if (insightData.similarity_score > 0 && insightData.similarity_reason) {
+                    const pct = (insightData.similarity_score * 100).toFixed(1);
+                    const reason = insightData.similarity_reason.replace(/\n/g, '\n> ');
+                    finalResult = `> **[ 🧠 지능형 지식베이스 매칭 (유사도 ${pct}%) ]**\n> ${reason}\n\n` + finalResult;
+                  }
+                  
+                  return finalResult;
                 })()} />
               ) : (
                 <span className="text-slate-500 font-bold tracking-tight animate-pulse flex items-center gap-2">
@@ -953,11 +966,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         )}
 
         {/* 🚀 War-Room Action (Original Position Restored) */}
-        {analysisComplete && selectedSms && (
+        {!hideWarRoomButton && analysisComplete && selectedSms && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-700 delay-150">
              {(() => {
                 const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
-                const incidentId = String(selectedSms.inc_id || selectedSms.id || '').replace('INC-', '');
+                const incidentId = String(selectedSms.inc_id || selectedSms.id || '');
                 const roomExists = (warRooms || []).some(r => String(r.id) === incidentId);
                 
                 const btnCls = roomExists 

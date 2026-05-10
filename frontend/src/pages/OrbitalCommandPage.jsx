@@ -38,8 +38,8 @@ export default function OrbitalCommandPage() {
       .then(r => r.json())
       .then(data => {
         if (data.success) {
-          const tech = data.settings.find(s => s.key === 'similarity_threshold_technical')?.value;
-          if (tech) setThreshold(parseFloat(tech));
+          const adminThresh = data.settings.find(s => s.key === 'similarity_threshold_admin')?.value;
+          if (adminThresh) setThreshold(parseFloat(adminThresh));
         }
       })
       .catch(e => console.error('Failed to fetch threshold', e));
@@ -51,7 +51,7 @@ export default function OrbitalCommandPage() {
       const res = await fetch('https://sguardai.khcho0421.workers.dev/sms/settings', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ key: 'similarity_threshold_technical', value: String(newVal) })
+        body: JSON.stringify({ key: 'similarity_threshold_admin', value: String(newVal) })
       });
       if (res.ok) toast.success(`임계값 ${newVal.toFixed(2)} 적용 완료`);
     } catch (e) {

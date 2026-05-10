@@ -103,8 +103,7 @@ export default function ChatSummaryPage() {
 
     const fetchSummary = async (isRetry = false) => {
       // 🛡️ Robust ID Normalization: Strip existing INC- and re-apply it consistently
-      const rawId = String(incidentId || '').replace(/^INC-/i, '');
-      const cleanIdForAi = `INC-${rawId}`;
+      const cleanIdForAi = String(incidentId || '').replace(/^INC-/i, '');
       
       console.log(`[ChatSummary] fetchSummary(isRetry=${isRetry}) started for ${cleanIdForAi}`);
       setIsLoading(true);
@@ -134,8 +133,7 @@ export default function ChatSummaryPage() {
           const userStr = localStorage.getItem('sguard_user');
           const user = JSON.parse(userStr || '{}');
           
-          // ID에서 'INC-' 접두사 제거 (백엔드 매칭용)
-          const cleanId = incidentId.replace('INC-', '');
+          const cleanId = String(incidentId || '').replace(/^INC-/i, '');
 
           try {
             // 🛡️ Fail-safe: Manual timeout for better compatibility
@@ -153,7 +151,7 @@ export default function ChatSummaryPage() {
             const lockData = await lockRes.json();
             console.log(`[ChatSummary] Lock acquisition result:`, lockData);
             if (!lockData.success) {
-              setLoadingStatus(`${lockData.owner} 매니저님이 이미 처리 중입니다.`);
+              setLoadingStatus(`${lockData.owner} 매니저님이 처리중 입니다.`);
               setIsStreaming(false);
               return;
             }
@@ -166,9 +164,9 @@ export default function ChatSummaryPage() {
         setLoadingStatus('Dify AI 엔진에 분석 요청을 전송했습니다...');
         if (isRetry) setLoadingStatus(`재시도 중... (${retryCountRef.current}/2)`);
 
-        // ⏱️ Add a fetch timeout for better feedback
+        // ⏱️ Add a fetch timeout for better feedback (90s to match Dify workflow processing time)
         const timeoutController = new AbortController();
-        const timeoutId = setTimeout(() => timeoutController.abort(), 15000); 
+        const timeoutId = setTimeout(() => timeoutController.abort(), 90000); 
 
         const response = await fetch(getApiUrl('/ai/summarize-chat'), {
           method: 'POST',
@@ -293,7 +291,7 @@ export default function ChatSummaryPage() {
           setIsLoading(false);
           setIsStreaming(false);
           // 🚀 Unlock (Cleanup)
-          const cleanIdForUnlock = `INC-${String(incidentId || '').replace(/^INC-/i, '')}`;
+          const cleanIdForUnlock = String(incidentId || '').replace(/^INC-/i, '');
           fetch(getApiUrl(`/ai/summarize/lock/${cleanIdForUnlock}`), { 
             method: 'DELETE',
             headers: getAuthHeader() 
@@ -347,7 +345,7 @@ export default function ChatSummaryPage() {
           if (data.incident) {
             setIncidentStatus(data.incident.status);
             // If already completed, set govSuccess to true to show the 'Checked' state
-            if (data.incident.status === '처리완료') {
+            if (data.incident.status === 'INC_003' || data.incident.status === '처리완료') {
               setGovSuccess(true);
             }
           }
@@ -380,7 +378,7 @@ export default function ChatSummaryPage() {
       } catch (e) { console.error('Failed to fetch incident message:', e); }
 
       try {
-        const cleanIdForWf = `INC-${String(incidentId || '').replace(/^INC-/i, '')}`;
+        const cleanIdForWf = String(incidentId || '').replace(/^INC-/i, '');
         const res = await fetch(getApiUrl(`/ai/incident/workflow-details?inc_id=${cleanIdForWf}`), {
           headers: getAuthHeader()
         });
@@ -773,7 +771,7 @@ export default function ChatSummaryPage() {
       
       setGovSuccess(true);
       setGovernanceStep('done');
-      setIncidentStatus('처리완료');
+      setIncidentStatus('INC_003');
       
       const supMsg = result.recipient_count > 0 
         ? `\n\n[보고 전송 완료]: ${result.superiors.join(', ')}`
@@ -789,7 +787,7 @@ export default function ChatSummaryPage() {
       alert(`처리 중 오류가 발생했습니다: ${err.message}`);
     } finally {
       setIsGoverning(false);
-      if (incidentStatus !== '처리완료') setGovernanceStep(null);
+      if (incidentStatus !== 'INC_003' && incidentStatus !== '처리완료') setGovernanceStep(null);
     }
   };
 

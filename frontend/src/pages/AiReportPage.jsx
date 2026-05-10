@@ -478,7 +478,7 @@ export default function AiReportPage() {
     setActiveTab('ai_report');
     try {
       const safeId = String(incidentId);
-      const reqId = safeId.startsWith('INC-') ? safeId.slice(4) : safeId;
+      const reqId = safeId;
       const res = await fetch(`${API_BASE_URL}/ai/generate-report`, {
         method: 'POST',
         headers: getAuthHeaders(),

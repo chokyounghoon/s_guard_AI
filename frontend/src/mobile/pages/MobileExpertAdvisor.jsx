@@ -25,7 +25,7 @@ export default function MobileExpertAdvisor({ user }) {
     setLoading(true);
     try {
       // Use direct incident endpoint for better performance on mobile
-      const cleanId = String(incidentId).startsWith('INC-') ? incidentId : `INC-${incidentId}`;
+      const cleanId = String(incidentId);
       const res = await fetch(`${API_BASE}/ai/incident/${cleanId}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch incident');
       const data = await res.json();

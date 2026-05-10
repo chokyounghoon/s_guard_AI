@@ -4,6 +4,7 @@ import {
   ArrowLeft, Activity, Filter, Clock, ChevronRight,
   AlertCircle, MessageSquare, Brain, CheckCircle, Search
 } from 'lucide-react';
+import { useCodebook } from '../context/CodebookContext';
 
 export default function IncidentListPage() {
   const navigate = useNavigate();
@@ -11,6 +12,13 @@ export default function IncidentListPage() {
   const queryParams = new URLSearchParams(location.search);
   const type = queryParams.get('type') || 'AI';
   const category = queryParams.get('category') || 'All';
+  const { getCodesByCategory } = useCodebook();
+  const statusCodes = getCodesByCategory('INCIDENT_STATUS');
+
+  const getStatusName = (code) => {
+    const found = statusCodes.find(c => c.code_value === code);
+    return found ? found.code_name : code;
+  };
 
   const [loading, setLoading] = useState(true);
 
@@ -27,17 +35,17 @@ export default function IncidentListPage() {
     const params = new URLSearchParams();
     if (category !== 'All') {
       if (['Critical', 'Major', 'Normal'].includes(category)) params.set('severity', category.toUpperCase());
-      if (category === 'Processing') params.set('status', 'In Progress');
-      if (category === 'Unconfirmed') params.set('status', 'Open');
-      if (category === 'Completed') params.set('status', 'Completed');
+      if (category === 'Processing') params.set('status', 'INC_002');
+      if (category === 'Unconfirmed') params.set('status', 'INC_001');
+      if (category === 'Completed') params.set('status', 'INC_003');
     }
     if (type) params.set('incident_type', type);
 
     fetch(`${API_BASE}/incidents?${params}&limit=50`)
       .then(r => r.json())
       .then(data => {
-        setIncidents((data.incidents || []).map(inc => ({
-          id: inc.code,
+        setIncidents((data.incidents || data || []).map(inc => ({
+          id: inc.inc_id || inc.code || inc.id,
           title: inc.title,
           desc: inc.description || '',
           time: inc.created_at ? new Date(inc.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '',
@@ -110,11 +118,11 @@ export default function IncidentListPage() {
                   <span>{incident.date}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${incident.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                      incident.status === 'Unconfirmed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${incident.status === 'INC_003' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                      incident.status === 'INC_001' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
                         'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                     }`}>
-                    {incident.status}
+                    {getStatusName(incident.status)}
                   </span>
                   <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400" />
                 </div>

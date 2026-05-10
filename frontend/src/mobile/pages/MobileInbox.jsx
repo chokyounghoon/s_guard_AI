@@ -92,7 +92,7 @@ export default function MobileInbox({ user, onAiClick }) {
   const handleItemClick = (item) => {
     if (!item.is_read) markRead(item.id);
     if (item.inc_id) {
-      const cleanId = String(item.inc_id).replace('INC-', '');
+      const cleanId = String(item.inc_id);
       navigate(item.type === 'REPORT' ? `/report/${cleanId}` : `/chat/${cleanId}`);
     }
   };

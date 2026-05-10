@@ -92,7 +92,7 @@ export default function WorkflowPage() {
     (async () => {
       setLoading(true);
       try {
-        const normId = inc_id.replace('INC-', '');
+        const normId = inc_id;
         let r = await fetch(`${API_BASE}/ai/incident/${normId}`, { headers: getAuthHeaders() });
         if (!r.ok) r = await fetch(`${API_BASE}/sms/${normId}`, { headers: getAuthHeaders() });
         if (r.ok) {

@@ -112,6 +112,7 @@ function AppContent() {
     () => getUserProfile() || JSON.parse(localStorage.getItem('sguard_user') || 'null')
   );
   const [isRefreshing, setIsRefreshing] = useState(true);
+  const [isSessionRefreshed, setIsSessionRefreshed] = useState(false);
 
   useEffect(() => {
     return addAuthListener(({ userProfile: u }) => setUserProfile(u));
@@ -119,7 +120,7 @@ function AppContent() {
 
   // 🔔 AUTO PUSH SUBSCRIBE: 세션 복원(Silent Refresh) 후 구독 재동기화
   useEffect(() => {
-    if (!userProfile || isRefreshing) return;
+    if (!userProfile || isRefreshing || !isSessionRefreshed) return;
     PushManager.subscribe(API_BASE).then(result => {
       if (result.success) {
         console.log('[Push] Session-restore subscribe success ✅');
@@ -150,6 +151,7 @@ function AppContent() {
           setAccessToken(refreshData.access_token);
           setStoreUserProfile(refreshData.user);
           if (refreshData.ghost_token) setGhostToken(refreshData.ghost_token);
+          setIsSessionRefreshed(true);
           setIsRefreshing(false);
           return;
         }
@@ -167,6 +169,7 @@ function AppContent() {
             setAccessToken(ghostData.access_token);
             setStoreUserProfile(ghostData.user);
             if (ghostData.ghost_token) setGhostToken(ghostData.ghost_token);
+            setIsSessionRefreshed(true);
             setIsRefreshing(false);
             return;
           }
@@ -568,7 +571,7 @@ function AppContent() {
                 </div>
               ) : warRooms.map((room) => {
                 const roomId = room.inc_id || room.id;
-                const rawId = String(roomId).replace('INC-', '');
+                const rawId = String(roomId);
 
                 // 년월일시 포맷
                 const regDate = room.reg_dt ? new Date(room.reg_dt) : null;

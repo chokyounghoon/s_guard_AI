@@ -92,6 +92,7 @@ function AppContent() {
   const [hideCompletedWarRooms, setHideCompletedWarRooms] = useState(true);
   const [userProfile, setUserProfile] = useState(() => getUserProfile() || JSON.parse(localStorage.getItem('sguard_user') || 'null'));
   const [isRefreshing, setIsRefreshing] = useState(true);
+  const [isSessionRefreshed, setIsSessionRefreshed] = useState(false);
 
   // 🛡️ Sync with Auth Store
   useEffect(() => {
@@ -103,7 +104,7 @@ function AppContent() {
 
   // 🔔 AUTO PUSH SUBSCRIBE: 세션 복원(Silent Refresh) 후 구독 재동기화
   useEffect(() => {
-    if (!userProfile || isRefreshing) return;
+    if (!userProfile || isRefreshing || !isSessionRefreshed) return;
     // 토큰이 없어도 시도 — PushManager 내에서 gracefully 처리
     PushManager.subscribe(apiBase).then(result => {
       if (result.success) {
@@ -140,6 +141,7 @@ function AppContent() {
           setAccessToken(refreshData.access_token);
           setStoreUserProfile(refreshData.user);
           if (refreshData.ghost_token) setGhostToken(refreshData.ghost_token);
+          setIsSessionRefreshed(true);
           setIsRefreshing(false);
           return;
         }
@@ -166,6 +168,7 @@ function AppContent() {
             setAccessToken(ghostData.access_token);
             setStoreUserProfile(ghostData.user);
             if (ghostData.ghost_token) setGhostToken(ghostData.ghost_token);
+            setIsSessionRefreshed(true);
             setIsRefreshing(false);
             return;
           } else {

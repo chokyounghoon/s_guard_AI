@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v12'; // force cache invalidation for interceptor fix
+const CACHE_NAME = 'sguard-v13'; // push payload unwrap fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -96,35 +96,46 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   // 기본값 세팅
   let title = 'S-Guard AI';
-  let body = '장애가 수신되었습니다. S-GUARD로 이동하세요.';
+  let body = '새로운 장애 알림이 수신되었습니다.';
   let tag = 'sguard-push';
   let url = '/';
   let vibrate = [200, 100, 200];
 
-  // 페이로드 파싱 (실패해도 기본값 사용)
+  // 페이로드 파싱
   if (event.data) {
     try {
       const rawText = event.data.text();
-      console.log('[SW] Raw push text (first 200):', rawText.substring(0, 200));
-      const data = JSON.parse(rawText);
+      console.log('[SW] Raw push text:', rawText.substring(0, 300));
+
+      let raw;
+      try {
+        raw = JSON.parse(rawText);
+      } catch (e) {
+        raw = { body: rawText };
+      }
+
+      // 백엔드가 { notification: { title, body, ... }, data: {...} } 구조로 보내는 경우 언래핑
+      const data = (raw && raw.notification)
+        ? { ...raw.notification, ...(raw.notification.data || {}) }
+        : raw;
+
       if (data.title) title = data.title;
       if (data.body)  body  = data.body;
       if (data.tag)   tag   = data.tag;
       if (data.url)   url   = data.url;
-      if (data.inc_id) body = `📋 장애ID: ${data.inc_id}\n` + body;
+
+      // 장애 ID가 있으면 앞에 표시 (중복 방지)
+      if (data.inc_id && body && !body.includes(data.inc_id)) {
+        body = `📋 ${data.inc_id} | ` + body;
+      }
+
       const priority = typeof data.priority === 'number' ? data.priority : 0;
       if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
     } catch (e) {
-      console.error('[SW] Push JSON parse failed:', e.message);
-      // 원시 텍스트라도 보여주기 시도
-      try {
-        const raw = event.data.text();
-        if (raw && raw.length > 0 && raw.length < 500) body = raw;
-      } catch (_) {}
+      console.error('[SW] Push processing failed:', e.message);
     }
   }
 
-  // tag에 타임스탬프를 붙여 매번 새 알림으로 표시 (이전 알림 미확인 상태여도 새 알림 생성)
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
@@ -134,7 +145,7 @@ self.addEventListener('push', (event) => {
       tag: `${tag}-${Date.now()}`,
       renotify: true,
       silent: false,
-      requireInteraction: (typeof vibrate[0] === 'number' && vibrate.length >= 5),
+      requireInteraction: (vibrate.length >= 5),
       data: { url }
     })
   );

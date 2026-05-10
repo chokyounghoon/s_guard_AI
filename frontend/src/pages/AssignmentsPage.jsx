@@ -37,7 +37,7 @@ export default function AssignmentsPage() {
       .then(data => {
         const mapped = (data.assignments || []).map(inc => ({
           id: inc.inc_id,
-          code: inc.inc_id.startsWith('INC-') ? inc.inc_id : `INC-${inc.inc_id}`,
+          code: inc.inc_id,
           assignmentType: 'SMS',
           severity: inc.severity || 'NORMAL',
           status: inc.status || '미확인',
@@ -134,7 +134,7 @@ export default function AssignmentsPage() {
                   key={assignment.id}
                   onClick={(e) => {
                     if (e.target.closest('button')) return;
-                    const cleanId = String(assignment.inc_id).replace('INC-', '');
+                    const cleanId = String(assignment.inc_id);
                     
                     // 처리완료인 경우 채팅방이 아닌 리포트 페이지로 이동
                     if (assignment.status === '처리완료' || assignment.status === '조치완료') {

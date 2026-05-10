@@ -235,7 +235,16 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
                     </div>
                     {/* Time */}
                     <span className="text-[9px] text-slate-600 shrink-0 mb-1 tabular-nums">
-                      {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      {(() => {
+                        const d = new Date();
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const mi = String(d.getMinutes()).padStart(2, '0');
+                        const ss = String(d.getSeconds()).padStart(2, '0');
+                        return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+                      })()}
                     </span>
                   </div>
                 </div>

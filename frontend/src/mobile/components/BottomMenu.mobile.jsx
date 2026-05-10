@@ -61,7 +61,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-blue-600/10 blur-[60px] rounded-full pointer-events-none" />
               <div className="w-12 h-1.5 rounded-full mb-5 bg-white/10" />
               <h3 className="text-xl font-black text-white tracking-tight">System Console</h3>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-1 text-blue-500">Management & Intelligence</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-1 text-blue-500 pb-1 leading-normal">Management & Intelligence</p>
             </div>
 
             {/* Manual Entry - 전체 너비 강조 버튼 */}
@@ -125,6 +125,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'Push\nDiagnostic', sub: '푸시 진단', icon: Bell, path: '/push-diagnostic', color: '#f59e0b' },
                 { label: 'AI Report', sub: 'AI 리포트', icon: FileText, path: '/ai-report', color: '#3b82f6' },
                 { label: 'Report\nSearch', sub: '리포트 검색', icon: Search, path: '/mobile-report-search', color: '#10b981' },
+                { label: 'S-Callert', sub: '상황전파', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
                 const Icon = item.icon;
                 return (

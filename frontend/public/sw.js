@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v12'; // force cache invalidation for interceptor fix
+const CACHE_NAME = 'sguard-v13'; // push payload unwrap fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -107,13 +107,15 @@ self.addEventListener('push', (event) => {
       const rawText = event.data.text();
       console.log('[SW] Push Received:', rawText);
       
-      let data;
+      let raw;
       try {
-        data = JSON.parse(rawText);
+        raw = JSON.parse(rawText);
       } catch (e) {
-        // JSON이 아닌 일반 텍스트일 경우
-        data = { body: rawText };
+        raw = { body: rawText };
       }
+
+      // 백엔드가 { notification: { title, body, ... }, data: {...} } 구조로 보내는 경우 언래핑
+      const data = raw.notification ? { ...raw.notification, ...raw.notification.data } : raw;
 
       if (data.title !== undefined) title = data.title;
       if (data.body !== undefined)  body  = data.body;
@@ -122,7 +124,7 @@ self.addEventListener('push', (event) => {
       
       // 장애 ID가 있다면 본문 상단에 추가 (중복 방지 로직 포함)
       if (data.inc_id && body && !body.includes(data.inc_id)) {
-        body = `📋 장애ID: ${data.inc_id}\n` + body;
+        body = `📋 ${data.inc_id} | ` + body;
       }
       
       const priority = typeof data.priority === 'number' ? data.priority : 0;

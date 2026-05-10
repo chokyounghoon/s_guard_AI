@@ -134,7 +134,7 @@ export default function ChatPage() {
   // Load chat history (reusable for polling)
   const fetchChatHistory = React.useCallback(async (isAutoPoll = false) => {
     if (!isAutoPoll) setIsLoading(true);
-    const normId = String(incidentId).replace('INC-', '');
+    const normId = String(incidentId);
     try {
       const res = await fetch(getApiUrl(`/warroom/chat/${normId}`), {
         headers: getAuthHeaders()
@@ -223,7 +223,7 @@ export default function ChatPage() {
   }, [fetchWorkflowDetails]);
 
   const fetchParticipants = React.useCallback(async () => {
-    const normId = String(incidentId).replace('INC-', '');
+    const normId = String(incidentId);
     try {
       const res = await fetch(getApiUrl(`/warroom/participants/${normId}`), {
         headers: getAuthHeaders()
@@ -238,7 +238,7 @@ export default function ChatPage() {
   }, [incidentId]);
 
   const fetchActivityLogs = React.useCallback(async () => {
-    const normId = String(incidentId).replace('INC-', '');
+    const normId = String(incidentId);
     try {
       const res = await fetch(getApiUrl(`/activity-logs?inc_id=${normId}`), {
         headers: getAuthHeaders()
@@ -256,7 +256,7 @@ export default function ChatPage() {
 
   const fetchAnalysisSummary = React.useCallback(async () => {
     try {
-      const normId = incidentId.replace('INC-', '');
+      const normId = incidentId;
       // /warroom/report/:id 가 autopilot_insight, leader_summary 등을 반환
       const res = await fetch(getApiUrl(`/warroom/report/${normId}`), {
         headers: getAuthHeaders()
@@ -621,8 +621,8 @@ export default function ChatPage() {
   // Warp/Jump to message function
   const handleWarpToMessage = (target_incident_id, seq) => {
     // Standardize IDs: strip 'INC-' if present
-    const currentId = incidentId.replace('INC-', '');
-    const cleanTargetId = String(target_incident_id).replace('INC-', '');
+    const currentId = incidentId;
+    const cleanTargetId = String(target_incident_id);
 
     if (cleanTargetId !== currentId) {
       if (window.confirm(`다른 장애방(INC-${target_incident_id})의 메시지입니다. 해당 방으로 이동하시겠습니까?`)) {
@@ -1202,7 +1202,7 @@ export default function ChatPage() {
           <div className="flex flex-col min-w-0 flex-1 pr-2">
             {/* 장애 ID */}
             <span className="font-bold text-sm sm:text-base truncate text-white">
-              {incidentId?.replace('INC-', '')}
+              {incidentId}
             </span>
             {/* SMS 내용 2줄 말줄임 + 롱프레스 */}
             {roomDescription && (
@@ -2043,7 +2043,7 @@ export default function ChatPage() {
             <div className="px-5 mb-3 flex items-center justify-between">
               <div>
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">장애 ID</p>
-                <p className="text-base font-black text-white">{incidentId?.replace('INC-', '')}</p>
+                <p className="text-base font-black text-white">{incidentId}</p>
               </div>
               <button onClick={() => setShowFullDesc(false)} className="p-2 rounded-full hover:bg-white/10">
                 <X className="w-4 h-4 text-slate-400" />

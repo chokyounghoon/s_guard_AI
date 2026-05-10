@@ -416,7 +416,7 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                           fontSize: 13, fontWeight: 800, fontFamily: 'monospace', color: '#818cf8',
                           background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)',
                           borderRadius: 6, padding: '2px 8px',
-                        }}>INC-{String(incId).replace('INC-', '')}</span>
+                        }}>INC-{String(incId)}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{
                             fontSize: 12, fontWeight: 800, color: stColor,
