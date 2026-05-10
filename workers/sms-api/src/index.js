@@ -3212,6 +3212,19 @@ app.post('/sms/receive', async (c) => {
     tags, category
   ).run()
 
+  // 🚀 NEW: Auto-sync to incidents table to prevent 404s on detail pages
+  try {
+    const incTitle = `INC-${newIncId} | ${maskedMessage.substring(0, 100)}`;
+    await db.prepare(`
+      INSERT OR IGNORE INTO incidents (
+        inc_id, title, description, severity, status, incident_type,
+        reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at
+      ) VALUES (?, ?, ?, 'NORMAL', 'INC_001', 'AI', 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
+    `).bind(newIncId, incTitle, maskedMessage, timestamp, timestamp, timestamp, timestamp).run();
+  } catch (e) {
+    console.error("[Sync-Incidents] Error:", e.message);
+  }
+
   // --- 🚀 NEW: Automatic Assignment by Sender's Rank (New Path) ---
   if (employee_id) {
      try {
@@ -7608,15 +7621,26 @@ app.get('/ai/incident/:inc_id', async (c) => {
   const normId = String(rawId)
   const db = c.env.DB
   
+  // High-performance query starting from received_messages to ensure no 404s for new SMS
   const incident = await db.prepare(`
-    SELECT i.*, u.name as assignee_name,
-           r.message as sms_message, r.sender as sms_sender
-    FROM incidents i 
+    SELECT 
+      COALESCE(i.inc_id, r.inc_id) as inc_id,
+      COALESCE(i.title, 'INC-' || r.inc_id || ' | ' || r.message) as title,
+      COALESCE(i.status, 'INC_001') as status,
+      i.description, 
+      COALESCE(i.severity, 'NORMAL') as severity,
+      i.incident_type, 
+      i.assigned_to,
+      u.name as assignee_name,
+      r.message as sms_message, 
+      r.sender as sms_sender,
+      r.timestamp as created_at
+    FROM received_messages r
+    LEFT JOIN incidents i ON r.inc_id = i.inc_id
     LEFT JOIN users u ON i.assigned_to = u.employee_id 
-    LEFT JOIN received_messages r ON r.inc_id = ?
-    WHERE i.inc_id = ? 
+    WHERE r.inc_id = ? 
     LIMIT 1
-  `).bind(normId, normId).first()
+  `).bind(normId).first()
   
   if (!incident) return c.json({ error: "Not found" }, 404)
   return c.json({ incident })

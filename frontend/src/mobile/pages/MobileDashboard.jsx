@@ -1290,10 +1290,14 @@ export default function DashboardPage({ onAiClick }) {
 
   return (
     <div className="text-white font-sans overflow-x-clip relative" style={{ background: '#080c14', minHeight: '100dvh' }}>
-
-      {/* ── TOP NAV ──────────────────────────────────── */}
-      <nav className="mobile-top-nav flex justify-between items-center px-4 sticky top-0 z-30"
-        style={{ background: '#080c14', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <nav className="mobile-top-nav flex justify-between items-end px-4 sticky top-0 z-[100]"
+        style={{ 
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: '12px',
+          height: 'calc(62px + env(safe-area-inset-top, 0px))',
+          background: '#080c14', 
+          borderBottom: '1px solid rgba(255,255,255,0.06)' 
+        }}>
 
         {/* Left: logo + icon buttons */}
         <div className="flex items-center gap-3 shrink-0">
@@ -1396,7 +1400,7 @@ export default function DashboardPage({ onAiClick }) {
 
         {/* Tooltip */}
         {activeTooltip && (
-          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[200]">
+          <div className="fixed left-1/2 -translate-x-1/2 z-[200]" style={{ top: 'calc(70px + env(safe-area-inset-top, 0px))' }}>
             <div className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white tracking-widest uppercase"
               style={{ background: '#1e40af', border: '1px solid rgba(96,165,250,0.4)' }}>
               {activeTooltip}
@@ -1407,7 +1411,7 @@ export default function DashboardPage({ onAiClick }) {
 
       {/* Top Banner Messages */}
       {messages.length > 0 && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md p-4 space-y-2">
+        <div className="fixed left-1/2 -translate-x-1/2 z-[150] w-full max-w-md p-4 space-y-2" style={{ top: 'calc(70px + env(safe-area-inset-top, 0px))' }}>
           {messages.map(msg => (
             <div
               key={msg.id}
