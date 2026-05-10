@@ -92,17 +92,24 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
           },
 
           p: ({ children }) => {
-            const childrenArray = React.Children.toArray(children);
-            const contentStr = childrenArray.map(child => typeof child === 'string' ? child : '').join('');
+            // Helper to get text content from children for pattern matching
+            const getText = (node) => {
+              if (typeof node === 'string') return node;
+              if (Array.isArray(node)) return node.map(getText).join('');
+              if (node?.props?.children) return getText(node.props.children);
+              return '';
+            };
+            
+            const contentStr = getText(children);
 
             // 💡 핵심 원인 (Root Cause)
             if (contentStr.includes('💡 핵심 원인') || contentStr.includes('Root Cause:')) {
               return (
                 <div className="my-3 flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                   <TriangleAlert className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Root Cause</span>
-                    <div className="text-amber-50/90 text-[14px] leading-relaxed">{children}</div>
+                    <div className="text-amber-50/90 text-[14px] leading-relaxed break-words">{children}</div>
                   </div>
                 </div>
               );
@@ -113,15 +120,15 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
               return (
                 <div className="my-3 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
                   <CircleCheckBig className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Resolution</span>
-                    <div className="text-emerald-50/90 text-[14px] leading-relaxed">{children}</div>
+                    <div className="text-emerald-50/90 text-[14px] leading-relaxed break-words">{children}</div>
                   </div>
                 </div>
               );
             }
 
-            return <div className="mb-1.5 text-slate-200 leading-relaxed text-[14px]">{children}</div>;
+            return <div className="mb-1.5 text-slate-200 leading-relaxed text-[14px] break-words">{children}</div>;
           },
 
           ol: ({ children }) => <div className="space-y-1 my-2">{children}</div>,
@@ -131,35 +138,34 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
             const extractText = (node) => {
               if (typeof node === 'string' || typeof node === 'number') return String(node);
               if (Array.isArray(node)) return node.map(extractText).join('');
-              if (React.isValidElement(node)) return extractText(node.props.children);
+              if (node?.props?.children) return extractText(node.props.children);
               return '';
             };
             const content = extractText(children).trim();
             if (!content || content === '*' || content === '-') return null;
 
-            // ⏱️ Timeline Item
+            // ⏱️ Timeline Item pattern matching
             const timestampMatch = content.match(/^\[?((?:\d{4}-\d{2}-\d{2}\s)?\d{2}:\d{2}(?::\d{2})?(?:\s*~\s*\d{2}:\d{2})?(?:\sKST)?)\]?/);
             if (timestampMatch || content.match(/^\d{2}:\d{2}/)) {
               const fullMatch = timestampMatch ? timestampMatch[0] : content.split(':')[0] + ':' + content.split(':')[1].substring(0,2);
               const timestamp = timestampMatch ? timestampMatch[1] : fullMatch;
-              const text = content.replace(fullMatch, '').replace(/^[:\s\-~]+/, '').trim();
-
+              
+              // We keep the original children but try to indent them
               return (
                 <div className="flex items-start gap-2 py-1 group">
                   <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
                   <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono text-[11px] font-black border border-blue-500/20 shrink-0">
                     {timestamp}
                   </span>
-                  <span className="text-slate-200 text-[14px] leading-relaxed">{text}</span>
+                  <span className="text-slate-200 text-[14px] leading-relaxed break-words">{children}</span>
                 </div>
               );
             }
 
-            // Regular List Item — children 그대로 렌더링하여 링크/버튼 엘리먼트 보존
             return (
               <div className="flex items-start gap-2 py-1">
                 <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500/70 shrink-0" />
-                <span className="text-slate-200 text-[14px] leading-relaxed">{children}</span>
+                <span className="text-slate-200 text-[14px] leading-relaxed break-words">{children}</span>
               </div>
             );
           },
