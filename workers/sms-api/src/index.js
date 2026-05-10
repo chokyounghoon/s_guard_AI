@@ -363,7 +363,6 @@ const sendPushNotification = async (c, userId, payload) => {
           }
         };
 
-        // 플랫 구조로 전송 — SW에서 별도 언래핑 없이 바로 title/body 사용 가능
         const notificationPayload = {
           title:    payload.title   || '[S-GUARD]',
           body:     payload.body    || '새 알림이 수신되었습니다.',
@@ -376,18 +375,28 @@ const sendPushNotification = async (c, userId, payload) => {
           vibrate:  (payload.priority || 50) >= 80 ? [300, 100, 300, 100, 300] : [200, 100, 200]
         };
 
-        const encoder = new TextEncoder();
-        const payloadBuffer = encoder.encode(JSON.stringify(notificationPayload));
+        const payloadStr = JSON.stringify(notificationPayload);
+        console.log('[Push] Sending payload to', sub.endpoint.substring(0, 40), '| body:', payloadStr.substring(0, 80));
+        console.log('[Push] p256dh length:', sub.p256dh?.length, '| auth length:', sub.auth?.length);
 
-        const pushPayload = await buildPushPayload(
-          payloadBuffer,
-          subscription,
-          {
-            subject: vapidSubject,
-            publicKey: vapidPublicKey,
-            privateKey: vapidPrivateKey
-          }
-        );
+        let pushPayload;
+        try {
+          pushPayload = await buildPushPayload(
+            payloadStr,
+            subscription,
+            {
+              subject: vapidSubject,
+              publicKey: vapidPublicKey,
+              privateKey: vapidPrivateKey
+            }
+          );
+          console.log('[Push] buildPushPayload success. body byteLength:', pushPayload.body?.byteLength);
+          console.log('[Push] headers:', JSON.stringify(pushPayload.headers));
+        } catch (buildErr) {
+          console.error('[Push] buildPushPayload FAILED:', buildErr.message);
+          results.push({ endpoint: sub.endpoint.substring(0, 30) + '...', error: 'buildPushPayload: ' + buildErr.message });
+          continue;
+        }
 
         const response = await fetch(sub.endpoint, {
           method: 'POST',
@@ -395,16 +404,21 @@ const sendPushNotification = async (c, userId, payload) => {
           body: pushPayload.body
         });
 
+        const resText = await response.text().catch(() => '');
+        console.log('[Push] Push server response:', response.status, resText.substring(0, 100));
+
         results.push({
           endpoint: sub.endpoint.substring(0, 30) + '...',
           status: response.status,
-          ok: response.ok
+          ok: response.ok,
+          responseBody: resText.substring(0, 80)
         });
 
         if (response.status === 410 || response.status === 404) {
           await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(sub.endpoint).run();
         }
       } catch (err) {
+        console.error('[Push] Outer error:', err.message);
         results.push({ endpoint: sub.endpoint.substring(0, 30) + '...', error: err.message });
       }
     }
