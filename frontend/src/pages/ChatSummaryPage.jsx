@@ -961,19 +961,19 @@ export default function ChatSummaryPage() {
                 const now = new Date();
                 const formatDHMS = (from, to) => {
                   if (!from) return '-';
-                  const ms = (to ? new Date(to.timestamp) : now) - new Date(from.timestamp);
-                  if (ms < 0) return '-';
+                  const diff = (to ? new Date(to.timestamp) : now) - new Date(from.timestamp);
+                  const ms = Math.max(0, diff);
                   const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000);
                   const m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
-                  if (d > 0) return `${d}일 ${h}시간 ${m}분 ${s}초`;
-                  if (h > 0) return `${h}시간 ${m}분 ${s}초`;
-                  if (m > 0) return `${m}분 ${s}초`;
-                  return `${s}초`;
+                  if (d > 0) return `${d}d ${h}h ${m}m ${s}s`;
+                  if (h > 0) return `${h}h ${m}m ${s}s`;
+                  if (m > 0) return `${m}m ${s}s`;
+                  return `${s}s`;
                 };
                 return (
                   <div className="p-3 bg-white/[0.02] rounded-xl border border-white/5">
                     <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-2">장애처리현황 MTTR</div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-4 gap-1.5">
                       {[
                         { label: '인지', from: smsStep, to: ragStep },
                         { label: '분석', from: ragStep, to: warStep },
@@ -982,12 +982,12 @@ export default function ChatSummaryPage() {
                       ].map(({ label, from, to }) => {
                         const isDone = !!to, isActive = !!from && !to;
                         return (
-                          <div key={label} className={`flex flex-col gap-0.5 px-3 py-2 rounded-lg border ${isDone ? 'bg-emerald-500/5 border-emerald-500/20' : isActive ? 'bg-blue-500/5 border-blue-500/20' : 'bg-white/[0.01] border-white/5'}`}>
+                          <div key={label} className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border ${isDone ? 'bg-emerald-500/5 border-emerald-500/20' : isActive ? 'bg-blue-500/5 border-blue-500/20' : 'bg-white/[0.01] border-white/5'}`}>
                             <div className="flex items-center gap-1">
                               <div className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-400' : isActive ? 'bg-blue-400 animate-pulse' : 'bg-slate-600'}`} />
-                              <span className={`text-[9px] font-black ${isDone ? 'text-emerald-400' : isActive ? 'text-blue-400' : 'text-slate-600'}`}>{label}</span>
+                              <span className={`text-[8px] font-black leading-none ${isDone ? 'text-emerald-400' : isActive ? 'text-blue-400' : 'text-slate-600'}`}>{label}</span>
                             </div>
-                            <span className={`text-[11px] font-black font-mono ${isDone ? 'text-emerald-300' : isActive ? 'text-blue-300' : 'text-slate-600'}`}>{formatDHMS(from, to)}</span>
+                            <span className={`text-[10px] font-black font-mono leading-tight truncate ${isDone ? 'text-emerald-300' : isActive ? 'text-blue-300' : 'text-slate-600'}`}>{formatDHMS(from, to)}</span>
                           </div>
                         );
                       })}

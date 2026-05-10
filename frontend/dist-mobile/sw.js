@@ -94,9 +94,9 @@ self.addEventListener('fetch', (event) => {
 
 // 🔔 PUSH: Web Push Notification Receiver
 self.addEventListener('push', (event) => {
-  // 기본값 세팅
+  // 기본값 세팅 (데이터 파싱 실패 시 대비)
   let title = 'S-Guard AI';
-  let body = '새로운 장애 알림이 수신되었습니다.';
+  let body = '새로운 보안 알림이 수신되었습니다. 내용을 확인하려면 클릭하세요.';
   let tag = 'sguard-push';
   let url = '/';
   let vibrate = [200, 100, 200];
@@ -105,8 +105,8 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       const rawText = event.data.text();
-      console.log('[SW] Raw push text:', rawText.substring(0, 300));
-
+      console.log('[SW] Push Received:', rawText);
+      
       let raw;
       try {
         raw = JSON.parse(rawText);
@@ -114,45 +114,38 @@ self.addEventListener('push', (event) => {
         raw = { body: rawText };
       }
 
-      // 플랫 구조(백엔드 v2) 또는 래퍼 구조(이전 버전) 모두 지원
-      const data = (raw && raw.notification)
-        ? { ...raw.notification, ...(raw.notification.data || {}) }
-        : raw;
+      // 백엔드가 { notification: { title, body, ... }, data: {...} } 구조로 보내는 경우 언래핑
+      const data = raw.notification ? { ...raw.notification, ...raw.notification.data } : raw;
 
       if (data.title !== undefined) title = data.title;
       if (data.body !== undefined)  body  = data.body;
       if (data.tag !== undefined)   tag   = data.tag;
       if (data.url !== undefined)   url   = data.url;
-
-      // 장애 ID가 있으면 앞에 표시 (중복 방지)
+      
+      // 장애 ID가 있다면 본문 상단에 추가 (중복 방지 로직 포함)
       if (data.inc_id && body && !body.includes(data.inc_id)) {
         body = `📋 ${data.inc_id} | ` + body;
       }
-
-      // vibrate: 데이터에 있으면 사용, 아니면 priority 기준
-      if (Array.isArray(data.vibrate)) {
-        vibrate = data.vibrate;
-      } else {
-        const priority = typeof data.priority === 'number' ? data.priority : 0;
-        if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
-      }
+      
+      const priority = typeof data.priority === 'number' ? data.priority : 0;
+      if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
     } catch (e) {
       console.error('[SW] Push processing failed:', e.message);
     }
   }
 
+  const options = {
+    body: body,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: vibrate,
+    tag: `${tag}-${Date.now()}`, // 매번 새로운 알림으로 표시
+    renotify: true,
+    data: { url: url }
+  };
+
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      vibrate,
-      tag: `${tag}-${Date.now()}`,
-      renotify: true,
-      silent: false,
-      requireInteraction: (vibrate.length >= 5),
-      data: { url }
-    })
+    self.registration.showNotification(title, options)
   );
 });
 

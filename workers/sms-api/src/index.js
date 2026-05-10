@@ -940,6 +940,14 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
     if (sms) {
       // Mark as ANALYZING so UI can show a spinner
       await db.prepare("UPDATE received_messages SET status = 'ANALYZING' WHERE inc_id = ?").bind(String(sms_id)).run();
+      
+      // 🚀 [Activity Log] RAG/AGENT 분석 시작 기록
+      try {
+        await db.prepare(`
+          INSERT INTO activity_logs (inc_id, type, status, message, created_at, reg_id)
+          VALUES (?, 'AGENT', 'PROCESSING', 'AI 분석 및 지능형 에이전트 가동 중...', ?, 'SYSTEM')
+        `).bind(String(sms_id), getKst()).run();
+      } catch (e) { console.error("[Activity-Log-Start] Error:", e.message); }
     }
 
     if (!sms) {
@@ -1274,6 +1282,20 @@ ${detailedInfo}`;
             similarity_reason=COALESCE(excluded.similarity_reason, autopilot_insight.similarity_reason)
         `).bind(String(sms_id), fullOutput, alertSeverity ?? 'NORMAL', now, now, similarityScore ?? null, difyReason).run();
         await db.prepare("UPDATE received_messages SET status = 'ANALYZED' WHERE inc_id = ?").bind(String(sms_id)).run();
+        
+        // 🚀 [Activity Log] RAG/AGENT 분석 완료 기록
+        try {
+          await db.prepare(`
+            UPDATE activity_logs SET status = 'SUCCESS', message = 'AI 지능형 분석 및 전문가 진단이 완료되었습니다.', created_at = ?
+            WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
+          `).bind(getKst(), String(sms_id)).run();
+          
+          // 만약 위에서 업데이트가 안 되었다면 (중복 방지 등으로 INSERT가 안 된 경우 등) 새로 삽입
+          await db.prepare(`
+            INSERT OR IGNORE INTO activity_logs (inc_id, type, status, message, created_at, reg_id)
+            VALUES (?, 'AGENT', 'SUCCESS', 'AI 지능형 분석 완료', ?, 'SYSTEM')
+          `).bind(String(sms_id), getKst()).run();
+        } catch (e) { console.error("[Activity-Log-Success] Error:", e.message); }
       } else {
         // Specific Error Hints based on status
         let errorMsg = FALLBACK_MSG;
@@ -1299,6 +1321,13 @@ ${detailedInfo}`;
         // DB 저장을 건너뛰어 대시보드가 항상 신선한 데이터를 요구하게 함
         
         await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
+        // 🚀 [Activity Log] 실패 기록
+        try {
+          await db.prepare(`
+            UPDATE activity_logs SET status = 'FAIL', message = 'AI 분석 엔진이 응답하지 않거나 오류가 발생했습니다.', created_at = ?
+            WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
+          `).bind(getKst(), String(sms_id)).run();
+        } catch (e) {}
       }
     }
 
@@ -1308,6 +1337,13 @@ ${detailedInfo}`;
   } catch (err) {
     console.error(`[Background] Error analyzing SMS ${sms_id}:`, err);
     await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
+    // 🚀 [Activity Log] 치명적 오류 기록
+    try {
+      await db.prepare(`
+        UPDATE activity_logs SET status = 'FAIL', message = 'AI 분석 중 치명적 오류가 발생했습니다.', created_at = ?
+        WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
+      `).bind(getKst(), String(sms_id)).run();
+    } catch (e) {}
     
     // Log fatal error to trace
     try {
@@ -3075,10 +3111,10 @@ app.post('/sms/receive', async (c) => {
     c.executionCtx.waitUntil(performBackgroundAiAnalysis(existing.inc_id, c.env).catch(e => console.error(e)));
 
     // 🔔 즉시 푸시 - 중복 수신 시에도 본인 + 모든 담당자에게 일괄 전송
-    const dupMsgPreview = (message || '내용 없음').substring(0, 80);
+    const dupMsgPreview = (message || '내용 없음').substring(0, 120);
     const dupPushPayload = {
       title: `[S-GUARD] 🔁 반복 장애 알림 (×${newCount})`,
-      body: `발신: ${sender || '알 수 없음'} | ${dupMsgPreview}`,
+      body: dupMsgPreview,
       inc_id: String(existing.inc_id),
       priority: 70,
       url: `/inbox`,
@@ -3202,10 +3238,10 @@ app.post('/sms/receive', async (c) => {
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
   // 🔔 즉시 푸시 - 할당된 모든 사용자에게 일괄 전송
-  const msgPreview = (message || '내용 없음').substring(0, 80);
+  const msgPreview = (message || '내용 없음').substring(0, 120);
   const immediatePushPayload = {
-    title: detectedCount > 0 ? `🚨 [S-GUARD] 키워드 감지됨` : `📩 [S-GUARD] 새 문자 수신`,
-    body: `발신: ${sender || '알 수 없음'} | ${msgPreview}`,
+    title: detectedCount > 0 ? `🚨 [S-GUARD] 키워드 감지` : `📩 [S-GUARD] 새 문자 수신`,
+    body: msgPreview,
     inc_id: String(newIncId),
     priority: detectedCount > 0 ? 90 : 50,
     url: `/inbox`,

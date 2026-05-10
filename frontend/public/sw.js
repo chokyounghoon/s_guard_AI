@@ -114,20 +114,27 @@ self.addEventListener('push', (event) => {
         raw = { body: rawText };
       }
 
-      // 백엔드가 { notification: { title, body, ... }, data: {...} } 구조로 보내는 경우 언래핑
-      const data = raw.notification ? { ...raw.notification, ...raw.notification.data } : raw;
+      // 백엔드가 { title, body, ... } 플랫 구조로 보내는 경우를 우선 처리
+      if (raw.title) title = raw.title;
+      if (raw.body)  body  = raw.body;
+      if (raw.tag)   tag   = raw.tag;
+      if (raw.url)   url   = raw.url;
 
-      if (data.title !== undefined) title = data.title;
-      if (data.body !== undefined)  body  = data.body;
-      if (data.tag !== undefined)   tag   = data.tag;
-      if (data.url !== undefined)   url   = data.url;
-      
-      // 장애 ID가 있다면 본문 상단에 추가 (중복 방지 로직 포함)
-      if (data.inc_id && body && !body.includes(data.inc_id)) {
-        body = `📋 ${data.inc_id} | ` + body;
+      // 만약 notification 객체로 감싸져 있다면 (Legacy 대응)
+      if (raw.notification) {
+        if (raw.notification.title) title = raw.notification.title;
+        if (raw.notification.body)  body  = raw.notification.body;
+        if (raw.notification.tag)   tag   = raw.notification.tag;
+        if (raw.notification.data && raw.notification.data.url) url = raw.notification.data.url;
       }
       
-      const priority = typeof data.priority === 'number' ? data.priority : 0;
+      // 장애 ID가 있다면 본문 상단에 추가 (중복 방지 로직 포함)
+      const incId = raw.inc_id || (raw.notification && raw.notification.data && raw.notification.data.inc_id);
+      if (incId && body && !body.includes(incId)) {
+        body = `📋 ${incId} | ` + body;
+      }
+      
+      const priority = typeof raw.priority === 'number' ? raw.priority : (raw.notification && raw.notification.priority ? raw.notification.priority : 0);
       if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
     } catch (e) {
       console.error('[SW] Push processing failed:', e.message);
