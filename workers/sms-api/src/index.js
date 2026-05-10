@@ -3208,10 +3208,10 @@ app.post('/sms/receive', async (c) => {
     c.executionCtx.waitUntil(performBackgroundAiAnalysis(existing.inc_id, c.env).catch(e => console.error(e)));
 
     // 🔔 즉시 푸시 - 중복 수신 시에도 본인 + 모든 담당자에게 일괄 전송
-    const dupMsgPreview = (message || '내용 없음').substring(0, 120);
+    const dupMsgPreview = (message || '내용 없음').substring(0, 100);
     const dupPushPayload = {
       title: `[S-GUARD] 🔁 반복 장애 알림 (×${newCount})`,
-      body: dupMsgPreview,
+      body: `새로운 시스템 이벤트가 감지되었습니다.\n${dupMsgPreview}`,
       inc_id: String(existing.inc_id),
       priority: 70,
       url: `/inbox`,
@@ -3348,10 +3348,10 @@ app.post('/sms/receive', async (c) => {
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
   // 🔔 즉시 푸시 - 할당된 모든 사용자에게 일괄 전송
-  const msgPreview = (message || '내용 없음').substring(0, 120);
+  const msgPreview = (message || '내용 없음').substring(0, 100);
   const immediatePushPayload = {
     title: detectedCount > 0 ? `🚨 [S-GUARD] 키워드 감지` : `📩 [S-GUARD] 새 문자 수신`,
-    body: msgPreview,
+    body: `새로운 시스템 이벤트가 감지되었습니다.\n${msgPreview}`,
     inc_id: String(newIncId),
     priority: detectedCount > 0 ? 90 : 50,
     url: `/inbox`,
