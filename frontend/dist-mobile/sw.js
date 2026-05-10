@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v13'; // push payload unwrap fix
+const CACHE_NAME = 'sguard-v14'; // push payload unwrap fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -114,23 +114,28 @@ self.addEventListener('push', (event) => {
         raw = { body: rawText };
       }
 
-      // 백엔드가 { notification: { title, body, ... }, data: {...} } 구조로 보내는 경우 언래핑
+      // 플랫 구조(백엔드 v2) 또는 래퍼 구조(이전 버전) 모두 지원
       const data = (raw && raw.notification)
         ? { ...raw.notification, ...(raw.notification.data || {}) }
         : raw;
 
-      if (data.title) title = data.title;
-      if (data.body)  body  = data.body;
-      if (data.tag)   tag   = data.tag;
-      if (data.url)   url   = data.url;
+      if (data.title !== undefined) title = data.title;
+      if (data.body !== undefined)  body  = data.body;
+      if (data.tag !== undefined)   tag   = data.tag;
+      if (data.url !== undefined)   url   = data.url;
 
       // 장애 ID가 있으면 앞에 표시 (중복 방지)
       if (data.inc_id && body && !body.includes(data.inc_id)) {
         body = `📋 ${data.inc_id} | ` + body;
       }
 
-      const priority = typeof data.priority === 'number' ? data.priority : 0;
-      if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
+      // vibrate: 데이터에 있으면 사용, 아니면 priority 기준
+      if (Array.isArray(data.vibrate)) {
+        vibrate = data.vibrate;
+      } else {
+        const priority = typeof data.priority === 'number' ? data.priority : 0;
+        if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
+      }
     } catch (e) {
       console.error('[SW] Push processing failed:', e.message);
     }

@@ -257,27 +257,16 @@ export default function ChatSummaryPage() {
 
       } catch (err) {
         if (err.name === 'AbortError') {
-          // If we are already retrying or it's a stale controller, just ignore
           if (abortControllerRef.current !== currentController) return;
           console.error('[ChatSummary] Fetch Aborted (Timeout/Cancel)');
-          setError('AI 엔진 응답 대기 시간이 초과되었습니다. (15초)');
+          setError('AI 엔진 응답 대기 시간이 초과되었습니다.');
         } else {
           console.error('[ChatSummary] Summary fetch error:', err);
           setError(`분석 오류: ${err.message}`);
         }
 
-        // 자동 재시도 (최대 2회)
-        if (retryCountRef.current < 2) {
-          retryCountRef.current += 1;
-          console.log(`[ChatSummary] Retrying ${retryCountRef.current}/2 in 2s...`);
-          setLoadingStatus(`Dify 응답 실패 — ${retryCountRef.current}회 재시도 중...`);
-          await new Promise(res => setTimeout(res, 2000));
-          // 현재 controller가 여전히 유효하면 재시도
-          if (abortControllerRef.current === currentController) {
-            return fetchSummary(true);
-          }
-          return;
-        }
+        // 🚫 자동 재시도 비활성화: 백엔드 heartbeat(5s) + 90s timeout으로 안정화됨
+        // 재시도가 두 번째 summarize-chat 호출의 원인이었음
 
         // 🚑 로컬 비상 요약 엔진 (AI 장애 시 작동)
         const localSummary = `# [🛠️ 로컬 비상 장애 요약]\n\n현재 AI 리포트 생성 엔진이 일시적으로 응답하지 않아 시스템 기본 정보로 요약되었습니다.\n\n### 🚨 장애 개요\n- **인시던트 ID:** INC-${incidentId}\n- **분석 상태:** AI 자동 요약 지연 (Dify API Time-out)\n\n### 📝 주요 내용\n해당 인시던트에 대한 상세 대화 내역 및 조치 사항은 워룸(War-Room) 채널에서 직접 확인이 필요합니다.\n\n### 💡 조치 권고\n1. 관련 파트 담당자 소집 확인\n2. 장애 전파 및 유관 부서 공지\n3. 시스템 로그 및 모니터링 대시보드 집중 관측\n\n*정상 복구 시 AI 심층 요약 리포트가 자동으로 생성됩니다.*`;
@@ -391,6 +380,7 @@ export default function ChatSummaryPage() {
     fetchIncidentData();
 
     return () => {
+      // cleanup: abort 진행중인 요청 취소 (StrictMode에서 ref는 유지 — 두 번째 mount에서 guard가 작동함)
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }

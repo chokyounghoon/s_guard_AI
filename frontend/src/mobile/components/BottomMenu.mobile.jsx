@@ -16,7 +16,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
       <nav className="fixed bottom-0 left-0 right-0 z-[250] bg-[#0f1219]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden">
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
-          { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
+          { id: 'chat', label: 'WAR-ROOM', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
           { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox' },
           { id: 'my', label: 'MY', icon: User, path: '/my-assignments' },
           { id: 'more', label: '더보기', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
@@ -41,7 +41,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                   <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-purple-500 rounded-full border-2 border-[#0f1219] animate-pulse shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
                 )}
               </div>
-              <span className={`text-[9px] font-black tracking-widest leading-none uppercase ${isActive ? 'text-blue-400' : 'text-slate-500'}`}>
+              <span className={`text-[9px] font-black tracking-widest leading-none uppercase whitespace-nowrap ${isActive ? 'text-blue-400' : 'text-slate-500'}`}>
                 {item.label}
               </span>
             </button>

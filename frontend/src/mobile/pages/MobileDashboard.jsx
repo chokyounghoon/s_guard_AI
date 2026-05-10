@@ -1314,7 +1314,7 @@ export default function DashboardPage({ onAiClick }) {
                         handleOpenWarRoomFromInsight(insightSms, insightContent);
                       }}
                       disabled={isOpeningWarRoom}
-                      className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-black text-[10px] transition-all border border-white/10 ${btnCls} disabled:opacity-50 truncate`}
+                      className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-black text-[9px] transition-all border border-white/10 ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden`}
                     >
                       {isOpeningWarRoom ? (
                         <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />

@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw, ThumbsUp, ThumbsDown, CheckCircle, AlertCircle, X, ChevronRight } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
+
+// 🔗 장애 ID (INC- 또는 inc-숫자) 를 마크다운 링크로 변환 (대소문자 무관)
+const linkIncidentIds = (text) => {
+  if (!text) return text;
+  // 표준 HashRouter 링크 형식인 /#/ai-report/{id} 로 변환
+  return text.replace(/(?<!\[)(?<!\/)([Ii][Nn][Cc]-)(\d{10,})/g, (_, _prefix, id) => {
+    return `[INC-${id}](/#/ai-report/${id})`;
+  });
+};
 
 const getApiUrl = (endpoint) => {
   // 🚀 AI 스트리밍 성능 최적화: Vite Proxy를 거치지 않고 Worker로 직접 호출합니다.
@@ -56,6 +66,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
 };
 
 export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete }) {
+  const navigate = useNavigate();
   
   const formatYYMMDD = (dateStr) => {
     if (!dateStr) return '';
@@ -886,26 +897,23 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         <div className="w-full relative z-10">
           <div className={`leading-relaxed w-full ${textColor}`}>
               {displayedText ? (
-                <MarkdownViewer text={(() => {
-                  let t = displayedText;
-                  // [전문가별 심층 진단] 이하 제거
-                  const dIdx = t.indexOf('[전문가별 심층 진단]');
-                  if (dIdx !== -1) t = t.substring(0, dIdx).trim();
-                  // [리더의 최종 조치 가이드] 이하 제거 (Expert Advisor에서만 표시)
-                  const lIdx = t.indexOf('[리더의 최종 조치 가이드]');
-                  if (lIdx !== -1) t = t.substring(0, lIdx).trim();
-                  
-                  let finalResult = t || displayedText;
-                  
-                  // 지식베이스 유사도 정보가 있으면 텍스트 맨 위에 눈에 띄게 삽입
-                  if (insightData.similarity_score > 0 && insightData.similarity_reason) {
-                    const pct = (insightData.similarity_score * 100).toFixed(1);
-                    const reason = insightData.similarity_reason.replace(/\n/g, '\n> ');
-                    finalResult = `> **[ 🧠 지능형 지식베이스 매칭 (유사도 ${pct}%) ]**\n> ${reason}\n\n` + finalResult;
-                  }
-                  
-                  return finalResult;
-                })()} />
+                <MarkdownViewer
+                  text={(() => {
+                    let t = displayedText;
+                    const dIdx = t.indexOf('[전문가별 심층 진단]');
+                    if (dIdx !== -1) t = t.substring(0, dIdx).trim();
+                    const lIdx = t.indexOf('[리더의 최종 조치 가이드]');
+                    if (lIdx !== -1) t = t.substring(0, lIdx).trim();
+                    let finalResult = t || displayedText;
+                    if (insightData.similarity_score > 0 && insightData.similarity_reason) {
+                      const pct = (insightData.similarity_score * 100).toFixed(1);
+                      const reason = insightData.similarity_reason.replace(/\n/g, '\n> ');
+                      finalResult = `> **[ 🧠 지능형 지식베이스 매칭 (유사도 ${pct}%) ]**\n> ${reason}\n\n` + finalResult;
+                    }
+                    // 🔗 장애 ID 링크 변환
+                    return linkIncidentIds(finalResult);
+                  })()}
+                />
               ) : (
                 <span className="text-slate-500 font-bold tracking-tight animate-pulse flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>

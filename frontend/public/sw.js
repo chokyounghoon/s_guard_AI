@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v13'; // push payload unwrap fix
+const CACHE_NAME = 'sguard-v14'; // push payload unwrap fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

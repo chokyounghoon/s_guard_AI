@@ -35,7 +35,7 @@ const CodeBlock = ({ children, className }) => {
   );
 };
 
-const MarkdownViewer = ({ text }) => {
+const MarkdownViewer = ({ text, onLinkClick }) => {
   if (!text) return null;
 
   // 📝 Pre-process: 불필요 요소 제거 (번호 제목 **N.** 패턴은 유지)
@@ -69,6 +69,27 @@ const MarkdownViewer = ({ text }) => {
           ),
           strong: ({ children }) => <span className="font-black text-white">{children}</span>,
           em: ({ children }) => <span className="text-slate-400 italic">{children}</span>,
+
+          // 🔗 링크 렌더러: 내부 해시 링크는 현재 창에서, 외부 링크는 새 창에서 열기
+          a: ({ href, children }) => {
+            const isInternal = href && (href.startsWith('#') || href.startsWith('/#'));
+            return (
+              <a 
+                href={href} 
+                target={isInternal ? undefined : "_blank"} 
+                rel={isInternal ? undefined : "noreferrer"}
+                className="text-blue-400 underline underline-offset-2 hover:text-blue-300 font-bold"
+                onClick={(e) => {
+                  if (isInternal) {
+                    // 이벤트 전파 방지하여 부모 컴포넌트의 클릭 이벤트 간섭 차단
+                    e.stopPropagation();
+                  }
+                }}
+              >
+                {children}
+              </a>
+            );
+          },
 
           p: ({ children }) => {
             const childrenArray = React.Children.toArray(children);
@@ -134,11 +155,11 @@ const MarkdownViewer = ({ text }) => {
               );
             }
 
-            // Regular List Item
+            // Regular List Item — children 그대로 렌더링하여 링크/버튼 엘리먼트 보존
             return (
               <div className="flex items-start gap-2 py-1">
                 <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500/70 shrink-0" />
-                <span className="text-slate-200 text-[14px] leading-relaxed">{content}</span>
+                <span className="text-slate-200 text-[14px] leading-relaxed">{children}</span>
               </div>
             );
           },

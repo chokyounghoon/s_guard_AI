@@ -363,21 +363,17 @@ const sendPushNotification = async (c, userId, payload) => {
           }
         };
 
-        // Web Push 표준: { notification: { title, body, ... }, data: { ... } } 구조로 래핑
+        // 플랫 구조로 전송 — SW에서 별도 언래핑 없이 바로 title/body 사용 가능
         const notificationPayload = {
-          notification: {
-            title: payload.title || '[S-GUARD]',
-            body:  payload.body  || '',
-            icon:  '/icons/icon-192x192.png',
-            badge: '/icons/badge-72x72.png',
-            tag:   payload.tag  || 'sguard-alert',
-            vibrate: [200, 100, 200],
-            requireInteraction: (payload.priority || 50) >= 80,
-            data: {
-              url:    payload.url    || '/inbox',
-              inc_id: payload.inc_id || null
-            }
-          }
+          title:    payload.title   || '[S-GUARD]',
+          body:     payload.body    || '새 알림이 수신되었습니다.',
+          icon:     '/icons/icon-192.png',
+          badge:    '/icons/icon-192.png',
+          tag:      payload.tag     || 'sguard-alert',
+          url:      payload.url     || '/inbox',
+          inc_id:   payload.inc_id  || null,
+          priority: payload.priority || 50,
+          vibrate:  (payload.priority || 50) >= 80 ? [300, 100, 300, 100, 300] : [200, 100, 200]
         };
 
         const pushPayload = await buildPushPayload(
@@ -5662,7 +5658,7 @@ app.post('/ai/summarize-chat', async (c) => {
         let lock = await kv.get(lockKey);
         if (lock === 'processing') {
           console.log(`[Concurrency] Another user is summarizing chat for ${cleanId}. Waiting...`);
-          await writer.write(encode(`data: ${JSON.stringify({ status: '다른 사용자가 분석 중입니다. 대기 중...' })}\n\n`));
+          await writer.write(encode(`data: ${JSON.stringify({ status: '분석 중입니다. 처리 중 ...' })}\n\n`));
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(r => setTimeout(r, 1000));
             const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first();
@@ -9160,15 +9156,20 @@ export class WarRoom {
       case "MARK_READ":
         this.state.waitUntil((async () => {
           const db = this.env.DB;
-          // Decrement read_count in D1
+          // Decrement read_count in D1 — guard: only if this user hasn't already read
           await db.prepare("UPDATE warroom_chats SET read_count = CASE WHEN read_count > 0 THEN read_count - 1 ELSE 0 END WHERE inc_id = ? AND seq = ?")
             .bind(data.incident_id, data.seq).run();
+          
+          // Fetch actual updated value to broadcast (prevents client-side -1 drift)
+          const updated = await db.prepare("SELECT read_count FROM warroom_chats WHERE inc_id = ? AND seq = ?")
+            .bind(data.incident_id, data.seq).first();
           
           this.broadcast({
             type: "READ_UPDATE",
             incident_id: data.incident_id,
             seq: data.seq,
-            user_id: data.user_id
+            user_id: data.user_id,
+            read_count: updated?.read_count ?? 0  // 실제 DB 값을 broadcast
           });
         })());
         break;
