@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v30'; // Force SW update - push fix v30
+const CACHE_NAME = 'sguard-v32'; // Force SW update - enhanced debug
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -92,33 +92,43 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 🚀 [SW-v30] Robust Push Notification Handler
+// 🚀 [SW-v32] Robust Push Notification Handler (Enhanced Debug)
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push Event Received');
+  console.log('[SW] Push Event received:', event);
+  console.log('[SW] event.data exists:', !!event.data);
+  if (event.data) {
+    console.log('[SW] event.data methods:', Object.keys(Object.getPrototypeOf(event.data)));
+  }
 
   let pushData = {
-    title: 'S-Guard AI',
-    body: '새로운 알림이 수신되었습니다.',
+    title: 'S-Guard AI (Default)',
+    body: '새로운 시스템 이벤트가 감지되었습니다. (데이터 없음)',
     url: '/',
     tag: 'sguard-alert',
     vibrate: [100, 50, 100]
   };
 
   if (event.data) {
+    const rawText = event.data.text();
+    console.log('[SW] Raw payload text:', rawText);
     try {
-      const data = event.data.json();
+      const data = JSON.parse(rawText);
+      console.log('[SW] Parsed JSON:', data);
       if (data && typeof data === 'object') {
         pushData.title = data.title || pushData.title;
-        pushData.body = data.body || data.message || pushData.body;
-        pushData.url = data.url || data.link || pushData.url;
-        pushData.tag = data.tag || pushData.tag;
+        pushData.body  = data.body  || data.message || pushData.body;
+        pushData.url   = data.url   || data.link    || pushData.url;
+        pushData.tag   = data.tag   || pushData.tag;
         if (Array.isArray(data.vibrate)) pushData.vibrate = data.vibrate;
       }
     } catch (e) {
-      const text = event.data.text();
-      if (text) pushData.body = text;
+      console.warn('[SW] Parsing error or plain text:', e.message);
+      if (rawText) pushData.body = rawText;
     }
+  } else {
+    console.warn('[SW] Push event has NO data payload.');
   }
+  console.log('[SW] Final notification to show:', pushData);
 
   const options = {
     body: pushData.body,

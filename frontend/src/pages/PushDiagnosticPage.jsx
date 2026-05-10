@@ -114,6 +114,9 @@ export default function PushDiagnosticPage() {
   const [permLoad,  setPermLoad]  = useState(false);
   const [subLoad,   setSubLoad]   = useState(false);
   const [log,       setLog]       = useState([]);
+  const [customTitle, setCustomTitle] = useState('[S-Guard] 커스텀 테스트');
+  const [customBody,  setCustomBody]  = useState('이것은 커스텀 데이터 테스트 메시지입니다. 📱');
+  const [customLoad,  setCustomLoad]  = useState(false);
 
   const addLog = (msg, type = 'info') =>
     setLog(prev => [{ msg, type, time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }, ...prev].slice(0, 50));
@@ -220,6 +223,38 @@ export default function PushDiagnosticPage() {
         addLog('실패: ' + (data.error || res.status), 'err');
       }
     } catch (e) { addLog('오류: ' + e.message, 'err'); }
+  };
+
+  const handleCustomPush = async () => {
+    if (!customTitle.trim() || !customBody.trim()) { addLog('⚠️ 제목과 내용을 입력하세요', 'warn'); return; }
+    setCustomLoad(true);
+    addLog(`커스텀 푸시 발송 중... title="${customTitle}"`);
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`${API_BASE}/push/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          target_user_id: JSON.parse(localStorage.getItem('sguard_user') || '{}').employee_id || '',
+          title: customTitle,
+          body: customBody,
+          url: '/push-diagnostic',
+          tag: 'custom-test'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addLog(`✅ 커스텀 푸시 발송 완료 (대상: ${data.target})`, 'ok');
+        (data.results || []).forEach(r => {
+          if (r.error) addLog(`❌ 전송 실패: ${r.error}`, 'err');
+          else addLog(`📡 서버 응답: ${r.status} (${r.ok ? '성공' : '실패'})`, r.ok ? 'info' : 'err');
+        });
+        if (!data.results?.length) addLog('⚠️ 등록된 구독 기기 없음', 'warn');
+      } else {
+        addLog('실패: ' + (data.error || res.status), 'err');
+      }
+    } catch (e) { addLog('오류: ' + e.message, 'err'); }
+    setCustomLoad(false);
   };
 
   const handleDeepClean = async () => {
@@ -434,7 +469,7 @@ export default function PushDiagnosticPage() {
               </Btn>
             </div>
 
-            {/* 테스트 푸시 */}
+            {/* 테스트 푸시 (기본) */}
             <button
               onClick={handleTestPush}
               style={{
@@ -446,8 +481,49 @@ export default function PushDiagnosticPage() {
                 marginBottom: 7, transition: 'all 0.2s',
               }}
             >
-              <ShieldAlert size={13} /> 🚀 테스트 푸시 발송
+              <ShieldAlert size={13} /> 🚀 기본 테스트 푸시
             </button>
+
+            {/* 커스텀 데이터 테스트 */}
+            <div style={{ marginBottom: 7, padding: '12px', borderRadius: 12, border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.06)' }}>
+              <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(99,102,241,0.8)', letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 8px' }}>커스텀 데이터 테스트</p>
+              <input
+                value={customTitle}
+                onChange={e => setCustomTitle(e.target.value)}
+                placeholder="알림 제목"
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, marginBottom: 6, boxSizing: 'border-box'
+                }}
+              />
+              <textarea
+                value={customBody}
+                onChange={e => setCustomBody(e.target.value)}
+                placeholder="알림 내용 (SMS 메시지 내용 등)"
+                rows={2}
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, marginBottom: 8,
+                  resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit'
+                }}
+              />
+              <button
+                onClick={handleCustomPush}
+                disabled={customLoad}
+                style={{
+                  width: '100%', padding: '9px', borderRadius: 9,
+                  border: 'none',
+                  background: customLoad ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  color: customLoad ? 'rgba(255,255,255,0.3)' : '#fff',
+                  fontSize: 11, fontWeight: 800, cursor: customLoad ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  boxShadow: customLoad ? 'none' : '0 4px 14px rgba(99,102,241,0.35)',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {customLoad ? <><RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> 발송 중...</> : <><Radio size={11} /> 커스텀 데이터 발송</>}
+              </button>
+            </div>
 
             {/* 딥 클린 */}
             <button

@@ -376,8 +376,11 @@ const sendPushNotification = async (c, userId, payload) => {
           vibrate:  (payload.priority || 50) >= 80 ? [300, 100, 300, 100, 300] : [200, 100, 200]
         };
 
+        const encoder = new TextEncoder();
+        const payloadBuffer = encoder.encode(JSON.stringify(notificationPayload));
+
         const pushPayload = await buildPushPayload(
-          JSON.stringify(notificationPayload),
+          payloadBuffer,
           subscription,
           {
             subject: vapidSubject,
