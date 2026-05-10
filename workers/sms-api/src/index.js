@@ -4175,24 +4175,29 @@ app.post('/incidents', async (c) => {
   const inc_id = String(data.inc_id)
   const rawId = inc_id
 
-  // Fetch actual message from received_messages
-  const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
-  const msg = sms ? sms.message : (data.title || 'SMS 장애 감지')
-  const finalTitle = `INC-${inc_id} | ${msg}`
-  
-  const res = await db.prepare(`
-    INSERT INTO incidents (
-      inc_id, title, description, severity, status, incident_type, 
-      assigned_to, source_sms_id, ai_insight, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    rawId, finalTitle, data.description || null, data.severity || 'NORMAL', 
-    data.status || 'INC_001', data.incident_type || 'AI', data.assigned_to || null,
-    data.source_sms_id || null, data.ai_insight || null,
-    'SYSTEM', now, 'SYSTEM', now, now, now
-  ).run()
-  
-  return c.json({ status: "success", id: rawId, title: finalTitle })
+  try {
+    // Fetch actual message from received_messages
+    const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
+    const msg = sms ? sms.message : (data.title || 'SMS 장애 감지')
+    const finalTitle = `INC-${inc_id} | ${msg}`
+
+    await db.prepare(`
+      INSERT OR IGNORE INTO incidents (
+        inc_id, title, description, severity, status, incident_type, 
+        assigned_to, source_sms_id, ai_insight, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      rawId, finalTitle, data.description || null, data.severity || 'NORMAL',
+      data.status || 'INC_001', data.incident_type || 'AI', data.assigned_to || null,
+      data.source_sms_id || null, data.ai_insight || null,
+      'SYSTEM', now, 'SYSTEM', now, now, now
+    ).run()
+
+    return c.json({ status: "success", id: rawId, title: finalTitle })
+  } catch (e) {
+    console.error('[POST /incidents] Error:', e.message)
+    return c.json({ error: e.message }, 500)
+  }
 })
 
 app.post('/incident-history', async (c) => {
