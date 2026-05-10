@@ -215,7 +215,7 @@ export default function PushDiagnosticPage() {
         addLog(`✅ 테스트 푸시 발송 (대상: ${data.target})`, 'ok');
         (data.results || []).forEach(r => {
           if (r.error) addLog(`❌ 전송 실패: ${r.error}`, 'err');
-          else addLog(`📡 응답: ${r.status} (${r.ok ? '성공' : '실패'})`, r.ok ? 'info' : 'err');
+          else addLog(`📡 [${r.status}] ${r.ok ? '✅성공' : '❌실패'} body:${r.bodySize}B | h:${(r.sentHeaders||[]).join(',')} | 응답:${r.responseBody || '없음'}`, r.ok ? 'info' : 'err');
         });
         if (!data.results?.length) addLog('⚠️ 등록된 구독 기기 없음', 'warn');
       } else {
@@ -247,7 +247,7 @@ export default function PushDiagnosticPage() {
         addLog(`✅ 커스텀 푸시 발송 완료 (대상: ${data.target})`, 'ok');
         (data.results || []).forEach(r => {
           if (r.error) addLog(`❌ 전송 실패: ${r.error}`, 'err');
-          else addLog(`📡 서버 응답: ${r.status} (${r.ok ? '성공' : '실패'})`, r.ok ? 'info' : 'err');
+          else addLog(`📡 [${r.status}] ${r.ok ? '✅성공' : '❌실패'} body:${r.bodySize}B | h:${(r.sentHeaders||[]).join(',')} | 응답:${r.responseBody || '없음'}`, r.ok ? 'info' : 'err');
         });
         if (!data.results?.length) addLog('⚠️ 등록된 구독 기기 없음', 'warn');
       } else {

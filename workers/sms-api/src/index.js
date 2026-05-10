@@ -3,11 +3,105 @@ import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
 import { secureHeaders } from 'hono/secure-headers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { 
-  buildPushPayload, 
-  encryptNotification, 
-  vapidHeaders 
-} from '@block65/webcrypto-web-push'
+
+// 🔔 Web Push: SubtleCrypto 기반 직접 구현 (RFC 8291 aes128gcm + VAPID)
+function b64urlToBytes(b64url) {
+  const pad = '='.repeat((4 - (b64url.length % 4)) % 4);
+  const b64 = (b64url + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64);
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
+}
+function bytesToB64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+function concatBytes(...arrays) {
+  const total = arrays.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
+
+async function generateVapidJWT(endpoint, vapidPublicKeyB64url, vapidPrivateKeyB64url, subject) {
+  const { origin } = new URL(endpoint);
+  const header = { typ: 'JWT', alg: 'ES256' };
+  const payload = { aud: origin, exp: Math.floor(Date.now() / 1000) + 43200, sub: subject };
+  const enc = s => btoa(JSON.stringify(s)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const sigInput = `${enc(header)}.${enc(payload)}`;
+
+  const pubBytes = b64urlToBytes(vapidPublicKeyB64url);
+  const privBytes = b64urlToBytes(vapidPrivateKeyB64url);
+  const jwk = {
+    kty: 'EC', crv: 'P-256',
+    d: bytesToB64url(privBytes),
+    x: bytesToB64url(pubBytes.slice(1, 33)),
+    y: bytesToB64url(pubBytes.slice(33, 65)),
+  };
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(sigInput));
+  return `${sigInput}.${bytesToB64url(sig)}`;
+}
+
+async function encryptWebPush(p256dhB64url, authB64url, plaintext) {
+  const enc = new TextEncoder();
+  const receiverPub = b64urlToBytes(p256dhB64url);
+  const authSecret = b64urlToBytes(authB64url);
+  const plainBytes = typeof plaintext === 'string' ? enc.encode(plaintext) : plaintext;
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const serverKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const serverPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', serverKeyPair.publicKey));
+
+  const receiverKey = await crypto.subtle.importKey('raw', receiverPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const sharedBits = await crypto.subtle.deriveBits({ name: 'ECDH', public: receiverKey }, serverKeyPair.privateKey, 256);
+  const sharedSecret = new Uint8Array(sharedBits);
+
+  // PRK via HKDF (auth extraction)
+  const ikmKey = await crypto.subtle.importKey('raw', sharedSecret, 'HKDF', false, ['deriveBits']);
+  const authInfo = concatBytes(enc.encode('WebPush: info\0'), receiverPub, serverPubRaw);
+  const prk = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: authSecret, info: authInfo }, ikmKey, 256
+  ));
+
+  // CEK (16 bytes) + Nonce (12 bytes)
+  const prkKey = await crypto.subtle.importKey('raw', prk, 'HKDF', false, ['deriveBits']);
+  const cek = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt, info: enc.encode('Content-Encoding: aes128gcm\0') }, prkKey, 128
+  ));
+  const nonce = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt, info: enc.encode('Content-Encoding: nonce\0') }, prkKey, 96
+  ));
+
+  // Encrypt
+  const aesKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce },
+    aesKey,
+    concatBytes(plainBytes, new Uint8Array([2])) // RFC 8291: padding delimiter
+  ));
+
+  // Build aes128gcm content
+  const rsBytes = new Uint8Array(4);
+  new DataView(rsBytes.buffer).setUint32(0, 4096, false);
+  return concatBytes(salt, rsBytes, new Uint8Array([serverPubRaw.length]), serverPubRaw, ciphertext);
+}
+
+async function sendWebPush(endpoint, p256dh, auth, payloadStr, vapidPublicKey, vapidPrivateKey, vapidSubject) {
+  const encrypted = await encryptWebPush(p256dh, auth, payloadStr);
+  const jwt = await generateVapidJWT(endpoint, vapidPublicKey, vapidPrivateKey, vapidSubject);
+  return fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'authorization': `vapid t=${jwt},k=${vapidPublicKey}`,
+      'content-encoding': 'aes128gcm',
+      'content-type': 'application/octet-stream',
+      'ttl': '86400',
+      'content-length': String(encrypted.byteLength),
+    },
+    body: encrypted,
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PII 마스킹 유틸리티 - Cloudflare Worker 수신 즉시 비식별화
@@ -355,70 +449,38 @@ const sendPushNotification = async (c, userId, payload) => {
 
     for (const sub of subscriptions.results) {
       try {
-        const subscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth
-          }
-        };
-
         const notificationPayload = {
-          title:    payload.title   || '[S-GUARD]',
-          body:     payload.body    || '새 알림이 수신되었습니다.',
-          icon:     '/icons/icon-192.png',
-          badge:    '/icons/icon-192.png',
-          tag:      payload.tag     || 'sguard-alert',
-          url:      payload.url     || '/inbox',
-          inc_id:   payload.inc_id  || null,
+          title:   payload.title    || '[S-GUARD]',
+          body:    payload.body     || '새 알림이 수신되었습니다.',
+          tag:     payload.tag      || 'sguard-alert',
+          url:     payload.url      || '/inbox',
+          inc_id:  payload.inc_id   || null,
           priority: payload.priority || 50,
-          vibrate:  (payload.priority || 50) >= 80 ? [300, 100, 300, 100, 300] : [200, 100, 200]
+          vibrate: (payload.priority || 50) >= 80 ? [300, 100, 300] : [200, 100, 200]
         };
-
         const payloadStr = JSON.stringify(notificationPayload);
-        console.log('[Push] Sending payload to', sub.endpoint.substring(0, 40), '| body:', payloadStr.substring(0, 80));
-        console.log('[Push] p256dh length:', sub.p256dh?.length, '| auth length:', sub.auth?.length);
+        console.log('[Push] Sending to', sub.endpoint.substring(0, 40), '| payload:', payloadStr.substring(0, 80));
 
-        let pushPayload;
-        try {
-          pushPayload = await buildPushPayload(
-            payloadStr,
-            subscription,
-            {
-              subject: vapidSubject,
-              publicKey: vapidPublicKey,
-              privateKey: vapidPrivateKey
-            }
-          );
-          console.log('[Push] buildPushPayload success. body byteLength:', pushPayload.body?.byteLength);
-          console.log('[Push] headers:', JSON.stringify(pushPayload.headers));
-        } catch (buildErr) {
-          console.error('[Push] buildPushPayload FAILED:', buildErr.message);
-          results.push({ endpoint: sub.endpoint.substring(0, 30) + '...', error: 'buildPushPayload: ' + buildErr.message });
-          continue;
-        }
-
-        const response = await fetch(sub.endpoint, {
-          method: 'POST',
-          headers: pushPayload.headers,
-          body: pushPayload.body
-        });
-
+        const response = await sendWebPush(
+          sub.endpoint, sub.p256dh, sub.auth,
+          payloadStr,
+          vapidPublicKey, vapidPrivateKey, vapidSubject
+        );
         const resText = await response.text().catch(() => '');
-        console.log('[Push] Push server response:', response.status, resText.substring(0, 100));
+        console.log('[Push] Response:', response.status, resText.substring(0, 80));
 
         results.push({
           endpoint: sub.endpoint.substring(0, 30) + '...',
           status: response.status,
           ok: response.ok,
-          responseBody: resText.substring(0, 80)
+          responseBody: resText.substring(0, 120)
         });
 
         if (response.status === 410 || response.status === 404) {
-          await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(sub.endpoint).run();
+          await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
         }
       } catch (err) {
-        console.error('[Push] Outer error:', err.message);
+        console.error('[Push] Error:', err.message);
         results.push({ endpoint: sub.endpoint.substring(0, 30) + '...', error: err.message });
       }
     }
