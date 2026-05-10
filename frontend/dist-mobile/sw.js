@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v15'; // force SW update - push body fix
+const CACHE_NAME = 'sguard-v30'; // Force SW update - push fix v30
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -92,11 +92,13 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 🚀 [SW-v21] 푸시 알림 수신 및 데이터 파싱
+// 🚀 [SW-v30] Robust Push Notification Handler
 self.addEventListener('push', (event) => {
+  console.log('[SW] Push Event Received');
+
   let pushData = {
-    title: 'S-Guard AI 알림',
-    body: '새로운 시스템 이벤트가 감지되었습니다.',
+    title: 'S-Guard AI',
+    body: '새로운 알림이 수신되었습니다.',
     url: '/',
     tag: 'sguard-alert',
     vibrate: [100, 50, 100]
@@ -105,15 +107,16 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       const data = event.data.json();
-      pushData = {
-        title: data.title || pushData.title,
-        body: data.body || data.message || pushData.body,
-        url: data.url || data.link || pushData.url,
-        tag: data.tag || pushData.tag,
-        vibrate: data.vibrate || pushData.vibrate
-      };
+      if (data && typeof data === 'object') {
+        pushData.title = data.title || pushData.title;
+        pushData.body = data.body || data.message || pushData.body;
+        pushData.url = data.url || data.link || pushData.url;
+        pushData.tag = data.tag || pushData.tag;
+        if (Array.isArray(data.vibrate)) pushData.vibrate = data.vibrate;
+      }
     } catch (e) {
-      pushData.body = event.data.text();
+      const text = event.data.text();
+      if (text) pushData.body = text;
     }
   }
 
@@ -124,11 +127,15 @@ self.addEventListener('push', (event) => {
     vibrate: pushData.vibrate,
     tag: `${pushData.tag}-${Date.now()}`,
     renotify: true,
-    data: { url: pushData.url }
+    data: { 
+      url: pushData.url,
+      receivedAt: Date.now()
+    }
   };
 
   event.waitUntil(
     self.registration.showNotification(pushData.title, options)
+      .catch(err => console.error('[SW] Notification Error:', err))
   );
 });
 
