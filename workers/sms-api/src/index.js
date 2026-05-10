@@ -941,12 +941,15 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
       // Mark as ANALYZING so UI can show a spinner
       await db.prepare("UPDATE received_messages SET status = 'ANALYZING' WHERE inc_id = ?").bind(String(sms_id)).run();
       
-      // 🚀 [Activity Log] RAG/AGENT 분석 시작 기록
+      // 🚀 [Activity Log] RAG/AGENT 분석 시작 기록 (중복 방지: 이미 PROCESSING 중이면 생략)
       try {
-        await db.prepare(`
-          INSERT INTO activity_logs (inc_id, type, status, message, created_at, reg_id)
-          VALUES (?, 'AGENT', 'PROCESSING', 'AI 분석 및 지능형 에이전트 가동 중...', ?, 'SYSTEM')
-        `).bind(String(sms_id), getKst()).run();
+        const existingLog = await db.prepare("SELECT id FROM activity_logs WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'").bind(String(sms_id)).first();
+        if (!existingLog) {
+          await db.prepare(`
+            INSERT INTO activity_logs (inc_id, type, status, message, created_at, reg_id)
+            VALUES (?, 'AGENT', 'PROCESSING', 'AI 분석 및 지능형 에이전트 가동 중...', ?, 'SYSTEM')
+          `).bind(String(sms_id), getKst()).run();
+        }
       } catch (e) { console.error("[Activity-Log-Start] Error:", e.message); }
     }
 
@@ -1285,16 +1288,21 @@ ${detailedInfo}`;
         
         // 🚀 [Activity Log] RAG/AGENT 분석 완료 기록
         try {
-          await db.prepare(`
+          const updateRes = await db.prepare(`
             UPDATE activity_logs SET status = 'SUCCESS', message = 'AI 지능형 분석 및 전문가 진단이 완료되었습니다.', created_at = ?
             WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
           `).bind(getKst(), String(sms_id)).run();
           
-          // 만약 위에서 업데이트가 안 되었다면 (중복 방지 등으로 INSERT가 안 된 경우 등) 새로 삽입
-          await db.prepare(`
-            INSERT OR IGNORE INTO activity_logs (inc_id, type, status, message, created_at, reg_id)
-            VALUES (?, 'AGENT', 'SUCCESS', 'AI 지능형 분석 완료', ?, 'SYSTEM')
-          `).bind(String(sms_id), getKst()).run();
+          // 만약 위에서 업데이트가 안 되었다면 (신규 건 등) 중복 확인 후 삽입
+          if (updateRes.meta.changes === 0) {
+            const hasSuccess = await db.prepare("SELECT id FROM activity_logs WHERE inc_id = ? AND type = 'AGENT' AND status = 'SUCCESS'").bind(String(sms_id)).first();
+            if (!hasSuccess) {
+              await db.prepare(`
+                INSERT INTO activity_logs (inc_id, type, status, message, created_at, reg_id)
+                VALUES (?, 'AGENT', 'SUCCESS', 'AI 지능형 분석 완료', ?, 'SYSTEM')
+              `).bind(String(sms_id), getKst()).run();
+            }
+          }
         } catch (e) { console.error("[Activity-Log-Success] Error:", e.message); }
       } else {
         // Specific Error Hints based on status
@@ -1323,10 +1331,20 @@ ${detailedInfo}`;
         await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
         // 🚀 [Activity Log] 실패 기록
         try {
-          await db.prepare(`
+          const failUpdate = await db.prepare(`
             UPDATE activity_logs SET status = 'FAIL', message = 'AI 분석 엔진이 응답하지 않거나 오류가 발생했습니다.', created_at = ?
             WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
           `).bind(getKst(), String(sms_id)).run();
+          
+          if (failUpdate.meta.changes === 0) {
+            const hasFail = await db.prepare("SELECT id FROM activity_logs WHERE inc_id = ? AND type = 'AGENT' AND status = 'FAIL'").bind(String(sms_id)).first();
+            if (!hasFail) {
+              await db.prepare(`
+                INSERT INTO activity_logs (inc_id, type, status, message, created_at, reg_id)
+                VALUES (?, 'AGENT', 'FAIL', 'AI 분석 실패', ?, 'SYSTEM')
+              `).bind(String(sms_id), getKst()).run();
+            }
+          }
         } catch (e) {}
       }
     }
@@ -3643,51 +3661,73 @@ app.get('/ai/governance/stats', async (c) => {
   try {
     // 1. Core Lifecycle Statistics (The "Dream" Join)
     // MTTR (Mean Time to RAG): Average time between incident detection and KB registration
-    const mttrData = await db.prepare(`
-      SELECT AVG(strftime('%s', k.reg_dt) - strftime('%s', r.timestamp)) / 60.0 as avg_minutes
+    // 🛡️ Robust Query: Added COALESCE and ensure numeric conversion
+    const mttrRes = await db.prepare(`
+      SELECT AVG(CAST(strftime('%s', k.reg_dt) AS INTEGER) - CAST(strftime('%s', r.timestamp) AS INTEGER)) / 60.0 as avg_minutes
       FROM knowledge_base k
       JOIN received_messages r ON k.inc_id = r.inc_id
       WHERE r.timestamp IS NOT NULL AND k.reg_dt IS NOT NULL
-    `).first('avg_minutes');
+    `).first();
+    
+    const mttrVal = mttrRes?.avg_minutes || 0;
 
     // 2. Incident & Knowledge Integrity
-    const totalInc = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first('c');
-    const resolvedInc = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE response_message IS NOT NULL").first('c');
-    const knowledgeCount = await db.prepare("SELECT COUNT(*) as c FROM knowledge_base").first('c');
-    const activeWarRooms = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM received_messages WHERE received_count > 0").first('c');
+    const totalIncRes = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first();
+    const totalInc = totalIncRes?.c || 0;
+
+    // 처리완료(워룸 종료 또는 보고서 생성) 기준으로 집계
+    const resolvedIncRes = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE response_message IS NOT NULL OR status = '처리완료'").first();
+    const resolvedInc = resolvedIncRes?.c || 0;
+
+    // 전체 KB 수 (표시용)
+    const knowledgeCountRes = await db.prepare("SELECT COUNT(*) as c FROM knowledge_base").first();
+    const knowledgeCount = knowledgeCountRes?.c || 0;
+
+    // 🛡️ 자산화 성공률: KB화된 '고유 인시던트' 수 / 전체 인시던트
+    // COUNT(*) 대신 COUNT(DISTINCT inc_id) 사용 — 동일 인시던트에 KB가 여러 개여도 1건으로 카운트
+    const kbDistinctIncRes = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM knowledge_base WHERE inc_id IS NOT NULL AND inc_id != ''").first();
+    const kbDistinctInc = kbDistinctIncRes?.c || 0;
+
+    const activeWarRoomsRes = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM received_messages WHERE received_count > 0").first();
+    const activeWarRooms = activeWarRoomsRes?.c || 0;
     
-    // Governance Rate: How many incidents successfully turned into RAG assets
-    const governanceRate = totalInc > 0 ? Math.round((knowledgeCount / totalInc) * 100) : 100;
-    const resolveRate = totalInc > 0 ? Math.round((resolvedInc / totalInc) * 100) : 100;
+    // Governance Rate: 고유 인시던트 기준, 최대 100%
+    const governanceRate = totalInc > 0 ? Math.min(100, Math.round((kbDistinctInc / totalInc) * 100)) : 0;
+    const resolveRate = totalInc > 0 ? Math.min(100, Math.round((resolvedInc / totalInc) * 100)) : 0;
 
     // 3. Expert Ecosystem & Synergy Score (Users -> Assignments -> KB -> Logs)
-    const topContributors = await db.prepare(`
-      SELECT 
-        u.name, u.role, u.team,
-        COUNT(DISTINCT a.inc_id) as assigned_count,
-        COUNT(DISTINCT k.id) as kb_count,
-        (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.rowid) * 2) as synergy_score
-      FROM users u
-      LEFT JOIN incident_assignments a ON u.employee_id = a.user_id
-      LEFT JOIN knowledge_base k ON u.employee_id = k.reg_id
-      LEFT JOIN activity_logs l ON u.employee_id = l.user_id
-      WHERE u.is_active = 1
-      GROUP BY u.employee_id, u.name, u.role, u.team
-      HAVING (COUNT(DISTINCT k.id) * 10 + COUNT(DISTINCT l.rowid) * 2) > 0
-      ORDER BY synergy_score DESC
+    // 🛡️ Optimized: Using subqueries to avoid heavy 4-way join explosion
+    const topContributorsRes = await db.prepare(`
+      SELECT * FROM (
+        SELECT 
+          u.name, u.role, u.team,
+          (SELECT COUNT(DISTINCT inc_id) FROM incident_assignments WHERE user_id = u.employee_id) as assigned_count,
+          (SELECT COUNT(DISTINCT id) FROM knowledge_base WHERE reg_id = u.employee_id) as kb_count,
+          (
+            (SELECT COUNT(DISTINCT id) FROM knowledge_base WHERE reg_id = u.employee_id) * 10 + 
+            (SELECT COUNT(*) FROM activity_logs WHERE user_id = u.employee_id) * 2
+          ) as synergy_score
+        FROM users u
+        WHERE u.is_active = 1
+      ) t
+      WHERE t.synergy_score > 0
+      ORDER BY t.synergy_score DESC
       LIMIT 5
     `).all();
+    
+    const topContributors = topContributorsRes.results || [];
 
     // 4. Intelligence Category Density
-    const categories = await db.prepare(`
+    const categoriesRes = await db.prepare(`
       SELECT category, COUNT(*) as c 
       FROM knowledge_base 
       GROUP BY category 
       ORDER BY c DESC
     `).all();
+    const categories = categoriesRes.results || [];
 
     // 5. Recent High-End Activity Feed (Full Context)
-    const recentFeed = await db.prepare(`
+    const recentFeedRes = await db.prepare(`
       SELECT 
         k.title, k.reg_dt, k.category,
         u.name as reg_name, u.role as reg_role
@@ -3696,25 +3736,48 @@ app.get('/ai/governance/stats', async (c) => {
       ORDER BY k.reg_dt DESC
       LIMIT 5
     `).all();
+    const recentFeed = recentFeedRes.results || [];
+
+    // 6. 이번달 vs 저번달 KB 증가율 (실데이터)
+    const thisMonthKbRes = await db.prepare(`
+      SELECT COUNT(*) as c FROM knowledge_base
+      WHERE strftime('%Y-%m', reg_dt) = strftime('%Y-%m', 'now')
+    `).first();
+    const lastMonthKbRes = await db.prepare(`
+      SELECT COUNT(*) as c FROM knowledge_base
+      WHERE strftime('%Y-%m', reg_dt) = strftime('%Y-%m', date('now','-1 month'))
+    `).first();
+    const thisMonthKb = thisMonthKbRes?.c || 0;
+    const lastMonthKb = lastMonthKbRes?.c || 0;
+    const growthVal = lastMonthKb > 0
+      ? `${thisMonthKb >= lastMonthKb ? '+' : ''}${Math.round(((thisMonthKb - lastMonthKb) / lastMonthKb) * 100)}%`
+      : (thisMonthKb > 0 ? `+${thisMonthKb}건` : '-');
+
+    // 7. 실제 incident_assignments 기반 배정 인원
+    const assignedUsersRes = await db.prepare(`
+      SELECT COUNT(DISTINCT user_id) as c FROM incident_assignments
+    `).first();
+    const assignedUsers = assignedUsersRes?.c || 0;
 
     return c.json({
       incidents: { 
-        total: totalInc || 0, 
-        resolved: resolvedInc || 0, 
+        total: totalInc, 
+        resolved: resolvedInc, 
         rate: resolveRate,
         integrity: governanceRate,
-        mttr: Math.round(mttrData || 42) 
+        mttr: Math.round(mttrVal)
       },
       knowledge: { 
-        total: knowledgeCount || 0, 
-        growth: "+22%" 
+        total: knowledgeCount, 
+        growth: growthVal
       }, 
       warrooms: { 
-        active: activeWarRooms || 0 
+        active: activeWarRooms,
+        assignedUsers
       },
-      categories: categories.results || [],
-      topContributors: topContributors.results || [],
-      recentFeed: recentFeed.results || []
+      categories,
+      topContributors,
+      recentFeed
     });
   } catch (e) {
     console.error("Dream Analytics Error:", e);
@@ -6225,6 +6288,16 @@ app.post('/ai/warroom/open', async (c) => {
     }
   })());
 
+  // 🚀 [Activity Log] 워룸 개설
+  try {
+    if (creator_id) {
+      await db.prepare(`
+        INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
+        VALUES (?, ?, ?, '워룸 개설', ?, ?)
+      `).bind(normId, normId, creator_id, `WAR-ROOM이 개설되었습니다: ${cleanTitle}`, now).run();
+    }
+  } catch(e) { console.error('[ActivityLog-WROpen]', e.message); }
+
   return c.json({ status: 'opened', inc_id: normId })
 })
 
@@ -6505,7 +6578,7 @@ app.post('/warroom/join', async (c) => {
   const now = getKst()
 
   // 1️⃣ 워룸 참여 등록
-  await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
+  const joinRes = await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
     .bind(user_id, normId, now).run()
 
   // 2️⃣ incident_assignments 동기화
@@ -6537,6 +6610,17 @@ app.post('/warroom/join', async (c) => {
       data: { type: 'warroom_invite', incident_id: normId, url: `/chat/${normId}` }
     });
   } catch(e) { console.error('[warroom/join] push failed:', e.message); }
+
+  // 5️⃣ [Activity Log] 워룸 참여
+  try {
+    if (joinRes.meta.changes > 0) {
+      const inviterNote = inviter_name ? ` (${inviter_name}님 초대)` : '';
+      await db.prepare(`
+        INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
+        VALUES (?, ?, ?, '워룸 참여', ?, ?)
+      `).bind(normId, normId, user_id || 'SYSTEM', `워룸에 참여했습니다${inviterNote}.`, now).run();
+    }
+  } catch(e) { console.error('[ActivityLog-Join]', e.message); }
     
   return c.json({ status: 'joined', name: displayName })
 })
@@ -7311,18 +7395,20 @@ app.post('/ai/incident/assign', async (c) => {
     const empId = user.employee_id;
 
     // 2. Perform Assignment
-    await db.prepare(`
+    const assignResult = await db.prepare(`
       INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
       VALUES (?, ?, '미확인', ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
       ON CONFLICT(user_id, inc_id) DO NOTHING
     `).bind(empId, normId, now, now, now, now).run()
 
-    // 3. Log activity with INSERT OR IGNORE to prevent PK collision
-    await db.prepare(`
-      INSERT OR IGNORE INTO activity_logs (inc_id, incident_code, incident_title, user_id, user_name, action, detail, created_at) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(normId, normId, incident_title || 'SMS 수신 확인', empId, user.name || '알 수 없음', action || '장애 할당', detail || '인시던트가 담당자에게 할당되었습니다.', now)
-      .run()
+    // 3. Log activity ONLY if a new assignment was actually made
+    if (assignResult.meta.changes > 0) {
+      await db.prepare(`
+        INSERT INTO activity_logs (inc_id, incident_code, incident_title, user_id, user_name, action, detail, created_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(normId, normId, incident_title || 'SMS 수신 확인', empId, user.name || '알 수 없음', action || '장애 할당', detail || '인시던트가 담당자에게 할당되었습니다.', now)
+        .run()
+    }
     
     return c.json({ status: 'assigned', user_id: empId, inc_id: normId })
 
@@ -7345,6 +7431,15 @@ app.post('/ai/incident/status', async (c) => {
     SET status = ?, updated_at = ?, mod_dt = ?, mod_id = ?
     WHERE user_id = ? AND inc_id = ?
   `).bind(status, now, now, user_id || 'SYSTEM', user_id, normId).run()
+
+  // 🚀 [Activity Log] 인시던트 상태 변경
+  try {
+    const statusLabel = { '미확인': '미확인', '처리중': '처리 시작', '처리완료': '처리 완료', '미처리': '미처리 전환' }[status] || status;
+    await db.prepare(`
+      INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
+      VALUES (?, ?, ?, '상태 변경', ?, ?)
+    `).bind(normId, normId, user_id || 'SYSTEM', `담당자 상태가 '${statusLabel}'으로 변경되었습니다.`, now).run();
+  } catch(e) { console.error('[ActivityLog-Status]', e.message); }
   
   return c.json({ status: 'updated', user_id, inc_id: normId, new_status: status })
 })
@@ -7531,8 +7626,18 @@ app.get('/ai/incident/:inc_id', async (c) => {
 // User Specific War-Room mapping
 app.post('/warroom/leave', async (c) => {
   const { user_id, inc_id } = await c.req.json()
-  await c.env.DB.prepare("DELETE FROM user_warrooms WHERE user_id = ? AND inc_id = ?")
-    .bind(user_id, String(inc_id)).run()
+  const db = c.env.DB
+  const normId = String(inc_id)
+  const now = getKst()
+  await db.prepare("DELETE FROM user_warrooms WHERE user_id = ? AND inc_id = ?")
+    .bind(user_id, normId).run()
+  // 🚀 [Activity Log] 워룸 퇴장
+  try {
+    await db.prepare(`
+      INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
+      VALUES (?, ?, ?, '워룸 퇴장', '워룸에서 나갔습니다.', ?)
+    `).bind(normId, normId, user_id || 'SYSTEM', now).run();
+  } catch(e) { console.error('[ActivityLog-Leave]', e.message); }
   return c.json({ status: 'left', user_id, inc_id })
 })
 
@@ -7567,9 +7672,20 @@ app.patch('/incidents/:id', async (c) => {
 
 app.post('/ai/warroom/invite', async (c) => {
   const { user_id, inc_id } = await c.req.json()
+  const db = c.env.DB
+  const normId = String(inc_id)
   const now = getKst()
-  await c.env.DB.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
-    .bind(user_id, String(inc_id), now).run()
+  const joinRes = await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
+    .bind(user_id, normId, now).run()
+  // 🚀 [Activity Log] 워룸 초대
+  try {
+    if (joinRes.meta.changes > 0) {
+      await db.prepare(`
+        INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
+        VALUES (?, ?, ?, '워룸 초대', '워룸에 초대되어 참여했습니다.', ?)
+      `).bind(normId, normId, user_id || 'SYSTEM', now).run();
+    }
+  } catch(e) { console.error('[ActivityLog-Invite]', e.message); }
   return c.json({ status: 'invited', user_id, inc_id })
 })
 
@@ -8821,7 +8937,16 @@ app.get('/reports/:inc_id', async (c) => {
     }
   }
 
-  return c.json({ report: { ...report, sms_message: smsMessage, user_name: userName, user_org_path: userOrgPath } })
+  // 추가: 유사도(similarity_score) 조회
+  let similarity = null
+  try {
+    const insight = await db.prepare(
+      "SELECT similarity_score FROM autopilot_insight WHERE inc_id = ? LIMIT 1"
+    ).bind(normId).first()
+    similarity = insight?.similarity_score || null
+  } catch (e) { /* ignore */ }
+
+  return c.json({ report: { ...report, sms_message: smsMessage, user_name: userName, user_org_path: userOrgPath, similarity } })
 })
 
 app.post('/inbox', async (c) => {

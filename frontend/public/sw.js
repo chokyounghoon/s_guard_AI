@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v14'; // push payload unwrap fix
+const CACHE_NAME = 'sguard-v15'; // force SW update - push body fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -92,55 +92,8 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 🔔 PUSH: Web Push Notification Receiver
+// 🚀 [SW-v20] 푸시 알림 수신 및 데이터 파싱
 self.addEventListener('push', (event) => {
-  // 기본값 세팅 (데이터 파싱 실패 시 대비)
-  let title = 'S-Guard AI';
-  let body = '새로운 보안 알림이 수신되었습니다. 내용을 확인하려면 클릭하세요.';
-  let tag = 'sguard-push';
-  let url = '/';
-  let vibrate = [200, 100, 200];
-
-  // 페이로드 파싱
-  if (event.data) {
-    try {
-      const rawText = event.data.text();
-      console.log('[SW] Push Received:', rawText);
-      
-      let raw;
-      try {
-        raw = JSON.parse(rawText);
-      } catch (e) {
-        raw = { body: rawText };
-      }
-
-      // 백엔드가 { title, body, ... } 플랫 구조로 보내는 경우를 우선 처리
-      if (raw.title) title = raw.title;
-      if (raw.body)  body  = raw.body;
-      if (raw.tag)   tag   = raw.tag;
-      if (raw.url)   url   = raw.url;
-
-      // 만약 notification 객체로 감싸져 있다면 (Legacy 대응)
-      if (raw.notification) {
-        if (raw.notification.title) title = raw.notification.title;
-        if (raw.notification.body)  body  = raw.notification.body;
-        if (raw.notification.tag)   tag   = raw.notification.tag;
-        if (raw.notification.data && raw.notification.data.url) url = raw.notification.data.url;
-      }
-      
-      // 장애 ID가 있다면 본문 상단에 추가 (중복 방지 로직 포함)
-      const incId = raw.inc_id || (raw.notification && raw.notification.data && raw.notification.data.inc_id);
-      if (incId && body && !body.includes(incId)) {
-        body = `📋 ${incId} | ` + body;
-      }
-      
-      const priority = typeof raw.priority === 'number' ? raw.priority : (raw.notification && raw.notification.priority ? raw.notification.priority : 0);
-      if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
-    } catch (e) {
-      console.error('[SW] Push processing failed:', e.message);
-    }
-  }
-
   const options = {
     body: body,
     icon: '/icons/icon-192.png',

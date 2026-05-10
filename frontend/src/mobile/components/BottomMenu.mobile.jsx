@@ -57,11 +57,11 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             style={{ background: '#0e1118', maxHeight: '85vh' }}>
 
             {/* 헤더 */}
-            <div className="pt-6 pb-4 px-6 flex flex-col items-center relative overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="pt-6 pb-6 px-6 flex flex-col items-center relative" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-blue-600/10 blur-[60px] rounded-full pointer-events-none" />
               <div className="w-12 h-1.5 rounded-full mb-5 bg-white/10" />
               <h3 className="text-xl font-black text-white tracking-tight">System Console</h3>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-1 text-blue-500 pb-1 leading-normal">Management & Intelligence</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-2 text-blue-500 leading-none" style={{ paddingBottom: '8px' }}>Management & Intelligence</p>
             </div>
 
             {/* Manual Entry - 전체 너비 강조 버튼 */}

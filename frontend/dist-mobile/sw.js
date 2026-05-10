@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v14'; // push payload unwrap fix
+const CACHE_NAME = 'sguard-v15'; // force SW update - push body fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -92,48 +92,8 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 🔔 PUSH: Web Push Notification Receiver
+// 🚀 [SW-v20] 푸시 알림 수신 및 데이터 파싱
 self.addEventListener('push', (event) => {
-  // 기본값 세팅 (데이터 파싱 실패 시 대비)
-  let title = 'S-Guard AI';
-  let body = '새로운 보안 알림이 수신되었습니다. 내용을 확인하려면 클릭하세요.';
-  let tag = 'sguard-push';
-  let url = '/';
-  let vibrate = [200, 100, 200];
-
-  // 페이로드 파싱
-  if (event.data) {
-    try {
-      const rawText = event.data.text();
-      console.log('[SW] Push Received:', rawText);
-      
-      let raw;
-      try {
-        raw = JSON.parse(rawText);
-      } catch (e) {
-        raw = { body: rawText };
-      }
-
-      // 백엔드가 { notification: { title, body, ... }, data: {...} } 구조로 보내는 경우 언래핑
-      const data = raw.notification ? { ...raw.notification, ...raw.notification.data } : raw;
-
-      if (data.title !== undefined) title = data.title;
-      if (data.body !== undefined)  body  = data.body;
-      if (data.tag !== undefined)   tag   = data.tag;
-      if (data.url !== undefined)   url   = data.url;
-      
-      // 장애 ID가 있다면 본문 상단에 추가 (중복 방지 로직 포함)
-      if (data.inc_id && body && !body.includes(data.inc_id)) {
-        body = `📋 ${data.inc_id} | ` + body;
-      }
-      
-      const priority = typeof data.priority === 'number' ? data.priority : 0;
-      if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
-    } catch (e) {
-      console.error('[SW] Push processing failed:', e.message);
-    }
-  }
-
   const options = {
     body: body,
     icon: '/icons/icon-192.png',

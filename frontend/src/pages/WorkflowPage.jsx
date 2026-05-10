@@ -304,30 +304,6 @@ export default function WorkflowPage() {
         </div>
       </div>
 
-      {/* 원문 SMS */}
-      {incidentData?.rawMessage && (
-        <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden shadow-lg">
-          <button onClick={() => setShowRawMsg(!showRawMsg)} className="w-full px-5 py-4 flex items-center justify-between bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
-            <h3 className="text-xs font-black text-white flex items-center gap-2">
-              <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-              원문 SMS 전문
-            </h3>
-            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showRawMsg ? 'rotate-180' : ''}`} />
-          </button>
-          <AnimatePresence>
-            {showRawMsg && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                <div className="p-5 bg-black/40 border-t border-white/5">
-                  <p className="text-[11px] text-slate-400 font-mono leading-relaxed break-all whitespace-pre-wrap">
-                    {incidentData.rawMessage}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-
     </div>
   );
 

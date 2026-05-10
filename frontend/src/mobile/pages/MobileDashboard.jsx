@@ -440,29 +440,28 @@ export default function DashboardPage({ onAiClick }) {
     }
   }, []);
 
+  // 독립 함수: 외부(handleAnalysisComplete 등)에서도 호출 가능
+  const fetchWorkflowForId = useCallback(async (incId) => {
+    if (!incId) return;
+    try {
+      const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${incId}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      setIncidentWorkflowSteps(data.steps || []);
+    } catch (e) {
+      console.error('Workflow fetch failed:', e);
+    }
+  }, [apiBase]);
+
   // Fetch detailed workflow when an incident is selected
   useEffect(() => {
     if (!selectedIncidentIdFlow) {
       setIncidentWorkflowSteps([]);
       return;
     }
-
-    const fetchWorkflow = async () => {
-      try {
-        const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`, {
-          headers: getAuthHeaders()
-        });
-        const data = await res.json();
-        setIncidentWorkflowSteps(data.steps || []);
-      } catch (e) {
-        console.error('Workflow fetch failed:', e);
-        alert("원활한 서비스 조회를 위해 페이지를 새로고침합니다.");
-        window.location.reload();
-      }
-    };
-
-    fetchWorkflow();
-  }, [selectedIncidentIdFlow]);
+    fetchWorkflowForId(selectedIncidentIdFlow);
+  }, [selectedIncidentIdFlow, fetchWorkflowForId]);
 
   // 상단 S-Autopilot Insight 패널은 항상 최신 SMS만 분석하도록 고정
   // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
@@ -1145,8 +1144,22 @@ export default function DashboardPage({ onAiClick }) {
 
   const handleAnalysisComplete = useCallback((done, content) => {
     setIsInsightComplete(done);
-    if (done) setInsightContent(content);
-  }, []);
+    if (done) {
+      setInsightContent(content);
+      setIsAnalyzingActive(false);
+      const doneIncId = selectedSmsRef.current?.inc_id;
+      if (doneIncId) {
+        // 1) 목록 배지 업데이트 (로컬 패치 — 재분석 루프 방지)
+        setSmsMessages(prev =>
+          (prev || []).map(m =>
+            m.inc_id === doneIncId ? { ...m, is_analyzed: 1 } : m
+          )
+        );
+        // 2) 장애 처리 현황 타임라인 재조회 (workflow steps 갱신)
+        fetchWorkflowForId(doneIncId);
+      }
+    }
+  }, [fetchWorkflowForId]);
 
   const handleLogReceived = useCallback((log, counts) => {
     // 🛡️ SECURITY: Dify 서버 에러나 기술적 오류 문구가 포함된 로그는 대시보드에 노출하지 않음
@@ -1810,12 +1823,29 @@ export default function DashboardPage({ onAiClick }) {
                 <div className="absolute left-[9px] top-0 bottom-0 w-px" style={{ background: 'rgba(59,130,246,0.2)' }} />
                 {(() => {
                   const firstPendingIdx = FLOW_STEPS.findIndex(step => {
-                    if (step.id === 'RAG_AGENT') return !incidentWorkflowSteps.find(s=>s.id==='RAG')&&!incidentWorkflowSteps.find(s=>s.id==='AGENT');
+                    if (step.id === 'RAG_AGENT') {
+                      const isDone = (selectedSms && Number(selectedSms.is_analyzed) >= 1) || 
+                                    incidentWorkflowSteps.find(s=>s.id==='RAG') || 
+                                    incidentWorkflowSteps.find(s=>s.id==='AGENT');
+                      return !isDone;
+                    }
                     return !incidentWorkflowSteps.find(s=>s.id===step.id);
                   });
                   return FLOW_STEPS.map((step, sIdx) => {
                     let stepData = incidentWorkflowSteps.find(s=>s.id===step.id);
-                    if (step.id==='RAG_AGENT'){const rag=incidentWorkflowSteps.find(s=>s.id==='RAG'),agent=incidentWorkflowSteps.find(s=>s.id==='AGENT');if(rag&&agent)stepData={...agent,id:'RAG_AGENT',timestamp:agent.timestamp>rag.timestamp?agent.timestamp:rag.timestamp,detail:'AI 에이전트 그룹이 수천 건의 과거 데이터와 내부 지식베이스를 결합하여 인시던트 근본 원인을 입체적으로 분석하고 대응 시나리오를 수립했습니다.'};else if(rag||agent)stepData={...(rag||agent),id:'RAG_AGENT'};}
+                    if (step.id==='RAG_AGENT'){
+                      const rag=incidentWorkflowSteps.find(s=>s.id==='RAG'), agent=incidentWorkflowSteps.find(s=>s.id==='AGENT');
+                      const isAnalyzed = selectedSms && Number(selectedSms.is_analyzed) >= 1;
+                      
+                      if(rag && agent) {
+                        stepData={...agent,id:'RAG_AGENT',timestamp:agent.timestamp>rag.timestamp?agent.timestamp:rag.timestamp,detail:'AI 에이전트 그룹이 수천 건의 과거 데이터와 내부 지식베이스를 결합하여 인시던트 근본 원인을 입체적으로 분석하고 대응 시나리오를 수립했습니다.'};
+                      } else if(rag || agent) {
+                        stepData={...(rag||agent),id:'RAG_AGENT'};
+                      } else if(isAnalyzed) {
+                        // 로그가 없지만 분석은 완료된 경우 (방어 로직)
+                        stepData={id:'RAG_AGENT', timestamp: selectedSms.timestamp, detail: 'AI 엔진의 지능형 분석이 완료되었습니다.'};
+                      }
+                    }
                     if(step.id==='WARROOM'&&stepData?.detail?.includes('2.0님'))stepData.detail=stepData.detail.replace('2.0님','조경훈님');
                     const isCompleted=!!stepData, isNextStep=sIdx===firstPendingIdx;
                     let intervalText=null, intervalMinutes=0;

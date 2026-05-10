@@ -18,14 +18,25 @@ export default function ReportViewPage() {
   const [orgTree, setOrgTree] = useState([]);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
+  const [workflowLogs, setWorkflowLogs] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  const fetchToken = () => {
-    try {
-      return getAccessToken();
-    } catch (e) {
-      return null;
-    }
+  const formatDuration = (ms) => {
+    if (ms < 0) return '00:00:00';
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    
+    if (h > 0) return `${h}h ${m}m ${sec}s`;
+    if (m > 0) return `${m}m ${sec}s`;
+    return `${sec}s`;
   };
+
+  useEffect(() => {
+    const t = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const fetch_ = async () => {
@@ -59,8 +70,18 @@ export default function ReportViewPage() {
               }
             }
           }
+
+          // **추가: 워크플로우 상세 정보(MTTR 계산용) 가져오기**
+          const wfRes = await fetch(getApiUrl(`/ai/incident/workflow-details?inc_id=${cleanId}`), {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (wfRes.ok) {
+            const wfData = await wfRes.json();
+            setWorkflowLogs(wfData.steps || []);
+          }
+
         } catch (smsErr) {
-          console.error("Failed to fetch real SMS in sequence:", smsErr);
+          console.error("Failed to fetch real SMS/Workflow in sequence:", smsErr);
         }
 
         setReport(reportData);
@@ -177,7 +198,7 @@ export default function ReportViewPage() {
                 처리완료
               </span>
               <span className="text-[11px] font-black text-slate-500 font-mono tracking-tight">
-                유사도 {report?.similarity ? (String(report.similarity).includes('%') ? report.similarity : `${report.similarity}%`) : '98.5%'}
+                유사도 {report?.similarity ? (String(report.similarity).includes('%') ? report.similarity : `${report.similarity}%`) : (loading ? '분석중' : '-')}
               </span>
             </div>
 
@@ -216,7 +237,18 @@ export default function ReportViewPage() {
               
               <div className="shrink-0 flex flex-col items-end px-4 py-2 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500">
                 <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-0.5">MTTR</span>
-                <span className="text-lg font-black font-mono leading-none">{report?.mttr || '12m 34s'}</span>
+                <span className="text-lg font-black font-mono leading-none">
+                  {(() => {
+                    if (report?.mttr && report.mttr !== '12m 34s') return report.mttr;
+                    const smsLog = workflowLogs.find(l => l.id === 'SMS');
+                    const knwLog = workflowLogs.find(l => l.id === 'KNOWLEDGE');
+                    if (!smsLog) return '-';
+                    const startT = new Date(smsLog.timestamp);
+                    const endT   = knwLog ? new Date(knwLog.timestamp) : currentTime;
+                    const diffMs = endT - startT;
+                    return formatDuration(diffMs);
+                  })()}
+                </span>
               </div>
             </div>
 

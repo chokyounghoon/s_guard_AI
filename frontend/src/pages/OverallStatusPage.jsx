@@ -56,20 +56,20 @@ export default function OverallStatusPage() {
       formula: 'KB_COUNT / TOTAL_INC × 100',
     },
     {
-      label: '평균 자산화 소요',
-      sub: 'MTTR (Recognition→RAG)',
-      value: `${stats.incidents.mttr}m`,
+      label: '평균 복구 소요시간',
+      sub: 'MTTR (인지→지식화)',
+      value: stats.incidents.mttr > 0 ? `${stats.incidents.mttr}m` : '-',
       icon: Rocket,
       color: '#60a5fa',
-      formula: 'AVG(KB_REG - ALERT_STAMP)',
+      formula: 'AVG(KB_REG - SMS_RECV)',
     },
     {
-      label: '전문가 시너지',
-      sub: 'Active Synergy',
-      value: `+${stats.knowledge.growth}`,
+      label: '이번달 KB 증가',
+      sub: '전월 대비 지식 성장률',
+      value: stats.knowledge.growth || '-',
       icon: Heart,
       color: '#f87171',
-      formula: '(KB×10) + (LOGS×2)',
+      formula: 'THIS_MONTH / LAST_MONTH',
     },
     {
       label: '전사 조치 지수',
@@ -82,9 +82,9 @@ export default function OverallStatusPage() {
   ];
 
   const FLOW = [
-    { label: '장애 인지 (SMS)', value: stats.incidents.total, icon: MessageSquare, color: '#f87171' },
-    { label: '전문가 배정', value: stats.warrooms.active, icon: Users, color: '#60a5fa' },
-    { label: '대응 로그', value: 'LIVE', icon: Activity, color: '#a78bfa' },
+    { label: 'SMS 수신', value: stats.incidents.total, icon: MessageSquare, color: '#f87171' },
+    { label: '전문가 배정', value: stats.warrooms?.assignedUsers ?? stats.warrooms.active, icon: Users, color: '#60a5fa' },
+    { label: '대응 중', value: stats.warrooms.active, icon: Activity, color: '#a78bfa' },
     { label: '조치 완료', value: stats.incidents.resolved, icon: CheckCircle2, color: '#fb923c' },
     { label: '지식 자산', value: stats.knowledge.total, icon: Database, color: '#a78bfa' },
   ];
