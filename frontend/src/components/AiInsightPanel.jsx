@@ -66,7 +66,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     const dd = String(d.getDate()).padStart(2, '0');
     const hh = String(d.getHours()).padStart(2, '0');
     const mi = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
   };
 
   const [insightData, setInsightData] = useState({
@@ -670,13 +671,13 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               <p className="text-[9px] text-slate-500 font-mono mt-0.5 truncate">
                 {(() => {
                   const d = new Date(insightTimestamp);
-                  const yy = String(d.getFullYear()).slice(2);
+                  const yyyy = d.getFullYear();
                   const mm = String(d.getMonth() + 1).padStart(2, '0');
                   const dd = String(d.getDate()).padStart(2, '0');
                   const hh = String(d.getHours()).padStart(2, '0');
                   const min = String(d.getMinutes()).padStart(2, '0');
                   const ss = String(d.getSeconds()).padStart(2, '0');
-                  return `${yy}/${mm}/${dd} ${hh}:${min}:${ss}`;
+                  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
                 })()}
               </p>
             )}

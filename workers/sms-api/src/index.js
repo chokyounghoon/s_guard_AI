@@ -3023,7 +3023,7 @@ app.post('/sms/receive', async (c) => {
     // 🔔 즉시 푸시 - 중복 수신 시에도 본인 + 모든 담당자에게 일괄 전송
     const dupPushPayload = {
       title: `[S-GUARD] 🔁 반복 장애 알림 (×${newCount})`,
-      body: `📋 장애ID: ${existing.inc_id}\n${(message || '').length > 60 ? message.substring(0, 60) + '…' : (message || '내용 없음')}`,
+      body: `📨 발신: ${sender || '알 수 없음'}\n${message || '내용 없음'}`,
       inc_id: String(existing.inc_id),
       priority: 70,
       url: `/inbox`,
@@ -3147,10 +3147,9 @@ app.post('/sms/receive', async (c) => {
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
   // 🔔 즉시 푸시 - 할당된 모든 사용자에게 일괄 전송
-  const shortMsg = (message || '').length > 60 ? message.substring(0, 60) + '…' : (message || '내용 없음');
   const immediatePushPayload = {
     title: detectedCount > 0 ? `🚨 [S-GUARD] 키워드 감지됨` : `📩 [S-GUARD] 새 문자 수신`,
-    body: `📋 장애ID: ${newIncId}\n📨 발신: ${sender || '알 수 없음'}\n${shortMsg}`,
+    body: `📨 발신: ${sender || '알 수 없음'}\n${message || '내용 없음'}`,
     inc_id: String(newIncId),
     priority: detectedCount > 0 ? 90 : 50,
     url: `/inbox`,
@@ -5949,6 +5948,8 @@ app.post('/ai/warroom/open', async (c) => {
   const now = getKst()
   
   const normId = String(inc_id).replace('INC-', '');
+  // 🛡️ Remove 'INC-' from title as requested
+  const cleanTitle = String(title || '').replace(/INC-/g, '');
 
   // Prevent duplicate creation
   const existing = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ?").bind(normId).first()
@@ -5956,7 +5957,7 @@ app.post('/ai/warroom/open', async (c) => {
     await db.prepare(`
       INSERT INTO warroom_list (inc_id, title, creator_id, severity, leader_summary, reg_dt)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(normId, title, creator_id, severity, leader_summary || '', now)
+    `).bind(normId, cleanTitle, creator_id, severity, leader_summary || '', now)
     .run()
   } else if (leader_summary) {
     await db.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
@@ -8847,12 +8848,12 @@ export class WarRoom {
               `).bind(...absentUserIds).all();
 
               const pushPayload = {
-                title: data.name || data.sender,
-                body: data.text.length > 60 ? data.text.substring(0, 60) + '...' : data.text,
+                title: data.text,
+                body: `보낸 사람: ${data.name || data.sender}`,
                 inc_id: String(incId),
-                tag: `chat-${incId}`, // Kakao-style: replaces previous notification
-                priority: 0,           // Chat messages have default priority
-                url: `/chat/${incId}`  // ✅ ChatPage 딥링크
+                tag: `chat-${incId}`, 
+                priority: 0,           
+                url: `/chat/${incId}`  
               };
 
               for (const sub of subs) {

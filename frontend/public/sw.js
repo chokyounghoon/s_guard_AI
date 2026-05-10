@@ -94,49 +94,56 @@ self.addEventListener('fetch', (event) => {
 
 // 🔔 PUSH: Web Push Notification Receiver
 self.addEventListener('push', (event) => {
-  // 기본값 세팅
+  // 기본값 세팅 (데이터 파싱 실패 시 대비)
   let title = 'S-Guard AI';
-  let body = '장애가 수신되었습니다. S-GUARD로 이동하세요.';
+  let body = '새로운 보안 알림이 수신되었습니다. 내용을 확인하려면 클릭하세요.';
   let tag = 'sguard-push';
   let url = '/';
   let vibrate = [200, 100, 200];
 
-  // 페이로드 파싱 (실패해도 기본값 사용)
+  // 페이로드 파싱
   if (event.data) {
     try {
       const rawText = event.data.text();
-      console.log('[SW] Raw push text (first 200):', rawText.substring(0, 200));
-      const data = JSON.parse(rawText);
-      if (data.title) title = data.title;
-      if (data.body)  body  = data.body;
-      if (data.tag)   tag   = data.tag;
-      if (data.url)   url   = data.url;
-      if (data.inc_id) body = `📋 장애ID: ${data.inc_id}\n` + body;
+      console.log('[SW] Push Received:', rawText);
+      
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        // JSON이 아닌 일반 텍스트일 경우
+        data = { body: rawText };
+      }
+
+      if (data.title !== undefined) title = data.title;
+      if (data.body !== undefined)  body  = data.body;
+      if (data.tag !== undefined)   tag   = data.tag;
+      if (data.url !== undefined)   url   = data.url;
+      
+      // 장애 ID가 있다면 본문 상단에 추가 (중복 방지 로직 포함)
+      if (data.inc_id && body && !body.includes(data.inc_id)) {
+        body = `📋 장애ID: ${data.inc_id}\n` + body;
+      }
+      
       const priority = typeof data.priority === 'number' ? data.priority : 0;
       if (priority >= 80) vibrate = [300, 100, 300, 100, 300];
     } catch (e) {
-      console.error('[SW] Push JSON parse failed:', e.message);
-      // 원시 텍스트라도 보여주기 시도
-      try {
-        const raw = event.data.text();
-        if (raw && raw.length > 0 && raw.length < 500) body = raw;
-      } catch (_) {}
+      console.error('[SW] Push processing failed:', e.message);
     }
   }
 
-  // tag에 타임스탬프를 붙여 매번 새 알림으로 표시 (이전 알림 미확인 상태여도 새 알림 생성)
+  const options = {
+    body: body,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: vibrate,
+    tag: `${tag}-${Date.now()}`, // 매번 새로운 알림으로 표시
+    renotify: true,
+    data: { url: url }
+  };
+
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      vibrate,
-      tag: `${tag}-${Date.now()}`,
-      renotify: true,
-      silent: false,
-      requireInteraction: (typeof vibrate[0] === 'number' && vibrate.length >= 5),
-      data: { url }
-    })
+    self.registration.showNotification(title, options)
   );
 });
 
