@@ -43,6 +43,12 @@ export default function IncidentKeywordPage() {
   const [copied, setCopied] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const inputRef = useRef(null);
+  
+  // Get current user for shortcut URL
+  const userStr = localStorage.getItem('sguard_user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const employeeId = user?.employee_id || '';
+  const shortcutUrl = `${API_BASE}/sms/keywords${employeeId ? `?employee_id=${employeeId}` : ''}`;
 
   const fetchKeywords = async () => {
     setLoading(true);
@@ -111,7 +117,7 @@ export default function IncidentKeywordPage() {
   };
 
   const handleCopyApiUrl = () => {
-    navigator.clipboard.writeText(`${API_BASE}/sms/keywords`);
+    navigator.clipboard.writeText(shortcutUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -205,7 +211,7 @@ export default function IncidentKeywordPage() {
             </div>
           </div>
           <div className="mt-3 flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2 border border-white/5">
-            <span className="text-[9px] font-mono text-slate-500 truncate flex-1">{API_BASE}/sms/keywords</span>
+            <span className="text-[9px] font-mono text-slate-500 truncate flex-1">{shortcutUrl}</span>
             <span className="text-[9px] font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">GET</span>
           </div>
         </div>

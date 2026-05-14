@@ -4,7 +4,7 @@ import {
   CheckCircle, Check, Eye, EyeOff, Mail, KeyRound, UserCheck, Download, Lock, ChevronRight, BookOpen, X, Apple
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { setAccessToken, setUserProfile as setStoreUserProfile, setGhostToken } from '../lib/authStore';
+import { setAccessToken, setUserProfile as setStoreUserProfile, setGhostToken, setAllowedPaths } from '../lib/authStore';
 import { PushManager } from '../lib/pushManager';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -383,6 +383,7 @@ export default function LoginPage() {
       }
       
       setStoreUserProfile(data.user || data);
+      if ('allowed_paths' in data) setAllowedPaths(data.allowed_paths);
 
       // 🔔 로그인 성공 즉시 푸시 구독 등록 (Access Token이 확실히 있는 시점)
       const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
@@ -823,6 +824,12 @@ export default function LoginPage() {
               <ErrorBox msg={error} />
               <SubmitBtn label="로그인" />
               
+              <div style={{ display:'flex', gap:16, justifyContent:'center', marginTop: isShrink ? 0 : 8 }}>
+                <button type="button" onClick={() => navigate('/signup')} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.4)', fontSize:12, cursor:'pointer', fontWeight:600 }}>회원가입</button>
+                <div style={{ width:1, background:'rgba(255,255,255,0.1)' }} />
+                <button type="button" onClick={() => setState(S.RESET_A)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.4)', fontSize:12, cursor:'pointer', fontWeight:600 }}>비밀번호 찾기</button>
+              </div>
+              
               <div style={{ display:'flex', gap:8, marginTop: isShrink ? 0 : 8 }}>
                 <button type="button" onClick={() => setShowManual(true)}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
@@ -848,7 +855,6 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              <button type="button" onClick={() => setState(S.RESET_A)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:12, textDecoration:'underline', cursor:'pointer', marginTop: isShrink ? 12 : 8 }}>비밀번호를 분실하셨나요?</button>
             </form>
           )}
 

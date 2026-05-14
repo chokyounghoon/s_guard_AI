@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu }) {
   const navigate = useNavigate();
@@ -109,8 +109,11 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             {/* 그리드: 2열 (PC 버전 - s-callert 만) */}
             <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {[
+                { label: '대직자 관리', sub: 'DEPUTY MGMT', icon: UserCircle, path: '/admin/deputy', color: '#10b981' },
                 { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
-              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
+                { label: '권한 관리', sub: 'RBAC SETTING', icon: Shield, path: '/admin/permissions', color: '#6366f1', adminOnly: true },
+                { label: '사용자 관리', sub: 'USER MGMT', icon: Users, path: '/user-management', color: '#3b82f6', adminOnly: true },
+              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin' || user?.role === 'SUPER_ADMIN').map((item) => {
                 const Icon = item.icon;
                 return (
                   <div

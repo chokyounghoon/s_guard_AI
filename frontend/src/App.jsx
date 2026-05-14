@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 
 import DashboardPage from './pages/DashboardPage';
 import AiReportPage from './pages/AiReportPage';
@@ -36,6 +37,8 @@ import PushDiagnosticPage from './pages/PushDiagnosticPage';
 import AlertMonitorPage from './pages/AlertMonitorPage';
 import IncidentKeywordPage from './pages/IncidentKeywordPage';
 import UserKeywordPage from './pages/UserKeywordPage';
+import PermissionManagementPage from './pages/PermissionManagementPage';
+import DeputyManagementPage from './pages/DeputyManagementPage';
 import SCallertPage from './pages/SCallertPage';
 import ConsentModal from './components/ConsentModal';
 import PCPageModal from './components/PCPageModal';
@@ -54,25 +57,28 @@ import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User } fr
 import { CodebookProvider } from './context/CodebookContext';
 
 import { Navigate } from 'react-router-dom';
-import { setAccessToken, getAccessToken, setUserProfile as setStoreUserProfile, getUserProfile, addAuthListener, getGhostToken, setGhostToken } from './lib/authStore';
+import { setAccessToken, getAccessToken, setUserProfile as setStoreUserProfile, getUserProfile, addAuthListener, getGhostToken, setGhostToken, setAllowedPaths, isPathAllowed } from './lib/authStore';
 import { PushManager } from './lib/pushManager';
 
 // 🔒 인증된 사용자만 접근할 수 있도록 보호하는 컴포넌트 (Navigation Guard)
 // 🔒 Protected Route: Waits for session refresh to complete before redirecting
 function ProtectedRoute({ children, isRefreshing, userProfile }) {
+  const location = useLocation();
   const accessToken = getAccessToken();
-  
-  // Show nothing or a loading spinner while the app is attempting silent refresh
-  if (isRefreshing) {
-    return null; // or <div className="loading-screen" />
-  }
 
-  // After refresh check is done, verify if we have a valid session
+  if (isRefreshing) return null;
+
   if (!userProfile && !accessToken) {
     console.log('[Auth] Protected route blocked - No valid session found.');
     return <Navigate to="/" replace />;
   }
-  
+
+  // 🔐 RBAC: 현재 경로가 사용자 역할에서 허용되지 않으면 대시보드로 리다이렉트
+  if (!isPathAllowed(location.pathname)) {
+    console.warn('[RBAC] Access denied for path:', location.pathname);
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 }
 
@@ -141,6 +147,7 @@ function AppContent() {
           setAccessToken(refreshData.access_token);
           setStoreUserProfile(refreshData.user);
           if (refreshData.ghost_token) setGhostToken(refreshData.ghost_token);
+          if ('allowed_paths' in refreshData) setAllowedPaths(refreshData.allowed_paths);
           setIsSessionRefreshed(true);
           setIsRefreshing(false);
           return;
@@ -168,6 +175,7 @@ function AppContent() {
             setAccessToken(ghostData.access_token);
             setStoreUserProfile(ghostData.user);
             if (ghostData.ghost_token) setGhostToken(ghostData.ghost_token);
+            if ('allowed_paths' in ghostData) setAllowedPaths(ghostData.allowed_paths);
             setIsSessionRefreshed(true);
             setIsRefreshing(false);
             return;
@@ -296,6 +304,7 @@ function AppContent() {
       
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
         {/* 🔒 Protected Routes: 인증 필수 */}
         {/* 대시보드는 항상 렌더링 (모달 배경) */}
@@ -325,6 +334,8 @@ function AppContent() {
         <Route path="/user-management"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserManagementPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/organization-management" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OrganizationManagementPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/warroom-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><WarRoomManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/admin/permissions"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><PermissionManagementPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/admin/deputy"            element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><DeputyManagementPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/codebook-management"     element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><CodebookManagementPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/workflow/:inc_id"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><WorkflowPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/report/:incId"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ReportViewPage /></PCPageModal></ProtectedRoute>} />

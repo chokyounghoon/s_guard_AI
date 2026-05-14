@@ -301,7 +301,7 @@ const authMiddleware = async (c, next) => {
     path === '/sms/shortcut/keywords' ||   // ⚡ iPhone 단축어 전용 (userId 기반 조회)
     path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
     path.startsWith('/codebook') ||
-    path.startsWith('/sms/');              // ⚡ SMS 원문 조회 경로 (Public 허용)
+    (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
     
   if (isPublic) {
     console.log(`[Auth-Pass] Public access to: ${path}`);
@@ -1963,6 +1963,27 @@ app.post('/auth/set-password', async (c) => {
   });
 });
 
+// ─── 역할 기반 허용 경로 조회 헬퍼 ───────────────────────────────────────────
+// SUPER_ADMIN / ADMIN 은 null 반환 (모든 경로 허용)
+// 그 외 역할은 can_read=1 인 경로 목록 반환
+async function fetchUserPermissions(db, roleCode) {
+  if (!roleCode) return [];
+  const code = roleCode.toUpperCase();
+  if (code === 'SUPER_ADMIN' || code === 'ADMIN') return null; // null = 전체 허용
+  try {
+    const { results } = await db.prepare(`
+      SELECT m.path FROM menus m
+      INNER JOIN role_permissions rp ON m.id = rp.menu_id AND rp.role_code = ?
+      WHERE rp.can_read = 1 AND m.is_active = 1
+    `).bind(code).all();
+    return results ? results.map(r => r.path) : [];
+  } catch (e) {
+    console.error('[RBAC] fetchUserPermissions error:', e.message);
+    return null; // 오류 시 전체 허용으로 안전 처리
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.post('/auth/login', async (c) => {
   const { email, employee_id: rawEmpId, password } = await c.req.json();
   const db = c.env.DB;
@@ -2023,11 +2044,12 @@ app.post('/auth/login', async (c) => {
     try {
       const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
       const ua = c.req.header('User-Agent') || 'unknown';
+      const nowKst = getKst();
       await db.prepare(
         `INSERT INTO login_history 
          (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
-         VALUES (?, ?, ?, ?, 'FAILURE', DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'))`
-      ).bind(user.employee_id, user.email || '', ip, ua).run();
+         VALUES (?, ?, ?, ?, 'FAILURE', ?, ?, ?)`
+      ).bind(user.employee_id, user.email || '', ip, ua, nowKst, nowKst, nowKst).run();
     } catch (err) {
       console.error(`[Auth-Error] Failed to record login failure:`, err.message);
     }
@@ -2087,7 +2109,8 @@ app.post('/auth/login', async (c) => {
     user, 
     token: `sguard-token-${user.employee_id}`, 
     access_token: jwt,
-    ghost_token: refreshToken // 👻 Ghost Token for localhost fallback
+    ghost_token: refreshToken,
+    allowed_paths: await fetchUserPermissions(db, user.role)
   });
 })
 
@@ -2190,7 +2213,8 @@ app.get('/auth/refresh', async (c) => {
       ok: true, 
       access_token: newAccessToken, 
       ghost_token: refreshToken, 
-      user 
+      user,
+      allowed_paths: await fetchUserPermissions(db, user.role)
     });
 
   } catch (err) {
@@ -2266,7 +2290,7 @@ app.get('/auth/check', async (c) => {
 
 app.post('/auth/signup', async (c) => {
   const body = await c.req.json()
-  const { email, password, name, company, honbu, team, part, subpart, phone, employee_id, position } = body
+  const { email, password, name, company, honbu, team, part, subpart, phone, employee_id, position, os_type } = body
   const db = c.env.DB
   
   console.log('[Signup Search] employee_id:', employee_id);
@@ -2291,12 +2315,12 @@ app.post('/auth/signup', async (c) => {
   
   const res = await db.prepare(
     `INSERT INTO users (
-      email, password_hash, name, company, honbu, team, part, subpart, phone,
+      email, password_hash, name, company, honbu, team, part, subpart, phone, os_type,
       employee_id, position, role, is_active, is_admin, token, status,
       reg_id, reg_dt, mod_id, mod_dt, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', finalPhone,
+    email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', finalPhone, os_type || 'android',
     cleanEmpId, position || 'POS_001', 'user', 1, 0, token, 'ACTIVE',
     cleanEmpId, regDt, cleanEmpId, regDt, regDt
   ).run()
@@ -2347,7 +2371,7 @@ app.post('/auth/signup', async (c) => {
 app.post('/admin/users', async (c) => {
   const body = await c.req.json()
   const { 
-    email, name, employee_id, phone, role, password,
+    email, name, employee_id, phone, os_type, role, password,
     company, honbu, team, part, subpart 
   } = body
   const db = c.env.DB
@@ -2374,12 +2398,12 @@ app.post('/admin/users', async (c) => {
   try {
     await db.prepare(
       `INSERT INTO users (
-        email, password_hash, name, company, honbu, team, part, subpart, phone,
+        email, password_hash, name, company, honbu, team, part, subpart, phone, os_type,
         employee_id, role, is_active, is_admin, token, status,
         reg_id, reg_dt, mod_id, mod_dt, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      email, hashedPassword, name, company || '', honbu || '', team || '', part || '', subpart || '', phone || '',
+      email, hashedPassword, name, company || '', honbu || '', team || '', part || '', subpart || '', phone || '', os_type || 'android',
       cleanEmpId, role || 'viewer', 1, 0, token, status,
       'admin', regDt, 'admin', regDt, regDt
     ).run()
@@ -2544,7 +2568,7 @@ app.get('/users', async (c) => {
       u.subpart,
       COALESCE(os.name, u.subpart) as subpart_name,
       u.profile_picture,
-      u.status, u.is_active, u.is_admin , u.last_login_at
+      u.status, u.is_active, u.is_admin , u.last_login_at, u.os_type
     FROM users u
     LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
     LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
@@ -2579,7 +2603,7 @@ app.get('/users/:id', async (c) => {
   const id = c.req.param('id')
   const user = await db.prepare(`
     SELECT 
-      u.employee_id, u.email, u.name, u.role, u.phone, u.is_active, u.is_admin, u.profile_picture,
+      u.employee_id, u.email, u.name, u.role, u.phone, u.os_type, u.is_active, u.is_admin, u.profile_picture,
       u.company,
       COALESCE(oc.name, u.company) as company_name, 
       u.honbu,
@@ -2603,7 +2627,7 @@ app.get('/users/:id', async (c) => {
 })
 app.patch('/auth/profile', async (c) => {
   const body = await c.req.json()
-  const { user_id, employee_id, name, phone, company, honbu, team, part, subpart, profile_picture } = body
+  const { user_id, employee_id, name, phone, company, honbu, team, part, subpart, os_type, profile_picture } = body
   console.log('[Auth-Profile-Debug] Received Profile Update:', JSON.stringify(body))
   
   const targetId = String(user_id || employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
@@ -2627,11 +2651,12 @@ app.patch('/auth/profile', async (c) => {
   const finalTeam    = team !== undefined ? team : existing.team
   const finalPart    = part !== undefined ? part : existing.part
   const finalSubpart = subpart !== undefined ? subpart : existing.subpart
+  const finalOsType  = os_type !== undefined ? os_type : existing.os_type
   const finalPic     = profile_picture !== undefined ? profile_picture : existing.profile_picture
 
   await db.prepare(
-    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, profile_picture = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
-  ).bind(finalName, finalPhone, finalCompany, finalHonbu, finalTeam, finalPart, finalSubpart, finalPic, modDt, targetId, targetId).run()
+    "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, os_type = ?, profile_picture = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
+  ).bind(finalName, finalPhone, finalCompany, finalHonbu, finalTeam, finalPart, finalSubpart, finalOsType, finalPic, modDt, targetId, targetId).run()
   
   const updated = await db.prepare(`
     SELECT 
@@ -2719,13 +2744,13 @@ app.patch('/users/:id/role', async (c) => {
 app.patch('/users/:id/org', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
-  const { company, honbu, team, part, subpart } = await c.req.json()
+  const { company, honbu, team, part, subpart, email, phone, os_type } = await c.req.json()
   const modDt = getKst()
   
   const result = await db.prepare(
-    "UPDATE users SET company = ?, honbu = ?, team = ?, part = ?, subpart = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
+    "UPDATE users SET company = ?, honbu = ?, team = ?, part = ?, subpart = ?, email = ?, phone = ?, os_type = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
   )
-  .bind(company || null, honbu || null, team || null, part || null, subpart || null, modDt, 'ADMIN', id)
+  .bind(company || null, honbu || null, team || null, part || null, subpart || null, email || null, phone || null, os_type || null, modDt, 'ADMIN', id)
   .run()
     
   if (result.meta?.changes === 0) {
@@ -2819,6 +2844,156 @@ app.get('/ai/codes/:category', async (c) => {
   ).bind(category.toUpperCase()).all()
   return c.json({ category, codes: results })
 })
+
+// ==========================================
+// 1.6 RBAC (Role-Based Access Control) APIs
+// ==========================================
+app.get('/rbac/roles', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM roles ORDER BY role_name ASC").all()
+  return c.json({ roles: results })
+})
+
+app.post('/rbac/roles', async (c) => {
+  const db = c.env.DB
+  const { role_code, role_name, description } = await c.req.json()
+  const modDt = getKst()
+  
+  await db.prepare(`
+    INSERT INTO roles (role_code, role_name, description, reg_dt, mod_dt)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(role_code) DO UPDATE SET
+      role_name = excluded.role_name,
+      description = excluded.description,
+      mod_dt = excluded.mod_dt
+  `).bind(role_code, role_name, description, modDt, modDt).run()
+  
+  return c.json({ success: true })
+})
+
+app.get('/rbac/menus', async (c) => {
+  const db = c.env.DB
+  const { results } = await db.prepare("SELECT * FROM menus ORDER BY sort_order ASC").all()
+  return c.json({ menus: results })
+})
+
+app.get('/rbac/permissions/:roleCode', async (c) => {
+  const roleCode = c.req.param('roleCode')
+  const db = c.env.DB
+  
+  // Get all menus joined with permissions for this role
+  const query = `
+    SELECT 
+      m.id as menu_id, m.name as menu_name, m.path, m.icon,
+      COALESCE(rp.can_read, 0) as can_read,
+      COALESCE(rp.can_write, 0) as can_write,
+      COALESCE(rp.can_delete, 0) as can_delete
+    FROM menus m
+    LEFT JOIN role_permissions rp ON m.id = rp.menu_id AND rp.role_code = ?
+    WHERE m.is_active = 1
+    ORDER BY m.sort_order ASC
+  `
+  const { results } = await db.prepare(query).bind(roleCode).all()
+  return c.json({ role_code: roleCode, permissions: results })
+})
+
+app.post('/rbac/permissions', async (c) => {
+  const db = c.env.DB
+  const { role_code, permissions } = await c.req.json()
+  const modDt = getKst()
+
+  for (const p of permissions) {
+    await db.prepare(`
+      INSERT INTO role_permissions
+        (role_code, menu_id, menu_name, menu_path, can_read, can_write, can_delete, reg_dt, mod_dt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(role_code, menu_id) DO UPDATE SET
+        menu_name  = excluded.menu_name,
+        menu_path  = excluded.menu_path,
+        can_read   = excluded.can_read,
+        can_write  = excluded.can_write,
+        can_delete = excluded.can_delete,
+        mod_dt     = excluded.mod_dt
+    `).bind(
+      role_code,
+      p.menu_id,
+      p.menu_name  || '',
+      p.menu_path  || p.path || '',
+      p.can_read   ? 1 : 0,
+      p.can_write  ? 1 : 0,
+      p.can_delete ? 1 : 0,
+      modDt,
+      modDt
+    ).run()
+  }
+
+  return c.json({ success: true, saved: permissions.length })
+})
+
+// ==========================================
+// 1.7 Substitute (Deputy) Management APIs
+// ==========================================
+
+app.get('/rbac/substitutes/:userId', async (c) => {
+  const userId = c.req.param('userId')
+  const db = c.env.DB
+  const { results } = await db.prepare(`
+    SELECT s.*,
+      u.name as deputy_name,
+      u.team as deputy_team_code,
+      u.part as deputy_part_code,
+      u.subpart as deputy_subpart_code,
+      u.position as deputy_position,
+      COALESCE(ot.name, u.team)    as deputy_team,
+      COALESCE(op.name, u.part)    as deputy_part,
+      COALESCE(os.name, u.subpart) as deputy_subpart
+    FROM substitutes s
+    JOIN users u ON s.deputy_id = u.employee_id
+    LEFT JOIN organizations ot ON u.team    = ot.code AND ot.depth = 3
+    LEFT JOIN organizations op ON u.part    = op.code AND op.depth = 4
+    LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+    WHERE s.user_id = ?
+    ORDER BY s.priority ASC
+  `).bind(userId).all()
+  return c.json({ userId, substitutes: results })
+})
+
+app.post('/rbac/substitutes', async (c) => {
+  const db = c.env.DB
+  const { user_id, deputy_id, priority } = await c.req.json()
+  const modDt = getKst()
+  
+  await db.prepare(`
+    INSERT INTO substitutes (user_id, deputy_id, priority, reg_dt, mod_dt)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, deputy_id) DO UPDATE SET
+      priority = excluded.priority,
+      mod_dt = excluded.mod_dt
+  `).bind(user_id, deputy_id, priority || 1, modDt, modDt).run()
+  
+  return c.json({ success: true })
+})
+
+app.delete('/rbac/substitutes/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  await db.prepare("DELETE FROM substitutes WHERE id = ?").bind(id).run()
+  return c.json({ success: true })
+})
+
+app.post('/rbac/substitutes/reorder', async (c) => {
+  const db = c.env.DB
+  const { user_id, items } = await c.req.json() // items: [{id, priority}]
+  const modDt = getKst()
+  
+  for (const item of items) {
+    await db.prepare("UPDATE substitutes SET priority = ?, mod_dt = ? WHERE id = ? AND user_id = ?")
+      .bind(item.priority, modDt, item.id, user_id).run()
+  }
+  
+  return c.json({ success: true })
+})
+
 
 app.post('/sms/convert-multimodal', async (c) => {
   let formData
@@ -3887,8 +4062,46 @@ app.get('/ai/governance/stats', async (c) => {
 
 app.get('/sms/keywords', async (c) => {
   const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM alert_keywords").all()
-  return c.json({ keywords: results })
+  const employeeId = c.req.query('employee_id') || c.req.query('id') || c.req.query('userId')
+  
+  // 1. 기본 글로벌 장애 키워드 목록 조회
+  const { results: globalKeywords } = await db.prepare("SELECT * FROM alert_keywords").all()
+  
+  if (employeeId) {
+    // ⚡ iPhone Shortcut / User Specific Mode
+    // 이 모드는 특정 사용자의 개인 감지 키워드(user_keywords)를 반환합니다.
+    const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(employeeId).first()
+    
+    // 사용자가 등록한 키워드가 없으면 기본 장애 키워드 세트를 제공
+    let keywordStr = result ? result.keywords : ""
+    if (!keywordStr) {
+      keywordStr = "IN USED FILE|DELAY|임계치|ERROR|테스트|Z FILE EXITS|Z FILE|임계|ABEND|장애|오류|에러";
+    }
+
+    const keywordList = keywordStr.split('|').map(k => k.trim()).filter(Boolean)
+    
+    // 개인 키워드를 글로벌 포맷과 동일한 객체 배열로 변환
+    const personalKeywords = keywordList.map(k => ({
+      keyword: k,
+      response: `[감지] ${k} 장애 예상`,
+      severity: 'CRITICAL',
+      is_personal: true
+    }))
+
+    // 글로벌 키워드와 개인 키워드를 통합하여 반환 (iPhone 단축어 및 웹 UI 호환)
+    return c.json({ 
+      success: true,
+      employee_id: employeeId,
+      keywords: [...globalKeywords, ...personalKeywords],
+      keywordList: keywordList,
+      userKeywords: keywordStr,
+      count: globalKeywords.length + keywordList.length,
+      timestamp: new Date().toISOString()
+    })
+  }
+
+  // 기본 모드: 글로벌 장애 키워드 목록만 반환
+  return c.json({ keywords: globalKeywords })
 })
 
 app.post('/sms/keywords', async (c) => {
@@ -3921,11 +4134,12 @@ app.post('/sms/user-keywords', async (c) => {
   const userId = user.employee_id
   const { keywords } = await c.req.json()
   
+  const nowKst = getKst()
   await db.prepare(`
     INSERT INTO user_keywords (user_id, keywords, updated_at) 
-    VALUES (?, ?, CURRENT_TIMESTAMP) 
+    VALUES (?, ?, ?) 
     ON CONFLICT(user_id) DO UPDATE SET keywords = excluded.keywords, updated_at = excluded.updated_at
-  `).bind(userId, keywords).run()
+  `).bind(userId, keywords, nowKst).run()
   
   return c.json({ status: "success" })
 })
@@ -6053,11 +6267,12 @@ ${timelineCtx.join('\n')}
       
       // Auto-save summary to DB (only if it's a valid summary, not a raw transcript leak)
       if (fullContent && !isRaw(fullContent)) {
+        const nowKst = getKst()
         await db.prepare(`
           INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
-          VALUES (?, ?, 'dify-workflow', CURRENT_TIMESTAMP)
-          ON CONFLICT(inc_id) DO UPDATE SET summary = excluded.summary, mod_dt = CURRENT_TIMESTAMP
-        `).bind(cleanId, fullContent).run();
+          VALUES (?, ?, 'dify-workflow', ?)
+          ON CONFLICT(inc_id) DO UPDATE SET summary = excluded.summary, mod_dt = ?
+        `).bind(cleanId, fullContent, nowKst, nowKst).run();
       }
 
       if (kv) await kv.delete(lockKey);

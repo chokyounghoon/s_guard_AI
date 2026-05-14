@@ -21,6 +21,12 @@ export default function UserKeywordPage({ userProfile }) {
   const [copied, setCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false);
+  // 저장 프로그레스 바
+  const [saveProgress, setSaveProgress] = useState(0);   // 0~100
+  const [saveComplete, setSaveComplete] = useState(false); // 완료 배너
+  const progressTimer = useRef(null);
+
+  const DEFAULT_KEYWORDS = "IN USED FILE|DELAY|임계치|ERROR|테스트|Z FILE EXITS|Z FILE||임계|ABEND|장애|오류|에러";
 
   const fetchUserKeywords = async () => {
     setLoading(true);
@@ -28,17 +34,53 @@ export default function UserKeywordPage({ userProfile }) {
       const res = await fetch(`${API_BASE}/sms/user-keywords`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setKeywords(data.keywords || '');
-        setLastSaved(new Date());
+        const kw = data.keywords ? data.keywords.trim() : '';
+        setKeywords(kw || DEFAULT_KEYWORDS);
+      } else {
+        setKeywords(DEFAULT_KEYWORDS);
       }
-    } catch (e) { console.error(e); }
+      setLastSaved(new Date());
+    } catch (e) {
+      console.error(e);
+      setKeywords(DEFAULT_KEYWORDS);
+    }
     finally { setLoading(false); }
   };
 
   useEffect(() => { fetchUserKeywords(); }, []);
 
+  const runProgressBar = (onDone) => {
+    setSaveProgress(0);
+    setSaveComplete(false);
+    let p = 0;
+    clearInterval(progressTimer.current);
+    progressTimer.current = setInterval(() => {
+      p += Math.random() * 18 + 8; // 불규칙한 속도로 올라가다가 90%서 멈춤
+      if (p >= 90) { p = 90; clearInterval(progressTimer.current); }
+      setSaveProgress(Math.min(p, 90));
+    }, 120);
+    return () => clearInterval(progressTimer.current);
+  };
+
+  const finishProgressBar = (success) => {
+    clearInterval(progressTimer.current);
+    setSaveProgress(100);
+    if (success) {
+      setTimeout(() => {
+        setSaveComplete(true);
+        setTimeout(() => {
+          setSaveComplete(false);
+          setSaveProgress(0);
+        }, 2500);
+      }, 300);
+    } else {
+      setTimeout(() => setSaveProgress(0), 600);
+    }
+  };
+
   const saveKeywords = async () => {
     setSaving(true);
+    runProgressBar();
     try {
       const res = await fetch(`${API_BASE}/sms/user-keywords`, {
         method: 'POST',
@@ -47,13 +89,14 @@ export default function UserKeywordPage({ userProfile }) {
       });
       if (res.ok) {
         setLastSaved(new Date());
-        toast.success('키워드가 D1 서버에 안전하게 저장되었습니다.', {
-          style: { background: '#0e1420', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)', fontSize: '12px', fontWeight: 'bold' },
-          iconTheme: { primary: '#22d3ee', secondary: '#0e1420' }
-        });
+        finishProgressBar(true);
+      } else {
+        finishProgressBar(false);
+        toast.error('저장에 실패했습니다.');
       }
     } catch (e) { 
       console.error(e);
+      finishProgressBar(false);
       toast.error('저장에 실패했습니다.');
     }
     finally { setSaving(false); }
@@ -68,13 +111,11 @@ export default function UserKeywordPage({ userProfile }) {
 
   const handleSync = async () => {
     setSyncing(true);
-    await new Promise(r => setTimeout(r, 1000));
+    runProgressBar();
+    await new Promise(r => setTimeout(r, 1200));
+    finishProgressBar(true);
     setSyncing(false);
     setSyncSuccess(true);
-    toast.success('모바일 동기화 신호 전송 완료', {
-      icon: '📡',
-      style: { background: '#0e1420', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.2)', fontSize: '12px' }
-    });
     setTimeout(() => setSyncSuccess(false), 3000);
   };
 
@@ -84,7 +125,17 @@ export default function UserKeywordPage({ userProfile }) {
     <div className="min-h-screen bg-[#080b12] text-white pb-28">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[#080b12]/95 backdrop-blur-xl border-b border-white/5">
-        <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+        {/* ── 프로그레스 바 ── */}
+        <div className="relative h-1 w-full bg-white/5 overflow-hidden">
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 ease-out"
+            style={{ width: `${saveProgress}%`, opacity: saveProgress > 0 ? 1 : 0 }}
+          />
+          {saving && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_1s_infinite]" />
+          )}
+        </div>
+
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all">
@@ -98,11 +149,28 @@ export default function UserKeywordPage({ userProfile }) {
           <button
             onClick={saveKeywords}
             disabled={saving || loading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-black transition-all shadow-lg shadow-cyan-900/30"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-black transition-all shadow-lg shadow-cyan-900/30 active:scale-95"
           >
             {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            저장
+            {saving ? '저장 중...' : '저장'}
           </button>
+        </div>
+
+        {/* ── 완료 배너 ── */}
+        <div className={`overflow-hidden transition-all duration-500 ease-out ${
+          saveComplete ? 'max-h-10 opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          <div className="flex items-center justify-between px-4 py-2 bg-emerald-500/15 border-t border-emerald-500/25">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
+                <Check className="w-2.5 h-2.5 text-white" />
+              </div>
+              <span className="text-[11px] font-black text-emerald-400">D1 서버에 안전하게 저장 완료</span>
+            </div>
+            {lastSaved && (
+              <span className="text-[9px] text-emerald-600 font-mono">{lastSaved.toLocaleTimeString()}</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -210,7 +278,7 @@ export default function UserKeywordPage({ userProfile }) {
             <button
               onClick={() => {
                 const empId = userProfile?.employee_id || (localStorage.getItem('sguard_user') ? JSON.parse(localStorage.getItem('sguard_user')).employee_id : 'YOUR_ID');
-                const url = `${API_BASE}/sms/shortcut/keywords?id=${empId}`;
+                const url = `${API_BASE}/sms/keywords?employee_id=${empId}`;
                 handleCopyApiUrl(url, 'Shortcut URL');
               }}
               className="px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-400 text-[10px] font-black hover:bg-purple-500/30 transition-all"
@@ -225,7 +293,7 @@ export default function UserKeywordPage({ userProfile }) {
               <span className="text-[9px] font-bold text-slate-600">GET JSON</span>
             </div>
             <p className="text-[10px] font-mono text-slate-400 break-all leading-relaxed">
-              {API_BASE}/sms/shortcut/keywords?id={userProfile?.employee_id || (localStorage.getItem('sguard_user') ? JSON.parse(localStorage.getItem('sguard_user')).employee_id : '[사번]')}
+              {API_BASE}/sms/keywords?employee_id={userProfile?.employee_id || (localStorage.getItem('sguard_user') ? JSON.parse(localStorage.getItem('sguard_user')).employee_id : '[사번]')}
             </p>
           </div>
 

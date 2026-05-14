@@ -6,6 +6,7 @@
 
 let accessToken = null;
 let userProfile = null;
+let allowedPaths = null; // null = 전체 허용 (ADMIN/SUPER_ADMIN), [] = 전체 차단, [...] = 허용 목록
 const listeners = new Set();
 
 const notify = () => {
@@ -62,6 +63,29 @@ export const getUserProfile = () => {
   return userProfile;
 };
 
+export const setAllowedPaths = (paths) => {
+  allowedPaths = paths; // null = 전체 허용, 배열 = 명시적 허용 목록
+  if (paths !== null) {
+    localStorage.setItem('sguard_allowed_paths', JSON.stringify(paths));
+  } else {
+    localStorage.removeItem('sguard_allowed_paths');
+  }
+};
+
+export const getAllowedPaths = () => {
+  if (allowedPaths !== undefined) return allowedPaths;
+  const stored = localStorage.getItem('sguard_allowed_paths');
+  return stored ? JSON.parse(stored) : null;
+};
+
+export const isPathAllowed = (path) => {
+  const paths = getAllowedPaths();
+  if (paths === null) return true; // ADMIN/SUPER_ADMIN: 전체 허용
+  if (!paths || paths.length === 0) return false;
+  // 경로 prefix 매칭 (예: /chat/INC-123 → /chat 허용이면 통과)
+  return paths.some(p => path === p || path.startsWith(p + '/'));
+};
+
 // 👻 Ghost Token Management (LocalStorage fallback for cookies)
 export const setGhostToken = (token) => {
   if (token) {
@@ -78,8 +102,10 @@ export const getGhostToken = () => {
 export const clearSession = () => {
   accessToken = null;
   userProfile = null;
+  allowedPaths = null;
   localStorage.removeItem('sguard_user');
   localStorage.removeItem('sguard_ghost');
+  localStorage.removeItem('sguard_allowed_paths');
   notify();
 };
 

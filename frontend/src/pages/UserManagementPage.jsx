@@ -17,6 +17,7 @@ export default function UserManagementPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [roles, setRoles] = useState([]);
   
   // My Profile State
   const [myProfile, setMyProfile] = useState(null);
@@ -26,12 +27,15 @@ export default function UserManagementPage() {
   const [orgTree, setOrgTree] = useState([]);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [tempOrgs, setTempOrgs] = useState({ org1: '', org2: '', org3: '', org4: '', org5: '' });
+  const [tempUserDetail, setTempUserDetail] = useState({ 
+    org1: '', org2: '', org3: '', org4: '', org5: '',
+    email: '', phone: '', os_type: 'android'
+  });
   
   // New User Registration State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newUser, setNewUser] = useState({
-    name: '', employee_id: '', email: '', phone: '', role: 'viewer', password: '',
+    name: '', employee_id: '', email: '', phone: '', os_type: 'android', role: 'viewer', password: '',
     org1: '', org2: '', org3: '', org4: '', org5: ''
   });
 
@@ -66,6 +70,16 @@ export default function UserManagementPage() {
     }
   };
 
+  const fetchRoles = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/rbac/roles`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setRoles(data.roles || []);
+      }
+    } catch (e) { console.error('[Roles] Fetch failed:', e); }
+  };
+
   const fetchUsers = () => {
     setLoading(true);
     fetch(`${API_BASE}/users`, {
@@ -86,6 +100,7 @@ export default function UserManagementPage() {
   useEffect(() => {
     fetchMyProfile();
     fetchUsers();
+    fetchRoles();
     fetch(`${API_BASE}/org/tree`, {
       headers: getAuthHeaders()
     })
@@ -225,12 +240,15 @@ export default function UserManagementPage() {
     setEditingUser(user);
     
     // Direct 1:1 Pre-population (Matches the User Database Schema)
-    setTempOrgs({
+    setTempUserDetail({
       org1: user.company_code || user.company || '',
       org2: user.honbu_code || user.honbu || '',
       org3: user.team_code || user.team || '',
       org4: user.part_code || user.part || '',
-      org5: user.subpart_code || user.subpart || ''
+      org5: user.subpart_code || user.subpart || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      os_type: user.os_type || 'android'
     });
     setIsOrgModalOpen(true);
   };
@@ -238,19 +256,22 @@ export default function UserManagementPage() {
   const handleSaveOrg = async () => {
     if (!editingUser) return;
     
-    // Map UI dropdowns (org1-5) exactly back to the database fields
+    // Map UI dropdowns exactly back to the database fields
     const payload = {
-      company: tempOrgs.org1 || null,
-      honbu:   tempOrgs.org2 || null,
-      team:    tempOrgs.org3 || null,
-      part:    tempOrgs.org4 || null,
-      subpart: tempOrgs.org5 || null
+      company: tempUserDetail.org1 || null,
+      honbu:   tempUserDetail.org2 || null,
+      team:    tempUserDetail.org3 || null,
+      part:    tempUserDetail.org4 || null,
+      subpart: tempUserDetail.org5 || null,
+      email:   tempUserDetail.email || null,
+      phone:   tempUserDetail.phone || null,
+      os_type: tempUserDetail.os_type || null
     };
 
     try {
       const res = await fetch(`${API_BASE}/users/${editingUser.employee_id}/org`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
+        method: 'PATCH',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -278,6 +299,7 @@ export default function UserManagementPage() {
       employee_id: newUser.employee_id,
       email: newUser.email,
       phone: newUser.phone,
+      os_type: newUser.os_type,
       role: newUser.role,
       password: newUser.password || null,
       company: newUser.org1 || null,
@@ -297,7 +319,7 @@ export default function UserManagementPage() {
       if (res.ok) {
         setIsAddModalOpen(false);
         setNewUser({
-          name: '', employee_id: '', email: '', phone: '', role: 'viewer', password: '',
+          name: '', employee_id: '', email: '', phone: '', os_type: 'android', role: 'viewer', password: '',
           org1: '', org2: '', org3: '', org4: '', org5: ''
         });
         fetchUsers();
@@ -465,7 +487,14 @@ export default function UserManagementPage() {
                 {/* Info Container */}
                 <div className={`${viewMode === 'grid' ? 'w-full' : 'flex-1 grid grid-cols-4 items-center gap-4'}`}>
                   <div className={viewMode === 'list' ? 'col-span-1' : 'mb-6'}>
-                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors truncate"><span>{user.name}</span></h3>
+                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors truncate flex items-center gap-2">
+                      <span>{user.name}</span>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
+                        user.os_type === 'ios' ? 'bg-slate-500/10 border-slate-500/20 text-slate-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
+                      }`}>
+                        {user.os_type?.toUpperCase() || 'AND'}
+                      </span>
+                    </h3>
                     <div className={`flex items-center gap-2 mt-1 ${viewMode === 'grid' ? 'justify-center' : ''}`}>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${user.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
                          <span>{user.role?.toUpperCase() || 'USER'}</span>
@@ -534,15 +563,25 @@ export default function UserManagementPage() {
                              <span><Shield className="w-3.5 h-3.5" /></span> 권한
                           </button>
                           <div className="absolute bottom-full left-0 w-full mb-1 bg-[#1a1f2e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl opacity-0 group-hover/role:opacity-100 transition-all pointer-events-none group-hover/role:pointer-events-auto origin-bottom">
-                             {['admin', 'analyst', 'viewer'].map(role => (
+                             {roles.length > 0 ? roles.map(r => (
                                <button
-                                 key={role}
-                                 onClick={() => handleUpdateRole(user.employee_id, role)}
-                                 className={`w-full text-left px-5 py-3 text-xs hover:bg-blue-600/10 transition-colors ${user.role === role ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+                                 key={r.role_code}
+                                 onClick={() => handleUpdateRole(user.employee_id, r.role_code)}
+                                 className={`w-full text-left px-5 py-3 text-xs hover:bg-blue-600/10 transition-colors ${String(user.role).toUpperCase() === String(r.role_code).toUpperCase() ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
                                >
-                                 <span>{role.toUpperCase()}</span>
+                                 <span>{r.role_name}</span>
                                </button>
-                             ))}
+                             )) : (
+                               ['ADMIN', 'ANALYST', 'VIEWER'].map(r => (
+                                 <button
+                                   key={r}
+                                   onClick={() => handleUpdateRole(user.employee_id, r.toLowerCase())}
+                                   className={`w-full text-left px-5 py-3 text-xs hover:bg-blue-600/10 transition-colors ${String(user.role).toUpperCase() === r ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+                                 >
+                                   <span>{r}</span>
+                                 </button>
+                               ))
+                             )}
                           </div>
                        </div>
                        <button
@@ -595,50 +634,76 @@ export default function UserManagementPage() {
               <div className="h-2 bg-gradient-to-r from-blue-600 to-purple-600" />
               <div className="p-8">
                  <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-white">소속 조직 변경</h2>
-                    <p className="text-slate-500 text-sm mt-1">{editingUser?.name}님의 소속 조직을 계층별로 선택하세요.</p>
+                    <h2 className="text-2xl font-bold text-white">사용자 정보 및 소속 변경</h2>
+                    <p className="text-slate-500 text-sm mt-1">{editingUser?.name}님의 상세 정보와 소속 조직을 변경합니다.</p>
                  </div>
 
                  <div className="space-y-4">
-                    {/* Level 1: 전사/회사 */}
-                    <Dropdown 
-                      label="회사" 
-                      value={tempOrgs.org1} 
-                      options={orgTree} 
-                      onChange={(val) => setTempOrgs({ org1: val, org2: '', org3: '', org4: '', org5: '' })}
-                    />
-                    {/* Level 2: 부문/실 */}
-                    <Dropdown 
-                      label="부문/실" 
-                      value={tempOrgs.org2} 
-                      options={getSubNodes(2, tempOrgs.org1)} 
-                      disabled={!tempOrgs.org1}
-                      onChange={(val) => setTempOrgs({...tempOrgs, org2: val, org3: '', org4: '', org5: ''})}
-                    />
-                    {/* Level 3: 본부 */}
-                    <Dropdown 
-                      label="본부/부서" 
-                      value={tempOrgs.org3} 
-                      options={getSubNodes(3, tempOrgs.org2)} 
-                      disabled={!tempOrgs.org2}
-                      onChange={(val) => setTempOrgs({...tempOrgs, org3: val, org4: '', org5: ''})}
-                    />
-                    {/* Level 4: 팀 */}
-                    <Dropdown 
-                      label="팀" 
-                      value={tempOrgs.org4} 
-                      options={getSubNodes(4, tempOrgs.org3)} 
-                      disabled={!tempOrgs.org3}
-                      onChange={(val) => setTempOrgs({...tempOrgs, org4: val, org5: ''})}
-                    />
-                    {/* Level 5: 파트 */}
-                    <Dropdown 
-                      label="파트" 
-                      value={tempOrgs.org5} 
-                      options={getSubNodes(5, tempOrgs.org4)} 
-                      disabled={!tempOrgs.org4}
-                      onChange={(val) => setTempOrgs({...tempOrgs, org5: val})}
-                    />
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                       <Input label="이메일" value={tempUserDetail.email} onChange={(v) => setTempUserDetail({...tempUserDetail, email: v})} />
+                       <Input label="전화번호" value={tempUserDetail.phone} onChange={(v) => setTempUserDetail({...tempUserDetail, phone: v})} />
+                    </div>
+                    <div className="mb-6">
+                       <label className="text-[10px] text-slate-500 font-bold ml-2 uppercase tracking-wider">휴대폰 기종 (Push 알림용)</label>
+                       <div className="flex gap-2 mt-1.5">
+                          {['android', 'ios'].map(os => (
+                            <button
+                              key={os}
+                              onClick={() => setTempUserDetail({...tempUserDetail, os_type: os})}
+                              className={`flex-1 py-3 rounded-xl border text-xs font-black transition-all ${
+                                tempUserDetail.os_type === os 
+                                  ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/30' 
+                                  : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              {os === 'android' ? 'Android' : 'iOS (iPhone)'}
+                            </button>
+                          ))}
+                       </div>
+                    </div>
+
+                    <div className="border-t border-white/5 pt-6 space-y-4">
+                       <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">조직 소속 설정</h3>
+                       {/* Level 1: 전사/회사 */}
+                       <Dropdown 
+                         label="회사" 
+                         value={tempUserDetail.org1} 
+                         options={orgTree} 
+                         onChange={(val) => setTempUserDetail({ ...tempUserDetail, org1: val, org2: '', org3: '', org4: '', org5: '' })}
+                       />
+                       {/* Level 2: 부문/실 */}
+                       <Dropdown 
+                         label="부문/실" 
+                         value={tempUserDetail.org2} 
+                         options={getSubNodes(2, tempUserDetail.org1)} 
+                         disabled={!tempUserDetail.org1}
+                         onChange={(val) => setTempUserDetail({...tempUserDetail, org2: val, org3: '', org4: '', org5: ''})}
+                       />
+                       {/* Level 3: 본부 */}
+                       <Dropdown 
+                         label="본부/부서" 
+                         value={tempUserDetail.org3} 
+                         options={getSubNodes(3, tempUserDetail.org2)} 
+                         disabled={!tempUserDetail.org2}
+                         onChange={(val) => setTempUserDetail({...tempUserDetail, org3: val, org4: '', org5: ''})}
+                       />
+                       {/* Level 4: 팀 */}
+                       <Dropdown 
+                         label="팀" 
+                         value={tempUserDetail.org4} 
+                         options={getSubNodes(4, tempUserDetail.org3)} 
+                         disabled={!tempUserDetail.org3}
+                         onChange={(val) => setTempUserDetail({...tempUserDetail, org4: val, org5: ''})}
+                       />
+                       {/* Level 5: 파트 */}
+                       <Dropdown 
+                         label="파트" 
+                         value={tempUserDetail.org5} 
+                         options={getSubNodes(5, tempUserDetail.org4)} 
+                         disabled={!tempUserDetail.org4}
+                         onChange={(val) => setTempUserDetail({...tempUserDetail, org5: val})}
+                       />
+                    </div>
                  </div>
 
                  <div className="mt-10 flex gap-3">
@@ -692,9 +757,15 @@ export default function UserManagementPage() {
                             onChange={(e) => setNewUser({...newUser, role: e.target.value})}
                             className="w-full bg-[#0a0e17] border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-slate-200"
                           >
-                             <option value="viewer">VIEWER (조회 전용)</option>
-                             <option value="analyst">ANALYST (분석가)</option>
-                             <option value="admin">ADMIN (관리자)</option>
+                              {roles.length > 0 ? roles.map(r => (
+                                <option key={r.role_code} value={r.role_code.toLowerCase()}>{r.role_name} ({r.role_code})</option>
+                              )) : (
+                                <>
+                                  <option value="viewer">VIEWER (조회 전용)</option>
+                                  <option value="analyst">ANALYST (분석가)</option>
+                                  <option value="admin">ADMIN (관리자)</option>
+                                </>
+                              )}
                           </select>
                        </div>
                        <Input 
@@ -704,6 +775,24 @@ export default function UserManagementPage() {
                          onChange={(v) => setNewUser({...newUser, password: v})} 
                          placeholder="미입력 시 가입대기 상태로 생성됨" 
                        />
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-500 font-bold ml-2 uppercase tracking-wider">휴대폰 기종</label>
+                          <div className="flex gap-2">
+                             {['android', 'ios'].map(os => (
+                               <button
+                                 key={os}
+                                 onClick={() => setNewUser({...newUser, os_type: os})}
+                                 className={`flex-1 py-3 rounded-2xl border text-xs font-black transition-all ${
+                                   newUser.os_type === os 
+                                     ? 'bg-blue-600 border-blue-500 text-white' 
+                                     : 'bg-white/5 border-white/10 text-slate-500'
+                                 }`}
+                               >
+                                 {os === 'android' ? 'Android' : 'iOS'}
+                               </button>
+                             ))}
+                          </div>
+                       </div>
                        <p className="text-[10px] text-slate-600 px-2 leading-relaxed">
                           * 비밀번호 미입력 시, 해당 사용자는 첫 로그인 시 '사번 인증 및 OTP' 절차를 거쳐 직접 비밀번호를 설정해야 합니다.
                        </p>

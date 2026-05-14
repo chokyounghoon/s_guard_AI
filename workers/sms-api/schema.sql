@@ -384,3 +384,89 @@ CREATE TABLE IF NOT EXISTS inbox_items (
     mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(employee_id)
 );
+
+-- System Code Book
+CREATE TABLE IF NOT EXISTS code_book (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT 1,
+    description TEXT,
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(category, code)
+);
+
+-- Seed Code Book for System Roles
+INSERT OR IGNORE INTO code_book (category, code, name, sort_order, description) VALUES 
+('SYSTEM_ROLE', 'SUPER_ADMIN', '슈퍼 관리자', 0, '시스템 전체 제어 및 역할 관리 최고 권한'),
+('SYSTEM_ROLE', 'ADMIN', '시스템 관리자', 1, '모든 기능에 대한 전체 권한'),
+('SYSTEM_ROLE', 'ANALYST', '분석가', 2, '데이터 분석 및 보고서 작성 권한'),
+('SYSTEM_ROLE', 'VIEWER', '조회자', 3, '단순 데이터 조회 및 모니터링 권한');
+
+-- RBAC (Role Based Access Control) System
+CREATE TABLE IF NOT EXISTS roles (
+    role_code TEXT PRIMARY KEY,
+    role_name TEXT NOT NULL,
+    description TEXT,
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS menus (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    path TEXT UNIQUE NOT NULL,
+    icon TEXT,
+    parent_id INTEGER,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    reg_id TEXT DEFAULT 'SYSTEM',
+    reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id TEXT DEFAULT 'SYSTEM',
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(parent_id) REFERENCES menus(id)
+);
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,  -- 단일 PK (자동증가)
+    role_code  TEXT    NOT NULL,                   -- 역할 코드 (roles.role_code 참조)
+    menu_id    INTEGER NOT NULL,                   -- 소스 메뉴 ID (menus.id 참조)
+    menu_name  TEXT    NOT NULL DEFAULT '',        -- 메뉴명 (비정규화 - 조회 편의용)
+    menu_path  TEXT    NOT NULL DEFAULT '',        -- 메뉴 경로 (비정규화 - 경로 비교용)
+    can_read   INTEGER NOT NULL DEFAULT 0,         -- 화면 접근(조회) 권한
+    can_write  INTEGER NOT NULL DEFAULT 0,         -- 생성/수정 권한
+    can_delete INTEGER NOT NULL DEFAULT 0,         -- 삭제 권한
+    reg_id     TEXT    DEFAULT 'SYSTEM',
+    reg_dt     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mod_id     TEXT    DEFAULT 'SYSTEM',
+    mod_dt     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(role_code, menu_id),                    -- 역할+메뉴 조합 유일성 보장
+    FOREIGN KEY(role_code) REFERENCES roles(role_code),
+    FOREIGN KEY(menu_id)   REFERENCES menus(id)
+);
+
+-- Seed initial data for RBAC (Using codes from Code Book)
+INSERT OR IGNORE INTO roles (role_code, role_name, description) VALUES ('SUPER_ADMIN', '슈퍼 관리자', '시스템 전체 제어 및 역할 관리 최고 권한');
+INSERT OR IGNORE INTO roles (role_code, role_name, description) VALUES ('ADMIN', '시스템 관리자', '모든 기능에 대한 전체 권한');
+INSERT OR IGNORE INTO roles (role_code, role_name, description) VALUES ('ANALYST', '분석가', '데이터 분석 및 보고서 작성 권한');
+INSERT OR IGNORE INTO roles (role_code, role_name, description) VALUES ('VIEWER', '조회자', '단순 데이터 조회 및 모니터링 권한');
+
+-- Initial Menu Structure
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('대시보드', '/dashboard', 'LayoutDashboard', 1);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('실시간 모니터링', '/monitor', 'Activity', 2);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('인시던트 관리', '/inbox', 'Inbox', 3);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('AI 리포트', '/ai-reports', 'FileText', 4);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('조직 관리', '/admin/org', 'Users', 5);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('사용자 관리', '/admin/users', 'UserCog', 6);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('권한 관리', '/admin/permissions', 'ShieldCheck', 7);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('지식 베이스', '/knowledge-base', 'Database', 8);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('코드북 관리', '/admin/codebook', 'Code', 9);
+INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('시스템 로그', '/admin/logs', 'History', 10);
+

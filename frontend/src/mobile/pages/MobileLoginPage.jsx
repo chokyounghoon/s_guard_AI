@@ -241,6 +241,25 @@ export default function MobileLoginPage() {
           )}
         </button>
 
+        {/* 회원가입 / 비밀번호 재설정 링크 */}
+        {step === 'id' && (
+          <div className="mt-6 flex items-center justify-center gap-4 text-xs font-bold">
+            <button 
+              onClick={() => navigate('/signup')} 
+              className="text-slate-400 hover:text-white transition-colors"
+            >
+              회원가입
+            </button>
+            <div className="w-[1px] h-3 bg-white/10" />
+            <button 
+              onClick={() => navigate('/reset-password')} 
+              className="text-slate-400 hover:text-white transition-colors"
+            >
+              비밀번호 찾기
+            </button>
+          </div>
+        )}
+
         {/* 🛡️ s-bridge 설치 표시 (로그인 버튼 아래) */}
         <div className="mt-8 flex flex-col items-center">
           <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white/5 border border-white/5 shadow-inner">

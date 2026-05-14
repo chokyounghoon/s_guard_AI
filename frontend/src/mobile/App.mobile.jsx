@@ -36,6 +36,9 @@ import AlertMonitorPage      from '../pages/AlertMonitorPage';
 import IncidentKeywordPage   from '../pages/IncidentKeywordPage';
 import UserKeywordPage       from '../pages/UserKeywordPage';
 import SCallertPage          from '../pages/SCallertPage';
+import PermissionManagementPage from '../pages/PermissionManagementPage';
+import DeputyManagementPage from '../pages/DeputyManagementPage';
+import MobileDeputyManagementPage from './pages/MobileDeputyManagementPage';
 
 
 // ── 모바일 전용 페이지 (카드 기반, 네이티브 UX) ────────────────────────────────
@@ -49,6 +52,7 @@ import MobileMyAssignments    from './pages/MobileMyAssignments';
 import MobileReportSearch     from './pages/MobileReportSearch';
 import MobileExpertAdvisor    from './pages/MobileExpertAdvisor';
 import MobileAlertMonitor     from './pages/MobileAlertMonitor';
+import MobileUserKeywordPage  from './pages/MobileUserKeywordPage';
 
 // ── 기존 PC 공통 컴포넌트 그대로 재사용 ─────────────────────────────────────────
 import SMSNotification        from '../components/SMSNotification';
@@ -300,8 +304,10 @@ function AppContent() {
         <Route path="/report/:incId"           element={<PR><ReportViewPage /></PR>} />
         <Route path="/alert-monitor"           element={<PR><MobileAlertMonitor /></PR>} />
         <Route path="/incident-keyword"         element={<PR><IncidentKeywordPage /></PR>} />
-        <Route path="/user-keyword"             element={<PR><UserKeywordPage /></PR>} />
+        <Route path="/user-keyword"             element={<ProtectedRoute userProfile={userProfile}><MobileUserKeywordPage /></ProtectedRoute>} />
         <Route path="/s-callert"                element={<PR><SCallertPage /></PR>} />
+        <Route path="/admin/permissions" element={<ProtectedRoute userProfile={userProfile}><PermissionManagementPage /></ProtectedRoute>} />
+        <Route path="/admin/deputy" element={<ProtectedRoute userProfile={userProfile}><MobileDeputyManagementPage /></ProtectedRoute>} />
       </Routes>
 
       {/* Consent Modal */}

@@ -1280,6 +1280,7 @@ export default function DashboardPage({ onAiClick }) {
                 team: updated.team,
                 part: updated.part,
                 subpart: updated.subpart,
+                os_type: updated.os_type,
                 profile_picture: updated.profile_picture,
               }),
             });
@@ -2413,6 +2414,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
     team: profile.team || '',
     part: profile.part || '',
     subpart: profile.subpart || '',
+    os_type: profile.os_type || 'android',
     profile_picture: profile.profile_picture || null,
   });
 
@@ -2596,6 +2598,26 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
 
             <div className="space-y-4">
+            {/* 휴대폰 기종 */}
+            <div>
+              <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">휴대폰 기종 (Push 알림용)</label>
+              <div className="flex gap-2">
+                {['android', 'ios'].map(os => (
+                  <button
+                    key={os}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, os_type: os }))}
+                    className={`flex-1 py-3.5 rounded-xl border text-xs font-black transition-all ${
+                      formData.os_type === os 
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40' 
+                        : 'bg-[#1a1f2e] border-white/10 text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    {os === 'android' ? 'Android' : 'iOS (iPhone)'}
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* 이름 */}
             <div>
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">이름 *</label>

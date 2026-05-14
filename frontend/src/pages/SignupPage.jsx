@@ -265,6 +265,7 @@ export default function SignupPage() {
     part: '',
     subpart: '',
     position: 'POS_001', // Code for '팀원'
+    os_type: 'android',
     password: '',
     confirmPassword: '',
   });
@@ -396,6 +397,7 @@ export default function SignupPage() {
       employee_id: (formData.employee_id || '').trim(),
       position: formData.position,
       phone: (formData.phone || '').trim(),
+      os_type: formData.os_type,
       honbu: formData.honbu,
       team: formData.team,
       part: formData.part,
@@ -605,20 +607,41 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* 핸드폰 */}
-          <div>
-            <label className={labelClass}>핸드폰 번호 <span className="text-red-400">*</span></label>
-            <div className="relative">
-              <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input 
-                required 
-                type="tel" 
-                value={formData.phone} 
-                onChange={handleChange('phone')} 
-                placeholder="010-0000-0000" 
-                maxLength={13} 
-                className={inputClass} 
-              />
+          {/* 핸드폰 + 기종 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>핸드폰 번호 <span className="text-red-400">*</span></label>
+              <div className="relative">
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input 
+                  required 
+                  type="tel" 
+                  value={formData.phone} 
+                  onChange={handleChange('phone')} 
+                  placeholder="010-0000-0000" 
+                  maxLength={13} 
+                  className={inputClass} 
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>모바일 기종 <span className="text-red-400">*</span></label>
+              <div className="flex gap-2">
+                 {['android', 'ios'].map(os => (
+                   <button
+                     key={os}
+                     type="button"
+                     onClick={() => setFormData(prev => ({ ...prev, os_type: os }))}
+                     className={`flex-1 py-3.5 rounded-xl border text-xs font-black transition-all ${
+                       formData.os_type === os 
+                         ? 'bg-blue-600 border-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' 
+                         : 'bg-[#1a1f2e] border-blue-500/20 text-slate-500 hover:border-blue-500/40 hover:text-slate-300'
+                     }`}
+                   >
+                     {os === 'android' ? 'Android' : 'iOS'}
+                   </button>
+                 ))}
+              </div>
             </div>
           </div>
 
