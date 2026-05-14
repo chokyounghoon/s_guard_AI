@@ -60,6 +60,16 @@ export const setUserProfile = (user) => {
 };
 
 export const getUserProfile = () => {
+  if (!userProfile) {
+    const stored = localStorage.getItem('sguard_user');
+    if (stored && stored !== 'null' && stored !== 'undefined') {
+      try {
+        userProfile = JSON.parse(stored);
+      } catch (_) {
+        localStorage.removeItem('sguard_user');
+      }
+    }
+  }
   return userProfile;
 };
 

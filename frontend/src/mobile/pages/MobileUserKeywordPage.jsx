@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, RefreshCw, Save, Sparkles, Hash, Tag,
-  Smartphone, Copy, Check, Zap, Clock
+  Smartphone, Copy, Check, Zap, Clock, Search, Send, CheckCircle2
 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
@@ -21,6 +21,9 @@ export default function MobileUserKeywordPage() {
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveComplete, setSaveComplete] = useState(false);
   const progressTimer = useRef(null);
+  const [testId, setTestId] = useState('');
+  const [testResult, setTestResult] = useState(null);
+  const [testing, setTesting] = useState(false);
 
   const DEFAULT_KEYWORDS = "IN USED FILE|DELAY|임계치|ERROR|테스트|Z FILE EXITS|Z FILE|임계|ABEND|장애|오류|에러";
 
@@ -46,7 +49,13 @@ export default function MobileUserKeywordPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchUserKeywords(); }, []);
+  useEffect(() => { 
+    fetchUserKeywords(); 
+    const profile = getUserProfile();
+    if (profile?.employee_id) {
+      setTestId(profile.employee_id);
+    }
+  }, []);
 
   const runProgressBar = () => {
     setSaveProgress(0);
@@ -86,9 +95,10 @@ export default function MobileUserKeywordPage() {
         body: JSON.stringify({ keywords: keywords.trim() }),
       });
       if (res.ok) {
+        const data = await res.json();
         setLastSaved(new Date());
         finishProgressBar(true);
-        toast.success('설정이 클라우드에 저장되었습니다.');
+        toast.success(`설정이 클라우드에 저장되었습니다.`);
       } else {
         finishProgressBar(false);
         toast.error('저장에 실패했습니다.');
@@ -109,6 +119,29 @@ export default function MobileUserKeywordPage() {
   };
 
   const keywordList = keywords ? keywords.split('|').map(k => k.trim()).filter(Boolean) : [];
+
+  const handleTestKeywords = async () => {
+    if (!testId) return;
+    console.log(`[Mobile-Keyword-Test] Starting verification for employee_id: ${testId}`);
+    setTesting(true);
+    try {
+      const url = `${API_BASE}/sms/keywords?employee_id=${testId}`;
+      console.log(`[Mobile-Keyword-Test] Fetching URL: ${url}`);
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setTestResult(data);
+        toast.success('검증 완료');
+      } else {
+        toast.error('검증 실패');
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('오류 발생');
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }} className="min-h-screen bg-[#07090f] text-white pb-28">
@@ -219,6 +252,53 @@ export default function MobileUserKeywordPage() {
               <Copy className="w-4 h-4" />
             </button>
           </div>
+        </div>
+
+        {/* Keyword Validation Section */}
+        <div className="pt-6 border-t border-white/5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">키워드 검증 테스트</p>
+              <p className="text-xs text-slate-500">사번별 API 응답을 직접 확인하세요</p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={testId}
+                onChange={(e) => setTestId(e.target.value)}
+                placeholder="사번 입력..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-9 pr-3 text-xs font-mono text-white focus:outline-none focus:border-emerald-500/40"
+              />
+            </div>
+            <button
+              onClick={handleTestKeywords}
+              disabled={testing || !testId}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 disabled:opacity-30"
+            >
+              {testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              검증
+            </button>
+          </div>
+
+          {testResult && (
+            <div className="bg-black/40 rounded-2xl border border-emerald-500/20 overflow-hidden animate-in">
+              <div className="px-4 py-2 bg-emerald-500/10 border-b border-emerald-500/20 flex justify-between items-center">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">API Response</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="text-[11px] font-mono text-emerald-200/70 whitespace-pre-wrap">
+                  {JSON.stringify(testResult, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

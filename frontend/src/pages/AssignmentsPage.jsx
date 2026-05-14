@@ -40,7 +40,7 @@ export default function AssignmentsPage() {
           code: inc.inc_id,
           assignmentType: 'SMS',
           severity: inc.severity || 'NORMAL',
-          status: inc.status || '미확인',
+          status: inc.status || 'INC_001',
           title: inc.message || '상공 발생',
           sender: inc.sender,
           time: inc.assigned_at ? new Date(inc.assigned_at).toLocaleString('ko-KR') : '',
@@ -48,10 +48,10 @@ export default function AssignmentsPage() {
           received_count: inc.received_count || 1,
           assignees: inc.assignees || '담당자 미지정',
           inc_id: inc.inc_id,
-          bgColor: (inc.status === '미확인' || inc.status === '미처리' || inc.status === '대기') ? 'bg-red-900/10' : 
-                   (inc.status === '처리중' || inc.status === '진행중' || inc.status === 'IN_PROGRESS') ? 'bg-orange-900/10' : 'bg-emerald-900/10',
-          borderColor: (inc.status === '미확인' || inc.status === '미처리' || inc.status === '대기') ? 'border-red-500/20' : 
-                       (inc.status === '처리중' || inc.status === '진행중' || inc.status === 'IN_PROGRESS') ? 'border-orange-500/20' : 'border-emerald-500/20',
+          bgColor: (['미확인', '미처리', '대기', 'INC_001'].includes(inc.status)) ? 'bg-red-900/10' : 
+                   (['처리중', '진행중', 'IN_PROGRESS', 'INC_002'].includes(inc.status)) ? 'bg-orange-900/10' : 'bg-emerald-900/10',
+          borderColor: (['미확인', '미처리', '대기', 'INC_001'].includes(inc.status)) ? 'border-red-500/20' : 
+                       (['처리중', '진행중', 'IN_PROGRESS', 'INC_002'].includes(inc.status)) ? 'border-orange-500/20' : 'border-emerald-500/20',
         }));
         setAssignments(mapped);
       })
@@ -137,7 +137,7 @@ export default function AssignmentsPage() {
                     const cleanId = String(assignment.inc_id);
                     
                     // 처리완료인 경우 채팅방이 아닌 리포트 페이지로 이동
-                    if (assignment.status === '처리완료' || assignment.status === '조치완료') {
+                    if (['처리완료', '조치완료', 'INC_003'].includes(assignment.status)) {
                       navigate(`/report/${cleanId}`);
                     } else {
                       navigate(`/chat/${cleanId}`);
@@ -201,7 +201,7 @@ export default function AssignmentsPage() {
                       <span className="text-[11px] text-slate-200 font-bold">{assignment.assignees}</span>
                     </div>
                   </div>
-                  {assignment.status === '처리완료' ? (
+                  {['처리완료', '조치완료', 'INC_003'].includes(assignment.status) ? (
                     <button 
                       onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${assignment.id}`); }}
                       className="text-xs font-bold text-emerald-500 flex items-center space-x-1 hover:text-white transition-colors bg-emerald-500/5 px-3 py-1.5 rounded-lg border border-emerald-500/20"

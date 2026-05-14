@@ -27,7 +27,7 @@ export default function MobileDeputyManagementPage() {
       fetchSubstitutes(profile.employee_id);
       fetchOrgTree();
       fetchAllUsers();
-    } else { navigate('/login'); }
+    } else { navigate('/'); }
   }, []);
 
   const fetchSubstitutes = async (userId) => {
@@ -94,6 +94,53 @@ export default function MobileDeputyManagementPage() {
   const closeModal = () => {
     setShowModal(false); setSearchQuery(''); setSearchResults([]);
     setSelectedUser(null); setExpandedNodes(new Set()); setModalTab('search');
+  };
+
+  useEffect(() => {
+    // 🚀 자동 등록 로직: 대직자 목록이 비어있을 때 동일 부서원 자동 추가
+    if (!loading && substitutes.length === 0 && allUsers.length > 0 && myProfile) {
+      handleAutoRegistration();
+    }
+  }, [loading, substitutes.length, allUsers.length, myProfile]);
+
+  const handleAutoRegistration = async () => {
+    const mySubpart = myProfile.subpart;
+    const myTeamCode = myProfile.team_code || myProfile.team;
+    const userId = myProfile.employee_id;
+    if (!mySubpart && !myTeamCode) return;
+
+    let sameDeptUsers = [];
+    if (mySubpart) {
+      sameDeptUsers = allUsers.filter(u => u.subpart === mySubpart);
+    }
+    if (sameDeptUsers.length === 0 && myTeamCode) {
+      sameDeptUsers = allUsers.filter(u => u.team_code === myTeamCode || u.team === myTeamCode);
+    }
+
+    // 나 자신 제외
+    sameDeptUsers = sameDeptUsers.filter(u => u.employee_id !== userId);
+
+    if (sameDeptUsers.length > 0) {
+      const tid = toast.loading(`${sameDeptUsers.length}명의 팀원을 대직자로 자동 등록 중...`);
+      try {
+        const promises = sameDeptUsers.map((u, i) => 
+          fetch(`${API_BASE}/rbac/substitutes`, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              user_id: userId, 
+              deputy_id: u.employee_id, 
+              priority: i + 1 
+            })
+          })
+        );
+        await Promise.all(promises);
+        toast.success('동일 부서 인원이 대직자로 자동 등록되었습니다.', { id: tid });
+        fetchSubstitutes(userId);
+      } catch (e) {
+        toast.error('자동 등록 실패', { id: tid });
+      }
+    }
   };
 
   const removeDeputy = async (id) => {

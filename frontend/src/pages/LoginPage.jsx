@@ -742,8 +742,8 @@ export default function LoginPage() {
         .input-wrap { position:relative; }
         .input-icon { position:absolute; right:14px; top:50%; transform:translateY(-50%); }
         .login-bg {
-          min-height: 100vh;
-          min-height: 100dvh;
+          position: fixed;
+          inset: 0;
           background: #05091a;
           font-family: 'Inter','Noto Sans KR',sans-serif;
           display: flex;

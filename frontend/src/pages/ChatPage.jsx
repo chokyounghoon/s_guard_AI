@@ -6,6 +6,7 @@ import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
 import MarkdownViewer from '../components/MarkdownViewer';
+import { useCodebook } from '../context/CodebookContext';
 
 const agentColors = {
   Security: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', icon: Shield },
@@ -49,6 +50,14 @@ const formatKst = (dateInput) => {
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const { allCodes } = useCodebook();
+  
+  const getStatusName = (code) => {
+    if (!code) return 'Open';
+    const found = allCodes.find(c => c.category === 'INCIDENT_STATUS' && (c.code === code || c.name === code));
+    return found ? found.name : code;
+  };
+
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [showPhoneList, setShowPhoneList] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -1162,7 +1171,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#191919] text-white font-sans flex flex-col relative">
+    <div className="fixed inset-0 overflow-hidden overscroll-none bg-[#191919] text-white font-sans flex flex-col z-[100]" style={{ height: '100dvh' }}>
       {/* Header */}
       {/* DM Notifications Toast */}
       <div className="fixed top-20 right-4 z-[150] flex flex-col items-end space-y-2 pointer-events-none">
@@ -1250,7 +1259,7 @@ export default function ChatPage() {
               {/* Moved Status Indicator */}
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                <span className="text-xs font-black tracking-tight text-emerald-400 uppercase">{roomStatus || 'Open'}</span>
+                <span className="text-xs font-black tracking-tight text-emerald-400 uppercase">{getStatusName(roomStatus)}</span>
               </div>
                 {/* 참여자 아이콘 및 숫자 */}
                 <button

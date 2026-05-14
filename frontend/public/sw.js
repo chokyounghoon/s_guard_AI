@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v33'; // Push payload fix - SubtleCrypto RFC 8291
+const CACHE_NAME = 'sguard-v34.3'; // Debug event.data
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -104,18 +104,23 @@ self.addEventListener('push', (event) => {
 
   if (event.data) {
     try {
-      const data = JSON.parse(event.data.text());
+      const rawText = event.data.text();
+      console.log('🚀 [SW-v34.3] Raw Push Data received:', rawText);
+      if (rawText) pushData.body = rawText;
+      const data = JSON.parse(rawText);
+      
       if (data && typeof data === 'object') {
         pushData.title = data.title || pushData.title;
-        pushData.body  = data.body  || data.message || pushData.body;
-        pushData.url   = data.url   || data.link    || pushData.url;
-        pushData.tag   = data.tag   || pushData.tag;
-        if (Array.isArray(data.vibrate)) pushData.vibrate = data.vibrate;
+        pushData.body  = data.body || data.text || data.message || pushData.body;
+        pushData.url   = data.url || data.link || pushData.url;
+        pushData.tag   = data.tag || pushData.tag;
       }
     } catch (e) {
-      const text = event.data.text();
-      if (text) pushData.body = text;
+      console.error('[SW] Push Parse Error:', e);
     }
+  } else {
+    console.warn('⚠️ [SW-v34.3] Push event received but event.data is NULL');
+    pushData.body = `[v34.3] 알림 데이터가 비어있습니다. (Null Data)`;
   }
 
   const options = {
@@ -143,30 +148,39 @@ self.addEventListener('notificationclick', (event) => {
     navigator.clearAppBadge().catch(() => {});
   }
 
-  const notifData = event.notification.data;
+  const notifData = event.notification.data || {};
   let urlToOpen = notifData.url || '/';
 
   // Handle action buttons
   if (event.action === 'close') return;
-  if (event.action === 'dispatch') {
-    // 📍 현장출동: Record action and navigate to incident
-    urlToOpen = notifData.url || '/';
-  } else if (event.action === 'open_chat') {
-    urlToOpen = notifData.url || '/';
-  }
-  // 'open' action and default click: just navigate to url
 
-  const absoluteUrl = new URL(urlToOpen, self.location.origin).href;
+  // Build the target absolute URL
+  // If urlToOpen starts with '/', prepend origin. If it's already absolute, use it.
+  const absoluteUrl = urlToOpen.startsWith('http') 
+    ? urlToOpen 
+    : new URL(urlToOpen, self.location.origin).href;
+
+  console.log('[SW] Notification clicked. Target URL:', absoluteUrl);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // If a window is already open at the target URL, focus it
+      // 🎯 1. Try to find a window that's already at this exact URL (including hash)
       for (const client of windowClients) {
         if (client.url === absoluteUrl && 'focus' in client) {
           return client.focus();
         }
       }
-      // Otherwise, open a new window
+
+      // 🎯 2. If not found, try to find any app window and navigate it
+      if (windowClients.length > 0) {
+        const client = windowClients[0];
+        if ('focus' in client && 'navigate' in client) {
+          client.focus();
+          return client.navigate(absoluteUrl);
+        }
+      }
+
+      // 🎯 3. Otherwise, open a new window
       if (clients.openWindow) {
         return clients.openWindow(absoluteUrl);
       }

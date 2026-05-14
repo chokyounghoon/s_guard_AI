@@ -1290,7 +1290,7 @@ export default function DashboardPage({ onAiClick }) {
   };
 
   return (
-    <div className="text-white font-sans overflow-x-clip relative" style={{ background: '#080c14', minHeight: '100dvh' }}>
+    <div className="fixed inset-0 text-white font-sans overflow-x-clip overflow-y-auto" style={{ background: '#080c14' }}>
       <nav className="mobile-top-nav flex justify-between items-end px-4 sticky top-0 z-[100]"
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',
@@ -1314,14 +1314,17 @@ export default function DashboardPage({ onAiClick }) {
             <div className="animate-in fade-in zoom-in duration-500">
                {(() => {
                   const sev = (insightSms.severity || 'NORMAL').toUpperCase();
-                  const incidentId = String(insightSms.inc_id || insightSms.id || '');
-                  const roomExists = (warRooms || []).some(r => String(r.id) === incidentId);
+                  const incidentStatus = insightSms.status || 'INC_001';
+                  const isProcessing = incidentStatus === 'INC_002';
+                  const isCompleted = incidentStatus === 'INC_003';
                   
-                  const btnCls = roomExists 
-                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/30'
-                    : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_8px_rgba(239,68,68,0.4)]'
-                    : sev === 'MAJOR'    ? 'bg-orange-600 text-white'
-                    :                      'bg-emerald-600 text-white';
+                  const btnCls = isCompleted 
+                    ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
+                    : isProcessing
+                      ? 'bg-blue-600/20 text-blue-400 border-blue-500/30'
+                      : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+                      : sev === 'MAJOR'    ? 'bg-orange-600 text-white'
+                      :                      'bg-emerald-600 text-white';
 
                   return (
                     <button
@@ -1340,7 +1343,7 @@ export default function DashboardPage({ onAiClick }) {
                         <Users size={12} />
                       )}
                       <span className="truncate">
-                        {isOpeningWarRoom ? '진행중' : roomExists ? '이동' : 'WAR-ROOM 개설'}
+                        {isOpeningWarRoom ? '진행중' : (isCompleted || isProcessing) ? 'WAR-ROOM 이동' : 'WAR-ROOM 개설'}
                       </span>
                     </button>
                   );

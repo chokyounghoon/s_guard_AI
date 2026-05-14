@@ -53,8 +53,16 @@ export default function ReportLineManagementPage() {
   const fetchData = async () => {
     setIsLoading(true);
     let userId = '';
+    let userDataObj = null;
     const saved = localStorage.getItem('sguard_user');
-    if (saved) { try { userId = JSON.parse(saved).employee_id; } catch (e) {} }
+    if (saved) { 
+      try { 
+        userDataObj = JSON.parse(saved); 
+        userId = userDataObj.employee_id; 
+      } catch (e) {
+      } 
+    }
+
     try {
       const [usersRes, linesRes] = await Promise.all([
         fetch(getApiUrl('/api/v1/users/organization')),
@@ -63,10 +71,65 @@ export default function ReportLineManagementPage() {
       if (usersRes.ok && linesRes.ok) {
         const usersData = await usersRes.json();
         const linesData = await linesRes.json();
-        setAvailableMembers(usersData.users || []);
-        const hydrated = (linesData.report_lines || []).map(line => {
-          const u = (usersData.users || []).find(u => u.id === line.user_id) || {};
-          return { ...line, name: u.name || line.user_name, role: u.role || line.role_name || '결재자', honbu: u.honbu || '', team: u.team || '', id: line.user_id };
+        const allUsers = usersData.users || [];
+        setAvailableMembers(allUsers);
+
+        let lines = linesData.report_lines || [];
+
+        // 🚀 자동 등록 로직: 목록이 비어있을 때 해당 subpart 또는 team 인원 모두 추가
+        if (lines.length === 0 && userDataObj) {
+          const mySubpart = userDataObj.subpart;
+          const myTeamCode = userDataObj.team; // 로그인 유저 정보의 team은 보통 코드
+          
+          let sameDeptUsers = [];
+          
+          // 1. subpart 우선 매칭
+          if (mySubpart) {
+            sameDeptUsers = allUsers.filter(u => u.subpart === mySubpart);
+          }
+          
+          // 2. subpart 결과가 없으면 team 코드로 매칭
+          if (sameDeptUsers.length === 0 && myTeamCode) {
+            sameDeptUsers = allUsers.filter(u => u.team_code === myTeamCode || u.team === myTeamCode);
+          }
+
+          sameDeptUsers = sameDeptUsers.filter(u => u.id !== userId);
+
+          if (sameDeptUsers.length > 0) {
+            const autoLines = sameDeptUsers.map((u, i) => ({
+              hierarchy_level: i + 1,
+              role_name: u.role || '결재자',
+              user_id: u.id,
+              user_name: u.name
+            }));
+
+            // 서버에 자동 저장
+            await fetch(getApiUrl('/api/v1/report-lines'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ owner_id: userId, report_lines: autoLines }),
+            });
+
+            // 저장 후 다시 불러오기
+            const refreshRes = await fetch(getApiUrl(`/api/v1/report-lines?user_id=${userId}`));
+            if (refreshRes.ok) {
+              const refreshData = await refreshRes.json();
+              lines = refreshData.report_lines || [];
+            }
+          }
+        }
+
+        const hydrated = lines.map(line => {
+          const u = allUsers.find(u => u.id === line.user_id) || {};
+          return { 
+            ...line, 
+            name: u.name || line.user_name, 
+            role: u.role || line.role_name || '결재자', 
+            honbu: u.honbu || '', 
+            team: u.team || '', 
+            subpart: u.subpart || '',
+            id: line.user_id 
+          };
         });
         setReportLines(hydrated);
       }

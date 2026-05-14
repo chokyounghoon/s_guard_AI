@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import ReactMarkdown from 'react-markdown';
+import { useCodebook } from '../../context/CodebookContext';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -18,6 +19,13 @@ const formatTime = (ts) => {
 export default function MobileChat({ user }) {
   const { incidentId } = useParams();
   const navigate = useNavigate();
+  const { allCodes } = useCodebook();
+
+  const getStatusName = (code) => {
+    if (!code) return 'INC_002'; // Fallback
+    const found = allCodes.find(c => c.category === 'INCIDENT_STATUS' && c.code === code);
+    return found ? found.name : code;
+  };
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -291,7 +299,7 @@ export default function MobileChat({ user }) {
       {incidentInfo?.message && (
         <div className="bg-red-900/10 border-b border-red-500/15 px-4 py-2 shrink-0 flex items-center gap-3">
           <p className="text-[11px] text-red-400/80 flex-1 truncate">{incidentInfo.message}</p>
-          <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full font-bold shrink-0">ACTIVE</span>
+          <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full font-bold shrink-0">{getStatusName(incidentInfo?.status)}</span>
         </div>
       )}
 

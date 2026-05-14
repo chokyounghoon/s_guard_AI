@@ -303,6 +303,8 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/codebook') ||
     (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
     
+  console.log(`[Auth-Access] Path: ${path} | isPublic: ${isPublic}`);
+
   if (isPublic) {
     console.log(`[Auth-Pass] Public access to: ${path}`);
     return await next();
@@ -330,6 +332,7 @@ const authMiddleware = async (c, next) => {
 
   // 사용자 정보를 context에 저장 (JWT의 sub를 employee_id로 매핑하여 호환성 유지)
   const userObj = { ...payload, employee_id: payload.employee_id || payload.sub };
+  console.log(`[Auth-Token-Check] Path: ${path} | User: ${userObj.employee_id} | Sub: ${payload.sub}`);
   c.set('user', userObj);
   await next();
 };
@@ -3509,7 +3512,7 @@ app.post('/sms/receive', async (c) => {
              
              if (targetUsers && targetUsers.length > 0) {
                  for (const u of targetUsers) {
-                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, '미처리', ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
+                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, 'INC_001', ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
                       .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp).run();
                  }
              }
@@ -3666,9 +3669,22 @@ app.get('/sms/recent', async (c) => {
              ai.similarity_score, ai.similarity_reason,
              (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE ai2.inc_id = r.inc_id) as is_analyzed,
              COALESCE(
-               (SELECT '처리완료' FROM warroom_list wl WHERE wl.inc_id = r.inc_id AND (wl.status = 'CLOSED' OR wl.status = '최종완료') LIMIT 1),
-               (SELECT status FROM incident_assignments ia WHERE ia.inc_id = r.inc_id ORDER BY updated_at DESC LIMIT 1),
-               '미처리'
+               (SELECT 'INC_003' FROM warroom_list wl WHERE wl.inc_id = r.inc_id AND (wl.status = 'CLOSED' OR wl.status = '최종완료' OR wl.status = 'Completed' OR wl.status = '처리완료') LIMIT 1),
+               (SELECT CASE 
+                 WHEN status = 'Open' THEN 'INC_001' 
+                 WHEN status = '미처리' THEN 'INC_001' 
+                 WHEN status = '처리중' THEN 'INC_002' 
+                 WHEN status = '처리완료' THEN 'INC_003' 
+                 ELSE status 
+               END FROM incidents i WHERE i.inc_id = r.inc_id LIMIT 1),
+               (SELECT CASE 
+                 WHEN status = '미확인' THEN 'INC_001' 
+                 WHEN status = '미처리' THEN 'INC_001' 
+                 WHEN status = '처리중' THEN 'INC_002' 
+                 WHEN status = '처리완료' THEN 'INC_003' 
+                 ELSE status 
+               END FROM incident_assignments ia WHERE ia.inc_id = r.inc_id ORDER BY updated_at DESC LIMIT 1),
+               'INC_001'
              ) as incident_status
       FROM received_messages r
       LEFT JOIN users u ON r.employee_id = u.employee_id
@@ -3678,7 +3694,7 @@ app.get('/sms/recent', async (c) => {
   `
   const params = []
   if (excludeCompleted) {
-    baseQuery += ` AND incident_status != '처리완료' `
+    baseQuery += ` AND incident_status != 'INC_003' `
   }
   baseQuery += ` ORDER BY timestamp DESC LIMIT ? `
   params.push(limit)
@@ -3710,7 +3726,8 @@ app.get('/sms/recent', async (c) => {
     occurrence_node: r.occurrence_node,
     error_message: r.error_message,
     occurrence_time: r.occurrence_time,
-    incident_status: r.incident_status || '미확인',
+    incident_status: r.incident_status || 'INC_001',
+    status: r.incident_status || 'INC_001',
     is_analyzed: r.is_analyzed,
     receivers: [
       r.receiver_1, r.receiver_2, r.receiver_3, r.receiver_4, r.receiver_5,
@@ -3942,8 +3959,8 @@ app.get('/ai/governance/stats', async (c) => {
     const totalIncRes = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first();
     const totalInc = totalIncRes?.c || 0;
 
-    // 처리완료(워룸 종료 또는 보고서 생성) 기준으로 집계
-    const resolvedIncRes = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE response_message IS NOT NULL OR status = '처리완료'").first();
+    // 🚀 MTTR stats
+    const resolvedIncRes = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE response_message IS NOT NULL OR status = 'INC_003'").first();
     const resolvedInc = resolvedIncRes?.c || 0;
 
     // 전체 KB 수 (표시용)
@@ -4062,14 +4079,17 @@ app.get('/ai/governance/stats', async (c) => {
 
 app.get('/sms/keywords', async (c) => {
   const db = c.env.DB
+  const url = new URL(c.req.url)
   const employeeId = c.req.query('employee_id') || c.req.query('id') || c.req.query('userId')
   
-  // 1. 기본 글로벌 장애 키워드 목록 조회
-  const { results: globalKeywords } = await db.prepare("SELECT * FROM alert_keywords").all()
-  
+  if (hasParam && !employeeId) {
+    return c.json({ error: "사번(employee_id) 값이 누락되었습니다." }, 400)
+  }
+
   if (employeeId) {
     // ⚡ iPhone Shortcut / User Specific Mode
-    // 이 모드는 특정 사용자의 개인 감지 키워드(user_keywords)를 반환합니다.
+    // 🚀 무조건 user_keywords 테이블만 참조하여 개인 감지 키워드만 반환
+    console.log(`[Keyword-API] Fetching EXCLUSIVELY from user_keywords for: ${employeeId}`);
     const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(employeeId).first()
     
     // 사용자가 등록한 키워드가 없으면 기본 장애 키워드 세트를 제공
@@ -4080,7 +4100,7 @@ app.get('/sms/keywords', async (c) => {
 
     const keywordList = keywordStr.split('|').map(k => k.trim()).filter(Boolean)
     
-    // 개인 키워드를 글로벌 포맷과 동일한 객체 배열로 변환
+    // 개인 키워드를 객체 배열로 변환
     const personalKeywords = keywordList.map(k => ({
       keyword: k,
       response: `[감지] ${k} 장애 예상`,
@@ -4088,19 +4108,19 @@ app.get('/sms/keywords', async (c) => {
       is_personal: true
     }))
 
-    // 글로벌 키워드와 개인 키워드를 통합하여 반환 (iPhone 단축어 및 웹 UI 호환)
     return c.json({ 
       success: true,
       employee_id: employeeId,
-      keywords: [...globalKeywords, ...personalKeywords],
+      keywords: personalKeywords, // 🛡️ 글로벌 키워드 병합 제거
       keywordList: keywordList,
       userKeywords: keywordStr,
-      count: globalKeywords.length + keywordList.length,
+      count: keywordList.length,
       timestamp: new Date().toISOString()
     })
   }
 
-  // 기본 모드: 글로벌 장애 키워드 목록만 반환
+  // 1. 기본 글로벌 장애 키워드 목록 조회 (사번이 없을 때만)
+  const { results: globalKeywords } = await db.prepare("SELECT * FROM alert_keywords").all()
   return c.json({ keywords: globalKeywords })
 })
 
@@ -4125,23 +4145,55 @@ app.get('/sms/user-keywords', async (c) => {
   const userId = user.employee_id
   
   const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(userId).first()
-  return c.json({ keywords: result ? result.keywords : "" })
+  return c.json({ 
+    keywords: result ? result.keywords : "",
+    userId: userId
+  })
 })
-
 app.post('/sms/user-keywords', async (c) => {
-  const user = c.get('user')
+  const user = c.get('user') || {}
   const db = c.env.DB
-  const userId = user.employee_id
+  const userId = user.employee_id || user.sub || user.id;
   const { keywords } = await c.req.json()
   
-  const nowKst = getKst()
-  await db.prepare(`
-    INSERT INTO user_keywords (user_id, keywords, updated_at) 
-    VALUES (?, ?, ?) 
-    ON CONFLICT(user_id) DO UPDATE SET keywords = excluded.keywords, updated_at = excluded.updated_at
-  `).bind(userId, keywords, nowKst).run()
+  if (!userId || userId === 'undefined' || userId === 'null') {
+    return c.json({ error: "로그인 정보가 유효하지 않습니다. (사번 누락)", userId: "NONE" }, 401);
+  }
   
-  return c.json({ status: "success" })
+  const nowKst = getKst()
+  
+  // 🛡️ Audit 컬럼 추가 및 데이터 무결성 보장
+  try {
+    await db.prepare(`
+      INSERT INTO user_keywords (
+        user_id, keywords, reg_id, reg_dt, mod_id, mod_dt, updated_at
+      ) 
+      VALUES (?, ?, ?, ?, ?, ?, ?) 
+      ON CONFLICT(user_id) DO UPDATE SET 
+        keywords = excluded.keywords, 
+        mod_id = excluded.mod_id,
+        mod_dt = excluded.mod_dt,
+        updated_at = excluded.updated_at
+    `).bind(userId, keywords, userId, nowKst, userId, nowKst, nowKst).run()
+    
+    return c.json({ status: "success", userId })
+  } catch (err) {
+    // 만약 테이블에 Audit 컬럼이 없어서 에러가 난다면 자동 패치 시도 (임시 대응)
+    if (err.message.includes("has no column named reg_id")) {
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN reg_id TEXT").run().catch(()=>{});
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN reg_dt DATETIME").run().catch(()=>{});
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN mod_id TEXT").run().catch(()=>{});
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN mod_dt DATETIME").run().catch(()=>{});
+      // 재시도
+      await db.prepare(`
+        INSERT INTO user_keywords (user_id, keywords, updated_at) 
+        VALUES (?, ?, ?) 
+        ON CONFLICT(user_id) DO UPDATE SET keywords = excluded.keywords, updated_at = excluded.updated_at
+      `).bind(userId, keywords, nowKst).run()
+      return c.json({ status: "success", userId, note: "table_patched" })
+    }
+    throw err;
+  }
 })
 
 // ── NEW: iPhone Shortcut Dedicated Endpoint ──────────────────────────────────
@@ -6504,7 +6556,9 @@ app.get('/warroom/ai-search', async (c) => {
 });
 
 app.post('/ai/warroom/open', async (c) => {
-  const { inc_id, title, creator_id, severity, leader_summary } = await c.req.json()
+  const body = await c.req.json()
+  const inc_id = body.inc_id || body.id
+  const { title, creator_id, severity, leader_summary } = body
   const db = c.env.DB
   const now = getKst()
   
@@ -6538,25 +6592,33 @@ app.post('/ai/warroom/open', async (c) => {
     console.error("Bulk join error:", e);
   }
 
-  // Also ensure creator is joined (if not already listed in assignments)
   if (creator_id) {
     await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
       .bind(creator_id, normId, now).run()
-      
-    // 🚀 NEW: Ensure creator is also in incident_assignments with status '처리중'
-    await db.prepare(`
-      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
-      VALUES (?, ?, '처리중', ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id, inc_id) 
-      DO UPDATE SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ?
-    `).bind(
-      creator_id, normId, now, now, creator_id, now, creator_id, now,
-      now, now, creator_id
-    ).run();
   }
+      
+  // 🚀 NEW: Ensure incidents table has a record and set status to 'INC_002' (처리중)
+  await db.prepare(`
+    INSERT OR IGNORE INTO incidents (inc_id, title, status, severity, incident_type, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at)
+    VALUES (?, ?, 'INC_002', ?, 'AI', ?, ?, ?, ?, ?, ?)
+  `).bind(normId, cleanTitle, severity || 'NORMAL', creator_id || 'SYSTEM', now, creator_id || 'SYSTEM', now, now, now).run()
 
-  // Update assignment status to '처리중' for all assignees of this incident
-  await db.prepare("UPDATE incident_assignments SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+  await db.prepare("UPDATE incidents SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, now, creator_id || 'SYSTEM', normId).run()
+
+  // 🚀 NEW: Ensure creator is in incident_assignments with status 'INC_002'
+  await db.prepare(`
+    INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+    VALUES (?, ?, 'INC_002', ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, inc_id) 
+    DO UPDATE SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ?
+  `).bind(
+    creator_id, normId, now, now, creator_id || 'SYSTEM', now, creator_id || 'SYSTEM', now,
+    now, now, creator_id || 'SYSTEM'
+  ).run();
+
+  // Update assignment status to 'INC_002' for all assignees of this incident
+  await db.prepare("UPDATE incident_assignments SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, creator_id || 'SYSTEM', normId).run()
 
   // Release Lock if exists (KV cleanup)
@@ -6695,9 +6757,9 @@ app.post('/ai/report/save', async (c) => {
 
   // 4. 보고서 저장 완료 → 해당 incident 모든 담당자 일괄 처리완료 + SMS 상태 동기화
   if (normId) {
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
       .bind(now, now, empId, normId).run()
-    await db.prepare("UPDATE received_messages SET status = '처리완료', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    await db.prepare("UPDATE received_messages SET status = 'INC_003', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
       .bind(now, empId, normId).run()
   }
 
@@ -6772,7 +6834,7 @@ app.get('/warroom/report/:id', async (c) => {
     "SELECT timestamp FROM received_messages WHERE inc_id = ? LIMIT 1"
   ).bind(rawId).first()
   const doneRow = await db.prepare(
-    "SELECT MAX(updated_at) as done_at FROM incident_assignments WHERE inc_id = ? AND status = '처리완료'"
+    "SELECT MAX(updated_at) as done_at FROM incident_assignments WHERE inc_id = ? AND status = 'INC_003'"
   ).bind(rawId).first()
 
   // MTTR: SMS 수신 → 처리완료, fallback: firstChat → lastChat
@@ -6896,9 +6958,9 @@ app.post('/warroom/join', async (c) => {
   // 2️⃣ incident_assignments 동기화
   await db.prepare(`
     INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
-    VALUES (?, ?, '처리중', ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, 'INC_002', ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, inc_id) 
-    DO UPDATE SET status = '처리중', updated_at = excluded.updated_at, mod_dt = excluded.mod_dt, mod_id = excluded.mod_id
+    DO UPDATE SET status = 'INC_002', updated_at = excluded.updated_at, mod_dt = excluded.mod_dt, mod_id = excluded.mod_id
   `).bind(user_id, normId, now, now, user_id, now, user_id, now).run();
 
   // 3️⃣ 채팅에 시스템 메시지 저장
@@ -7653,7 +7715,7 @@ app.post('/warroom/resolve-only', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
     .bind(user_id, now, normId).run();
   
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+  await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id, normId).run();
 
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '장애 완료', '보고서 없이 장애가 처리 완료되었습니다.', ?)")
@@ -7672,7 +7734,7 @@ app.post('/ai/warroom/close', async (c) => {
     .bind(now, user_id || 'SYSTEM', normId).run()
     
   // Cascading update for all participants
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+  await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id || 'SYSTEM', normId).run();
     
   // Log termination
@@ -7709,7 +7771,7 @@ app.post('/ai/incident/assign', async (c) => {
     // 2. Perform Assignment
     const assignResult = await db.prepare(`
       INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
-      VALUES (?, ?, '미확인', ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
+      VALUES (?, ?, 'INC_001', ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
       ON CONFLICT(user_id, inc_id) DO NOTHING
     `).bind(empId, normId, now, now, now, now).run()
 
@@ -7771,9 +7833,9 @@ app.get('/ai/incident/my-assignments', async (c) => {
     SELECT 
       a.id, a.user_id, a.inc_id, a.assigned_at, a.updated_at,
       CASE 
-        WHEN a.status = '처리완료' THEN '처리완료'
-        WHEN wl.status IN ('CLOSED', '최종완료', '처리완료', 'Completed', '완료') THEN '처리완료'
-        WHEN chat_counts.cnt > 0 THEN '처리중'
+        WHEN a.status = 'INC_003' THEN 'INC_003'
+        WHEN wl.status IN ('CLOSED', '최종완료', '처리완료', 'Completed', '완료') THEN 'INC_003'
+        WHEN chat_counts.cnt > 0 THEN 'INC_002'
         ELSE a.status
       END as status,
       COALESCE(chat_counts.cnt, 0) as chat_count,
@@ -7894,9 +7956,9 @@ app.get('/ai/incident/workflow-details', async (c) => {
 
     const finalizedAssignees = (assigneesRes.results || []).map(a => {
       if (isWarroomClosed || kn) {
-        return { ...a, status: '처리완료' };
+        return { ...a, status: 'INC_003' };
       }
-      if (a.status === '처리중' && Number(a.chat_count) === 0) {
+      if (a.status === 'INC_002' && Number(a.chat_count) === 0) {
         return { ...a, status: '미참여' };
       }
       return a;
@@ -8419,7 +8481,7 @@ app.get('/warroom/asset/:key', async (c) => {
 // Dify-powered High-Performance Summary
 // Consolidated Resolve (Close) an Incident
 app.post('/warroom/resolve', async (c) => {
-  const { incident_id } = await c.req.json();
+  const { incident_id, user_id } = await c.req.json();
   const db = c.env.DB;
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400);
 
@@ -8428,16 +8490,16 @@ app.post('/warroom/resolve', async (c) => {
 
   try {
     // 1. Update War-Room Status
-    await db.prepare("UPDATE warroom_list SET status = '최종완료', mod_dt = ? WHERE inc_id = ?")
-      .bind(now, incident_id).run();
+    await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, user_id || 'SYSTEM', incident_id).run();
 
-    // 2. Update Incident Status to '처리완료'
-    await db.prepare("UPDATE incidents SET status = 'INC_003', mod_dt = ? WHERE inc_id = ?")
-      .bind(now, normId).run();
+    // 2. Update Incident Status to 'INC_003'
+    await db.prepare("UPDATE incidents SET status = 'INC_003', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, user_id || 'SYSTEM', normId).run();
 
-    // 3. Update ALL incident assignments to '처리완료' (check both ID formats)
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-      .bind(now, now, 'SYSTEM', normId).run();
+    // 3. Update ALL incident assignments to 'INC_003' (check both ID formats)
+    await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, now, user_id || 'SYSTEM', normId).run();
 
     return c.json({ success: true, status: '최종완료' });
   } catch (err) {
@@ -8521,7 +8583,7 @@ app.post('/ai/send-report-email', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
     .bind(now, normId).run();
     
-  await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+  await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, 'SYSTEM', normId).run();
 
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, 'SYSTEM', '인시던트 종료', '분석 보고서가 최종 전송되어 장애가 처리 완료되었습니다.', ?)")
@@ -8737,18 +8799,18 @@ app.post('/ai/governance/approve', async (c) => {
     }
 
     // 5. Update Incident Status to '처리완료'
-    await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ? WHERE inc_id = ?")
-      .bind(now, incident_id).run();
+    await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, now, actor, incident_id).run();
 
     const normId = String(incident_id);
 
     // 6. Update ALL assignments for this incident to '처리완료'
-    await db.prepare("UPDATE incident_assignments SET status = '처리완료', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-      .bind(now, now, 'SYSTEM', normId).run();
+    await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, now, actor, normId).run();
 
     // 7. Auto-update War-Room Status here to prevent sync issues
-    await db.prepare("UPDATE warroom_list SET status = '최종완료', mod_dt = ? WHERE inc_id = ?")
-      .bind(now, normId).run();
+    await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+      .bind(now, actor, normId).run();
 
     // 8. Auto-notify assigned users in their inbox
     try {
@@ -8805,7 +8867,9 @@ app.get('/api/v1/users/organization', async (c) => {
         u.employee_id as id, u.name, u.role, 
         COALESCE(h.name, u.honbu) as honbu, 
         COALESCE(t.name, u.team) as team, 
-        u.part, u.position 
+        u.honbu as honbu_code,
+        u.team as team_code,
+        u.part, u.subpart, u.position 
       FROM users u
       LEFT JOIN organizations h ON u.honbu = h.code
       LEFT JOIN organizations t ON u.team = t.code
@@ -9031,20 +9095,20 @@ app.post('/api/v1/reports/submit', async (c) => {
     const normId = String(incident_id);
     const incIdWithPrefix = `INC-${normId}`;
 
-    // 1. Update Incident Status to '처리완료'
+    // 1. Update Incident Status to 'INC_003'
     await db.prepare(`
-      UPDATE incidents SET status = 'INC_003', updated_at = ? WHERE inc_id = ?
-    `).bind(now, normId).run()
+      UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?
+    `).bind(now, now, sender_id || 'SYSTEM', normId).run()
 
     // 1-1. Update WarRoom Status to 'CLOSED'
     await db.prepare(`
-      UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?
-    `).bind(now, normId).run()
+      UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?
+    `).bind(now, sender_id || 'SYSTEM', normId).run()
 
-    // 1-2. Update All Assignees Status to '처리완료'
+    // 1-2. Update All Assignees Status to 'INC_003'
     await db.prepare(`
-      UPDATE incident_assignments SET status = '처리완료' WHERE inc_id = ?
-    `).bind(normId).run()
+      UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?
+    `).bind(now, now, sender_id || 'SYSTEM', normId).run()
     
     // 2. Generate embedding for Vector Search
     const ai = c.env.AI;
@@ -9397,21 +9461,26 @@ export class WarRoom {
         session.visible = true;                 // Assume visible on join
         console.log(`[DO] [${this.state.id.toString()}] User JOIN: ${data.name} (${data.user_id})`);
         
-        // 🚀 NEW: Auto-update status to '처리중' when a user joins the warroom
+        // 🚀 NEW: Auto-update status to 'INC_002' when a user joins the warroom
         if (data.user_id && data.incident_id) {
           this.state.waitUntil((async () => {
             try {
               const now = getKst();
               await this.env.DB.prepare(`
                 INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
-                VALUES (?, ?, '처리중', ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, 'INC_002', ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, inc_id) 
-                DO UPDATE SET status = '처리중', updated_at = ?, mod_dt = ?, mod_id = ?
+                DO UPDATE SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ?
               `).bind(
                 data.user_id, data.incident_id, now, now, data.user_id, now, data.user_id, now,
                 now, now, data.user_id
               ).run();
-              console.log(`[DO] [${data.incident_id}] Status updated to '처리중' for joiner: ${data.user_id}`);
+
+              // 🚀 NEW: Also update incidents table status to 'INC_002'
+              await this.env.DB.prepare("UPDATE incidents SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+                .bind(now, now, data.user_id || 'SYSTEM', data.incident_id).run();
+
+              console.log(`[DO] [${data.incident_id}] Status updated to 'INC_002' for joiner: ${data.user_id}`);
             } catch (e) {
               console.error("[DO] JOIN Status Update Error:", e);
             }
@@ -9503,25 +9572,28 @@ export class WarRoom {
               `).bind(...absentUserIds).all();
 
               const pushPayload = {
-                title: data.text,
-                body: `보낸 사람: ${data.name || data.sender}`,
+                title: `[S-Guard] 새 메시지 (${data.name || data.sender})`,
+                body: data.text,
                 inc_id: String(incId),
                 tag: `chat-${incId}`, 
-                priority: 0,           
-                url: `/chat/${incId}`  
+                priority: 1,           
+                url: `/#/chat/${incId}`  
               };
+
+              console.log('[DO-Push] Sending payload:', JSON.stringify(pushPayload));
 
               for (const sub of subs) {
                 try {
-                  const { buildPushPayload } = await import('@block65/webcrypto-web-push');
-                  const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
-                  const pp = await buildPushPayload(JSON.stringify(pushPayload), subscription, {
-                    subject: 'mailto:admin@chokerslab.store',
-                    publicKey: this.env.VAPID_PUBLIC_KEY,
-                    privateKey: this.env.VAPID_PRIVATE_KEY
-                  });
-                  const resp = await fetch(sub.endpoint, { method: 'POST', headers: pp.headers, body: pp.body });
-                  if (resp.status === 410 || resp.status === 404) {
+                  // Use the global sendWebPush helper (consistent with SMS alerts)
+                  const response = await sendWebPush(
+                    sub.endpoint, sub.p256dh, sub.auth,
+                    JSON.stringify(pushPayload),
+                    this.env.VAPID_PUBLIC_KEY,
+                    this.env.VAPID_PRIVATE_KEY,
+                    'mailto:admin@chokerslab.store'
+                  );
+                  
+                  if (response.status === 410 || response.status === 404) {
                     await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
                   }
                 } catch (pe) {

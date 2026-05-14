@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, ShieldCheck } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Keyboard, Bell, Phone, UserCircle, ShieldCheck } from 'lucide-react';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu }) {
   const navigate = useNavigate();
@@ -111,7 +111,6 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             {/* 그리드: 2열 (전체 시스템 콘솔 메뉴 복구) */}
             <div className="flex-1 overflow-y-auto p-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
               {[
-                { label: 'Incident\nKW', sub: '장애 키워드', icon: Hash, path: '/incident-keyword', color: '#22d3ee' },
                 { label: 'Personal\nKW', sub: '개인 키워드', icon: Keyboard, path: '/user-keyword', color: '#06b6d4' },
                 { label: 'Deputy\nMgmt', sub: '대직자 관리', icon: UserCircle, path: '/admin/deputy', color: '#10b981' },
                 { label: 'RBAC\nSetting', sub: '권한 관리', icon: ShieldCheck, path: '/admin/permissions', color: '#6366f1', adminOnly: true },

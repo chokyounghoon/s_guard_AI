@@ -435,7 +435,7 @@ export default function SignupPage() {
   const labelClass = "text-xs font-semibold text-slate-400 ml-1 mb-1.5 block";
 
   return (
-    <div className="min-h-screen font-sans flex flex-col bg-[#0f111a] text-white relative overflow-hidden">
+    <div className="fixed inset-0 font-sans flex flex-col bg-[#0f111a] text-white overflow-y-auto overflow-x-hidden">
       {/* Modals */}
       {modal === 'terms' && <TermsModal title="이용약관" content={TERMS_OF_SERVICE} onClose={() => setModal(null)} />}
       {modal === 'privacy' && <TermsModal title="개인정보 처리방침" content={PRIVACY_POLICY} onClose={() => setModal(null)} />}

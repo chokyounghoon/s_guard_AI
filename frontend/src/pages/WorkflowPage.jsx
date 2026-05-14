@@ -448,7 +448,7 @@ export default function WorkflowPage() {
 
       {/* 상단 앱바 */}
       <header className="sticky top-0 z-50 bg-[#0a0c14]/80 backdrop-blur-2xl border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-none mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => goBack()} className="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors">
               <ArrowLeft className="w-5 h-5 text-slate-300" />
@@ -484,7 +484,7 @@ export default function WorkflowPage() {
       </header>
 
       {/* 메인 콘텐츠 영역 */}
-      <main className="flex-1 relative z-10 w-full max-w-7xl mx-auto">
+      <main className="flex-1 relative z-10 w-full max-w-none mx-auto">
         <div className="p-4 lg:p-6 h-full">
           {/* 데스크탑: 2단 레이아웃, 모바일: 탭 스위칭 */}
           <div className="hidden lg:grid grid-cols-12 gap-8 h-full">

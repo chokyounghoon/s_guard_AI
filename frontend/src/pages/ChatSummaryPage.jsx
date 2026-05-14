@@ -740,7 +740,7 @@ export default function ChatSummaryPage() {
 
       const response = await fetch(getApiUrl('/api/v1/reports/submit'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({
           incident_id: incidentId,
           sender_id: savedUser.employee_id,

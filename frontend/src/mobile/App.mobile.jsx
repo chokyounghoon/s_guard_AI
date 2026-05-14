@@ -4,6 +4,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // ── 기존 PC 페이지 전체 그대로 재사용 ───────────────────────────────────────────
 import LoginPage              from '../pages/LoginPage';
+import SignupPage             from '../pages/SignupPage';
 // (DashboardPage 미사용 - 모바일은 MobileDashboard 독립적으로 사용)
 import AiReportPage           from '../pages/AiReportPage';
 import AiProcessReportPage    from '../pages/AiProcessReportPage';
@@ -267,6 +268,7 @@ function AppContent() {
       <Routes>
         {/* 로그인 + 하단 PWA 설치 버튼 */}
         <Route path="/" element={<LoginPageWithPWA />} />
+        <Route path="/signup" element={<SignupPage />} />
 
         {/* ── 대시보드: PC DashboardPage와 동일한 파일 사용 ── */}
         <Route path="/dashboard"   element={<PR><MobileDashboard onAiClick={() => setShowAIAssistant(true)} /></PR>} />
@@ -304,10 +306,10 @@ function AppContent() {
         <Route path="/report/:incId"           element={<PR><ReportViewPage /></PR>} />
         <Route path="/alert-monitor"           element={<PR><MobileAlertMonitor /></PR>} />
         <Route path="/incident-keyword"         element={<PR><IncidentKeywordPage /></PR>} />
-        <Route path="/user-keyword"             element={<ProtectedRoute userProfile={userProfile}><MobileUserKeywordPage /></ProtectedRoute>} />
+        <Route path="/user-keyword"             element={<PR><MobileUserKeywordPage /></PR>} />
         <Route path="/s-callert"                element={<PR><SCallertPage /></PR>} />
-        <Route path="/admin/permissions" element={<ProtectedRoute userProfile={userProfile}><PermissionManagementPage /></ProtectedRoute>} />
-        <Route path="/admin/deputy" element={<ProtectedRoute userProfile={userProfile}><MobileDeputyManagementPage /></ProtectedRoute>} />
+        <Route path="/admin/permissions" element={<PR><PermissionManagementPage /></PR>} />
+        <Route path="/admin/deputy" element={<PR><MobileDeputyManagementPage /></PR>} />
       </Routes>
 
       {/* Consent Modal */}
