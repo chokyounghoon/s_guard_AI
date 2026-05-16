@@ -69,37 +69,40 @@ export default function PermissionManagementPage() {
   useEffect(() => { fetchRoles(); }, []);
   useEffect(() => { if (selectedRole) fetchPermissions(selectedRole.role_code); }, [selectedRole]);
 
-  // Toggle screen visibility (can_read = screen access)
-  const handleToggleScreen = (menuId) => {
-    setPermissions(prev => prev.map(p =>
-      p.menu_id === menuId ? { ...p, can_read: p.can_read ? 0 : 1 } : p
-    ));
-  };
-
-  const toggleAll = (value) => {
-    setPermissions(prev => prev.map(p => ({ ...p, can_read: value })));
-  };
-
-  const savePermissions = async () => {
+  const savePermissions = async (permsToSave) => {
     if (!selectedRole) return;
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/rbac/permissions`, {
         method: 'POST',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role_code: selectedRole.role_code, permissions }),
+        body: JSON.stringify({ role_code: selectedRole.role_code, permissions: permsToSave }),
       });
       if (res.ok) {
-        toast.success('권한이 저장되었습니다!', {
+        toast.success('권한이 실시간 변경/저장되었습니다!', {
           style: { background: '#0f172a', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
         });
-        // ✅ 저장 후 DB에서 최신 상태를 다시 불러와 UI에 반영
         await fetchPermissions(selectedRole.role_code);
       } else {
         toast.error('저장 실패: 서버 오류');
       }
     } catch (e) { toast.error('저장 실패'); }
     finally { setSaving(false); }
+  };
+
+  // Toggle screen visibility (can_read = screen access)
+  const handleToggleScreen = (menuId) => {
+    const nextPerms = permissions.map(p =>
+      p.menu_id === menuId ? { ...p, can_read: p.can_read ? 0 : 1 } : p
+    );
+    setPermissions(nextPerms);
+    savePermissions(nextPerms);
+  };
+
+  const toggleAll = (value) => {
+    const nextPerms = permissions.map(p => ({ ...p, can_read: value }));
+    setPermissions(nextPerms);
+    savePermissions(nextPerms);
   };
 
   const createRole = async () => {
@@ -231,19 +234,6 @@ export default function PermissionManagementPage() {
         )}
       </div>
       </div>
-
-      {/* Sticky Save Button */}
-      {selectedRole && (
-        <div className="sticky bottom-0 left-0 right-0 p-4 bg-[#07090f]/95 backdrop-blur-xl border-t border-white/5 flex-shrink-0">
-          <button onClick={savePermissions} disabled={saving || loading}
-            className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-900/30">
-            {saving
-              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> 저장 중...</>
-              : <><Save className="w-4 h-4" /> {selectedRole.role_name} 권한 저장</>
-            }
-          </button>
-        </div>
-      )}
 
       {/* Role Select Bottom Sheet */}
       {showRoleSheet && (
