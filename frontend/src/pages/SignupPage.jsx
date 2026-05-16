@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCodebook } from '../context/CodebookContext';
-import { setAccessToken, setUserProfile as setStoreUserProfile } from '../lib/authStore';
+import { setAccessToken, setUserProfile as setStoreUserProfile, setGhostToken, setAllowedPaths } from '../lib/authStore';
 
 // ── 데이터 ─────────────────────────────────────────
 const SHINHAN_COMPANIES = [
@@ -421,6 +421,9 @@ export default function SignupPage() {
       }
       if (data.ghost_token) {
         setGhostToken(data.ghost_token);
+      }
+      if ('allowed_paths' in data) {
+        setAllowedPaths(data.allowed_paths);
       }
       
       setStoreUserProfile(data.user || data);

@@ -1855,6 +1855,7 @@ app.post('/auth/verify', async (c) => {
     token,                          // 하위 호환성 유지
     access_token:    jwt,           // 🔒 신규: 메모리 저장용 Access Token
     ghost_token:     refreshToken,  // 👻 신규: 장기 세션용
+    allowed_paths:   await fetchUserPermissions(db, updated.role),
     user: {
       id:              empId,
       employee_id:     empId,
@@ -2346,12 +2347,37 @@ app.post('/auth/signup', async (c) => {
     console.error(`[Signup-History-Error] Failed to log signup for ${cleanEmpId}:`, e.message);
   }
 
+  const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+  const jwt = await generateJWT({
+    sub:         cleanEmpId,
+    name:        name,
+    role:        finalRole,
+    is_admin:    0,
+    company:     company,
+    honbu:       honbu || '',
+    team:        team || '',
+  }, jwtSecret, 1800);
+
+  const refreshToken = await createAndStoreSession(c, cleanEmpId);
+  if (refreshToken) {
+    setCookie(c, 'sguard_refresh', refreshToken, {
+      path: '/',
+      httpOnly: true,
+      maxAge: 2592000,
+      sameSite: 'None',
+      secure: true,
+    });
+  }
+
   return c.json({ 
     status: "success", 
-    debug_v: "20240328_final", // 배포 여부 확인용 버전 플래그
-    token: token,
+    debug_v: "20240328_final",
+    token: `sguard-token-${cleanEmpId}`,
+    access_token: jwt,
+    ghost_token: refreshToken,
+    allowed_paths: await fetchUserPermissions(db, finalRole),
     user: {
-      id: cleanEmpId, // Return cleaned employee_id as id
+      id: cleanEmpId,
       email,
       name,
       role: finalRole,
@@ -2365,7 +2391,7 @@ app.post('/auth/signup', async (c) => {
       position: position || 'POS_001',
       profile_picture: null,
       is_admin: 0,
-      terms_agreed_at: null, // ⚖️ New signup: Always null
+      terms_agreed_at: null,
       numeric_id: userId
     }
   })
@@ -2906,32 +2932,38 @@ app.post('/rbac/permissions', async (c) => {
   const { role_code, permissions } = await c.req.json()
   const modDt = getKst()
 
-  for (const p of permissions) {
-    await db.prepare(`
-      INSERT INTO role_permissions
-        (role_code, menu_id, menu_name, menu_path, can_read, can_write, can_delete, reg_dt, mod_dt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(role_code, menu_id) DO UPDATE SET
-        menu_name  = excluded.menu_name,
-        menu_path  = excluded.menu_path,
-        can_read   = excluded.can_read,
-        can_write  = excluded.can_write,
-        can_delete = excluded.can_delete,
-        mod_dt     = excluded.mod_dt
-    `).bind(
-      role_code,
-      p.menu_id,
-      p.menu_name  || '',
-      p.menu_path  || p.path || '',
-      p.can_read   ? 1 : 0,
-      p.can_write  ? 1 : 0,
-      p.can_delete ? 1 : 0,
-      modDt,
-      modDt
-    ).run()
-  }
+  try {
+    const stmts = permissions.map(p =>
+      db.prepare(`
+        INSERT INTO role_permissions
+          (role_code, menu_id, menu_name, menu_path, can_read, can_write, can_delete, reg_dt, mod_dt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(role_code, menu_id) DO UPDATE SET
+          menu_name  = excluded.menu_name,
+          menu_path  = excluded.menu_path,
+          can_read   = excluded.can_read,
+          can_write  = excluded.can_write,
+          can_delete = excluded.can_delete,
+          mod_dt     = excluded.mod_dt
+      `).bind(
+        role_code,
+        p.menu_id,
+        p.menu_name  || '',
+        p.menu_path  || p.path || '',
+        p.can_read   ? 1 : 0,
+        p.can_write  ? 1 : 0,
+        p.can_delete ? 1 : 0,
+        modDt,
+        modDt
+      )
+    );
 
-  return c.json({ success: true, saved: permissions.length })
+    await db.batch(stmts);
+    return c.json({ success: true, saved: permissions.length })
+  } catch (err) {
+    console.error('[RBAC] save permissions error:', err.message);
+    return c.json({ success: false, error: err.message }, 500);
+  }
 })
 
 // ==========================================
