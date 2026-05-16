@@ -2374,11 +2374,11 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
         if (profile.dept && profile.team) onClose();
       }}></div>
 
-      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#1a1f2e] to-[#0f111a] border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-scale-up">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-cyan-400"></div>
+      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#1a1f2e] to-[#0f111a] border border-white/10 rounded-3xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden animate-scale-up">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-cyan-400 shrink-0"></div>
 
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-6">
+        <div className="p-6 sm:p-8 flex flex-col max-h-full overflow-hidden flex-1">
+          <div className="flex justify-between items-center mb-6 shrink-0">
             <h2 className="text-xl font-bold text-white flex items-center space-x-2">
               <User className="w-5 h-5 text-blue-400" />
               <span>회원 정보 관리</span>
@@ -2388,7 +2388,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </button>
           </div>
 
-          <div className="flex items-center space-x-4 mb-8 bg-slate-900/40 p-4 rounded-2xl border border-white/5 relative">
+          <div className="flex items-center space-x-4 mb-6 bg-slate-900/40 p-4 rounded-2xl border border-white/5 relative shrink-0">
             <div 
               className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-amber-500 animate-pulse' : 'border-blue-500/30'} overflow-hidden shadow-lg shrink-0 group cursor-pointer`}
               onClick={() => fileInputRef.current?.click()}
@@ -2426,7 +2426,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
           </div>
 
-          <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: 'calc(85vh - 140px)' }}>
+          <div className="space-y-4 flex-1 overflow-y-auto pr-2 pb-8 custom-scrollbar">
             {/* 사번 (읽기 전용) */}
             {(profile.employee_id || profile.id) && (
               <div>
@@ -2626,27 +2626,27 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
 
 
-          <div className="mt-8 flex flex-col space-y-3">
-            <button
-              onClick={handleSave}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/40 transition-all transform active:scale-[0.98]"
-            >
-              저장하기 (Save)
-            </button>
-            <button
-              onClick={handleLogout}
-              className="w-full bg-white/5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1"
-            >
-              <LogIn className="w-4 h-4 rotate-180" />
-              <span>Logout</span>
-            </button>
-          </div>
+            <div className="pt-6 pb-2 flex flex-col space-y-3 shrink-0 border-t border-white/5">
+              <button
+                onClick={handleSave}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/40 transition-all transform active:scale-[0.98]"
+              >
+                저장하기 (Save)
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full bg-white/5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1"
+              >
+                <LogIn className="w-4 h-4 rotate-180" />
+                <span>Logout</span>
+              </button>
+            </div>
 
-          {(!formData.company || !formData.honbu || !formData.team || !formData.part) && (
-            <p className="text-[10px] text-yellow-500/70 text-center mt-4 italic">
-              * 서비스 이용을 위해 필수 정보를 모두 입력해 주세요.
-            </p>
-          )}
+            {(!formData.company || !formData.honbu || !formData.team || !formData.part) && (
+              <p className="text-[10px] text-yellow-500/70 text-center mt-4 italic shrink-0">
+                * 서비스 이용을 위해 필수 정보를 모두 입력해 주세요.
+              </p>
+            )}
           </div>
         </div>
       </div>
