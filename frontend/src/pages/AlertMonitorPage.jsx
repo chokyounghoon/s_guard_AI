@@ -247,7 +247,6 @@ export default function AlertMonitorPage() {
   return (
     <div style={{ height: '100%', background: 'linear-gradient(160deg,#020917 0%,#070d1f 50%,#020917 100%)', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       className="text-slate-300">
-      <Toaster position="top-center" toastOptions={{ style: { background: '#0f172a', color: '#fff', border: '1px solid rgba(6,182,212,0.2)', fontSize: 12 } }} />
 
       {/* HEADER */}
       <header style={{ background: 'rgba(2,9,23,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(6,182,212,0.08)' }}

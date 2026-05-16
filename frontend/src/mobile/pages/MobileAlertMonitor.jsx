@@ -204,7 +204,6 @@ export default function MobileAlertMonitor() {
 
   return (
     <div style={{ height: '100%', background: '#020917', fontFamily: "Pretendard, sans-serif", display: 'flex', flexDirection: 'column' }} className="text-slate-300">
-      <Toaster position="top-center" />
 
       <header style={{ background: 'rgba(2,9,23,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
         className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 flex-shrink-0">

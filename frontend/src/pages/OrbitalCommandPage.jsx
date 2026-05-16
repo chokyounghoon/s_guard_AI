@@ -152,9 +152,6 @@ export default function OrbitalCommandPage() {
       fontFamily: "'Pretendard', 'Inter', sans-serif",
       color: '#cbd5e1',
     }}>
-      <Toaster position="top-center" toastOptions={{
-        style: { background: '#0f172a', color: '#fff', border: '1px solid rgba(6,182,212,0.2)', fontSize: 12 }
-      }} />
 
       {/* ── 헤더 ── */}
       <header style={{
