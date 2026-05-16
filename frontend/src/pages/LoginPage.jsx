@@ -617,7 +617,7 @@ export default function LoginPage() {
             </h4>
             <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
               <li>iPhone <span style={{ color:'white', fontWeight:600 }}>단축어(Shortcuts)</span> 앱 하단 <span style={{ color:'white', fontWeight:600 }}>자동화</span> 탭에서 [+] 버튼을 누릅니다.</li>
-              <li>조건으로 <span style={{ color:'white', fontWeight:600 }}>메시지</span>를 선택하고, <span style={{ color:'#c084fc', fontWeight:600 }}>'보낸 사람'과 '내용'을 모두 비워두면(기본값)</span> 모든 문자에 반응합니다.</li>
+              <li>조건으로 <span style={{ color:'white', fontWeight:600 }}>메시지</span>를 선택하고, '메시지 포함 내용'에 <span style={{ color:'#c084fc', fontWeight:600 }}>[Web발신] 또는 알림, 신한, 경보</span> 등 수신할 문자의 공통 키워드를 필수로 입력합니다.</li>
               <li>반드시 <span style={{ color:'#c084fc', fontWeight:600 }}>즉시 실행</span>을 선택해 주세요.</li>
             </ul>
           </div>

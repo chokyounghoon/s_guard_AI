@@ -347,7 +347,7 @@ export default function MobileLoginPage() {
                   개인용 자동화(Automation) 생성
                 </h4>
                 <p className="pl-7 leading-relaxed text-slate-400 break-keep">
-                  아이폰 <span className="text-white font-bold">단축어(Shortcuts)</span> 앱 하단 <span className="text-white font-bold">자동화</span> 탭에서 [+] 버튼을 눌러 새 자동화를 생성합니다. 조건으로 <span className="text-white font-bold">메시지</span>를 선택하고, <span className="text-purple-300 font-bold">'보낸 사람'과 '내용'을 모두 비워두면(기본값)</span> 모든 문자에 반응합니다. 반드시 <span className="text-purple-300 font-bold">즉시 실행</span>을 체크해 주세요.
+                  아이폰 <span className="text-white font-bold">단축어(Shortcuts)</span> 앱 하단 <span className="text-white font-bold">자동화</span> 탭에서 [+] 버튼을 눌러 새 자동화를 생성합니다. 조건으로 <span className="text-white font-bold">메시지</span>를 선택하고, '메시지 포함 내용'에 <span className="text-purple-300 font-bold">[Web발신] 또는 알림, 신한, 경보</span> 등 수신할 문자의 공통 키워드를 필수로 입력합니다. 반드시 <span className="text-purple-300 font-bold">즉시 실행</span>을 체크해 주세요.
                 </p>
               </div>
 
