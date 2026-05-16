@@ -260,6 +260,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     } else {
       localStorage.removeItem('sguard_current_incident');
     }
+    window.dispatchEvent(new Event('sguard_current_incident_changed'));
   }, [selectedSms]);
   
   // 🚀 Derived State: Filtered SMS list based on visibility settings

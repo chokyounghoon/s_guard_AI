@@ -57,19 +57,68 @@ export default function AIChatBubble({ message, query, incidentId, onCopy, onSha
   };
 
   const parseMarkdown = (text) => {
-// ... (기존 parseMarkdown 로직 유지)
+    if (!text) return null;
     const lines = text.split('\n');
     const elements = [];
     let codeBlock = null;
     let codeLines = [];
+    let tableRows = [];
+
+    const flushTable = (keySuffix) => {
+      if (tableRows.length === 0) return null;
+      const validRows = tableRows.filter(r => !r.replace(/\|/g, '').trim().match(/^[-: ]+$/));
+      if (validRows.length > 0) {
+        const headerCols = validRows[0].split('|').map(c => c.trim()).filter(Boolean);
+        const bodyRows = validRows.slice(1).map(row => row.split('|').map(c => c.trim()).filter(Boolean));
+
+        const cleanCol = (colStr) => colStr.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*\*/g, '');
+
+        const tableElem = (
+          <div key={`table-${keySuffix}`} className="my-3 overflow-x-auto rounded-xl border border-purple-500/20 bg-[#0d1017] shadow-lg">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-800/80 border-b border-purple-500/20">
+                  {headerCols.map((col, cIdx) => (
+                    <th key={cIdx} className="px-3.5 py-2.5 font-bold text-purple-300 tracking-wider uppercase text-[11px]">
+                      {cleanCol(col)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-slate-300 font-medium">
+                {bodyRows.map((row, rIdx) => (
+                  <tr key={rIdx} className="hover:bg-white/[0.03] transition-colors">
+                    {row.map((col, cIdx) => (
+                      <td key={cIdx} className={`px-3.5 py-2.5 ${cIdx === 0 ? 'font-bold text-white/95 bg-white/[0.02]' : ''}`}>
+                        {cleanCol(col)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        tableRows = [];
+        return tableElem;
+      }
+      tableRows = [];
+      return null;
+    };
 
     lines.forEach((line, idx) => {
-      if (line.trim().startsWith('```')) {
+      const trimmed = line.trim();
+      
+      if (trimmed.startsWith('```')) {
+        if (tableRows.length > 0) {
+          const tElem = flushTable(idx);
+          if (tElem) elements.push(tElem);
+        }
         if (codeBlock === null) {
-          codeBlock = line.replace('```', '').trim();
+          codeBlock = trimmed.replace('```', '').trim();
         } else {
           elements.push(
-            <div key={`code-${idx}`} className="bg-[#0d0f14] border border-blue-500/20 rounded-xl p-4 my-3 font-mono text-xs overflow-x-auto">
+            <div key={`code-${idx}`} className="bg-[#0d0f14] border border-blue-500/20 rounded-xl p-4 my-3 font-mono text-xs overflow-x-auto shadow-md">
               <div className="text-blue-400 text-[10px] mb-2 font-bold uppercase tracking-wider">{codeBlock || 'Code'}</div>
               {codeLines.map((codeLine, i) => (
                 <div key={i} className="text-slate-300 leading-relaxed">{codeLine}</div>
@@ -85,21 +134,78 @@ export default function AIChatBubble({ message, query, incidentId, onCopy, onSha
         codeLines.push(line);
         return;
       }
-      let processedLine = line;
-      processedLine = processedLine.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-white">$1</strong>');
-      if (line.trim().startsWith('-')) {
+
+      // 테이블 문법 처리
+      if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        tableRows.push(trimmed);
+        return;
+      } else if (tableRows.length > 0) {
+        const tElem = flushTable(idx);
+        if (tElem) elements.push(tElem);
+      }
+
+      // 헤딩 (###, #### 등) 처리
+      if (trimmed.startsWith('#')) {
+        const match = trimmed.match(/^#+/);
+        if (!match) return;
+        const level = match[0].length;
+        let title = trimmed.replace(/^#+\s*/, '').trim();
+        title = title.replace(/\[(.+?)\]/g, '$1'); // 대괄호 벗기기
+
+        if (level <= 3) {
+          elements.push(
+            <div key={idx} className="text-[14px] font-black text-purple-200 border-b border-purple-500/30 pb-1.5 mt-4 mb-2.5 flex items-center gap-2">
+              <Sparkles size={15} className="text-purple-400 shrink-0" />
+              <span className="tracking-wide">{title}</span>
+            </div>
+          );
+        } else {
+          elements.push(
+            <div key={idx} className="text-xs font-bold text-blue-300 mt-3 mb-1.5 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20 inline-block tracking-tight">
+              {title}
+            </div>
+          );
+        }
+        return;
+      }
+
+      if (!trimmed) {
+        elements.push(<div key={idx} className="h-1.5" />);
+        return;
+      }
+
+      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        const rawText = trimmed.replace(/^[\*\-]\s*/, '');
+        const parts = rawText.split(':');
+        let contentHtml = rawText;
+        if (parts.length > 1 && parts[0].length < 35) {
+          const cleanTitle = parts[0].replace(/\*\*/g, '').trim();
+          const boldTitle = `<strong class="font-bold text-purple-200">${cleanTitle}:</strong>`;
+          const remaining = parts.slice(1).join(':').replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>').replace(/\*\*/g, '');
+          contentHtml = boldTitle + remaining;
+        } else {
+          contentHtml = rawText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>').replace(/\*\*/g, '');
+        }
+
         elements.push(
-          <div key={idx} className="flex items-start space-x-2 my-1">
-            <span className="text-blue-400 mt-1">•</span>
-            <span dangerouslySetInnerHTML={{ __html: processedLine.replace(/^-\s*/, '') }} />
+          <div key={idx} className="flex items-start space-x-2 my-1.5 text-[13px] text-slate-200">
+            <span className="text-purple-400 mt-0.5 shrink-0 text-xs">•</span>
+            <span className="leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: contentHtml }} />
           </div>
         );
-      } else if (line.trim()) {
+      } else {
+        let processed = trimmed;
+        processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-white">$1</strong>').replace(/\*\*/g, '');
         elements.push(
-          <p key={idx} className="my-1.5 leading-relaxed" dangerouslySetInnerHTML={{ __html: processedLine }} />
+          <p key={idx} className="my-1.5 leading-relaxed text-[13px] text-slate-200 break-words font-normal" dangerouslySetInnerHTML={{ __html: processed }} />
         );
       }
     });
+
+    if (tableRows.length > 0) {
+      const tElem = flushTable('end');
+      if (tElem) elements.push(tElem);
+    }
 
     return elements;
   };

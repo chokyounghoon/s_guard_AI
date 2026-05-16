@@ -31,12 +31,14 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
     try { const s = localStorage.getItem('sguard_current_incident'); return s ? JSON.parse(s) : null; } catch { return null; }
   };
   useEffect(() => {
-    if (!isOpen) return;
     setCurrentIncident(readIncident());
-    // 대시보드에서 SMS 선택이 바뀔 때 동기화
     const onStorage = () => setCurrentIncident(readIncident());
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener('sguard_current_incident_changed', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('sguard_current_incident_changed', onStorage);
+    };
   }, [isOpen]);
 
   const aiAbortRef = useRef(null);
@@ -138,7 +140,7 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
       const res = await fetch(getApiUrl('/ai/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ query: message + hiddenPrompt + contextPrompt, incident_id: incidentId }),
+        body: JSON.stringify({ query: message + hiddenPrompt + contextPrompt, incident_id: incidentId || (activeContext ? activeContext.id : null) }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(`API Error: ${res.status}`);
@@ -295,12 +297,19 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
 
         {/* ── Context Badge / Warning ── */}
         {currentIncident ? (
-          <div className="mx-4 mt-2.5 mb-0 px-3 py-2 rounded-xl shrink-0 flex items-center gap-2"
+          <div className="mx-4 mt-2.5 mb-0 px-3.5 py-2.5 rounded-xl shrink-0 flex items-start gap-2.5"
             style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" style={{ boxShadow: '0 0 6px rgba(16,185,129,0.8)' }} />
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" style={{ boxShadow: '0 0 6px rgba(16,185,129,0.8)' }} />
             <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 leading-none">분석 대상 장애</p>
-              <p className="text-[11px] font-bold text-white truncate mt-0.5">[{currentIncident.id}] {currentIncident.title}</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 leading-none mb-1">분석 대상 장애</p>
+              <p className="text-[11px] font-bold text-white truncate">[{currentIncident.id}] {currentIncident.title}</p>
+              {currentIncident.message && (
+                <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/15">
+                  <p className="text-[11px] text-emerald-100/90 leading-relaxed line-clamp-2 font-medium break-all whitespace-pre-wrap">
+                    {currentIncident.message}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ) : (
