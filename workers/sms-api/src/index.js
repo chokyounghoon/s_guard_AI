@@ -2293,7 +2293,7 @@ app.get('/auth/check', async (c) => {
 
 app.post('/auth/signup', async (c) => {
   const body = await c.req.json()
-  const { email, password, name, company, honbu, team, part, subpart, phone, employee_id, position, os_type } = body
+  const { email, password, name, company, honbu, team, part, subpart, phone, employee_id, position, os_type, role } = body
   const db = c.env.DB
   
   console.log('[Signup Search] employee_id:', employee_id);
@@ -2315,6 +2315,7 @@ app.post('/auth/signup', async (c) => {
   const cleanEmpId = String(employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
   
   const finalPhone = (phone || '').trim();
+  const finalRole = role || 'analyst';
   
   const res = await db.prepare(
     `INSERT INTO users (
@@ -2324,7 +2325,7 @@ app.post('/auth/signup', async (c) => {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', finalPhone, os_type || 'android',
-    cleanEmpId, position || 'POS_001', 'user', 1, 0, token, 'ACTIVE',
+    cleanEmpId, position || 'POS_001', finalRole, 1, 0, token, 'ACTIVE',
     cleanEmpId, regDt, cleanEmpId, regDt, regDt
   ).run()
 
@@ -2353,7 +2354,7 @@ app.post('/auth/signup', async (c) => {
       id: cleanEmpId, // Return cleaned employee_id as id
       email,
       name,
-      role: 'user',
+      role: finalRole,
       company,
       honbu: honbu || '',
       team: team || '',

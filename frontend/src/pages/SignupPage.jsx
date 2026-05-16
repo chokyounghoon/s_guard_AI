@@ -402,6 +402,7 @@ export default function SignupPage() {
       team: formData.team,
       part: formData.part,
       subpart: formData.subpart,
+      role: 'analyst',
     };
 
     console.log('[SignupPage] Submitting Body:', signupBody);
