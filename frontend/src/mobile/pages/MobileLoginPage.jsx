@@ -4,7 +4,8 @@ import { Shield, Eye, EyeOff, Loader2, ChevronRight, KeyRound, SmartphoneNfc, Do
 import {
   setAccessToken,
   setUserProfile as setStoreUserProfile,
-  setGhostToken
+  setGhostToken,
+  setAllowedPaths
 } from '../../lib/authStore';
 import PWAInstallButton from '../components/PWAInstallButton';
 
@@ -81,6 +82,7 @@ export default function MobileLoginPage() {
       setAccessToken(data.access_token);
       setStoreUserProfile(data.user);
       if (data.ghost_token) setGhostToken(data.ghost_token);
+      if ('allowed_paths' in data) setAllowedPaths(data.allowed_paths);
       navigate('/dashboard', { replace: true });
     } catch (e) {
       setError(e.message);

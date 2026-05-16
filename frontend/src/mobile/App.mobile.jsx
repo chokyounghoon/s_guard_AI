@@ -66,25 +66,53 @@ import { CodebookProvider }   from '../context/CodebookContext';
 import { PushManager }       from '../lib/pushManager';
 
 // ── Auth Store ────────────────────────────────────────────────────────────────
+// ── Auth Store ────────────────────────────────────────────────────────────────
 import {
   getAccessToken, setAccessToken, clearSession,
   getUserProfile, setUserProfile as setStoreUserProfile,
   addAuthListener,
   getGhostToken, setGhostToken, getAuthHeaders,
+  isPathAllowed, setAllowedPaths
 } from '../lib/authStore';
 
 // ── PWA Install Button (모바일 전용) ──────────────────────────────────────────
 import PWAInstallButton from './components/PWAInstallButton';
 
-import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User } from 'lucide-react';
+import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User, ShieldAlert } from 'lucide-react';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
+function PermissionDeniedView() {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-[#07090f] flex flex-col items-center justify-center p-6 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(239,68,68,0.3)]">
+        <ShieldAlert className="w-8 h-8 text-red-500" />
+      </div>
+      <h2 className="text-xl font-black text-white mb-2">해당 화면의 권한이 없습니다.</h2>
+      <p className="text-xs text-slate-400 max-w-xs mb-8 leading-relaxed">
+        현재 로그인한 사용자 계정의 권한 등급으로는 이 페이지에 접근할 수 없습니다. 관리자에게 문의해 주세요.
+      </p>
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+      >
+        대시보드로 돌아가기
+      </button>
+    </div>
+  );
+}
+
 // ─── Protected Route ─────────────────────────────────────────────────────────
 function ProtectedRoute({ children, isRefreshing, userProfile }) {
+  const location = useLocation();
   if (isRefreshing) return null;
   if (!userProfile && !getAccessToken()) {
     return <Navigate to="/" replace />;
+  }
+  if (!isPathAllowed(location.pathname)) {
+    console.warn('[RBAC] Access denied for mobile path:', location.pathname);
+    return <PermissionDeniedView />;
   }
   return children;
 }
@@ -157,6 +185,7 @@ function AppContent() {
           setAccessToken(refreshData.access_token);
           setStoreUserProfile(refreshData.user);
           if (refreshData.ghost_token) setGhostToken(refreshData.ghost_token);
+          if ('allowed_paths' in refreshData) setAllowedPaths(refreshData.allowed_paths);
           setIsSessionRefreshed(true);
           setIsRefreshing(false);
           return;
@@ -175,6 +204,7 @@ function AppContent() {
             setAccessToken(ghostData.access_token);
             setStoreUserProfile(ghostData.user);
             if (ghostData.ghost_token) setGhostToken(ghostData.ghost_token);
+            if ('allowed_paths' in ghostData) setAllowedPaths(ghostData.allowed_paths);
             setIsSessionRefreshed(true);
             setIsRefreshing(false);
             return;

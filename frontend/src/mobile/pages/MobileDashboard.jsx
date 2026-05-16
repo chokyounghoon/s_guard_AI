@@ -10,7 +10,8 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import AIInsightModal from '../../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu.mobile';
 import { useCodebook } from '../../context/CodebookContext';
-import { getAccessToken, clearSession, getAuthHeaders } from '../../lib/authStore';
+import { getAccessToken, clearSession, getAuthHeaders, isPathAllowed } from '../../lib/authStore';
+import { toast } from 'react-hot-toast';
 
 const SHINHAN_COMPANIES = [
   '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
@@ -1357,19 +1358,35 @@ export default function DashboardPage({ onAiClick }) {
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-1.5 mr-1">
             {/* Orbital Command */}
-            <button onClick={() => navigate('/orbital-command')}
+            <button onClick={() => {
+              if (!isPathAllowed('/orbital-command')) {
+                toast.error('해당 화면의 권한이 없습니다.');
+                return;
+              }
+              navigate('/orbital-command');
+            }}
+              disabled={!isPathAllowed('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
+              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!isPathAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ border: '1px solid rgba(6,182,212,0.4)', background: 'transparent' }}>
               <Cpu size={15} style={{ color: '#06b6d4' }} />
+              {!isPathAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
             </button>
 
             {/* Alert Monitor */}
-            <button onClick={() => navigate('/alert-monitor')}
+            <button onClick={() => {
+              if (!isPathAllowed('/alert-monitor')) {
+                toast.error('해당 화면의 권한이 없습니다.');
+                return;
+              }
+              navigate('/alert-monitor');
+            }}
+              disabled={!isPathAllowed('/alert-monitor')}
               onPointerDown={() => handleTooltipStart('Alert Monitor')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
+              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!isPathAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ border: '1px solid rgba(239,68,68,0.4)', background: 'transparent' }}>
               <BellDot size={15} style={{ color: '#ef4444' }} />
+              {!isPathAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
             </button>
 
             {/* Threshold */}

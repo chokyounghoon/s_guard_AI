@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Keyboard, Bell, Phone, UserCircle, ShieldCheck } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Keyboard, Bell, Phone, UserCircle, ShieldCheck, Lock } from 'lucide-react';
+import { isPathAllowed } from '../../lib/authStore';
+import { toast } from 'react-hot-toast';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu }) {
   const navigate = useNavigate();
@@ -129,15 +131,19 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'S-Callert', sub: '상황전파', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
                 const Icon = item.icon;
+                const allowed = isPathAllowed(item.path);
                 return (
                   <div
                     key={item.label}
                     onClick={() => {
+                      if (!allowed) {
+                        toast.error('해당 화면의 권한이 없습니다.');
+                        return;
+                      }
                       setShowMoreMenu(false);
                       if (item.action) {
                         item.action();
                       } else {
-                        // 콘솔 복귀 플래그: navigate(-1)로 돌아오면 콘솔 자동 재오픈
                         sessionStorage.setItem('console_return_pending', '1');
                         navigate(item.path, { state: { from: 'system-console' } });
                       }
@@ -147,17 +153,20 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                       border: '1px solid rgba(255,255,255,0.06)',
                       borderRadius: 18,
                       padding: '12px 8px 10px',
-                      cursor: 'pointer',
+                      cursor: !allowed ? 'not-allowed' : 'pointer',
+                      opacity: !allowed ? 0.35 : 1,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       textAlign: 'center',
                       gap: 6,
                       transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 15px -5px rgba(0,0,0,0.3)'
+                      boxShadow: '0 4px 15px -5px rgba(0,0,0,0.3)',
+                      position: 'relative'
                     }}
                     className="hover:bg-white/5 active:scale-95 group"
                   >
+                    {!allowed && <Lock className="w-3.5 h-3.5 text-red-500 absolute top-2 right-2" />}
                     <div style={{
                       width: 38, height: 38, borderRadius: 12,
                       background: `linear-gradient(135deg, ${item.color}25 0%, ${item.color}08 100%)`,

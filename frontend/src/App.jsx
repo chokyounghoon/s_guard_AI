@@ -53,13 +53,34 @@ import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User } from 'lucide-react';
+import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User, ShieldAlert } from 'lucide-react';
 
 import { CodebookProvider } from './context/CodebookContext';
 
 import { Navigate } from 'react-router-dom';
 import { setAccessToken, getAccessToken, setUserProfile as setStoreUserProfile, getUserProfile, addAuthListener, getGhostToken, setGhostToken, setAllowedPaths, isPathAllowed } from './lib/authStore';
 import { PushManager } from './lib/pushManager';
+
+function PermissionDeniedView() {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-[#07090f] flex flex-col items-center justify-center p-6 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(239,68,68,0.3)]">
+        <ShieldAlert className="w-8 h-8 text-red-500" />
+      </div>
+      <h2 className="text-xl font-black text-white mb-2">해당 화면의 권한이 없습니다.</h2>
+      <p className="text-xs text-slate-400 max-w-xs mb-8 leading-relaxed">
+        현재 로그인한 사용자 계정의 권한 등급으로는 이 페이지에 접근할 수 없습니다. 관리자에게 문의해 주세요.
+      </p>
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+      >
+        대시보드로 돌아가기
+      </button>
+    </div>
+  );
+}
 
 // 🔒 인증된 사용자만 접근할 수 있도록 보호하는 컴포넌트 (Navigation Guard)
 // 🔒 Protected Route: Waits for session refresh to complete before redirecting
@@ -74,10 +95,10 @@ function ProtectedRoute({ children, isRefreshing, userProfile }) {
     return <Navigate to="/" replace />;
   }
 
-  // 🔐 RBAC: 현재 경로가 사용자 역할에서 허용되지 않으면 대시보드로 리다이렉트
+  // 🔐 RBAC: 현재 경로가 사용자 역할에서 허용되지 않으면 권한 없음 뷰 표시
   if (!isPathAllowed(location.pathname)) {
     console.warn('[RBAC] Access denied for path:', location.pathname);
-    return <Navigate to="/dashboard" replace />;
+    return <PermissionDeniedView />;
   }
 
   return children;

@@ -10,7 +10,8 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
 import { useCodebook } from '../context/CodebookContext';
-import { getAccessToken, clearSession, getAuthHeaders } from '../lib/authStore';
+import { getAccessToken, clearSession, getAuthHeaders, isPathAllowed } from '../lib/authStore';
+import { toast } from 'react-hot-toast';
 
 const SHINHAN_COMPANIES = [
   '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
@@ -1470,22 +1471,37 @@ export default function DashboardPage({ onAiClick }) {
            .map((item, idx, arr) => {
             const Icon = item.icon;
             const isActive = window.location.pathname === item.path;
+            const allowed = isPathAllowed(item.path);
             return (
               <button
                 key={item.label}
-                onClick={() => item.action ? item.action() : navigate(item.path)}
+                onClick={(e) => {
+                  if (!allowed) {
+                    e.preventDefault();
+                    toast.error('해당 화면의 권한이 없습니다.');
+                    return;
+                  }
+                  item.action ? item.action() : navigate(item.path);
+                }}
+                disabled={!allowed}
                 className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-bold transition-all relative
                   ${idx < arr.length - 1 ? 'border-r border-white/5' : ''}
-                  ${isActive
-                    ? 'bg-white/8 text-white'
-                    : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+                  ${!allowed
+                    ? 'opacity-25 cursor-not-allowed text-slate-600'
+                    : isActive
+                      ? 'bg-white/8 text-white'
+                      : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
                   }`}
                 style={{ color: isActive ? item.color : undefined }}
+                title={!allowed ? '접근 권한 없음' : item.label}
               >
                 {isActive && (
                   <span className="absolute top-0 left-0 right-0 h-[2px] rounded-b" style={{ background: item.color }} />
                 )}
-                <Icon size={14} style={{ color: item.color, opacity: isActive ? 1 : 0.55 }} />
+                <div className="relative">
+                  <Icon size={14} style={{ color: item.color, opacity: !allowed ? 0.3 : isActive ? 1 : 0.55 }} />
+                  {!allowed && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
+                </div>
                 <span className="whitespace-nowrap tracking-wide">{item.label}</span>
               </button>
             );

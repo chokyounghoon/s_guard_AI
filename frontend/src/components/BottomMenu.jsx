@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, Lock } from 'lucide-react';
+import { isPathAllowed } from '../lib/authStore';
+import { toast } from 'react-hot-toast';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu }) {
   const navigate = useNavigate();
@@ -115,15 +117,19 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: '사용자 관리', sub: 'USER MGMT', icon: Users, path: '/user-management', color: '#3b82f6', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin' || user?.role === 'SUPER_ADMIN').map((item) => {
                 const Icon = item.icon;
+                const allowed = isPathAllowed(item.path);
                 return (
                   <div
                     key={item.label}
                     onClick={() => {
+                      if (!allowed) {
+                        toast.error('해당 화면의 권한이 없습니다.');
+                        return;
+                      }
                       setShowMoreMenu(false);
                       if (item.action) {
                         item.action();
                       } else {
-                        // 콘솔 복귀 플래그: navigate(-1)로 돌아오면 콘솔 자동 재오픈
                         sessionStorage.setItem('console_return_pending', '1');
                         navigate(item.path, { state: { from: 'system-console' } });
                       }
@@ -133,15 +139,18 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                       border: '1px solid rgba(255,255,255,0.07)',
                       borderRadius: 16,
                       padding: '14px 8px 12px',
-                      cursor: 'pointer',
+                      cursor: !allowed ? 'not-allowed' : 'pointer',
+                      opacity: !allowed ? 0.35 : 1,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       textAlign: 'center',
                       gap: 6,
-                      transition: 'background 0.2s',
+                      transition: 'all 0.2s',
+                      position: 'relative'
                     }}
                   >
+                    {!allowed && <Lock className="w-3.5 h-3.5 text-red-500 absolute top-2 right-2" />}
                     <div style={{
                       width: 40, height: 40, borderRadius: 12,
                       background: `${item.color}18`,
