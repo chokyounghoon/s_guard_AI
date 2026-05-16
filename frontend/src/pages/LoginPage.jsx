@@ -616,9 +616,9 @@ export default function LoginPage() {
               단축어 자동화(Automation) 생성
             </h4>
             <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
-              <li>iPhone 기본 앱인 <span style={{ color:'white', fontWeight:600 }}>단축어(Shortcuts)</span> 앱을 실행합니다.</li>
-              <li>하단 중앙의 <span style={{ color:'white', fontWeight:600 }}>자동화</span> 탭을 선택하고 우측 상단 <span style={{ color:'white', fontWeight:600 }}>[+]</span> 버튼을 누릅니다.</li>
-              <li>조건으로 <span style={{ color:'white', fontWeight:600 }}>메시지(SMS)</span> 수신 등을 선택하고 즉시 실행되도록 설정합니다.</li>
+              <li>iPhone <span style={{ color:'white', fontWeight:600 }}>단축어(Shortcuts)</span> 앱 하단 <span style={{ color:'white', fontWeight:600 }}>자동화</span> 탭에서 [+] 버튼을 누릅니다.</li>
+              <li>조건으로 <span style={{ color:'white', fontWeight:600 }}>메시지</span>를 선택하고, <span style={{ color:'#c084fc', fontWeight:600 }}>'보낸 사람'과 '내용'을 모두 비워두면(기본값)</span> 모든 문자에 반응합니다.</li>
+              <li>반드시 <span style={{ color:'#c084fc', fontWeight:600 }}>즉시 실행</span>을 선택해 주세요.</li>
             </ul>
           </div>
 
