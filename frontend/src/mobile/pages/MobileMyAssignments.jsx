@@ -45,6 +45,15 @@ export default function MobileMyAssignments({ user, onAiClick }) {
     return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
   };
 
+  const getStatusName = (status) => {
+    if (!status) return '미확인';
+    const s = String(status).toUpperCase();
+    if (s === 'INC_001') return '미확인';
+    if (s === 'INC_002') return '분석중';
+    if (s === 'INC_003') return '처리완료';
+    return status;
+  };
+
   const fetchMyAssignments = async (isRefresh = false) => {
     if (!user?.employee_id) return;
     if (isRefresh) setRefreshing(true);
@@ -300,7 +309,7 @@ export default function MobileMyAssignments({ user, onAiClick }) {
                         isUnconfirmed ? 'bg-red-400' :
                         isActive ? 'bg-orange-400' : 'bg-emerald-400'
                       }`} />
-                      {isActive ? '분석중' : item.status}
+                      {getStatusName(item.status)}
                     </div>
                     <span className="text-[10px] text-slate-500 font-mono">{formatYYMMDD(item.assigned_at)}</span>
                   </div>

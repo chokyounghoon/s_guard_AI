@@ -406,15 +406,17 @@ app.post('/auth/push-test', async (c) => {
   return c.json({ success: true, target: userId, results });
 });
 
-// ✅ NEW: /push/notify - 특정 사용자에게 푸시 알림 전송 (초대 등)
+// ✅ NEW: /push/notify - 특정 사용자 또는 전체에게 푸시 알림 전송
 app.post('/push/notify', async (c) => {
   const sender = c.get('user');
   if (!sender) return c.json({ error: 'Auth required' }, 401);
 
   const { target_user_id, title, body, url, inc_id, tag, priority } = await c.req.json();
-  if (!target_user_id || !title || !body) {
-    return c.json({ error: 'target_user_id, title, body required' }, 400);
+  if (!title || !body) {
+    return c.json({ error: 'title, body required' }, 400);
   }
+
+  const target = (!target_user_id || target_user_id === '*' || target_user_id === 'ALL') ? 'ALL' : target_user_id;
 
   const payload = {
     title: title || '[S-Guard] 알림',
@@ -425,8 +427,8 @@ app.post('/push/notify', async (c) => {
     priority: typeof priority === 'number' ? priority : 0
   };
 
-  const results = await sendPushNotification(c, target_user_id, payload);
-  return c.json({ success: true, target: target_user_id, results });
+  const results = await sendPushNotification(c, target, payload);
+  return c.json({ success: true, target, results });
 });
 
 // 🔔 PUSH: Web Push Notification Helper
@@ -445,13 +447,27 @@ const sendPushNotification = async (c, userId, payload) => {
 
   const results = [];
   try {
-    const subscriptions = await db.prepare("SELECT * FROM push_subscriptions WHERE user_id = ?").bind(userId).all();
+    let subscriptions;
+    if (userId === 'ALL') {
+      subscriptions = await db.prepare("SELECT * FROM push_subscriptions").all();
+    } else {
+      subscriptions = await db.prepare("SELECT * FROM push_subscriptions WHERE user_id = ?").bind(userId).all();
+    }
     
     if (!subscriptions.results || subscriptions.results.length === 0) {
       return [{ error: 'No subscriptions found for user' }];
     }
 
+    // 🛡️ Deduplicate subscriptions by endpoint (prevent duplicate push on same device)
+    const uniqueSubsMap = new Map();
     for (const sub of subscriptions.results) {
+      if (sub.endpoint) {
+        uniqueSubsMap.set(sub.endpoint, sub);
+      }
+    }
+    const uniqueSubs = Array.from(uniqueSubsMap.values());
+
+    for (const sub of uniqueSubs) {
       try {
         const notificationPayload = {
           title:   payload.title    || '[S-GUARD]',
@@ -6938,8 +6954,8 @@ app.get('/warroom/report/:id', async (c) => {
     when: wr.reg_dt || '-',
     where: (wr.title || '').split('|').slice(-1)[0]?.trim() || '-',
     what: wr.title || '-',
-    why: insightText ? insightText.slice(0, 300) : '-',
-    how: leaderSummary ? leaderSummary.slice(0, 500) : '-',
+    why: insightText ? insightText.slice(0, 5000) : '-',
+    how: leaderSummary ? leaderSummary.slice(0, 5000) : (insightText ? insightText.slice(0, 5000) : '-'),
 
     // Related records
     agent_logs: agentLogs || [],

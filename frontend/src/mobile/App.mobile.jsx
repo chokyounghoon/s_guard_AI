@@ -154,6 +154,37 @@ function AppContent() {
     });
   }, []);
 
+  // 🚀 서비스 워커 PUSH_NAVIGATE 이벤트 수신 시 즉시 라우팅
+  useEffect(() => {
+    const handleSwMessage = (event) => {
+      if (event.data && event.data.type === 'PUSH_NAVIGATE' && event.data.url) {
+        try {
+          const targetPath = new URL(event.data.url, window.location.origin).pathname;
+          console.log('[App.mobile] Received PUSH_NAVIGATE to:', targetPath);
+          setShowWarRoomPopup(false);
+          setShowReportPopup(false);
+          navigate(targetPath);
+        } catch (e) {
+          console.error('[App.mobile] PUSH_NAVIGATE routing error:', e);
+        }
+      }
+    };
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, [navigate]);
+
+  // 🚀 URL(경로) 이동 시 열려있는 모든 모달/팝업 자동 닫기 (하단 메뉴바 클릭 시 부드러운 화면 전환 보장)
+  useEffect(() => {
+    setShowWarRoomPopup(false);
+    setShowReportPopup(false);
+  }, [location.pathname]);
+
   // 🔔 AUTO PUSH SUBSCRIBE: 세션 복원(Silent Refresh) 후 구독 재동기화
   useEffect(() => {
     if (!userProfile || isRefreshing || !isSessionRefreshed) return;
@@ -384,6 +415,7 @@ function AppContent() {
       {!isAuthPage && !isImmersivePage && (
         <BottomMenu
           currentPath={location.pathname}
+          initialOpenMoreMenu={sessionStorage.getItem('console_return_pending') === '1'}
           onWarRoomClick={() => { fetchWarRooms(); setShowWarRoomPopup(true); }}
           onReportClick={() => { fetchWarRooms(); setShowReportPopup(true); }}
           onAiClick={() => setShowAIAssistant(true)}

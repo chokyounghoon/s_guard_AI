@@ -52,7 +52,7 @@ const mdComponents = {
     </p>
   ),
   strong: ({ children }) => (
-    <strong style={{ color: '#f8fafc', fontWeight: 700, background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: 4 }}>
+    <strong style={{ color: '#93c5fd', fontWeight: 800, background: 'linear-gradient(90deg, rgba(59,130,246,0.2), rgba(99,102,241,0.2))', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginRight: 6, marginBottom: 2 }}>
       {children}
     </strong>
   ),
@@ -95,32 +95,66 @@ const mdComponents = {
     <div style={{ margin: '20px 0', height: 1, background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)' }} />
   ),
   table: ({ children }) => (
-    <div style={{ overflowX: 'auto', margin: '16px 0', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>{children}</table>
+    <div style={{ overflowX: 'auto', margin: '16px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, wordBreak: 'keep-all' }}>{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead style={{ background: 'rgba(30,41,59,0.8)' }}>{children}</thead>,
+  thead: ({ children }) => <thead style={{ background: 'rgba(30,41,59,0.9)', borderBottom: '2px solid rgba(59,130,246,0.3)' }}>{children}</thead>,
   th: ({ children }) => (
-    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#93c5fd', fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 800, color: '#93c5fd', fontSize: 11.5, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', minWidth: 100 }}>
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td style={{ padding: '9px 14px', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.04)', verticalAlign: 'top' }}>
+    <td style={{ padding: '12px 16px', color: '#e2e8f0', borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', wordBreak: 'break-word' }}>
       {children}
     </td>
   ),
   tr: ({ children }) => (
-    <tr style={{ transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background=''}>
+    <tr style={{ transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(59,130,246,0.06)'} onMouseLeave={e => e.currentTarget.style.background=''}>
       {children}
     </tr>
   ),
 };
 
-function MarkdownBlock({ text }) {
+function MarkdownBlock({ text, report }) {
   if (!text) return <span style={{ color: '#475569' }}>-</span>;
-  // 별표 아티팩트 정리
-  const clean = text.replace(/\*{3,}/g, '').replace(/^\*\s*/gm, '');
+  
+  let clean = text;
+
+  // 1. 대괄호 대분류 섹션을 명확한 헤딩으로 변환
+  clean = clean
+    .replace(/(?:^|\s|\n)\[S-Autopilot Insight\]/gi, '\n\n### 💡 S-Autopilot Insight\n\n')
+    .replace(/(?:^|\s|\n)\[전문가별 심층 진단\]/gi, '\n\n### 🛡️ 전문가별 심층 진단\n\n')
+    .replace(/(?:^|\s|\n)\[리더의 최종 조치 가이드\]/gi, '\n\n### 🎯 리더의 최종 조치 가이드\n\n')
+    .replace(/(?:^|\s|\n)\[전문가별 분석\]/gi, '\n\n### 🔬 전문가별 분석\n\n')
+    .replace(/(?:^|\s|\n)\[종합 요약\]/gi, '\n\n### 📌 종합 요약\n\n');
+
+  // 2. 문자열 내의 기존 마크다운 별표(*) 및 불필요한 대시(-) 기호를 싹 지워서 깨끗한 평문으로 정리 (정규식 충돌 원천 차단)
+  clean = clean.replace(/\*/g, '').replace(/^-+\s*/gm, '');
+
+  // 3. 주요 키워드들을 감지하여 정확하게 단 한 번씩만 독립된 불릿 문단 및 강조 배지로 변환
+  const keywords = [
+    '상황 요약', '상황요약', '담당자 자동 할당', '담당자 자동할당', '핵심 분석 방향', '분석 방향',
+    'Security Agent', 'DB Agent', 'DevOps Agent', 'Leader Agent', 'Network Agent',
+    '원인 특정', '조치 권고', '담당자 할당', '분석 결과', '장애 원인', '해결 방안', '조치 가이드'
+  ].join('|');
+
+  const keywordRegex = new RegExp(`(?:\\s*)(${keywords})\\s*:`, 'gi');
+  clean = clean.replace(keywordRegex, '\n\n- **$1:** ');
+
+  // 4. 과도한 빈 줄 및 중복 개행 정리
+  clean = clean.replace(/\n{3,}/g, '\n\n').trim();
+
+  // 4. 담당자 사번(S09073 등) 발견 시 옆에 (사원명) 자동 삽입 보강
+  if (report?.who) {
+    const assigneeName = report.who_name || report.creator_name;
+    if (assigneeName && !clean.includes(assigneeName)) {
+      const regex = new RegExp(`(${report.who})`, 'g');
+      clean = clean.replace(regex, `$1 (${assigneeName})`);
+    }
+  }
+
   return (
     <div style={{ fontSize: 13.5, lineHeight: 1.8, wordBreak: 'break-word' }}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{clean}</ReactMarkdown>
@@ -141,6 +175,15 @@ const agentColors = {
   DB:       { bg: 'bg-purple-500/15', border: 'border-purple-500/30', text: 'text-purple-400', icon: Database },
   DevOps:   { bg: 'bg-green-500/15', border: 'border-green-500/30', text: 'text-green-400', icon: Server },
   Leader:   { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-400', icon: Bot },
+};
+
+const getStatusName = (status) => {
+  if (!status) return '미확인';
+  const s = String(status).toUpperCase();
+  if (s === 'INC_001') return '미확인';
+  if (s === 'INC_002') return '분석중';
+  if (s === 'INC_003') return '처리완료';
+  return status;
 };
 
 export default function AiReportPage() {
@@ -180,6 +223,24 @@ export default function AiReportPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const genAbortRef = useRef(null);
   const [chatSummary, setChatSummary] = useState('');
+
+  // 🚀 탭 바 가로 스크롤 인디케이터 상태
+  const tabsRef = useRef(null);
+  const [hasMoreTabs, setHasMoreTabs] = useState(false);
+
+  const checkTabsScroll = () => {
+    if (!tabsRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
+    setHasMoreTabs(scrollLeft < scrollWidth - clientWidth - 5);
+  };
+
+  useEffect(() => {
+    if (report && !listMode) {
+      setTimeout(checkTabsScroll, 100);
+      window.addEventListener('resize', checkTabsScroll);
+      return () => window.removeEventListener('resize', checkTabsScroll);
+    }
+  }, [report, listMode, activeTab]);
 
   // 사용자 목록 로드
   useEffect(() => {
@@ -246,11 +307,16 @@ export default function AiReportPage() {
         const res = await fetch(`${API_BASE_URL}/warroom/report/${incidentId}`, {
           headers: getAuthHeaders()
         });
+        if (res.status === 404) throw new Error('NOT_FOUND');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setReport(data);
       } catch (e) {
-        setError(`데이터 로드 실패: ${e.message}`);
+        if (e.message === 'NOT_FOUND') {
+          setError('아직 보고서 생성 전입니다.');
+        } else {
+          setError(`데이터 로드 실패: ${e.message}`);
+        }
       } finally {
         setLoading(false);
       }
@@ -450,7 +516,7 @@ export default function AiReportPage() {
                             <span className="text-[10px] text-slate-500">INC-{inc.inc_id}</span>
                             <span className="text-[10px] text-slate-600">{inc.created_at?.slice(0,16)}</span>
                             {assignee !== '-' && <span className="text-[10px] text-blue-400">담당: {assignee}</span>}
-                            {inc.status && <span className="text-[10px] text-emerald-400">{inc.status}</span>}
+                            {inc.status && <span className="text-[10px] text-emerald-400">{getStatusName(inc.status)}</span>}
                           </div>
                         </div>
                         <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 shrink-0 mt-1 transition-colors" />
@@ -567,7 +633,6 @@ export default function AiReportPage() {
 
   const tabs = [
     { id: 'summary',   label: 'AI 분석 요약' },
-    { id: '6w1h',      label: '6W1H 분석' },
     { id: 'agents',    label: 'Agent 로그' },
     { id: 'chat',      label: 'War-Room 요약' },
     { id: 'files',     label: '첨부파일' },
@@ -578,7 +643,7 @@ export default function AiReportPage() {
   const sevClass = severityColors[sev] || severityColors.NORMAL;
 
   return (
-    <div className="h-screen bg-[#0a0d14] text-white font-sans flex flex-col overflow-hidden">
+    <div className="h-[100dvh] bg-[#0a0d14] text-white font-sans flex flex-col overflow-hidden">
       {/* Header — 2줄 풀-width */}
       <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5">
         {/* Row 1: 네비게이션 + 타이틀 */}
@@ -733,36 +798,67 @@ export default function AiReportPage() {
       </header>
 
 
-      {/* Tabs */}
-      <div className="flex overflow-x-auto border-b border-white/5 bg-[#0a0d14] justify-center shrink-0">
-        <div className="flex max-w-5xl w-full">
+      {/* Tabs with Horizontal Scroll Indicator */}
+      <div className="relative border-b border-white/5 bg-[#0a0d14] shrink-0">
+        <div 
+          ref={tabsRef}
+          onScroll={checkTabsScroll}
+          className="flex overflow-x-auto custom-scrollbar no-scrollbar max-w-5xl mx-auto"
+        >
           {tabs.map(t => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`px-5 py-2 text-[13px] font-bold whitespace-nowrap transition-all border-b-2 ${
+              onClick={() => {
+                setActiveTab(t.id);
+                const el = document.getElementById(`tab-${t.id}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+              }}
+              id={`tab-${t.id}`}
+              className={`px-5 py-3 text-[13px] font-bold whitespace-nowrap transition-all border-b-2 relative shrink-0 ${
                 activeTab === t.id
-                  ? 'border-blue-500 text-blue-400'
+                  ? 'border-blue-500 text-blue-400 bg-blue-500/5'
                   : 'border-transparent text-slate-500 hover:text-slate-300'
               }`}
             >
               {t.label}
+              {activeTab === t.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]" />
+              )}
             </button>
           ))}
         </div>
+
+        {/* 🚀 우측 스크롤 인디케이터 (탭이 더 있음을 시각적으로 알림) */}
+        {hasMoreTabs && (
+          <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#0a0d14] via-[#0a0d14]/90 to-transparent flex items-center justify-end pr-2 pointer-events-none z-10 animate-in fade-in duration-300">
+            <div className="bg-blue-500/20 text-blue-400 p-1.5 rounded-full border border-blue-500/30 animate-pulse flex items-center shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-8 overflow-y-auto custom-scrollbar">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-20 overflow-y-auto custom-scrollbar">
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
             <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
             <span className="text-sm">데이터 로드 중...</span>
           </div>
         )}
-        {error && (
+        {error && error === '아직 보고서 생성 전입니다.' ? (
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center animate-in fade-in duration-300 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4 shadow-[0_0_25px_rgba(59,130,246,0.15)]">
+              <FileText className="w-8 h-8 text-blue-400 opacity-80" />
+            </div>
+            <h3 className="text-base font-bold text-slate-200 mb-2">아직 보고서가 생성되지 않았습니다</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              AI 에이전트가 실시간 데이터를 수집 및 분석 중이거나 아직 워룸 리포트 생성이 요청되지 않은 상태입니다. 잠시 후 다시 확인해 주세요.
+            </p>
+          </div>
+        ) : error ? (
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm mx-auto max-w-2xl">{error}</div>
-        )}
+        ) : null}
         {report && !loading && (
           <>
             {/* ── AI 분석 요약 ── */}
@@ -799,7 +895,7 @@ export default function AiReportPage() {
                           </div>
                         </div>
                       )}
-                      <MarkdownBlock text={report.autopilot_insight} />
+                      <MarkdownBlock text={report.autopilot_insight} report={report} />
                     </div>
                   </section>
                 )}
@@ -811,7 +907,7 @@ export default function AiReportPage() {
                       <span className="text-xs font-bold text-amber-400">Leader Agent 종합 요약</span>
                     </div>
                     <div className="p-4">
-                      <MarkdownBlock text={report.leader_summary} />
+                      <MarkdownBlock text={report.leader_summary} report={report} />
                     </div>
                   </section>
                 )}
@@ -824,7 +920,7 @@ export default function AiReportPage() {
                       <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
                     </div>
                     <div className="p-5 overflow-visible">
-                      <MarkdownBlock text={chatSummary} />
+                      <MarkdownBlock text={chatSummary} report={report} />
                     </div>
                   </section>
                 )}
@@ -832,27 +928,6 @@ export default function AiReportPage() {
                 {!report.autopilot_insight && !report.leader_summary && !chatSummary && (
                   <div className="text-center py-10 text-slate-500 text-sm">분석 데이터가 없습니다.</div>
                 )}
-              </div>
-            )}
-
-            {/* ── 6W1H ── */}
-            {activeTab === '6w1h' && (
-              <div className="space-y-2.5 animate-in fade-in duration-300">
-                {[
-                  { label: 'WHO (담당자)',      value: report.who ? `${report.who}${report.who_name ? ` (${report.who_name})` : ''}` : '-', color: 'text-blue-400' },
-                  { label: 'WHEN (발생 일시)', value: report.when, color: 'text-purple-400' },
-                  { label: 'WHERE (대상 시스템)', value: report.where, color: 'text-teal-400' },
-                  { label: 'WHAT (장애 현상)', value: report.what, color: 'text-yellow-400' },
-                  { label: 'WHY (원인 분석)', value: report.why, color: 'text-red-400', wide: true },
-                  { label: 'HOW (조치 방법)', value: report.how, color: 'text-emerald-400', wide: true },
-                ].map(item => (
-                  <div key={item.label} className="bg-[#0f1421] rounded-xl p-3.5 border border-white/5">
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${item.color}`}>{item.label}</span>
-                    <div className="mt-1.5">
-                      <MarkdownBlock text={item.value} />
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
 
@@ -872,7 +947,7 @@ export default function AiReportPage() {
                         <span className={`text-xs font-bold ${cfg.text}`}>{log.agent_role} Agent</span>
                         <span className="ml-auto text-[10px] text-slate-500">{log.reg_dt?.slice(0, 16)}</span>
                       </div>
-                      <MarkdownBlock text={log.content} />
+                      <MarkdownBlock text={log.content} report={report} />
                     </div>
                   );
                 })}
@@ -889,7 +964,7 @@ export default function AiReportPage() {
                   </div>
                   <div className="p-5 overflow-visible">
                     {chatSummary ? (
-                      <MarkdownBlock text={chatSummary} />
+                      <MarkdownBlock text={chatSummary} report={report} />
                     ) : (
                       <div className="text-center py-10 text-slate-500 text-sm">
                         요약된 타임라인 정보가 없습니다. [AI 분석 요약] 탭에서 분석이 진행되었는지 확인해주세요.
@@ -975,7 +1050,7 @@ export default function AiReportPage() {
 
                     {/* 본문 */}
                     <div style={{ padding: '24px 28px', minHeight: 400 }}>
-                      <MarkdownBlock text={aiGenText} />
+                      <MarkdownBlock text={aiGenText} report={report} />
                       {isGenerating && (
                         <span style={{ display: 'inline-block', width: 2, height: 18, background: '#3b82f6', animation: 'pulse 1s ease-in-out infinite', marginLeft: 4, verticalAlign: 'middle', borderRadius: 1 }} />
                       )}

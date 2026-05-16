@@ -713,9 +713,10 @@ export default function ChatSummaryPage() {
 
   const [isGoverning, setIsGoverning] = useState(false);
   const [govSuccess, setGovSuccess] = useState(false);
+  const isGoverningLockRef = useRef(false);
 
   const handleGovernance = async () => {
-    if (!summary || isGoverning) return;
+    if (!summary || isGoverning || isGoverningLockRef.current) return;
 
     // 1. Validation for "Other Actions" (그외 처리 사항)
     if (!additionalNotes.trim()) {
@@ -731,6 +732,7 @@ export default function ChatSummaryPage() {
       return;
     }
 
+    isGoverningLockRef.current = true;
     setIsGoverning(true);
     setGovernanceStep('knowledge');
     
@@ -762,6 +764,28 @@ export default function ChatSummaryPage() {
       setGovSuccess(true);
       setGovernanceStep('done');
       setIncidentStatus('INC_003');
+
+      // 🚀 앱 푸시 전송 (최종 완료 및 보고 브로드캐스트)
+      try {
+        const cleanSmsText = incidentMessage || cleanAiText(summary || '').replace(/\n+/g, ' ').substring(0, 100);
+        const pushBody = `해당 문자 오류는 최종 보고 및 완료 처리 되었습니다.\n\n[문자 내용]\n${cleanSmsText}`;
+
+        await fetch(getApiUrl('/push/notify'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+          body: JSON.stringify({
+            target_user_id: '', // 브로드캐스트 (전체 구독자 발송)
+            title: `[${(incidentId || '').replace(/^INC-/i, '')}] 최종 보고 및 완료`,
+            body: pushBody,
+            url: `/chat-summary/${incidentId}`,
+            inc_id: incidentId,
+            tag: `complete-${incidentId}`,
+            priority: 50
+          })
+        });
+      } catch (pushErr) {
+        console.warn('Push notification on complete failed:', pushErr);
+      }
       
       const supMsg = result.recipient_count > 0 
         ? `\n\n[보고 전송 완료]: ${result.superiors.join(', ')}`
@@ -777,7 +801,10 @@ export default function ChatSummaryPage() {
       alert(`처리 중 오류가 발생했습니다: ${err.message}`);
     } finally {
       setIsGoverning(false);
-      if (incidentStatus !== 'INC_003' && incidentStatus !== '처리완료') setGovernanceStep(null);
+      if (incidentStatus !== 'INC_003' && incidentStatus !== '처리완료') {
+        setGovernanceStep(null);
+        isGoverningLockRef.current = false;
+      }
     }
   };
 

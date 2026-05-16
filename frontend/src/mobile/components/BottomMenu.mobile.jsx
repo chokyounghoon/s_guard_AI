@@ -28,8 +28,16 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
   };
 
   useEffect(() => {
-    if (initialOpenMoreMenu) setShowMoreMenu(true);
+    if (initialOpenMoreMenu) {
+      setShowMoreMenu(true);
+      sessionStorage.removeItem('console_return_pending');
+    }
   }, [initialOpenMoreMenu]);
+
+  useEffect(() => {
+    // 탭 이동(경로 변경) 시 더보기 메뉴 팝업 자동 닫기
+    setShowMoreMenu(false);
+  }, [currentPath]);
 
 
   return (
@@ -39,7 +47,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
           { id: 'chat', label: 'WAR-ROOM', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
-          { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox' },
+          { id: 'inbox', label: 'Report', icon: FileText, path: '/inbox', action: onReportClick },
           { id: 'my', label: 'MY', icon: User, path: '/my-assignments' },
           { id: 'more', label: '더보기', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
         ].map((item) => {
@@ -49,7 +57,14 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
           return (
             <button
               key={item.id}
-              onClick={() => item.action ? item.action() : navigate(item.path)}
+              onClick={() => {
+                setShowMoreMenu(false);
+                if (item.action) {
+                  item.action();
+                } else if (item.path) {
+                  navigate(item.path);
+                }
+              }}
               className={`flex flex-col items-center gap-1.5 px-2 py-1.5 rounded-2xl transition-all duration-300 relative min-w-[56px] ${
                 isActive ? 'bg-blue-500/10 scale-105' : 'hover:bg-white/5 opacity-70 hover:opacity-100'
               }`}

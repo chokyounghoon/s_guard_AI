@@ -166,6 +166,31 @@ function AppContent() {
     return () => removeListener();
   }, []);
 
+  // 🚀 서비스 워커 PUSH_NAVIGATE 이벤트 수신 시 즉시 라우팅
+  useEffect(() => {
+    const handleSwMessage = (event) => {
+      if (event.data && event.data.type === 'PUSH_NAVIGATE' && event.data.url) {
+        try {
+          const targetPath = new URL(event.data.url, window.location.origin).pathname;
+          console.log('[App] Received PUSH_NAVIGATE to:', targetPath);
+          setShowWarRoomPopup(false);
+          setShowReportPopup(false);
+          navigate(targetPath);
+        } catch (e) {
+          console.error('[App] PUSH_NAVIGATE routing error:', e);
+        }
+      }
+    };
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, [navigate]);
+
   // 🔔 AUTO PUSH SUBSCRIBE: 세션 복원(Silent Refresh) 후 구독 재동기화
   useEffect(() => {
     if (!userProfile || isRefreshing || !isSessionRefreshed) return;

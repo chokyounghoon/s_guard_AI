@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v34.4'; // Robust deep-linking
+const CACHE_NAME = 'sguard-v35.0'; // Robust deep-linking and SPA navigation
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -170,16 +170,17 @@ self.addEventListener('notificationclick', (event) => {
       // 🎯 2. Try to find any app window on same origin and navigate
       if (windowClients.length > 0) {
         const client = windowClients.find(c => c.focused) || windowClients[0];
-        console.log('[SW] Reusing existing window, navigating...');
+        console.log('[SW] Reusing existing window, sending postMessage and navigating...');
         
         if ('focus' in client) {
           client.focus();
-          if ('navigate' in client) {
-            return client.navigate(absoluteUrl).catch(err => {
-              console.error('[SW] Navigate failed, opening new window:', err);
-              return clients.openWindow(absoluteUrl);
-            });
-          }
+        }
+        client.postMessage({ type: 'PUSH_NAVIGATE', url: absoluteUrl });
+        if ('navigate' in client) {
+          return client.navigate(absoluteUrl).catch(err => {
+            console.error('[SW] Navigate failed, opening new window:', err);
+            return clients.openWindow(absoluteUrl);
+          });
         }
       }
 
