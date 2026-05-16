@@ -363,12 +363,17 @@
   }
 
 
-  /* ─── SCROLLBAR: Ultra-thin refined ────────────────────────────── */
-  .custom-scrollbar::-webkit-scrollbar { width: 2px !important; }
-  .custom-scrollbar::-webkit-scrollbar-track { background: transparent !important; }
+  /* ─── SCROLLBAR: Premium Sleek Glow ────────────────────────────── */
+  .custom-scrollbar::-webkit-scrollbar { width: 6px !important; height: 6px !important; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: rgba(2, 6, 23, 0.4) !important; border-radius: 99px !important; }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.25) !important;
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.5) 0%, rgba(168, 85, 247, 0.5) 100%) !important;
     border-radius: 99px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.8) 0%, rgba(168, 85, 247, 0.8) 100%) !important;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
   }
 
 

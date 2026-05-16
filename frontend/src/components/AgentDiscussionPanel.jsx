@@ -140,7 +140,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
 
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar" ref={scrollRef}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center text-center text-slate-500 text-xs py-20 opacity-40 space-y-3">
             <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center animate-pulse border border-white/5">

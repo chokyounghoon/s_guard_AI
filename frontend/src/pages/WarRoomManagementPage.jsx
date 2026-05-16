@@ -117,7 +117,7 @@ export default function WarRoomManagementPage() {
 
   return (
     <div style={{
-      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      width: '100%', height: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflowY: 'auto',
       background: 'linear-gradient(160deg, #050810 0%, #090c1a 60%, #050810 100%)',
       fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
     }}>
@@ -293,7 +293,7 @@ export default function WarRoomManagementPage() {
       </div>
 
       {/* ⑤  룸 목록 (flex:1 스크롤) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 16px 16px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 16px 80px' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <Loader2 size={24} color="#f87171" style={{ animation: 'spin 1s linear infinite' }} />

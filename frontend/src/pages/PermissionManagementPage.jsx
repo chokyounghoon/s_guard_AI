@@ -6,7 +6,7 @@ import {
   UserCog, History, Inbox, Activity, FileText,
   Users, Shield, Code, Eye, EyeOff, Star
 } from 'lucide-react';
-import { getAuthHeaders } from '../lib/authStore';
+import { getAuthHeaders, setAllowedPaths, getUserProfile } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -53,7 +53,6 @@ export default function PermissionManagementPage() {
       const res = await fetch(`${API_BASE}/rbac/permissions/${roleCode}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        // normalize: DB returns 0/1 integers, ensure consistency
         const normalized = (data.permissions || []).map(p => ({
           ...p,
           can_read:   p.can_read   ? 1 : 0,
@@ -64,6 +63,22 @@ export default function PermissionManagementPage() {
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
+  };
+
+  const fetchPermissionsSilent = async (roleCode) => {
+    try {
+      const res = await fetch(`${API_BASE}/rbac/permissions/${roleCode}`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const normalized = (data.permissions || []).map(p => ({
+          ...p,
+          can_read:   p.can_read   ? 1 : 0,
+          can_write:  p.can_write  ? 1 : 0,
+          can_delete: p.can_delete ? 1 : 0,
+        }));
+        setPermissions(normalized);
+      }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => { fetchRoles(); }, []);
@@ -82,7 +97,15 @@ export default function PermissionManagementPage() {
         toast.success('권한이 실시간 변경/저장되었습니다!', {
           style: { background: '#0f172a', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
         });
-        await fetchPermissions(selectedRole.role_code);
+        const u = getUserProfile();
+        if (u && u.role && u.role.toUpperCase() === selectedRole.role_code.toUpperCase()) {
+          const paths = permsToSave
+            .filter(p => p.can_read === 1)
+            .map(p => p.path || p.menu_path)
+            .filter(Boolean);
+          setAllowedPaths(paths.length > 0 ? paths : null);
+        }
+        fetchPermissionsSilent(selectedRole.role_code);
       } else {
         toast.error('저장 실패: 서버 오류');
       }
@@ -147,7 +170,7 @@ export default function PermissionManagementPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
       <div className="px-4 pt-4 pb-4 space-y-4">
         {/* Role Selector */}
         <button onClick={() => setShowRoleSheet(true)}
@@ -245,7 +268,7 @@ export default function PermissionManagementPage() {
               <h3 className="text-sm font-black text-white">역할 선택</h3>
               <button onClick={() => setShowRoleSheet(false)} className="p-1.5 rounded-lg bg-white/5 text-slate-500"><X className="w-4 h-4" /></button>
             </div>
-            <div className="px-4 pb-4 space-y-2">
+            <div className="px-4 pb-4 space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
               {roles.map(role => {
                 const c = ROLE_COLOR[role.role_code] || defaultColor;
                 const isSelected = selectedRole?.role_code === role.role_code;

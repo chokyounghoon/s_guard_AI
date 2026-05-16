@@ -301,6 +301,7 @@ const authMiddleware = async (c, next) => {
     path === '/sms/shortcut/keywords' ||   // ⚡ iPhone 단축어 전용 (userId 기반 조회)
     path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
     path.startsWith('/codebook') ||
+    path.startsWith('/rbac/permissions') ||
     (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
     
   console.log(`[Auth-Access] Path: ${path} | isPublic: ${isPublic}`);
@@ -4115,6 +4116,7 @@ app.get('/sms/keywords', async (c) => {
   const url = new URL(c.req.url)
   const employeeId = c.req.query('employee_id') || c.req.query('id') || c.req.query('userId')
   
+  const hasParam = url.searchParams.has('employee_id') || url.searchParams.has('id') || url.searchParams.has('userId')
   if (hasParam && !employeeId) {
     return c.json({ error: "사번(employee_id) 값이 누락되었습니다." }, 400)
   }

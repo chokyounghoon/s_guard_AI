@@ -36,7 +36,6 @@ import SecurityLogPage from './pages/SecurityLogPage';
 import ProcessingFlowPage from './pages/ProcessingFlowPage';
 import PushDiagnosticPage from './pages/PushDiagnosticPage';
 import AlertMonitorPage from './pages/AlertMonitorPage';
-import IncidentKeywordPage from './pages/IncidentKeywordPage';
 import UserKeywordPage from './pages/UserKeywordPage';
 import PermissionManagementPage from './pages/PermissionManagementPage';
 import DeputyManagementPage from './pages/DeputyManagementPage';
@@ -58,7 +57,7 @@ import { X, MessageSquare, FileText, CheckCircle, Clock, ChevronRight, User, Shi
 import { CodebookProvider } from './context/CodebookContext';
 
 import { Navigate } from 'react-router-dom';
-import { setAccessToken, getAccessToken, setUserProfile as setStoreUserProfile, getUserProfile, addAuthListener, getGhostToken, setGhostToken, setAllowedPaths, isPathAllowed } from './lib/authStore';
+import { setAccessToken, getAccessToken, setUserProfile as setStoreUserProfile, getUserProfile, addAuthListener, getGhostToken, setGhostToken, setAllowedPaths, getAllowedPaths, isPathAllowed, fetchAndApplyPermissions } from './lib/authStore';
 import { PushManager } from './lib/pushManager';
 
 function PermissionDeniedView() {
@@ -119,6 +118,7 @@ function AppContent() {
   const [warRooms, setWarRooms] = useState([]);
   const [hideCompletedWarRooms, setHideCompletedWarRooms] = useState(true);
   const [userProfile, setUserProfile] = useState(() => getUserProfile() || JSON.parse(localStorage.getItem('sguard_user') || 'null'));
+  const [allowedPathsState, setAllowedPathsState] = useState(() => getAllowedPaths());
   const [isRefreshing, setIsRefreshing] = useState(true);
   const [isSessionRefreshed, setIsSessionRefreshed] = useState(false);
 
@@ -159,8 +159,9 @@ function AppContent() {
 
   // 🛡️ Sync with Auth Store
   useEffect(() => {
-    const removeListener = addAuthListener(({ userProfile: newUser }) => {
+    const removeListener = addAuthListener(({ userProfile: newUser, allowedPaths: newPaths }) => {
       setUserProfile(newUser);
+      setAllowedPathsState(newPaths);
     });
     return () => removeListener();
   }, []);
@@ -180,6 +181,8 @@ function AppContent() {
 
   // Load user profile & 실시간 세션 검증 + 🔄 Silent Refresh
   useEffect(() => {
+    const apiBase = 'https://sguardai.khcho0421.workers.dev';
+
     const checkSession = async () => {
       // 🚫 로그아웃 직후 → 세션 복원 건너뜀 (Ghost Token / localStorage 재복원 방지)
       if (sessionStorage.getItem('s_logged_out') === '1') {
@@ -204,7 +207,11 @@ function AppContent() {
           setAccessToken(refreshData.access_token);
           setStoreUserProfile(refreshData.user);
           if (refreshData.ghost_token) setGhostToken(refreshData.ghost_token);
-          if ('allowed_paths' in refreshData) setAllowedPaths(refreshData.allowed_paths);
+          if (Array.isArray(refreshData.allowed_paths) && refreshData.allowed_paths.length > 0) {
+            setAllowedPaths(refreshData.allowed_paths);
+          } else {
+            await fetchAndApplyPermissions(refreshData.user?.role);
+          }
           setIsSessionRefreshed(true);
           setIsRefreshing(false);
           return;
@@ -232,7 +239,11 @@ function AppContent() {
             setAccessToken(ghostData.access_token);
             setStoreUserProfile(ghostData.user);
             if (ghostData.ghost_token) setGhostToken(ghostData.ghost_token);
-            if ('allowed_paths' in ghostData) setAllowedPaths(ghostData.allowed_paths);
+            if (Array.isArray(ghostData.allowed_paths) && ghostData.allowed_paths.length > 0) {
+              setAllowedPaths(ghostData.allowed_paths);
+            } else {
+              await fetchAndApplyPermissions(ghostData.user?.role);
+            }
             setIsSessionRefreshed(true);
             setIsRefreshing(false);
             return;
@@ -242,16 +253,15 @@ function AppContent() {
         }
 
         // 👻 Fallback 2: localStorage 캐시 사용 (새로고침 시 세션 유지)
-        // Ghost Token / Cookie 모두 실패해도, 로컬 캐시가 있으면 임시 세션 유지
-        // (Access Token은 없지만 사용자는 인증된 상태로 간주 — API 호출 시 재인증 처리)
         const cachedUser = localStorage.getItem('sguard_user');
         if (cachedUser && cachedUser !== 'null' && cachedUser !== 'undefined') {
           try {
             const parsedUser = JSON.parse(cachedUser);
             if (parsedUser?.employee_id) {
-              console.warn('[Auth] Using localStorage cache to maintain session. Ghost Token expired or missing.');
+              console.warn('[Auth] Using localStorage cache to maintain session.');
               setStoreUserProfile(parsedUser);
-              // Access token is null — interceptor's short-circuit will handle re-auth gracefully
+              // Fallback 2에서는 allowed_paths가 없으므로 직접 fetch
+              await fetchAndApplyPermissions(parsedUser.role);
               setIsRefreshing(false);
               return;
             }
@@ -272,12 +282,13 @@ function AppContent() {
       } catch (e) {
         console.error('Session check failed', e);
         // 네트워크 오류 등 예외 상황에서도 캐시로 복원 시도
-        const cachedUser = localStorage.getItem('sguard_user');
-        if (cachedUser && cachedUser !== 'null') {
+        const cachedUser2 = localStorage.getItem('sguard_user');
+        if (cachedUser2 && cachedUser2 !== 'null') {
           try {
-            const parsedUser = JSON.parse(cachedUser);
+            const parsedUser = JSON.parse(cachedUser2);
             if (parsedUser?.employee_id) {
               setStoreUserProfile(parsedUser);
+              await fetchAndApplyPermissions(parsedUser.role);
               setIsRefreshing(false);
               return;
             }
@@ -357,7 +368,7 @@ function AppContent() {
 
   return (
     <CodebookProvider>
-      <Toaster position="top-center" toastOptions={{ style: { background: '#0f172a', color: '#fff', border: '1px solid rgba(59,130,246,0.2)', fontSize: '14px', borderRadius: '12px' } }} />
+      <Toaster position="top-center" containerStyle={{ zIndex: 999999 }} toastOptions={{ style: { background: '#0f172a', color: '#fff', border: '1px solid rgba(59,130,246,0.2)', fontSize: '14px', borderRadius: '12px' } }} />
       {!isAuthPage && <SMSNotification />}
       
       <Routes>
@@ -366,7 +377,7 @@ function AppContent() {
 
         {/* 🔒 Protected Routes: 인증 필수 */}
         {/* 대시보드는 항상 렌더링 (모달 배경) */}
-        <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage onAiClick={() => setShowAIAssistant(true)} /></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ErrorBoundary><DashboardPage allowedPaths={allowedPathsState} onAiClick={() => setShowAIAssistant(true)} /></ErrorBoundary></ProtectedRoute>} />
         <Route path="/activity"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ActivityPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/inbox"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><InboxPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/incident-push" element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><IncidentPushPage /></PCPageModal></ProtectedRoute>} />
@@ -399,7 +410,6 @@ function AppContent() {
         <Route path="/report/:incId"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ReportViewPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OrbitalCommandPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AlertMonitorPage /></PCPageModal></ProtectedRoute>} />
-        <Route path="/incident-keyword"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><IncidentKeywordPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SCallertPage /></PCPageModal></ProtectedRoute>} />
       </Routes>
@@ -418,6 +428,7 @@ function AppContent() {
           onReportClick={handleReportClick}
           onAiClick={() => setShowAIAssistant(true)}
           user={userProfile}
+          allowedPaths={allowedPathsState}
         />
       )}
 

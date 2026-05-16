@@ -35,7 +35,6 @@ import ProcessingFlowPage     from '../pages/ProcessingFlowPage';
 import PushDiagnosticPage     from '../pages/PushDiagnosticPage';
 import ReportViewPage        from '../pages/ReportViewPage';
 import AlertMonitorPage      from '../pages/AlertMonitorPage';
-import IncidentKeywordPage   from '../pages/IncidentKeywordPage';
 import UserKeywordPage       from '../pages/UserKeywordPage';
 import SCallertPage          from '../pages/SCallertPage';
 import PermissionManagementPage from '../pages/PermissionManagementPage';
@@ -66,13 +65,12 @@ import { CodebookProvider }   from '../context/CodebookContext';
 import { PushManager }       from '../lib/pushManager';
 
 // ── Auth Store ────────────────────────────────────────────────────────────────
-// ── Auth Store ────────────────────────────────────────────────────────────────
 import {
   getAccessToken, setAccessToken, clearSession,
   getUserProfile, setUserProfile as setStoreUserProfile,
   addAuthListener,
-  getGhostToken, setGhostToken, getAuthHeaders,
-  isPathAllowed, setAllowedPaths
+  getGhostToken, setGhostToken, setAllowedPaths, getAllowedPaths,
+  isPathAllowed, fetchAndApplyPermissions, getAuthHeaders
 } from '../lib/authStore';
 
 // ── PWA Install Button (모바일 전용) ──────────────────────────────────────────
@@ -145,11 +143,15 @@ function AppContent() {
   const [userProfile, setUserProfile] = useState(
     () => getUserProfile() || JSON.parse(localStorage.getItem('sguard_user') || 'null')
   );
+  const [allowedPathsState, setAllowedPathsState] = useState(() => getAllowedPaths());
   const [isRefreshing, setIsRefreshing] = useState(true);
   const [isSessionRefreshed, setIsSessionRefreshed] = useState(false);
 
   useEffect(() => {
-    return addAuthListener(({ userProfile: u }) => setUserProfile(u));
+    return addAuthListener(({ userProfile: u, allowedPaths: p }) => {
+      setUserProfile(u);
+      setAllowedPathsState(p);
+    });
   }, []);
 
   // 🔔 AUTO PUSH SUBSCRIBE: 세션 복원(Silent Refresh) 후 구독 재동기화
@@ -185,7 +187,11 @@ function AppContent() {
           setAccessToken(refreshData.access_token);
           setStoreUserProfile(refreshData.user);
           if (refreshData.ghost_token) setGhostToken(refreshData.ghost_token);
-          if ('allowed_paths' in refreshData) setAllowedPaths(refreshData.allowed_paths);
+          if (Array.isArray(refreshData.allowed_paths) && refreshData.allowed_paths.length > 0) {
+            setAllowedPaths(refreshData.allowed_paths);
+          } else {
+            await fetchAndApplyPermissions(refreshData.user?.role);
+          }
           setIsSessionRefreshed(true);
           setIsRefreshing(false);
           return;
@@ -204,19 +210,25 @@ function AppContent() {
             setAccessToken(ghostData.access_token);
             setStoreUserProfile(ghostData.user);
             if (ghostData.ghost_token) setGhostToken(ghostData.ghost_token);
-            if ('allowed_paths' in ghostData) setAllowedPaths(ghostData.allowed_paths);
+            if (Array.isArray(ghostData.allowed_paths) && ghostData.allowed_paths.length > 0) {
+              setAllowedPaths(ghostData.allowed_paths);
+            } else {
+              await fetchAndApplyPermissions(ghostData.user?.role);
+            }
             setIsSessionRefreshed(true);
             setIsRefreshing(false);
             return;
           }
         }
 
+        // Fallback 2: localStorage 캐시 — allowed_paths 없으므로 직접 fetch
         const cachedUser = localStorage.getItem('sguard_user');
         if (cachedUser && cachedUser !== 'null' && cachedUser !== 'undefined') {
           try {
             const parsed = JSON.parse(cachedUser);
             if (parsed?.employee_id) {
               setStoreUserProfile(parsed);
+              await fetchAndApplyPermissions(parsed.role);
               setIsRefreshing(false);
               return;
             }
@@ -231,6 +243,21 @@ function AppContent() {
         }
       } catch (e) {
         console.error('[Session-Error]', e);
+        // 네트워크 오류 등 예외 상황에서도 캐시로 복원 시도
+        const cachedUser2 = localStorage.getItem('sguard_user');
+        if (cachedUser2 && cachedUser2 !== 'null') {
+          try {
+            const parsedUser = JSON.parse(cachedUser2);
+            if (parsedUser?.employee_id) {
+              setStoreUserProfile(parsedUser);
+              await fetchAndApplyPermissions(parsedUser.role);
+              setIsRefreshing(false);
+              return;
+            }
+          } catch (_) {}
+        }
+        setStoreUserProfile(null);
+        setAccessToken(null);
       } finally {
         setIsRefreshing(false);
       }
@@ -294,7 +321,7 @@ function AppContent() {
 
   return (
     <CodebookProvider>
-      <Toaster position="top-center" toastOptions={{ style: { background: '#0f172a', color: '#fff', border: '1px solid rgba(59,130,246,0.2)', fontSize: '14px', borderRadius: '12px' } }} />
+      <Toaster position="top-center" containerStyle={{ zIndex: 999999 }} toastOptions={{ style: { background: '#0f172a', color: '#fff', border: '1px solid rgba(59,130,246,0.2)', fontSize: '14px', borderRadius: '12px' } }} />
       {!isAuthPage && <SMSNotification />}
 
       <Routes>
@@ -303,7 +330,7 @@ function AppContent() {
         <Route path="/signup" element={<SignupPage />} />
 
         {/* ── 대시보드: PC DashboardPage와 동일한 파일 사용 ── */}
-        <Route path="/dashboard"   element={<PR><MobileDashboard onAiClick={() => setShowAIAssistant(true)} /></PR>} />
+        <Route path="/dashboard"   element={<PR><MobileDashboard allowedPaths={allowedPathsState} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/activity"    element={<PR><MobileActivity user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/inbox"       element={<PR><MobileInbox user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
         <Route path="/incident-push" element={<PR><MobileIncidentPush user={userProfile} onAiClick={() => setShowAIAssistant(true)} /></PR>} />
@@ -337,7 +364,6 @@ function AppContent() {
         <Route path="/orbital-command"         element={<PR><OrbitalCommandPage /></PR>} />
         <Route path="/report/:incId"           element={<PR><ReportViewPage /></PR>} />
         <Route path="/alert-monitor"           element={<PR><MobileAlertMonitor /></PR>} />
-        <Route path="/incident-keyword"         element={<PR><IncidentKeywordPage /></PR>} />
         <Route path="/user-keyword"             element={<PR><MobileUserKeywordPage /></PR>} />
         <Route path="/s-callert"                element={<PR><SCallertPage /></PR>} />
         <Route path="/admin/permissions" element={<PR><PermissionManagementPage /></PR>} />
@@ -362,6 +388,7 @@ function AppContent() {
           onReportClick={() => { fetchWarRooms(); setShowReportPopup(true); }}
           onAiClick={() => setShowAIAssistant(true)}
           user={userProfile}
+          allowedPaths={allowedPathsState}
         />
       )}
 

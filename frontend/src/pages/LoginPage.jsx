@@ -4,7 +4,7 @@ import {
   CheckCircle, Check, Eye, EyeOff, Mail, KeyRound, UserCheck, Download, Lock, ChevronRight, BookOpen, X, Apple
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { setAccessToken, setUserProfile as setStoreUserProfile, setGhostToken, setAllowedPaths } from '../lib/authStore';
+import { setAccessToken, setUserProfile as setStoreUserProfile, setGhostToken, setAllowedPaths, fetchAndApplyPermissions } from '../lib/authStore';
 import { PushManager } from '../lib/pushManager';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -147,6 +147,7 @@ export default function LoginPage() {
   const [pwConf, setPwConf]           = useState('');
   const [showPw, setShowPw]           = useState(false);
   const [showManual, setShowManual]   = useState(false);
+  const [showIosManual, setShowIosManual] = useState(false);
   const [isNewUser, setIsNewUser]     = useState(false);
   const [consent1, setConsent1]       = useState(false); // 개인정보 수집/이용 동의
   const [consent2, setConsent2]       = useState(false); // 개인정보 제3자 제공 동의 (AI)
@@ -383,7 +384,11 @@ export default function LoginPage() {
       }
       
       setStoreUserProfile(data.user || data);
-      if ('allowed_paths' in data) setAllowedPaths(data.allowed_paths);
+      if (Array.isArray(data.allowed_paths) && data.allowed_paths.length > 0) {
+        setAllowedPaths(data.allowed_paths);
+      } else {
+        await fetchAndApplyPermissions((data.user || data)?.role);
+      }
 
       // 🔔 로그인 성공 즉시 푸시 구독 등록 (Access Token이 확실히 있는 시점)
       const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
@@ -570,6 +575,83 @@ export default function LoginPage() {
           </button>
           <p style={{ textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11, marginTop:16 }}>
             보안 정책에 따라 설치 파일은 사내 네트워크에서만 다운로드 가능할 수 있습니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const IosManualModal = ({ onClose }) => (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', backdropFilter:'blur(12px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:20 }} onClick={onClose}>
+      <div style={{ 
+        background:'#0f172a', border:'1px solid rgba(168,85,247,0.3)', borderRadius:28, maxWidth:480, width:'100%', 
+        padding:32, animation:'fadeUp .3s ease', position:'relative',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 40px rgba(168, 85, 247, 0.1)'
+      }} onClick={e=>e.stopPropagation()}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ background:'rgba(168,85,247,0.2)', padding:10, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Apple size={20} color="#c084fc" />
+            </div>
+            <h3 style={{ color:'white', fontSize:18, fontWeight:800, margin:0, whiteSpace:'nowrap', letterSpacing:'-0.5px' }}>iOS 단축어 설정 매뉴얼</h3>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:4, display:'flex', alignItems:'center', justifyContent:'center' }}><X size={20}/></button>
+        </div>
+
+        <div style={{ maxHeight:'60vh', overflowY:'auto', paddingRight:8, display:'flex', flexDirection:'column', gap:28 }}>
+          <div>
+            <h4 style={{ color:'#c084fc', fontSize:14, fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ background:'#c084fc', color:'#0f172a', width:18, height:18, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>1</span>
+              단축어(Shortcut) 파일 다운로드 및 추가
+            </h4>
+            <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
+              <li>하단의 <span style={{ color:'white', fontWeight:600 }}>단축어 프로파일 다운로드</span> 버튼을 탭합니다.</li>
+              <li>다운로드된 <span style={{ color:'white', fontWeight:600 }}>S-BRIDGE-iOS.shortcut</span> 파일을 실행하여 내 단축어에 추가합니다.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 style={{ color:'#c084fc', fontSize:14, fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ background:'#c084fc', color:'#0f172a', width:18, height:18, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>2</span>
+              단축어 자동화(Automation) 생성
+            </h4>
+            <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
+              <li>iPhone 기본 앱인 <span style={{ color:'white', fontWeight:600 }}>단축어(Shortcuts)</span> 앱을 실행합니다.</li>
+              <li>하단 중앙의 <span style={{ color:'white', fontWeight:600 }}>자동화</span> 탭을 선택하고 우측 상단 <span style={{ color:'white', fontWeight:600 }}>[+]</span> 버튼을 누릅니다.</li>
+              <li>조건으로 <span style={{ color:'white', fontWeight:600 }}>메시지(SMS)</span> 수신 등을 선택하고 즉시 실행되도록 설정합니다.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 style={{ color:'#10b981', fontSize:14, fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ background:'#10b981', color:'#0f172a', width:18, height:18, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>3</span>
+              백그라운드 자동 실행 설정 완료
+            </h4>
+            <ul style={{ color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.8, paddingLeft:20, margin:0 }}>
+              <li>동작으로 추가한 <span style={{ color:'white', fontWeight:600 }}>S-BRIDGE-iOS</span> 단축어를 연결합니다.</li>
+              <li><span style={{ color:'#f87171', fontWeight:600 }}>실행 전에 묻기</span> 및 <span style={{ color:'#f87171', fontWeight:600 }}>실행되면 알림</span> 스위치를 꺼서 백그라운드 즉시 연동을 완성합니다.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style={{ marginTop:32 }}>
+          <button 
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = '/S-BRIDGE-iOS.shortcut?v=' + Date.now();
+              link.download = 'S-BRIDGE-iOS.shortcut';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              onClose();
+            }}
+            style={{ ...primaryBtn, background:'linear-gradient(135deg, #a855f7, #9333ea)', border:'1px solid rgba(168,85,247,0.5)', padding:'16px' }}
+          >
+            <Download size={18} />
+            <span>iOS 단축어 프로파일 다운로드</span>
+          </button>
+          <p style={{ textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11, marginTop:16 }}>
+            iOS 보안 정책에 따라 사파리(Safari) 브라우저에서의 다운로드를 권장합니다.
           </p>
         </div>
       </div>
@@ -835,7 +917,7 @@ export default function LoginPage() {
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
                   <Download size={12} />Android S-bridge
                 </button>
-                <button type="button" onClick={() => window.alert('iOS S-bridge 배포 준비 중입니다.')}
+                <button type="button" onClick={() => setShowIosManual(true)}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
                   <Apple size={12} />iOS S-bridge
                 </button>
@@ -1026,6 +1108,7 @@ export default function LoginPage() {
       </div>
       {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
       {showManual && <ManualModal onClose={() => setShowManual(false)} />}
+      {showIosManual && <IosManualModal onClose={() => setShowIosManual(false)} />}
     </>
   );
 }

@@ -2230,7 +2230,7 @@ export default function ChatPage() {
             </div>
 
             {/* User List */}
-            <div className="flex-1 overflow-y-auto" style={{ padding: '12px 16px' }}>
+            <div className="flex-1 overflow-y-auto custom-scrollbar" style={{ padding: '12px 16px' }}>
               {inviteSearchResults.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {inviteSearchResults

@@ -10,7 +10,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import AIInsightModal from '../../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu.mobile';
 import { useCodebook } from '../../context/CodebookContext';
-import { getAccessToken, clearSession, getAuthHeaders, isPathAllowed } from '../../lib/authStore';
+import { getAccessToken, clearSession, getAuthHeaders, getUserProfile, getAllowedPaths, addAuthListener } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
 
 const SHINHAN_COMPANIES = [
@@ -103,9 +103,30 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
 }
 
 // ── 메인 대시보드 컴포넌트 ───────────────────────
-export default function DashboardPage({ onAiClick }) {
+export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // authStore 직접 구독 → 다른 탭/하를 콘솔에서 권한 변경 시 즉시 반영
+  const [liveAllowedPaths, setLiveAllowedPaths] = useState(() => getAllowedPaths());
+  useEffect(() => {
+    const remove = addAuthListener(({ allowedPaths: newPaths }) => {
+      setLiveAllowedPaths(newPaths);
+    });
+    return remove;
+  }, []);
+
+  // 로컴 state 기반 권한 체크
+  const checkAllowed = (path) => {
+    if (!path || path === '/dashboard') return true;
+    const u = getUserProfile();
+    if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
+    if (liveAllowedPaths === null || liveAllowedPaths === undefined) return true;
+    if (!Array.isArray(liveAllowedPaths)) return true;
+    if (liveAllowedPaths.length === 0) return false;
+    return liveAllowedPaths.some(p => path === p || path.startsWith(p + '/'));
+  };
+
   const [showMoreMenuFromConsole, setShowMoreMenuFromConsole] = useState(false);
   const [showAgentPanel, setShowAgentPanel] = useState(false);
 
@@ -1359,34 +1380,34 @@ export default function DashboardPage({ onAiClick }) {
           <div className="flex items-center gap-1.5 mr-1">
             {/* Orbital Command */}
             <button onClick={() => {
-              if (!isPathAllowed('/orbital-command')) {
+              if (!checkAllowed('/orbital-command')) {
                 toast.error('해당 화면의 권한이 없습니다.');
                 return;
               }
               navigate('/orbital-command');
             }}
-              disabled={!isPathAllowed('/orbital-command')}
+              disabled={!checkAllowed('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!isPathAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ border: '1px solid rgba(6,182,212,0.4)', background: 'transparent' }}>
               <Cpu size={15} style={{ color: '#06b6d4' }} />
-              {!isPathAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
+              {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
             </button>
 
             {/* Alert Monitor */}
             <button onClick={() => {
-              if (!isPathAllowed('/alert-monitor')) {
+              if (!checkAllowed('/alert-monitor')) {
                 toast.error('해당 화면의 권한이 없습니다.');
                 return;
               }
               navigate('/alert-monitor');
             }}
-              disabled={!isPathAllowed('/alert-monitor')}
+              disabled={!checkAllowed('/alert-monitor')}
               onPointerDown={() => handleTooltipStart('Alert Monitor')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!isPathAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ border: '1px solid rgba(239,68,68,0.4)', background: 'transparent' }}>
               <BellDot size={15} style={{ color: '#ef4444' }} />
-              {!isPathAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
+              {!checkAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
             </button>
 
             {/* Threshold */}

@@ -248,7 +248,7 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
                   <Plus size={14} /> 새 채팅
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1 min-h-0">
+              <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1 min-h-0 custom-scrollbar">
                 {chatSessions.map(s => (
                   <div key={s.id} onClick={() => switchSession(s.id)}
                     className="relative group flex items-center px-3 py-2.5 rounded-xl cursor-pointer transition-all"
@@ -333,7 +333,7 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
         </div>
 
         {/* ── Messages ── CRITICAL: min-h-0 prevents flex overflow */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 custom-scrollbar">
           {aiMessages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4 opacity-40">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center"

@@ -54,7 +54,7 @@ export default function CodebookManagementPage() {
   ];
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(160deg,#05080f,#090c1a)', fontFamily: "'Pretendard','Inter',sans-serif", color: '#cbd5e1' }}>
+    <div style={{ width: '100%', height: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'linear-gradient(160deg,#05080f,#090c1a)', fontFamily: "'Pretendard','Inter',sans-serif", color: '#cbd5e1' }}>
       <style>{`
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         input::placeholder,textarea::placeholder{color:#1e293b}
@@ -106,7 +106,7 @@ export default function CodebookManagementPage() {
       </div>
 
       {/* 목록 */}
-      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'10px 16px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8 }}>
         {loading ? (
           <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:100 }}>
             <Loader2 size={22} color="#818cf8" style={{ animation:'spin 1s linear infinite' }} />
@@ -145,9 +145,9 @@ export default function CodebookManagementPage() {
 
       {/* 모달 */}
       {showModal && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'flex-end' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:350, display:'flex', alignItems:'flex-end' }}>
           <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.6)', backdropFilter:'blur(8px)' }} onClick={() => setShowModal(false)} />
-          <div style={{ position:'relative', width:'100%', background:'#0e1120', borderRadius:'24px 24px 0 0', border:'1px solid rgba(255,255,255,.1)', padding:'20px 20px 36px', maxHeight:'85dvh', overflowY:'auto' }}>
+          <div style={{ position:'relative', width:'100%', background:'#0e1120', borderRadius:'24px 24px 0 0', border:'1px solid rgba(255,255,255,.1)', padding:'20px 20px 64px', maxHeight:'85dvh', overflowY:'auto' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
               <div>
                 <div style={{ fontSize:18, fontWeight:900, color:'#f1f5f9' }}>{editingCode ? '코드 수정' : '코드 추가'}</div>

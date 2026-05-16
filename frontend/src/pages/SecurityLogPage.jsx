@@ -68,7 +68,7 @@ const SecurityLogPage = () => {
 
   return (
     <div style={{
-      height: '100dvh', display: 'flex', flexDirection: 'column',
+      width: '100%', height: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflowY: 'auto',
       background: 'linear-gradient(160deg, #050812 0%, #080d1c 60%, #050812 100%)',
       fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
     }}>
@@ -250,7 +250,7 @@ const SecurityLogPage = () => {
       <div style={{
         flexShrink: 0,
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 16px 12px',
+        padding: '8px 16px 80px',
         borderTop: '1px solid rgba(255,255,255,0.05)',
       }}>
         <Shield size={10} color="#1e293b" />

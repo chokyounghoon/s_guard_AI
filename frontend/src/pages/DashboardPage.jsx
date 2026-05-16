@@ -10,7 +10,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
 import { useCodebook } from '../context/CodebookContext';
-import { getAccessToken, clearSession, getAuthHeaders, isPathAllowed } from '../lib/authStore';
+import { getAccessToken, clearSession, getAuthHeaders, getUserProfile, getAllowedPaths, addAuthListener } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
 
 const SHINHAN_COMPANIES = [
@@ -103,8 +103,30 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
 }
 
 // ── 메인 대시보드 컴포넌트 ───────────────────────
-export default function DashboardPage({ onAiClick }) {
+export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const navigate = useNavigate();
+
+  // authStore를 직접 구독하여 다른 킭/칬믁에서 권한 변경 시 즉시 반영
+  const [liveAllowedPaths, setLiveAllowedPaths] = useState(() => getAllowedPaths());
+  useEffect(() => {
+    const remove = addAuthListener(({ allowedPaths: newPaths }) => {
+      setLiveAllowedPaths(newPaths);
+    });
+    return remove;
+  }, []);
+
+  // 실제 권한 체크 헬퍼 (로컴 state 기반)
+  const checkAllowed = (path) => {
+    if (!path || path === '/dashboard') return true;
+    const u = getUserProfile();
+    if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
+    // liveAllowedPaths가 null = 로딩 중 또는 전체허용
+    if (liveAllowedPaths === null || liveAllowedPaths === undefined) return true;
+    if (!Array.isArray(liveAllowedPaths)) return true;
+    if (liveAllowedPaths.length === 0) return false;
+    return liveAllowedPaths.some(p => path === p || path.startsWith(p + '/'));
+  };
+
   const [showMoreMenuFromConsole, setShowMoreMenuFromConsole] = useState(false);
   const location = useLocation();
   const [showAgentPanel, setShowAgentPanel] = useState(false);
@@ -1453,7 +1475,6 @@ export default function DashboardPage({ onAiClick }) {
           {[
             { label: 'Orbital Command', icon: Cpu,         path: '/orbital-command',        color: '#06b6d4' },
             { label: 'Alert Monitor',   icon: BellDot,     path: '/alert-monitor',          color: '#ef4444' },
-            { label: 'Incident KW',     icon: Hash,        path: '/incident-keyword',       color: '#22d3ee' },
             { label: 'Personal KW',     icon: Keyboard,    path: '/user-keyword',           color: '#06b6d4' },
             { label: 'Report Line',     icon: Users,       path: '/report-line-management', color: '#a855f7' },
             { label: 'Accounts',        icon: User,        path: '/user-management',        color: '#3b82f6' },
@@ -1467,11 +1488,11 @@ export default function DashboardPage({ onAiClick }) {
             { label: 'Push Diagnostic', icon: Bell,        path: '/push-diagnostic',        color: '#f59e0b' },
             { label: 'AI Report',       icon: FileText,    path: '/ai-report',              color: '#3b82f6' },
             { label: 'Report Search',   icon: Search,      path: '/mobile-report-search',   color: '#10b981' },
-          ].filter(m => !m.adminOnly || userProfile?.is_admin === 1 || userProfile?.role === 'admin')
+          ].filter(m => !m.adminOnly || userProfile?.is_admin === 1 || userProfile?.role?.toLowerCase() === 'admin' || userProfile?.role?.toLowerCase() === 'super_admin')
            .map((item, idx, arr) => {
             const Icon = item.icon;
             const isActive = window.location.pathname === item.path;
-            const allowed = isPathAllowed(item.path);
+            const allowed = checkAllowed(item.path);
             return (
               <button
                 key={item.label}

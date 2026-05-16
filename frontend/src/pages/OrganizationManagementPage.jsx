@@ -164,16 +164,18 @@ export default function OrganizationManagementPage() {
     }
   };
 
-  const currentNodes = getNodes(activeDepth).filter(n =>
-    !search || n.name.toLowerCase().includes(search.toLowerCase()) || (n.code || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const currentNodes = [...getNodes(activeDepth)]
+    .filter(n =>
+      !search || n.name.toLowerCase().includes(search.toLowerCase()) || (n.code || '').toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => b.id - a.id);
 
   const cfg = DEPTH_CONFIG[activeDepth];
   const Icon = cfg.icon;
 
   return (
     <div style={{
-      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      width: '100%', height: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflowY: 'auto',
       background: 'linear-gradient(160deg, #060a18 0%, #0a0f20 60%, #060a18 100%)',
       fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
     }}>
@@ -302,7 +304,7 @@ export default function OrganizationManagementPage() {
       )}
 
       {/* ⑤  노드 목록 (flex:1 스크롤) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 16px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 16px 80px' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <Loader2 size={24} color="#3b82f6" style={{ animation: 'spin 1s linear infinite' }} />
@@ -445,14 +447,14 @@ export default function OrganizationManagementPage() {
       {/* 추가/수정 모달 */}
       {isModalOpen && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 100,
+          position: 'fixed', inset: 0, zIndex: 350,
           display: 'flex', alignItems: 'flex-end',
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
         }} onClick={() => setIsModalOpen(false)}>
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: '100%', padding: '24px 20px 32px',
+              width: '100%', padding: '24px 20px 64px',
               background: 'linear-gradient(180deg, #0f172a, #0a0e1a)',
               borderRadius: '24px 24px 0 0',
               border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',

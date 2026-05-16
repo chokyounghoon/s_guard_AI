@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Eye, EyeOff, Loader2, ChevronRight, KeyRound, SmartphoneNfc, Download } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2, ChevronRight, KeyRound, SmartphoneNfc, Download, Apple, X } from 'lucide-react';
 import {
   setAccessToken,
   setUserProfile as setStoreUserProfile,
   setGhostToken,
-  setAllowedPaths
+  setAllowedPaths,
+  fetchAndApplyPermissions
 } from '../../lib/authStore';
 import PWAInstallButton from '../components/PWAInstallButton';
 
@@ -23,6 +24,7 @@ export default function MobileLoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showIosManual, setShowIosManual] = useState(false);
 
   // Step 1: 사번 입력 → OTP 발송
   const handleInitAuth = async () => {
@@ -82,7 +84,11 @@ export default function MobileLoginPage() {
       setAccessToken(data.access_token);
       setStoreUserProfile(data.user);
       if (data.ghost_token) setGhostToken(data.ghost_token);
-      if ('allowed_paths' in data) setAllowedPaths(data.allowed_paths);
+      if (Array.isArray(data.allowed_paths) && data.allowed_paths.length > 0) {
+        setAllowedPaths(data.allowed_paths);
+      } else {
+        await fetchAndApplyPermissions(data.user?.role);
+      }
       navigate('/dashboard', { replace: true });
     } catch (e) {
       setError(e.message);
@@ -290,7 +296,7 @@ export default function MobileLoginPage() {
           </button>
           
           <button
-            onClick={() => { window.open('https://www.icloud.com/shortcuts/placeholder', '_blank'); }}
+            onClick={() => setShowIosManual(true)}
             className="flex flex-col items-center gap-3 p-5 rounded-[2rem] bg-white/5 border border-white/5 active-scale group shadow-xl"
           >
             <div className="p-3 rounded-2xl bg-purple-600/10 border border-purple-500/20 group-hover:scale-110 transition-transform shadow-lg">
@@ -304,6 +310,81 @@ export default function MobileLoginPage() {
           <p className="text-[11px] text-slate-600 font-black tracking-widest opacity-60">© 2026 SHINHAN DS CORP. S-GUARD OPERATIONS</p>
         </div>
       </div>
+
+      {/* iOS 단축어 설정 매뉴얼 모달 */}
+      {showIosManual && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg bg-[#0f172a] border border-purple-500/30 rounded-[28px] p-6 sm:p-8 shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-start justify-between gap-3 mb-6">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-3 rounded-2xl bg-purple-600/20 text-purple-400 shrink-0">
+                  <Apple className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight break-keep leading-snug">iOS 단축어 연동 매뉴얼</h3>
+              </div>
+              <button 
+                onClick={() => setShowIosManual(false)} 
+                className="p-2 rounded-full hover:bg-white/10 text-slate-400 shrink-0 -mr-1 -mt-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto pr-2 space-y-6 flex-1 text-slate-300 text-xs sm:text-sm custom-scrollbar">
+              <div className="space-y-2">
+                <h4 className="flex items-center gap-2 text-purple-400 font-bold text-sm sm:text-base break-keep">
+                  <span className="w-5 h-5 rounded bg-purple-400 text-[#0f172a] flex items-center justify-center font-black text-xs shrink-0">1</span>
+                  단축어 프로파일 다운로드
+                </h4>
+                <p className="pl-7 leading-relaxed text-slate-400 break-keep">
+                  하단의 <span className="text-white font-bold">단축어 프로파일 다운로드</span> 버튼을 탭하여 <span className="text-white font-bold">S-BRIDGE-iOS.shortcut</span> 파일을 실행하고 내 단축어에 추가합니다.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="flex items-center gap-2 text-purple-400 font-bold text-sm sm:text-base break-keep">
+                  <span className="w-5 h-5 rounded bg-purple-400 text-[#0f172a] flex items-center justify-center font-black text-xs shrink-0">2</span>
+                  개인용 자동화(Automation) 생성
+                </h4>
+                <p className="pl-7 leading-relaxed text-slate-400 break-keep">
+                  아이폰 기본 앱인 <span className="text-white font-bold">단축어(Shortcuts)</span> 앱 실행 후, 하단 <span className="text-white font-bold">자동화</span> 탭에서 [+] 버튼을 눌러 새 자동화를 생성합니다. 조건으로 <span className="text-white font-bold">메시지(SMS)</span> 수신을 선택합니다.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="flex items-center gap-2 text-emerald-400 font-bold text-sm sm:text-base break-keep">
+                  <span className="w-5 h-5 rounded bg-emerald-400 text-[#0f172a] flex items-center justify-center font-black text-xs shrink-0">3</span>
+                  무인 백그라운드 동작 설정
+                </h4>
+                <p className="pl-7 leading-relaxed text-slate-400 break-keep">
+                  동작으로 추가한 <span className="text-white font-bold">S-BRIDGE-iOS</span> 단축어를 연결한 뒤, <span className="text-red-400 font-bold">실행 전에 묻기</span> 및 <span className="text-red-400 font-bold">실행되면 알림</span> 스위치를 꺼서 무인 연동을 완료합니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-white/10 shrink-0">
+              <button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = '/S-BRIDGE-iOS.shortcut?v=' + Date.now();
+                  link.download = 'S-BRIDGE-iOS.shortcut';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  setShowIosManual(false);
+                }}
+                className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 active:scale-95 transition-all break-keep truncate"
+              >
+                <Download className="w-5 h-5 shrink-0" />
+                <span className="truncate">iOS 단축어 프로파일 다운로드</span>
+              </button>
+              <p className="text-[11px] text-center text-slate-500 mt-3 break-keep">
+                iOS 보안 정책에 따라 사파리(Safari) 브라우저에서의 다운로드를 권장합니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

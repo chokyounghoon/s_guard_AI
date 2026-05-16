@@ -201,7 +201,7 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
       {/* Message Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin scrollbar-thumb-white/10"
+        className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar"
       >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center text-center py-20 opacity-30 space-y-3">

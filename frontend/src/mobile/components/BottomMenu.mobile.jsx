@@ -1,16 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Keyboard, Bell, Phone, UserCircle, ShieldCheck, Lock } from 'lucide-react';
-import { isPathAllowed } from '../../lib/authStore';
+import { getUserProfile, getAllowedPaths, addAuthListener } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
 
-export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu }) {
+export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu, allowedPaths: _ignored }) {
   const navigate = useNavigate();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
-  React.useEffect(() => {
+  // authStore 직접 구독
+  const [liveAllowedPaths, setLiveAllowedPaths] = useState(() => getAllowedPaths());
+  useEffect(() => {
+    const remove = addAuthListener(({ allowedPaths: newPaths }) => {
+      setLiveAllowedPaths(newPaths);
+    });
+    return remove;
+  }, []);
+
+  const checkAllowed = (path) => {
+    if (!path || path === '/dashboard') return true;
+    const u = getUserProfile();
+    if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
+    if (liveAllowedPaths === null || liveAllowedPaths === undefined) return true;
+    if (!Array.isArray(liveAllowedPaths)) return true;
+    if (liveAllowedPaths.length === 0) return false;
+    return liveAllowedPaths.some(p => path === p || path.startsWith(p + '/'));
+  };
+
+  useEffect(() => {
     if (initialOpenMoreMenu) setShowMoreMenu(true);
   }, [initialOpenMoreMenu]);
+
 
   return (
     <>
@@ -129,9 +149,9 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'AI Report', sub: 'AI 리포트', icon: FileText, path: '/ai-report', color: '#3b82f6' },
                 { label: 'Report\nSearch', sub: '리포트 검색', icon: Search, path: '/mobile-report-search', color: '#10b981' },
                 { label: 'S-Callert', sub: '상황전파', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
-              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role === 'admin').map((item) => {
+              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'super_admin').map((item) => {
                 const Icon = item.icon;
-                const allowed = isPathAllowed(item.path);
+                const allowed = checkAllowed(item.path);
                 return (
                   <div
                     key={item.label}

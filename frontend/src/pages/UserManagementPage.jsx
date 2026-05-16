@@ -438,7 +438,7 @@ export default function UserManagementPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-5 space-y-8">
+      <main className="max-w-7xl mx-auto p-5 pb-36 space-y-8">
         {/* 검색창 */}
         <section>
           <div className="relative group">
@@ -628,11 +628,11 @@ export default function UserManagementPage() {
 
       {/* Organization Selection Modal */}
       {isOrgModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 sm:p-6">
            <div className="absolute inset-0 bg-[#05070a]/80 backdrop-blur-md" onClick={() => setIsOrgModalOpen(false)} />
-           <div className="relative w-full max-w-xl bg-[#11141d] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-              <div className="h-2 bg-gradient-to-r from-blue-600 to-purple-600" />
-              <div className="p-8">
+           <div className="relative w-full max-w-xl bg-[#11141d] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[85vh] flex flex-col">
+              <div className="h-2 shrink-0 bg-gradient-to-r from-blue-600 to-purple-600" />
+              <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1 pb-12">
                  <div className="mb-8">
                     <h2 className="text-2xl font-bold text-white">사용자 정보 및 소속 변경</h2>
                     <p className="text-slate-500 text-sm mt-1">{editingUser?.name}님의 상세 정보와 소속 조직을 변경합니다.</p>
@@ -727,11 +727,11 @@ export default function UserManagementPage() {
  
       {/* User Registration Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 sm:p-6">
            <div className="absolute inset-0 bg-[#05070a]/90 backdrop-blur-md" onClick={() => setIsAddModalOpen(false)} />
-           <div className="relative w-full max-w-2xl bg-[#11141d] border border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-              <div className="h-2 bg-gradient-to-r from-blue-600 via-blue-400 to-emerald-500" />
-              <div className="p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
+           <div className="relative w-full max-w-2xl bg-[#11141d] border border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[85vh] flex flex-col">
+              <div className="h-2 shrink-0 bg-gradient-to-r from-blue-600 via-blue-400 to-emerald-500" />
+              <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1 pb-12">
                  <div className="mb-8 flex justify-between items-start">
                     <div>
                        <h2 className="text-3xl font-bold text-white tracking-tight">신규 사용자 등록</h2>

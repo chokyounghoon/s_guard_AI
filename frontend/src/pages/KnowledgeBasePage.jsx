@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutDashboard, List } from 'lucide-react';
+import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutDashboard, List, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { getAuthHeaders } from '../lib/authStore';
@@ -25,6 +25,21 @@ export default function KnowledgeBasePage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+
+  const getDefaultStartDate = () => {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T00:00`;
+  };
+  const getDefaultEndDate = () => {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T23:59`;
+  };
+
+  const [startDate, setStartDate] = useState(() => getDefaultStartDate());
+  const [endDate, setEndDate] = useState(() => getDefaultEndDate());
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const categories = ['all', 'SECURITY', 'DB', 'DEVOPS', 'INFRA', 'GENERAL'];
 
@@ -182,7 +197,18 @@ ${formData.content}`;
                           (k.content || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (k.tags || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || k.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    
+    let matchesDate = true;
+    if (k.reg_dt) {
+      const itemTime = new Date(k.reg_dt.replace(' ', 'T')).getTime();
+      const startTime = startDate ? new Date(startDate).getTime() : 0;
+      const endTime = endDate ? new Date(endDate).getTime() : Infinity;
+      if (!isNaN(itemTime)) {
+        matchesDate = itemTime >= startTime && itemTime <= endTime;
+      }
+    }
+    
+    return matchesSearch && matchesCategory && matchesDate;
   });
 
   return (
@@ -219,60 +245,179 @@ ${formData.content}`;
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="max-w-7xl mx-auto bg-[#1a1f2e] border border-white/5 rounded-2xl p-4 mb-8 flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input 
-            type="text" 
-            placeholder="지식 제안, 태그, 본문 내용 검색... (Enter 시 시맨틱 검색)" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={handleSearchKeyPress}
-            className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-all"
-          />
-          {searchTerm && (
-            <button 
-              onClick={() => { setSearchTerm(''); fetchKnowledge(''); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 text-slate-500"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-          <Filter className="w-4 h-4 text-slate-500 shrink-0 mr-1" />
-          {categories.map(cat => (
+      <div className="max-w-7xl mx-auto bg-[#1a1f2e] border border-white/5 rounded-2xl p-4 mb-8 flex flex-col gap-4 shadow-xl">
+        {/* 1행: 검색 + 필터 토글 + 카테고리 + 보기모드 */}
+        <div className="flex flex-col md:flex-row gap-3 items-center">
+          <div className="flex-1 w-full relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="지식 제목, 태그, 본문 내용 검색... (Enter 시 시맨틱 검색)" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearchKeyPress}
+              className="w-full bg-[#0f1219] border border-white/10 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => { setSearchTerm(''); fetchKnowledge(''); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          
+          {/* 필터 토글 & 재조회 버튼 (WarRoom 스타일) */}
+          <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                selectedCategory === cat ? 'bg-blue-500 text-white' : 'bg-[#0f1219] text-slate-400 border border-white/5 hover:border-white/20'
+              onClick={() => setShowFilterPanel(prev => !prev)}
+              className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                showFilterPanel 
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-lg shadow-blue-500/10' 
+                  : 'bg-[#0f1219] text-slate-400 border border-white/5 hover:border-white/20 hover:text-white'
               }`}
             >
-              {cat.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-4 border-l border-white/5 pl-4 ml-4 hidden md:flex">
-          <div className="flex bg-[#0f1219] rounded-lg p-1 border border-white/5">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-white'}`}
-              title="리스트 보기"
-            >
-              <List className="w-4 h-4" />
+              <Filter className={`w-4 h-4 ${showFilterPanel ? 'text-blue-400' : 'text-slate-500'}`} />
+              <span>상세 조건 필터 {startDate || endDate ? '(1)' : ''}</span>
             </button>
             <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-white'}`}
-              title="그리드 보기"
+              onClick={() => fetchKnowledge(searchTerm)}
+              disabled={loading}
+              title="데이터 재조회"
+              className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 text-blue-400 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center"
             >
-              <LayoutDashboard className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
+          
+          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+            <Filter className="w-4 h-4 text-slate-500 shrink-0 mr-1 hidden md:block" />
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  selectedCategory === cat ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-[#0f1219] text-slate-400 border border-white/5 hover:border-white/20'
+                }`}
+              >
+                {cat.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-4 border-l border-white/5 pl-4 ml-2 hidden md:flex">
+            <div className="flex bg-[#0f1219] rounded-lg p-1 border border-white/5">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${viewMode === 'list' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-white'}`}
+                title="리스트 보기"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${viewMode === 'grid' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-white'}`}
+                title="그리드 보기"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* 상세 필터 패널 (WarRoom 스타일) */}
+        {showFilterPanel && (
+          <div className="bg-[#0f1219]/90 border border-blue-500/30 rounded-2xl p-5 animate-in fade-in slide-in-from-top-2 duration-200 mt-2 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-white/5">
+              <div className="flex items-center gap-2 font-bold text-sm text-slate-200">
+                <Calendar className="w-4 h-4 text-blue-500" />
+                <span>등록 일시 상세 조회 조건</span>
+              </div>
+              <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20 font-black tracking-wider">
+                DATE RANGE FILTER
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              <div className="bg-[#1a1f2e] border border-white/5 rounded-xl p-3.5 shadow-inner">
+                <label className="text-xs font-bold text-slate-400 block mb-2">시작 일시 (From)</label>
+                <input 
+                  type="datetime-local" 
+                  value={startDate} 
+                  onChange={(e) => setStartDate(e.target.value)} 
+                  className="w-full bg-transparent text-white font-mono focus:outline-none text-sm [color-scheme:dark] cursor-pointer" 
+                />
+              </div>
+              <div className="bg-[#1a1f2e] border border-white/5 rounded-xl p-3.5 shadow-inner">
+                <label className="text-xs font-bold text-slate-400 block mb-2">종료 일시 (To)</label>
+                <input 
+                  type="datetime-local" 
+                  value={endDate} 
+                  onChange={(e) => setEndDate(e.target.value)} 
+                  className="w-full bg-transparent text-white font-mono focus:outline-none text-sm [color-scheme:dark] cursor-pointer" 
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <span className="text-xs text-slate-500 font-bold mr-1 hidden md:inline">간편 기간 :</span>
+                <button 
+                  onClick={() => {
+                    const d = new Date(); d.setDate(d.getDate() - 7);
+                    const pad = n => String(n).padStart(2, '0');
+                    setStartDate(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T00:00`);
+                    setEndDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}T23:59`);
+                  }}
+                  className="flex-1 md:flex-none px-3 py-2 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold text-xs hover:bg-blue-500/30 transition-all shadow-sm cursor-pointer"
+                >
+                  최근 7일 (기본)
+                </button>
+                <button 
+                  onClick={() => {
+                    const d = new Date(); d.setMonth(d.getMonth() - 1);
+                    const pad = n => String(n).padStart(2, '0');
+                    setStartDate(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T00:00`);
+                    setEndDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}T23:59`);
+                  }}
+                  className="flex-1 md:flex-none px-3 py-2 rounded-xl bg-[#1a1f2e] text-slate-300 border border-white/5 font-bold text-xs hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  최근 1개월
+                </button>
+                <button 
+                  onClick={() => {
+                    const d = new Date(); d.setMonth(d.getMonth() - 3);
+                    const pad = n => String(n).padStart(2, '0');
+                    setStartDate(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T00:00`);
+                    setEndDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}T23:59`);
+                  }}
+                  className="flex-1 md:flex-none px-3 py-2 rounded-xl bg-[#1a1f2e] text-slate-300 border border-white/5 font-bold text-xs hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  최근 3개월
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <button 
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-[#1a1f2e] text-slate-400 border border-white/5 font-bold text-xs hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                >
+                  초기화 (전체 기간)
+                </button>
+                <button 
+                  onClick={() => setShowFilterPanel(false)}
+                  className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
+                >
+                  필터 패널 닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Knowledge List Render */}

@@ -344,12 +344,12 @@ export default function MobileInbox({ user, onAiClick }) {
               onClick={() => setLongPressItem(null)}
               style={{
                 position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-                zIndex: 100, backdropFilter: 'blur(4px)',
+                zIndex: 350, backdropFilter: 'blur(4px)',
               }}
             />
             {/* 액션 시트 */}
             <div style={{
-              position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 101,
+              position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 351,
               background: '#141820',
               borderRadius: '24px 24px 0 0',
               border: '1px solid rgba(255,255,255,0.08)',
