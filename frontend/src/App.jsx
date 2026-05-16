@@ -100,6 +100,41 @@ function AppContent() {
   const [isRefreshing, setIsRefreshing] = useState(true);
   const [isSessionRefreshed, setIsSessionRefreshed] = useState(false);
 
+  // 📱 iOS 크롬 강제 실행 및 앱스토어 안내 폴백 로직
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(userAgent);
+    const isChrome = /crios/.test(userAgent);
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (isIOS && !isChrome && !isLocal) {
+      const fullPath = window.location.host + window.location.pathname + window.location.search + window.location.hash;
+      const scheme = window.location.protocol === 'https:' ? `googlechromes://${fullPath}` : `googlechrome://${fullPath}`;
+      const appStoreUrl = "https://apps.apple.com/kr/app/google-chrome/id535886823";
+
+      console.log('[Redirect] Redirecting iOS user to Google Chrome:', scheme);
+      window.location.href = scheme;
+
+      const timer = setTimeout(() => {
+        if (window.confirm("안전하고 원활한 S-Guard 이용을 위해 Google Chrome 앱 설치가 필요합니다.\n앱스토어로 이동하시겠습니까?")) {
+          window.location.href = appStoreUrl;
+        }
+      }, 2500);
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          clearTimeout(timer);
+        }
+      };
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+    }
+  }, []);
+
   // 🛡️ Sync with Auth Store
   useEffect(() => {
     const removeListener = addAuthListener(({ userProfile: newUser }) => {

@@ -80,7 +80,7 @@
 @media (min-width: 768px) {
 
   /* Root atmosphere — subtle grid overlay */
-  .h-screen.overflow-hidden.bg-\[#0f1421\] {
+  .h-screen.overflow-hidden.bg-sguard-main {
     background-image:
       radial-gradient(ellipse 80% 40% at 50% -10%, rgba(59,130,246,0.07) 0%, transparent 70%),
       linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
@@ -240,7 +240,7 @@
 
   /* ─── COLUMN 1: SMS PANEL ─────────────────── */
 
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl {
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-sguard-card.rounded-3xl {
     border-color: rgba(59,130,246,0.22) !important;
     position: relative;
     overflow: hidden;
@@ -249,7 +249,7 @@
   }
 
   /* Scan line — SMS panel */
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl::before {
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-sguard-card.rounded-3xl::before {
     content: '';
     position: absolute;
     left: 0;
@@ -262,7 +262,7 @@
     pointer-events: none;
     z-index: 1;
   }
-  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl::before {
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-sguard-card.rounded-3xl::before {
     animation-play-state: running;
   }
 
@@ -328,7 +328,7 @@
   }
 
   /* ─── COLUMN 3: EXPERT ADVISOR ───────────── */
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl {
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-sguard-deep.rounded-3xl {
     border-color: rgba(234,179,8,0.25) !important;
     box-shadow: 0 0 0 1px rgba(234,179,8,0.06), 0 8px 40px rgba(0,0,0,0.5), inset 0 0 40px rgba(234,179,8,0.02);
     position: relative;
@@ -336,7 +336,7 @@
   }
 
   /* Scan line — expert advisor */
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl::before {
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-sguard-deep.rounded-3xl::before {
     content: '';
     position: absolute;
     left: 0;
@@ -349,7 +349,7 @@
     pointer-events: none;
     z-index: 1;
   }
-  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl::before {
+  .hud-fetching .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-sguard-deep.rounded-3xl::before {
     animation-play-state: running;
   }
 
@@ -405,11 +405,11 @@
 
 
   /* ─── WARROOM / ASSIGNED CARDS ───────────── */
-  .bg-\[#11141d\].hover\:border-blue-500\/30,
-  .bg-\[#11141d\].hover\:border-yellow-500\/30 {
+  .bg-sguard-darker.hover\:border-blue-500\/30,
+  .bg-sguard-darker.hover\:border-yellow-500\/30 {
     transition: border-color 0.3s, box-shadow 0.3s, transform 0.15s;
   }
-  .bg-\[#11141d\].hover\:border-blue-500\/30:hover {
+  .bg-sguard-darker.hover\:border-blue-500\/30:hover {
     border-color: rgba(59,130,246,0.4) !important;
     box-shadow: 0 0 16px rgba(59,130,246,0.12), 0 4px 20px rgba(0,0,0,0.4);
     transform: translateX(2px);

@@ -6,7 +6,7 @@
 
 let accessToken = null;
 let userProfile = null;
-let allowedPaths = null; // null = 전체 허용 (ADMIN/SUPER_ADMIN), [] = 전체 차단, [...] = 허용 목록
+let allowedPaths = undefined; // undefined = 로컬스토리지 조회 전, null = 전체 허용 (ADMIN/SUPER_ADMIN), [] = 전체 차단, [...] = 허용 목록
 const listeners = new Set();
 
 const notify = () => {
@@ -85,10 +85,22 @@ export const setAllowedPaths = (paths) => {
 export const getAllowedPaths = () => {
   if (allowedPaths !== undefined) return allowedPaths;
   const stored = localStorage.getItem('sguard_allowed_paths');
-  return stored ? JSON.parse(stored) : null;
+  if (stored && stored !== 'null' && stored !== 'undefined') {
+    try {
+      allowedPaths = JSON.parse(stored);
+      return allowedPaths;
+    } catch (_) {
+      localStorage.removeItem('sguard_allowed_paths');
+    }
+  }
+  allowedPaths = null;
+  return null;
 };
 
 export const isPathAllowed = (path) => {
+  // 로그인(/) 및 대시보드(/dashboard)는 공통 필수 진입점이자 권한 부족 시 Fallback 경로이므로 항상 허용
+  if (path === '/' || path === '/dashboard') return true;
+
   const paths = getAllowedPaths();
   if (paths === null) return true; // ADMIN/SUPER_ADMIN: 전체 허용
   if (!paths || paths.length === 0) return false;
@@ -112,7 +124,7 @@ export const getGhostToken = () => {
 export const clearSession = () => {
   accessToken = null;
   userProfile = null;
-  allowedPaths = null;
+  allowedPaths = undefined;
   localStorage.removeItem('sguard_user');
   localStorage.removeItem('sguard_ghost');
   localStorage.removeItem('sguard_allowed_paths');

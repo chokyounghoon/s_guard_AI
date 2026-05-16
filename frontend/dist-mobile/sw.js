@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v33'; // Push payload fix - SubtleCrypto RFC 8291
+const CACHE_NAME = 'sguard-v34.4'; // Robust deep-linking
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -53,14 +53,13 @@ self.addEventListener('fetch', (event) => {
   if (!url.protocol.startsWith('http')) return;
   
   // ⚡ DEV OPTIMIZATION: Skip caching for local dev server assets (Vite/HMR)
-  // This prevents 'promise rejected' errors during development
   if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
     if (url.pathname.includes('/src/') || url.search.includes('t=')) {
       return; 
     }
   }
 
-  // Skip API requests (Cloudflare Workers) to ensure fresh data
+  // Skip API requests to ensure fresh data
   if (url.hostname.includes('workers.dev') || url.hostname.includes('api.chokerslab.store')) {
     return;
   }
@@ -69,8 +68,6 @@ self.addEventListener('fetch', (event) => {
     (async () => {
       try {
         const cachedResponse = await caches.match(event.request);
-        
-        // Network fetch promise (to update cache)
         const fetchPromise = fetch(event.request).then(async (networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const cache = await caches.open(CACHE_NAME);
@@ -78,11 +75,8 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         }).catch(() => {
-          // If both fail, return fallback response
           return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
         });
-
-        // Stale-While-Revalidate: Return cache if available, but still update it in background
         return cachedResponse || fetchPromise;
       } catch (err) {
         console.error('[SW] Fetch handler error:', err);
@@ -92,7 +86,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 🚀 [SW-v33] Push Notification Handler
+// 🚀 [SW-v34.4] Push Notification Handler
 self.addEventListener('push', (event) => {
   let pushData = {
     title: 'S-Guard AI',
@@ -104,18 +98,23 @@ self.addEventListener('push', (event) => {
 
   if (event.data) {
     try {
-      const data = JSON.parse(event.data.text());
+      const rawText = event.data.text();
+      console.log('🚀 [SW-v34.4] Raw Push Data received:', rawText);
+      if (rawText) pushData.body = rawText;
+      const data = JSON.parse(rawText);
+      
       if (data && typeof data === 'object') {
         pushData.title = data.title || pushData.title;
-        pushData.body  = data.body  || data.message || pushData.body;
-        pushData.url   = data.url   || data.link    || pushData.url;
-        pushData.tag   = data.tag   || pushData.tag;
-        if (Array.isArray(data.vibrate)) pushData.vibrate = data.vibrate;
+        pushData.body  = data.body || data.text || data.message || pushData.body;
+        pushData.url   = data.url || data.link || pushData.url;
+        pushData.tag   = data.tag || pushData.tag;
       }
     } catch (e) {
-      const text = event.data.text();
-      if (text) pushData.body = text;
+      console.error('[SW] Push Parse Error:', e);
     }
+  } else {
+    console.warn('⚠️ [SW-v34.4] Push event received but event.data is NULL');
+    pushData.body = `[v34.4] 알림 데이터가 비어있습니다. (Null Data)`;
   }
 
   const options = {
@@ -138,38 +137,55 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  // Clear app badge when user interacts
   if ('clearAppBadge' in navigator) {
     navigator.clearAppBadge().catch(() => {});
   }
 
-  const notifData = event.notification.data;
+  const notifData = event.notification.data || {};
   let urlToOpen = notifData.url || '/';
 
-  // Handle action buttons
   if (event.action === 'close') return;
-  if (event.action === 'dispatch') {
-    // 📍 현장출동: Record action and navigate to incident
-    urlToOpen = notifData.url || '/';
-  } else if (event.action === 'open_chat') {
-    urlToOpen = notifData.url || '/';
-  }
-  // 'open' action and default click: just navigate to url
 
-  const absoluteUrl = new URL(urlToOpen, self.location.origin).href;
+  const absoluteUrl = urlToOpen.startsWith('http') 
+    ? urlToOpen 
+    : new URL(urlToOpen, self.location.origin).href;
+
+  console.log('[SW-v34.4] Notification clicked. Target URL:', absoluteUrl);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // If a window is already open at the target URL, focus it
+      console.log(`[SW-v34.4] Total clients found: ${windowClients.length}`);
+
+      // 🎯 1. Try to find a window that's already at this URL (flexible matching)
       for (const client of windowClients) {
-        if (client.url === absoluteUrl && 'focus' in client) {
+        const clientUrl = client.url.replace(/\/$/, '');
+        const targetUrl = absoluteUrl.replace(/\/$/, '');
+        
+        if (clientUrl === targetUrl && 'focus' in client) {
+          console.log('[SW] Found exact matching window, focusing...');
           return client.focus();
         }
       }
-      // Otherwise, open a new window
-      if (clients.openWindow) {
-        return clients.openWindow(absoluteUrl);
+
+      // 🎯 2. Try to find any app window on same origin and navigate
+      if (windowClients.length > 0) {
+        const client = windowClients.find(c => c.focused) || windowClients[0];
+        console.log('[SW] Reusing existing window, navigating...');
+        
+        if ('focus' in client) {
+          client.focus();
+          if ('navigate' in client) {
+            return client.navigate(absoluteUrl).catch(err => {
+              console.error('[SW] Navigate failed, opening new window:', err);
+              return clients.openWindow(absoluteUrl);
+            });
+          }
+        }
       }
+
+      // 🎯 3. No windows found, open new
+      console.log('[SW] Opening new window at:', absoluteUrl);
+      return clients.openWindow(absoluteUrl);
     })
   );
 });

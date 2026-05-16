@@ -66,7 +66,7 @@
 @media (min-width: 768px) {
 
   /* ── 1. Root Background: Deep Navy + Radial + Animated Grid ──── */
-  .h-screen.overflow-hidden.bg-\[#0f1421\] {
+  .h-screen.overflow-hidden.bg-sguard-main {
     background:
       radial-gradient(ellipse 80% 60% at 50% -10%, rgba(37,99,235,0.12) 0%, transparent 70%),
       radial-gradient(ellipse 40% 40% at 90% 90%, rgba(99,102,241,0.08) 0%, transparent 60%),
@@ -75,7 +75,7 @@
   }
 
   /* Animated grid overlay (pseudo — applied via body::before trick on the flex container) */
-  .h-screen.overflow-hidden.bg-\[#0f1421\]::before {
+  .h-screen.overflow-hidden.bg-sguard-main::before {
     content: '';
     position: fixed;
     inset: 0;
@@ -89,7 +89,7 @@
   }
 
   /* Scanline sweep — disabled (was distracting) */
-  .h-screen.overflow-hidden.bg-\[#0f1421\]::after {
+  .h-screen.overflow-hidden.bg-sguard-main::after {
     display: none;
   }
 
@@ -166,10 +166,10 @@
   }
 
   /* ── 5. Glass Card Base: All major panel containers ─────────── */
-  .bg-\[#1a1f2e\].rounded-3xl,
-  .bg-\[#0a0c12\].rounded-3xl,
-  .bg-\[#0f1421\].rounded-3xl,
-  .bg-\[#11141d\].rounded-3xl {
+  .bg-sguard-card.rounded-3xl,
+  .bg-sguard-deep.rounded-3xl,
+  .bg-sguard-main.rounded-3xl,
+  .bg-sguard-darker.rounded-3xl {
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
@@ -292,8 +292,8 @@
   }
 
   /* AI panel container — brightest glow */
-  .flex-1.overflow-hidden.flex.flex-col > .bg-\[#0a0c12\].rounded-3xl,
-  div:nth-child(2) > .bg-\[#0a0c12\].rounded-3xl {
+  .flex-1.overflow-hidden.flex.flex-col > .bg-sguard-deep.rounded-3xl,
+  div:nth-child(2) > .bg-sguard-deep.rounded-3xl {
     border-color: rgba(99,102,241,0.35) !important;
     box-shadow:
       0 0 0 0.5px rgba(99,102,241,0.2),
@@ -431,14 +431,14 @@
   }
 
   /* ── 15. Notification / War-Room Popup Panels ─────────────────── */
-  .w-full.max-w-sm.bg-\[#1a1f2e\].h-full {
+  .w-full.max-w-sm.bg-sguard-card.h-full {
     background: rgba(4,8,20,0.9) !important;
     backdrop-filter: blur(32px) !important;
     -webkit-backdrop-filter: blur(32px) !important;
     border-left: 0.5px solid rgba(37,99,235,0.3) !important;
   }
 
-  .bg-\[#1a1f2e\].w-full.max-w-xl.rounded-t-\[2\.5rem\] {
+  .bg-sguard-card.w-full.max-w-xl.rounded-t-\[2\.5rem\] {
     background: rgba(4,8,20,0.92) !important;
     backdrop-filter: blur(32px) !important;
     -webkit-backdrop-filter: blur(32px) !important;
@@ -455,12 +455,12 @@
   }
 
   /* ── 17. Input Fields: Deep HUD style ─────────────────────────── */
-  .w-full.bg-\[#1a1f2e\].border.border-blue-500\/20.rounded-xl {
+  .w-full.bg-sguard-card.border.border-blue-500\/20.rounded-xl {
     background: rgba(2,6,23,0.8) !important;
     border-color: rgba(37,99,235,0.25) !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
   }
-  .w-full.bg-\[#1a1f2e\].border.border-blue-500\/20.rounded-xl:focus {
+  .w-full.bg-sguard-card.border.border-blue-500\/20.rounded-xl:focus {
     border-color: rgba(37,99,235,0.7) !important;
     box-shadow: 0 0 0 2px rgba(37,99,235,0.15), 0 0 12px rgba(37,99,235,0.2) !important;
     outline: none !important;
@@ -507,7 +507,7 @@
   }
 
   /* ── 24. Col-4 "처리현황" special panel ──────────────────────── */
-  .bg-\[#0f1421\].rounded-3xl.border.border-white\/5.shadow-xl.flex-1 {
+  .bg-sguard-main.rounded-3xl.border.border-white\/5.shadow-xl.flex-1 {
     border-color: rgba(99,102,241,0.2) !important;
     box-shadow:
       0 0 0 0.5px rgba(99,102,241,0.1),

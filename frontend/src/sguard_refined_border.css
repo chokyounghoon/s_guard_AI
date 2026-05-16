@@ -23,8 +23,8 @@
 @media (min-width: 768px) {
 
   /* Scanlines, grid drift, sine-wave flows, ring-spin, scanner bounce */
-  .h-screen.overflow-hidden.bg-\[#0f1421\]::before,
-  .h-screen.overflow-hidden.bg-\[#0f1421\]::after,
+  .h-screen.overflow-hidden.bg-sguard-main::before,
+  .h-screen.overflow-hidden.bg-sguard-main::after,
   nav.sticky.top-0::before,
   nav .ring-2.ring-blue-500\/20::after,
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1)::after,
@@ -33,9 +33,9 @@
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2)::before,
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3)::after,
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3)::before,
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl::before,
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-sguard-card.rounded-3xl::before,
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) .rounded-3xl::before,
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl::before,
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-sguard-deep.rounded-3xl::before,
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) [class*="border-b"]::after,
   .bg-emerald-500\/5.border-emerald-500\/20::after,
   .bg-blue-500\/5.border-blue-500\/20::after,
@@ -46,10 +46,10 @@
   }
 
   /* Stop panel card flicker */
-  .bg-\[#1a1f2e\].rounded-3xl,
-  .bg-\[#0a0c12\].rounded-3xl,
-  .bg-\[#0f1421\].rounded-3xl,
-  .bg-\[#11141d\].rounded-3xl {
+  .bg-sguard-card.rounded-3xl,
+  .bg-sguard-deep.rounded-3xl,
+  .bg-sguard-main.rounded-3xl,
+  .bg-sguard-darker.rounded-3xl {
     animation: none !important;
   }
 
@@ -87,7 +87,7 @@
 
 
   /* ─── ROOT BACKGROUND: Deep Glass ─────────────────────────────── */
-  .h-screen.overflow-hidden.bg-\[#0f1421\] {
+  .h-screen.overflow-hidden.bg-sguard-main {
     background:
       radial-gradient(ellipse 70% 50% at 50% -5%, rgba(59,130,246,0.06) 0%, transparent 65%),
       radial-gradient(ellipse 40% 30% at 85% 85%, rgba(16,185,129,0.04) 0%, transparent 55%),
@@ -137,10 +137,10 @@
 
 
   /* ─── GLASS CARD BASE ──────────────────────────────────────────── */
-  .bg-\[#1a1f2e\].rounded-3xl,
-  .bg-\[#0a0c12\].rounded-3xl,
-  .bg-\[#0f1421\].rounded-3xl,
-  .bg-\[#11141d\].rounded-3xl {
+  .bg-sguard-card.rounded-3xl,
+  .bg-sguard-deep.rounded-3xl,
+  .bg-sguard-main.rounded-3xl,
+  .bg-sguard-darker.rounded-3xl {
     background: rgba(2, 6, 23, 0.70) !important; /* 깊은 심해색 #020617 + 투명도 70% */
     backdrop-filter: blur(20px) saturate(120%) !important;
     -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
@@ -182,7 +182,7 @@
   /* ═══════════════════════════════════════════════════════════════
      COLUMN 1 — 실시간 SMS  ·  Electric Blue  #3B82F6
   ═══════════════════════════════════════════════════════════════ */
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-\[#1a1f2e\].rounded-3xl {
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-sguard-card.rounded-3xl {
     border-color: rgba(59, 130, 246, 0.4) !important;
     box-shadow:
       0 0 15px rgba(59, 130, 246, 0.15),
@@ -192,8 +192,8 @@
   }
 
   /* SMS — critical alert state override (장애 감지 시 Red 정적 변환) */
-  .sms-pulse-critical .bg-\[#1a1f2e\].rounded-3xl,
-  .sms-pulse-major .bg-\[#1a1f2e\].rounded-3xl {
+  .sms-pulse-critical .bg-sguard-card.rounded-3xl,
+  .sms-pulse-major .bg-sguard-card.rounded-3xl {
     border-color: rgba(239, 68, 68, 0.5) !important;
     box-shadow:
       0 0 20px rgba(239, 68, 68, 0.2),
@@ -236,7 +236,7 @@
   /* ═══════════════════════════════════════════════════════════════
      COLUMN 3 — Expert Advisor  ·  Teal / Cyan  #2DD4BF
   ═══════════════════════════════════════════════════════════════ */
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-\[#0a0c12\].rounded-3xl {
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-sguard-deep.rounded-3xl {
     border-color: rgba(45, 212, 191, 0.35) !important;
     box-shadow:
       0 0 15px rgba(45, 212, 191, 0.15),
@@ -262,7 +262,7 @@
   /* ═══════════════════════════════════════════════════════════════
      COLUMN 4 — 처리 현황  ·  Neon Green  #10B981
   ═══════════════════════════════════════════════════════════════ */
-  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) .bg-\[#0f1421\].rounded-3xl,
+  .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) .bg-sguard-main.rounded-3xl,
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) [class*="rounded-3xl"] {
     border-color: rgba(16, 185, 129, 0.35) !important;
     box-shadow:
@@ -373,13 +373,13 @@
 
 
   /* ─── NOTIFICATION / POPUP PANELS ──────────────────────────────── */
-  .w-full.max-w-sm.bg-\[#1a1f2e\].h-full {
+  .w-full.max-w-sm.bg-sguard-card.h-full {
     background: rgba(3, 7, 18, 0.93) !important;
     backdrop-filter: blur(32px) !important;
     border-left: 1px solid rgba(59, 130, 246, 0.18) !important;
   }
 
-  .bg-\[#1a1f2e\].w-full.max-w-xl.rounded-t-\[2\.5rem\] {
+  .bg-sguard-card.w-full.max-w-xl.rounded-t-\[2\.5rem\] {
     background: rgba(3, 7, 18, 0.93) !important;
     backdrop-filter: blur(32px) !important;
     border-top: 1px solid rgba(59, 130, 246, 0.18) !important;
@@ -396,12 +396,12 @@
 
 
   /* ─── INPUT FIELDS ──────────────────────────────────────────────── */
-  .w-full.bg-\[#1a1f2e\].border.border-blue-500\/20.rounded-xl {
+  .w-full.bg-sguard-card.border.border-blue-500\/20.rounded-xl {
     background: rgba(2, 6, 23, 0.80) !important;
     border-color: rgba(59, 130, 246, 0.20) !important;
     transition: border-color 0.25s, box-shadow 0.25s !important;
   }
-  .w-full.bg-\[#1a1f2e\].border.border-blue-500\/20.rounded-xl:focus {
+  .w-full.bg-sguard-card.border.border-blue-500\/20.rounded-xl:focus {
     border-color: rgba(59, 130, 246, 0.60) !important;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12) !important;
     outline: none !important;
@@ -409,11 +409,11 @@
 
 
   /* ─── ASSIGNED INCIDENT CARDS ───────────────────────────────────── */
-  .bg-\[#11141d\] {
+  .bg-sguard-darker {
     transition: border-color 0.25s, box-shadow 0.25s !important;
     animation: none !important;
   }
-  .bg-\[#11141d\]:hover {
+  .bg-sguard-darker:hover {
     border-color: rgba(59, 130, 246, 0.30) !important;
     box-shadow: 0 0 12px rgba(59, 130, 246, 0.08) !important;
   }
