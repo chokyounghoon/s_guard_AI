@@ -215,6 +215,7 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
     if (isAiQuery) {
       try {
         const apiKey = 'app-ZDaVB8EWtA5vmTYJLmbysdQq';
+        const cleanUser = String(currentUser?.employee_id || "sguard_user").replace(/[^a-zA-Z0-9_-]/g, '') || "sguard_user";
         const difyRes = await fetch('https://api.dify.ai/v1/chat-messages', {
           method: 'POST',
           headers: {
@@ -223,9 +224,9 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
           },
           body: JSON.stringify({
             inputs: {},
-            query: `[${incidentId}] ${aiQueryText}`,
+            query: `[${incidentId || "INC_000"}] ${aiQueryText}`.trim(),
             response_mode: "blocking",
-            user: currentUser?.employee_id || "sguard_user"
+            user: cleanUser
           })
         });
         if (difyRes.ok) {
@@ -244,6 +245,9 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
               text: aiAnswer
             }));
           }
+        } else {
+          const errText = await difyRes.text();
+          console.error("Dify API 400 Error:", errText);
         }
       } catch (err) {
         console.error("AI API Error:", err);

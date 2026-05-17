@@ -322,6 +322,7 @@ export default function MobileChat({ user }) {
       const callDify = async () => {
         try {
           const apiKey = 'app-ZDaVB8EWtA5vmTYJLmbysdQq';
+          const cleanUser = String(user?.employee_id || "sguard_user").replace(/[^a-zA-Z0-9_-]/g, '') || "sguard_user";
           const difyRes = await fetch('https://api.dify.ai/v1/chat-messages', {
             method: 'POST',
             headers: {
@@ -330,9 +331,9 @@ export default function MobileChat({ user }) {
             },
             body: JSON.stringify({
               inputs: {},
-              query: `[${incidentId}] ${aiQueryText}`,
+              query: `[${incidentId || "INC_000"}] ${aiQueryText}`.trim(),
               response_mode: "blocking",
-              user: user?.employee_id || "sguard_user"
+              user: cleanUser
             })
           });
           if (difyRes.ok) {
@@ -350,6 +351,9 @@ export default function MobileChat({ user }) {
                 text: aiAnswer
               }));
             }
+          } else {
+            const errText = await difyRes.text();
+            console.error("Dify API 400 Error:", errText);
           }
         } catch (e) {
           console.error("Dify API error", e);
