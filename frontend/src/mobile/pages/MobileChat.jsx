@@ -47,9 +47,14 @@ export default function MobileChat({ user }) {
   const { allCodes } = useCodebook();
 
   const getStatusName = (code) => {
-    if (!code) return 'INC_002'; // Fallback
-    const found = allCodes.find(c => c.category === 'INCIDENT_STATUS' && c.code === code);
-    return found ? found.name : code;
+    if (!code) return '분석중';
+    const norm = String(code).toUpperCase().trim();
+    const found = allCodes.find(c => c.category === 'INCIDENT_STATUS' && (c.code.toUpperCase() === norm || c.name.toUpperCase() === norm));
+    if (found) return found.name;
+    if (norm === 'INC_001' || norm === 'OPEN' || norm === '미확인' || norm === '대기') return '미처리';
+    if (norm === 'INC_002' || norm === 'PROGRESS' || norm === '분석중' || norm === '처리중' || norm === '진행중') return '진행중';
+    if (norm === 'INC_003' || norm === 'CLOSED' || norm === '처리완료' || norm === '조치완료') return '처리완료';
+    return code;
   };
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');

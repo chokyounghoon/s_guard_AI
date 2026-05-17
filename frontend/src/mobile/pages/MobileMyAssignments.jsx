@@ -5,11 +5,13 @@ import {
   AlertCircle, Zap, Bot, RefreshCw, ClipboardList, Info, FileText, Activity
 } from 'lucide-react';
 import { getAuthHeaders } from '../../lib/authStore';
+import { useCodebook } from '../../context/CodebookContext';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function MobileMyAssignments({ user, onAiClick }) {
   const navigate = useNavigate();
+  const { allCodes } = useCodebook();
   const [myAssignments, setMyAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,13 +47,15 @@ export default function MobileMyAssignments({ user, onAiClick }) {
     return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
   };
 
-  const getStatusName = (status) => {
-    if (!status) return '미확인';
-    const s = String(status).toUpperCase();
-    if (s === 'INC_001') return '미확인';
-    if (s === 'INC_002') return '분석중';
-    if (s === 'INC_003') return '처리완료';
-    return status;
+  const getStatusName = (code) => {
+    if (!code) return '미확인';
+    const norm = String(code).toUpperCase().trim();
+    const found = allCodes?.find(c => c.category === 'INCIDENT_STATUS' && (c.code.toUpperCase() === norm || c.name.toUpperCase() === norm));
+    if (found) return found.name;
+    if (norm === 'INC_001' || norm === 'OPEN' || norm === '미확인' || norm === '대기') return '미확인';
+    if (norm === 'INC_002' || norm === 'PROGRESS' || norm === '분석중' || norm === '처리중' || norm === '진행중') return '분석중';
+    if (norm === 'INC_003' || norm === 'CLOSED' || norm === '처리완료' || norm === '조치완료') return '처리완료';
+    return code;
   };
 
   const fetchMyAssignments = async (isRefresh = false) => {

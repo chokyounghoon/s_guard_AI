@@ -223,20 +223,16 @@ export default function WorkflowPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Calendar className="w-3 h-3 text-slate-500" />
-              <span className="text-[9px] font-bold text-slate-500 uppercase">인지시각</span>
-            </div>
-            <span className="text-xs font-mono font-bold text-slate-300">{fmt(incidentData?.created_at) || '-'}</span>
+        <div className="flex items-center justify-between bg-white/[0.02] rounded-2xl p-3.5 border border-white/5 mt-3 text-xs">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-slate-400 font-bold">인지시각:</span>
+            <span className="font-mono font-bold text-slate-200">{fmt(incidentData?.created_at) || '-'}</span>
           </div>
-          <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <User className="w-3 h-3 text-slate-500" />
-              <span className="text-[9px] font-bold text-slate-500 uppercase">발신자</span>
-            </div>
-            <span className="text-xs font-bold text-slate-300 truncate block">{incidentData?.sender || 'SYSTEM'}</span>
+          <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+            <User className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-slate-400 font-bold">발신자:</span>
+            <span className="font-bold text-blue-400 truncate max-w-[120px]">{incidentData?.sender || 'SYSTEM'}</span>
           </div>
         </div>
       </div>
@@ -277,30 +273,39 @@ export default function WorkflowPage() {
           </span>
         </div>
         <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {assignees.length > 0 ? assignees.map((a, i) => (
-            <div key={`${a.user_id}-${i}`} className="flex items-center justify-between p-3 bg-white/[0.02] rounded-2xl border border-white/5">
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-[11px] shadow-inner ${getAvatarColor(a.name || a.user_id)}`}>
-                  {getInitials(a.name || a.user_id)}
+          {assignees.length > 0 ? assignees.map((a, i) => {
+            const isUnparticipated = ['미참여', 'INC_001', '미확인', '대기'].includes(a.status);
+            const isDone = ['INC_003', '처리완료', 'CLOSED'].includes(a.status);
+            const isActive = ['INC_002', '처리중', '진행중'].includes(a.status);
+            
+            const badgeLabel = isDone ? '처리완료' : isUnparticipated ? '미참여' : isActive ? '참여중' : a.status;
+            const badgeCls = isDone || isActive
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-black'
+              : 'bg-slate-800 text-slate-400 border-white/10';
+            const avatarBg = isDone || isActive
+              ? 'bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.5)] font-black'
+              : 'bg-slate-800 text-slate-500 border border-white/10';
+
+            return (
+              <div key={`${a.user_id}-${i}`} className="flex items-center justify-between p-3 bg-white/[0.02] rounded-2xl border border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] ${avatarBg}`}>
+                    {getInitials(a.name || a.user_id)}
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-black text-white tracking-tight">{a.name || a.user_id}</p>
+                    <p className="text-[10px] text-slate-500/70 font-normal whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px] tracking-tight">
+                      {a.user_id} {a.team_name || a.part_name ? `· ${[a.team_name, a.part_name].filter(Boolean).join(' ')}` : ''}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[13px] font-black text-white tracking-tight">{a.name || a.user_id}</p>
-                  <p className="text-[10px] text-slate-500/70 font-normal whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px] tracking-tight">
-                    {a.user_id} {a.team_name || a.part_name ? `· ${[a.team_name, a.part_name].filter(Boolean).join(' ')}` : ''}
-                  </p>
-                </div>
+                <span className={`text-[9px] px-2.5 py-1 rounded-full flex items-center gap-1 border ${badgeCls}`}>
+                  {(isDone || isActive) ? <CheckCircle2 className="w-2.5 h-2.5" /> : <UserX className="w-2.5 h-2.5" />}
+                  {badgeLabel}
+                </span>
               </div>
-              <span className={`text-[9px] font-black px-2 py-1 rounded-full flex items-center gap-1 border ${
-                a.status==='처리완료' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                a.status==='미참여'   ? 'bg-slate-800 text-slate-500 border-white/5' :
-                                        'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
-                {a.status==='처리중'   && <Zap className="w-2.5 h-2.5" />}
-                {a.status==='처리완료' && <CheckCircle2 className="w-2.5 h-2.5" />}
-                {a.status==='미참여'   && <UserX className="w-2.5 h-2.5" />}
-                {a.status}
-              </span>
-            </div>
-          )) : <div className="p-4 text-center text-[11px] text-slate-500 col-span-2">할당된 담당자가 없습니다.</div>}
+            );
+          }) : <div className="p-4 text-center text-[11px] text-slate-500 col-span-2">할당된 담당자가 없습니다.</div>}
         </div>
       </div>
 
@@ -354,84 +359,119 @@ export default function WorkflowPage() {
 
         <div className="relative">
           {/* 타임라인 선 */}
-          <div className="absolute left-[19px] lg:left-[23px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-white/10 to-transparent pointer-events-none" />
+          <div className="absolute left-[15px] lg:left-[15px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-white/10 to-transparent pointer-events-none" />
 
-          <div className="space-y-8 relative z-10">
+          <div className="space-y-6 relative z-10">
             <AnimatePresence>
               {FLOW_STEPS.map((step, sIdx) => {
                 let log = workflowLogs.find(l => l.id === step.id);
                 if (step.id === 'RAG_AGENT') log = workflowLogs.find(l=>l.id==='RAG') || workflowLogs.find(l=>l.id==='AGENT');
                 const done = !!log;
-            const next = sIdx === firstPending;
-            const Icon = step.icon;
+                const next = sIdx === firstPending;
+                const Icon = step.icon;
 
-            let intervalText = null;
-            let intervalMinutes = 0;
-            if (done && sIdx < FLOW_STEPS.length - 1) {
-              const nextId = FLOW_STEPS[sIdx+1].id;
-              let nextLog = workflowLogs.find(l => l.id === nextId);
-              if (!nextLog && nextId === 'RAG_AGENT') {
-                nextLog = workflowLogs.find(l => l.id === 'RAG') || workflowLogs.find(l => l.id === 'AGENT');
-              }
-              if (nextLog) {
-                const diff = new Date(nextLog.timestamp) - new Date(log.timestamp);
-                const m = Math.floor(diff / 60000);
-                const sec = Math.floor((diff % 60000) / 1000);
-                intervalMinutes = m;
-                intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요` : m > 0 ? `⏱ ${m}분 ${sec}초 소요` : `⏱ ${sec}초 소요`;
-              } else if (sIdx === firstPending - 1) {
-                const diff = currentTime - new Date(log.timestamp);
-                const m = Math.floor(diff / 60000);
-                const sec = Math.floor((diff % 60000) / 1000);
-                intervalMinutes = m;
-                intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과` : m > 0 ? `⏱ ${m}분 ${sec}초 경과` : `⏱ ${sec}초 경과`;
-              }
-            }
+                const stepPrefixes = {
+                  SMS: '[인시던트 인지]',
+                  RAG_AGENT: '[AI 초기 분석]',
+                  WARROOM: '[대응 워룸 가동]',
+                  KNOWLEDGE: '[장애 조치 완료]'
+                };
 
-            return (
-              <motion.div key={step.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: sIdx * 0.1 }} className="relative pl-14 lg:pl-20">
-                {/* 아이콘 마커 */}
-                <div className={`absolute left-0 top-0 w-10 h-10 lg:w-12 lg:h-12 rounded-2xl border-2 border-[#0a0c14] z-20 flex items-center justify-center transition-all duration-500
-                  ${done ? `bg-${step.color}-500 shadow-[0_0_15px_rgba(var(--color-${step.color}-500),0.5)]` : next ? 'bg-[#151926] border-blue-500' : 'bg-[#151926] border-white/10'}`}>
-                  <Icon className={`w-4 h-4 lg:w-5 lg:h-5 ${done ? 'text-white' : next ? 'text-blue-400' : 'text-slate-600'}`} />
-                </div>
+                let intervalText = null;
+                let intervalMinutes = 0;
+                let isElapsedLive = false;
+                if (done && sIdx < FLOW_STEPS.length - 1) {
+                  const nextId = FLOW_STEPS[sIdx+1].id;
+                  let nextLog = workflowLogs.find(l => l.id === nextId);
+                  if (!nextLog && nextId === 'RAG_AGENT') {
+                    nextLog = workflowLogs.find(l => l.id === 'RAG') || workflowLogs.find(l => l.id === 'AGENT');
+                  }
+                  if (nextLog) {
+                    const diff = new Date(nextLog.timestamp) - new Date(log.timestamp);
+                    const m = Math.floor(diff / 60000);
+                    const sec = Math.floor((diff % 60000) / 1000);
+                    intervalMinutes = m;
+                    intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요` : m > 0 ? `⏱ ${m}분 ${sec}초 소요` : `⏱ ${sec}초 소요`;
+                  } else if (sIdx === firstPending - 1) {
+                    isElapsedLive = true;
+                    const diff = currentTime - new Date(log.timestamp);
+                    const m = Math.floor(diff / 60000);
+                    const sec = Math.floor((diff % 60000) / 1000);
+                    intervalMinutes = m;
+                    intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과` : m > 0 ? `⏱ ${m}분 ${sec}초 경과` : `⏱ ${sec}초 경과`;
+                  }
+                }
 
-                {/* 콘텐츠 카드 */}
-                <div className={`p-4 lg:p-5 rounded-2xl border transition-all duration-300 ${done ? 'bg-white/[0.03] border-white/10 shadow-lg' : next ? 'bg-blue-900/10 border-blue-500/30 shadow-[0_0_20px_rgba(37,99,235,0.1)]' : 'bg-transparent border-transparent opacity-40'}`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                    <h4 className={`text-base font-black tracking-tight ${done ? 'text-white' : next ? 'text-blue-400' : 'text-slate-500'}`}>
-                      {step.label}
-                    </h4>
-                    {done ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-slate-400 bg-black/30 px-2 py-0.5 rounded-md">{fmt(log.timestamp)}</span>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      </div>
-                    ) : next && (
-                      <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md uppercase border border-blue-500/20">Processing</span>
-                    )}
-                  </div>
-                  
-                  <p className={`text-sm leading-relaxed ${done ? 'text-slate-300' : next ? 'text-blue-200' : 'text-slate-600'}`}>
-                    {done ? log.detail : next ? '실시간 AI 분석 및 보안 정책 대조를 통한 대응 시퀀스가 활성화되었습니다.' : '이전 단계 완료 대기 중'}
-                  </p>
-
-
-                  {/* 소요 시간 라벨 */}
-                  {intervalText && sIdx < FLOW_STEPS.length - 1 && (
-                    <div className="mt-3 flex justify-end">
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${
-                        intervalMinutes > 60 ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' : intervalMinutes > 10 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                      }`}>
-                        {intervalText}
-                      </span>
+                return (
+                  <motion.div key={step.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: sIdx * 0.1 }} className="relative pl-10 lg:pl-10">
+                    {/* 원형 타임라인 노드 */}
+                    <div className={`absolute left-[3px] lg:left-[3px] top-4 w-6 h-6 rounded-full z-20 flex items-center justify-center transition-all duration-500 border ${
+                      done ? 'bg-emerald-500 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]' : next ? 'bg-blue-600 border-blue-400 shadow-[0_0_12px_rgba(37,99,235,0.8)] animate-pulse' : 'bg-slate-800 border-slate-700'
+                    }`}>
+                      <Icon className={`w-3.5 h-3.5 ${done || next ? 'text-white' : 'text-slate-500'}`} />
                     </div>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+
+                    {/* 콘텐츠 카드 */}
+                    <div className={`p-4 lg:p-5 rounded-2xl border transition-all duration-300 ${done ? 'bg-white/[0.03] border-white/10 shadow-lg' : next ? 'bg-blue-900/15 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.15)]' : 'bg-transparent border-transparent opacity-40'}`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 border-b border-white/5 pb-2.5">
+                        <h4 className={`text-sm font-black tracking-tight flex items-center gap-1.5 ${done ? 'text-white' : next ? 'text-blue-400 font-bold tracking-wide' : 'text-slate-500'}`}>
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">STEP {sIdx + 1}</span>
+                          {step.label}
+                        </h4>
+                        {done ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono text-slate-400 bg-black/30 px-2 py-0.5 rounded-md">{fmt(log.timestamp)}</span>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          </div>
+                        ) : next && (
+                          <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md uppercase border border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.5)]">Processing</span>
+                        )}
+                      </div>
+                      
+                      <div className={`text-xs sm:text-sm leading-relaxed mt-2 ${done ? 'text-slate-300' : next ? 'text-blue-200' : 'text-slate-600'}`}>
+                        {done ? (
+                          <div className="space-y-1">
+                            <strong className="text-white font-black block text-xs tracking-tight text-blue-400">{stepPrefixes[step.id]}</strong>
+                            <p className="font-normal text-slate-300 leading-relaxed">{log.detail}</p>
+                          </div>
+                        ) : next ? (
+                          <div className="space-y-1">
+                            <strong className="text-blue-400 font-black block text-xs tracking-tight">{stepPrefixes[step.id]} (진행 중)</strong>
+                            <p className="font-normal text-blue-200/90 leading-relaxed">실시간 AI 분석 및 보안 정책 대조를 통한 대응 시퀀스가 활성화되었습니다.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <strong className="text-slate-500 font-black block text-xs tracking-tight">{stepPrefixes[step.id]} (대기)</strong>
+                            <p className="font-normal text-slate-600 leading-relaxed">이전 단계 완료 대기 중</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 소요 시간 라벨 (소요시간 vs 경과시간 Live Dot 분리) */}
+                      {intervalText && sIdx < FLOW_STEPS.length - 1 && (
+                        <div className="mt-3.5 flex justify-end">
+                          {isElapsedLive ? (
+                            <span className="text-[11px] font-black px-3 py-1 rounded-full border bg-orange-500/15 text-orange-400 border-orange-500/30 shadow-[0_0_12px_rgba(249,115,22,0.25)] flex items-center gap-2">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                              </span>
+                              {intervalText} (진행 중)
+                            </span>
+                          ) : (
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${
+                              intervalMinutes > 60 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                            }`}>
+                              {intervalText}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
       </div>
     </div>
   </div>

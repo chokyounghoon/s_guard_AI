@@ -1980,7 +1980,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
                     return roomExists ? (
                       <button onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)} className="skeuo-btn w-full py-3.5 bg-gradient-to-r from-[#00e5ff]/20 to-[#00e5ff]/10 border border-[#00e5ff]/50 rounded-xl font-bold text-sm text-[#00e5ff] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)]">
-                        <Zap size={16} />참여 중인 워룸으로 이동<ChevronRight size={16} />
+                        <Zap size={16} />해당 워룸으로 이동<ChevronRight size={16} />
                       </button>
                     ) : (
                       <button 

@@ -12,12 +12,17 @@ export default function IncidentListPage() {
   const queryParams = new URLSearchParams(location.search);
   const type = queryParams.get('type') || 'AI';
   const category = queryParams.get('category') || 'All';
-  const { getCodesByCategory } = useCodebook();
-  const statusCodes = getCodesByCategory('INCIDENT_STATUS');
+  const { allCodes } = useCodebook();
 
   const getStatusName = (code) => {
-    const found = statusCodes.find(c => c.code_value === code);
-    return found ? found.code_name : code;
+    if (!code) return '미처리';
+    const norm = String(code).toUpperCase().trim();
+    const found = allCodes.find(c => c.category === 'INCIDENT_STATUS' && (c.code.toUpperCase() === norm || c.name.toUpperCase() === norm));
+    if (found) return found.name;
+    if (norm === 'INC_001' || norm === 'OPEN' || norm === '미확인' || norm === '대기') return '미처리';
+    if (norm === 'INC_002' || norm === 'PROGRESS' || norm === '분석중' || norm === '처리중' || norm === '진행중') return '진행중';
+    if (norm === 'INC_003' || norm === 'CLOSED' || norm === '처리완료' || norm === '조치완료') return '처리완료';
+    return code;
   };
 
   const [loading, setLoading] = useState(true);
