@@ -5,7 +5,7 @@ import {
   AlertTriangle, Mic, Square, Wifi, WifiOff, Plus, Sparkles
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
-import ReactMarkdown from 'react-markdown';
+import AICardMarkdown from '../../components/AICardMarkdown';
 import { useCodebook } from '../../context/CodebookContext';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -477,8 +477,8 @@ export default function MobileChat({ user }) {
                     <span>{formatTime(msg.ts || msg.time)}</span>
                   </div>
                 </div>
-                <div className="prose prose-invert prose-sm max-w-none text-slate-100 leading-relaxed prose-headings:text-[#00e5ff] prose-a:text-[#00ff88] prose-strong:text-[#00ff88] prose-strong:bg-[#00ff88]/10 prose-strong:px-1 prose-strong:py-0.5 prose-strong:rounded">
-                  <ReactMarkdown>{msg.content || msg.text || ''}</ReactMarkdown>
+                <div className="pt-2">
+                  <AICardMarkdown text={msg.content || msg.text || ''} />
                 </div>
               </div>
             );

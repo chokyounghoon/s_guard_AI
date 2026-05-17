@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Phone, Menu, Plus, Send, Home, MessageSquare, BarChart, BarChart2, Settings, Info, AlertTriangle, ChevronDown, ChevronUp, Users, LogOut, FileText, UserPlus, Bot, Sparkles, Zap, X, Database, Paperclip, Image as ImgIcon, Shield, Server, User, Terminal, CheckCircle, CheckCircle2, Smile, Hash, Network, Megaphone, Star, UserX, Search, ChevronRight } from 'lucide-react';
 import AIChatBubble from '../components/AIChatBubble';
-import ReactMarkdown from 'react-markdown';
+import AICardMarkdown from '../components/AICardMarkdown';
 import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
@@ -256,8 +256,8 @@ const ChatMessageRow = React.memo(({
             <span>{msg.time}</span>
           </div>
         </div>
-        <div className="prose prose-invert prose-sm max-w-none text-slate-100 leading-relaxed prose-headings:text-[#00e5ff] prose-a:text-[#00ff88] prose-strong:text-[#00ff88] prose-strong:bg-[#00ff88]/10 prose-strong:px-1 prose-strong:py-0.5 prose-strong:rounded">
-          <ReactMarkdown>{msg.text || msg.content || ''}</ReactMarkdown>
+        <div className="pt-2">
+          <AICardMarkdown text={msg.text || msg.content || ''} />
         </div>
       </div>
     );

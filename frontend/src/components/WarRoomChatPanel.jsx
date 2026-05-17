@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info, Bot } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import AICardMarkdown from './AICardMarkdown';
 import { getAccessToken } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -362,8 +362,8 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                       <span>{msg.time || msg.ts ? formatKst(msg.time || msg.ts) : ''}</span>
                     </div>
                   </div>
-                  <div className="prose prose-invert prose-sm max-w-none text-slate-100 leading-relaxed prose-headings:text-[#00e5ff] prose-a:text-[#00ff88] prose-strong:text-[#00ff88] prose-strong:bg-[#00ff88]/10 prose-strong:px-1 prose-strong:py-0.5 prose-strong:rounded">
-                    <ReactMarkdown>{msg.text || msg.content || ''}</ReactMarkdown>
+                  <div className="pt-2">
+                    <AICardMarkdown text={msg.text || msg.content || ''} />
                   </div>
                 </div>
               );
