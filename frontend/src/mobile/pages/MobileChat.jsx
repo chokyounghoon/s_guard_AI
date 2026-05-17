@@ -59,6 +59,7 @@ export default function MobileChat({ user }) {
   const [participants, setParticipants] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isAiTyping, setIsAiTyping] = useState(false);
   
   const AI_AGENTS = [
     { id: 'expert', name: 'AI Expert', label: 'S-Autopilot Expert' },
@@ -326,6 +327,7 @@ export default function MobileChat({ user }) {
     // Dify API 호출
     if (isAiQuery) {
       const callDify = async () => {
+        setIsAiTyping(true);
         try {
           const apiKey = 'app-ZDaVB8EWtA5vmTYJLmbysdQq';
           const cleanUser = String(user?.employee_id || "sguard_user").replace(/[^a-zA-Z0-9_-]/g, '') || "sguard_user";
@@ -386,6 +388,8 @@ export default function MobileChat({ user }) {
           }
         } catch (e) {
           console.error("Dify API error", e);
+        } finally {
+          setIsAiTyping(false);
         }
       };
       callDify();
@@ -548,6 +552,23 @@ export default function MobileChat({ user }) {
             </div>
         );
       })}
+        {isAiTyping && (
+          <div className="w-full my-4 bg-gradient-to-br from-[#051329]/90 to-[#0a1b3a]/90 border border-[#00e5ff]/40 rounded-2xl p-4 shadow-[0_4px_25px_rgba(0,229,255,0.25)] animate-pulse flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 border border-[#00e5ff]/50 flex items-center justify-center shrink-0 animate-spin shadow-[0_0_12px_rgba(0,229,255,0.5)]">
+              <Bot className="w-4 h-4 text-[#00e5ff]" />
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-white text-sm tracking-wide">AI Assistant</span>
+                <span className="px-1.5 py-0.5 rounded-md bg-[#00e5ff]/15 border border-[#00e5ff]/30 text-[#00e5ff] text-[10px] font-mono font-bold animate-pulse tracking-wider">THINKING</span>
+              </div>
+              <span className="text-xs text-[#00ff88] font-mono mt-1 flex items-center gap-2 truncate">
+                <span className="inline-block w-2 h-2 rounded-full bg-[#00ff88] animate-ping shrink-0 shadow-[0_0_8px_#00ff88]" />
+                <span className="truncate">AI가 S-Guard 내부 DB 및 지식 기반을 연동하여 실시간 답변을 생성 중입니다...</span>
+              </span>
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

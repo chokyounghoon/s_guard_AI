@@ -43,14 +43,14 @@ const AICardMarkdown = ({ text }) => {
           ),
           em: ({ children }) => <span className="text-slate-300 italic font-medium">{children}</span>,
           p: ({ children }) => (
-            <div className="my-2.5 text-[14px] sm:text-[15px] leading-[1.65] text-slate-100 break-words whitespace-pre-wrap">
+            <div className="my-2.5 text-[13px] sm:text-[14px] leading-[1.65] text-slate-100 break-words whitespace-pre-wrap font-sans">
               {children}
             </div>
           ),
           ul: ({ children }) => <ul className="space-y-2 my-3 pl-2">{children}</ul>,
           ol: ({ children }) => <ol className="space-y-2 my-3 pl-2 list-decimal list-inside">{children}</ol>,
           li: ({ children }) => (
-            <li className="flex items-start gap-2 text-[14px] sm:text-[15px] text-slate-200 leading-relaxed">
+            <li className="flex items-start gap-2 text-[13px] sm:text-[14px] text-slate-200 leading-relaxed font-sans">
               <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[#00e5ff] shrink-0 shadow-[0_0_6px_rgba(0,229,255,0.8)] inline-block" />
               <span className="flex-1 min-w-0 block">{children}</span>
             </li>

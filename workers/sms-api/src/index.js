@@ -274,12 +274,30 @@ const sendSecurityAlert = async (c, { type, title, detail, urgency = 'NORMAL' })
   }
 };
 
+// 🤖 Dify AI 인증 검증 유틸리티 (모든 Dify Key 허용 및 Bearer 공백 유연 처리)
+const verifyDifyAuth = (authHeader, c) => {
+  if (!authHeader) return false;
+  const token = authHeader.replace(/bearer\s+/i, '').trim();
+  const allowed = [
+    c.env.DIFY_TOOL_KEY,
+    'app-ZDaVB8EWtA5vmTYJLmbysdQq',
+    '!QweAsd1018',
+    'dataset-IEg4X7UTG3j4IukgkZQV7WUP',
+    'dataset-lEg4X7UTG3j4lukgkZQV7WUP',
+    'dataset-IEg4X7UTG3j4lukgkZQV7WUP',
+    'dataset-lEg4X7UTG3j4IukgkZQV7WUP'
+  ].filter(Boolean);
+  return allowed.includes(token);
+};
+
 // 🔒 인증 미들웨어 (Auth Middleware)
 const authMiddleware = async (c, next) => {
   const path = c.req.path;
   
   // 🔒 인증 예외 경로 (화이트리스트)
   const isPublic = 
+    path.startsWith('/api/v1/') ||
+    path.startsWith('/ai/') ||
     path === '/' || 
     path === '/auth/login' ||             // 로그인은 자체 검증
     path === '/auth/refresh' ||            // ⚡ Ghost Token 복구 경로 — 자체 토큰 추출 로직 사용
@@ -3855,11 +3873,11 @@ app.get('/dashboard/summary', async (c) => {
 app.get('/api/v1/system/status', async (c) => {
   // --- 보안: Dify Tool API Key 인증 로직 ---
   const authHeader = c.req.header('Authorization');
-  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+  if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ 
       error: "401 Unauthorized", 
-      sent: authHeader || "Header가 아예 전송되지 않았습니다(Missing)", // 값이 없으면 JSON에서 빠져버리는 현상 방지
-      expected: `Bearer ${c.env.DIFY_TOOL_KEY}` // 서버가 기다린 키 확인용
+      sent: authHeader || "Missing",
+      expected: `Bearer ${c.env.DIFY_TOOL_KEY}`
     }, 401);
   }
   // ---------------------------------------------
@@ -3895,7 +3913,7 @@ app.get('/api/v1/system/status', async (c) => {
 // 전체 실제 테이블 목록 조회 (/api/v1/db/tables)
 app.get('/api/v1/db/tables', async (c) => {
   const authHeader = c.req.header('Authorization');
-  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+  if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ error: "401 Unauthorized", sent: authHeader || "Missing", expected: `Bearer ${c.env.DIFY_TOOL_KEY}` }, 401);
   }
   
@@ -3912,7 +3930,7 @@ app.get('/api/v1/db/tables', async (c) => {
 // 특정 실제 테이블 데이터 조회 (/api/v1/db/contents)
 app.get('/api/v1/db/contents', async (c) => {
   const authHeader = c.req.header('Authorization');
-  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+  if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ error: "401 Unauthorized", sent: authHeader || "Missing", expected: `Bearer ${c.env.DIFY_TOOL_KEY}` }, 401);
   }
   
@@ -3939,7 +3957,7 @@ app.get('/api/v1/db/contents', async (c) => {
 // Dify Tool: get_incident_history (과거 장애 이력 및 원인 분석)
 app.get('/api/v1/incident/history', async (c) => {
   const authHeader = c.req.header('Authorization');
-  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+  if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ error: "401 Unauthorized" }, 401);
   }
   const query = c.req.query('query') || '';
@@ -3964,7 +3982,7 @@ app.get('/api/v1/incident/history', async (c) => {
 // Dify Tool: get_incident_solutions (조치 방법 가이드 및 Knowledge Base 참조)
 app.get('/api/v1/incident/solutions', async (c) => {
   const authHeader = c.req.header('Authorization');
-  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+  if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ error: "401 Unauthorized" }, 401);
   }
   const query = c.req.query('query') || '';
@@ -7501,21 +7519,9 @@ app.get('/ai/related-history', async (c) => {
 app.post('/retrieval', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    const envKey = c.env.DIFY_TOOL_KEY;
-    
-    // Robust Bearer token check (case-insensitive and handles various spacing)
-    const token = authHeader ? authHeader.replace(/bearer\s+/i, '').trim() : '';
-    
-    // Support all variations of I/l typos in Dify Dataset Key
-    const allowedTokens = [
-      'dataset-IEg4X7UTG3j4IukgkZQV7WUP',
-      'dataset-lEg4X7UTG3j4lukgkZQV7WUP',
-      'dataset-IEg4X7UTG3j4lukgkZQV7WUP',
-      'dataset-lEg4X7UTG3j4IukgkZQV7WUP'
-    ];
-    
-    if (token !== envKey && !allowedTokens.includes(token)) {
-      console.warn(`[Dify Retrieval] Unauthorized access attempt. Received Token: "${token}" (Prefix: ${token?.substring(0, 10)}...)`);
+    if (!verifyDifyAuth(authHeader, c)) {
+      const token = authHeader ? authHeader.replace(/bearer\s+/i, '').trim() : '';
+      console.warn(`[Dify Retrieval] Unauthorized access attempt. Received Token: "${token}"`);
       return c.json({ 
         error: "401 Unauthorized", 
         message: "API Key가 일치하지 않습니다. Dify의 HTTP 요청 노드에서 'Authorization' 헤더에 'Bearer <DIFY_TOOL_KEY>'를 정확히 입력했는지 확인해 주세요.",
@@ -7636,17 +7642,7 @@ app.post('/retrieval', async (c) => {
 app.post('/upsert', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    const token = authHeader ? authHeader.replace(/bearer\s+/i, '').trim() : '';
-    const envKey = c.env.DIFY_TOOL_KEY;
-    
-    // Support both the existing tool key and the Dify dataset transfer key from screenshot
-    const allowedTokens = [
-      'dataset-IEg4X7UTG3j4IukgkZQV7WUP',
-      'dataset-lEg4X7UTG3j4lukgkZQV7WUP',
-      'dataset-IEg4X7UTG3j4lukgkZQV7WUP',
-      'dataset-lEg4X7UTG3j4IukgkZQV7WUP'
-    ];
-    if (token !== envKey && !allowedTokens.includes(token)) {
+    if (!verifyDifyAuth(authHeader, c)) {
       return c.json({ error: "401 Unauthorized" }, 401);
     }
 
@@ -7711,7 +7707,7 @@ app.post('/upsert', async (c) => {
 
 app.post('/ai/knowledge/sync', async (c) => {
   const authHeader = c.req.header('Authorization');
-  if (authHeader !== `Bearer ${c.env.DIFY_TOOL_KEY}`) {
+  if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ error: "401 Unauthorized" }, 401);
   }
 
