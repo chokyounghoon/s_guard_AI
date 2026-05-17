@@ -1848,7 +1848,30 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   onClose={() => { setShowAgentPanel(false); setSelectedSms(null); }}
                 />
               ) : (
-                <WarRoomChatPanel incidentId={selectedSms?.inc_id} currentUser={userProfile || {}} isVisible={true} />
+                <div className="fixed inset-0 z-[500] bg-[#0a0c12] flex flex-col h-[100dvh]">
+                  {/* 헤더 영역 (닫기 버튼 포함) */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 bg-[#0a0c12] z-10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+                        <MessageSquare className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-black text-white uppercase tracking-wider">War-Room Chat</h2>
+                        <p className="text-[10px] text-slate-400 font-mono">Expert Advisor Collaboration</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setActiveLogTab('ai')}
+                      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-xs font-bold active:scale-95 transition-all"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                  {/* 채팅 패널 영역 (스크롤을 여기서 처리) */}
+                  <div className="flex-1 min-h-0 relative">
+                    <WarRoomChatPanel incidentId={selectedSms?.inc_id} currentUser={userProfile || {}} isVisible={true} />
+                  </div>
+                </div>
               )
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center opacity-30" style={{ minHeight: 240 }}>
