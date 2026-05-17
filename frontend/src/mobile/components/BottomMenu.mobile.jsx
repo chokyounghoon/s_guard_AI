@@ -4,7 +4,7 @@ import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Net
 import { getUserProfile, getAllowedPaths, addAuthListener } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
 
-export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu, allowedPaths: _ignored }) {
+export default function BottomMenu({ currentPath, activePopup, onClosePopups, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu, allowedPaths: _ignored }) {
   const navigate = useNavigate();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
@@ -51,7 +51,10 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
           { id: 'my', label: 'MY', icon: User, path: '/my-assignments' },
           { id: 'more', label: '더보기', icon: MoreHorizontal, action: () => setShowMoreMenu(true) },
         ].map((item) => {
-          const isActive = currentPath === item.path || (item.path && currentPath?.startsWith(item.path));
+          const effectiveTab = showMoreMenu ? 'more' : activePopup ? activePopup : null;
+          const isActive = effectiveTab
+            ? item.id === effectiveTab
+            : (currentPath === item.path || (item.path && currentPath?.startsWith(item.path)));
           const Icon = item.icon;
 
           return (
@@ -59,6 +62,9 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
               key={item.id}
               onClick={() => {
                 setShowMoreMenu(false);
+                if (onClosePopups && item.id !== 'chat' && item.id !== 'inbox') {
+                  onClosePopups();
+                }
                 if (item.action) {
                   item.action();
                 } else if (item.path) {

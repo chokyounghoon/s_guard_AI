@@ -417,6 +417,8 @@ function AppContent() {
       {!isAuthPage && !isImmersivePage && (
         <BottomMenu
           currentPath={location.pathname}
+          activePopup={showWarRoomPopup ? 'chat' : showReportPopup ? 'inbox' : null}
+          onClosePopups={() => { setShowWarRoomPopup(false); setShowReportPopup(false); }}
           initialOpenMoreMenu={sessionStorage.getItem('console_return_pending') === '1'}
           onWarRoomClick={() => { fetchWarRooms(); setShowWarRoomPopup(true); }}
           onReportClick={() => { fetchWarRooms(); setShowReportPopup(true); }}
