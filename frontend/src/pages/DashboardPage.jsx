@@ -1050,6 +1050,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 
 
+  const deduplicateMessages = (msgs) => {
+    const seen = new Set();
+    return msgs.filter(m => {
+      const key = `${m.role}:${(m.text || '').trim().substring(0, 30)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   // Callback called from AiInsightPanel
   const handleAgentContent = (fullTranscript, isDone) => {
     const currentMsgs = parseTranscript(fullTranscript);
@@ -1071,13 +1081,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       // 완료 시: 결과가 있으면 업데이트, 없으면 현재 상태 유지
       if (filteredMsgs.length > 0) {
         setShowAgentPanel(true);
-        setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: true })));
+        setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: true }))));
       }
     } else {
       // 스트리밍 중: 2개 이상 파싱됐을 때만 중간 업데이트 (깜빡임 방지)
       if (filteredMsgs.length >= 2) {
         setShowAgentPanel(true);
-        setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: false })));
+        setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: false }))));
       }
     }
 
@@ -1087,7 +1097,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ incident_id: String(currentIncId), messages: filteredMsgs })
+          body: JSON.stringify({ incident_id: String(currentIncId), messages: deduplicateMessages(filteredMsgs) })
         })
         .then(res => res.json())
         .then(data => console.log('Save complete:', data))
@@ -1153,7 +1163,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
             const filtered = data.messages.filter(m => m.role !== 'AI분석');
-            const completedMsgs = filtered.map(m => ({ ...m, isCompleted: true }));
+            const completedMsgs = deduplicateMessages(filtered.map(m => ({ ...m, isCompleted: true })));
             const hasSecurityExpert = filtered.some(m => /Security|보안/i.test(m.role));
 
             if (hasSecurityExpert) {
@@ -1830,33 +1840,40 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               </h4>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
+                              {(msg.incident_status === '처리완료' || msg.incident_status === 'Completed' || msg.status === '처리완료' || msg.status === 'Completed' || Number(msg.is_analyzed) >= 1) && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${msg.inc_id}`); }}
+                                  className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 whitespace-nowrap shadow-[0_0_8px_rgba(217,70,239,0.2)]"
+                                >
+                                  REPORT
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
                                 className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 whitespace-nowrap"
                               >
                                 진행상태 <ExternalLink className="w-2.5 h-2.5" />
                               </button>
-                              <span className={`h-6 flex items-center px-2 rounded-lg border text-[8.5px] font-black whitespace-nowrap transition-all ${
-                                msg.incident_status === '처리완료'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                  : Number(msg.is_analyzed) >= 1
-                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'
-                              }`}>
-                                {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
-                              </span>
-
                             </div>
                           </div>
 
-                          {/* 중단: 발신자 + 사번 */}
+                          {/* 중단: 발신자 + 사번 + 분석 상태 뱃지 */}
                           <div className="flex flex-wrap items-center gap-2 mb-1">
                             <p className="text-[8.5px] text-slate-500 font-bold">발신: <span className="text-slate-400 font-mono">{msg.sender}</span></p>
                             {msg.employee_id && (
-                              <span className="h-5 flex items-center gap-1 bg-blue-500/10 px-1.5 rounded-md border border-blue-500/20 text-[8.5px] text-blue-400 font-mono font-black">
+                              <span className="h-5 flex items-center gap-1 bg-blue-500/10 px-1.5 rounded-md border border-blue-500/20 text-[8.5px] text-blue-400 font-mono font-black shrink-0">
                                 {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
                               </span>
                             )}
+                            <span className={`h-5 flex items-center px-2 rounded-md border text-[8.5px] font-black whitespace-nowrap transition-all shrink-0 ml-auto sm:ml-0 ${
+                              msg.incident_status === '처리완료'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                                : Number(msg.is_analyzed) >= 1
+                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.2)]'
+                                  : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'
+                            }`}>
+                              {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
+                            </span>
                           </div>
 
                           {/* 하단: 메시지 본문 + 타임스탬프 */}

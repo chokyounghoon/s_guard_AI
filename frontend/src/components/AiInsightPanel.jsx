@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw, ThumbsUp, ThumbsDown, CheckCircle, AlertCircle, X, ChevronRight } from 'lucide-react';
+import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw, ThumbsUp, ThumbsDown, CheckCircle, AlertCircle, X, ChevronRight, Hash, Search, Filter, ExternalLink } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
+import { toast } from 'react-hot-toast';
 
 // 🔗 장애 ID (INC- 또는 inc-숫자) 를 마크다운 링크로 변환 (대소문자 무관)
 const linkIncidentIds = (text) => {
@@ -67,6 +68,29 @@ const getCategoryFromAnalysis = (analysisText, message) => {
 
 export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete }) {
   const navigate = useNavigate();
+  
+  const handleChipClick = (value, label) => {
+    if (!value) return;
+    toast.success(`[${label}] '${value}' 관련 과거 장애 이력 및 시스템 상태를 필터링합니다.`, {
+      icon: '🔍',
+      style: {
+        borderRadius: '16px',
+        background: '#16191f',
+        color: '#00e5ff',
+        border: '1px solid rgba(0, 229, 255, 0.4)',
+        boxShadow: '0 0 20px rgba(0, 229, 255, 0.3)',
+        fontSize: '12px',
+        fontWeight: 'bold'
+      }
+    });
+
+    // 🚀 모바일/PC 반응형 스마트 라우팅 연동 (실제 필터링 작동)
+    const isMobile = window.innerWidth <= 768;
+    const targetRoute = isMobile ? '/mobile-report-search' : '/search';
+    navigate(targetRoute, { state: { keyword: value } });
+  };
+
+
   
   const formatYYMMDD = (dateStr) => {
     if (!dateStr) return '';
@@ -830,58 +854,73 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
       <div className="pb-4 relative">
         
-        {/* 장애 상세 정보 (확장 파라미터) */}
+        {/* 장애 상세 정보 -> 데이터 칩(Chip) 시각화 및 필터 인터랙션 */}
         {selectedSms && (
-          <div className="mb-3 animate-in fade-in slide-in-from-top-2 duration-500">
-            <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
-              <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">장애 상세 정보 (Detailed Incident Info)</span>
+          <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-500">
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Hash size={12} className="text-[#00e5ff]" />
+                  메타데이터 칩 필터 (Click to Filter)
+                </span>
                 {selectedSms.occurrence_time && (
                   <span className="text-[10px] text-blue-400 font-mono">발생: {formatYYMMDD(selectedSms.occurrence_time)}</span>
                 )}
               </div>
-              <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+
+              {/* 칩 목록 */}
+              <div className="flex flex-wrap gap-2 pt-1">
                 {[
-                  { label: '채널', value: selectedSms.channel },
-                  { label: 'IF아이디', value: selectedSms.if_id },
-                  { label: '서비스명', value: selectedSms.service_name, code: selectedSms.service_code },
-                  { label: '업무시스템', value: selectedSms.biz_system },
-                  { label: '에러코드', value: selectedSms.error_code },
-                  { label: '발생노드', value: selectedSms.occurrence_node },
-                  { label: '발생건수', value: selectedSms.occurrence_count },
-                ].map((f, i) => (f.value !== null && f.value !== undefined && f.value !== '' && f.value !== 0 && f.value !== '0') && (
-                  <div key={i} className="min-w-0">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">{f.label}</p>
-                    <p className="text-[10px] text-slate-200 font-mono break-all leading-tight" title={f.value}>
-                      {f.value} {f.code && <span className="text-[10px] text-slate-500">({f.code})</span>}
-                    </p>
-                  </div>
+                  { label: '업무시스템', value: selectedSms.biz_system, prefix: '#' },
+                  { label: '에러코드', value: selectedSms.error_code, prefix: '#' },
+                  { label: '서비스명', value: selectedSms.service_name, prefix: '#' },
+                  { label: '발생노드', value: selectedSms.occurrence_node, prefix: '@' },
+                  { label: '채널', value: selectedSms.channel, prefix: '#' },
+                  { label: 'IF아이디', value: selectedSms.if_id, prefix: 'IF:' },
+                  { label: '발생건수', value: selectedSms.occurrence_count ? `${selectedSms.occurrence_count}건` : null, prefix: '⚡' },
+                ].map((chip, i) => (chip.value !== null && chip.value !== undefined && chip.value !== '' && chip.value !== 0 && chip.value !== '0') && (
+                  <button
+                    key={i}
+                    onClick={() => handleChipClick(chip.value, chip.label)}
+                    className="skeuo-pill flex items-center gap-1.5 px-3 py-2 bg-[#12151a] hover:bg-[#1c2027] active:scale-95 border border-[#00e5ff]/40 rounded-xl text-xs font-black text-white transition-all shadow-[0_0_12px_rgba(0,229,255,0.15)] group cursor-pointer"
+                  >
+                    <span className="text-[#00e5ff] font-mono font-bold group-hover:scale-110 transition-transform">{chip.prefix}</span>
+                    <span className="tracking-tight">{chip.value}</span>
+                    <Search size={10} className="text-slate-500 group-hover:text-[#00ff88] transition-colors ml-1" />
+                  </button>
                 ))}
-                
-                {/* 에러 메시지 - 별도 행 */}
-                {selectedSms.error_message && (
-                  <div className="col-span-2 md:col-span-4 pt-2 border-t border-white/5">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">상세 에러 메시지</p>
-                    <p className="text-xs text-red-400/80 leading-relaxed font-mono italic">
+              </div>
+
+              {/* 에러 메시지 (강조 박스) */}
+              {selectedSms.error_message && (
+                <div className="skeuo-card mt-2 p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl shadow-[0_0_15px_rgba(239,68,68,0.15)] flex items-start gap-3">
+                  <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5 animate-pulse" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider mb-0.5">상세 에러 메시지</span>
+                    <p className="text-xs font-mono text-red-200 leading-relaxed italic break-words break-all">
                       "{selectedSms.error_message}"
                     </p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* 수신자 목록 */}
-                {selectedSms.receivers && selectedSms.receivers.length > 0 && (
-                  <div className="col-span-2 md:col-span-4 pt-2 border-t border-white/5">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">메시지 수신자 ({selectedSms.receivers.length}명)</p>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {selectedSms.receivers.map((r, i) => (
-                        <span key={i} className="text-[10px] text-slate-400 bg-white/10 px-2 py-0.5 rounded-md font-mono border border-white/5">
-                          {r}
-                        </span>
-                      ))}
-                    </div>
+              {/* 수신자 목록 칩 */}
+              {selectedSms.receivers && selectedSms.receivers.length > 0 && (
+                <div className="mt-2 p-3 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <Users size={12} className="text-purple-400" />
+                    수신자 ({selectedSms.receivers.length}명)
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedSms.receivers.map((r, i) => (
+                      <span key={i} className="text-[10px] text-slate-300 bg-white/10 px-2.5 py-1 rounded-lg font-mono border border-white/5 flex items-center gap-1.5 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                        {r}
+                      </span>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}

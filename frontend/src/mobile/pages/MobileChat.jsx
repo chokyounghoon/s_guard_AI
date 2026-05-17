@@ -10,6 +10,31 @@ import { useCodebook } from '../../context/CodebookContext';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
+// ── 🚀 2단계 최적화: Base64 → Blob Object URL 단일 변환 캐시 (모바일) ──
+const _mobileAvatarCache = new Map();
+const getMobileAvatarUrl = (pic) => {
+  if (!pic) return null;
+  if (_mobileAvatarCache.has(pic)) return _mobileAvatarCache.get(pic);
+  if (pic.startsWith('data:image')) {
+    try {
+      const [header, b64] = pic.split(',');
+      const mime = header.match(/:(.*?);/)[1];
+      const bstr = atob(b64);
+      let n = bstr.length;
+      const u8 = new Uint8Array(n);
+      while (n--) u8[n] = bstr.charCodeAt(n);
+      const url = URL.createObjectURL(new Blob([u8], { type: mime }));
+      _mobileAvatarCache.set(pic, url);
+      return url;
+    } catch { _mobileAvatarCache.set(pic, pic); return pic; }
+  } else if (pic.startsWith('http')) {
+    _mobileAvatarCache.set(pic, pic); return pic;
+  } else {
+    const url = `${API_BASE}${pic}`;
+    _mobileAvatarCache.set(pic, url); return url;
+  }
+};
+
 const formatTime = (ts) => {
   if (!ts) return '';
   const d = new Date(typeof ts === 'string' && !ts.includes('T') ? ts.replace(' ', 'T') : ts);
@@ -41,6 +66,8 @@ export default function MobileChat({ user }) {
   const reconnectTimer = useRef(null);
   const isMounted = useRef(true);
 
+  const cleanProfilePic = (pic) => (typeof pic === 'string' && pic.length > 300) ? null : (pic || null);
+
   // 인시던트 정보 + 채팅 기록 로드
   useEffect(() => {
     isMounted.current = true;
@@ -61,6 +88,7 @@ export default function MobileChat({ user }) {
         seq: m.seq,
         role: m.sender === user?.employee_id || m.sender === user?.name ? 'user' : (m.type === 'ai_analysis' ? 'assistant' : 'other'),
         sender: m.sender_name || m.sender,
+        avatar_url: getMobileAvatarUrl(m.profile_picture),
         content: m.text || m.content || '',
         ts: m.timestamp,
         read_count: m.read_count || 0,
@@ -142,6 +170,7 @@ export default function MobileChat({ user }) {
                   seq: data.seq,
                   role: (data.sender === user.employee_id || data.sender === user.name) ? 'user' : 'other',
                   sender: data.sender_name || data.sender,
+                  avatar_url: getMobileAvatarUrl(data.profile_picture),
                   content: data.text,
                   ts: data.timestamp,
                   read_count: data.read_count || 0,
@@ -222,6 +251,7 @@ export default function MobileChat({ user }) {
       seq: null,
       role: 'user',
       sender: user?.name || '나',
+      profile_picture: user?.profile_picture || null,
       content: text,
       ts: new Date().toISOString(),
       read_count: Math.max(0, participants.length - 1)
@@ -235,6 +265,7 @@ export default function MobileChat({ user }) {
       sender: user?.employee_id,
       name: user?.name,
       role: user?.role,
+      profile_picture: cleanProfilePic(user?.profile_picture),
       msg_type: 'user',
       text,
     }));
@@ -247,7 +278,10 @@ export default function MobileChat({ user }) {
         body: JSON.stringify({
           incident_id: normId,
           sender: user?.employee_id,
+          name: user?.name,
+          sender_name: user?.name,
           role: user?.role || 'user',
+          profile_picture: cleanProfilePic(user?.profile_picture),
           type: 'user',
           text,
         }),
@@ -316,17 +350,29 @@ export default function MobileChat({ user }) {
           </div>
         ) : null}
 
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[11px] font-bold ${
-              msg.role === 'user'
-                ? 'bg-[#00236e]/20 border border-[#00236e]/30 text-white/70'
-                : msg.role === 'assistant' ? 'bg-[#242424] border border-white/10 text-slate-300'
-                : 'bg-[#333333] border border-white/5 text-slate-400'
-            }`}>
-              {msg.role === 'user' ? (user?.name?.[0] || 'U') : msg.role === 'assistant' ? <Bot className="w-4 h-4" /> : (msg.sender?.[0] || '?')}
-            </div>
-            <div className={`max-w-[78%] flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+        {messages.map((msg) => {
+          const avatarUrl = msg.avatar_url || null;
+          return (
+            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className="relative w-8 h-8 shrink-0 mt-0.5">
+                {avatarUrl ? (
+                  <img 
+                    src={avatarUrl} 
+                    alt={msg.sender || 'User'} 
+                    className="w-8 h-8 rounded-full object-cover border border-white/10 shadow-sm"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex'; }}
+                  />
+                ) : null}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${avatarUrl ? 'hidden' : 'flex'} ${
+                  msg.role === 'user'
+                    ? 'bg-[#00236e]/20 border border-[#00236e]/30 text-white/70'
+                    : msg.role === 'assistant' ? 'bg-[#242424] border border-white/10 text-slate-300'
+                    : 'bg-[#333333] border border-white/5 text-slate-400'
+                }`}>
+                  {msg.role === 'user' ? (user?.name?.[0] || 'U') : msg.role === 'assistant' ? <Bot className="w-4 h-4" /> : (msg.sender?.[0] || '?')}
+                </div>
+              </div>
+              <div className={`max-w-[78%] flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
               {msg.role === 'other' && (
                 <span className="text-[10px] text-slate-500 px-1 font-medium">{msg.sender}</span>
               )}
@@ -350,7 +396,8 @@ export default function MobileChat({ user }) {
               </div>
             </div>
           </div>
-        ))}
+        );
+      })}
         <div ref={bottomRef} />
       </div>
 

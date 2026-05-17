@@ -4948,13 +4948,23 @@ app.get('/warroom/rooms', async (c) => {
 
   if (q) { sql += ` AND (w.title LIKE ? OR w.inc_id LIKE ?)`; params.push(`%${q}%`, `%${q}%`) }
 
+  const startDate = c.req.query('start_date') || ''
+  const endDate = c.req.query('end_date') || ''
+  const assignedTo = c.req.query('assigned_to') || ''
+
   // status 필터: 프론트 값 → DB 실제값으로 변환
   if (statusFilter === 'Completed') {
     sql += ` AND (UPPER(w.status) = 'CLOSED' OR w.status = '최종완료')`
   } else if (statusFilter === 'Open') {
     sql += ` AND (w.status IS NULL OR (UPPER(w.status) != 'CLOSED' AND w.status != '최종완료'))`
   }
-  // 'all' 또는 파라미터 없으면 전체 반환
+  
+  if (startDate) { sql += ` AND DATE(w.reg_dt) >= DATE(?)`; params.push(startDate) }
+  if (endDate) { sql += ` AND DATE(w.reg_dt) <= DATE(?)`; params.push(endDate) }
+  if (assignedTo) {
+    sql += ` AND EXISTS (SELECT 1 FROM incident_assignments ia LEFT JOIN users u_a ON ia.user_id = u_a.employee_id WHERE ia.inc_id = w.inc_id AND (u_a.name LIKE ? OR ia.user_id LIKE ?))`
+    params.push(`%${assignedTo}%`, `%${assignedTo}%`)
+  }
 
   sql += ` ORDER BY w.reg_dt DESC LIMIT 50`
 
@@ -5730,7 +5740,7 @@ app.post('/ai/generate-report', async (c) => {
 
   const [{ results: agentLogs }, { results: chatLogs }, { results: attachments }] = await Promise.all([
     db.prepare("SELECT agent_role, content, reg_dt FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(rawId).all(),
-    db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC").bind(rawId).all(),
+    db.prepare("SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC").bind(rawId).all(),
     db.prepare("SELECT original_name, file_type, url, uploaded_by, timestamp FROM warroom_attachments WHERE inc_id = ? ORDER BY seq ASC").bind(rawId).all(),
   ])
 
@@ -6190,7 +6200,7 @@ app.post('/ai/summarize-chat', async (c) => {
       }
 
       // 3. Fetch ONLY user chat history - Using numeric ID
-      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(cleanId).all()
+      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(cleanId).all()
       
       // (incDetail and wfLogs already fetched above in parallel)
       const wfLogs_data = wfLogs;
@@ -6846,7 +6856,7 @@ app.get('/warroom/report/:id', async (c) => {
 
   // 4. War-Room chat history
   const { results: chatLogs } = await db.prepare(
-    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
+    "SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
   ).bind(rawId).all()
 
   // 5. Attachments
@@ -6979,7 +6989,7 @@ app.get('/warroom/participants/:id', async (c) => {
   const normId = String(id)
   const { results } = await db.prepare(`
     SELECT 
-      u.name, u.employee_id, u.role, u.company, u.position, u.phone,
+      u.name, u.employee_id, u.role, u.company, u.position, u.phone, u.profile_picture,
       COALESCE(ot.name, u.team) as team_name,
       COALESCE(op.name, u.part) as part_name
     FROM user_warrooms uw
@@ -7994,6 +8004,7 @@ app.get('/ai/incident/workflow-details', async (c) => {
         ia.status, 
         ia.assigned_at, 
         u.name,
+        u.profile_picture,
         COALESCE(ot.name, u.team) as team_name,
         COALESCE(op.name, u.part) as part_name,
         (SELECT COUNT(*) FROM warroom_chats wc WHERE (wc.inc_id = ? ) AND wc.sender = ia.user_id) as chat_count
@@ -8395,7 +8406,7 @@ app.get('/warroom/chat/:id', async (c) => {
     "SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC"
   ).bind(rawId).all()
   const { results: wrResults } = await db.prepare(
-    "SELECT wc.*, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
+    "SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? ORDER BY wc.timestamp ASC"
   ).bind(rawId).all()
 
   // Format AI messages
@@ -8416,6 +8427,7 @@ app.get('/warroom/chat/:id', async (c) => {
     sender: r.sender,
     sender_name: r.sender_name || r.sender,
     role: r.role,
+    profile_picture: r.profile_picture || null,
     text: r.text,
     timestamp: r.timestamp,
     read_count: r.read_count || 0,
@@ -8435,7 +8447,7 @@ app.get('/warroom/chat/:id', async (c) => {
 
 // Warroom chat post
 app.post('/warroom/chat', async (c) => {
-  const { incident_id, sender, role, type, text } = await c.req.json()
+  const { incident_id, sender, name, sender_name, role, type, text } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
   const senderId = sender || 'anonymous'
@@ -8444,8 +8456,8 @@ app.post('/warroom/chat', async (c) => {
   const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1
 
   await db.prepare(
-    "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(incident_id, seq, senderId, role || 'user', type || 'user', text, now, senderId, now, senderId, now).run()
+    "INSERT INTO warroom_chats (inc_id, seq, sender, name, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(incident_id, seq, senderId, name || sender_name || senderId, role || 'user', type || 'user', text, now, senderId, now, senderId, now).run()
   
   return c.json({ status: 'saved' })
 })
@@ -9480,12 +9492,38 @@ export class WarRoom {
           console.warn(`[DO] [${this.state.id.toString()}] Received binary/non-string message, ignoring.`);
           return;
         }
-        const data = JSON.parse(msg.data);
-        console.log(`[DO] [${this.state.id.toString()}] Incoming event: ${data.type}`);
-        await this.onMessage(webSocket, data);
+
+        // ── 🚀 패킷 뭉침(Coalescing) 복구: 깊이 추적 기반 JSON 스트림 분리기 ──
+        // 단순 "}{" 분리는 문자열 내부의 중괄호를 오염시킬 수 있으므로,
+        // 실제 depth를 추적하여 최상위 JSON 오브젝트 경계만 정확히 분리합니다.
+        const rawStr = String(msg.data).trim();
+        const jsonPayloads = [];
+        let depth = 0, inStr = false, esc = false, start = 0;
+        for (let i = 0; i < rawStr.length; i++) {
+          const ch = rawStr[i];
+          if (esc) { esc = false; continue; }
+          if (ch === '\\' && inStr) { esc = true; continue; }
+          if (ch === '"') { inStr = !inStr; continue; }
+          if (inStr) continue;
+          if (ch === '{') {
+            if (depth === 0) start = i;
+            depth++;
+          } else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+              jsonPayloads.push(rawStr.slice(start, i + 1));
+            }
+          }
+        }
+        if (jsonPayloads.length === 0) jsonPayloads.push(rawStr);
+
+        for (const payloadStr of jsonPayloads) {
+          const data = JSON.parse(payloadStr);
+          console.log(`[DO] [${this.state.id.toString()}] Incoming event: ${data.type}`);
+          await this.onMessage(webSocket, data);
+        }
       } catch (err) {
-        console.error(`[DO] [${this.state.id.toString()}] WebSocket Message Parse Error:`, err.message, "Raw Content:", String(msg.data).slice(0, 500));
-        webSocket.send(JSON.stringify({ type: "ERROR", message: "Invalid JSON", raw: String(msg.data).slice(0, 100) }));
+        console.error(`[DO] [${this.state.id.toString()}] WebSocket Message Parse Error:`, err.message, err.stack);
       }
     });
 
@@ -9548,10 +9586,11 @@ export class WarRoom {
         }));
         break;
 
-      case "CHAT_SEND":
+      case "CHAT_SEND": {
         // 1. Save to D1
         const db = this.env.DB;
         const now = getKst(); 
+        const msgText = data.text || '';  // ── null 방어
         const lastRow = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(data.incident_id).first();
         const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1;
 
@@ -9569,14 +9608,22 @@ export class WarRoom {
         await db.prepare(
           "INSERT INTO warroom_chats (inc_id, seq, sender, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt, parent_seq, reactions, read_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
-          data.incident_id, seq, data.sender, data.role || 'user', data.msg_type || 'user', data.text, now, data.sender, now, data.sender, now,
+          data.incident_id, seq, data.sender, data.role || 'user', data.msg_type || 'user', msgText, now, data.sender, now, data.sender, now,
           data.reply_to || null,
           JSON.stringify({}),
           initialReadCount
         ).run();
 
+        // ── 전송자 프로필 사진: 페이로드에 없으면 DB에서 조회 ──
+        let senderProfilePic = data.profile_picture || null;
+        if (!senderProfilePic && data.sender) {
+          try {
+            const userRow = await db.prepare("SELECT profile_picture FROM users WHERE employee_id = ?").bind(data.sender).first();
+            senderProfilePic = userRow?.profile_picture || null;
+          } catch (_) {}
+        }
+
         // 2. Broadcast
-        const initialUnread = initialReadCount;
         const broadcastMsg = {
           type: "CHAT_MESSAGE",
           msg_id: `${data.incident_id}_${seq}`,
@@ -9585,14 +9632,14 @@ export class WarRoom {
           sender: data.sender,
           sender_name: data.name || data.sender,
           role: data.role,
-          text: data.text,
+          profile_picture: senderProfilePic,
+          text: msgText,
           timestamp: now,
           parent_seq: data.reply_to || null,
           reactions: {},
-          read_count: initialUnread
-
+          read_count: initialReadCount
         };
-        console.log(`[DO] [${this.state.id.toString()}] CHAT_SEND from ${data.sender}: ${data.text.slice(0, 50)}...`);
+        console.log(`[DO] [${this.state.id.toString()}] CHAT_SEND from ${data.sender}: ${msgText.slice(0, 50)}`);
         this.broadcast(broadcastMsg);
 
         // 3. Web Push: Send to warroom members who are NOT currently present
@@ -9662,12 +9709,12 @@ export class WarRoom {
           try {
             const ai = this.env.AI;
             const index = this.env.WARROOM_INDEX;
-            if (ai && index && data.text.length > 5) {
-              const { data: embeddings } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [data.text] });
+            if (ai && index && msgText.length > 5) {
+              const { data: embeddings } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [msgText] });
               await index.upsert([{
                 id: `${data.incident_id}_${seq}`,
                 values: embeddings[0],
-                metadata: { text: data.text, sender: data.sender, incident_id: data.incident_id }
+                metadata: { text: msgText, sender: data.sender, incident_id: data.incident_id }
               }]);
             }
           } catch (e) {
@@ -9675,6 +9722,7 @@ export class WarRoom {
           }
         })());
         break;
+      }
 
       case "SUMMARY_REQUEST":
         this.state.waitUntil((async () => {
@@ -9695,7 +9743,7 @@ export class WarRoom {
             const ai = this.env.AI;
             const db = this.env.DB;
             const chats = await db.prepare(
-              "SELECT wc.sender, wc.text, u.name as sender_name FROM warroom_chats wc LEFT JOIN users u ON wc.sender = u.employee_id WHERE wc.inc_id = ? ORDER BY wc.seq DESC LIMIT 50"
+              "SELECT wc.sender, wc.text, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? ORDER BY wc.seq DESC LIMIT 50"
             ).bind(data.incident_id).all();
             
             if (chats.results.length === 0) {

@@ -4,7 +4,7 @@ import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ArrowLeft, Search, User, Shield, RefreshCw,
   Trash2, Mail, Phone, Building2,
-  ChevronRight, Key, MoreHorizontal, UserCheck, UserX,
+  ChevronRight, Key, MoreHorizontal, MoreVertical, UserCheck, UserX,
   LayoutDashboard, List as ListIcon, X, Star, Edit3, CheckCircle2, Hash, Activity, Eye
 } from 'lucide-react';
 import { getAccessToken, getUserProfile, getAuthHeaders } from '../lib/authStore';
@@ -38,6 +38,9 @@ export default function UserManagementPage() {
     name: '', employee_id: '', email: '', phone: '', os_type: 'android', role: 'viewer', password: '',
     org1: '', org2: '', org3: '', org4: '', org5: ''
   });
+  
+  // Action Bottom Sheet State
+  const [actionTargetUser, setActionTargetUser] = useState(null);
 
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -130,6 +133,7 @@ export default function UserManagementPage() {
         alert(`비밀번호 초기화 실패: ${error.detail || '서버 오류'}`);
       } else {
         alert('비밀번호가 초기화되었습니다.');
+        setActionTargetUser(null);
       }
     } catch (e) {
       console.error(e);
@@ -157,6 +161,7 @@ export default function UserManagementPage() {
       });
       if (res.ok) {
         alert(`${nextStatus === 'SUSPENDED' ? '차단' : '활성화'} 처리가 완료되었습니다.`);
+        setActionTargetUser(null);
         fetchUsers();
       } else {
         const error = await res.json().catch(() => ({}));
@@ -179,6 +184,7 @@ export default function UserManagementPage() {
       });
       if (res.ok) {
         alert(`권한이 ${newRole.toUpperCase()}(으)로 변경되었습니다.`);
+        setActionTargetUser(null);
         fetchUsers();
       } else {
         const error = await res.json().catch(() => ({}));
@@ -353,6 +359,7 @@ export default function UserManagementPage() {
       if (res.ok) {
         fetchUsers();
         alert('사용자가 삭제되었습니다.');
+        setActionTargetUser(null);
       } else {
         const err = await res.json().catch(() => ({}));
         alert(`삭제 실패: ${err.detail || '서버 오류가 발생했습니다.'}`);
@@ -463,150 +470,132 @@ export default function UserManagementPage() {
              <p className="text-sm text-slate-500 animate-pulse">사용자 데이터를 불러오는 중...</p>
           </div>
         ) : (
-          <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6' : 'flex flex-col gap-3'}`}>
+          <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6' : 'flex flex-col gap-4'}`}>
             {filteredUsers.map((user) => (
               <div
                 key={user.employee_id || user.id}
-                className={`bg-[#1a1f2e] rounded-3xl border border-white/5 overflow-hidden group hover:border-white/10 transition-all shadow-xl hover:shadow-2xl relative
-                  ${viewMode === 'list' ? 'flex items-center p-4 gap-6' : 'p-6 flex flex-col items-center text-center'}`}
+                onClick={() => handleOpenOrgModal(user)}
+                className={`bg-[#1a1f2e] rounded-3xl border border-white/5 overflow-hidden group hover:border-blue-500/30 transition-all shadow-xl hover:shadow-2xl relative cursor-pointer p-5 sm:p-6 flex ${viewMode === 'grid' ? 'flex-col items-center text-center' : 'items-start gap-4 sm:gap-6'}`}
               >
                 {!user.is_active && <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] z-10 pointer-events-none" />}
 
-                {/* Avatar / Icon */}
-                <div className={`shrink-0 relative ${viewMode === 'list' ? 'w-12 h-12' : 'w-16 h-16 mb-4'}`}>
-                  <div className={`w-full h-full rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 shadow-lg ${user.is_active ? 'bg-gradient-to-br from-blue-600/20 to-purple-600/20 text-blue-400' : 'bg-slate-800 text-slate-500'}`}>
-                    <span><User className={viewMode === 'list' ? 'w-6 h-6' : 'w-8 h-8'} /></span>
-                  </div>
-                  {user.is_active && (
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-[#1a1f2e] flex items-center justify-center shadow-lg">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                {/* Avatar / Icon - 그리드 모드에서만 표시 */}
+                {viewMode === 'grid' && (
+                  <div className="shrink-0 relative w-16 h-16 mb-4">
+                    <div className="w-full h-full rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-600/20 to-purple-600/20 text-blue-400 border border-white/5 shadow-lg group-hover:scale-105 transition-all">
+                      {user.profile_picture ? (
+                        <img src={user.profile_picture} alt={user.name} className="w-full h-full rounded-2xl object-cover" />
+                      ) : (
+                        <User className="w-8 h-8" />
+                      )}
                     </div>
-                  )}
-                </div>
+                    {user.is_active && (
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-[3px] border-[#1a1f2e] shadow-lg animate-pulse" />
+                    )}
+                  </div>
+                )}
 
                 {/* Info Container */}
-                <div className={`${viewMode === 'grid' ? 'w-full' : 'flex-1 grid grid-cols-4 items-center gap-4'}`}>
-                  <div className={viewMode === 'list' ? 'col-span-1' : 'mb-6'}>
-                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors truncate flex items-center gap-2">
-                      <span>{user.name}</span>
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
-                        user.os_type === 'ios' ? 'bg-slate-500/10 border-slate-500/20 text-slate-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
-                      }`}>
+                {viewMode === 'list' ? (
+                  <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
+                    {/* 1줄 */}
+                    <div className="flex items-center gap-2 pr-10 mb-1.5">
+                      <span className="text-base font-bold text-white flex items-center gap-1.5">
+                        <span className="text-slate-500">[</span>
+                        <span className="text-sm">{user.status === 'ACTIVE' ? '🟢' : user.status === 'PRE_REGISTERED' ? '🟡' : '🔴'}</span>
+                        <span className="group-hover:text-blue-400 transition-colors tracking-tight">{user.name}</span>
+                        <span className="text-slate-500">]</span>
+                      </span>
+                      <span className="text-[12px] font-bold text-indigo-400 uppercase tracking-wider ml-1">{user.role || 'USER'}</span>
+                      <span className="text-[12px] font-mono text-slate-400 ml-1 tracking-tight">ID: {user.employee_id}</span>
+                    </div>
+                    {/* 2줄 */}
+                    <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap truncate">
+                      <span className="flex items-center gap-1.5 truncate">
+                        <span className="text-sm">🏢</span>
+                        <span className="font-bold text-slate-300 whitespace-nowrap">{user.company_name || user.company || '신한DS'}</span>
+                        {(user.honbu_name || user.team_name || user.part_name || user.subpart_name) && (
+                          <>
+                            <span className="text-slate-600 mx-0.5">·</span>
+                            <span className="truncate">{[user.honbu_name, user.team_name, user.part_name, user.subpart_name].filter(Boolean).join(' > ')}</span>
+                          </>
+                        )}
+                      </span>
+                      <span className="text-slate-600 shrink-0">|</span>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-sm">📱</span>
+                        <span className="uppercase text-slate-300 font-bold tracking-tight">{user.os_type || 'ANDROID'}</span>
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 min-w-0 space-y-2.5 w-full">
+                    {/* 1줄: 이름 + 상태배지 + OS기종배지 */}
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
+                      <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-blue-400 transition-colors truncate">
+                        {user.name}
+                      </h3>
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${user.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : user.status === 'PRE_REGISTERED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                        {user.status === 'ACTIVE' ? '정상 🟢' : user.status === 'PRE_REGISTERED' ? '가입대기 🟡' : '사용중지 🔴'}
+                      </span>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${user.os_type === 'ios' ? 'bg-slate-500/10 border-slate-500/20 text-slate-400' : 'bg-green-500/10 border-green-500/20 text-green-400'}`}>
                         {user.os_type?.toUpperCase() || 'AND'}
                       </span>
-                    </h3>
-                    <div className={`flex items-center gap-2 mt-1 ${viewMode === 'grid' ? 'justify-center' : ''}`}>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${user.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                         <span>{user.role?.toUpperCase() || 'USER'}</span>
-                      </span>
-                      {/* 🛡️ 계정 상태 배지 (State Machine UI) */}
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        user.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                        user.status === 'PRE_REGISTERED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                        'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                      }`}>
-                         {user.status === 'ACTIVE' ? '정상' : user.status === 'PRE_REGISTERED' ? '가입대기' : '사용중지'}
-                      </span>
-                      {user.employee_id && <span className="text-[10px] text-slate-500 font-mono">#<span>{user.employee_id}</span></span>}
                     </div>
-                  </div>
 
-                  <div className={`${viewMode === 'grid' ? 'space-y-3 mb-8' : 'col-span-1 space-y-1'}`}>
-                    <div className={`flex items-center gap-3 text-slate-400 group/item ${viewMode === 'grid' ? 'justify-center' : ''}`}>
-                       <span><Mail className="w-4 h-4 text-slate-600 group-hover/item:text-blue-400 transition-colors" /></span>
-                       <span className="text-xs truncate"><span>{user.email}</span></span>
+                    {/* 2줄: 권한 및 사번 */}
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 flex-wrap justify-center">
+                      <span className="flex items-center gap-1.5 text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                        <Shield className="w-3.5 h-3.5" />
+                        <span>{user.role?.toUpperCase() || 'USER'}</span>
+                      </span>
+                      <span className="text-slate-500">|</span>
+                      <span className="font-mono text-slate-400">ID: #{user.employee_id}</span>
                     </div>
-                    {user.phone && (
-                      <div className={`flex items-center gap-3 text-slate-400 group/item ${viewMode === 'grid' ? 'justify-center' : ''}`}>
-                         <span><Phone className="w-4 h-4 text-slate-600 group-hover/item:text-blue-400 transition-colors" /></span>
-                         <span className="text-xs"><span>{user.phone}</span></span>
+
+                    {/* 3줄: 이메일 & 전화번호 */}
+                    <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap justify-center">
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate max-w-[180px] sm:max-w-none">{user.email}</span>
+                      </div>
+                      {user.phone && (
+                        <>
+                          <span className="text-slate-600 hidden sm:inline">•</span>
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span>{user.phone}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* 4줄: 소속 정보 칩 */}
+                    {(user.company_name || user.company || user.honbu_name || user.team_name || user.part_name || user.subpart_name) && (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5 mt-1 max-w-full overflow-hidden justify-center">
+                        <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <div className="truncate flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-300">{user.company_name || user.company || '신한DS'}</span>
+                          {[user.honbu_name, user.team_name, user.part_name, user.subpart_name].filter(Boolean).map((n, idx) => (
+                            <React.Fragment key={idx}>
+                              <span className="text-slate-600 font-normal">&gt;</span>
+                              <span className="text-slate-400">{n}</span>
+                            </React.Fragment>
+                          ))}
+                        </div>
                       </div>
                     )}
-                    {(user.company_name || user.honbu_name || user.team_name || user.part_name || user.subpart_name) && (
-                       <div className={`flex flex-col gap-1 text-slate-400 group/item border-b border-white/5 pb-2 mb-2 ${viewMode === 'grid' ? 'items-center' : ''}`}>
-                          <div className="flex items-center gap-2">
-                             <span><Building2 className="w-3.5 h-3.5 text-slate-600 group-hover/item:text-blue-400 transition-colors" /></span>
-                             <span className="text-[10px] font-bold text-slate-500 truncate">
-                                <span>{user.company_name || user.company || '-'}</span>
-                             </span>
-                          </div>
-                          <div className="text-[10px] leading-relaxed text-slate-400 break-all px-6 flex flex-wrap gap-1">
-                            {[
-                              user.honbu_name,
-                              user.team_name,
-                              user.part_name,
-                              user.subpart_name
-                            ]
-                              .filter(Boolean)
-                              .map((name, idx, arr) => (
-                                <React.Fragment key={`${user.employee_id}-org-${idx}`}>
-                                  <span>{name}</span>
-                                  {idx < arr.length - 1 && <span className="text-slate-600 mx-0.5">&gt;</span>}
-                                </React.Fragment>
-                              ))}
-                          </div>
-                       </div>
-                    )}
-                    <button 
-                      onClick={() => handleOpenOrgModal(user)}
-                      className={`text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 mx-auto py-1 px-2 rounded-lg hover:bg-blue-400/10 transition-all ${viewMode === 'list' ? 'ml-0' : ''}`}
-                    >
-                      <span><RefreshCw className="w-3 h-3" /></span> 소속 정보 수정
-                    </button>
                   </div>
+                )}
 
-                  {/* Actions Area */}
-                  <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 gap-2 p-1 relative z-20' : 'col-span-2 flex justify-end gap-2 p-1 relative z-20'}`}>
-                    <div className="flex gap-2">
-                       <div className="relative group/role flex-1">
-                          <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-blue-500/30 text-[11px] font-bold transition-all">
-                             <span><Shield className="w-3.5 h-3.5" /></span> 권한
-                          </button>
-                          <div className="absolute bottom-full left-0 w-full mb-1 bg-[#1a1f2e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl opacity-0 group-hover/role:opacity-100 transition-all pointer-events-none group-hover/role:pointer-events-auto origin-bottom">
-                             {roles.length > 0 ? roles.map(r => (
-                               <button
-                                 key={r.role_code}
-                                 onClick={() => handleUpdateRole(user.employee_id, r.role_code)}
-                                 className={`w-full text-left px-5 py-3 text-xs hover:bg-blue-600/10 transition-colors ${String(user.role).toUpperCase() === String(r.role_code).toUpperCase() ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
-                               >
-                                 <span>{r.role_name}</span>
-                               </button>
-                             )) : (
-                               ['ADMIN', 'ANALYST', 'VIEWER'].map(r => (
-                                 <button
-                                   key={r}
-                                   onClick={() => handleUpdateRole(user.employee_id, r.toLowerCase())}
-                                   className={`w-full text-left px-5 py-3 text-xs hover:bg-blue-600/10 transition-colors ${String(user.role).toUpperCase() === r ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
-                                 >
-                                   <span>{r}</span>
-                                 </button>
-                               ))
-                             )}
-                          </div>
-                       </div>
-                       <button
-                         onClick={() => handleResetPassword(user.employee_id)}
-                         className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-yellow-500/30 text-[11px] font-bold transition-all"
-                       >
-                         <span><Key className="w-3.5 h-3.5" /></span> PW 초기화
-                       </button>
-                       <button
-                         onClick={() => handleDeleteUser(user)}
-                         className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-red-500/20 hover:text-red-500 transition-all text-slate-500"
-                         title="계정 영구 삭제"
-                       >
-                         <span><Trash2 className="w-3.5 h-3.5" /></span>
-                       </button>
-                    </div>
-                    <button
-                      onClick={() => handleToggleStatus(user)}
-                      className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-[11px] font-bold border ${user.status === 'ACTIVE' || user.status === 'PRE_REGISTERED' ? 'bg-red-500/5 border-red-500/10 hover:border-red-500/30 text-red-500' : 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30 text-emerald-500'}`}
-                    >
-                      <span>{user.status === 'ACTIVE' || user.status === 'PRE_REGISTERED' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}</span>
-                      <span>{user.status === 'ACTIVE' || user.status === 'PRE_REGISTERED' ? '계정 차단(SUSPEND)' : '차단 해제(ACTIVE)'}</span>
-                    </button>
-                  </div>
-                </div>
+                {/* ── 우측 상단 케밥 버튼 (액션 메뉴 호출) ── */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setActionTargetUser(user); }}
+                  className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 text-slate-400 hover:text-white transition-all z-20 shadow-lg active:scale-95"
+                  title="액션 및 관리 메뉴"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -622,6 +611,111 @@ export default function UserManagementPage() {
                 <p className="text-sm text-slate-600 mt-2">검색어를 다시 확인해 주세요.</p>
              </div>
              <button onClick={() => setSearch('')} className="text-blue-400 text-sm font-bold hover:underline">검색어 초기화</button>
+          </div>
+        )}
+
+        {/* ── 사용자 액션 관리 바텀 시트 / 모달 ── */}
+        {actionTargetUser && (
+          <div className="fixed inset-0 z-[400] flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in duration-200">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setActionTargetUser(null)} />
+            <div className="relative w-full max-w-md bg-[#11141d] border-t sm:border border-white/10 sm:rounded-[32px] rounded-t-[32px] p-6 sm:p-8 shadow-2xl space-y-6 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto custom-scrollbar">
+              <div className="w-12 h-1 bg-white/10 rounded-full mx-auto sm:hidden mb-2" />
+              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center text-blue-400 font-bold border border-white/5 shadow-md">
+                    {actionTargetUser.profile_picture ? (
+                      <img src={actionTargetUser.profile_picture} alt={actionTargetUser.name} className="w-full h-full rounded-2xl object-cover" />
+                    ) : (
+                      <User className="w-6 h-6" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">{actionTargetUser.name}</h3>
+                    <p className="text-xs font-mono text-slate-500">ID: #{actionTargetUser.employee_id}</p>
+                  </div>
+                </div>
+                <button onClick={() => setActionTargetUser(null)} className="p-2 rounded-full hover:bg-white/5 text-slate-500 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-blue-400 uppercase tracking-widest block mb-2 px-1">권한 변경</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(roles.length > 0 ? roles : [{role_code:'admin', role_name:'ADMIN'}, {role_code:'analyst', role_name:'ANALYST'}, {role_code:'viewer', role_name:'VIEWER'}]).map(r => (
+                      <button
+                        key={r.role_code}
+                        onClick={() => handleUpdateRole(actionTargetUser.employee_id, r.role_code.toLowerCase())}
+                        className={`py-3 rounded-2xl border text-xs font-black transition-all flex flex-col items-center gap-1 ${
+                          String(actionTargetUser.role).toLowerCase() === String(r.role_code).toLowerCase()
+                            ? 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10'
+                            : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <Shield className="w-4 h-4" />
+                        <span>{r.role_name || r.role_code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-white/5 pt-4 space-y-2.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1 px-1">계정 보안 및 상태 관리</label>
+                  <button
+                    onClick={() => handleResetPassword(actionTargetUser.employee_id)}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-white/5 border border-white/5 hover:border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 transition-all font-bold text-sm flex items-center justify-between group shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-yellow-500/10 text-yellow-400 group-hover:scale-110 transition-transform">
+                        <Key className="w-4 h-4" />
+                      </div>
+                      <span>비밀번호 초기화 (PW Reset)</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-500 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  <button
+                    onClick={() => handleToggleStatus(actionTargetUser)}
+                    className={`w-full py-3.5 px-4 rounded-2xl border transition-all font-bold text-sm flex items-center justify-between group shadow-md ${
+                      actionTargetUser.status === 'ACTIVE' || actionTargetUser.status === 'PRE_REGISTERED'
+                        ? 'bg-red-500/5 border-red-500/10 hover:border-red-500/30 text-red-400 hover:bg-red-500/10'
+                        : 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl group-hover:scale-110 transition-transform ${actionTargetUser.status === 'ACTIVE' || actionTargetUser.status === 'PRE_REGISTERED' ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                        {actionTargetUser.status === 'ACTIVE' || actionTargetUser.status === 'PRE_REGISTERED' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                      </div>
+                      <span>{actionTargetUser.status === 'ACTIVE' || actionTargetUser.status === 'PRE_REGISTERED' ? '계정 즉시 차단 (SUSPEND)' : '계정 차단 해제 (ACTIVE)'}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-500 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+
+                <div className="border-t border-white/5 pt-4">
+                  <button
+                    onClick={() => handleDeleteUser(actionTargetUser)}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all font-bold text-sm flex items-center justify-between group shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-red-500/20 text-red-400 group-hover:scale-110 transition-transform">
+                        <Trash2 className="w-4 h-4" />
+                      </div>
+                      <span>계정 영구 삭제 (Delete Account)</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-red-500/50 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActionTargetUser(null)}
+                className="w-full py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-bold border border-white/5"
+              >
+                닫기
+              </button>
+            </div>
           </div>
         )}
       </main>

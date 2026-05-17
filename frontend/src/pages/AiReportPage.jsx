@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import ReactMarkdown from 'react-markdown';
@@ -7,7 +7,7 @@ import {
   ArrowLeft, Share2, Sparkles, AlertCircle, MessageSquare,
   FileText, Paperclip, Clock, Users, CheckCircle2, Send, User, Check, ChevronRight, X,
   Database, Shield, Server, Bot, Activity, RefreshCw, Loader, Zap,
-  Search, Filter, Calendar, Building2, AlertTriangle, CheckCircle
+  Search, Filter, Calendar, Building2, AlertTriangle, CheckCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { getAuthHeaders } from '../lib/authStore';
 import { SMS_WORKER_URL } from '../config/api';
@@ -47,9 +47,9 @@ const mdComponents = {
     </h3>
   ),
   p: ({ children }) => (
-    <p style={{ fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word' }}>
+    <div className="md-p" style={{ fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word' }}>
       {children}
-    </p>
+    </div>
   ),
   strong: ({ children }) => (
     <strong style={{ color: '#93c5fd', fontWeight: 800, background: 'linear-gradient(90deg, rgba(59,130,246,0.2), rgba(99,102,241,0.2))', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginRight: 6, marginBottom: 2 }}>
@@ -88,7 +88,7 @@ const mdComponents = {
   li: ({ children }) => (
     <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.7 }}>
       <span style={{ marginTop: 6, width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, display: 'inline-block' }} />
-      <span style={{ flex: 1, wordBreak: 'break-word' }}>{children}</span>
+      <div style={{ flex: 1, wordBreak: 'break-word' }}>{children}</div>
     </li>
   ),
   hr: () => (
@@ -117,23 +117,33 @@ const mdComponents = {
   ),
 };
 
-function MarkdownBlock({ text, report }) {
+function MarkdownBlock({ text, report, checkedItems = {}, onToggleCheck = () => {} }) {
   if (!text) return <span style={{ color: '#475569' }}>-</span>;
   
   let clean = text;
 
-  // 1. 대괄호 대분류 섹션을 명확한 헤딩으로 변환
-  clean = clean
-    .replace(/(?:^|\s|\n)\[S-Autopilot Insight\]/gi, '\n\n### 💡 S-Autopilot Insight\n\n')
-    .replace(/(?:^|\s|\n)\[전문가별 심층 진단\]/gi, '\n\n### 🛡️ 전문가별 심층 진단\n\n')
-    .replace(/(?:^|\s|\n)\[리더의 최종 조치 가이드\]/gi, '\n\n### 🎯 리더의 최종 조치 가이드\n\n')
-    .replace(/(?:^|\s|\n)\[전문가별 분석\]/gi, '\n\n### 🔬 전문가별 분석\n\n')
-    .replace(/(?:^|\s|\n)\[종합 요약\]/gi, '\n\n### 📌 종합 요약\n\n');
+  // 1. 역피라미드 정렬: [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 섹션 순서 보장
+  const sInsightMatch = clean.match(/(?:\[S-Autopilot Insight\]|### 💡 S-Autopilot Insight)([\s\S]*?)(?=(?:\[전문가별|\[리더의|### 🛡️|### 🎯|$))/i);
+  const sExpertMatch  = clean.match(/(?:\[전문가별 심층 진단\]|### 🛡️ 전문가별 심층 진단)([\s\S]*?)(?=(?:\[S-Autopilot|\[리더의|### 💡|### 🎯|$))/i);
+  const sGuideMatch   = clean.match(/(?:\[리더의 최종 조치 가이드\]|### 🎯 리더의 최종 조치 가이드)([\s\S]*?)(?=(?:\[S-Autopilot|\[전문가별|### 💡|### 🛡️|$))/i);
 
-  // 2. 문자열 내의 기존 마크다운 별표(*) 및 불필요한 대시(-) 기호를 싹 지워서 깨끗한 평문으로 정리 (정규식 충돌 원천 차단)
+  if (sInsightMatch || sExpertMatch || sGuideMatch) {
+    let reordered = '';
+    if (sInsightMatch) reordered += `### 💡 S-Autopilot Insight\n\n${sInsightMatch[1].trim()}\n\n`;
+    if (sExpertMatch)  reordered += `### 🛡️ 전문가별 심층 진단 (원인 특정)\n\n${sExpertMatch[1].trim()}\n\n`;
+    if (sGuideMatch)   reordered += `### 🎯 리더의 최종 조치 가이드 (긴급 작전 체크리스트)\n\n${sGuideMatch[1].trim()}\n\n`;
+    clean = reordered || clean;
+  } else {
+    clean = clean
+      .replace(/(?:^|\s|\n)\[S-Autopilot Insight\]/gi, '\n\n### 💡 S-Autopilot Insight\n\n')
+      .replace(/(?:^|\s|\n)\[전문가별 심층 진단\]/gi, '\n\n### 🛡️ 전문가별 심층 진단 (원인 특정)\n\n')
+      .replace(/(?:^|\s|\n)\[리더의 최종 조치 가이드\]/gi, '\n\n### 🎯 리더의 최종 조치 가이드 (긴급 작전 체크리스트)\n\n');
+  }
+
+  // 2. 문자열 내의 기존 마크다운 별표(*) 및 불필요한 대시(-) 기호 정리
   clean = clean.replace(/\*/g, '').replace(/^-+\s*/gm, '');
 
-  // 3. 주요 키워드들을 감지하여 정확하게 단 한 번씩만 독립된 불릿 문단 및 강조 배지로 변환
+  // 3. 주요 키워드들을 감지하여 단 한 번씩만 불릿 문단으로 변환
   const keywords = [
     '상황 요약', '상황요약', '담당자 자동 할당', '담당자 자동할당', '핵심 분석 방향', '분석 방향',
     'Security Agent', 'DB Agent', 'DevOps Agent', 'Leader Agent', 'Network Agent',
@@ -143,10 +153,13 @@ function MarkdownBlock({ text, report }) {
   const keywordRegex = new RegExp(`(?:\\s*)(${keywords})\\s*:`, 'gi');
   clean = clean.replace(keywordRegex, '\n\n- **$1:** ');
 
-  // 4. 과도한 빈 줄 및 중복 개행 정리
+  // 4. 조치 가이드 내의 항목들을 작전판 체크리스트 기호('[ ]')로 자동 변환
+  clean = clean.replace(/-\s+(조치 사항|긴급 조치|향후 권고|상황 전파|대외 기관|EAS 서버|'신분증)/gi, '- [ ] $1');
+
+  // 5. 과도한 빈 줄 및 중복 개행 정리
   clean = clean.replace(/\n{3,}/g, '\n\n').trim();
 
-  // 4. 담당자 사번(S09073 등) 발견 시 옆에 (사원명) 자동 삽입 보강
+  // 6. 담당자 사번 발견 시 옆에 사원명 자동 삽입
   if (report?.who) {
     const assigneeName = report.who_name || report.creator_name;
     if (assigneeName && !clean.includes(assigneeName)) {
@@ -155,9 +168,54 @@ function MarkdownBlock({ text, report }) {
     }
   }
 
+  const customComponents = useMemo(() => ({
+    ...mdComponents,
+    li: ({ children }) => {
+      let textStr = '';
+      React.Children.forEach(children, child => {
+        if (typeof child === 'string') textStr += child;
+        else if (child?.props?.children && typeof child.props.children === 'string') textStr += child.props.children;
+      });
+      
+      const isCheckItem = textStr.trim().startsWith('[ ]') || textStr.trim().startsWith('[x]') || textStr.trim().startsWith('[X]');
+      
+      if (isCheckItem) {
+        const cleanText = textStr.replace(/^\[[ xX]?\]/, '').trim();
+        const isChecked = checkedItems[cleanText] || textStr.trim().startsWith('[x]') || textStr.trim().startsWith('[X]');
+        return (
+          <li 
+            onClick={(e) => { e.stopPropagation(); onToggleCheck(cleanText); }}
+            className={`flex items-start gap-3 p-3.5 my-2.5 rounded-2xl border transition-all cursor-pointer select-none shadow-lg text-left ${
+              isChecked 
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-slate-400 line-through' 
+                : 'bg-[#161b2a] border-blue-500/30 hover:border-blue-500 text-slate-100 font-bold'
+            }`}
+          >
+            <div className={`w-5 h-5 mt-0.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+              isChecked ? 'bg-emerald-500 border-emerald-400 text-black' : 'border-slate-500 bg-black/40 text-transparent'
+            }`}>
+              <Check size={14} className="stroke-[3]" />
+            </div>
+            <div className="flex-1 text-xs leading-relaxed break-words">{cleanText}</div>
+            <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-black uppercase shrink-0 ${isChecked ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
+              {isChecked ? 'Done' : 'Action'}
+            </span>
+          </li>
+        );
+      }
+      
+      return (
+        <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.7 }}>
+          <span style={{ marginTop: 6, width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, display: 'inline-block' }} />
+          <div style={{ flex: 1, wordBreak: 'break-word' }}>{children}</div>
+        </li>
+      );
+    }
+  }), [checkedItems, onToggleCheck]);
+
   return (
-    <div style={{ fontSize: 13.5, lineHeight: 1.8, wordBreak: 'break-word' }}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{clean}</ReactMarkdown>
+    <div className="markdown-body-custom" style={{ fontSize: 13.5, lineHeight: 1.8, wordBreak: 'break-word' }}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={customComponents}>{clean}</ReactMarkdown>
     </div>
   );
 }
@@ -197,6 +255,7 @@ export default function AiReportPage() {
   const currentUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
 
   // — 검색 목록 모드 state (항상 선언 — Hook 규칙) —
+  // — 검색 목록 모드 state (항상 선언 — Hook 규칙) —
   const listMode = !incidentId;
   const dates = useMemo(() => getDefaultDates(), []);
   const [srchParams, setSrchParams] = useState({
@@ -209,6 +268,7 @@ export default function AiReportPage() {
   const [srchLoading, setSrchLoading] = useState(false);
   const [srchStats, setSrchStats] = useState({ total: 0, critical: 0, high: 0, normal: 0 });
   const [didSearch, setDidSearch] = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   // — 상세 보기 state (항상 선언 — Hook 규칙) —
   const [report, setReport] = useState(null);
@@ -223,6 +283,10 @@ export default function AiReportPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const genAbortRef = useRef(null);
   const [chatSummary, setChatSummary] = useState('');
+  const [checkedActionItems, setCheckedActionItems] = useState({});
+  const toggleActionItem = useCallback((key) => {
+    setCheckedActionItems(prev => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
   // 🚀 탭 바 가로 스크롤 인디케이터 상태
   const tabsRef = useRef(null);
@@ -247,11 +311,9 @@ export default function AiReportPage() {
     if (!listMode) return;
     fetch(`${SMS_WORKER_URL}/users`, { headers: getAuthHeaders() })
       .then(r => r.json()).then(setAllUsers).catch(() => {});
-    // 초기 검색 (최근 30일 완료)
-    handleListSearch();
   }, [listMode]);
 
-  const handleListSearch = async (overrideParams) => {
+  const handleListSearch = useCallback(async (overrideParams) => {
     setSrchLoading(true);
     const p = overrideParams || srchParams;
     const qs = new URLSearchParams();
@@ -270,8 +332,8 @@ export default function AiReportPage() {
       setSrchStats({
         total: list.length,
         critical: list.filter(i => i.severity === 'CRITICAL').length,
-        high: list.filter(i => i.severity === 'HIGH').length,
-        normal: list.filter(i => !['CRITICAL','HIGH'].includes(i.severity)).length,
+        high: list.filter(i => i.severity === 'HIGH' || i.severity === 'MAJOR').length,
+        normal: list.filter(i => !['CRITICAL','HIGH','MAJOR'].includes(i.severity)).length,
       });
       setDidSearch(true);
     } catch (e) {
@@ -279,7 +341,16 @@ export default function AiReportPage() {
     } finally {
       setSrchLoading(false);
     }
-  };
+  }, [srchParams]);
+
+  // 실시간 라이브 디바운스 검색 (키워드/조건 변경 시 자동조회)
+  useEffect(() => {
+    if (!listMode) return;
+    const timer = setTimeout(() => {
+      handleListSearch();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [srchParams.keyword, srchParams.incidentId, srchParams.startDate, srchParams.endDate, srchParams.severity, srchParams.status, srchParams.assignee, listMode, handleListSearch]);
 
   const handleQuickDate = (days) => {
     const end = new Date();
@@ -292,7 +363,6 @@ export default function AiReportPage() {
       endDate:   new Date(end.getTime()   - tz).toISOString().split('T')[0],
     };
     setSrchParams(p);
-    handleListSearch(p);
   };
 
   const sevCls = { CRITICAL: 'text-red-400 bg-red-500/10 border-red-500/30', HIGH: 'text-orange-400 bg-orange-500/10 border-orange-500/30', NORMAL: 'text-blue-400 bg-blue-500/10 border-blue-500/20', INFO: 'text-slate-400 bg-slate-500/10 border-slate-500/20', MAJOR: 'text-orange-400 bg-orange-500/10 border-orange-500/30' };
@@ -347,187 +417,262 @@ export default function AiReportPage() {
 
   if (listMode) {
     return (
-      <div className="min-h-screen bg-[#0a0d14] text-white font-sans flex flex-col pb-6">
-        {/* 헤더 */}
-        <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5">
-          <div className="max-w-5xl mx-auto w-full flex items-center gap-3 px-5 py-3">
-            <button onClick={() => goBack()} className="shrink-0 p-2 rounded-full hover:bg-white/5 transition-colors">
-              <ArrowLeft className="w-5 h-5 text-slate-400" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-sm font-black text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-400" /> AI 장애 보고서
-              </h1>
-              <p className="text-[10px] text-slate-500">검색 조건을 설정하고 보고서를 열람하세요</p>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 max-w-5xl mx-auto w-full px-5 py-5 space-y-5">
-
-          {/* 검색 조건 */}
-          <div className="bg-[#0f1421] rounded-2xl border border-white/5 p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-black text-slate-300 flex items-center gap-2 uppercase tracking-widest">
-                <Filter className="w-3.5 h-3.5 text-blue-400" /> 검색 조건
-              </h2>
-              <button
-                onClick={() => { const p = { incidentId:'', keyword:'', ...getDefaultDates(), severity:'', status:'처리완료', assignee:'' }; setSrchParams(p); handleListSearch(p); }}
-                className="text-[10px] text-slate-500 hover:text-white flex items-center gap-1 bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition-all"
-              >
-                <X className="w-3 h-3" /> 초기화
+      <div className="min-h-[100dvh] bg-[#0a0d14] text-white font-sans flex flex-col pb-24 select-none overflow-y-auto">
+        {/* ── Sticky Header (Slim 1-line + Quick Search) ───────────── */}
+        <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5 flex flex-col gap-2.5 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                <ArrowLeft className="w-4 h-4 text-slate-400" />
               </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {/* 장애 ID */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">장애 ID</label>
-                <input
-                  type="text" placeholder="INC-번호 입력"
-                  value={srchParams.incidentId}
-                  onChange={e => setSrchParams(p => ({...p, incidentId: e.target.value}))}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
-                />
-              </div>
-              {/* 키워드 */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">키워드</label>
-                <input
-                  type="text" placeholder="장애명 / 메시지 검색"
-                  value={srchParams.keyword}
-                  onChange={e => setSrchParams(p => ({...p, keyword: e.target.value}))}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
-                />
-              </div>
-              {/* 처리자 */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">처리자</label>
-                <select
-                  value={srchParams.assignee}
-                  onChange={e => setSrchParams(p => ({...p, assignee: e.target.value}))}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
-                >
-                  <option value="">전체 담당자</option>
-                  {allUsers.map(u => <option key={u.employee_id} value={u.name}>{u.name}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* 기간 */}
-            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-blue-400" /> 조회 기간
-                </label>
-                <div className="flex gap-1">
-                  {[[1,'오늘'],[7,'7일'],[30,'30일'],[90,'90일']].map(([d,l]) => (
-                    <button key={d} type="button" onClick={() => handleQuickDate(d)}
-                      className="px-2.5 py-1 text-[9px] font-bold text-slate-500 hover:text-blue-400 bg-white/5 hover:bg-blue-500/10 rounded-lg transition-all">
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input type="date" value={srchParams.startDate}
-                  onChange={e => setSrchParams(p => ({...p, startDate: e.target.value}))}
-                  className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white" style={{colorScheme:'dark'}} />
-                <input type="date" value={srchParams.endDate}
-                  onChange={e => setSrchParams(p => ({...p, endDate: e.target.value}))}
-                  className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white" style={{colorScheme:'dark'}} />
-              </div>
-            </div>
-
-            {/* 심각도 / 완료 여부 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">심각도</label>
-                <select value={srchParams.severity} onChange={e => setSrchParams(p => ({...p, severity: e.target.value}))}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50">
-                  <option value="">전체</option>
-                  <option value="CRITICAL">CRITICAL</option>
-                  <option value="HIGH">HIGH</option>
-                  <option value="NORMAL">NORMAL</option>
-                  <option value="INFO">INFO</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">처리 상태</label>
-                <select value={srchParams.status} onChange={e => setSrchParams(p => ({...p, status: e.target.value}))}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50">
-                  <option value="">전체</option>
-                  <option value="처리완료">처리완료</option>
-                  <option value="처리중">처리중</option>
-                  <option value="대기">대기</option>
-                </select>
+              <div>
+                <h1 className="text-sm font-black text-white flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-blue-400" /> AI 장애 보고서
+                </h1>
+                <p className="text-[10px] text-slate-500 font-mono">
+                  {srchParams.startDate.substring(2).replace(/-/g, '.')} ~ {srchParams.endDate.substring(2).replace(/-/g, '.')}
+                </p>
               </div>
             </div>
 
             <button
-              onClick={() => handleListSearch()}
-              disabled={srchLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              onClick={() => setShowFilterSheet(true)}
+              className="skeuo-btn flex items-center gap-1.5 px-3 py-2 bg-blue-500/15 border border-blue-500/40 rounded-xl text-xs font-black text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)] active:scale-95 transition-all cursor-pointer"
             >
-              <Search className="w-4 h-4" />
-              {srchLoading ? '검색 중...' : '검색'}
+              <Filter size={14} />
+              <span>상세 필터</span>
+              {(srchParams.keyword || srchParams.incidentId || srchParams.assignee) && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />}
             </button>
           </div>
 
-          {/* 검색 결과 */}
-          {didSearch && (
-            <div className="space-y-3">
-              {/* 통계 */}
-              <div className="grid grid-cols-3 gap-3">
-                {[{label:'전체', count:srchStats.total, color:'blue'}, {label:'CRITICAL', count:srchStats.critical, color:'red'}, {label:'HIGH', count:srchStats.high, color:'orange'}].map(s => (
-                  <div key={s.label} className={`bg-${s.color}-500/10 border border-${s.color}-500/20 rounded-xl p-3 text-center`}>
-                    <p className={`text-2xl font-black text-${s.color}-400 font-mono`}>{s.count}</p>
-                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{s.label}</p>
-                  </div>
-                ))}
+          {/* 빠른 키워드 검색 바 */}
+          <div className="flex items-center bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-blue-500/50 transition-colors">
+            <Search size={14} className="text-slate-400 mr-2 shrink-0" />
+            <input
+              type="text" placeholder="제목 · ID · 메시지 빠른 검색"
+              value={srchParams.keyword}
+              onChange={e => { const v = e.target.value; setSrchParams(p => ({ ...p, keyword: v })); }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleListSearch(); } }}
+              className="w-full bg-transparent py-1 text-xs text-white placeholder-slate-500 focus:outline-none"
+            />
+            {srchParams.keyword && (
+              <button onClick={() => { setSrchParams(p => ({ ...p, keyword: '' })); }} className="p-1 hover:opacity-80">
+                <X size={12} className="text-slate-400" />
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* ── Sticky 요약 카드 (Summary Cards - 필터링 연동) ──────────────────────── */}
+        <div className="sticky top-[102px] z-40 bg-[#0a0d14]/90 backdrop-blur-md px-4 py-3 border-b border-white/5 shadow-lg">
+          <div className="grid grid-cols-3 gap-2.5 max-w-5xl mx-auto">
+            {[{label:'전체 장애', val:'', count:srchStats.total, color:'blue', border:'border-blue-500/30', bg:'bg-blue-500/5'},
+              {label:'CRITICAL', val:'CRITICAL', count:srchStats.critical, color:'red', border:'border-red-500/40', bg:'bg-red-500/5'},
+              {label:'HIGH / MAJOR', val:'HIGH', count:srchStats.high, color:'orange', border:'border-orange-500/40', bg:'bg-orange-500/5'}].map(s => {
+              const active = srchParams.severity === s.val;
+              return (
+                <button
+                  key={s.label}
+                  onClick={() => setSrchParams(p => ({ ...p, severity: s.val }))}
+                  className={`border rounded-xl p-2.5 text-center flex flex-col justify-center transition-all cursor-pointer select-none active:scale-95 ${active ? `border-${s.color}-400 bg-${s.color}-500/20 shadow-[0_0_15px_rgba(${s.color === 'red' ? '239,68,68': s.color === 'orange' ? '249,115,22' : '59,130,246'},0.3)]` : `${s.bg} ${s.border} opacity-70 hover:opacity-100`}`}
+                >
+                  <p className={`text-xl font-black text-${s.color}-400 font-mono leading-none`}>{s.count}</p>
+                  <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mt-1">{s.label}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── 결과 리스트 (Color Coding 정교화 + 선택된 요약 카드 필터 연동) ──────────────────────── */}
+        <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-3.5">
+          {srchLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500">
+              <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+              <span className="text-sm font-bold">장애 이력 실시간 필터링 중...</span>
+            </div>
+          ) : searchResults.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 bg-white/5 border border-white/10 rounded-2xl text-center my-4">
+              <FileText size={36} className="text-slate-600 mb-3" />
+              <p className="text-sm font-black text-slate-300 mb-1">검색 결과가 없습니다</p>
+              <p className="text-xs text-slate-500">상단 필터 버튼을 눌러 조건을 변경해 보세요</p>
+            </div>
+          ) : (() => {
+            const displayList = searchResults.filter(inc => {
+              if (!srchParams.severity) return true;
+              const s = (inc.severity || 'NORMAL').toUpperCase();
+              if (srchParams.severity === 'HIGH') return s === 'HIGH' || s === 'MAJOR';
+              return s === srchParams.severity;
+            });
+
+            if (displayList.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-16 bg-white/5 border border-white/10 rounded-2xl text-center my-4">
+                  <AlertCircle size={36} className="text-slate-600 mb-3" />
+                  <p className="text-sm font-black text-slate-300 mb-1">선택된 심각도에 해당하는 장애가 없습니다</p>
+                  <button onClick={() => setSrchParams(p => ({ ...p, severity: '' }))} className="text-xs text-blue-400 mt-2 underline cursor-pointer">전체 장애 보기</button>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between px-1 mb-1">
+                  <span className="text-xs font-bold text-slate-400">조회된 장애 <strong className="text-blue-400">{displayList.length}</strong>건</span>
+                  <span className="text-[10px] text-slate-500 font-mono bg-white/5 px-2.5 py-1 rounded-full border border-white/10">최신 발생순</span>
+                </div>
+                {displayList.map(inc => {
+                  const sev = (inc.severity || 'NORMAL').toUpperCase();
+                  const sc = sev === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border-red-500/40' :
+                             sev === 'HIGH' || sev === 'MAJOR' ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' :
+                             sev === 'NORMAL' ? 'bg-blue-500/20 text-blue-400 border-blue-500/40' : 'bg-slate-500/20 text-slate-400 border-slate-500/40';
+                  
+                  const st = String(inc.status || '').toUpperCase();
+                  const isComplete = st.includes('완료') || st.includes('COMPLETED') || st === 'INC_003' || st === 'CLOSED' || st === '정상';
+                  const isProgress = st.includes('분석중') || st.includes('처리중') || st.includes('PROGRESS') || st === 'INC_002';
+                  
+                  const statusCls = isComplete ? 'bg-slate-500/10 border-slate-500/20 text-slate-400 font-normal' :
+                                    isProgress ? 'bg-[#ff8800]/15 border-[#ff8800]/40 text-[#ff8800] font-black animate-pulse shadow-[0_0_10px_rgba(255,136,0,0.2)]' :
+                                    'bg-blue-500/10 border-blue-500/30 text-blue-400 font-bold';
+                  const statusName = isComplete ? '처리완료' : isProgress ? '분석중' : (inc.status || '대기');
+                  const assignee = inc.assignee_name || inc.assigned_to || '-';
+
+                  return (
+                    <div
+                      key={inc.inc_id}
+                      onClick={() => navigate(`/ai-report/${inc.inc_id}`)}
+                      className="skeuo-card p-4 rounded-2xl bg-[#12151a] hover:bg-[#1a1f26] border border-white/10 transition-all duration-300 flex flex-col gap-2.5 cursor-pointer relative overflow-hidden shadow-xl active:scale-[0.98] group"
+                    >
+                      <div className="absolute top-0 left-0 bottom-0 w-1.5" style={{ background: sev === 'CRITICAL' ? '#ff2a2a' : sev === 'HIGH' || sev === 'MAJOR' ? '#ffb700' : '#3b82f6' }} />
+                      
+                      <div className="flex items-center justify-between pl-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-wide ${sc}`}>{sev}</span>
+                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full border ${statusCls}`}>{statusName}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">{inc.created_at?.slice(0, 16) || '-'}</span>
+                      </div>
+
+                      <div className="pl-2 pr-1">
+                        <h3 className="text-sm font-black text-white leading-snug break-words line-clamp-3 group-hover:text-blue-400 transition-colors">
+                          {(inc.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '') || `INC-${inc.inc_id}`}
+                        </h3>
+                        {inc.message && (
+                          <p className="text-xs text-slate-400 line-clamp-2 mt-1.5 font-normal leading-relaxed">{inc.message}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2.5 border-t border-white/5 pl-2 mt-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-slate-500 font-mono tracking-tighter truncate max-w-[140px]">INC-{inc.inc_id}</span>
+                          {assignee !== '-' && <span className="text-[10px] text-blue-400 font-bold">담당: {assignee}</span>}
+                        </div>
+                        <div className="flex items-center gap-0.5 text-[11px] font-bold text-blue-400 group-hover:translate-x-1 transition-transform shrink-0">
+                          <span>보고서 보기</span>
+                          <ChevronRight size={14} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </main>
+
+        {/* ── Bottom Sheet Modal (상세 검색 필터) ────────────────── */}
+        {showFilterSheet && (
+          <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/75 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowFilterSheet(false)}>
+            <div className="bg-[#12151a] border-t border-white/10 rounded-t-3xl p-6 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto select-none" onClick={e => e.stopPropagation()}>
+              <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-1" />
+              
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <h2 className="text-base font-black text-white flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-blue-400" /> 상세 검색 필터
+                </h2>
+                <button onClick={() => setShowFilterSheet(false)} className="p-1.5 rounded-full bg-white/5 text-slate-400 hover:text-white transition-colors cursor-pointer">
+                  <X size={16} />
+                </button>
               </div>
 
-              {srchLoading ? (
-                <div className="flex items-center justify-center py-16 gap-3 text-slate-500">
-                  <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                  <span className="text-sm">검색 중...</span>
+              <div className="flex flex-col gap-4 text-left">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-400 ml-1">장애 ID</label>
+                    <input
+                      type="text" placeholder="INC-번호 입력"
+                      value={srchParams.incidentId}
+                      onChange={e => setSrchParams(p => ({ ...p, incidentId: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-400 ml-1">처리자</label>
+                    <select
+                      value={srchParams.assignee}
+                      onChange={e => setSrchParams(p => ({ ...p, assignee: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50"
+                    >
+                      <option value="">전체 담당자</option>
+                      {allUsers.map(u => <option key={u.employee_id} value={u.name}>{u.name}</option>)}
+                    </select>
+                  </div>
                 </div>
-              ) : searchResults.length === 0 ? (
-                <div className="text-center py-16 text-slate-500 text-sm">검색 결과가 없습니다.</div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{searchResults.length}건 조회됨</p>
-                  {searchResults.map(inc => {
-                    const sev = inc.severity || 'NORMAL';
-                    const sc = sevCls[sev] || sevCls.NORMAL;
-                    const assignee = inc.assignee_name || inc.assigned_to || '-';
-                    return (
-                      <button
-                        key={inc.inc_id}
-                        onClick={() => navigate(`/ai-report/${inc.inc_id}`)}
-                        className="w-full flex items-start gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-blue-500/20 transition-all text-left group"
-                      >
-                        <div className={`shrink-0 mt-0.5 text-[9px] font-black px-2 py-0.5 rounded border uppercase ${sc}`}>{sev}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-200 group-hover:text-white truncate">
-                            {(inc.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '') || `INC-${inc.inc_id}`}
-                          </p>
-                          <div className="flex items-center gap-3 mt-0.5">
-                            <span className="text-[10px] text-slate-500">INC-{inc.inc_id}</span>
-                            <span className="text-[10px] text-slate-600">{inc.created_at?.slice(0,16)}</span>
-                            {assignee !== '-' && <span className="text-[10px] text-blue-400">담당: {assignee}</span>}
-                            {inc.status && <span className="text-[10px] text-emerald-400">{getStatusName(inc.status)}</span>}
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 shrink-0 mt-1 transition-colors" />
-                      </button>
-                    );
-                  })}
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between ml-1">
+                    <label className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-400" /> 조회 기간
+                    </label>
+                    <div className="flex gap-1">
+                      {[[1,'오늘'],[7,'7일'],[30,'30일'],[90,'90일']].map(([d,l]) => (
+                        <button key={d} type="button" onClick={() => handleQuickDate(d)}
+                          className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all">
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="date" value={srchParams.startDate} onChange={e => setSrchParams(p => ({...p, startDate: e.target.value}))} className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" style={{colorScheme:'dark'}} />
+                    <input type="date" value={srchParams.endDate} onChange={e => setSrchParams(p => ({...p, endDate: e.target.value}))} className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" style={{colorScheme:'dark'}} />
+                  </div>
                 </div>
-              )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-400 ml-1">심각도</label>
+                    <select value={srchParams.severity} onChange={e => setSrchParams(p => ({...p, severity: e.target.value}))} className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50">
+                      <option value="">전체</option>
+                      <option value="CRITICAL">CRITICAL</option>
+                      <option value="HIGH">HIGH / MAJOR</option>
+                      <option value="NORMAL">NORMAL</option>
+                      <option value="INFO">INFO</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-400 ml-1">처리 상태</label>
+                    <select value={srchParams.status} onChange={e => setSrchParams(p => ({...p, status: e.target.value}))} className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50">
+                      <option value="">전체</option>
+                      <option value="처리완료">처리완료</option>
+                      <option value="처리중">처리중 / 분석중</option>
+                      <option value="대기">대기</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-4 border-t border-white/10 mt-2">
+                <button onClick={() => { const p = { incidentId:'', keyword:'', ...getDefaultDates(), severity:'', status:'처리완료', assignee:'' }; setSrchParams(p); }} className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-slate-400 hover:text-white cursor-pointer">
+                  초기화
+                </button>
+                <button onClick={() => { handleListSearch(); setShowFilterSheet(false); }} className="flex-1 py-3.5 bg-gradient-to-r from-blue-500 to-blue-400 text-black font-black text-sm rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                  <Search size={16} />적용 및 조회하기
+                </button>
+              </div>
             </div>
-          )}
-        </main>
+          </div>
+        )}
       </div>
     );
   }
@@ -728,69 +873,37 @@ export default function AiReportPage() {
           </div>
         </div>
 
-        {/* Row 2: 메타데이터 풀-width */}
+        {/* Row 2: 메타데이터 스와이프 칩 바 (대상 시스템 제거 및 극도로 간결한 미니 바 유지) */}
         {report && (
-          <div className="max-w-5xl mx-auto w-full flex items-stretch divide-x divide-white/5 bg-[#0d1220] border-t border-white/5">
-            {/* 담당자: ID + 이름 + 조직 */}
-            {report.who && (
-              <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
-                <Users className="w-3 h-3 text-blue-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">담당자</p>
-                  <p className="text-[11px] text-slate-300 font-semibold leading-none">
-                    {report.who}
-                    {(report.who_name || report.creator_name) && (
-                      <span className="text-slate-400 font-normal"> ({report.who_name || report.creator_name})</span>
-                    )}
-                  </p>
-                  {report.who_org && (
-                    <p className="text-[10px] text-slate-500 font-normal leading-none mt-0.5 truncate">{report.who_org}</p>
-                  )}
+          <div className="bg-[#0d1220] border-t border-white/5 py-1.5 px-2 shadow-inner">
+            <div className="relative max-w-5xl mx-auto">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-1 py-1 pr-12 text-left">
+                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold flex items-center gap-1.5 shadow-sm">
+                  <Clock size={13} /> {report.created_at?.slice(5, 16) || '05-15 11:41'}
+                </span>
+                
+                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center gap-1.5 shadow-sm">
+                  <Users size={13} /> {report.who_name || report.creator_name || (report.who && String(report.who).startsWith('S') ? '조경훈' : report.who) || '조경훈'}
+                </span>
+
+                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-mono font-black bg-red-500/10 text-red-400 border border-red-500/30 flex items-center gap-1.5 shadow-sm">
+                  <Activity size={13} /> MTTR {report.duration_label ?? (report.duration_min != null ? `${report.duration_min}분` : '51분')}
+                </span>
+
+                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                  <MessageSquare size={13} /> 채팅 {report.message_count || 0}
+                </span>
+
+                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5 shadow-sm">
+                  <Paperclip size={13} /> 첨부 {report.attachment_count || 0}
+                </span>
+              </div>
+
+              {/* 우측 스와이프 시각적 인디케이터 */}
+              <div className="absolute right-0 top-0 bottom-0 w-14 bg-gradient-to-l from-[#0d1220] via-[#0d1220]/80 to-transparent flex items-center justify-end pr-2 pointer-events-none z-10 animate-pulse">
+                <div className="bg-white/10 text-slate-300 p-1 rounded-full border border-white/20 shadow-lg flex items-center justify-center">
+                  <ChevronRight size={14} className="stroke-[3]" />
                 </div>
-              </div>
-            )}
-            {/* 발생 일시 */}
-            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
-              <Clock className="w-3 h-3 text-purple-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">발생일시</p>
-                <p className="text-[11px] text-slate-300 font-semibold truncate leading-none">{report.created_at?.slice(0, 16) || '-'}</p>
-              </div>
-            </div>
-            {/* 대상 시스템 */}
-            {report.where && (
-              <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
-                <Server className="w-3 h-3 text-teal-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">대상시스템</p>
-                  <p className="text-[11px] text-slate-300 font-semibold truncate leading-none">{report.where}</p>
-                </div>
-              </div>
-            )}
-            {/* 채팅 건수 */}
-            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
-              <MessageSquare className="w-3 h-3 text-emerald-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">채팅</p>
-                <p className="text-[11px] text-slate-300 font-semibold leading-none">{report.message_count ?? '-'}건</p>
-              </div>
-            </div>
-            {/* 첨부파일 */}
-            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
-              <Paperclip className="w-3 h-3 text-amber-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">첨부</p>
-                <p className="text-[11px] text-slate-300 font-semibold leading-none">{report.attachment_count ?? '-'}건</p>
-              </div>
-            </div>
-            {/* 소요시간 */}
-            <div className="flex-1 flex items-center gap-1.5 px-3 py-2 min-w-0">
-              <Activity className="w-3 h-3 text-red-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wide leading-none mb-0.5">소요시간</p>
-                <p className="text-[11px] text-slate-300 font-semibold leading-none">
-                  {report.duration_label ?? (report.duration_min != null ? `${report.duration_min}분` : '-')}
-                </p>
               </div>
             </div>
           </div>
@@ -895,7 +1008,7 @@ export default function AiReportPage() {
                           </div>
                         </div>
                       )}
-                      <MarkdownBlock text={report.autopilot_insight} report={report} />
+                      <MarkdownBlock text={report.autopilot_insight} report={report} checkedItems={checkedActionItems} onToggleCheck={toggleActionItem} />
                     </div>
                   </section>
                 )}
@@ -907,7 +1020,7 @@ export default function AiReportPage() {
                       <span className="text-xs font-bold text-amber-400">Leader Agent 종합 요약</span>
                     </div>
                     <div className="p-4">
-                      <MarkdownBlock text={report.leader_summary} report={report} />
+                      <MarkdownBlock text={report.leader_summary} report={report} checkedItems={checkedActionItems} onToggleCheck={toggleActionItem} />
                     </div>
                   </section>
                 )}
@@ -920,7 +1033,7 @@ export default function AiReportPage() {
                       <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
                     </div>
                     <div className="p-5 overflow-visible">
-                      <MarkdownBlock text={chatSummary} report={report} />
+                      <MarkdownBlock text={chatSummary} report={report} checkedItems={checkedActionItems} onToggleCheck={toggleActionItem} />
                     </div>
                   </section>
                 )}

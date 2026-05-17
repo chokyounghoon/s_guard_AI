@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Shield, Database, Server, User, Terminal, Copy, Check, X } from 'lucide-react';
+import { Shield, Database, Server, User, Terminal, Copy, Check, X, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
 
 const AgentAvatar = ({ role }) => {
   const getAgentStyle = (role) => {
@@ -46,6 +46,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
   const longPressTimer = useRef(null);
   const [contextMenu, setContextMenu] = useState(null); // { text, x, y }
   const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -136,11 +137,61 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         </div>
       )}
 
-      {/* Incident Details Summary (Shared) */}
+      {/* Incident Details Summary (Shared) - 컨센서스(합의) 대시보드 */}
+      <div className="p-4 bg-[#060a12] flex flex-col gap-3">
+        {/* 아이콘 3개 상태 인디케이터 */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border border-[#00ff88]/40 shadow-[0_0_20px_rgba(0,255,136,0.15)] text-center">
+            <div className="w-10 h-10 rounded-full bg-[#00ff88]/15 border border-[#00ff88]/30 flex items-center justify-center mb-2 shadow-[0_0_12px_rgba(0,255,136,0.3)]">
+              <Shield className="w-5 h-5 text-[#00ff88] filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+            </div>
+            <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider mb-1">SEC-OPS</span>
+            <span className="text-[9px] font-black text-[#00ff88] bg-[#00ff88]/10 px-2 py-0.5 rounded-full border border-[#00ff88]/30 shadow-[0_0_8px_rgba(0,255,136,0.2)]">SAFE</span>
+          </div>
 
+          <div className="skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border border-[#00ff88]/40 shadow-[0_0_20px_rgba(0,255,136,0.15)] text-center">
+            <div className="w-10 h-10 rounded-full bg-[#00ff88]/15 border border-[#00ff88]/30 flex items-center justify-center mb-2 shadow-[0_0_12px_rgba(0,255,136,0.3)]">
+              <Database className="w-5 h-5 text-[#00ff88] filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+            </div>
+            <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider mb-1">DB-SYS</span>
+            <span className="text-[9px] font-black text-[#00ff88] bg-[#00ff88]/10 px-2 py-0.5 rounded-full border border-[#00ff88]/30 shadow-[0_0_8px_rgba(0,255,136,0.2)]">SAFE</span>
+          </div>
+
+          <div className="skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border border-[#00ff88]/40 shadow-[0_0_20px_rgba(0,255,136,0.15)] text-center">
+            <div className="w-10 h-10 rounded-full bg-[#00ff88]/15 border border-[#00ff88]/30 flex items-center justify-center mb-2 shadow-[0_0_12px_rgba(0,255,136,0.3)]">
+              <Server className="w-5 h-5 text-[#00ff88] filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+            </div>
+            <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider mb-1">DEV-OPS</span>
+            <span className="text-[9px] font-black text-[#00ff88] bg-[#00ff88]/10 px-2 py-0.5 rounded-full border border-[#00ff88]/30 shadow-[0_0_8px_rgba(0,255,136,0.2)]">SAFE</span>
+          </div>
+        </div>
+
+        {/* 한 줄 결론 요약 박스 */}
+        <div className="skeuo-card p-4 rounded-2xl bg-gradient-to-r from-[#00ff88]/15 to-[#00ff88]/5 border border-[#00ff88]/30 flex items-center gap-3.5 shadow-[0_0_20px_rgba(0,255,136,0.1)]">
+          <CheckCircle2 className="w-6 h-6 text-[#00ff88] shrink-0 filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px] font-bold text-[#00ff88] tracking-widest uppercase mb-0.5">Consensus Conclusion</span>
+            <p className="text-sm font-black text-white tracking-tight leading-snug">
+              요약: 관리자 테스트로 인한 정상 데이터 유입 (위협 없음)
+            </p>
+          </div>
+        </div>
+
+        {/* 에이전트 로그 보기 버튼 */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="skeuo-btn w-full py-3.5 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/15 rounded-xl flex items-center justify-between text-slate-200 font-black text-xs tracking-tight transition-all cursor-pointer shadow-md"
+        >
+          <span className="flex items-center gap-2">
+            <Terminal size={15} className="text-indigo-400" />
+            에이전트 실시간 토론 로그 {isExpanded ? '접기' : '보기'} ({messages?.length || 0}건)
+          </span>
+          {isExpanded ? <ChevronUp size={18} className="text-[#00ff88]" /> : <ChevronDown size={18} className="text-slate-400" />}
+        </button>
+      </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar" ref={scrollRef}>
+      <div className={`flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar transition-all duration-300 ${isExpanded ? 'block animate-slide-in-smooth' : 'hidden'}`} ref={scrollRef}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center text-center text-slate-500 text-xs py-20 opacity-40 space-y-3">
             <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center animate-pulse border border-white/5">

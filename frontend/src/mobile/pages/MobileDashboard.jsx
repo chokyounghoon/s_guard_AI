@@ -147,6 +147,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [messages, setMessages] = useState([]); 
   const [allNotifications, setAllNotifications] = useState([]); 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showFullTimeline, setShowFullTimeline] = useState(false);
   const { refreshCodes } = useCodebook();
   
   // 🌐 API Configuration (Production Worker)
@@ -980,6 +981,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     return result;
   };
 
+  const deduplicateMessages = (msgs) => {
+    const seen = new Set();
+    return msgs.filter(m => {
+      const key = `${m.role}:${(m.text || '').trim().substring(0, 30)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   // Callback called from AiInsightPanel (PC 버전과 동일한 로직)
   const handleAgentContent = useCallback((fullTranscript, isDone) => {
     const currentMsgs = parseTranscript(fullTranscript);
@@ -997,18 +1008,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
     if (filteredMsgs.length > 0) {
       setShowAgentPanel(true);
-      // 순서대로(Security→DB→DevOps→Leader) 즉시 전부 표시
-      setAgentMessages(filteredMsgs.map(m => ({ ...m, isCompleted: isDone })));
+      // 순서대로(Security→DB→DevOps→Leader) 중복 제거 후 표시
+      setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: isDone }))));
     }
 
-    // 완료 시에만 DB 저장
+    // 완료 시에만 중복 제거된 내역을 DB 저장
     if (isDone && currentMsgs.length > 0) {
       const currentIncId = selectedSmsRef.current?.inc_id;
       if (currentIncId) {
         fetch(`${apiBase}/ai/chat-history/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ incident_id: String(currentIncId), messages: currentMsgs })
+          body: JSON.stringify({ incident_id: String(currentIncId), messages: deduplicateMessages(currentMsgs) })
         }).catch(console.error);
 
         setTimeout(() => setShowEmergencyModal(true), 1500);
@@ -1066,7 +1077,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
          const data = await checkRes.json();
          if (data.messages && data.messages.length > 0) {
             const filtered = data.messages.filter(m => m.role !== 'AI분석');
-            const completedMsgs = filtered.map(m => ({ ...m, isCompleted: true }));
+            const completedMsgs = deduplicateMessages(filtered.map(m => ({ ...m, isCompleted: true })));
             const hasSecurityExpert = filtered.some(m => /Security|보안/i.test(m.role));
 
             if (hasSecurityExpert) {
@@ -1311,21 +1322,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   };
 
   return (
-    <div className="fixed inset-0 text-white font-sans overflow-x-clip overflow-y-auto" style={{ background: '#080c14' }}>
+    <div className="fixed inset-0 text-white font-sans overflow-x-clip overflow-y-auto" style={{ background: '#121212' }}>
       <nav className="mobile-top-nav flex justify-between items-end px-4 sticky top-0 z-[100]"
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingBottom: '12px',
           height: 'calc(62px + env(safe-area-inset-top, 0px))',
-          background: '#080c14', 
-          borderBottom: '1px solid rgba(255,255,255,0.06)' 
+          background: '#121212', 
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
         }}>
 
         {/* Left: logo + icon buttons */}
         <div className="flex items-center gap-3 shrink-0">
           <button onClick={() => window.location.reload()}
             className="text-xs font-black tracking-[0.1em] uppercase text-white whitespace-nowrap">
-            S-GUARD <span style={{ color: '#3b82f6' }}>AI</span>
+            S-GUARD <span style={{ color: '#00e5ff', textShadow: '0 0 10px rgba(0,229,255,0.6)' }}>AI</span>
           </button>
         </div>
 
@@ -1343,9 +1355,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
                     : isProcessing
                       ? 'bg-blue-600/20 text-blue-400 border-blue-500/30'
-                      : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_8px_rgba(239,68,68,0.4)]'
-                      : sev === 'MAJOR'    ? 'bg-orange-600 text-white'
-                      :                      'bg-emerald-600 text-white';
+                      : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(255,42,42,0.6)] border-red-500'
+                      : sev === 'MAJOR'    ? 'bg-orange-600 text-white shadow-[0_0_12px_rgba(255,183,0,0.6)] border-yellow-500'
+                      :                      'bg-emerald-600 text-white shadow-[0_0_12px_rgba(0,255,136,0.6)] border-emerald-500';
 
                   return (
                     <button
@@ -1356,7 +1368,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         handleOpenWarRoomFromInsight(insightSms, insightContent);
                       }}
                       disabled={isOpeningWarRoom}
-                      className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-black text-[9px] transition-all border border-white/10 ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden`}
+                      className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-black text-[9px] transition-all border ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden`}
                     >
                       {isOpeningWarRoom ? (
                         <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -1388,8 +1400,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               disabled={!checkAllowed('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
               className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
-              style={{ border: '1px solid rgba(6,182,212,0.4)', background: 'transparent' }}>
-              <Cpu size={15} style={{ color: '#06b6d4' }} />
+              style={{ border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.08)', boxShadow: '0 0 10px rgba(0,229,255,0.25)' }}>
+              <Cpu size={15} style={{ color: '#00e5ff' }} />
               {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
             </button>
 
@@ -1404,8 +1416,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               disabled={!checkAllowed('/alert-monitor')}
               onPointerDown={() => handleTooltipStart('Alert Monitor')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
               className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
-              style={{ border: '1px solid rgba(239,68,68,0.4)', background: 'transparent' }}>
-              <BellDot size={15} style={{ color: '#ef4444' }} />
+              style={{ border: '1px solid #ff2a2a', background: 'rgba(255,42,42,0.08)', boxShadow: '0 0 10px rgba(255,42,42,0.25)' }}>
+              <BellDot size={15} style={{ color: '#ff2a2a' }} />
               {!checkAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-red-500 absolute -top-1 -right-1" />}
             </button>
 
@@ -1414,24 +1426,25 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               onPointerDown={() => handleTooltipStart('Threshold')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
               className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
               style={{
-                border: showThresholdSettings ? '1px solid rgba(59,130,246,0.7)' : '1px solid rgba(255,255,255,0.12)',
-                background: showThresholdSettings ? 'rgba(59,130,246,0.1)' : 'transparent'
+                border: showThresholdSettings ? '1px solid #00ff88' : '1px solid rgba(255,255,255,0.15)',
+                background: showThresholdSettings ? 'rgba(0,255,136,0.1)' : 'transparent',
+                boxShadow: showThresholdSettings ? '0 0 10px rgba(0,255,136,0.3)' : 'none'
               }}>
-              <Settings size={15} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#60a5fa' : '#64748b', transition: 'transform 0.3s' }} />
+              <Settings size={15} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#00ff88' : '#94a3b8', transition: 'transform 0.3s' }} />
             </button>
           </div>
 
           <button onClick={onAiClick}
             onPointerDown={() => handleTooltipStart('AI Assistant')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
             className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
-            style={{ border: '1px solid rgba(168,85,247,0.5)', background: 'rgba(168,85,247,0.08)' }}>
-            <Bot size={16} style={{ color: '#a855f7' }} />
+            style={{ border: '1px solid #ffb700', background: 'rgba(255,183,0,0.1)', boxShadow: '0 0 10px rgba(255,183,0,0.3)' }}>
+            <Bot size={16} style={{ color: '#ffb700' }} />
           </button>
 
           <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 active:opacity-60">
             {userProfile && <span className="text-[11px] font-semibold text-slate-400 hidden sm:block">{userProfile.name}</span>}
-            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center"
-              style={{ border: '1px solid rgba(59,130,246,0.3)', background: '#13182a' }}>
+            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.2)]"
+              style={{ border: '1px solid #00e5ff', background: '#1c2027' }}>
               {userProfile?.profile_picture
                 ? <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
                 : <User size={15} className="text-slate-400" />}
@@ -1476,20 +1489,20 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       {showNotifications && (
         <div className="fixed inset-0 z-[110] flex justify-end animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowNotifications(false)} />
-          <div className="w-full max-w-sm bg-[#1a1f2e] h-full shadow-2xl relative z-10 animate-in slide-in-from-right duration-500 flex flex-col border-l border-white/10">
-            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
+          <div className="w-full max-w-sm bg-[#16191f] h-full shadow-[0_0_30px_rgba(0,0,0,0.8)] relative z-10 animate-in slide-in-from-right duration-500 flex flex-col border-l border-white/10">
+            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-[#00e5ff]/10 to-transparent">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden shrink-0"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 100%)',
-                    border: '1px solid rgba(59,130,246,0.3)',
-                    boxShadow: '0 4px 12px -2px rgba(59,130,246,0.15)'
+                    background: 'linear-gradient(135deg, rgba(0,229,255,0.15) 0%, rgba(0,229,255,0.05) 100%)',
+                    border: '1px solid #00e5ff',
+                    boxShadow: '0 0 15px rgba(0,229,255,0.3)'
                   }}>
-                  <Bell className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                  <Bell className="w-5 h-5 text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-lg">알림 센터</h3>
-                  <p className="text-[10px] text-slate-500 font-mono uppercase">Notification Center</p>
+                  <p className="text-[10px] text-[#00e5ff] font-mono uppercase">Notification Center</p>
                 </div>
               </div>
               <button
@@ -1513,7 +1526,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       // Blocked legacy assignment-detail link
                     }
                     }}
-                    className={`p-4 rounded-2xl border ${n.severity === 'CRITICAL' ? 'bg-red-500/5 border-red-500/10' : 'bg-[#11141d] border-white/5'} hover:border-blue-500/30 transition-all cursor-pointer group active:scale-[0.98] relative`}
+                    className={`p-4 rounded-2xl border ${n.severity === 'CRITICAL' ? 'bg-[#ff2a2a]/5 border-[#ff2a2a]/30 shadow-[0_0_15px_rgba(255,42,42,0.15)]' : 'bg-[#1c2027] border-white/10 hover:border-[#00e5ff]/50 hover:shadow-[0_0_15px_rgba(0,229,255,0.2)]'} transition-all cursor-pointer group active:scale-[0.98] relative`}
                   >
                     <button
                       onClick={(e) => {
@@ -1528,17 +1541,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     <div className="flex justify-between items-start mb-2 pr-6">
                       <div className="flex items-center gap-2">
                         {n.type === 'AI' ? (
-                          <Brain className="w-3.5 h-3.5 text-blue-400" />
+                          <Brain className="w-3.5 h-3.5 text-[#00e5ff]" />
                         ) : (
-                          <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+                          <MessageSquare className="w-3.5 h-3.5 text-[#00ff88]" />
                         )}
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${n.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-400'}`}>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${n.severity === 'CRITICAL' ? 'bg-[#ff2a2a]/20 text-[#ff2a2a] border border-[#ff2a2a]/30' : 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30'}`}>
                           {n.type}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-500 font-mono">{n.time}</span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-200 mb-1 group-hover:text-blue-400 transition-colors line-clamp-1">{n.title}</h4>
+                    <h4 className="text-xs font-bold text-slate-200 mb-1 group-hover:text-[#00e5ff] transition-colors line-clamp-1">{n.title}</h4>
                     <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{n.content}</p>
                   </div>
                 ))
@@ -1553,7 +1566,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               )}
             </div>
 
-            <div className="p-4 border-t border-white/5">
+            <div className="p-4 border-t border-white/10">
               <button
                 onClick={() => {
                   setAllNotifications([]);
@@ -1575,29 +1588,30 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         {/* ── PANEL 1: SMS FEED (Bento Wide) ── */}
         {(() => {
           const isCrit = smsMessages.some(m => m.severity === 'CRITICAL' || m.severity === 'MAJOR');
-          const smsColor = isCrit ? '239,68,68' : '59,130,246';
+          const borderGlow = isCrit ? 'rgba(255,42,42,0.6)' : 'rgba(0,229,255,0.5)';
+          const borderColor = isCrit ? '#ff2a2a' : '#00e5ff';
           return (
         <div className="md:col-span-2 transition-all duration-300 shadow-2xl" style={{
-          background: 'linear-gradient(180deg, rgba(17,24,39,0.85) 0%, rgba(11,15,25,0.95) 100%)',
-          border: `1px solid rgba(${smsColor},0.4)`,
+          background: 'linear-gradient(180deg, #1c2027 0%, #12151a 100%)',
+          border: `1px solid ${borderColor}`,
           borderRadius: 24,
           overflow: 'hidden',
-          boxShadow: `0 10px 30px -5px rgba(${smsColor},0.2), inset 0 1px 0 rgba(255,255,255,0.1)`,
+          boxShadow: `0 0 25px ${borderGlow}, inset 0 1px 0 rgba(255,255,255,0.1)`,
           backdropFilter: 'blur(20px)'
         }}>
 
           {/* Panel header */}
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
-              <MessageSquare size={16} style={{ color: smsMessages.some(m => m.severity === 'CRITICAL' || m.severity === 'MAJOR') ? '#ef4444' : '#3b82f6' }} />
+              <MessageSquare size={16} style={{ color: borderColor, filter: `drop-shadow(0 0 8px ${borderColor})` }} />
               <span className="text-[12px] font-black text-white uppercase tracking-[0.15em]">실시간 SMS 수신내역</span>
             </div>
             <div className="flex items-center gap-3">
               {/* Hide Done toggle */}
               <button onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
                 className="flex items-center gap-1.5 active:opacity-60">
-                <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: hideCompletedSms ? '#3b82f6' : '#475569' }}>Done 숨김</span>
-                <div className="w-7 h-3.5 rounded-full relative" style={{ background: hideCompletedSms ? '#1d4ed8' : '#1e293b', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: hideCompletedSms ? '#00e5ff' : '#475569' }}>Done 숨김</span>
+                <div className="w-7 h-3.5 rounded-full relative" style={{ background: hideCompletedSms ? '#00e5ff' : '#1e293b', border: '1px solid rgba(255,255,255,0.1)', boxShadow: hideCompletedSms ? '0 0 8px #00e5ff' : 'none' }}>
                   <div className="absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white" style={{ left: hideCompletedSms ? '13px' : '1px', transition: 'left 0.2s' }} />
                 </div>
               </button>
@@ -1606,9 +1620,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 const isLive = smsMessages.length > 0 && smsMessages.some(m => !m.is_analyzed || Number(m.is_analyzed) === 0);
                 return (
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg"
-                    style={{ border: `1px solid ${isLive ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`, background: isLive ? 'rgba(59,130,246,0.06)' : 'transparent' }}>
-                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isLive ? '#3b82f6' : '#334155' }} />
-                    <span className="text-[9px] font-black tracking-widest" style={{ color: isLive ? '#60a5fa' : '#475569' }}>{isLive ? 'LIVE' : 'DONE'}</span>
+                    style={{ border: `1px solid ${isLive ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, background: isLive ? 'rgba(0,229,255,0.1)' : 'transparent', boxShadow: isLive ? '0 0 10px rgba(0,229,255,0.3)' : 'none' }}>
+                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isLive ? '#00e5ff' : '#475569', boxShadow: isLive ? '0 0 8px #00e5ff' : 'none' }} />
+                    <span className="text-[9px] font-black tracking-widest" style={{ color: isLive ? '#00e5ff' : '#64748b' }}>{isLive ? 'LIVE' : 'DONE'}</span>
                   </div>
                 );
               })()}
@@ -1616,27 +1630,27 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
 
           {/* Threshold panel */}
-          <div style={{ maxHeight: showThresholdSettings ? 200 : 0, overflow: 'hidden', transition: 'max-height 0.3s', borderBottom: showThresholdSettings ? '1px solid rgba(255,255,255,0.05)' : 'none', background: 'rgba(59,130,246,0.03)' }}>
+          <div style={{ maxHeight: showThresholdSettings ? 200 : 0, overflow: 'hidden', transition: 'max-height 0.3s', borderBottom: showThresholdSettings ? '1px solid rgba(255,255,255,0.08)' : 'none', background: 'rgba(0,255,136,0.05)' }}>
             <div className="px-5 py-4 space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Technical Threshold</span>
-                  <span className="text-[10px] font-black font-mono" style={{ color: '#60a5fa' }}>{(thresholds.technical * 100).toFixed(0)}%</span>
+                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Technical Threshold</span>
+                  <span className="text-[10px] font-black font-mono" style={{ color: '#00ff88', textShadow: '0 0 8px rgba(0,255,136,0.5)' }}>{(thresholds.technical * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0.5" max="1.0" step="0.01" value={thresholds.technical}
                   onChange={(e) => setThresholds(prev => ({ ...prev, technical: parseFloat(e.target.value) }))}
                   onMouseUp={() => updateThreshold('similarity_threshold_technical', thresholds.technical)}
-                  className="w-full h-1 rounded appearance-none cursor-pointer accent-blue-500" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                  className="w-full h-1 rounded appearance-none cursor-pointer accent-[#00ff88]" style={{ background: 'rgba(255,255,255,0.15)' }} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Casual Strictness</span>
-                  <span className="text-[10px] font-black font-mono" style={{ color: '#a855f7' }}>{(thresholds.casual * 100).toFixed(0)}%</span>
+                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Casual Strictness</span>
+                  <span className="text-[10px] font-black font-mono" style={{ color: '#00e5ff', textShadow: '0 0 8px rgba(0,229,255,0.5)' }}>{(thresholds.casual * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0.7" max="1.0" step="0.01" value={thresholds.casual}
                   onChange={(e) => setThresholds(prev => ({ ...prev, casual: parseFloat(e.target.value) }))}
                   onMouseUp={() => updateThreshold('similarity_threshold_casual', thresholds.casual)}
-                  className="w-full h-1 rounded appearance-none cursor-pointer accent-purple-500" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                  className="w-full h-1 rounded appearance-none cursor-pointer accent-[#00e5ff]" style={{ background: 'rgba(255,255,255,0.15)' }} />
               </div>
             </div>
           </div>
@@ -1647,7 +1661,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               const isSel = selectedSms?.inc_id === msg.inc_id;
               const isCrit = msg.severity === 'CRITICAL';
               const isMaj = msg.severity === 'MAJOR';
-              const accentColor = isSel ? '#eab308' : isCrit ? '#ef4444' : isMaj ? '#f97316' : '#3b82f6';
+              const accentColor = isSel ? '#ffb700' : isCrit ? '#ff2a2a' : isMaj ? '#ffb700' : '#00e5ff';
               return (
                 <div key={`sms-${msg.inc_id}`}
                   onClick={() => {
@@ -1656,70 +1670,78 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   }}
                   className="rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98]"
                   style={{
-                    background: isSel ? 'rgba(234,179,8,0.06)' : 'rgba(13,17,23,0.7)',
-                    borderTop: `1px solid ${isSel ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                    borderRight: `1px solid ${isSel ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                    borderBottom: `1px solid ${isSel ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                    background: isSel ? 'rgba(255,183,0,0.08)' : 'rgba(18,21,26,0.85)',
+                    borderTop: `1px solid ${isSel ? '#ffb700' : 'rgba(255,255,255,0.06)'}`,
+                    borderRight: `1px solid ${isSel ? '#ffb700' : 'rgba(255,255,255,0.06)'}`,
+                    borderBottom: `1px solid ${isSel ? '#ffb700' : 'rgba(255,255,255,0.06)'}`,
                     borderLeft: `4px solid ${accentColor}`,
                     borderRadius: 16,
-                    boxShadow: isSel ? '0 4px 20px rgba(234,179,8,0.15)' : '0 2px 10px rgba(0,0,0,0.2)'
+                    boxShadow: isSel ? '0 0 20px rgba(255,183,0,0.35)' : '0 4px 15px rgba(0,0,0,0.4)'
                   }}>
                   {/* Row 1: type + badges */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      {msg.keyword_detected ? <AlertCircle size={14} style={{ color: accentColor }} /> : <Info size={14} style={{ color: accentColor }} />}
-                      <span className="text-[12px] font-bold tracking-wide" style={{ color: isSel ? '#facc15' : '#e2e8f0' }}>
+                      {msg.keyword_detected ? <AlertCircle size={14} style={{ color: accentColor, filter: `drop-shadow(0 0 6px ${accentColor})` }} /> : <Info size={14} style={{ color: accentColor }} />}
+                      <span className="text-[12px] font-bold tracking-wide" style={{ color: isSel ? '#ffb700' : '#f8fafc', textShadow: isSel ? '0 0 8px rgba(255,183,0,0.5)' : 'none' }}>
                         {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {msg.severity && (
                         <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider"
-                          style={{ color: accentColor, border: `1px solid ${accentColor}40`, background: `${accentColor}10` }}>
+                          style={{ color: accentColor, border: `1px solid ${accentColor}`, background: `${accentColor}15`, boxShadow: `0 0 8px ${accentColor}40` }}>
                           {msg.severity}
                         </span>
                       )}
+                      {(msg.incident_status === '처리완료' || msg.incident_status === 'Completed' || msg.status === '처리완료' || msg.status === 'Completed' || Number(msg.is_analyzed) >= 1) && (
+                        <button onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${msg.inc_id}`); }}
+                          className="text-[9px] font-black px-2 py-0.5 rounded-md active:opacity-60 transition-all hover:bg-purple-500/20"
+                          style={{ color: '#d946ef', border: '1px solid #d946ef', background: 'rgba(217,70,239,0.1)', boxShadow: '0 0 8px rgba(217,70,239,0.3)' }}>
+                          REPORT
+                        </button>
+                      )}
                       <button onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                        className="text-[9px] font-black px-2 py-0.5 rounded-md active:opacity-60 transition-all hover:bg-blue-500/20"
-                        style={{ color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)' }}>
+                        className="text-[9px] font-black px-2 py-0.5 rounded-md active:opacity-60 transition-all hover:bg-[#00e5ff]/20"
+                        style={{ color: '#00e5ff', border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.1)', boxShadow: '0 0 8px rgba(0,229,255,0.3)' }}>
                         현황
                       </button>
-                      <span className="text-[9px] font-black px-2 py-0.5 rounded-md"
-                        style={{
-                          color: msg.incident_status === '처리완료' ? '#34d399' : Number(msg.is_analyzed) >= 1 ? '#60a5fa' : '#facc15',
-                          border: `1px solid ${msg.incident_status === '처리완료' ? 'rgba(52,211,153,0.3)' : Number(msg.is_analyzed) >= 1 ? 'rgba(96,165,250,0.3)' : 'rgba(250,204,21,0.3)'}`,
-                          background: msg.incident_status === '처리완료' ? 'rgba(52,211,153,0.05)' : Number(msg.is_analyzed) >= 1 ? 'rgba(96,165,250,0.05)' : 'rgba(250,204,21,0.05)'
-                        }}>
-                        {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANALYZED' : 'ANALYZING'}
-                      </span>
                     </div>
                   </div>
-                  {/* Row 2: sender */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] text-slate-500">발신 <span className="font-mono text-slate-400">{msg.sender}</span></span>
+                  {/* Row 2: sender + employee + analysis status */}
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="text-[10px] text-slate-400">발신 <span className="font-mono text-slate-300">{msg.sender}</span></span>
                     {msg.employee_id && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md" style={{ color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)', background: 'rgba(59,130,246,0.05)' }}>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md shrink-0" style={{ color: '#00e5ff', border: '1px solid rgba(0,229,255,0.3)', background: 'rgba(0,229,255,0.08)' }}>
                         {msg.employee_id}{msg.sender_name && ` (${msg.sender_name})`}
                       </span>
                     )}
+                    <span className="text-[9px] font-black px-2 py-0.5 rounded-md shrink-0 ml-auto sm:ml-0"
+                      style={{
+                        color: msg.incident_status === '처리완료' ? '#00ff88' : Number(msg.is_analyzed) >= 1 ? '#00e5ff' : '#ffb700',
+                        border: `1px solid ${msg.incident_status === '처리완료' ? '#00ff88' : Number(msg.is_analyzed) >= 1 ? '#00e5ff' : '#ffb700'}`,
+                        background: msg.incident_status === '처리완료' ? 'rgba(0,255,136,0.1)' : Number(msg.is_analyzed) >= 1 ? 'rgba(0,229,255,0.1)' : 'rgba(255,183,0,0.1)',
+                        boxShadow: `0 0 8px ${msg.incident_status === '처리완료' ? 'rgba(0,255,136,0.4)' : Number(msg.is_analyzed) >= 1 ? 'rgba(0,229,255,0.4)' : 'rgba(255,183,0,0.4)'}`
+                      }}>
+                      {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANALYZED' : 'ANALYZING'}
+                    </span>
                   </div>
                   {/* Row 3: message */}
-                  <p className="text-[13px] leading-relaxed break-all whitespace-pre-wrap font-normal" style={{ color: isSel ? '#fef9c3' : '#94a3b8' }}>{msg.message}</p>
+                  <p className="text-[13px] leading-relaxed break-all whitespace-pre-wrap font-normal" style={{ color: isSel ? '#fff' : '#cbd5e1' }}>{msg.message}</p>
                   {/* Row 4: footer */}
-                  <div className="flex items-center justify-between mt-2.5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="flex items-center justify-between mt-2.5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                     {msg.similarity_score != null && (
-                      <span className="text-[9px] font-black uppercase" style={{ color: msg.similarity_score >= 0.8 ? '#34d399' : '#60a5fa' }}>
+                      <span className="text-[9px] font-black uppercase" style={{ color: msg.similarity_score >= 0.8 ? '#00ff88' : '#00e5ff', textShadow: `0 0 8px ${msg.similarity_score >= 0.8 ? 'rgba(0,255,136,0.5)' : 'rgba(0,229,255,0.5)'}` }}>
                         ⚡ Match {(msg.similarity_score * 100).toFixed(1)}%
                       </span>
                     )}
-                    <span className="text-[9px] font-mono text-slate-600 ml-auto">{formatYYMMDD(msg.timestamp)}</span>
+                    <span className="text-[9px] font-mono text-slate-500 ml-auto">{formatYYMMDD(msg.timestamp)}</span>
                   </div>
                 </div>
               );
             }) : (
-              <div className="py-12 flex flex-col items-center gap-3 opacity-20">
-                <MessageSquare size={28} className="text-slate-500" />
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">수신된 SMS 없음</p>
+              <div className="py-12 flex flex-col items-center gap-3 opacity-30">
+                <MessageSquare size={28} className="text-[#00e5ff]" />
+                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">수신된 SMS 없음</p>
               </div>
             )}
           </div>
@@ -1730,11 +1752,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         {/* ── PANEL 2: AI Insight (Bento Wide) ── */}
         {(visibleSms.length > 0 || selectedSms) && (
           <div className="md:col-span-2 transition-all duration-300 shadow-2xl" style={{
-            background: 'linear-gradient(180deg, rgba(26,16,47,0.7) 0%, rgba(13,10,24,0.9) 100%)',
-            border: '1px solid rgba(168,85,247,0.4)',
+            background: 'linear-gradient(180deg, #1c2027 0%, #12151a 100%)',
+            border: '1px solid #00e5ff',
             borderRadius: 24,
             overflow: 'hidden',
-            boxShadow: '0 10px 30px -5px rgba(168,85,247,0.25), inset 0 1px 0 rgba(255,255,255,0.1)',
+            boxShadow: '0 0 25px rgba(0,229,255,0.25), inset 0 1px 0 rgba(255,255,255,0.1)',
             backdropFilter: 'blur(20px)'
           }}>
             <AiInsightPanel
@@ -1754,27 +1776,27 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
         {/* ── PANEL 3: Expert Advisor (Bento Card) ── */}
         <div className="md:col-span-1 transition-all duration-300 flex flex-col shadow-2xl" style={{
-          background: 'linear-gradient(180deg, rgba(13,27,26,0.8) 0%, rgba(8,15,16,0.95) 100%)',
-          border: '1px solid rgba(45,212,191,0.35)',
+          background: 'linear-gradient(180deg, #1c2027 0%, #12151a 100%)',
+          border: '1px solid #00ff88',
           borderRadius: 24,
           overflow: 'hidden',
-          boxShadow: '0 10px 30px -5px rgba(45,212,191,0.15), inset 0 1px 0 rgba(255,255,255,0.1)',
+          boxShadow: '0 0 25px rgba(0,255,136,0.25), inset 0 1px 0 rgba(255,255,255,0.1)',
           backdropFilter: 'blur(20px)'
         }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
-              <Sparkles size={16} style={{ color: '#2dd4bf' }} />
+              <Sparkles size={16} style={{ color: '#00ff88', filter: 'drop-shadow(0 0 8px #00ff88)' }} />
               <span className="text-[12px] font-black text-white uppercase tracking-[0.15em]">Expert Advisor</span>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setActiveLogTab('ai')}
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
-                style={{ background: activeLogTab === 'ai' ? '#312e81' : 'transparent', color: activeLogTab === 'ai' ? '#a5b4fc' : '#475569', border: '1px solid rgba(129,140,248,0.3)' }}>
+                style={{ background: activeLogTab === 'ai' ? 'rgba(0,255,136,0.2)' : 'transparent', color: activeLogTab === 'ai' ? '#00ff88' : '#64748b', border: activeLogTab === 'ai' ? '1px solid #00ff88' : '1px solid rgba(255,255,255,0.15)', textShadow: activeLogTab === 'ai' ? '0 0 8px rgba(0,255,136,0.5)' : 'none' }}>
                 AI
               </button>
               <button onClick={() => setActiveLogTab('human')}
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ml-0.5 transition-all"
-                style={{ background: activeLogTab === 'human' ? '#1e3a5f' : 'transparent', color: activeLogTab === 'human' ? '#60a5fa' : '#475569', border: '1px solid rgba(96,165,250,0.3)' }}>
+                style={{ background: activeLogTab === 'human' ? 'rgba(0,229,255,0.2)' : 'transparent', color: activeLogTab === 'human' ? '#00e5ff' : '#64748b', border: activeLogTab === 'human' ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.15)', textShadow: activeLogTab === 'human' ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>
                 Chat
               </button>
               {(() => {
@@ -1782,9 +1804,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 const isLive = showAgentPanel && agentMessages.length > 0 && !isDone;
                 return (
                   <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg ml-1"
-                    style={{ border: `1px solid ${isLive ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.08)'}`, background: isLive ? 'rgba(52,211,153,0.05)' : 'transparent' }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: isDone ? '#334155' : isLive ? '#34d399' : '#334155' }} />
-                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#475569' : isLive ? '#6ee7b7' : '#475569' }}>
+                    style={{ border: `1px solid ${isLive ? '#00ff88' : 'rgba(255,255,255,0.15)'}`, background: isLive ? 'rgba(0,255,136,0.1)' : 'transparent', boxShadow: isLive ? '0 0 8px rgba(0,255,136,0.3)' : 'none' }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: isDone ? '#64748b' : isLive ? '#00ff88' : '#64748b', boxShadow: isLive ? '0 0 6px #00ff88' : 'none' }} />
+                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#94a3b8' : isLive ? '#00ff88' : '#94a3b8' }}>
                       {isDone ? 'DONE' : isLive ? 'LIVE' : 'IDLE'}
                     </span>
                   </div>
@@ -1806,9 +1828,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 <WarRoomChatPanel incidentId={selectedSms?.inc_id} currentUser={userProfile || {}} isVisible={true} />
               )
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center opacity-20" style={{ minHeight: 240 }}>
-                <Brain size={32} className="text-slate-600 mb-3" />
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">SMS를 선택하면 분석이 시작됩니다</p>
+              <div className="flex-1 flex flex-col items-center justify-center opacity-30" style={{ minHeight: 240 }}>
+                <Brain size={32} className="text-[#00ff88] mb-3 filter drop-shadow-[0_0_8px_rgba(0,255,136,0.5)]" />
+                <p className="text-[11px] font-bold text-[#00ff88] uppercase tracking-wider">SMS를 선택하면 분석이 시작됩니다</p>
               </div>
             )}
           </div>
@@ -1817,61 +1839,133 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         {/* ── PANEL 4: 장애 처리 현황 (Bento Card) ── */}
         {(() => {
           const isActive = !!selectedIncidentIdFlow;
-          const flowRgb = isActive ? '16,185,129' : '148,163,184';
           return (
         <div className="md:col-span-1 transition-all duration-300 flex flex-col shadow-2xl" style={{
-          background: 'linear-gradient(180deg, rgba(16,28,38,0.8) 0%, rgba(9,15,22,0.95) 100%)',
-          border: `1px solid rgba(${flowRgb},${isActive ? '0.45' : '0.25'})`,
+          background: 'linear-gradient(180deg, #1c2027 0%, #12151a 100%)',
+          border: `1px solid ${isActive ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`,
           borderRadius: 24,
           overflow: 'hidden',
           boxShadow: isActive
-            ? `0 10px 30px -5px rgba(${flowRgb},0.2), inset 0 1px 0 rgba(255,255,255,0.1)`
-            : `0 8px 24px -5px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)`,
+            ? '0 0 25px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+            : '0 8px 24px -5px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
           backdropFilter: 'blur(20px)'
         }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
-              <Activity size={16} style={{ color: selectedIncidentIdFlow ? '#10b981' : '#94a3b8' }} />
+              <Activity size={16} style={{ color: selectedIncidentIdFlow ? '#00e5ff' : '#94a3b8', filter: selectedIncidentIdFlow ? 'drop-shadow(0 0 8px #00e5ff)' : 'none' }} />
               <span className="text-[12px] font-black text-white uppercase tracking-[0.15em]">장애 처리 현황</span>
             </div>
-            {selectedIncidentIdFlow && (() => {
-              const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
-              const endStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-              if (!startStep) return null;
-              const durationMs = (endStep ? new Date(endStep.timestamp) : currentTime) - new Date(startStep.timestamp);
-              const isClosed = !!endStep;
-              return (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/50 border border-white/5">
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isClosed ? '#34d399' : '#3b82f6' }} />
-                  <span className="text-xs font-black font-mono tabular-nums" style={{ color: isClosed ? '#34d399' : '#60a5fa' }}>{formatDuration(durationMs)}</span>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">MTTR</span>
-                </div>
-              );
-            })()}
+            <span className="text-[10px] font-bold text-[#00e5ff] bg-[#00e5ff]/10 border border-[#00e5ff]/30 px-2.5 py-0.5 rounded-full">LIVE FLOW</span>
           </div>
 
-          {/* Phase badges */}
+          {/* 가로 프로그레스 바 & 활동 링 */}
           {selectedIncidentIdFlow && (() => {
             const smsStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
             const ragStep = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
             const warStep = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
             const knwStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
             const diff = (a, b) => { if (!a) return '-'; const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp); const m = Math.floor(ms/60000), s2 = Math.floor((ms%60000)/1000); return m > 0 ? `${m}m${s2}s` : `${s2}s`; };
+
+            const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - new Date(smsStep?.timestamp || currentTime);
+            const isClosed = !!knwStep;
+
+            const steps = [
+              { id: 'SMS', label: '인지', done: !!ragStep || !!knwStep, active: !!smsStep && !ragStep, time: diff(smsStep, ragStep) },
+              { id: 'RAG', label: '분석', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, time: diff(ragStep, warStep) },
+              { id: 'WARROOM', label: '워룸', done: !!knwStep, active: !!warStep && !knwStep, time: diff(warStep, knwStep) },
+              { id: 'KNOWLEDGE', label: '완료', done: !!knwStep, active: !!knwStep, time: diff(smsStep, knwStep) }
+            ];
+
+            const radius = 70;
+            const circum = 2 * Math.PI * radius;
+            const progressPct = knwStep ? 100 : warStep ? 75 : ragStep ? 50 : smsStep ? 25 : 0;
+            const offset = circum - (progressPct / 100) * circum;
+
             return (
-              <div className="flex items-center gap-2 px-5 py-3 flex-wrap bg-white/[0.01]" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                {[{l:'인지',a:smsStep,b:ragStep},{l:'분석',a:ragStep,b:warStep},{l:'워룸',a:warStep,b:knwStep},{l:'완료',a:smsStep,b:knwStep}].map(({l,a,b})=>{
-                  const done = l==='완료'?!!knwStep:!!b; const active=!!a&&!b; const t=diff(a,b);
-                  return <div key={l} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all" style={{color:done?'#34d399':active?'#60a5fa':'#334155',border:`1px solid ${done?'rgba(52,211,153,0.3)':active?'rgba(96,165,250,0.3)':'rgba(255,255,255,0.06)'}`,background:done?'rgba(52,211,153,0.06)':active?'rgba(96,165,250,0.06)':'transparent'}}><span className="opacity-70">{l}</span><span className="font-mono">{t}</span></div>;
-                })}
+              <div className="flex flex-col">
+                {/* 가로 프로그레스 바 (Horizontal Stepper) */}
+                <div className="flex items-center justify-between px-6 py-5 bg-black/20 border-b border-white/5 relative">
+                  <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-1 bg-slate-800 z-0" />
+                  {steps.map((st, i) => {
+                    const isDone = st.done;
+                    const isActive = st.active;
+                    return (
+                      <div key={st.id} className="relative z-10 flex flex-col items-center gap-1.5">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? 'bg-[#00ff88] text-black shadow-[0_0_12px_#00ff88]' : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                          {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                        </div>
+                        <span className={`text-[11px] font-black tracking-tight ${isDone ? 'text-[#00ff88]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
+                        {st.time && st.time !== '-' && <span className="text-[9px] font-mono text-slate-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">{st.time}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 애플워치 스타일 활동 링 (Activity Ring) */}
+                <div className="py-8 flex flex-col items-center justify-center bg-gradient-to-b from-black/40 to-transparent relative">
+                  <div className="relative w-52 h-52 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
+                      <defs>
+                        <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#00e5ff" />
+                          <stop offset="100%" stopColor="#00ff88" />
+                        </linearGradient>
+                      </defs>
+                      <circle cx="90" cy="90" r="70" stroke="#1e293b" strokeWidth="12" fill="none" />
+                      <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter="drop-shadow(0 0 10px rgba(0, 255, 136, 0.5))" />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">MTTR TIMER</span>
+                      <span className="text-3xl font-black font-mono tracking-tighter tabular-nums" style={{ color: isClosed ? '#00ff88' : '#00e5ff', textShadow: `0 0 15px ${isClosed ? 'rgba(0,255,136,0.8)' : 'rgba(0,229,255,0.8)'}` }}>
+                        {formatDuration(durationMs)}
+                      </span>
+                      <span className="text-[10px] font-bold mt-1 px-2.5 py-0.5 rounded-full border border-white/10 bg-white/5 text-slate-300 shadow-inner">
+                        {isClosed ? '조치 완료 (SAFE)' : '실시간 대응 중'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 워룸 이동/개설 액션 및 아코디언 버튼 */}
+                <div className="px-5 pb-5 flex flex-col gap-3">
+                  {warStep && !knwStep && (() => {
+                    const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
+                    return roomExists ? (
+                      <button onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)} className="skeuo-btn w-full py-3.5 bg-gradient-to-r from-[#00e5ff]/20 to-[#00e5ff]/10 border border-[#00e5ff]/50 rounded-xl font-bold text-sm text-[#00e5ff] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+                        <Zap size={16} />참여 중인 워룸으로 이동<ChevronRight size={16} />
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
+                        disabled={isOpeningWarRoom}
+                        className={`skeuo-btn w-full py-3.5 bg-gradient-to-r from-[#00e5ff]/20 to-[#00e5ff]/10 border border-[#00e5ff]/50 rounded-xl font-bold text-sm text-[#00e5ff] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)] ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Users size={16} />{isOpeningWarRoom ? '워룸 개설 진행 중...' : '긴급 워룸 개설하기'}
+                      </button>
+                    );
+                  })()}
+
+                  <button
+                    onClick={() => setShowFullTimeline(!showFullTimeline)}
+                    className="skeuo-btn w-full py-3 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl text-slate-300 font-bold text-xs flex items-center justify-between transition-all"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Clock size={15} className="text-indigo-400" />
+                      전체 스텝 상세 히스토리 타임라인 {showFullTimeline ? '접기' : '보기'}
+                    </span>
+                    {showFullTimeline ? <ChevronUp size={18} className="text-[#00ff88]" /> : <ChevronDown size={18} className="text-slate-400" />}
+                  </button>
+                </div>
               </div>
             );
           })()}
 
-          {/* Timeline */}
-          <div className="p-5 flex-1">
-            {selectedIncidentIdFlow ? (
+          {/* 기존 상세 Timeline (아코디언 토글 시에만 노출) */}
+          <div className={`transition-all duration-300 overflow-hidden ${showFullTimeline ? 'block border-t border-white/5 bg-black/20' : 'hidden'}`}>
+            <div className="p-5 flex-1">
+              {selectedIncidentIdFlow ? (
               <div className="relative">
-                <div className="absolute left-[9px] top-0 bottom-0 w-px" style={{ background: 'rgba(59,130,246,0.2)' }} />
+                <div className="absolute left-[9px] top-0 bottom-0 w-px" style={{ background: 'rgba(0,229,255,0.3)' }} />
                 {(() => {
                   const firstPendingIdx = FLOW_STEPS.findIndex(step => {
                     if (step.id === 'RAG_AGENT') {
@@ -1903,34 +1997,34 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     const pb = intervalMinutes===0?24:Math.min(160,Math.max(24,Math.round(24+intervalMinutes*0.2)));
                     return (
                       <div key={step.id} className="relative pl-10 transition-all duration-300" style={{ paddingBottom: pb+'px', opacity: !isCompleted&&!isNextStep ? 0.3 : 1 }}>
-                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 w-px" style={{ background: isCompleted ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.06)' }} />}
-                        <div className="absolute left-0 top-0 w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-md" style={{ background: isCompleted ? '#1e3a8a' : isNextStep ? '#172554' : '#0f172a', border: `1px solid ${isCompleted ? '#3b82f6' : isNextStep ? 'rgba(96,165,250,0.5)' : 'rgba(255,255,255,0.1)'}` }}>
-                          {isCompleted ? <CheckCircle2 size={10} style={{ color: '#60a5fa' }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#3b82f6' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#1e293b' }} />}
+                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 w-px" style={{ background: isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.1)' }} />}
+                        <div className="absolute left-0 top-0 w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-md" style={{ background: isCompleted ? 'rgba(0,229,255,0.2)' : isNextStep ? 'rgba(0,255,136,0.2)' : '#16191f', border: `1px solid ${isCompleted ? '#00e5ff' : isNextStep ? '#00ff88' : 'rgba(255,255,255,0.15)'}`, boxShadow: isCompleted ? '0 0 10px rgba(0,229,255,0.4)' : isNextStep ? '0 0 10px rgba(0,255,136,0.4)' : 'none' }}>
+                          {isCompleted ? <CheckCircle2 size={10} style={{ color: '#00e5ff' }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#00ff88' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#475569' }} />}
                         </div>
                         <div className="ml-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-bold" style={{ color: isCompleted ? '#e2e8f0' : isNextStep ? '#60a5fa' : '#334155' }}>{step.label}</span>
-                            {isNextStep && <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse" style={{ color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', background: 'rgba(96,165,250,0.08)' }}>진행중</span>}
-                            {isCompleted && <span className="text-[10px] font-mono text-slate-500">{formatYYMMDD(stepData.timestamp)}</span>}
+                            <span className="text-[13px] font-bold" style={{ color: isCompleted ? '#fff' : isNextStep ? '#00ff88' : '#64748b', textShadow: isNextStep ? '0 0 8px rgba(0,255,136,0.5)' : 'none' }}>{step.label}</span>
+                            {isNextStep && <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse" style={{ color: '#00ff88', border: '1px solid #00ff88', background: 'rgba(0,255,136,0.15)', boxSadow: '0 0 8px rgba(0,255,136,0.4)' }}>진행중</span>}
+                            {isCompleted && <span className="text-[10px] font-mono text-slate-400">{formatYYMMDD(stepData.timestamp)}</span>}
                           </div>
-                          <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? '#64748b' : isNextStep ? '#94a3b8' : '#1e293b' }}>
+                          <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? '#94a3b8' : isNextStep ? '#cbd5e1' : '#475569' }}>
                             {isCompleted ? stepData.detail : isNextStep ? '처리 진행 중...' : '대기 중'}
                           </p>
                           {intervalText && sIdx < FLOW_STEPS.length-1 && (
-                            <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ color: intervalMinutes>60?'#fb923c':intervalMinutes>10?'#eab308':'#34d399', border: `1px solid ${intervalMinutes>60?'rgba(251,146,60,0.3)':intervalMinutes>10?'rgba(234,179,8,0.3)':'rgba(52,211,153,0.3)'}`, background: 'transparent' }}>{intervalText}</span>
+                            <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ color: intervalMinutes>60?'#ff2a2a':intervalMinutes>10?'#ffb700':'#00ff88', border: `1px solid ${intervalMinutes>60?'#ff2a2a':intervalMinutes>10?'#ffb700':'#00ff88'}`, background: 'transparent' }}>{intervalText}</span>
                           )}
                           {(isCompleted||isNextStep)&&step.id==='WARROOM'&&(()=>{
                             const roomExists=warRooms.some(r=>String(r.id)===String(selectedIncidentIdFlow)||String(r.inc_id)===String(selectedIncidentIdFlow));
                             return roomExists?(
-                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-lg" style={{ color: "#e2e8f0", border: "1px solid rgba(59,130,246,0.5)", background: "rgba(59,130,246,0.15)" }}>
+                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)]" style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }}>
                                 <Zap size={12} />워룸 이동<ChevronRight size={12} />
                               </button>
                             ):(
                                <button 
                                  onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
                                  disabled={isOpeningWarRoom}
-                                 className={`mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-lg ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                                 style={{ color: "#60a5fa", border: "1px solid rgba(96,165,250,0.5)", background: "rgba(59,130,246,0.15)" }} 
+                                 className={`mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)] ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                                 style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }} 
                                > 
                                  <Users size={12} />
                                  {isOpeningWarRoom ? '개설 진행 중...' : '워룸 개설하기'} 
@@ -1944,14 +2038,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 })()}
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center py-16 opacity-15" style={{ minHeight: 240 }}>
-                <Activity size={32} className="text-slate-600 mb-3" />
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">인시던트를 선택하면 활성화됩니다</p>
+              <div className="flex-1 flex flex-col items-center justify-center py-16 opacity-30" style={{ minHeight: 240 }}>
+                <Activity size={32} className="text-[#00e5ff] mb-3 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]" />
+                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">인시던트를 선택하면 활성화됩니다</p>
               </div>
             )}
+            </div>
           </div>
         </div>
           );
+
         })()}
 
       </div>
@@ -1963,7 +2059,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
       {/* 🚀 Dynamic Save Toast for Thresholds */}
       {saveStatus && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#1a1f2e] border border-emerald-500/30 text-emerald-400 text-xs font-black px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#16191f] border border-[#00ff88] text-[#00ff88] shadow-[0_0_20px_rgba(0,255,136,0.4)] text-xs font-black px-6 py-3.5 rounded-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
           <CheckCircle className="w-4 h-4 animate-bounce" />
           <span>{saveStatus}</span>
         </div>
@@ -1974,22 +2070,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 function MetricCard({ title, value, subValue, trend, trendUp, icon: Icon, color }) {
   const colorClasses = {
-    blue: "text-blue-400 bg-blue-500/10",
-    purple: "text-purple-400 bg-purple-500/10",
-    green: "text-emerald-400 bg-emerald-500/10",
-    emerald: "text-emerald-400 bg-emerald-500/10",
-    red: "text-red-400 bg-red-500/10",
-    yellow: "text-yellow-400 bg-yellow-500/10",
+    blue: "text-[#00e5ff] bg-[#00e5ff]/10 shadow-[0_0_10px_rgba(0,229,255,0.2)] border border-[#00e5ff]/30",
+    purple: "text-[#a855f7] bg-[#a855f7]/10 shadow-[0_0_10px_rgba(168,85,247,0.2)] border border-[#a855f7]/30",
+    green: "text-[#00ff88] bg-[#00ff88]/10 shadow-[0_0_10px_rgba(0,255,136,0.2)] border border-[#00ff88]/30",
+    emerald: "text-[#00ff88] bg-[#00ff88]/10 shadow-[0_0_10px_rgba(0,255,136,0.2)] border border-[#00ff88]/30",
+    red: "text-[#ff2a2a] bg-[#ff2a2a]/10 shadow-[0_0_10px_rgba(255,42,42,0.2)] border border-[#ff2a2a]/30",
+    yellow: "text-[#ffb700] bg-[#ffb700]/10 shadow-[0_0_10px_rgba(255,183,0,0.2)] border border-[#ffb700]/30",
   };
 
   return (
-    <div className="bg-[#1a1f2e] p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+    <div className="bg-[#1c2027] p-5 rounded-2xl border border-white/10 hover:border-[#00e5ff]/50 transition-all hover:shadow-[0_0_15px_rgba(0,229,255,0.2)]">
       <div className="flex justify-between items-start mb-2">
         <div className={`p-2 rounded-lg ${colorClasses[color]} mb-2`}>
           <Icon className="w-5 h-5" />
         </div>
         {trend && (
-          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${trendUp ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'}`}>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${trendUp ? 'text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30' : 'text-[#ff2a2a] bg-[#ff2a2a]/10 border border-[#ff2a2a]/30'}`}>
             {trend}
           </span>
         )}
@@ -2007,22 +2103,22 @@ function MetricCard({ title, value, subValue, trend, trendUp, icon: Icon, color 
 
 function AlertItem({ title, time, severity, desc, isSelected }) {
   const sevColor = {
-    critical: "bg-red-500",
-    warning: "bg-yellow-500",
-    info: "bg-blue-500",
-    success: "bg-green-500"
+    critical: "bg-[#ff2a2a] shadow-[0_0_8px_#ff2a2a]",
+    warning: "bg-[#ffb700] shadow-[0_0_8px_#ffb700]",
+    info: "bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]",
+    success: "bg-[#00ff88] shadow-[0_0_8px_#00ff88]"
   };
 
   return (
     <div className={`flex items-start space-x-2 p-3 rounded-xl transition-all group cursor-pointer ${
       isSelected 
-        ? "bg-yellow-500/10 border border-yellow-500/30 shadow-lg shadow-yellow-500/5" 
-        : "bg-slate-900/30 border border-white/5 hover:bg-slate-800/50"
+        ? "bg-[#ffb700]/10 border border-[#ffb700] shadow-[0_0_15px_rgba(255,183,0,0.3)]" 
+        : "bg-[#16191f] border border-white/10 hover:border-[#00e5ff]/50 hover:shadow-[0_0_10px_rgba(0,229,255,0.2)]"
     }`}>
-      <div className={`w-1.5 h-1.5 mt-2 rounded-full shrink-0 ${sevColor[severity]} ${isSelected ? 'animate-pulse' : ''} shadow-[0_0_8px_rgba(var(--color-primary),0.6)]`}></div>
+      <div className={`w-1.5 h-1.5 mt-2 rounded-full shrink-0 ${sevColor[severity]} ${isSelected ? 'animate-pulse' : ''}`}></div>
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start mb-1 gap-2">
-          <h4 className={`font-bold text-sm transition-colors ${isSelected ? 'text-yellow-400' : 'text-slate-200 group-hover:text-white'}`}>{title}</h4>
+          <h4 className={`font-bold text-sm transition-colors ${isSelected ? 'text-[#ffb700]' : 'text-slate-200 group-hover:text-white'}`}>{title}</h4>
           <span className="text-[11px] font-black text-white whitespace-nowrap bg-white/10 px-2 py-0.5 rounded border border-white/20 shadow-md shrink-0">
             {time}
           </span>
@@ -2268,17 +2364,17 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#0f111a]/80 backdrop-blur-sm" onClick={() => {
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => {
         if (profile.dept && profile.team) onClose();
       }}></div>
 
-      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#1a1f2e] to-[#0f111a] border border-white/10 rounded-3xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden animate-scale-up">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-cyan-400 shrink-0"></div>
+      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#1c2027] to-[#12151a] border border-white/10 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.9)] flex flex-col max-h-[90dvh] overflow-hidden animate-scale-up">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#00e5ff] to-[#00ff88] shrink-0"></div>
 
         <div className="p-6 sm:p-8 flex flex-col max-h-full overflow-hidden flex-1">
           <div className="flex justify-between items-center mb-6 shrink-0">
             <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-              <User className="w-5 h-5 text-blue-400" />
+              <User className="w-5 h-5 text-[#00e5ff]" />
               <span>회원 정보 관리</span>
             </h2>
             <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
@@ -2288,7 +2384,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
           <div className="flex items-center space-x-4 mb-6 bg-slate-900/40 p-4 rounded-2xl border border-white/5 relative shrink-0">
             <div 
-              className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-amber-500 animate-pulse' : 'border-blue-500/30'} overflow-hidden shadow-lg shrink-0 group cursor-pointer`}
+              className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-[#ffb700] animate-pulse' : 'border-[#00e5ff]/50'} overflow-hidden shadow-[0_0_15px_rgba(0,229,255,0.2)] shrink-0 group cursor-pointer`}
               onClick={() => fileInputRef.current?.click()}
             >
               {profilePreview ? (
@@ -2317,8 +2413,8 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <p className="text-xs text-slate-400">{profile.email}</p>
               {(profile.employee_id || profile.id) && (
                 <div className="flex items-center gap-1.5 mt-1">
-                  <IdCard className="w-3 h-3 text-slate-500" />
-                  <span className="text-[11px] font-mono text-slate-400">사번 {profile.employee_id || profile.id}</span>
+                  <IdCard className="w-3 h-3 text-[#00e5ff]" />
+                  <span className="text-[11px] font-mono text-[#00e5ff]">사번 {profile.employee_id || profile.id}</span>
                 </div>
               )}
             </div>
@@ -2335,7 +2431,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                     readOnly
                     type="text"
                     value={profile.employee_id || profile.id}
-                    className="w-full bg-slate-900/60 border border-white/5 rounded-xl py-3.5 pl-11 pr-4 text-sm text-slate-400 cursor-not-allowed appearance-none select-all font-mono"
+                    className="w-full bg-[#16191f] border border-white/5 rounded-xl py-3.5 pl-11 pr-4 text-sm text-slate-400 cursor-not-allowed appearance-none select-all font-mono"
                   />
                 </div>
                 <p className="text-[10px] text-slate-600 ml-1 mt-1">사번은 관리자만 변경할 수 있습니다.</p>
@@ -2347,7 +2443,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">이름 *</label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input required type="text" value={formData.name} onChange={handleChange('name')} placeholder="홍길동" className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white appearance-none" />
+                <input required type="text" value={formData.name} onChange={handleChange('name')} placeholder="홍길동" className="w-full bg-[#16191f] border border-[#00e5ff]/30 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all text-white appearance-none" />
               </div>
             </div>
 
@@ -2356,7 +2452,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">핸드폰 번호</label>
               <div className="relative">
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type="tel" value={formData.phone || ''} onChange={handlePhoneChange} placeholder="010-0000-0000" maxLength={13} className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white appearance-none" />
+                <input type="tel" value={formData.phone || ''} onChange={handlePhoneChange} placeholder="010-0000-0000" maxLength={13} className="w-full bg-[#16191f] border border-[#00e5ff]/30 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all text-white appearance-none" />
               </div>
             </div>
             {/* 휴대폰 기종 */}
@@ -2370,8 +2466,8 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                     onClick={() => setFormData(prev => ({ ...prev, os_type: os }))}
                     className={`flex-1 py-3.5 rounded-xl border text-xs font-black transition-all ${
                       formData.os_type === os 
-                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40' 
-                        : 'bg-[#1a1f2e] border-white/10 text-slate-500 hover:text-slate-300'
+                        ? 'bg-[#00e5ff] border-[#00e5ff] text-black shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black' 
+                        : 'bg-[#16191f] border-white/10 text-slate-500 hover:text-slate-300'
                     }`}
                   >
                     {os === 'android' ? 'Android' : 'iOS (iPhone)'}
@@ -2394,11 +2490,11 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                     handleChange('part')('');
                     handleChange('subpart')('');
                   }}
-                  className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3.5 pl-11 pr-10 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-white appearance-none"
+                  className="w-full bg-[#16191f] border border-[#00e5ff]/30 rounded-xl py-3.5 pl-11 pr-10 text-sm focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all text-white appearance-none"
                 >
                   <option value="">회사를 선택하세요</option>
                   {companyList.map(c => (
-                    <option key={c.code} value={c.code} className="bg-[#1a1f2e] text-white">{c.name}</option>
+                    <option key={c.code} value={c.code} className="bg-[#16191f] text-white">{c.name}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -2463,7 +2559,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             <div className="pt-4 mt-2 border-t border-white/5">
               <button 
                 onClick={() => setShowPasswordChange(!showPasswordChange)}
-                className="flex items-center space-x-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider mb-3"
+                className="flex items-center space-x-2 text-xs font-bold text-[#00e5ff] hover:text-[#00e5ff]/80 transition-colors uppercase tracking-wider mb-3"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>{showPasswordChange ? '비밀번호 변경 취소' : '비밀번호 변경하기'}</span>
@@ -2473,13 +2569,13 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                 <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/5 animate-slide-down">
                   {/* 현재 비밀번호 */}
                     <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500" />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#ffb700]" />
                       <input 
                         type={showPw ? 'text' : 'password'} 
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
                         placeholder="현재 비밀번호" 
-                        className="w-full bg-[#1a1f2e] border border-amber-500/30 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all appearance-none"
+                        className="w-full bg-[#16191f] border border-[#ffb700]/50 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#ffb700] focus:ring-1 focus:ring-[#ffb700] transition-all appearance-none"
                       />
                     </div>
                     <div className="border-t border-white/5 pt-3">
@@ -2491,7 +2587,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="새 비밀번호 입력" 
-                          className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                          className="w-full bg-[#16191f] border border-[#00e5ff]/30 rounded-xl py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all appearance-none"
                         />
                         <button
                           onClick={() => setShowPw(!showPw)}
@@ -2508,14 +2604,14 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="새 비밀번호 확인" 
-                          className="w-full bg-[#1a1f2e] border border-blue-500/20 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                          className="w-full bg-[#16191f] border border-[#00e5ff]/30 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all appearance-none"
                         />
                       </div>
                     </div>
                   <button
                     onClick={handlePasswordChange}
                     disabled={isChangingPassword}
-                    className="w-full bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white font-bold py-2.5 rounded-xl transition-all text-xs border border-blue-500/30"
+                    className="w-full bg-[#00e5ff]/10 hover:bg-[#00e5ff] text-[#00e5ff] hover:text-black font-black py-2.5 rounded-xl transition-all text-xs border border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.2)]"
                   >
                     {isChangingPassword ? '변경 중...' : '비밀번호 변경 적용'}
                   </button>
@@ -2527,13 +2623,13 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             <div className="pt-6 pb-2 flex flex-col space-y-3 shrink-0 border-t border-white/5">
               <button
                 onClick={handleSave}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/40 transition-all transform active:scale-[0.98]"
+                className="w-full bg-[#00e5ff] hover:bg-[#00e5ff]/80 text-black font-black py-4 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all transform active:scale-[0.98]"
               >
                 저장하기 (Save)
               </button>
               <button
                 onClick={handleLogout}
-                className="w-full bg-white/5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1"
+                className="w-full bg-white/5 hover:bg-[#ff2a2a]/10 text-slate-400 hover:text-[#ff2a2a] font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1"
               >
                 <LogIn className="w-4 h-4 rotate-180" />
                 <span>Logout</span>
@@ -2541,7 +2637,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
 
             {(!formData.company || !formData.honbu || !formData.team || !formData.part) && (
-              <p className="text-[10px] text-yellow-500/70 text-center mt-4 italic shrink-0">
+              <p className="text-[10px] text-[#ffb700]/80 text-center mt-4 italic shrink-0">
                 * 서비스 이용을 위해 필수 정보를 모두 입력해 주세요.
               </p>
             )}

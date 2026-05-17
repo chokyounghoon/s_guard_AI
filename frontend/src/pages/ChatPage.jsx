@@ -35,6 +35,8 @@ const getApiUrl = (endpoint, isWs = false) => {
   return `https://${baseHost}${endpoint}`;
 };
 
+const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+
 // 한국 시간(KST) 포맷팅 헬퍼
 const formatKst = (dateInput) => {
   if (!dateInput) return '';
@@ -48,6 +50,478 @@ const formatKst = (dateInput) => {
   return `${hh}:${min}:${ss}`;
 };
 
+// ── 🚀 2단계 최적화: 전역 프로필 캐시 및 실시간 Object URL 변환기 ──
+const avatarCache = new Map();
+const getCachedAvatarUrl = (pic) => {
+  if (!pic) return null;
+  if (avatarCache.has(pic)) return avatarCache.get(pic);
+
+  if (pic.startsWith('data:image')) {
+    try {
+      const arr = pic.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      const url = URL.createObjectURL(blob);
+      avatarCache.set(pic, url);
+      return url;
+    } catch (e) {
+      avatarCache.set(pic, pic);
+      return pic;
+    }
+  } else if (pic.startsWith('http')) {
+    avatarCache.set(pic, pic);
+    return pic;
+  } else {
+    const url = `${API_BASE}${pic}`;
+    avatarCache.set(pic, url);
+    return url;
+  }
+};
+
+// ── 전역 렌더링 헬퍼 ────────────────────────────
+const renderCodeBlock = (code, lang = '') => (
+  <div className="sguard-code-block my-1.5">
+    {lang && (
+      <div className="sguard-code-lang">{lang.toUpperCase() || 'CODE'}</div>
+    )}
+    <pre className="sguard-code-pre"><code>{code}</code></pre>
+  </div>
+);
+
+const isServerLog = (text) => {
+  if (typeof text !== 'string') return false;
+  const logPatterns = [
+    /^\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}/m,
+    /\[(ERROR|WARN|INFO|DEBUG|FATAL|CRIT)\]/i,
+    /^(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|WITH)\s/im,
+    /^(nginx|apache|tomcat|mysql|postgresql|redis|docker|kubectl)/im,
+    /Exception:|StackTrace:|at\s+[\w.]+\([\w.]+:\d+\)/m,
+    /HTTP\/[12]\.[01]\s+\d{3}/,
+  ];
+  return logPatterns.some(p => p.test(text));
+};
+
+const renderMessageContent = (text, isMe = false) => {
+  if (typeof text === 'string' && text.includes('[첨부파일]')) {
+    const tagIndex = text.indexOf('[첨부파일]');
+    const tagContent = text.substring(tagIndex + 6).trim();
+    const parts = tagContent.split('|');
+    
+    if (parts.length >= 3) {
+      const [filename, url, type] = parts;
+      const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+      
+      if (type.startsWith('image/')) {
+        return (
+          <img
+            src={fullUrl}
+            alt={filename}
+            className="cursor-pointer hover:opacity-90 transition-opacity block"
+            style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'cover', borderRadius: 12, display: 'block' }}
+            onClick={() => window.open(fullUrl, '_blank')}
+          />
+        );
+      } else {
+        return (
+          <div 
+            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all group ${
+              isMe ? 'bg-white/10 border-white/10 hover:bg-white/20' : 'bg-black/20 border-[#242424] hover:bg-black/30'
+            }`}
+            onClick={() => window.open(fullUrl, '_blank')}
+          >
+            <div className={`p-2.5 rounded-xl transition-colors ${isMe ? 'bg-white/20 group-hover:bg-white/30' : 'bg-blue-600/20 group-hover:bg-blue-600/30'}`}>
+              <FileText className={`w-5 h-5 ${isMe ? 'text-white' : 'text-blue-400'}`} />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className={`text-xs font-bold truncate pr-2 ${isMe ? 'text-white' : 'text-slate-200'}`}>{filename}</span>
+              <span className={`text-[9px] uppercase font-mono tracking-wider mt-0.5 ${isMe ? 'text-blue-200' : 'text-slate-500'}`}>{type.split('/')[1] || 'FILE'} 형식</span>
+            </div>
+          </div>
+        );
+      }
+    }
+  }
+
+  if (typeof text === 'string') {
+    const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
+    if (codeBlockRegex.test(text)) {
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+      codeBlockRegex.lastIndex = 0;
+      while ((match = codeBlockRegex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          const before = text.slice(lastIndex, match.index);
+          if (before.trim()) parts.push(<span key={`txt-${lastIndex}`} className="whitespace-pre-wrap">{before}</span>);
+        }
+        parts.push(renderCodeBlock(match[2].trim(), match[1]));
+        lastIndex = match.index + match[0].length;
+      }
+      if (lastIndex < text.length) {
+        const after = text.slice(lastIndex);
+        if (after.trim()) parts.push(<span key={`txt-end`} className="whitespace-pre-wrap">{after}</span>);
+      }
+      return <>{parts}</>;
+    }
+
+    if (isServerLog(text)) {
+      const lang = /^(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|WITH)\s/im.test(text) ? 'SQL'
+                 : /^(docker|kubectl)/im.test(text) ? 'SHELL'
+                 : /Exception:|StackTrace:/m.test(text) ? 'TRACE'
+                 : 'LOG';
+      return renderCodeBlock(text, lang);
+    }
+
+    if (text.includes('`')) {
+      const parts = text.split(/(`[^`]+`)/g).map((part, i) =>
+        part.startsWith('`') && part.endsWith('`')
+          ? <code key={i} className="sguard-inline-code">{part.slice(1, -1)}</code>
+          : <span key={i} className="whitespace-pre-wrap">{part}</span>
+      );
+      return <>{parts}</>;
+    }
+  }
+
+  return text;
+};
+
+const renderAttachment = (attachment, isMe) => {
+  if (!attachment) return null;
+  const { name, url, type } = attachment;
+  
+  if (type && type.startsWith('image/')) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        className="block cursor-pointer hover:opacity-90 transition-opacity w-full"
+        style={{ maxHeight: 300, objectFit: 'cover', display: 'block' }}
+        onClick={() => window.open(url, '_blank')}
+      />
+    );
+  }
+  
+  return (
+    <div 
+      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all group ${
+        isMe ? 'bg-white/10 border-white/10 hover:bg-white/20' : 'bg-black/20 border-[#242424] hover:bg-black/30'
+      }`}
+      onClick={() => window.open(url, '_blank')}
+    >
+      <div className={`p-2.5 rounded-xl transition-colors ${isMe ? 'bg-white/20 group-hover:bg-white/30' : 'bg-blue-600/20 group-hover:bg-blue-600/30'}`}>
+        <FileText className={`w-5 h-5 ${isMe ? 'text-white' : 'text-blue-400'}`} />
+      </div>
+      <div className="flex flex-col min-w-0">
+        <span className={`text-xs font-bold truncate pr-2 ${isMe ? 'text-white' : 'text-slate-200'}`}>{name}</span>
+        <span className={`text-[9px] uppercase font-mono tracking-wider mt-0.5 ${isMe ? 'text-blue-200' : 'text-slate-500'}`}>{type?.split('/')[1] || 'FILE'} 형식</span>
+      </div>
+    </div>
+  );
+};
+
+// ── 🚀 3단계 최적화: 완벽하게 격리 및 메모이제이션된 개별 메시지 행 ──
+const ChatMessageRow = React.memo(({
+  msg, isContinuous, isMe, isResolved, currentUser, mainMessages, activeReactionMsg,
+  onLongPress, onToggleBookmark, onToggleReactionMenu, onReply, onAddReaction
+}) => {
+  const longPressTimer = useRef(null);
+  const avatarSrc = msg.avatar_url || (msg.profile_picture ? (msg.profile_picture.startsWith('http') || msg.profile_picture.startsWith('data:image') ? msg.profile_picture : `${API_BASE}${msg.profile_picture}`) : null);
+
+  return (
+    <div id={`msg-seq-${msg.seq}`}>
+      {!isMe && msg.type !== 'system' && (
+        <div className="flex items-start space-x-3 mb-1 group">
+          {isContinuous ? (
+            <div className="min-w-[40px] shrink-0" />
+          ) : (
+            <div className="relative w-10 h-10 min-w-[40px] shrink-0">
+              {avatarSrc ? (
+                <img 
+                  src={avatarSrc}
+                  alt={msg.sender}
+                  className="w-10 h-10 rounded-xl object-cover border border-white/10 shadow-sm"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex'; }}
+                />
+              ) : null}
+              <div className={`w-10 h-10 rounded-xl ${msg.color} flex items-center justify-center font-bold text-xs shrink-0 whitespace-nowrap text-white ${avatarSrc ? 'hidden' : 'flex'}`}>
+                {msg.initials}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col space-y-1">
+            {!isContinuous && (
+              <span className="text-xs text-slate-400 font-medium">{msg.sender}</span>
+            )}
+            <div className="flex items-end space-x-2 relative group/bubble">
+              <div
+                className={(() => {
+                  const isImgText = msg.text?.includes('[첨부파일]') && msg.text?.includes('image/');
+                  return isImgText ? '' : 'bg-[#333333] rounded-2xl rounded-tl-none px-3.5 py-1.5 max-w-[280px] text-[15px] leading-relaxed whitespace-pre-wrap relative group/bubble';
+                })()}
+                style={msg.text?.includes('[첨부파일]') && msg.text?.includes('image/') ? { maxWidth: 'calc(66vw)', overflow: 'hidden', borderRadius: '4px 16px 16px 16px' } : {}}
+                onContextMenu={(e) => { e.preventDefault(); onLongPress(msg); }}
+                onTouchStart={() => { longPressTimer.current = setTimeout(() => onLongPress(msg), 500); }}
+                onTouchEnd={() => clearTimeout(longPressTimer.current)}
+                onTouchMove={() => clearTimeout(longPressTimer.current)}
+              >
+                {msg.parent_seq && (
+                  <div className="mb-2 p-2 bg-black/10 rounded-lg text-[11px] border-l-2 border-white/20 opacity-80 cursor-alias" onClick={() => {
+                    const el = document.getElementById(`msg-seq-${msg.parent_seq}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}>
+                    <span className="font-bold block text-slate-400">
+                      Reply to {mainMessages.find(m => m.seq === msg.parent_seq)?.sender || 'Original'}
+                    </span>
+                    <span className="truncate block italic text-slate-300/70">
+                      {mainMessages.find(m => m.seq === msg.parent_seq)?.text || '원본 메시지를 찾을 수 없습니다'}
+                    </span>
+                  </div>
+                )}
+                {msg.fileAttachment ? renderAttachment(msg.fileAttachment, false) : renderMessageContent(msg.text, false)}
+                
+                {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-[#242424]">
+                    {Object.entries(msg.reactions).map(([emoji, users]) => (
+                      users.length > 0 && (
+                        <button 
+                          key={emoji} 
+                          onClick={() => onAddReaction(msg.seq, emoji)}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-all ${users.includes(currentUser.employee_id) ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-slate-700/50 border-white/10 text-slate-400'}`}
+                        >
+                          <span>{emoji}</span>
+                          <span className="font-bold">{users.length}</span>
+                        </button>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col items-start justify-end pb-1 ml-1 shrink-0">
+                {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
+                {msg.read_count > 0 && (
+                  <span className="text-[10px] text-[#FAE100] font-bold leading-none mb-0.5 drop-shadow-sm">{msg.read_count}</span>
+                )}
+                <span className="text-[10px] text-slate-500 shrink-0 whitespace-nowrap">{msg.time}</span>
+              </div>
+              {!isResolved && (
+                <div className="absolute right-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
+                  <button 
+                    onClick={() => onToggleBookmark(msg)}
+                    className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
+                    title="타임라인 등록"
+                  >
+                    <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
+                  </button>
+                  <button 
+                    onClick={() => onToggleReactionMenu(msg.seq)}
+                    className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
+                  >
+                    <Smile className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => onReply(msg)}
+                    className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {activeReactionMsg === msg.seq && (
+                <div className="absolute top-[-45px] left-0 bg-[#333333] border border-white/10 rounded-full p-1 shadow-2xl flex items-center space-x-1 z-[60] animate-in zoom-in-95 duration-200">
+                  {['👍', '🚨', '✅', '🙏', '💡'].map(emoji => (
+                    <button 
+                      key={emoji}
+                      onClick={() => onAddReaction(msg.seq, emoji)}
+                      className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMe && (
+        <div className="flex flex-col items-end space-y-1 mb-1 group">
+          <div className="flex items-end space-x-1">
+            <div className="flex flex-col items-end justify-end pb-1 mr-1 shrink-0">
+              {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
+              {msg.read_count > 0 && (
+                <span className="text-[10px] text-[#FAE100] font-bold leading-none mb-0.5 drop-shadow-sm">{msg.read_count}</span>
+              )}
+              <span className="text-[10px] text-slate-500 shrink-0 whitespace-nowrap">{msg.time}</span>
+            </div>
+            <div className="relative group/bubble">
+              <div
+                className={(() => {
+                  const isImgText = msg.text?.includes('[첨부파일]') && msg.text?.includes('image/');
+                  return isImgText ? '' : 'bg-[#00236e] rounded-2xl rounded-tr-none px-3.5 py-1.5 max-w-[280px] text-[15px] leading-relaxed shadow-lg whitespace-pre-wrap relative text-white';
+                })()}
+                style={msg.text?.includes('[첨부파일]') && msg.text?.includes('image/') ? { maxWidth: 'calc(66vw)', overflow: 'hidden', borderRadius: '16px 4px 16px 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } : {}}
+                onContextMenu={(e) => { e.preventDefault(); onLongPress(msg); }}
+                onTouchStart={() => { longPressTimer.current = setTimeout(() => onLongPress(msg), 500); }}
+                onTouchEnd={() => clearTimeout(longPressTimer.current)}
+                onTouchMove={() => clearTimeout(longPressTimer.current)}
+              >
+                {msg.parent_seq && (
+                  <div className="mb-2 p-2 bg-black/10 rounded-lg text-[11px] border-l-2 border-black/30 opacity-80 cursor-alias text-left" onClick={() => {
+                    const el = document.getElementById(`msg-seq-${msg.parent_seq}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}>
+                    <span className="font-bold block text-black/70">
+                      Reply to {mainMessages.find(m => m.seq === msg.parent_seq)?.sender || 'Original'}
+                    </span>
+                    <span className="truncate block italic text-black/50">
+                      {mainMessages.find(m => m.seq === msg.parent_seq)?.text || '원본 메시지를 찾을 수 없습니다'}
+                    </span>
+                  </div>
+                )}
+                {msg.fileAttachment ? renderAttachment(msg.fileAttachment, true) : renderMessageContent(msg.text, true)}
+                
+                {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-black/10">
+                    {Object.entries(msg.reactions).map(([emoji, users]) => (
+                      users.length > 0 && (
+                        <button 
+                          key={emoji} 
+                          onClick={() => onAddReaction(msg.seq, emoji)}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-all ${users.includes(currentUser.employee_id) ? 'bg-black/10 border-black/10 text-black' : 'bg-black/5 border-black/5 text-black'}`}
+                        >
+                          <span>{emoji}</span>
+                          <span className="font-bold">{users.length}</span>
+                        </button>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+              {!isResolved && (
+                <div className="absolute left-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
+                  <button 
+                    onClick={() => onReply(msg)}
+                    className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button 
+                    className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
+                    title="공지로 고정"
+                  >
+                    <Megaphone className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {activeReactionMsg === msg.seq && (
+                <div className="absolute top-[-45px] right-0 bg-[#333333] border border-white/10 rounded-full p-1 shadow-2xl flex items-center space-x-1 z-[60] animate-in zoom-in-95 duration-200">
+                  {['👍', '🚨', '✅', '🙏', '💡'].map(emoji => (
+                    <button 
+                      key={emoji}
+                      onClick={() => onAddReaction(msg.seq, emoji)}
+                      className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg.type === 'system' && (
+        <div className="flex justify-center my-3">
+          <div className="bg-[#1a1a1a] rounded-full px-4 py-1.5 max-w-[280px]">
+            <p className="text-[12px] text-center whitespace-pre-wrap" style={{color:'#777777'}} dangerouslySetInnerHTML={{ __html: msg.text }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}, (prev, next) => {
+  return prev.msg.id === next.msg.id &&
+         prev.msg.text === next.msg.text &&
+         prev.msg.read_count === next.msg.read_count &&
+         prev.msg.is_key_event === next.msg.is_key_event &&
+         prev.isContinuous === next.isContinuous &&
+         prev.isMe === next.isMe &&
+         prev.activeReactionMsg === next.activeReactionMsg &&
+         prev.isResolved === next.isResolved &&
+         JSON.stringify(prev.msg.reactions) === JSON.stringify(next.msg.reactions);
+});
+
+// ── 🚀 1단계 최적화: 타이핑 시 부모 리렌더링을 0%로 만드는 완벽 격리 입력창 ──
+const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadingFile, selectedFiles }) => {
+  const [localText, setLocalText] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const textareaRef = useRef(null);
+
+  const handleSend = () => {
+    if (!localText.trim() && selectedFiles.length === 0) return;
+    if (uploadingFile) return;
+    onSendMessage(localText);
+    setLocalText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '24px';
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 w-full">
+      <div className="flex items-center bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all px-1 rounded-[18px] flex-1" style={{ minHeight: 36 }}>
+        <textarea ref={textareaRef} id="main-chat-input" rows={1}
+          disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료'}
+          value={localText}
+          onChange={(e) => {
+            setLocalText(e.target.value);
+            onTyping();
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault(); handleSend();
+            }
+          }}
+          onFocus={() => setShowEmojiPicker(false)}
+          placeholder={(roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료') ? '종료된 워룸은 입력할 수 없습니다' : '메시지를 입력하세요...'}
+          className="flex-1 bg-transparent py-[7px] pl-3 pr-1 text-[14px] text-white focus:outline-none placeholder:text-[#666666] resize-none overflow-y-auto leading-tight"
+          style={{ minHeight: 32, maxHeight: 120 }}
+        />
+        <button onClick={() => setShowEmojiPicker(p => !p)}
+          className={`flex items-center justify-center w-8 h-8 mx-0.5 rounded-full transition-all active:scale-90 text-2xl leading-none shrink-0 ${showEmojiPicker ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}>
+          😊
+        </button>
+      </div>
+
+      <button onClick={handleSend}
+        disabled={(!localText.trim() && selectedFiles.length === 0) || uploadingFile}
+        className={`flex items-center justify-center rounded-full transition-all active:scale-95 flex-none shadow-lg mb-0.5
+          ${(!localText.trim() && selectedFiles.length === 0) || uploadingFile
+            ? 'bg-slate-800 text-slate-600 opacity-50 cursor-not-allowed'
+            : 'bg-blue-600 text-white shadow-blue-900/40 hover:bg-blue-500 hover:scale-105'
+          }`}
+        style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
+      >
+        {uploadingFile
+          ? <div className="w-5 h-5 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
+          : <Send className="w-5 h-5 fill-current" />}
+      </button>
+    </div>
+  );
+});
+
 export default function ChatPage() {
   const navigate = useNavigate();
   const { allCodes } = useCodebook();
@@ -57,6 +531,8 @@ export default function ChatPage() {
     const found = allCodes.find(c => c.category === 'INCIDENT_STATUS' && (c.code === code || c.name === code));
     return found ? found.name : code;
   };
+
+  const cleanProfilePic = (pic) => (typeof pic === 'string' && pic.length > 300) ? null : (pic || null);
 
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [showPhoneList, setShowPhoneList] = useState(false);
@@ -108,10 +584,13 @@ export default function ChatPage() {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
+        // 수신 즉시 Base64 → Blob URL 정규화: currentUser.profile_picture는 항상 안전한 URL
+        const normalizedPic = getCachedAvatarUrl(cleanProfilePic(user.profile_picture));
         setCurrentUser({
           employee_id: user.employee_id || user.id || 'EMP-1234',
           name: user.name || '이수민 매니저',
           role: user.role || 'Manager',
+          profile_picture: normalizedPic,
           org_code: user.org_code || user.team_code || user.honbu_code || null,
           team_name: user.team_name || user.team || user.honbu || ''
         });
@@ -170,6 +649,8 @@ export default function ChatPage() {
             sender_id: msg.sender,
             role: msg.role,
             initials: displayName ? displayName[0] : 'SY',
+            profile_picture: msg.profile_picture || null,
+            avatar_url: getCachedAvatarUrl(msg.profile_picture),
           color: msg.type === 'ai_analysis' ? 'bg-purple-600' : 'bg-slate-700',
           text: msg.text,
           time: formatKst(msg.timestamp),
@@ -312,6 +793,7 @@ export default function ChatPage() {
   
   const wsRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const lastTypingTimeRef = useRef(0);
 
   const fetchOrgTree = async () => {
     try {
@@ -413,23 +895,21 @@ export default function ChatPage() {
   // Post Chat Logic
 
   useEffect(() => {
-    // When messages load, mark OTHER people's messages with unread count as read — but only ONCE per seq
+    // When messages load, mark OTHER people's messages with unread count as read — but stagger with 25ms delay to prevent WS buffer collision
     if (mainMessages.length > 0 && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      mainMessages.forEach(msg => {
-        if (
-          msg.read_count > 0 &&
-          msg.type !== 'me' &&
-          msg.seq &&
-          !markedReadSeqs.current.has(msg.seq) // ✅ 이미 보낸 seq는 다시 보내지 않음
-        ) {
-          markedReadSeqs.current.add(msg.seq);
-          wsRef.current.send(JSON.stringify({
-            type: "MARK_READ",
-            incident_id: incidentId,
-            seq: msg.seq,
-            user_id: currentUser.employee_id
-          }));
-        }
+      const unreadMsgs = mainMessages.filter(msg => msg.read_count > 0 && msg.type !== 'me' && msg.seq && !markedReadSeqs.current.has(msg.seq));
+      unreadMsgs.forEach((msg, idx) => {
+        markedReadSeqs.current.add(msg.seq);
+        setTimeout(() => {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: "MARK_READ",
+              incident_id: incidentId,
+              seq: msg.seq,
+              user_id: currentUser.employee_id
+            }));
+          }
+        }, idx * 25);
       });
     }
   }, [mainMessages.length, currentUser.employee_id, incidentId]);
@@ -491,6 +971,8 @@ export default function ChatPage() {
                   sender: data.sender_name || data.name || data.sender,
                   role: data.role,
                   initials: (data.sender_name || data.sender)?.[0] || 'U',
+                  profile_picture: data.profile_picture || null,
+                  avatar_url: getCachedAvatarUrl(data.profile_picture),
                   color: 'bg-slate-700',
                   text: data.text,
                   time: formatKst(data.timestamp),
@@ -553,7 +1035,13 @@ export default function ChatPage() {
                 return [...prev, newMessage];
               });
               break;
-            case 'ERROR': console.error("WS Error:", data.message); break;
+            case 'ERROR':
+              if (data.message === 'Invalid JSON') {
+                console.warn("WS Warning: Staggering packet buffer collision mitigation active.");
+              } else {
+                console.error("WS Error:", data.message);
+              }
+              break;
             default: console.log("WS Event:", data);
           }
         } catch (e) {
@@ -684,9 +1172,11 @@ export default function ChatPage() {
         const newMessage = {
           id: saved.inc_id || Date.now(),
           type: messageData.type === 'me' ? 'me' : (messageData.type === 'system' ? 'system' : 'other'),
-          sender: messageData.sender,
+          sender: messageData.sender_name || messageData.name || messageData.sender,
+          sender_id: messageData.sender,
           role: messageData.role,
-          initials: messageData.sender,
+          initials: (messageData.sender_name || messageData.name || messageData.sender) ? (messageData.sender_name || messageData.name || messageData.sender)[0] : 'U',
+          profile_picture: messageData.profile_picture || null,
           color: messageData.type === 'system' ? 'bg-indigo-600' : 'bg-slate-700',
           text: messageData.text,
           time: formatKst(new Date()),
@@ -714,174 +1204,46 @@ export default function ChatPage() {
     const shareText = `[AI Analysis Shared]\n\n${text}`;
     saveChatToDb({
       incident_id: incidentId,
-      sender: currentUser.name,
+      sender: currentUser.employee_id,
+      name: currentUser.name,
+      sender_name: currentUser.name,
       role: currentUser.role,
+      profile_picture: cleanProfilePic(currentUser.profile_picture),
       type: 'me',
       text: shareText
     });
   };
 
-  // ── 코드블록 자동 감지 & 하이라이팅 ────────────────────────────
-  const renderCodeBlock = (code, lang = '') => (
-    <div className="sguard-code-block my-1.5">
-      {lang && (
-        <div className="sguard-code-lang">{lang.toUpperCase() || 'CODE'}</div>
-      )}
-      <pre className="sguard-code-pre"><code>{code}</code></pre>
-    </div>
-  );
 
-  // 서버 로그 / SQL 패턴 감지
-  const isServerLog = (text) => {
-    if (typeof text !== 'string') return false;
-    const logPatterns = [
-      /^\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}/m,  // 타임스탬프
-      /\[(ERROR|WARN|INFO|DEBUG|FATAL|CRIT)\]/i,
-      /^(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|WITH)\s/im,
-      /^(nginx|apache|tomcat|mysql|postgresql|redis|docker|kubectl)/im,
-      /Exception:|StackTrace:|at\s+[\w.]+\([\w.]+:\d+\)/m,
-      /HTTP\/[12]\.[01]\s+\d{3}/,
-    ];
-    return logPatterns.some(p => p.test(text));
-  };
-
-  const renderMessageContent = (text, isMe = false) => {
-    if (typeof text === 'string' && text.includes('[첨부파일]')) {
-      const tagIndex = text.indexOf('[첨부파일]');
-      const tagContent = text.substring(tagIndex + 6).trim();
-      const parts = tagContent.split('|');
-      
-      if (parts.length >= 3) {
-        const [filename, url, type] = parts;
-        const apiBase = 'https://sguardai.khcho0421.workers.dev';
-        const fullUrl = url.startsWith('http') ? url : `${apiBase}${url}`;
-        
-        if (type.startsWith('image/')) {
-          return (
-            <img
-              src={fullUrl}
-              alt={filename}
-              className="cursor-pointer hover:opacity-90 transition-opacity block"
-              style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'cover', borderRadius: 12, display: 'block' }}
-              onClick={() => window.open(fullUrl, '_blank')}
-            />
-          );
-        } else {
-          return (
-            <div 
-              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all group ${
-                isMe ? 'bg-white/10 border-white/10 hover:bg-white/20' : 'bg-black/20 border-[#242424] hover:bg-black/30'
-              }`}
-              onClick={() => window.open(fullUrl, '_blank')}
-            >
-              <div className={`p-2.5 rounded-xl transition-colors ${isMe ? 'bg-white/20 group-hover:bg-white/30' : 'bg-blue-600/20 group-hover:bg-blue-600/30'}`}>
-                <FileText className={`w-5 h-5 ${isMe ? 'text-white' : 'text-blue-400'}`} />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className={`text-xs font-bold truncate pr-2 ${isMe ? 'text-white' : 'text-slate-200'}`}>{filename}</span>
-                <span className={`text-[9px] uppercase font-mono tracking-wider mt-0.5 ${isMe ? 'text-blue-200' : 'text-slate-500'}`}>{type.split('/')[1] || 'FILE'} 형식</span>
-              </div>
-            </div>
-          );
-        }
-      }
-    }
-
-    // ── 코드블록 / 서버로그 자동 감지 ────────────────────────────
-    if (typeof text === 'string') {
-      // 1. 백틱 코드블록 (```lang\ncode\n```)
-      const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
-      if (codeBlockRegex.test(text)) {
-        const parts = [];
-        let lastIndex = 0;
-        let match;
-        codeBlockRegex.lastIndex = 0;
-        while ((match = codeBlockRegex.exec(text)) !== null) {
-          if (match.index > lastIndex) {
-            const before = text.slice(lastIndex, match.index);
-            if (before.trim()) parts.push(<span key={`txt-${lastIndex}`} className="whitespace-pre-wrap">{before}</span>);
-          }
-          parts.push(renderCodeBlock(match[2].trim(), match[1]));
-          lastIndex = match.index + match[0].length;
-        }
-        if (lastIndex < text.length) {
-          const after = text.slice(lastIndex);
-          if (after.trim()) parts.push(<span key={`txt-end`} className="whitespace-pre-wrap">{after}</span>);
-        }
-        return <>{parts}</>;
-      }
-
-      // 2. 서버 로그 / SQL 패턴 — 전체 메시지를 코드박스로
-      if (isServerLog(text)) {
-        const lang = /^(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|WITH)\s/im.test(text) ? 'SQL'
-                   : /^(docker|kubectl)/im.test(text) ? 'SHELL'
-                   : /Exception:|StackTrace:/m.test(text) ? 'TRACE'
-                   : 'LOG';
-        return renderCodeBlock(text, lang);
-      }
-
-      // 3. 인라인 코드 (`code`)
-      if (text.includes('`')) {
-        const parts = text.split(/(`[^`]+`)/g).map((part, i) =>
-          part.startsWith('`') && part.endsWith('`')
-            ? <code key={i} className="sguard-inline-code">{part.slice(1, -1)}</code>
-            : <span key={i} className="whitespace-pre-wrap">{part}</span>
-        );
-        return <>{parts}</>;
-      }
-    }
-
-    return text;
-  };
-
-  const renderAttachment = (attachment, isMe) => {
-    if (!attachment) return null;
-    const { name, url, type } = attachment;
-    
-    if (type && type.startsWith('image/')) {
-      return (
-        <img
-          src={url}
-          alt={name}
-          className="block cursor-pointer hover:opacity-90 transition-opacity w-full"
-          style={{ maxHeight: 300, objectFit: 'cover', display: 'block' }}
-          onClick={() => window.open(url, '_blank')}
-        />
-      );
-    }
-    
-    return (
-      <div 
-        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all group ${
-          isMe ? 'bg-white/10 border-white/10 hover:bg-white/20' : 'bg-black/20 border-[#242424] hover:bg-black/30'
-        }`}
-        onClick={() => window.open(url, '_blank')}
-      >
-        <div className={`p-2.5 rounded-xl transition-colors ${isMe ? 'bg-white/20 group-hover:bg-white/30' : 'bg-blue-600/20 group-hover:bg-blue-600/30'}`}>
-          <FileText className={`w-5 h-5 ${isMe ? 'text-white' : 'text-blue-400'}`} />
-        </div>
-        <div className="flex flex-col min-w-0">
-          <span className={`text-xs font-bold truncate pr-2 ${isMe ? 'text-white' : 'text-slate-200'}`}>{name}</span>
-          <span className={`text-[9px] uppercase font-mono tracking-wider mt-0.5 ${isMe ? 'text-blue-200' : 'text-slate-500'}`}>{type?.split('/')[1] || 'FILE'} 형식</span>
-        </div>
-      </div>
-    );
-  };
 
   const handleTyping = () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     
-    // Clear existing timeout
+    const now = Date.now();
+    // 1.5초 이내에 이미 TYPING_START를 보냈다면 생략 (웹소켓 버퍼 플러딩 방지)
+    if (now - lastTypingTimeRef.current < 1500) {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: "TYPING_STOP",
+            user_id: currentUser.employee_id,
+            name: currentUser.name
+          }));
+        }
+      }, 2000);
+      return;
+    }
+
+    lastTypingTimeRef.current = now;
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     
-    // Send TYPING_START
     wsRef.current.send(JSON.stringify({
       type: "TYPING_START",
       user_id: currentUser.employee_id,
       name: currentUser.name
     }));
 
-    // Set timeout to send TYPING_STOP
     typingTimeoutRef.current = setTimeout(() => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
@@ -892,6 +1254,90 @@ export default function ChatPage() {
       }
     }, 2000);
   };
+
+  const handleSendMessageFromInput = useCallback(async (inputText) => {
+    const hasText = inputText.trim();
+    const hasFiles = selectedFiles.length > 0;
+    
+    if (!hasText && !hasFiles) return;
+    if (uploadingFile) return;
+
+    setUploadingFile(true);
+    
+    try {
+      if (hasFiles) {
+        const apiBase = 'https://sguardai.khcho0421.workers.dev';
+        for (const fileObj of selectedFiles) {
+          const formData = new FormData();
+          formData.append('file', fileObj.file);
+          formData.append('incident_id', incidentId);
+          formData.append('uploaded_by', currentUser.name || '익명');
+          const uploadRes = await fetch(`${apiBase}/warroom/upload`, { 
+            method: 'POST', 
+            headers: getAuthHeaders({ 'Content-Type': null }),
+            body: formData 
+          });
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({
+                type: "CHAT_SEND",
+                incident_id: incidentId,
+                sender: currentUser.employee_id,
+                name: currentUser.name,
+                role: currentUser.role,
+                msg_type: "file",
+                text: `[첨부파일] ${fileObj.file.name}|${uploadData.url}|${fileObj.file.type}`
+              }));
+            }
+          }
+        }
+        setSelectedFiles([]);
+      }
+
+      if (hasText) {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: "CHAT_SEND",
+            incident_id: incidentId,
+            sender: currentUser.employee_id,
+            name: currentUser.name,
+            role: currentUser.role,
+            msg_type: "user",
+            text: inputText,
+            reply_to: replyTo?.seq
+          }));
+          
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          setTimeout(() => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({
+                type: "TYPING_STOP",
+                user_id: currentUser.employee_id,
+                name: currentUser.name
+              }));
+            }
+          }, 50);
+        } else {
+          await saveChatToDb({
+            incident_id: incidentId,
+            sender: currentUser.employee_id,
+            name: currentUser.name,
+            sender_name: currentUser.name,
+            role: currentUser.role,
+            profile_picture: cleanProfilePic(currentUser.profile_picture),
+            type: 'me',
+            text: inputText
+          });
+        }
+      }
+      setReplyTo(null);
+    } catch (err) {
+      console.error("전송 에러:", err);
+    } finally {
+      setUploadingFile(false);
+    }
+  }, [selectedFiles, uploadingFile, incidentId, currentUser, replyTo]);
 
   const handleSendMessage = async () => {
     const hasText = mainInput.trim();
@@ -947,16 +1393,23 @@ export default function ChatPage() {
           }));
           
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-          wsRef.current.send(JSON.stringify({
-            type: "TYPING_STOP",
-            user_id: currentUser.employee_id,
-            name: currentUser.name
-          }));
+          setTimeout(() => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({
+                type: "TYPING_STOP",
+                user_id: currentUser.employee_id,
+                name: currentUser.name
+              }));
+            }
+          }, 50);
         } else {
           await saveChatToDb({
             incident_id: incidentId,
-            sender: currentUser.name,
+            sender: currentUser.employee_id,
+            name: currentUser.name,
+            sender_name: currentUser.name,
             role: currentUser.role,
+            profile_picture: cleanProfilePic(currentUser.profile_picture),
             type: 'me',
             text: mainInput
           });
@@ -1171,10 +1624,10 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="fixed inset-0 overflow-hidden overscroll-none bg-[#191919] text-white font-sans flex flex-col z-[100]" style={{ height: '100dvh' }}>
+    <div className="fixed inset-0 overflow-hidden overscroll-none bg-[#191919] text-white font-sans flex flex-col z-[350]" style={{ height: '100dvh' }}>
       {/* Header */}
       {/* DM Notifications Toast */}
-      <div className="fixed top-20 right-4 z-[150] flex flex-col items-end space-y-2 pointer-events-none">
+      <div className="fixed top-20 right-4 z-[360] flex flex-col items-end space-y-2 pointer-events-none">
         {notifications.map(notif => (
           <div 
             key={notif.id} 
@@ -1209,10 +1662,19 @@ export default function ChatPage() {
             <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </button>
           <div className="flex flex-col min-w-0 flex-1 pr-2">
-            {/* 장애 ID */}
-            <span className="font-bold text-sm sm:text-base truncate text-white">
-              {incidentId}
-            </span>
+            {/* 장애 ID + 모바일 상태 뱃지 */}
+            <div className="flex items-center gap-2 truncate">
+              <span className="font-bold text-sm sm:text-base truncate text-white">
+                {incidentId}
+              </span>
+              <span className={`text-[10px] sm:hidden px-2 py-0.5 rounded font-black tracking-tight uppercase shrink-0 border ${
+                roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '완료' || roomStatus === '최종완료' || roomStatus === '처리완료'
+                  ? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                  : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse'
+              }`}>
+                {getStatusName(roomStatus)}
+              </span>
+            </div>
             {/* SMS 내용 2줄 말줄임 + 롱프레스 */}
             {roomDescription && (
               <span
@@ -1236,7 +1698,7 @@ export default function ChatPage() {
           const isAssignedToMe = assignees.length === 0 || assignees.some(a => String(a.user_id) === String(currentUser.employee_id)) || isAdmin;
           
           return (
-            <div className="flex items-center space-x-2 sm:space-x-3 relative ml-auto justify-end">
+            <div className="flex items-center gap-1 sm:gap-2 relative ml-auto justify-end shrink-0">
               {/* WAR-ROOM 분석 버튼 (명칭 변경) */}
               <button
                 onClick={() => {
@@ -1244,43 +1706,44 @@ export default function ChatPage() {
                   navigate(`/chat-summary/${incidentId}`);
                 }}
                 disabled={isResolved || !isAssignedToMe || !!summaryLockOwner}
-                className={`flex items-center px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-extrabold transition-all duration-300 ${
+                className={`flex items-center px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-extrabold transition-all duration-300 shrink-0 whitespace-nowrap ${
                   isResolved || !isAssignedToMe || summaryLockOwner
                     ? 'bg-slate-800 text-slate-500 border border-[#242424] cursor-not-allowed opacity-60'
                     : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 shadow-[0_0_12px_rgba(59,130,246,0.5)] hover:shadow-[0_0_20px_rgba(59,130,246,0.8)] hover:scale-105'
                 }`}
               >
-                <Sparkles className={`w-3.5 h-3.5 mr-1 ${(isResolved || !isAssignedToMe || summaryLockOwner) ? 'text-slate-600' : 'animate-pulse'}`} />
-                <span className="whitespace-nowrap">
+                <Sparkles className={`w-3.5 h-3.5 mr-1 shrink-0 ${(isResolved || !isAssignedToMe || summaryLockOwner) ? 'text-slate-600' : 'animate-pulse'}`} />
+                <span className="whitespace-nowrap shrink-0">
                   {summaryLockOwner ? `분석 중 (${summaryLockOwner})` : 'W/R 분석'}
                 </span>
               </button>
 
               {/* Moved Status Indicator */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl shrink-0 whitespace-nowrap">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                 <span className="text-xs font-black tracking-tight text-emerald-400 uppercase">{getStatusName(roomStatus)}</span>
               </div>
-                {/* 참여자 아이콘 및 숫자 */}
+                {/* 참여자 아이콘 및 숫자 (한 줄 유지 보장) */}
                 <button
                   onClick={() => { setShowParticipantDropdown(!showParticipantDropdown); setHasNewMessage(false); }}
                   title="참여 사용자 목록"
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border transition-all active:scale-95 ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full border transition-all active:scale-95 shrink-0 whitespace-nowrap ${
                     hasNewMessage
                       ? 'bg-yellow-500/20 border-yellow-500/50 animate-pulse shadow-lg shadow-yellow-500/20'
                       : 'bg-white/5 hover:bg-white/10 border-white/5'
                   }`}
                 >
-                  <User className={`w-3.5 h-3.5 ${hasNewMessage ? 'text-yellow-400' : 'text-slate-300'}`} />
-                  <span className={`text-[11px] font-semibold leading-none ${hasNewMessage ? 'text-yellow-400' : 'text-slate-300'}`}>
+                  <User className={`w-3.5 h-3.5 shrink-0 ${hasNewMessage ? 'text-yellow-400' : 'text-slate-300'}`} />
+                  <span className={`text-[12px] font-extrabold font-mono tracking-tight leading-none whitespace-nowrap shrink-0 ${hasNewMessage ? 'text-yellow-400' : 'text-slate-300'}`}>
                     +{assignees.length + participants.filter(p => !assignees.some(a => a.name === p.name || a.name === p.sender)).length || 0}
                   </span>
                 </button>
 
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors relative" onClick={() => setShowPhoneList(!showPhoneList)}>
+          <button className="p-1 sm:p-2 rounded-full hover:bg-white/10 transition-colors relative shrink-0" onClick={() => setShowPhoneList(!showPhoneList)}>
             <Phone className="w-4.5 h-4.5 text-slate-300" />
           </button>
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" onClick={() => setShowMenu(!showMenu)}>
+          {/* 햄버거 메뉴를 우측 끝으로 더 밀착 */}
+          <button className="p-1 sm:p-2 -mr-1 rounded-full hover:bg-white/10 transition-colors shrink-0" onClick={() => setShowMenu(!showMenu)}>
             <Menu className="w-5 h-5 text-white" />
           </button>
 
@@ -1427,272 +1890,23 @@ export default function ChatPage() {
             prevMsg.sender === msg.sender &&
             msg.type !== 'system';
           return (
-          <div key={msg.inc_id || msg.id} id={`msg-seq-${msg.seq}`}>
-            {!isMe && msg.type !== 'system' && (
-              <div className="flex items-start space-x-3 mb-1 group">
-                {/* 연속 메시지: 아바타 자리만 차지, 아이콘 숨김 */}
-                {isContinuous ? (
-                  <div className="min-w-[40px] shrink-0" />
-                ) : (
-                  <div className={`px-2 py-1 h-10 min-w-[40px] rounded-xl ${msg.color} flex items-center justify-center font-bold text-xs shrink-0 whitespace-nowrap`}>
-                    {msg.initials}
-                  </div>
-                )}
-                <div className="flex flex-col space-y-1">
-                  {/* 연속 메시지: 이름 숨김 */}
-                  {!isContinuous && (
-                    <span className="text-xs text-slate-400 font-medium">{msg.sender}</span>
-                  )}
-                  <div className="flex items-end space-x-2 relative group/bubble">
-                  <div
-                    className={(() => {
-                      const isImgText = msg.text?.includes('[첨부파일]') && msg.text?.includes('image/');
-                      return isImgText ? '' : 'bg-[#333333] rounded-2xl rounded-tl-none px-3.5 py-1.5 max-w-[280px] text-[15px] leading-relaxed whitespace-pre-wrap relative group/bubble';
-                    })()}
-                    style={msg.text?.includes('[첨부파일]') && msg.text?.includes('image/') ? { maxWidth: 'calc(66vw)', overflow: 'hidden', borderRadius: '4px 16px 16px 16px' } : {}}
-                    onContextMenu={(e) => { e.preventDefault(); setLongPressMsg(msg); }}
-                    onTouchStart={() => { longPressTimer.current = setTimeout(() => setLongPressMsg(msg), 500); }}
-                    onTouchEnd={() => clearTimeout(longPressTimer.current)}
-                    onTouchMove={() => clearTimeout(longPressTimer.current)}
-                  >
-                      {msg.parent_seq && (
-                        <div className="mb-2 p-2 bg-black/10 rounded-lg text-[11px] border-l-2 border-white/20 opacity-80 cursor-alias" onClick={() => {
-                          const el = document.getElementById(`msg-seq-${msg.parent_seq}`);
-                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }}>
-                          <span className="font-bold block text-slate-400">
-                            Reply to {mainMessages.find(m => m.seq === msg.parent_seq)?.sender || 'Original'}
-                          </span>
-                          <span className="truncate block italic text-slate-300/70">
-                            {mainMessages.find(m => m.seq === msg.parent_seq)?.text || '원본 메시지를 찾을 수 없습니다'}
-                          </span>
-                        </div>
-                      )}
-                      {msg.fileAttachment ? renderAttachment(msg.fileAttachment, false) : renderMessageContent(msg.text, false)}
-                      
-                      {/* Reaction Badges */}
-                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-[#242424]">
-                          {Object.entries(msg.reactions).map(([emoji, users]) => (
-                            users.length > 0 && (
-                              <button 
-                                key={emoji} 
-                                onClick={() => handleAddReaction(msg.seq, emoji)}
-                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-all ${users.includes(currentUser.employee_id) ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-slate-700/50 border-white/10 text-slate-400'}`}
-                              >
-                                <span>{emoji}</span>
-                                <span className="font-bold">{users.length}</span>
-                              </button>
-                            )
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-center justify-end pb-1">
-                      {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
-                      {msg.read_count > 0 && (
-                        <span className="text-[12px] text-[#FAE100] font-black leading-none mb-1 drop-shadow-sm">{msg.read_count}</span>
-                      )}
-                      <span className="text-[10px] text-slate-500 shrink-0 whitespace-nowrap">{msg.time}</span>
-                    </div>
-                    {/* Reply & Reaction Actions */}
-                    {!isResolved && (
-                      <div className="absolute right-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
-                        <button 
-                          onClick={() => handleToggleBookmark(msg)}
-                          className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${msg.is_key_event ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500'}`}
-                          title="타임라인 등록"
-                        >
-                          <Star className={`w-4 h-4 ${msg.is_key_event ? 'fill-current' : ''}`} />
-                        </button>
-                        <button 
-                          onClick={() => setActiveReactionMsg(activeReactionMsg === msg.seq ? null : msg.seq)}
-                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-yellow-500"
-                        >
-                          <Smile className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setReplyTo(msg)}
-                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Emoji Picker Popover */}
-                    {activeReactionMsg === msg.seq && (
-                      <div className="absolute top-[-45px] left-0 bg-[#333333] border border-white/10 rounded-full p-1 shadow-2xl flex items-center space-x-1 z-[60] animate-in zoom-in-95 duration-200">
-                        {['👍', '🚨', '✅', '🙏', '💡'].map(emoji => (
-                          <button 
-                            key={emoji}
-                            onClick={() => handleAddReaction(msg.seq, emoji)}
-                            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isMe && (
-              <div className="flex flex-col items-end space-y-1 mb-1 group">
-                <div className="flex items-end space-x-2">
-                  <div className="flex flex-col items-center justify-end pb-1">
-                    {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
-                    {msg.read_count > 0 && (
-                      <span className="text-[12px] text-[#FAE100] font-black leading-none mb-1 drop-shadow-sm">{msg.read_count}</span>
-                    )}
-                    <span className="text-[10px] text-slate-500 shrink-0 whitespace-nowrap">{msg.time}</span>
-                  </div>
-                  <div className="relative group/bubble">
-                    <div
-                      className={(() => {
-                        const isImgText = msg.text?.includes('[첨부파일]') && msg.text?.includes('image/');
-                        return isImgText ? '' : 'bg-[#00236e] rounded-2xl rounded-tr-none px-3.5 py-1.5 max-w-[280px] text-[15px] leading-relaxed shadow-lg whitespace-pre-wrap relative text-white';
-                      })()}
-                      style={msg.text?.includes('[첨부파일]') && msg.text?.includes('image/') ? { maxWidth: 'calc(66vw)', overflow: 'hidden', borderRadius: '16px 4px 16px 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } : {}}
-                      onContextMenu={(e) => { e.preventDefault(); setLongPressMsg(msg); }}
-                      onTouchStart={() => { longPressTimer.current = setTimeout(() => setLongPressMsg(msg), 500); }}
-                      onTouchEnd={() => clearTimeout(longPressTimer.current)}
-                      onTouchMove={() => clearTimeout(longPressTimer.current)}
-                    >
-                      {msg.parent_seq && (
-                        <div className="mb-2 p-2 bg-black/10 rounded-lg text-[11px] border-l-2 border-black/30 opacity-80 cursor-alias text-left" onClick={() => {
-                          const el = document.getElementById(`msg-seq-${msg.parent_seq}`);
-                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }}>
-                          <span className="font-bold block text-black/70">
-                            Reply to {mainMessages.find(m => m.seq === msg.parent_seq)?.sender || 'Original'}
-                          </span>
-                          <span className="truncate block italic text-black/50">
-                            {mainMessages.find(m => m.seq === msg.parent_seq)?.text || '원본 메시지를 찾을 수 없습니다'}
-                          </span>
-                        </div>
-                      )}
-                      {msg.fileAttachment ? renderAttachment(msg.fileAttachment, true) : renderMessageContent(msg.text, true)}
-                      
-                      {/* Reaction Badges (me) */}
-                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-black/10">
-                          {Object.entries(msg.reactions).map(([emoji, users]) => (
-                            users.length > 0 && (
-                              <button 
-                                key={emoji} 
-                                onClick={() => handleAddReaction(msg.seq, emoji)}
-                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-all ${users.includes(currentUser.employee_id) ? 'bg-black/10 border-black/10 text-black' : 'bg-black/5 border-black/5 text-black'}`}
-                              >
-                                <span>{emoji}</span>
-                                <span className="font-bold">{users.length}</span>
-                              </button>
-                            )
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {/* Reply & Reaction Actions (me) */}
-                    {!isResolved && (
-                      <div className="absolute left-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
-                        <button 
-                          onClick={() => setReplyTo(msg)}
-                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        <button 
-                          className="p-1.5 hover:bg-white/10 rounded-full text-slate-500 hover:text-blue-400"
-                          title="공지로 고정"
-                        >
-                          <Megaphone className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Emoji Picker Popover (me) */}
-                    {activeReactionMsg === msg.seq && (
-                      <div className="absolute top-[-45px] right-0 bg-[#333333] border border-white/10 rounded-full p-1 shadow-2xl flex items-center space-x-1 z-[60] animate-in zoom-in-95 duration-200">
-                        {['👍', '🚨', '✅', '🙏', '💡'].map(emoji => (
-                          <button 
-                            key={emoji}
-                            onClick={() => handleAddReaction(msg.seq, emoji)}
-                            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {msg.type === 'system' && (
-              <div className="flex justify-center my-3">
-                <div className="bg-[#1a1a1a] rounded-full px-4 py-1.5 max-w-[280px]">
-                  <p className="text-[12px] text-center whitespace-pre-wrap" style={{color:'#777777'}} dangerouslySetInnerHTML={{ __html: msg.text }} />
-                </div>
-              </div>
-            )}
-
-            {msg.type === 'ai_analysis' && (() => {
-              const isLeader = msg.role === 'Leader';
-              const roleColors = {
-                'Security': 'bg-red-500/20 text-red-400 border-red-500/30',
-                'DB': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-                'DevOps': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                'Leader': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-                'default': 'bg-slate-700 text-slate-300 border-white/10'
-              };
-              const roleColorClass = roleColors[msg.role] || roleColors['default'];
-              const roleTextClass = msg.role === 'Security' ? 'text-red-400' :
-                                    msg.role === 'DB' ? 'text-yellow-400' :
-                                    msg.role === 'DevOps' ? 'text-blue-400' :
-                                    msg.role === 'Leader' ? 'text-purple-400' : 'text-slate-400';
-              
-              const Icon = msg.role === 'Security' ? Shield :
-                           msg.role === 'DB' ? Database :
-                           msg.role === 'DevOps' ? Server :
-                           msg.role === 'Leader' ? User : Terminal;
-
-              return (
-                <div className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 mt-6 mb-6 ${isLeader ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`flex max-w-[90%] ${isLeader ? 'flex-row-reverse' : 'flex-row'} items-start gap-2.5`}>
-                    
-                    {/* Avatar */}
-                    <div className="shrink-0 mt-1 shadow-md">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${roleColorClass}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                    </div>
-                      {/* Message Content */}
-                      <div className={`flex flex-col ${isLeader ? 'items-end' : 'items-start'}`}>
-                        <span className={`text-[11px] mb-1.5 px-1 font-bold tracking-wide ${roleTextClass}`}>
-                          {msg.role} Agent
-                        </span>
-                        <div className={`flex items-end gap-2 ${isLeader ? 'flex-row-reverse' : 'flex-row'}`}>
-                          <div className={`p-3.5 text-[13px] leading-relaxed shadow-lg whitespace-pre-wrap break-words ${
-                            isLeader
-                              ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tr-sm border border-purple-500/30'
-                              : 'bg-[#242424] text-slate-200 rounded-2xl rounded-tl-sm border border-[#1a1a1a]'
-                          }`}>
-                            {msg.text}
-                          </div>
-                          <span className="text-[10px] text-slate-500 shrink-0 mb-1 font-mono tracking-tighter">
-                            {msg.time}
-                          </span>
-                        </div>
-                      </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        ); })}
+            <ChatMessageRow 
+              key={msg.inc_id || msg.id}
+              msg={msg}
+              isContinuous={isContinuous}
+              isMe={isMe}
+              isResolved={isResolved}
+              currentUser={currentUser}
+              mainMessages={mainMessages}
+              activeReactionMsg={activeReactionMsg}
+              onLongPress={setLongPressMsg}
+              onToggleBookmark={handleToggleBookmark}
+              onToggleReactionMenu={(seq) => setActiveReactionMsg(activeReactionMsg === seq ? null : seq)}
+              onReply={setReplyTo}
+              onAddReaction={handleAddReaction}
+            />
+          );
+        })}
           </main>
 
           <div className="px-4 pb-0 bg-[#191919]" />
@@ -1807,51 +2021,14 @@ export default function ChatPage() {
                         </div>
                       )}
 
-                      {/* pill 입력창 (수직 중앙 정렬: items-center) */}
-                      <div className={`flex items-center bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all px-1 ${replyTo ? 'rounded-b-[18px] rounded-t-none' : 'rounded-[18px]'}`} style={{ minHeight: 36 }}>
-                        {/* textarea */}
-                        <textarea ref={textareaRef} id="main-chat-input" rows={1}
-                          disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료'}
-                          value={mainInput}
-                          onChange={(e) => {
-                            setMainInput(e.target.value); handleTyping();
-                            e.target.style.height = 'auto';
-                            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault(); handleSendMessage();
-                              if (textareaRef.current) textareaRef.current.style.height = '24px';
-                            }
-                          }}
-                          onFocus={() => setShowEmojiPicker(false)}
-                          placeholder={(roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료') ? '종료된 워룸은 입력할 수 없습니다' : '메시지를 입력하세요...'}
-                          className="flex-1 bg-transparent py-[7px] pl-3 pr-1 text-[14px] text-white focus:outline-none placeholder:text-[#666666] resize-none overflow-y-auto leading-tight"
-                          style={{ minHeight: 32, maxHeight: 120 }}
-                        />
-
-                        {/* 이모지 버튼 (전송 버튼 좌측) */}
-                        <button onClick={() => setShowEmojiPicker(p => !p)}
-                          className={`flex items-center justify-center w-8 h-8 mx-0.5 rounded-full transition-all active:scale-90 text-2xl leading-none shrink-0 ${showEmojiPicker ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}>
-                          😊
-                        </button>
-                      </div>
+                      <ChatInputBar 
+                        roomStatus={roomStatus} 
+                        onSendMessage={handleSendMessageFromInput} 
+                        onTyping={handleTyping} 
+                        uploadingFile={uploadingFile} 
+                        selectedFiles={selectedFiles} 
+                      />
                     </div>
-
-                    {/* 전송 버튼 (36px 시원한 사이즈) */}
-                    <button onClick={handleSendMessage}
-                      disabled={(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile}
-                      className={`flex items-center justify-center rounded-full transition-all active:scale-95 flex-none shadow-lg mb-0.5
-                        ${(!mainInput.trim() && selectedFiles.length === 0) || uploadingFile
-                          ? 'bg-slate-800 text-slate-600 opacity-50 cursor-not-allowed'
-                          : 'bg-blue-600 text-white shadow-blue-900/40 hover:bg-blue-500 hover:scale-105'
-                        }`}
-                      style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
-                    >
-                      {uploadingFile
-                        ? <div className="w-5 h-5 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
-                        : <Send className="w-5 h-5 fill-current" />}
-                    </button>
                   </div>
                 </>
               )}
@@ -1900,19 +2077,24 @@ export default function ChatPage() {
           const orgLabel = orgParts.join(' · ');
 
           return (
-            <div className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03] ${!isOnl ? 'opacity-55' : ''}`}>
+            <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]">
               <div className="relative shrink-0">
                 {isOnl && (
-                  <span className="absolute inset-0 rounded-2xl bg-emerald-500/20 animate-ping" style={{animationDuration:'2s'}} />
+                  <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" style={{animationDuration:'2s'}} />
                 )}
-                <div className={`relative w-10 h-10 rounded-2xl bg-gradient-to-br ${avatarGrad} flex items-center justify-center text-[13px] font-black text-white border border-white/5`}>
-                  {person.name?.[0] || 'U'}
+                <div className={`relative w-10 h-10 rounded-full bg-gradient-to-br ${avatarGrad} flex items-center justify-center text-[13px] font-black text-white border transition-all overflow-hidden ${
+                  isOnl ? 'border-emerald-400/50 shadow-[0_0_12px_rgba(52,211,153,0.3)]' : 'border-white/5 opacity-80'
+                }`}>
+                  {person.profile_picture ? (
+                    <img src={getCachedAvatarUrl(person.profile_picture)} alt={person.name} className="w-full h-full object-cover" />
+                  ) : (
+                    person.name?.[0] || 'U'
+                  )}
                 </div>
-                <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#242424] ${isOnl ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-[#3a3a3a]'}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className={`text-[14px] font-bold truncate ${isOnl ? 'text-white' : 'text-slate-500'}`}>{person.name}</p>
+                  <p className={`text-[14px] font-bold truncate ${isOnl ? 'text-white' : 'text-slate-300'}`}>{person.name}</p>
                   {person.isGuest && <span className="text-[9px] bg-slate-700/80 text-slate-400 px-1.5 py-0.5 rounded-md font-bold">Guest</span>}
                 </div>
                 <p className="text-[11px] text-slate-500 truncate mt-0.5">{orgLabel}</p>
@@ -2009,12 +2191,16 @@ export default function ChatPage() {
                 )}
                 <div className="h-3" />
               </div>
-              {/* 초대 버튼 */}
-              <div className="px-5 py-3 border-t border-[#242424] bg-[#191919]" style={{paddingBottom:'calc(env(safe-area-inset-bottom) + 12px)'}}>
+              {/* 초대 버튼 (완벽한 플로팅 액션 버튼 FAB 감성) */}
+              <div className="px-6 pt-4 pb-6 bg-[#242424] border-t border-white/5" style={{paddingBottom:'calc(env(safe-area-inset-bottom) + 24px)'}}>
                 <button
                   onClick={() => { setShowParticipantDropdown(false); if (!isResolved) setShowInviteModal(true); }}
                   disabled={isResolved}
-                  className={`w-full py-3 rounded-2xl text-[14px] font-bold transition-all ${isResolved ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white shadow-lg shadow-blue-900/30'}`}
+                  className={`w-full py-4 rounded-[16px] text-[15px] font-black tracking-wider transition-all duration-300 ${
+                    isResolved
+                      ? 'bg-slate-800 text-slate-600 cursor-not-allowed opacity-70'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.98] text-white shadow-[0_8px_30px_rgba(37,99,235,0.6)] border border-blue-400/40'
+                  }`}
                 >
                   {isResolved ? '초대 불가 (종료됨)' : '+ 참여자 초대'}
                 </button>
@@ -2378,8 +2564,8 @@ export default function ChatPage() {
               </div>
             </div>
            </div>
-         </div>
-       )}
+          </div>
+        )}
 
       <style>{`
         #main-chat-input {

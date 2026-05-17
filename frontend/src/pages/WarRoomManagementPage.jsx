@@ -31,6 +31,19 @@ function formatTime(iso) {
   return d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
 }
 
+function getDefaultDates() {
+  const end = new Date();
+  const start = new Date();
+  start.setMonth(start.getMonth() - 1);
+  const fmt = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  return { startDate: fmt(start), endDate: fmt(end) };
+}
+
 export default function WarRoomManagementPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
@@ -41,7 +54,7 @@ export default function WarRoomManagementPage() {
   const [sortBy, setSortBy]         = useState('newest');
   const [joining, setJoining]       = useState(null);
   const [showFilter, setShowFilter] = useState(false);
-  const [filters, setFilters]       = useState({ startDate: '', endDate: '', assignee: '' });
+  const [filters, setFilters]       = useState(() => ({ ...getDefaultDates(), assignee: '' }));
   const timer = useRef(null);
 
   const fetchRooms = useCallback(async (q = searchQuery) => {
@@ -251,7 +264,7 @@ export default function WarRoomManagementPage() {
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <button onClick={() => { setFilters({ startDate: '', endDate: '', assignee: '' }); setSearchQuery(''); }}
+            <button onClick={() => { setFilters({ ...getDefaultDates(), assignee: '' }); setSearchQuery(''); }}
               style={{ padding: '10px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               초기화
             </button>

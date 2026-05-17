@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, Search, Filter, Calendar, AlertCircle, Clock, 
   FileText, ChevronRight, X, TrendingUp, AlertTriangle, CheckCircle, Zap,
@@ -24,9 +24,10 @@ const getDefaultConfig = () => {
 
 export default function SearchPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useState({
     incidentId: '',
-    incidentName: '',
+    incidentName: location.state?.keyword || '',
     startDate: getDefaultConfig().startDate,
     endDate: getDefaultConfig().endDate,
     org1: '신한DS', 
@@ -69,6 +70,7 @@ export default function SearchPage() {
     const deepestVal = savedUser.subpart_code || savedUser.subpart || savedUser.part_code || savedUser.part || savedUser.team_code || savedUser.team || savedUser.honbu_code || savedUser.honbu || savedUser.company_code || savedUser.company || '신한DS';
     const defaultData = getDefaultConfig();
     const params = new URLSearchParams();
+    if (location.state?.keyword) params.append('keyword', location.state.keyword);
     if (defaultData.startDate) params.append('startDate', defaultData.startDate);
     if (defaultData.endDate) params.append('endDate', defaultData.endDate);
     if (deepestVal && deepestVal !== '신한DS') params.append('orgCode', deepestVal);
