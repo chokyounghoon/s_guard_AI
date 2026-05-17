@@ -35,11 +35,41 @@ const CodeBlock = ({ children, className }) => {
   );
 };
 
+const highlightString = (str) => {
+  const regex = /(\b\d+(?:\.\d+)?%|행원 권한 누락|권한 점검 프로세스 가동|오류율|급증|누락|실패|초과|지연|권한|장애|원인|오류|비정상|중단|불가|예외|버그|에러|정상|복구|완료|점검|가동|해결|성공|안정|재시작)/g;
+  const parts = str.split(regex);
+  return parts.map((part, index) => {
+    if (/^\d+(?:\.\d+)?%$/.test(part)) {
+      return <span key={index} className="font-mono font-black text-[#fb923c] px-1.5 py-0.5 bg-orange-500/15 border border-orange-500/30 rounded shadow-sm mx-0.5 inline-block">{part}</span>;
+    }
+    if (/^(행원 권한 누락|오류율|급증|누락|실패|초과|지연|권한|장애|원인|오류|비정상|중단|불가|예외|버그|에러)$/.test(part)) {
+      return <span key={index} className="font-black text-white underline decoration-amber-500 decoration-2 underline-offset-4 bg-amber-500/15 px-1.5 py-0.5 rounded border-b border-amber-500 mx-0.5 shadow-[0_0_10px_rgba(245,158,11,0.2)] inline-block">{part}</span>;
+    }
+    if (/^(권한 점검 프로세스 가동|정상|복구|완료|점검|가동|해결|성공|안정|재시작)$/.test(part)) {
+      return <span key={index} className="font-bold text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30 mx-0.5 inline-block">{part}</span>;
+    }
+    return part;
+  });
+};
+
+const highlightKeywords = (node) => {
+  if (typeof node === 'string') return highlightString(node);
+  if (Array.isArray(node)) return node.map((child, i) => React.createElement(React.Fragment, { key: i }, highlightKeywords(child)));
+  if (React.isValidElement(node)) {
+    if (node.type === 'code' || node.type === 'pre' || node.type === 'a' || node.type === 'button' || node.type === 'span') return node;
+    if (node.props && node.props.children) {
+      return React.cloneElement(node, {}, highlightKeywords(node.props.children));
+    }
+  }
+  return node;
+};
+
 const MarkdownViewer = ({ text, onLinkClick }) => {
   if (!text) return null;
 
   // 📝 Pre-process: 불필요 요소 제거 (번호 제목 **N.** 패턴은 유지)
   const processedText = text
+    .replace(/#*\s*\[?S-Autopilot Insight\]?\s*\n?/gi, '') // Remove redundant [S-Autopilot Insight] title
     .replace(/([^\n])(⏱️)/g, '$1\n\n$2')
     .replace(/⏱️\s*장애 대응 타임라인 요약\s*\*?/g, '')
     .replace(/⏱️\s*[^\n]*/g, '')
@@ -102,6 +132,35 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
             
             const contentStr = getText(children);
 
+            // 💡 입력값 구조화 (▶ 기호 파싱)
+            if (contentStr.includes('▶')) {
+              const idx = contentStr.indexOf('▶');
+              const prefixText = contentStr.substring(0, idx).trim();
+              const parts = contentStr.substring(idx).split('▶').map(s => s.trim()).filter(Boolean);
+              
+              return (
+                <div className="my-3 space-y-2">
+                  {prefixText && <div className="text-slate-300 text-xs font-bold mb-2">{prefixText}</div>}
+                  <div className="text-[10px] font-black text-[#00e5ff] uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                    <Database size={12} /> 분석 입력값 메타데이터
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-[#0c181c]/90 p-3 rounded-xl border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.1)]">
+                    {parts.map((pt, i) => {
+                      const colonIdx = pt.indexOf(':');
+                      const k = colonIdx !== -1 ? pt.substring(0, colonIdx).trim() : '항목';
+                      const v = colonIdx !== -1 ? pt.substring(colonIdx + 1).trim() : pt;
+                      return (
+                        <div key={i} className="flex items-center justify-between p-2.5 bg-[#00e5ff]/10 border border-[#00e5ff]/20 rounded-lg shadow-sm">
+                          <span className="text-[11px] font-bold text-slate-400 truncate mr-2">{k}</span>
+                          <span className="text-xs font-mono font-black text-[#ffffff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)] shrink-0">{v}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
             // 💡 핵심 원인 (Root Cause)
             if (contentStr.includes('💡 핵심 원인') || contentStr.includes('Root Cause:')) {
               return (
@@ -109,7 +168,7 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
                   <TriangleAlert className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Root Cause</span>
-                    <div className="text-amber-50/90 text-[14px] leading-relaxed break-words">{children}</div>
+                    <div className="text-amber-50/90 text-[14px] leading-relaxed break-words">{highlightKeywords(children)}</div>
                   </div>
                 </div>
               );
@@ -122,13 +181,13 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
                   <CircleCheckBig className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Resolution</span>
-                    <div className="text-emerald-50/90 text-[14px] leading-relaxed break-words">{children}</div>
+                    <div className="text-emerald-50/90 text-[14px] leading-relaxed break-words">{highlightKeywords(children)}</div>
                   </div>
                 </div>
               );
             }
 
-            return <div className="mb-1.5 text-slate-200 leading-relaxed text-[14px] break-words">{children}</div>;
+            return <div className="mb-1.5 text-slate-200 leading-relaxed text-[14px] break-words">{highlightKeywords(children)}</div>;
           },
 
           ol: ({ children }) => <div className="space-y-1 my-2">{children}</div>,

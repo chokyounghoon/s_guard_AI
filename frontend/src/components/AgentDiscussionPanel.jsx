@@ -46,7 +46,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
   const longPressTimer = useRef(null);
   const [contextMenu, setContextMenu] = useState(null); // { text, x, y }
   const [copied, setCopied] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -182,11 +182,11 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
           onClick={() => setIsExpanded(!isExpanded)}
           className="skeuo-btn w-full py-3.5 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/15 rounded-xl flex items-center justify-between text-slate-200 font-black text-xs tracking-tight transition-all cursor-pointer shadow-md"
         >
-          <span className="flex items-center gap-2">
-            <Terminal size={15} className="text-indigo-400" />
-            에이전트 실시간 토론 로그 {isExpanded ? '접기' : '보기'} ({messages?.length || 0}건)
+          <span className="flex items-center gap-2 truncate mr-2">
+            <Terminal size={15} className="text-indigo-400 shrink-0" />
+            <span className="truncate">에이전트 분석 로그 {isExpanded ? '접기' : '보기'} ({messages?.length || 0}건)</span>
           </span>
-          {isExpanded ? <ChevronUp size={18} className="text-[#00ff88]" /> : <ChevronDown size={18} className="text-slate-400" />}
+          {isExpanded ? <ChevronUp size={18} className="text-[#00ff88] shrink-0" /> : <ChevronDown size={18} className="text-slate-400 shrink-0" />}
         </button>
       </div>
 

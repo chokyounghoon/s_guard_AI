@@ -906,15 +906,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
               {/* 수신자 목록 칩 */}
               {selectedSms.receivers && selectedSms.receivers.length > 0 && (
-                <div className="mt-2 p-3 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <Users size={12} className="text-purple-400" />
-                    수신자 ({selectedSms.receivers.length}명)
+                <div className="mt-2 p-3.5 bg-gradient-to-r from-[#00e5ff]/10 via-[#a855f7]/10 to-transparent border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.1)] rounded-2xl flex flex-col gap-2 backdrop-blur-md">
+                  <span className="text-[10px] font-black text-[#00e5ff] uppercase tracking-wider flex items-center gap-1.5">
+                    <Users size={12} className="text-[#a855f7]" />
+                    실시간 전파 대상자 ({selectedSms.receivers.length}명)
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {selectedSms.receivers.map((r, i) => (
-                      <span key={i} className="text-[10px] text-slate-300 bg-white/10 px-2.5 py-1 rounded-lg font-mono border border-white/5 flex items-center gap-1.5 shadow-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                      <span key={i} className="text-[11px] font-bold text-white bg-[#0a1518]/80 px-3 py-1.5 rounded-xl font-mono border border-[#00e5ff]/40 flex items-center gap-2 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                        <span className="w-2 h-2 rounded-full bg-[#00e5ff] shadow-[0_0_8px_#00e5ff] animate-pulse" />
                         {r}
                       </span>
                     ))}
@@ -970,41 +970,41 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         {/* Feedback Buttons (👍/👎) - 눈에 띄는 전체 너비 카드 */}
         {analysisComplete && displayedText && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <div className={`w-full rounded-2xl border p-4 transition-all duration-500 ${
+            <div className={`w-full rounded-3xl border p-5 transition-all duration-500 backdrop-blur-md ${
               feedback === 'UP'
-                ? 'bg-blue-500/10 border-blue-500/30 shadow-lg shadow-blue-900/20'
+                ? 'bg-emerald-500/15 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.3)]'
                 : feedback === 'DOWN'
-                ? 'bg-red-500/10 border-red-500/30 shadow-lg shadow-red-900/20'
-                : 'bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent border-indigo-500/20 shadow-lg shadow-indigo-900/10'
+                ? 'bg-red-500/15 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.3)]'
+                : 'bg-gradient-to-r from-[#0a1518]/90 via-[#101b24]/90 to-[#0a1518]/90 border-[#00e5ff]/30 shadow-[0_0_25px_rgba(0,229,255,0.15)]'
             }`}>
-              <p className={`text-[11px] font-black uppercase tracking-widest mb-3 ${
-                feedback === 'UP' ? 'text-blue-400' : feedback === 'DOWN' ? 'text-red-400' : 'text-slate-400'
+              <p className={`text-xs font-black uppercase tracking-widest mb-3.5 flex items-center gap-2 ${
+                feedback === 'UP' ? 'text-emerald-400' : feedback === 'DOWN' ? 'text-red-400' : 'text-[#00e5ff]'
               }`}>
-                {feedback === 'UP' ? '✅ 정확한 분석으로 평가하셨습니다' : feedback === 'DOWN' ? '📝 피드백을 제출해 주셔서 감사합니다' : '🤖 AI 분석이 정확한가요?'}
+                {feedback === 'UP' ? '✅ 정확한 분석으로 평가하셨습니다' : feedback === 'DOWN' ? '📝 피드백을 제출해 주셔서 감사합니다' : '🤖 AI 진단 결과가 실무에 도움이 되었나요?'}
               </p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => handleFeedback('UP')}
                   disabled={feedback === 'UP'}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 ${
+                  className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 rounded-2xl font-black text-sm transition-all duration-300 active:scale-95 border ${
                     feedback === 'UP'
-                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-inner'
-                      : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-blue-500/15 hover:text-blue-300 hover:border-blue-500/30 hover:shadow-md'
+                      ? 'bg-emerald-500/30 text-emerald-300 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.6)] font-black scale-[1.02]'
+                      : 'bg-white/5 text-slate-300 border-white/15 hover:border-emerald-500 hover:text-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] hover:bg-emerald-500/15 active:border-emerald-500 active:shadow-[0_0_20px_rgba(16,185,129,0.5)]'
                   }`}
                 >
-                  <ThumbsUp className={`w-5 h-5 ${feedback === 'UP' ? 'fill-current' : ''}`} />
+                  <ThumbsUp className={`w-5 h-5 ${feedback === 'UP' ? 'fill-current text-emerald-400' : ''}`} />
                   <span>정확해요</span>
                 </button>
                 <button
                   onClick={() => handleFeedback('DOWN')}
                   disabled={feedback === 'DOWN' && !showFeedbackModal}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 ${
+                  className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 rounded-2xl font-black text-sm transition-all duration-300 active:scale-95 border ${
                     feedback === 'DOWN'
-                      ? 'bg-red-500/20 text-red-300 border border-red-500/40 shadow-inner'
-                      : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-red-500/15 hover:text-red-300 hover:border-red-500/30 hover:shadow-md'
+                      ? 'bg-red-500/30 text-red-300 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] font-black scale-[1.02]'
+                      : 'bg-white/5 text-slate-300 border-white/15 hover:border-red-500 hover:text-red-400 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] hover:bg-red-500/15 active:border-red-500 active:shadow-[0_0_20px_rgba(239,68,68,0.5)]'
                   }`}
                 >
-                  <ThumbsDown className={`w-5 h-5 ${feedback === 'DOWN' ? 'fill-current' : ''}`} />
+                  <ThumbsDown className={`w-5 h-5 ${feedback === 'DOWN' ? 'fill-current text-red-400' : ''}`} />
                   <span>아니에요</span>
                 </button>
               </div>
