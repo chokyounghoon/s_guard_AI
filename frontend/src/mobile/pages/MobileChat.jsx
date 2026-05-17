@@ -398,9 +398,22 @@ export default function MobileChat({ user }) {
     setSending(false);
   }, [input, sending, incidentId, user, participants.length]);
 
-  const handleDeleteMessage = useCallback((msgId) => {
-    setMessages(prev => prev.filter(m => (m.id || m.seq) !== msgId));
-  }, []);
+  const handleDeleteMessage = useCallback(async (msgId) => {
+    try {
+      const cleanIncId = String(incidentId).replace('INC-', '');
+      const res = await fetch(`${API_BASE}/warroom/chat/${cleanIncId}/${msgId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        setMessages(prev => prev.filter(m => (m.id || m.seq || m.inc_id) !== msgId));
+      } else {
+        console.error("Failed to delete message from DB");
+      }
+    } catch (err) {
+      console.error("Error deleting message:", err);
+    }
+  }, [incidentId]);
 
   return (
     <div className="flex flex-col bg-[#191919] overflow-hidden" style={{ height: '100dvh' }}>

@@ -8458,6 +8458,33 @@ app.post('/warroom/chat', async (c) => {
   return c.json({ status: 'saved' })
 })
 
+// Warroom chat delete (permanently wipe from DB)
+app.delete('/warroom/chat/:inc_id/:id', async (c) => {
+  const inc_id = c.req.param('inc_id');
+  const idParam = c.req.param('id');
+  const db = c.env.DB;
+
+  try {
+    const normIncId = inc_id.replace('INC-', '');
+    const incIdWithInc = inc_id.startsWith('INC-') ? inc_id : `INC-${inc_id}`;
+
+    await db.prepare(`
+      DELETE FROM aichat_history 
+      WHERE (inc_id = ? OR inc_id = ?) AND id = ?
+    `).bind(normIncId, incIdWithInc, Number(idParam)).run();
+
+    await db.prepare(`
+      DELETE FROM warroom_chats 
+      WHERE (inc_id = ? OR inc_id = ?) AND (seq = ? OR timestamp = ?)
+    `).bind(normIncId, incIdWithInc, Number(idParam) || 0, String(idParam)).run();
+
+    return c.json({ status: 'deleted', id: idParam });
+  } catch (err) {
+    console.error("Delete message error:", err);
+    return c.json({ error: err.message }, 500);
+  }
+})
+
 // ==========================================
 // File Upload → warroom_attachments
 // ==========================================

@@ -1218,9 +1218,22 @@ export default function ChatPage() {
     }
   };
 
-  const handleDeleteMessage = useCallback((msgId) => {
-    setMainMessages(prev => prev.filter(m => (m.seq || m.id) !== msgId));
-  }, []);
+  const handleDeleteMessage = useCallback(async (msgId) => {
+    try {
+      const cleanIncId = String(incidentId).replace('INC-', '');
+      const res = await fetch(`${API_BASE}/warroom/chat/${cleanIncId}/${msgId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        setMainMessages(prev => prev.filter(m => (m.seq || m.id || m.inc_id) !== msgId));
+      } else {
+        console.error("Failed to delete message from DB");
+      }
+    } catch (err) {
+      console.error("Error deleting message:", err);
+    }
+  }, [incidentId]);
 
   // Warp/Jump to message function
   const handleWarpToMessage = (target_incident_id, seq) => {
