@@ -183,23 +183,23 @@
      COLUMN 1 — 실시간 SMS  ·  Electric Blue  #3B82F6
   ═══════════════════════════════════════════════════════════════ */
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(1) .bg-sguard-card.rounded-3xl {
-    border-color: rgba(59, 130, 246, 0.4) !important;
+    border-color: rgba(59, 130, 246, 0.35) !important;
     box-shadow:
-      0 0 15px rgba(59, 130, 246, 0.15),
-      0 0 2px rgba(59, 130, 246, 0.3),
-      inset 0 0 12px rgba(59, 130, 246, 0.1),
-      0 8px 40px rgba(0, 0, 0, 0.6) !important;
+      0 0 10px rgba(59, 130, 246, 0.12),
+      0 0 2px rgba(59, 130, 246, 0.20),
+      inset 0 0 10px rgba(59, 130, 246, 0.06),
+      0 8px 30px rgba(0, 0, 0, 0.5) !important;
   }
 
   /* SMS — critical alert state override (장애 감지 시 Red 정적 변환) */
   .sms-pulse-critical .bg-sguard-card.rounded-3xl,
   .sms-pulse-major .bg-sguard-card.rounded-3xl {
-    border-color: rgba(239, 68, 68, 0.5) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
     box-shadow:
-      0 0 20px rgba(239, 68, 68, 0.2),
-      0 0 3px rgba(239, 68, 68, 0.4),
-      inset 0 0 15px rgba(239, 68, 68, 0.15),
-      0 8px 40px rgba(0, 0, 0, 0.6) !important;
+      0 0 12px rgba(239, 68, 68, 0.15),
+      0 0 2px rgba(239, 68, 68, 0.25),
+      inset 0 0 10px rgba(239, 68, 68, 0.10),
+      0 8px 30px rgba(0, 0, 0, 0.5) !important;
   }
 
   /* SMS panel header separator */
@@ -217,12 +217,12 @@
      COLUMN 2 — S-Autopilot Insight  ·  Vivid Purple  #A855F7
   ═══════════════════════════════════════════════════════════════ */
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(2) .rounded-3xl {
-    border-color: rgba(168, 85, 247, 0.4) !important;
+    border-color: rgba(168, 85, 247, 0.35) !important;
     box-shadow:
-      0 0 15px rgba(168, 85, 247, 0.15),
-      0 0 2px rgba(168, 85, 247, 0.3),
-      inset 0 0 12px rgba(168, 85, 247, 0.1),
-      0 8px 40px rgba(0, 0, 0, 0.6) !important;
+      0 0 10px rgba(168, 85, 247, 0.12),
+      0 0 2px rgba(168, 85, 247, 0.20),
+      inset 0 0 10px rgba(168, 85, 247, 0.06),
+      0 8px 30px rgba(0, 0, 0, 0.5) !important;
     animation: none !important;
   }
 
@@ -237,12 +237,12 @@
      COLUMN 3 — Expert Advisor  ·  Teal / Cyan  #2DD4BF
   ═══════════════════════════════════════════════════════════════ */
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(3) .bg-sguard-deep.rounded-3xl {
-    border-color: rgba(45, 212, 191, 0.35) !important;
+    border-color: rgba(45, 212, 191, 0.30) !important;
     box-shadow:
-      0 0 15px rgba(45, 212, 191, 0.15),
-      0 0 2px rgba(45, 212, 191, 0.3),
-      inset 0 0 12px rgba(45, 212, 191, 0.1),
-      0 8px 40px rgba(0, 0, 0, 0.6) !important;
+      0 0 10px rgba(45, 212, 191, 0.12),
+      0 0 2px rgba(45, 212, 191, 0.20),
+      inset 0 0 10px rgba(45, 212, 191, 0.06),
+      0 8px 30px rgba(0, 0, 0, 0.5) !important;
     animation: none !important;
   }
 
@@ -264,12 +264,12 @@
   ═══════════════════════════════════════════════════════════════ */
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) .bg-sguard-main.rounded-3xl,
   .grid.grid-cols-1.lg\:grid-cols-4 > div:nth-child(4) [class*="rounded-3xl"] {
-    border-color: rgba(16, 185, 129, 0.35) !important;
+    border-color: rgba(16, 185, 129, 0.30) !important;
     box-shadow:
-      0 0 15px rgba(16, 185, 129, 0.15),
-      0 0 2px rgba(16, 185, 129, 0.3),
-      inset 0 0 12px rgba(16, 185, 129, 0.1),
-      0 8px 40px rgba(0, 0, 0, 0.6) !important;
+      0 0 10px rgba(16, 185, 129, 0.12),
+      0 0 2px rgba(16, 185, 129, 0.20),
+      inset 0 0 10px rgba(16, 185, 129, 0.06),
+      0 8px 30px rgba(0, 0, 0, 0.5) !important;
     animation: none !important;
   }
 

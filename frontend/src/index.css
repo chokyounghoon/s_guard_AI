@@ -3,10 +3,10 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
 @theme {
-  --color-sguard-main: #0f1421;
-  --color-sguard-card: #1a1f2e;
-  --color-sguard-deep: #0a0c12;
-  --color-sguard-darker: #11141d;
+  --color-sguard-main: #121214;
+  --color-sguard-card: #1c1e24;
+  --color-sguard-deep: #16181c;
+  --color-sguard-darker: #1a1c22;
   --color-sguard-accent: #3b82f6;
   --color-sguard-purple: #a855f7;
   --color-sguard-teal: #2dd4bf;
@@ -19,7 +19,7 @@
         overflow: hidden;
     }
     body {
-        @apply bg-slate-900 text-white;
+        @apply bg-[#121214] text-[#e3e5e8];
         font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR', 'Malgun Gothic',
                      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 15px;
@@ -318,47 +318,47 @@
 
 /* 시안 블룸 — 유사도, 분석 중 상태 */
 .bloom-cyan {
-  text-shadow: 0 0 8px rgba(6,182,212,0.8), 0 0 20px rgba(6,182,212,0.4), 0 0 40px rgba(6,182,212,0.15);
-  filter: drop-shadow(0 0 4px rgba(6,182,212,0.6));
+  text-shadow: 0 0 6px rgba(6,182,212,0.6), 0 0 16px rgba(6,182,212,0.3);
+  filter: drop-shadow(0 0 3px rgba(6,182,212,0.4));
 }
 .bloom-cyan-box {
-  box-shadow: 0 0 10px rgba(6,182,212,0.35), 0 0 24px rgba(6,182,212,0.15), inset 0 0 12px rgba(6,182,212,0.05);
+  box-shadow: 0 0 8px rgba(6,182,212,0.25), 0 0 16px rgba(6,182,212,0.1), inset 0 0 8px rgba(6,182,212,0.04);
 }
 
 /* 레드 블룸 — CRITICAL 상태 */
 .bloom-red {
-  text-shadow: 0 0 8px rgba(248,113,113,0.9), 0 0 20px rgba(248,113,113,0.5), 0 0 40px rgba(248,113,113,0.2);
-  filter: drop-shadow(0 0 5px rgba(248,113,113,0.7));
+  text-shadow: 0 0 6px rgba(248,113,113,0.7), 0 0 16px rgba(248,113,113,0.35);
+  filter: drop-shadow(0 0 3px rgba(248,113,113,0.5));
 }
 .bloom-red-box {
-  box-shadow: 0 0 12px rgba(248,113,113,0.4), 0 0 28px rgba(248,113,113,0.2), inset 0 0 14px rgba(248,113,113,0.06);
+  box-shadow: 0 0 8px rgba(248,113,113,0.28), 0 0 16px rgba(248,113,113,0.12), inset 0 0 8px rgba(248,113,113,0.05);
 }
 
 /* 오렌지 블룸 — MAJOR 상태 */
 .bloom-orange {
-  text-shadow: 0 0 8px rgba(251,146,60,0.8), 0 0 20px rgba(251,146,60,0.4), 0 0 36px rgba(251,146,60,0.15);
-  filter: drop-shadow(0 0 4px rgba(251,146,60,0.6));
+  text-shadow: 0 0 6px rgba(251,146,60,0.6), 0 0 16px rgba(251,146,60,0.3);
+  filter: drop-shadow(0 0 3px rgba(251,146,60,0.4));
 }
 .bloom-orange-box {
-  box-shadow: 0 0 10px rgba(251,146,60,0.35), 0 0 24px rgba(251,146,60,0.15), inset 0 0 12px rgba(251,146,60,0.05);
+  box-shadow: 0 0 8px rgba(251,146,60,0.25), 0 0 16px rgba(251,146,60,0.1), inset 0 0 8px rgba(251,146,60,0.04);
 }
 
 /* 그린 블룸 — NORMAL / 완료 상태 */
 .bloom-green {
-  text-shadow: 0 0 8px rgba(52,211,153,0.8), 0 0 20px rgba(52,211,153,0.4), 0 0 36px rgba(52,211,153,0.15);
-  filter: drop-shadow(0 0 4px rgba(52,211,153,0.5));
+  text-shadow: 0 0 6px rgba(52,211,153,0.6), 0 0 16px rgba(52,211,153,0.3);
+  filter: drop-shadow(0 0 3px rgba(52,211,153,0.4));
 }
 .bloom-green-box {
-  box-shadow: 0 0 10px rgba(52,211,153,0.3), 0 0 24px rgba(52,211,153,0.12), inset 0 0 12px rgba(52,211,153,0.04);
+  box-shadow: 0 0 8px rgba(52,211,153,0.22), 0 0 16px rgba(52,211,153,0.09), inset 0 0 8px rgba(52,211,153,0.03);
 }
 
 /* 퍼플 블룸 — AI/인사이트 패널 */
 .bloom-purple {
-  text-shadow: 0 0 8px rgba(139,92,246,0.8), 0 0 20px rgba(139,92,246,0.4);
-  filter: drop-shadow(0 0 4px rgba(139,92,246,0.6));
+  text-shadow: 0 0 6px rgba(139,92,246,0.6), 0 0 16px rgba(139,92,246,0.3);
+  filter: drop-shadow(0 0 3px rgba(139,92,246,0.4));
 }
 .bloom-purple-box {
-  box-shadow: 0 0 10px rgba(139,92,246,0.35), 0 0 24px rgba(139,92,246,0.15), inset 0 0 12px rgba(139,92,246,0.05);
+  box-shadow: 0 0 8px rgba(139,92,246,0.25), 0 0 16px rgba(139,92,246,0.1), inset 0 0 8px rgba(139,92,246,0.04);
 }
 
 /* 고유사도(≥80%) 숫자 강조 */
