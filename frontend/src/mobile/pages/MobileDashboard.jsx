@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot } from 'lucide-react';
 import AgentDiscussionPanel from '../../components/AgentDiscussionPanel';
@@ -1847,7 +1848,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   incident={selectedSms}
                   onClose={() => { setShowAgentPanel(false); setSelectedSms(null); }}
                 />
-              ) : (
+              ) : typeof document !== 'undefined' ? createPortal(
                 <div className="fixed inset-0 z-[500] bg-[#0a0c12] flex flex-col h-[100dvh]">
                   {/* 헤더 영역 (닫기 버튼 포함) */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 bg-[#0a0c12] z-10">
@@ -1871,8 +1872,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   <div className="flex-1 min-h-0 relative">
                     <WarRoomChatPanel incidentId={selectedSms?.inc_id} currentUser={userProfile || {}} isVisible={true} />
                   </div>
-                </div>
-              )
+                </div>,
+                document.body
+              ) : null
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center opacity-30" style={{ minHeight: 240 }}>
                 <Brain size={32} className="text-[#00ff88] mb-3 filter drop-shadow-[0_0_8px_rgba(0,255,136,0.5)]" />
