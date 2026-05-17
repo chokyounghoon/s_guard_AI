@@ -287,6 +287,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     }
   }, [visibleSms, selectedSms, insightSms, showAgentPanel, agentMessages.length, incidentWorkflowSteps.length]);
 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
   const [myAssignments, setMyAssignments] = useState([]);
@@ -502,12 +503,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
   // Fetch War-Rooms & SMS periodically
   useEffect(() => {
-    fetchSMSMessages();
-    fetchWarRooms();
-    fetchActivityLogs();
-    fetchMyAssignments();
-    fetchUserActivityHistory();
-    fetchSettings(); // 🚀 Load thresholds on start
+    setIsInitialLoading(true);
+    Promise.allSettled([
+      fetchSMSMessages(),
+      fetchWarRooms(),
+      fetchActivityLogs(),
+      fetchMyAssignments(),
+      fetchUserActivityHistory(),
+      fetchSettings()
+    ]).finally(() => {
+      setIsInitialLoading(false);
+    });
     // 🚀 Performance Optimization: Reduce polling pressure during active AI analysis
     const pollIntervalMultiplier = isAnalyzingActive ? 4 : 1; // 4x slower during analysis
 
@@ -1323,6 +1329,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
   return (
     <div className="fixed inset-0 text-white font-sans overflow-x-clip overflow-y-auto" style={{ background: '#121212' }}>
+      {isInitialLoading && (
+        <div className="absolute inset-0 z-[500] bg-[#121212]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-300">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 border-4 border-[#00e5ff]/20 rounded-full" />
+            <div className="absolute inset-0 border-4 border-[#00e5ff] border-t-transparent rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-[#00e5ff] animate-pulse" />
+            </div>
+          </div>
+          <div className="text-center space-y-1">
+            <h3 className="text-sm font-black tracking-wider text-white">S-GUARD 시스템 데이터 렌더링 중입니다...</h3>
+            <p className="text-[11px] text-slate-400">실시간 전파 이력 및 워룸 현황을 동기화하고 있습니다</p>
+          </div>
+        </div>
+      )}
       <nav className="mobile-top-nav flex justify-between items-end px-4 sticky top-0 z-[100]"
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',
@@ -1336,13 +1357,15 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         {/* Left: logo + icon buttons */}
         <div className="flex items-center gap-3 shrink-0">
           <button onClick={() => window.location.reload()}
-            className="text-xs font-black tracking-[0.1em] uppercase text-white whitespace-nowrap">
-            S-GUARD <span style={{ color: '#00e5ff', textShadow: '0 0 10px rgba(0,229,255,0.6)' }}>AI</span>
+            className="text-base sm:text-lg font-black tracking-widest uppercase text-white whitespace-nowrap font-mono flex items-center"
+            style={{ textShadow: '0 0 15px rgba(255,255,255,0.4)' }}
+          >
+            S-GUARD
           </button>
         </div>
 
-        {/* Center: War-Room Action Button (Filling remaining space) */}
-        <div className="flex-1 mx-2">
+        {/* Center: War-Room Action Button (More compact sizing) */}
+        <div className="flex-1 max-w-[125px] mx-2">
           {insightSms && isInsightComplete && (
             <div className="animate-in fade-in zoom-in duration-500">
                {(() => {
@@ -1368,12 +1391,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         handleOpenWarRoomFromInsight(insightSms, insightContent);
                       }}
                       disabled={isOpeningWarRoom}
-                      className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-black text-[9px] transition-all border ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden`}
+                      className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg font-black text-[10px] transition-all border ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden shadow-md`}
                     >
                       {isOpeningWarRoom ? (
-                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0" />
                       ) : (
-                        <Users size={12} />
+                        <Users size={12} className="shrink-0" />
                       )}
                       <span className="truncate">
                         {isOpeningWarRoom ? '진행중' : (isCompleted || isProcessing) ? 'WAR-ROOM 이동' : 'WAR-ROOM 개설'}
