@@ -258,11 +258,11 @@ const ChatMessageRow = React.memo(({
             {!isContinuous && (
               <span className="text-xs text-slate-400 font-medium">{msg.sender}</span>
             )}
-            <div className="flex items-end space-x-2 relative group/bubble">
+            <div className="flex items-end space-x-1.5 relative group/bubble mb-2">
               <div
                 className={(() => {
                   const isImgText = msg.text?.includes('[첨부파일]') && msg.text?.includes('image/');
-                  return isImgText ? '' : 'bg-[#333333] rounded-2xl rounded-tl-none px-3.5 py-1.5 max-w-[280px] text-[15px] leading-relaxed whitespace-pre-wrap relative group/bubble';
+                  return isImgText ? '' : 'bg-[#2a2f3a] rounded-2xl rounded-tl-none px-3.5 py-2.5 max-w-[280px] sm:max-w-[340px] text-[14px] sm:text-[15px] leading-[1.4] whitespace-pre-wrap relative group/bubble text-slate-100 shadow-md';
                 })()}
                 style={msg.text?.includes('[첨부파일]') && msg.text?.includes('image/') ? { maxWidth: 'calc(66vw)', overflow: 'hidden', borderRadius: '4px 16px 16px 16px' } : {}}
                 onContextMenu={(e) => { e.preventDefault(); onLongPress(msg); }}
@@ -302,12 +302,12 @@ const ChatMessageRow = React.memo(({
                   </div>
                 )}
               </div>
-              <div className="flex flex-col items-start justify-end pb-1 ml-1 shrink-0">
+              <div className="flex flex-col items-start justify-end pb-0.5 ml-1.5 shrink-0 select-none self-end">
                 {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
                 {msg.read_count > 0 && (
-                  <span className="text-[10px] text-[#FAE100] font-bold leading-none mb-0.5 drop-shadow-sm">{msg.read_count}</span>
+                  <span className="text-[10px] text-[#FAE100] font-black leading-none mb-1 drop-shadow-sm">{msg.read_count}</span>
                 )}
-                <span className="text-[10px] text-slate-500 shrink-0 whitespace-nowrap">{msg.time}</span>
+                <span className="text-[9px] text-slate-400 shrink-0 whitespace-nowrap font-mono leading-none">{msg.time}</span>
               </div>
               {!isResolved && (
                 <div className="absolute right-[-100px] top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-all">
@@ -352,20 +352,20 @@ const ChatMessageRow = React.memo(({
       )}
 
       {isMe && (
-        <div className="flex flex-col items-end space-y-1 mb-1 group">
-          <div className="flex items-end space-x-1">
-            <div className="flex flex-col items-end justify-end pb-1 mr-1 shrink-0">
+        <div className="flex flex-col items-end space-y-1 mb-2 group">
+          <div className="flex items-end space-x-1.5">
+            <div className="flex flex-col items-end justify-end pb-0.5 mr-1.5 shrink-0 select-none self-end">
               {msg.is_key_event && <Star className="w-3 h-3 text-yellow-500 fill-current mb-0.5 animate-in zoom-in-0" title="Key Event" />}
               {msg.read_count > 0 && (
-                <span className="text-[10px] text-[#FAE100] font-bold leading-none mb-0.5 drop-shadow-sm">{msg.read_count}</span>
+                <span className="text-[10px] text-[#FAE100] font-black leading-none mb-1 drop-shadow-sm">{msg.read_count}</span>
               )}
-              <span className="text-[10px] text-slate-500 shrink-0 whitespace-nowrap">{msg.time}</span>
+              <span className="text-[9px] text-slate-400 shrink-0 whitespace-nowrap font-mono leading-none">{msg.time}</span>
             </div>
             <div className="relative group/bubble">
               <div
                 className={(() => {
                   const isImgText = msg.text?.includes('[첨부파일]') && msg.text?.includes('image/');
-                  return isImgText ? '' : 'bg-[#00236e] rounded-2xl rounded-tr-none px-3.5 py-1.5 max-w-[280px] text-[15px] leading-relaxed shadow-lg whitespace-pre-wrap relative text-white';
+                  return isImgText ? '' : 'bg-[#0038a8] rounded-2xl rounded-tr-none px-3.5 py-2.5 max-w-[280px] sm:max-w-[340px] text-[14px] sm:text-[15px] leading-[1.4] shadow-md whitespace-pre-wrap relative text-white';
                 })()}
                 style={msg.text?.includes('[첨부파일]') && msg.text?.includes('image/') ? { maxWidth: 'calc(66vw)', overflow: 'hidden', borderRadius: '16px 4px 16px 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } : {}}
                 onContextMenu={(e) => { e.preventDefault(); onLongPress(msg); }}
@@ -1656,39 +1656,38 @@ export default function ChatPage() {
         ))}
       </div>
 
-      <header className="flex justify-between items-center px-3 py-1.5 sticky top-0 bg-[#191919]/90 backdrop-blur-md z-50 border-b border-[#242424]">
-        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+      <header className="flex justify-between items-center px-3 py-2 sticky top-0 bg-[#191919]/90 backdrop-blur-md z-50 border-b border-[#242424]">
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 pr-2">
           <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors shrink-0">
             <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </button>
           <div className="flex flex-col min-w-0 flex-1 pr-2">
-            {/* 장애 ID + 모바일 상태 뱃지 */}
+            {/* 1. 방 이름 메인 타이틀 (인간 중심) */}
             <div className="flex items-center gap-2 truncate">
-              <span className="font-bold text-sm sm:text-base truncate text-white">
-                {incidentId}
+              <span className="text-base sm:text-lg font-black truncate text-white tracking-wide">
+                {(() => {
+                  const titleStr = roomTitle || roomDescription || '';
+                  const cleaned = titleStr.replace(/^[\d-]+\s*\|\s*/, '').trim();
+                  return cleaned || '시스템 장애 대응 워룸';
+                })()}
               </span>
-              <span className={`text-[10px] sm:hidden px-2 py-0.5 rounded font-black tracking-tight uppercase shrink-0 border ${
+              <span className={`text-[10px] px-2 py-0.5 rounded font-black tracking-tight uppercase shrink-0 border ${
                 roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '완료' || roomStatus === '최종완료' || roomStatus === '처리완료'
-                  ? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
-                  : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse'
+                  ? 'bg-slate-500/20 text-slate-300 border-slate-500/30 font-normal'
+                  : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse font-black'
               }`}>
                 {getStatusName(roomStatus)}
               </span>
             </div>
-            {/* SMS 내용 2줄 말줄임 + 롱프레스 */}
-            {roomDescription && (
-              <span
-                className="text-slate-400 text-[10px] leading-tight select-none cursor-pointer"
-                style={{display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden'}}
-                onTouchStart={() => { descPressTimer.current = setTimeout(() => setShowFullDesc(true), 500); }}
-                onTouchEnd={() => clearTimeout(descPressTimer.current)}
-                onMouseDown={() => { descPressTimer.current = setTimeout(() => setShowFullDesc(true), 500); }}
-                onMouseUp={() => clearTimeout(descPressTimer.current)}
-                onContextMenu={e => { e.preventDefault(); setShowFullDesc(true); }}
-              >
-                {roomDescription}
-              </span>
-            )}
+            {/* 2. 시스템용 인시던트 ID (작고 흐린 회색 글씨) + 상세 설명 툴팁 */}
+            <div className="flex items-center gap-2 mt-0.5 truncate text-[11px] text-slate-500 font-mono">
+              <span className="shrink-0">ID: {incidentId}</span>
+              {roomDescription && roomDescription !== roomTitle && (
+                <span className="truncate text-slate-400 font-sans" title={roomDescription}>
+                  · {roomDescription}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         

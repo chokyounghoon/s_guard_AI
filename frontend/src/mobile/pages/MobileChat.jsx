@@ -303,11 +303,14 @@ export default function MobileChat({ user }) {
           <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-4 h-4 text-red-400" />
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-mono text-slate-500 uppercase tracking-tight">War-Room · {incidentId || '-'}</p>
-            <p className="text-sm font-bold text-white truncate">
-              {incidentInfo?.service_name || incidentInfo?.message?.substring(0, 28) || 'Incident Chat'}
+          <div className="min-w-0 flex-1 pr-1">
+            <p className="text-base sm:text-lg font-black text-white truncate tracking-wide">
+              {(() => {
+                const titleStr = incidentInfo?.service_name || incidentInfo?.message || 'Incident Chat';
+                return titleStr.replace(/^[\d-]+\s*\|\s*/, '').trim() || '시스템 장애 대응 워룸';
+              })()}
             </p>
+            <p className="text-[11px] font-mono text-slate-500 truncate mt-0.5 tracking-tight">ID: {incidentId || '-'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -353,8 +356,8 @@ export default function MobileChat({ user }) {
         {messages.map((msg) => {
           const avatarUrl = msg.avatar_url || null;
           return (
-            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className="relative w-8 h-8 shrink-0 mt-0.5">
+            <div key={msg.id} className={`flex gap-2 items-end ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} mb-3`}>
+              <div className="relative w-8 h-8 shrink-0 self-start mt-0.5">
                 {avatarUrl ? (
                   <img 
                     src={avatarUrl} 
@@ -372,30 +375,34 @@ export default function MobileChat({ user }) {
                   {msg.role === 'user' ? (user?.name?.[0] || 'U') : msg.role === 'assistant' ? <Bot className="w-4 h-4" /> : (msg.sender?.[0] || '?')}
                 </div>
               </div>
-              <div className={`max-w-[78%] flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              {msg.role === 'other' && (
-                <span className="text-[10px] text-slate-500 px-1 font-medium">{msg.sender}</span>
-              )}
-              <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-              msg.role === 'user'
-                  ? 'bg-[#00236e] text-white rounded-2xl rounded-tr-none'
-                  : msg.role === 'assistant'
-                  ? 'bg-[#242424] border border-[#333] text-slate-200 rounded-2xl rounded-tl-none'
-                  : 'bg-[#333333] border border-white/5 text-white rounded-2xl rounded-tl-none'
-              }`}>
-                {msg.role === 'assistant'
-                  ? <div className="prose prose-invert prose-sm max-w-none prose-p:my-1"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
-                  : <p className="whitespace-pre-wrap">{msg.content}</p>
-                }
-              </div>
-              <div className={`flex items-end gap-1.5 px-1 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <span className="text-[10px] text-slate-600 shrink-0">{formatTime(msg.ts)}</span>
-                {msg.read_count > 0 && (
-                  <span className="text-[11px] font-bold text-[#FAE100] leading-none mb-0.5">{msg.read_count}</span>
+              <div className={`flex flex-col max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                {msg.role === 'other' && (
+                  <span className="text-[10px] text-slate-500 px-1 font-medium mb-1">{msg.sender}</span>
                 )}
+                <div className={`flex items-end gap-1.5 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  {/* 말풍선 본체 */}
+                  <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-[1.4] shadow-md break-words ${
+                    msg.role === 'user'
+                      ? 'bg-[#0038a8] text-white rounded-tr-none'
+                      : msg.role === 'assistant'
+                      ? 'bg-[#242424] border border-[#333] text-slate-200 rounded-tl-none'
+                      : 'bg-[#2a2f3a] border border-white/5 text-slate-100 rounded-tl-none'
+                  }`}>
+                    {msg.role === 'assistant'
+                      ? <div className="prose prose-invert prose-sm max-w-none prose-p:my-1"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
+                      : <p className="whitespace-pre-wrap">{msg.content}</p>
+                    }
+                  </div>
+                  {/* 말풍선 메타데이터 (시간 + 안읽음 숫자) - 세로형 Flex 컨테이너 */}
+                  <div className={`flex flex-col justify-end shrink-0 select-none pb-0.5 ${msg.role === 'user' ? 'items-end mr-0.5' : 'items-start ml-0.5'}`}>
+                    {msg.read_count > 0 && (
+                      <span className="text-[10px] font-black text-[#FAE100] leading-none mb-1 drop-shadow-sm">{msg.read_count}</span>
+                    )}
+                    <span className="text-[9px] font-mono text-slate-400 leading-none">{formatTime(msg.ts)}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
         );
       })}
         <div ref={bottomRef} />
