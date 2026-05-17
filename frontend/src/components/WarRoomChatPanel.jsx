@@ -22,6 +22,14 @@ const formatKst = (dateInput) => {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 };
 
+const cleanProfilePic = (picStr) => {
+  if (!picStr || picStr === 'null') return null;
+  const cleaned = picStr.replace(/^"|"$/g, '');
+  if (!cleaned) return null;
+  if (cleaned.startsWith('http') || cleaned.startsWith('data:image')) return cleaned;
+  return `https://sguardai.khcho0421.workers.dev${cleaned.startsWith('/') ? '' : '/'}${cleaned}`;
+};
+
 export default function WarRoomChatPanel({ incidentId, currentUser, isVisible }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
@@ -54,7 +62,8 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
             ...m,
             sender: m.sender_name || m.sender,
             type: m.sender === currentUser.employee_id ? 'me' : (m.type === 'system' ? 'system' : 'other'),
-            time: formatKst(m.timestamp)
+            time: formatKst(m.timestamp),
+            avatar_url: cleanProfilePic(m.profile_picture)
           })));
         }
         if (partRes.ok) {
@@ -113,7 +122,8 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                   role: data.role,
                   text: data.text,
                   time: formatKst(data.timestamp),
-                  timestamp: data.timestamp
+                  timestamp: data.timestamp,
+                  avatar_url: cleanProfilePic(data.profile_picture)
                 }];
               });
               break;
@@ -218,43 +228,66 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
           </div>
         </div>
 
-        {messages.filter(m => m.type !== 'ai' && m.type !== 'ai_analysis' && m.type !== 'system' && m.role !== 'assistant' && m.role !== 'AI Expert').map((msg, idx) => (
-          <div 
-            key={msg.id || idx} 
-            className={`flex w-full ${msg.type === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-1 duration-300 mb-2`}
-          >
-            <div className={`flex max-w-[85%] ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'} items-end gap-2`}>
-              {/* Avatar */}
-              {msg.type !== 'me' && (
-                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[11px] font-bold shrink-0 border border-white/10 shadow-sm self-start mt-0.5">
-                  {(msg.sender_name || msg.sender)?.[0] || 'U'}
-                </div>
-              )}
+        {messages
+          .filter(m => 
+            m.type !== 'ai' && 
+            m.type !== 'ai_analysis' && 
+            m.type !== 'system' && 
+            m.role !== 'assistant' && 
+            m.role !== 'AI Expert' &&
+            !/Agent/i.test(m.sender_name || m.sender || '') &&
+            !/Agent/i.test(m.role || '')
+          )
+          .map((msg, idx) => {
+            const avatarSrc = msg.avatar_url || (msg.profile_picture ? (msg.profile_picture.startsWith('http') || msg.profile_picture.startsWith('data:image') ? msg.profile_picture : `https://sguardai.khcho0421.workers.dev${msg.profile_picture}`) : null);
+            return (
+              <div 
+                key={msg.id || idx} 
+                className={`flex w-full ${msg.type === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-1 duration-300 mb-2`}
+              >
+                <div className={`flex max-w-[85%] ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'} items-end gap-2`}>
+                  {/* Avatar */}
+                  {msg.type !== 'me' && (
+                    <div className="relative w-8 h-8 shrink-0 self-start mt-0.5">
+                      {avatarSrc ? (
+                        <img 
+                          src={avatarSrc} 
+                          alt={msg.sender || 'User'} 
+                          className="w-8 h-8 rounded-full object-cover border border-white/10 shadow-sm"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex'; }}
+                        />
+                      ) : null}
+                      <div className={`w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[11px] font-bold border border-white/10 shadow-sm ${avatarSrc ? 'hidden' : 'flex'}`}>
+                        {(msg.sender_name || msg.sender)?.[0] || 'U'}
+                      </div>
+                    </div>
+                  )}
 
-              <div className={`flex flex-col ${msg.type === 'me' ? 'items-end' : 'items-start'} max-w-full`}>
-                {msg.type !== 'me' && (
-                  <span className="text-[10px] text-slate-500 mb-1 px-1 font-medium">{msg.sender_name || msg.sender}</span>
-                )}
-                
-                <div className={`flex items-end gap-1.5 ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  {/* 말풍선 본체 */}
-                  <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.4] shadow-md break-words whitespace-pre-wrap
-                    ${msg.type === 'me' 
-                      ? 'bg-[#0038a8] text-white rounded-tr-none' 
-                      : 'bg-[#2a2f3a] text-slate-100 rounded-tl-none border border-white/5'
-                    }`}
-                  >
-                    {msg.text}
-                  </div>
-                  {/* 메타데이터 (시간 등) - 세로형 Flex 컨테이너 */}
-                  <div className={`flex flex-col justify-end shrink-0 select-none pb-0.5 ${msg.type === 'me' ? 'items-end mr-0.5' : 'items-start ml-0.5'}`}>
-                    <span className="text-[9px] font-mono text-slate-400 leading-none">{msg.time}</span>
+                  <div className={`flex flex-col ${msg.type === 'me' ? 'items-end' : 'items-start'} max-w-full`}>
+                    {msg.type !== 'me' && (
+                      <span className="text-[10px] text-slate-500 mb-1 px-1 font-medium">{msg.sender_name || msg.sender}</span>
+                    )}
+                    
+                    <div className={`flex items-end gap-1.5 ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      {/* 말풍선 본체 */}
+                      <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.4] shadow-md break-words whitespace-pre-wrap
+                        ${msg.type === 'me' 
+                          ? 'bg-[#0038a8] text-white rounded-tr-none' 
+                          : 'bg-[#2a2f3a] text-slate-100 rounded-tl-none border border-white/5'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                      {/* 메타데이터 (시간 등) - 세로형 Flex 컨테이너 */}
+                      <div className={`flex flex-col justify-end shrink-0 select-none pb-0.5 ${msg.type === 'me' ? 'items-end mr-0.5' : 'items-start ml-0.5'}`}>
+                        <span className="text-[9px] font-mono text-slate-400 leading-none">{msg.time}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
+            );
+          })}
       </div>
 
       {/* Input Area */}
