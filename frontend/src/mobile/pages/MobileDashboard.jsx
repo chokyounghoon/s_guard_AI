@@ -1849,88 +1849,35 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ml-0.5 transition-all"
                 style={{ background: activeLogTab === 'human' ? 'rgba(0,229,255,0.2)' : 'transparent', color: activeLogTab === 'human' ? '#00e5ff' : '#64748b', border: activeLogTab === 'human' ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.15)', textShadow: activeLogTab === 'human' ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>
                 Chat
-              </button>
-              {(() => {
-                const isDone = selectedSms && Number(selectedSms.is_analyzed) >= 1;
-                const isLive = showAgentPanel && agentMessages.length > 0 && !isDone;
-                return (
-                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg ml-1"
-                    style={{ border: `1px solid ${isLive ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, background: isLive ? 'rgba(0,229,255,0.1)' : 'transparent', boxShadow: isLive ? '0 0 8px rgba(0,229,255,0.3)' : 'none' }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: isDone ? '#64748b' : isLive ? '#00e5ff' : '#64748b', boxShadow: isLive ? '0 0 6px #00e5ff' : 'none' }} />
-                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#94a3b8' : isLive ? '#00e5ff' : '#94a3b8' }}>
-                      {isDone ? 'DONE' : isLive ? 'LIVE' : 'IDLE'}
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col" style={{ minHeight: 360 }}>
-            {showAgentPanel || selectedSms ? (
-              activeLogTab === 'ai' ? (
-                <AgentDiscussionPanel
-                  messages={agentMessages}
-                  isVisible={true}
-                  embedded={true}
-                  incident={selectedSms}
-                  onClose={() => { setShowAgentPanel(false); setSelectedSms(null); }}
-                />
-              ) : typeof document !== 'undefined' ? createPortal(
-                <div className="fixed inset-0 z-[500] bg-[#0a0c12] flex flex-col h-[100dvh]">
-                  {/* 헤더 영역 (닫기 버튼 포함) */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 bg-[#0a0c12] z-10">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 flex items-center justify-center border border-[#00e5ff]/30">
-                        <MessageSquare className="w-4 h-4 text-[#00e5ff]" />
-                      </div>
-                      <div>
-                        <h2 className="text-sm font-black text-slate-200 uppercase tracking-wider">War-Room Chat</h2>
-                        <p className="text-[10px] text-slate-400 font-mono">Expert Advisor Collaboration</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => setActiveLogTab('ai')}
-                      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-xs font-bold active:scale-95 transition-all"
-                    >
-                      닫기
-                    </button>
-                  </div>
-                  {/* 채팅 패널 영역 (스크롤을 여기서 처리) */}
-                  <div className="flex-1 min-h-0 relative">
-                    <WarRoomChatPanel incidentId={selectedSms?.inc_id} currentUser={userProfile || {}} isVisible={true} />
-                  </div>
-                </div>,
-                document.body
-              ) : null
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center opacity-30" style={{ minHeight: 240 }}>
-                <Brain size={32} className="text-[#00e5ff] mb-3 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]" />
-                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">SMS를 선택하면 분석이 시작됩니다</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── PANEL 4: 장애 처리 현황 (Bento Card) ── */}
+                      {/* ── PANEL 4: 장애 처리 현황 (Bento Card) ── */}
         {(() => {
           const isActive = !!selectedIncidentIdFlow;
+          const isClosedFlow = incidentWorkflowSteps.some(s => s.id === 'KNOWLEDGE');
           return (
         <div className="md:col-span-1 transition-all duration-300 flex flex-col shadow-2xl" style={{
           background: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
-          border: `1px solid ${isActive ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`,
+          border: `1px solid ${isActive ? (isClosedFlow ? '#10b981' : '#00e5ff') : 'rgba(255,255,255,0.15)'}`,
           borderRadius: 24,
           overflow: 'hidden',
           boxShadow: isActive
-            ? '0 0 25px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+            ? (isClosedFlow ? '0 0 20px rgba(16,185,129,0.2), inset 0 1px 0 rgba(255,255,255,0.1)' : '0 0 25px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.1)')
             : '0 8px 24px -5px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
           backdropFilter: 'blur(20px)'
         }}>
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
-              <Activity size={16} style={{ color: selectedIncidentIdFlow ? '#00e5ff' : '#94a3b8', filter: selectedIncidentIdFlow ? 'drop-shadow(0 0 8px #00e5ff)' : 'none' }} />
+              <Activity size={16} style={{ color: selectedIncidentIdFlow ? (isClosedFlow ? '#10b981' : '#00e5ff') : '#94a3b8', filter: selectedIncidentIdFlow && !isClosedFlow ? 'drop-shadow(0 0 8px #00e5ff)' : 'none' }} />
               <span className="text-[12px] font-black text-slate-200 uppercase tracking-[0.15em]">장애 처리 현황</span>
             </div>
-            <span className="text-[10px] font-bold text-[#00e5ff] bg-[#00e5ff]/10 border border-[#00e5ff]/30 px-2.5 py-0.5 rounded-full">LIVE FLOW</span>
+            {isClosedFlow ? (
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-inner">
+                <Check size={12} />COMPLETED FLOW
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-[#00e5ff] bg-[#00e5ff]/10 border border-[#00e5ff]/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-pulse shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00e5ff] animate-ping" />LIVE FLOW
+              </span>
+            )}
           </div>
 
           {/* 가로 프로그레스 바 & 활동 링 */}
@@ -1939,22 +1886,25 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             const ragStep = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
             const warStep = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
             const knwStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-            const diff = (a, b) => { if (!a) return '-'; const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp); const m = Math.floor(ms/60000), s2 = Math.floor((ms%60000)/1000); return m > 0 ? `${m}m${s2}s` : `${s2}s`; };
+            const diffObj = (a, b) => { if (!a) return null; const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp); const m = Math.floor(ms/60000), s2 = Math.floor((ms%60000)/1000); return { text: m > 0 ? `${m}m ${s2}s` : `${s2}s`, min: m }; };
 
             const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - new Date(smsStep?.timestamp || currentTime);
             const isClosed = !!knwStep;
 
             const steps = [
-              { id: 'SMS', label: '인지', done: !!ragStep || !!knwStep, active: !!smsStep && !ragStep, time: diff(smsStep, ragStep) },
-              { id: 'RAG', label: '분석', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, time: diff(ragStep, warStep) },
-              { id: 'WARROOM', label: '워룸', done: !!knwStep, active: !!warStep && !knwStep, time: diff(warStep, knwStep) },
-              { id: 'KNOWLEDGE', label: '완료', done: !!knwStep, active: !!knwStep, time: diff(smsStep, knwStep) }
+              { id: 'SMS', label: '인지', done: !!ragStep || !!knwStep, active: !!smsStep && !ragStep, dObj: diffObj(smsStep, ragStep) },
+              { id: 'RAG', label: '분석', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, dObj: diffObj(ragStep, warStep) },
+              { id: 'WARROOM', label: '워룸', done: !!knwStep, active: !!warStep && !knwStep, dObj: diffObj(warStep, knwStep) },
+              { id: 'KNOWLEDGE', label: '완료', done: !!knwStep, active: !!knwStep, dObj: diffObj(smsStep, knwStep) }
             ];
 
             const radius = 70;
             const circum = 2 * Math.PI * radius;
             const progressPct = knwStep ? 100 : warStep ? 75 : ragStep ? 50 : smsStep ? 25 : 0;
             const offset = circum - (progressPct / 100) * circum;
+
+            const ringColor = isClosed ? '#10b981' : '#00e5ff';
+            const ringShadow = isClosed ? 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.3))' : 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.5))';
 
             return (
               <div className="flex flex-col">
@@ -1964,13 +1914,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   {steps.map((st, i) => {
                     const isDone = st.done;
                     const isActive = st.active;
+                    const isBottleneck = st.dObj?.min > 60;
                     return (
                       <div key={st.id} className="relative z-10 flex flex-col items-center gap-1.5">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? 'bg-[#00e5ff] text-black shadow-[0_0_12px_#00e5ff]' : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
                           {isDone ? <CheckCircle2 size={16} /> : i + 1}
                         </div>
-                        <span className={`text-[11px] font-black tracking-tight ${isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
-                        {st.time && st.time !== '-' && <span className="text-[9px] font-mono text-slate-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">{st.time}</span>}
+                        <span className={`text-[11px] font-black tracking-tight ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
+                        {st.dObj && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded shadow-sm font-mono ${isBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-slate-900 text-[#ffffff] border border-white/20'}`}>
+                            {st.dObj.text}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
@@ -1982,19 +1937,19 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
                       <defs>
                         <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#00e5ff" />
-                          <stop offset="100%" stopColor="#00e5ff" />
+                          <stop offset="0%" stopColor={ringColor} />
+                          <stop offset="100%" stopColor={isClosed ? '#059669' : '#00e5ff'} />
                         </linearGradient>
                       </defs>
                       <circle cx="90" cy="90" r="70" stroke="#1e293b" strokeWidth="12" fill="none" />
-                      <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter="drop-shadow(0 0 10px rgba(0, 229, 255, 0.5))" />
+                      <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter={ringShadow} />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">MTTR TIMER</span>
-                      <span className="text-3xl font-black font-mono tracking-tighter tabular-nums" style={{ color: isClosed ? '#00e5ff' : '#00e5ff', textShadow: `0 0 15px ${isClosed ? 'rgba(0,229,255,0.8)' : 'rgba(0,229,255,0.8)'}` }}>
+                      <span className="text-3xl font-black font-mono tracking-tighter tabular-nums" style={{ color: ringColor, textShadow: isClosed ? '0 0 10px rgba(16,185,129,0.3)' : '0 0 15px rgba(0,229,255,0.8)' }}>
                         {formatDuration(durationMs)}
                       </span>
-                      <span className="text-[10px] font-bold mt-1 px-2.5 py-0.5 rounded-full border border-white/10 bg-white/5 text-slate-300 shadow-inner">
+                      <span className={`text-[11px] font-bold mt-2 px-3 py-1 rounded-full border shadow-inner ${isClosed ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-300'}`}>
                         {isClosed ? '조치 완료 (SAFE)' : '실시간 대응 중'}
                       </span>
                     </div>
@@ -2022,13 +1977,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                   <button
                     onClick={() => setShowFullTimeline(!showFullTimeline)}
-                    className="skeuo-btn w-full py-3 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl text-slate-300 font-bold text-xs flex items-center justify-between transition-all"
+                    className="skeuo-btn w-full py-3.5 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl text-slate-300 font-bold text-xs flex items-center justify-between transition-all shadow-sm"
                   >
                     <span className="flex items-center gap-2">
-                      <Clock size={15} className="text-[#00e5ff]" />
+                      <Clock size={16} className="text-[#00e5ff]" />
                       전체 스텝 상세 히스토리 타임라인 {showFullTimeline ? '접기' : '보기'}
                     </span>
-                    {showFullTimeline ? <ChevronUp size={18} className="text-[#00e5ff]" /> : <ChevronDown size={18} className="text-slate-400" />}
+                    {showFullTimeline ? <ChevronUp size={22} className="text-[#00e5ff] shrink-0 ml-auto" /> : <ChevronDown size={22} className="text-slate-300 shrink-0 ml-auto" />}
                   </button>
                 </div>
               </div>
@@ -2040,7 +1995,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             <div className="p-5 flex-1">
               {selectedIncidentIdFlow ? (
               <div className="relative">
-                <div className="absolute left-[9px] top-0 bottom-0 w-px" style={{ background: 'rgba(0,229,255,0.3)' }} />
+                <div className="absolute left-[9px] top-0 bottom-0 w-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
                 {(() => {
                   const firstPendingIdx = FLOW_STEPS.findIndex(step => {
                     if (step.id === 'RAG_AGENT') {
@@ -2069,12 +2024,61 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     const isCompleted=!!stepData, isNextStep=sIdx===firstPendingIdx;
                     let intervalText=null, intervalMinutes=0;
                     if(isCompleted&&sIdx<FLOW_STEPS.length-1){const nextId=FLOW_STEPS[sIdx+1].id;let next=incidentWorkflowSteps.find(s=>s.id===nextId);if(!next&&nextId==='RAG_AGENT')next=incidentWorkflowSteps.find(s=>s.id==='RAG')||incidentWorkflowSteps.find(s=>s.id==='AGENT');if(next){const ms=new Date(next.timestamp)-new Date(stepData.timestamp);const m=Math.floor(ms/60000),sec=Math.floor((ms%60000)/1000);intervalMinutes=m;intervalText=m>60?`⏱ ${Math.floor(m/60)}h ${m%60}m`:m>0?`⏱ ${m}m ${sec}s`:`⏱ ${sec}s`;}else if(sIdx===firstPendingIdx-1){const ms=currentTime-new Date(stepData.timestamp);const m=Math.floor(ms/60000),sec=Math.floor((ms%60000)/1000);intervalMinutes=m;intervalText=m>60?`⏱ ${Math.floor(m/60)}h ${m%60}m 경과`:m>0?`⏱ ${m}m ${sec}s 경과`:`⏱ ${sec}s 경과`;}}
+                    const isBottleneck = intervalMinutes > 60;
                     const pb = intervalMinutes===0?24:Math.min(160,Math.max(24,Math.round(24+intervalMinutes*0.2)));
                     return (
                       <div key={step.id} className="relative pl-10 transition-all duration-300" style={{ paddingBottom: pb+'px', opacity: !isCompleted&&!isNextStep ? 0.3 : 1 }}>
-                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 w-px" style={{ background: isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.1)' }} />}
-                        <div className="absolute left-0 top-0 w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-md" style={{ background: isCompleted ? 'rgba(0,229,255,0.2)' : isNextStep ? 'rgba(0,229,255,0.2)' : '#0a1c20', border: `1px solid ${isCompleted ? '#00e5ff' : isNextStep ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, boxShadow: isCompleted ? '0 0 10px rgba(0,229,255,0.4)' : isNextStep ? '0 0 10px rgba(0,229,255,0.4)' : 'none' }}>
-                          {isCompleted ? <CheckCircle2 size={10} style={{ color: '#00e5ff' }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#00e5ff' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#475569' }} />}
+                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 transition-all" style={{ width: isBottleneck ? '2px' : '1px', background: isBottleneck ? '#fb923c' : isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.1)', boxShadow: isBottleneck ? '0 0 8px rgba(251,146,60,0.5)' : 'none' }} />}
+                        <div className="absolute left-0 top-0 w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-md transition-all" style={{ background: isBottleneck ? 'rgba(251,146,60,0.2)' : isCompleted ? 'rgba(0,229,255,0.15)' : isNextStep ? 'rgba(0,229,255,0.2)' : '#0a1c20', border: `1px solid ${isBottleneck ? '#fb923c' : isCompleted ? '#00e5ff' : isNextStep ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, boxShadow: isBottleneck ? '0 0 10px rgba(251,146,60,0.4)' : isCompleted ? 'none' : isNextStep ? '0 0 10px rgba(0,229,255,0.4)' : 'none' }}>
+                          {isCompleted ? <CheckCircle2 size={10} style={{ color: isBottleneck ? '#fb923c' : '#00e5ff', opacity: isBottleneck ? 1 : 0.8 }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#00e5ff' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#475569' }} />}
+                        </div>
+                        <div className="ml-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[13px] font-bold" style={{ color: isBottleneck ? '#fb923c' : isCompleted ? '#fff' : isNextStep ? '#00e5ff' : '#64748b', textShadow: isNextStep ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>{step.label}</span>
+                            {isNextStep && <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse" style={{ color: '#00e5ff', border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.15)', boxShadow: '0 0 8px rgba(0,229,255,0.4)' }}>진행중</span>}
+                            {isCompleted && <span className="text-[10px] font-mono text-slate-400">{formatYYMMDD(stepData.timestamp)}</span>}
+                          </div>
+                          <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? '#94a3b8' : isNextStep ? '#cbd5e1' : '#475569' }}>
+                            {isCompleted ? stepData.detail : isNextStep ? '처리 진행 중...' : '대기 중'}
+                          </p>
+                          {intervalText && sIdx < FLOW_STEPS.length-1 && (
+                            <span className="inline-block mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm font-mono" style={{ color: isBottleneck ? '#fb923c' : '#ffffff', border: `1px solid ${isBottleneck ? '#fb923c' : 'rgba(255,255,255,0.3)'}`, background: isBottleneck ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.1)' }}>{intervalText}</span>
+                          )}
+                          {(isCompleted||isNextStep)&&step.id==='WARROOM'&&(()=>{
+                            const roomExists=warRooms.some(r=>String(r.id)===String(selectedIncidentIdFlow)||String(r.inc_id)===String(selectedIncidentIdFlow));
+                            return roomExists?(
+                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)]" style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }}>
+                                <Zap size={12} />워룸 이동<ChevronRight size={12} />
+                              </button>
+                            ):(
+                               <button 
+                                 onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
+                                 disabled={isOpeningWarRoom}
+                                 className={`mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)] ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                                 style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }} 
+                               > 
+                                 <Users size={12} />
+                                 {isOpeningWarRoom ? '개설 진행 중...' : '워룸 개설하기'} 
+                               </button>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center py-16 opacity-30" style={{ minHeight: 240 }}>
+                <Activity size={32} className="text-[#00e5ff] mb-3 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]" />
+                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">인시던트를 선택하면 활성화됩니다</p>
+              </div>
+            )}
+            </div>
+          </div>
+        </div>
+          );
+        })()}            {isCompleted ? <CheckCircle2 size={10} style={{ color: '#00e5ff' }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#00e5ff' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#475569' }} />}
                         </div>
                         <div className="ml-0">
                           <div className="flex items-center gap-2 mb-1">
