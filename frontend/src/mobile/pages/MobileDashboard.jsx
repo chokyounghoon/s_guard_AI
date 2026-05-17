@@ -148,7 +148,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [messages, setMessages] = useState([]); 
   const [allNotifications, setAllNotifications] = useState([]); 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showFullTimeline, setShowFullTimeline] = useState(false);
+  const [showFullTimeline, setShowFullTimeline] = useState(true);
   const { refreshCodes } = useCodebook();
   
   // 🌐 API Configuration (Production Worker)
