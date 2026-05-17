@@ -251,16 +251,19 @@ const ChatMessageRow = React.memo(({
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1 text-slate-400 text-[10px] font-mono shrink-0">
-            <Sparkles className="w-3 h-3 text-[#00e5ff]" />
-            <span>{msg.time}</span>
+          <div className="flex items-center gap-2 text-slate-400 text-[10px] font-mono shrink-0">
+            <div className="flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-[#00e5ff]" />
+              <span>{msg.time}</span>
+            </div>
             {onDelete && (
               <button 
                 onClick={() => onDelete(msg.seq || msg.id)}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors ml-1"
+                className="px-2.5 py-1 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 hover:text-red-300 active:scale-95 transition-all ml-1 flex items-center gap-1 shadow-[0_0_12px_rgba(239,68,68,0.25)] font-sans font-bold text-xs cursor-pointer z-10"
                 title="메시지 삭제"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5 text-red-400 stroke-[3]" />
+                <span>삭제</span>
               </button>
             )}
           </div>

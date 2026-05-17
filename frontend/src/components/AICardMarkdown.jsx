@@ -26,13 +26,13 @@ const AICardMarkdown = ({ text }) => {
           ),
           h2: ({ children }) => (
             <h2 className="text-base sm:text-lg font-black text-[#00ff88] flex items-center gap-2 mt-5 mb-2.5 pb-1 border-b border-[#00ff88]/20">
-              <div className="w-1.5 h-4 bg-[#00ff88] rounded-full shrink-0" />
+              <span className="w-1.5 h-4 bg-[#00ff88] rounded-full shrink-0 inline-block" />
               <span>{children}</span>
             </h2>
           ),
           h3: ({ children }) => (
             <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-1.5 mt-4 mb-2">
-              <div className="w-1.5 h-1.5 bg-[#00e5ff] rounded-full shrink-0" />
+              <span className="w-1.5 h-1.5 bg-[#00e5ff] rounded-full shrink-0 inline-block" />
               <span>{children}</span>
             </h3>
           ),
@@ -43,16 +43,16 @@ const AICardMarkdown = ({ text }) => {
           ),
           em: ({ children }) => <span className="text-slate-300 italic font-medium">{children}</span>,
           p: ({ children }) => (
-            <p className="my-2.5 text-[14px] sm:text-[15px] leading-[1.65] text-slate-100 break-words whitespace-pre-wrap">
+            <div className="my-2.5 text-[14px] sm:text-[15px] leading-[1.65] text-slate-100 break-words whitespace-pre-wrap">
               {children}
-            </p>
+            </div>
           ),
           ul: ({ children }) => <ul className="space-y-2 my-3 pl-2">{children}</ul>,
           ol: ({ children }) => <ol className="space-y-2 my-3 pl-2 list-decimal list-inside">{children}</ol>,
           li: ({ children }) => (
             <li className="flex items-start gap-2 text-[14px] sm:text-[15px] text-slate-200 leading-relaxed">
-              <div className="mt-2 w-1.5 h-1.5 rounded-full bg-[#00e5ff] shrink-0 shadow-[0_0_6px_rgba(0,229,255,0.8)]" />
-              <div className="flex-1 min-w-0">{children}</div>
+              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[#00e5ff] shrink-0 shadow-[0_0_6px_rgba(0,229,255,0.8)] inline-block" />
+              <span className="flex-1 min-w-0 block">{children}</span>
             </li>
           ),
           table: ({ children }) => (
@@ -77,13 +77,13 @@ const AICardMarkdown = ({ text }) => {
           ),
           code: ({ inline, children }) => (
             inline ? (
-              <code className="bg-[#00e5ff]/15 text-[#00e5ff] font-mono font-bold px-1.5 py-0.5 rounded text-xs border border-[#00e5ff]/30">
+              <span className="bg-[#00e5ff]/15 text-[#00e5ff] font-mono font-bold px-1.5 py-0.5 rounded text-xs border border-[#00e5ff]/30 inline-block">
                 {children}
-              </code>
+              </span>
             ) : (
-              <div className="my-3 rounded-xl overflow-hidden border border-white/10 bg-black/80 font-mono text-xs text-emerald-400 p-4 overflow-x-auto shadow-2xl">
-                <pre>{children}</pre>
-              </div>
+              <pre className="my-3 rounded-xl border border-white/10 bg-black/80 font-mono text-xs text-emerald-400 p-4 overflow-x-auto shadow-2xl block">
+                <code>{children}</code>
+              </pre>
             )
           )
         }}
