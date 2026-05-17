@@ -912,16 +912,7 @@ export default function LoginPage() {
                 <button type="button" onClick={() => setState(S.RESET_A)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.4)', fontSize:12, cursor:'pointer', fontWeight:600 }}>비밀번호 찾기</button>
               </div>
               
-              <div style={{ display:'flex', gap:8, marginTop: isShrink ? 0 : 8 }}>
-                <button type="button" onClick={() => setShowManual(true)}
-                  style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
-                  <Download size={12} />Android S-bridge
-                </button>
-                <button type="button" onClick={() => setShowIosManual(true)}
-                  style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'9px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
-                  <Apple size={12} />iOS S-bridge
-                </button>
-              </div>
+
 
               <div style={{ marginTop: isShrink ? 4 : 12, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 20 }}>
@@ -1096,7 +1087,7 @@ export default function LoginPage() {
           <div style={{ marginTop:'auto', paddingTop:32, textAlign:'center' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, marginBottom:6 }}>
               <div style={{ width:18, height:18, borderRadius:'50%', overflow:'hidden', flexShrink:0 }}>
-                <img src="/shinhan_logo.png" alt="신한DS" style={{ width:18, height:18, objectFit:'cover', display:'block', opacity:0.35 }} />
+                <img src="/icons/icon-192.png" alt="신한DS" style={{ width:18, height:18, objectFit:'cover', display:'block', opacity:0.5 }} />
               </div>
               <span style={{ color:'rgba(255,255,255,0.22)', fontSize:11, fontWeight:600, letterSpacing:'0.05em' }}>신한DS</span>
             </div>

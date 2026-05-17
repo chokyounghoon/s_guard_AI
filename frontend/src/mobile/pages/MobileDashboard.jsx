@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Check } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Check, Download, Apple, SmartphoneNfc } from 'lucide-react';
 import AgentDiscussionPanel from '../../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../../components/EmergencyActionModal';
 import AiInsightPanel from '../../components/AiInsightPanel';
@@ -1722,7 +1722,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
 
                   {/* Main Contents: SMS Message */}
-                  <p className="text-[15px] font-bold leading-relaxed break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
+                  <p className="text-[14px] font-bold leading-relaxed break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
                     {msg.message}
                   </p>
 
@@ -2231,6 +2231,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
   const [teamMap, setTeamMap]           = useState({}); // honbu.code   → depth3[]
   const [partMap, setPartMap]           = useState({}); // team.code    → depth4[]
   const [subpartMap, setSubpartMap]     = useState({}); // part.code    → depth5[]
+  const [showIosManual, setShowIosManual] = useState(false);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -2715,6 +2716,23 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
 
             <div className="pt-6 pb-2 flex flex-col space-y-3 shrink-0 border-t border-white/5">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { window.location.href = '/s-bridge.apk?v=' + Date.now(); }}
+                  className="flex-1 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/40 hover:to-cyan-600/40 text-[#00e5ff] font-black py-3.5 px-3 rounded-2xl transition-all flex items-center justify-center gap-2 border border-[#00e5ff]/30 shadow-[0_4px_20px_rgba(0,229,255,0.2)] active:scale-[0.98]"
+                >
+                  <Download className="w-4 h-4 shrink-0" />
+                  <span className="text-[11px] sm:text-xs tracking-wider whitespace-nowrap">Android S-bridge</span>
+                </button>
+                <button
+                  onClick={() => setShowIosManual(true)}
+                  className="flex-1 bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/40 hover:to-pink-600/40 text-purple-300 hover:text-white font-black py-3.5 px-3 rounded-2xl transition-all flex items-center justify-center gap-2 border border-purple-500/30 shadow-[0_4px_20px_rgba(168,85,247,0.2)] active:scale-[0.98]"
+                >
+                  <Apple className="w-4 h-4 shrink-0" />
+                  <span className="text-[11px] sm:text-xs tracking-wider whitespace-nowrap">iOS S-bridge</span>
+                </button>
+              </div>
+
               <button
                 onClick={handleSave}
                 className="w-full bg-[#00e5ff] hover:bg-[#00e5ff]/80 text-black font-black py-4 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all transform active:scale-[0.98]"
@@ -2737,6 +2755,82 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             )}
           </div>
         </div>
+
+        {/* iOS 단축어 설정 매뉴얼 모달 */}
+        {showIosManual && (
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+            <div className="relative w-full max-w-md bg-[#0b1322] border border-purple-500/40 rounded-[28px] p-6 sm:p-8 shadow-[0_0_50px_rgba(168,85,247,0.3)] flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10 shrink-0">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600/30 to-pink-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0 shadow-inner shadow-purple-500/20">
+                    <Apple className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight whitespace-nowrap">iOS 단축어 연동 매뉴얼</h3>
+                </div>
+                <button 
+                  onClick={() => setShowIosManual(false)} 
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto pr-2 space-y-6 flex-1 text-slate-300 text-xs sm:text-sm custom-scrollbar">
+                <div className="space-y-2">
+                  <h4 className="flex items-center gap-2 text-purple-400 font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-purple-400 text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">1</span>
+                    단축어 프로파일 다운로드
+                  </h4>
+                  <p className="pl-7 leading-relaxed text-slate-400">
+                    하단의 <span className="text-white font-bold">단축어 프로파일 다운로드</span> 버튼을 탭하여 <span className="text-white font-bold">S-BRIDGE-iOS.shortcut</span> 파일을 실행하고 내 단축어에 추가합니다.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="flex items-center gap-2 text-purple-400 font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-purple-400 text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">2</span>
+                    개인용 자동화(Automation) 생성
+                  </h4>
+                  <p className="pl-7 leading-relaxed text-slate-400">
+                    아이폰 <span className="text-white font-bold">단축어(Shortcuts)</span> 앱 하단 <span className="text-white font-bold">자동화</span> 탭에서 [+] 버튼을 눌러 새 자동화를 생성합니다. 조건으로 <span className="text-white font-bold">메시지</span>를 선택하고, '메시지 포함 내용'에 <span className="text-purple-300 font-bold">[Web발신] 또는 알림, 신한, 경보</span> 등 수신할 문자의 공통 키워드를 필수로 입력합니다. 반드시 <span className="text-purple-300 font-bold">즉시 실행</span>을 체크해 주세요.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="flex items-center gap-2 text-emerald-400 font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-emerald-400 text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">3</span>
+                    무인 백그라운드 동작 설정
+                  </h4>
+                  <p className="pl-7 leading-relaxed text-slate-400">
+                    동작으로 추가한 <span className="text-white font-bold">S-BRIDGE-iOS</span> 단축어를 연결한 뒤, <span className="text-red-400 font-bold">실행 전에 묻기</span> 및 <span className="text-red-400 font-bold">실행되면 알림</span> 스위치를 꺼서 무인 연동을 완료합니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-white/10 shrink-0">
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = '/S-BRIDGE-iOS.shortcut?v=' + Date.now();
+                    link.download = 'S-BRIDGE-iOS.shortcut';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setShowIosManual(false);
+                  }}
+                  className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_10px_25px_rgba(168,85,247,0.4)] active:scale-95 transition-all truncate border border-purple-400/30"
+                >
+                  <Download className="w-5 h-5 shrink-0" />
+                  <span className="truncate tracking-wide font-black">iOS 단축어 프로파일 다운로드</span>
+                </button>
+                <p className="text-[11px] text-center text-slate-500 mt-3.5">
+                  iOS 보안 정책에 따라 사파리(Safari) 브라우저에서의 다운로드를 권장합니다.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

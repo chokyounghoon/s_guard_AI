@@ -279,33 +279,7 @@ export default function MobileLoginPage() {
 
       {/* 하단 설치 및 다운로드 영역 */}
       <div className="w-full max-w-sm z-10 mt-12 space-y-5 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-        <div className="flex flex-col items-center mb-2">
-          <h3 className="text-sm font-black text-slate-400 tracking-tight">s-bridge 설치</h3>
-          <div className="w-8 h-1 bg-blue-600/30 rounded-full mt-1" />
-        </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            onClick={() => { window.location.href = '/s-bridge.apk?v=' + Date.now(); }}
-            className="flex flex-col items-center gap-3 p-5 rounded-[2.5rem] bg-white/5 border border-white/5 active-scale group shadow-xl"
-          >
-            <div className="p-3 rounded-2xl bg-blue-600/10 border border-blue-500/20 group-hover:scale-110 transition-transform shadow-lg">
-              <Download className="w-6 h-6 text-blue-400" />
-            </div>
-            <span className="text-[12px] font-black text-slate-300">Android s-bridge</span>
-          </button>
-          
-          <button
-            onClick={() => setShowIosManual(true)}
-            className="flex flex-col items-center gap-3 p-5 rounded-[2rem] bg-white/5 border border-white/5 active-scale group shadow-xl"
-          >
-            <div className="p-3 rounded-2xl bg-purple-600/10 border border-purple-500/20 group-hover:scale-110 transition-transform shadow-lg">
-              <SmartphoneNfc className="w-6 h-6 text-purple-400" />
-            </div>
-            <span className="text-[12px] font-black text-slate-300">iOS s-bridge</span>
-          </button>
-        </div>
-        
         <div className="text-center pt-4">
           <p className="text-[11px] text-slate-600 font-black tracking-widest opacity-60">© 2026 SHINHAN DS CORP. S-GUARD OPERATIONS</p>
         </div>
