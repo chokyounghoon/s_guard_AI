@@ -2078,55 +2078,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
         </div>
           );
-        })()}            {isCompleted ? <CheckCircle2 size={10} style={{ color: '#00e5ff' }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#00e5ff' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#475569' }} />}
-                        </div>
-                        <div className="ml-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-bold" style={{ color: isCompleted ? '#fff' : isNextStep ? '#00e5ff' : '#64748b', textShadow: isNextStep ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>{step.label}</span>
-                            {isNextStep && <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse" style={{ color: '#00e5ff', border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.15)', boxSadow: '0 0 8px rgba(0,229,255,0.4)' }}>진행중</span>}
-                            {isCompleted && <span className="text-[10px] font-mono text-slate-400">{formatYYMMDD(stepData.timestamp)}</span>}
-                          </div>
-                          <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? '#94a3b8' : isNextStep ? '#cbd5e1' : '#475569' }}>
-                            {isCompleted ? stepData.detail : isNextStep ? '처리 진행 중...' : '대기 중'}
-                          </p>
-                          {intervalText && sIdx < FLOW_STEPS.length-1 && (
-                            <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ color: intervalMinutes>60?'#00e5ff':intervalMinutes>10?'#00e5ff':'#00e5ff', border: `1px solid ${intervalMinutes>60?'#00e5ff':intervalMinutes>10?'#00e5ff':'#00e5ff'}`, background: 'transparent' }}>{intervalText}</span>
-                          )}
-                          {(isCompleted||isNextStep)&&step.id==='WARROOM'&&(()=>{
-                            const roomExists=warRooms.some(r=>String(r.id)===String(selectedIncidentIdFlow)||String(r.inc_id)===String(selectedIncidentIdFlow));
-                            return roomExists?(
-                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)]" style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }}>
-                                <Zap size={12} />워룸 이동<ChevronRight size={12} />
-                              </button>
-                            ):(
-                               <button 
-                                 onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
-                                 disabled={isOpeningWarRoom}
-                                 className={`mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)] ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                                 style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }} 
-                               > 
-                                 <Users size={12} />
-                                 {isOpeningWarRoom ? '개설 진행 중...' : '워룸 개설하기'} 
-                               </button>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center py-16 opacity-30" style={{ minHeight: 240 }}>
-                <Activity size={32} className="text-[#00e5ff] mb-3 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]" />
-                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">인시던트를 선택하면 활성화됩니다</p>
-              </div>
-            )}
-            </div>
-          </div>
-        </div>
-          );
-
         })()}
 
       </div>
