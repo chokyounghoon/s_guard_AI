@@ -420,8 +420,8 @@ function AppContent() {
           activePopup={showWarRoomPopup ? 'chat' : showReportPopup ? 'inbox' : null}
           onClosePopups={() => { setShowWarRoomPopup(false); setShowReportPopup(false); }}
           initialOpenMoreMenu={sessionStorage.getItem('console_return_pending') === '1'}
-          onWarRoomClick={() => { fetchWarRooms(); setShowWarRoomPopup(true); }}
-          onReportClick={() => { fetchWarRooms(); setShowReportPopup(true); }}
+          onWarRoomClick={() => { setShowReportPopup(false); fetchWarRooms(); setShowWarRoomPopup(true); }}
+          onReportClick={() => { setShowWarRoomPopup(false); fetchWarRooms(); setShowReportPopup(true); }}
           onAiClick={() => setShowAIAssistant(true)}
           user={userProfile}
           allowedPaths={allowedPathsState}
