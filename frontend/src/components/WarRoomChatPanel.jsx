@@ -218,41 +218,38 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
           </div>
         </div>
 
-        {messages.map((msg, idx) => (
+        {messages.filter(m => m.type !== 'ai' && m.type !== 'ai_analysis' && m.type !== 'system' && m.role !== 'assistant' && m.role !== 'AI Expert').map((msg, idx) => (
           <div 
             key={msg.id || idx} 
-            className={`flex w-full ${msg.type === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-1 duration-300`}
+            className={`flex w-full ${msg.type === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-1 duration-300 mb-2`}
           >
-            <div className={`flex max-w-[85%] ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'} items-start gap-2.5`}>
+            <div className={`flex max-w-[85%] ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'} items-end gap-2`}>
               {/* Avatar */}
               {msg.type !== 'me' && (
-                <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 shadow-lg">
+                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[11px] font-bold shrink-0 border border-white/10 shadow-sm self-start mt-0.5">
                   {(msg.sender_name || msg.sender)?.[0] || 'U'}
                 </div>
               )}
 
-              <div className={`flex flex-col ${msg.type === 'me' ? 'items-end' : 'items-start'}`}>
+              <div className={`flex flex-col ${msg.type === 'me' ? 'items-end' : 'items-start'} max-w-full`}>
                 {msg.type !== 'me' && (
-                  <span className="text-[10px] text-slate-500 mb-1 px-1 font-bold">{msg.sender_name || msg.sender}</span>
+                  <span className="text-[10px] text-slate-500 mb-1 px-1 font-medium">{msg.sender_name || msg.sender}</span>
                 )}
                 
-                <div className="flex items-end gap-2">
-                  {msg.type === 'me' && (
-                     <span className="text-[9px] text-slate-600 font-bold mb-1 opacity-60">{msg.time}</span>
-                  )}
-                  <div className={`px-3 py-2 text-[13px] leading-relaxed shadow-xl break-words whitespace-pre-wrap
+                <div className={`flex items-end gap-1.5 ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  {/* 말풍선 본체 */}
+                  <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.4] shadow-md break-words whitespace-pre-wrap
                     ${msg.type === 'me' 
-                      ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm' 
-                      : msg.type === 'ai'
-                      ? 'bg-purple-600/20 text-purple-200 rounded-2xl border border-purple-500/30 font-medium'
-                      : 'bg-slate-800/80 text-slate-200 rounded-2xl rounded-tl-sm border border-white/5'
+                      ? 'bg-[#0038a8] text-white rounded-tr-none' 
+                      : 'bg-[#2a2f3a] text-slate-100 rounded-tl-none border border-white/5'
                     }`}
                   >
                     {msg.text}
                   </div>
-                  {msg.type !== 'me' && (
-                    <span className="text-[9px] text-slate-600 font-bold mb-1 opacity-60">{msg.time}</span>
-                  )}
+                  {/* 메타데이터 (시간 등) - 세로형 Flex 컨테이너 */}
+                  <div className={`flex flex-col justify-end shrink-0 select-none pb-0.5 ${msg.type === 'me' ? 'items-end mr-0.5' : 'items-start ml-0.5'}`}>
+                    <span className="text-[9px] font-mono text-slate-400 leading-none">{msg.time}</span>
+                  </div>
                 </div>
               </div>
             </div>
