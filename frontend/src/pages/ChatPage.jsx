@@ -1679,15 +1679,12 @@ export default function ChatPage() {
                 {getStatusName(roomStatus)}
               </span>
             </div>
-            {/* 2. 시스템용 인시던트 ID (작고 흐린 회색 글씨) + 상세 설명 툴팁 */}
-            <div className="flex items-center gap-2 mt-0.5 truncate text-[11px] text-slate-500 font-mono">
-              <span className="shrink-0">ID: {incidentId}</span>
-              {roomDescription && roomDescription !== roomTitle && (
-                <span className="truncate text-slate-400 font-sans" title={roomDescription}>
-                  · {roomDescription}
-                </span>
-              )}
-            </div>
+            {/* 2. 상세 설명 (시스템 ID 제거) */}
+            {roomDescription && roomDescription !== roomTitle && (
+              <div className="mt-0.5 truncate text-[11px] text-slate-400 font-sans" title={roomDescription}>
+                {roomDescription}
+              </div>
+            )}
           </div>
         </div>
         

@@ -310,7 +310,9 @@ export default function MobileChat({ user }) {
                 return titleStr.replace(/^[\d-]+\s*\|\s*/, '').trim() || '시스템 장애 대응 워룸';
               })()}
             </p>
-            <p className="text-[11px] font-mono text-slate-500 truncate mt-0.5 tracking-tight">ID: {incidentId || '-'}</p>
+            {incidentInfo?.message && incidentInfo.message !== incidentInfo.service_name && (
+              <p className="text-[11px] text-slate-400 truncate mt-0.5 tracking-tight">{incidentInfo.message}</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
