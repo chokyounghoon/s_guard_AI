@@ -499,6 +499,12 @@ const AI_AGENTS = [
   { id: 'leader', name: 'Leader Agent', label: '총괄 매니저 (Leader Agent)' }
 ];
 
+const AI_PROMPT_SUGGESTIONS = [
+  { id: 'history', title: '유사 장애 이력 찾아줘', desc: '과거 유사 사례 및 조치 이력 검색' },
+  { id: 'cause', title: '이 에러 원인 분석해줘', desc: '현재 발생한 에러 로그 및 원인 정밀 분석' },
+  { id: 'solution', title: '조치 방법 추천해줘', desc: '단계별 최적의 복구 및 해결 가이드 제시' }
+];
+
 // ── 🚀 1단계 최적화: 타이핑 시 부모 리렌더링을 0%로 만드는 완벽 격리 입력창 ──
 const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadingFile, selectedFiles }) => {
   const [localText, setLocalText] = useState('');
@@ -522,29 +528,28 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
     <div className="flex items-center gap-2 w-full relative">
       {/* Mention Menu */}
       {showMentionMenu && (
-        <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#1a2035] border border-white/10 rounded-2xl p-1.5 shadow-2xl z-[100]">
-          {AI_AGENTS.filter(a => a.name.toLowerCase().includes(mentionFilter) || a.label.toLowerCase().includes(mentionFilter)).map(agent => (
+        <div className="absolute bottom-full left-0 mb-2 w-72 bg-[#1a2035] border border-white/10 rounded-2xl p-1.5 shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-200">
+          {AI_PROMPT_SUGGESTIONS.filter(p => p.title.toLowerCase().includes(mentionFilter)).map(prompt => (
             <div 
-              key={agent.id}
+              key={prompt.id}
               onClick={() => {
-                const lastAtPos = localText.lastIndexOf('@');
-                const newVal = localText.slice(0, lastAtPos) + `@${agent.name} `;
-                setLocalText(newVal);
+                const promptText = `@AI ${prompt.title}`;
                 setShowMentionMenu(false);
-                if (textareaRef.current) textareaRef.current.focus();
+                setLocalText('');
+                onSendMessage(promptText);
               }}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/10 active:bg-white/20 cursor-pointer transition-all border border-white/5 my-0.5 bg-black/20 hover:border-[#00e5ff]/30 group"
             >
-              <div className="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                <span className="text-[10px]">🤖</span>
+              <div className="w-7 h-7 rounded-xl bg-[#00e5ff]/20 border border-[#00e5ff]/40 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-3.5 h-3.5 text-[#00e5ff]" />
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold text-white truncate">{agent.name}</span>
-                <span className="text-[9px] text-slate-400 truncate">{agent.label}</span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-black text-white truncate group-hover:text-[#00e5ff] transition-colors">{prompt.title}</span>
+                <span className="text-[10px] text-slate-400 truncate">{prompt.desc}</span>
               </div>
             </div>
           ))}
-          {AI_AGENTS.filter(a => a.name.toLowerCase().includes(mentionFilter) || a.label.toLowerCase().includes(mentionFilter)).length === 0 && (
+          {AI_PROMPT_SUGGESTIONS.filter(p => p.title.toLowerCase().includes(mentionFilter)).length === 0 && (
             <div className="px-3 py-2 text-xs text-slate-500 text-center">검색 결과가 없습니다</div>
           )}
         </div>
