@@ -1345,7 +1345,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
         </div>
       )}
-      <nav className="mobile-top-nav flex justify-between items-end px-4 sticky top-0 z-[100]"
+      <nav className="mobile-top-nav flex justify-between items-end px-2.5 sm:px-4 sticky top-0 z-[100]"
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingBottom: '12px',
@@ -1356,9 +1356,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         }}>
 
         {/* Left: logo + icon buttons */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button onClick={() => window.location.reload()}
-            className="text-base sm:text-lg font-black tracking-widest uppercase text-slate-200 whitespace-nowrap font-mono flex items-center"
+            className="text-sm sm:text-lg font-black tracking-widest uppercase text-slate-200 whitespace-nowrap font-mono flex items-center"
             style={{ textShadow: '0 0 15px rgba(255,255,255,0.4)' }}
           >
             S-GUARD
@@ -1366,7 +1366,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         </div>
 
         {/* Center: War-Room Action Button (More compact sizing) */}
-        <div className="flex-1 max-w-[125px] mx-2">
+        <div className="flex-1 max-w-[110px] sm:max-w-[125px] mx-1 sm:mx-2">
           {insightSms && isInsightComplete && (
             <div className="animate-in fade-in zoom-in duration-500">
                {(() => {
@@ -1392,12 +1392,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         handleOpenWarRoomFromInsight(insightSms, insightContent);
                       }}
                       disabled={isOpeningWarRoom}
-                      className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg font-black text-[10px] transition-all border ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden shadow-md`}
+                      className={`w-full flex items-center justify-center gap-1 py-1 sm:py-1.5 px-1.5 sm:px-2.5 rounded-lg font-black text-[9.5px] sm:text-[10px] tracking-tight transition-all border ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden shadow-md`}
                     >
                       {isOpeningWarRoom ? (
-                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0" />
+                        <div className="w-2.5 h-2.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0" />
                       ) : (
-                        <Users size={12} className="shrink-0" />
+                        <Users size={11} className="shrink-0" />
                       )}
                       <span className="truncate">
                         {isOpeningWarRoom ? '진행중' : (isCompleted || isProcessing) ? 'WAR-ROOM 이동' : 'WAR-ROOM 개설'}
@@ -1411,8 +1411,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 
         {/* Right: Icon buttons + AI button + profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1.5 mr-1">
+        <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex items-center gap-1 mr-0.5">
             {/* Orbital Command */}
             <button onClick={() => {
               if (!checkAllowed('/orbital-command')) {
@@ -1423,9 +1423,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             }}
               disabled={!checkAllowed('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
+              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.08)', boxShadow: '0 0 10px rgba(0,229,255,0.25)' }}>
-              <Cpu size={15} style={{ color: '#00e5ff' }} />
+              <Cpu size={14} style={{ color: '#00e5ff' }} />
               {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
             </button>
 
@@ -1439,39 +1439,39 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             }}
               disabled={!checkAllowed('/alert-monitor')}
               onPointerDown={() => handleTooltipStart('Alert Monitor')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
+              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.08)', boxShadow: '0 0 10px rgba(0,229,255,0.25)' }}>
-              <BellDot size={15} style={{ color: '#00e5ff' }} />
+              <BellDot size={14} style={{ color: '#00e5ff' }} />
               {!checkAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
             </button>
 
             {/* Threshold */}
             <button onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
               onPointerDown={() => handleTooltipStart('Threshold')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60"
               style={{
                 border: showThresholdSettings ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.15)',
                 background: showThresholdSettings ? 'rgba(0,229,255,0.1)' : 'transparent',
                 boxShadow: showThresholdSettings ? '0 0 10px rgba(0,229,255,0.3)' : 'none'
               }}>
-              <Settings size={15} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#00e5ff' : '#94a3b8', transition: 'transform 0.3s' }} />
+              <Settings size={14} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#00e5ff' : '#94a3b8', transition: 'transform 0.3s' }} />
             </button>
           </div>
 
           <button onClick={onAiClick}
             onPointerDown={() => handleTooltipStart('AI Assistant')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-            className="w-8 h-8 rounded-lg flex items-center justify-center active:opacity-60"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60"
             style={{ border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.1)', boxShadow: '0 0 10px rgba(0,229,255,0.3)' }}>
-            <Bot size={16} style={{ color: '#00e5ff' }} />
+            <Bot size={14} style={{ color: '#00e5ff' }} />
           </button>
 
-          <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 active:opacity-60">
+          <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 active:opacity-60 shrink-0 ml-0.5">
             {userProfile && <span className="text-[11px] font-semibold text-slate-400 hidden sm:block">{userProfile.name}</span>}
-            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.2)]"
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.2)] shrink-0"
               style={{ border: '1px solid #00e5ff', background: '#102428' }}>
               {userProfile?.profile_picture
                 ? <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
-                : <User size={15} className="text-slate-400" />}
+                : <User size={14} className="text-slate-400" />}
             </div>
           </button>
         </div>
@@ -1849,7 +1849,69 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ml-0.5 transition-all"
                 style={{ background: activeLogTab === 'human' ? 'rgba(0,229,255,0.2)' : 'transparent', color: activeLogTab === 'human' ? '#00e5ff' : '#64748b', border: activeLogTab === 'human' ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.15)', textShadow: activeLogTab === 'human' ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>
                 Chat
-                      {/* ── PANEL 4: 장애 처리 현황 (Bento Card) ── */}
+              </button>
+              {(() => {
+                const isDone = selectedSms && Number(selectedSms.is_analyzed) >= 1;
+                const isLive = showAgentPanel && agentMessages.length > 0 && !isDone;
+                return (
+                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg ml-1"
+                    style={{ border: `1px solid ${isLive ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, background: isLive ? 'rgba(0,229,255,0.1)' : 'transparent', boxShadow: isLive ? '0 0 8px rgba(0,229,255,0.3)' : 'none' }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: isDone ? '#64748b' : isLive ? '#00e5ff' : '#64748b', boxShadow: isLive ? '0 0 6px #00e5ff' : 'none' }} />
+                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#94a3b8' : isLive ? '#00e5ff' : '#94a3b8' }}>
+                      {isDone ? 'DONE' : isLive ? 'LIVE' : 'IDLE'}
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col" style={{ minHeight: 360 }}>
+            {showAgentPanel || selectedSms ? (
+              activeLogTab === 'ai' ? (
+                <AgentDiscussionPanel
+                  messages={agentMessages}
+                  isVisible={true}
+                  embedded={true}
+                  incident={selectedSms}
+                  onClose={() => { setShowAgentPanel(false); setSelectedSms(null); }}
+                />
+              ) : typeof document !== 'undefined' ? createPortal(
+                <div className="fixed inset-0 z-[500] bg-[#0a0c12] flex flex-col h-[100dvh]">
+                  {/* 헤더 영역 (닫기 버튼 포함) */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 bg-[#0a0c12] z-10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 flex items-center justify-center border border-[#00e5ff]/30">
+                        <MessageSquare className="w-4 h-4 text-[#00e5ff]" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-black text-slate-200 uppercase tracking-wider">War-Room Chat</h2>
+                        <p className="text-[10px] text-slate-400 font-mono">Expert Advisor Collaboration</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setActiveLogTab('ai')}
+                      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-xs font-bold active:scale-95 transition-all"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                  {/* 채팅 패널 영역 (스크롤을 여기서 처리) */}
+                  <div className="flex-1 min-h-0 relative">
+                    <WarRoomChatPanel incidentId={selectedSms?.inc_id} currentUser={userProfile || {}} isVisible={true} />
+                  </div>
+                </div>,
+                document.body
+              ) : null
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center opacity-30" style={{ minHeight: 240 }}>
+                <Brain size={32} className="text-[#00e5ff] mb-3 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]" />
+                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">SMS를 선택하면 분석이 시작됩니다</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── PANEL 4: 장애 처리 현황 (Bento Card) ── */}
         {(() => {
           const isActive = !!selectedIncidentIdFlow;
           const isClosedFlow = incidentWorkflowSteps.some(s => s.id === 'KNOWLEDGE');
