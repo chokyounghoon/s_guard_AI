@@ -284,8 +284,8 @@ export default function WorkflowPage() {
                   {getInitials(a.name || a.user_id)}
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">{a.name || a.user_id}</p>
-                  <p className="text-[9px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px]">
+                  <p className="text-[13px] font-black text-white tracking-tight">{a.name || a.user_id}</p>
+                  <p className="text-[10px] text-slate-500/70 font-normal whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px] tracking-tight">
                     {a.user_id} {a.team_name || a.part_name ? `· ${[a.team_name, a.part_name].filter(Boolean).join(' ')}` : ''}
                   </p>
                 </div>
@@ -461,11 +461,16 @@ export default function WorkflowPage() {
               <p className="text-[10px] text-slate-500 font-mono mt-0.5">{inc_id}</p>
             </div>
           </div>
-          {/* 진행도 미니바 */}
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-[10px] font-black text-blue-400">{Math.round(progress)}%</span>
-            <div className="w-16 h-1 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          {/* 진행도 미니바 (형광 Cyan 포인트 튜닝) */}
+          <div className="flex flex-col items-end gap-1 font-mono">
+            <span className="text-[11px] font-black text-[#00e5ff] tracking-wider drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]">
+              {Math.round(progress)}%
+            </span>
+            <div className="w-20 h-1.5 bg-slate-800/80 rounded-full overflow-hidden p-0.5 border border-white/5">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 via-[#00e5ff] to-[#00ffc4] rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.6)] animate-pulse" 
+                style={{ width: `${progress}%` }} 
+              />
             </div>
           </div>
         </div>
