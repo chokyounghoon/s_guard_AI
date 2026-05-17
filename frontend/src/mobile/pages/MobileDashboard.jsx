@@ -1703,62 +1703,88 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     boxShadow: isSel ? '0 0 20px rgba(0,229,255,0.35)' : '0 4px 15px rgba(0,0,0,0.4)'
                   }}>
                   {/* Row 1: type + badges */}
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      {msg.keyword_detected ? <AlertCircle size={14} style={{ color: accentColor, filter: `drop-shadow(0 0 6px ${accentColor})` }} /> : <Info size={14} style={{ color: accentColor }} />}
-                      <span className="text-[12px] font-bold tracking-wide" style={{ color: isSel ? '#00e5ff' : '#f8fafc', textShadow: isSel ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>
+                      {msg.keyword_detected ? <AlertCircle size={15} style={{ color: accentColor, filter: `drop-shadow(0 0 6px ${accentColor})` }} /> : <Info size={15} style={{ color: accentColor }} />}
+                      <span className="text-[13px] font-bold tracking-wide" style={{ color: isSel ? '#00e5ff' : '#f8fafc', textShadow: isSel ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>
                         {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       {msg.severity && (
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider"
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-sm"
                           style={{ color: accentColor, border: `1px solid ${accentColor}`, background: `${accentColor}15`, boxShadow: `0 0 8px ${accentColor}40` }}>
                           {msg.severity}
                         </span>
                       )}
                       {(msg.incident_status === '처리완료' || msg.incident_status === 'Completed' || msg.status === '처리완료' || msg.status === 'Completed' || Number(msg.is_analyzed) >= 1) && (
                         <button onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${msg.inc_id}`); }}
-                          className="text-[9px] font-black px-2 py-0.5 rounded-md active:opacity-60 transition-all hover:bg-[#00e5ff]/20"
-                          style={{ color: '#00e5ff', border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.1)', boxShadow: '0 0 8px rgba(0,229,255,0.3)' }}>
+                          className="text-[10px] font-bold px-3 py-1 rounded-lg active:scale-95 transition-all text-[#ff4a4a] hover:bg-[#ff4a4a]/30 shadow-[0_0_12px_rgba(255,74,74,0.3)] shrink-0"
+                          style={{ border: '1px solid #ff4a4a', background: 'rgba(255,74,74,0.15)' }}>
                           REPORT
                         </button>
                       )}
                       <button onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                        className="text-[9px] font-black px-2 py-0.5 rounded-md active:opacity-60 transition-all hover:bg-[#00e5ff]/20"
+                        className="text-[10px] font-bold px-3 py-1 rounded-lg active:scale-95 transition-all hover:bg-[#00e5ff]/20 shrink-0"
                         style={{ color: '#00e5ff', border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.1)', boxShadow: '0 0 8px rgba(0,229,255,0.3)' }}>
                         현황
                       </button>
                     </div>
                   </div>
                   {/* Row 2: sender + employee + analysis status */}
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="text-[10px] text-slate-400">발신 <span className="font-mono text-slate-300">{msg.sender}</span></span>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                      <span className="text-slate-500 font-normal">발신</span>
+                      <span className="font-mono text-slate-200 font-semibold">{msg.sender}</span>
+                    </span>
                     {msg.employee_id && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md shrink-0" style={{ color: '#00e5ff', border: '1px solid rgba(0,229,255,0.3)', background: 'rgba(0,229,255,0.08)' }}>
-                        {msg.employee_id}{msg.sender_name && ` (${msg.sender_name})`}
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg font-mono shrink-0 shadow-sm flex items-center gap-1"
+                        style={{ color: '#00e5ff', background: 'rgba(0,229,255,0.15)', border: '1px solid rgba(0,229,255,0.3)' }}>
+                        👤 {msg.employee_id}{msg.sender_name && ` · ${msg.sender_name}`}
                       </span>
                     )}
-                    <span className="text-[9px] font-black px-2 py-0.5 rounded-md shrink-0 ml-auto sm:ml-0"
-                      style={{
-                        color: msg.incident_status === '처리완료' ? '#00e5ff' : Number(msg.is_analyzed) >= 1 ? '#00e5ff' : '#00e5ff',
-                        border: `1px solid ${msg.incident_status === '처리완료' ? '#00e5ff' : Number(msg.is_analyzed) >= 1 ? '#00e5ff' : '#00e5ff'}`,
-                        background: msg.incident_status === '처리완료' ? 'rgba(0,229,255,0.1)' : Number(msg.is_analyzed) >= 1 ? 'rgba(0,229,255,0.1)' : 'rgba(0,229,255,0.1)',
-                        boxShadow: `0 0 8px ${msg.incident_status === '처리완료' ? 'rgba(0,229,255,0.4)' : Number(msg.is_analyzed) >= 1 ? 'rgba(0,229,255,0.4)' : 'rgba(0,229,255,0.4)'}`
-                      }}>
-                      {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANALYZED' : 'ANALYZING'}
-                    </span>
+                    {(() => {
+                      const isDone = msg.incident_status === '처리완료' || Number(msg.is_analyzed) >= 1;
+                      const badgeColor = isDone ? '#94a3b8' : '#00e5ff';
+                      const badgeBg = isDone ? 'rgba(148,163,184,0.1)' : 'rgba(0,229,255,0.15)';
+                      const badgeBorder = isDone ? 'rgba(148,163,184,0.3)' : '#00e5ff';
+                      const badgeShadow = isDone ? 'none' : '0 0 10px rgba(0,229,255,0.4)';
+                      return (
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg shrink-0 ml-auto sm:ml-0 ${!isDone ? 'animate-pulse' : ''}`}
+                          style={{ color: badgeColor, border: `1px solid ${badgeBorder}`, background: badgeBg, boxShadow: badgeShadow }}>
+                          {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANALYZED' : 'ANALYZING'}
+                        </span>
+                      );
+                    })()}
                   </div>
                   {/* Row 3: message */}
-                  <p className="text-[13px] leading-relaxed break-all whitespace-pre-wrap font-normal" style={{ color: isSel ? '#fff' : '#cbd5e1' }}>{msg.message}</p>
+                  <p className="text-[14px] font-semibold leading-relaxed break-all whitespace-pre-wrap text-[#ffffff] my-2 bg-black/20 p-3.5 rounded-xl border border-white/5" style={{ textShadow: isSel ? '0 0 10px rgba(255,255,255,0.3)' : 'none' }}>
+                    {msg.message}
+                  </p>
                   {/* Row 4: footer */}
-                  <div className="flex items-center justify-between mt-2.5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    {msg.similarity_score != null && (
-                      <span className="text-[9px] font-black uppercase" style={{ color: msg.similarity_score >= 0.8 ? '#00e5ff' : '#00e5ff', textShadow: `0 0 8px ${msg.similarity_score >= 0.8 ? 'rgba(0,229,255,0.5)' : 'rgba(0,229,255,0.5)'}` }}>
-                        ⚡ Match {(msg.similarity_score * 100).toFixed(1)}%
-                      </span>
-                    )}
-                    <span className="text-[9px] font-mono text-slate-500 ml-auto">{formatYYMMDD(msg.timestamp)}</span>
+                  <div className="flex items-center justify-between mt-3 pt-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    {msg.similarity_score != null && (() => {
+                      const score = msg.similarity_score;
+                      let matchColor = '#00e5ff';
+                      let matchBg = 'rgba(0,229,255,0.1)';
+                      let matchBorder = 'rgba(0,229,255,0.2)';
+                      if (score >= 0.8) {
+                        matchColor = '#f87171'; // Coral Red
+                        matchBg = 'rgba(248,113,113,0.15)';
+                        matchBorder = 'rgba(248,113,113,0.3)';
+                      } else if (score >= 0.5) {
+                        matchColor = '#fb923c'; // Amber/Orange
+                        matchBg = 'rgba(251,146,60,0.15)';
+                        matchBorder = 'rgba(251,146,60,0.3)';
+                      }
+                      return (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg border uppercase tracking-wider flex items-center gap-1 shrink-0"
+                          style={{ color: matchColor, background: matchBg, borderColor: matchBorder, boxShadow: `0 0 10px ${matchColor}30` }}>
+                          ⚡ Match {(score * 100).toFixed(1)}%
+                        </span>
+                      );
+                    })()}
+                    <span className="text-[10px] font-mono text-slate-400 ml-auto">{formatYYMMDD(msg.timestamp)}</span>
                   </div>
                 </div>
               );
