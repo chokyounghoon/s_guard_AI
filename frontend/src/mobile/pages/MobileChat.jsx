@@ -60,6 +60,7 @@ export default function MobileChat({ user }) {
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [longPressMsg, setLongPressMsg] = useState(null);
   
   const AI_AGENTS = [
     { id: 'expert', name: 'AI Expert', label: 'S-Autopilot Expert' },
@@ -82,6 +83,7 @@ export default function MobileChat({ user }) {
   const recognitionRef = useRef(null);
   const reconnectTimer = useRef(null);
   const isMounted = useRef(true);
+  const longPressTimer = useRef(null);
 
   const cleanProfilePic = (pic) => (typeof pic === 'string' && pic.length > 300) ? null : (pic || null);
 
@@ -546,11 +548,17 @@ export default function MobileChat({ user }) {
                 )}
                 <div className={`flex items-end gap-1.5 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   {/* 말풍선 본체 */}
-                  <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-[1.4] shadow-md break-words ${
-                    msg.role === 'user'
-                      ? 'bg-[#0038a8] text-white rounded-tr-none'
-                      : 'bg-[#2a2f3a] border border-white/5 text-slate-100 rounded-tl-none'
-                  }`}>
+                  <div 
+                    onTouchStart={() => { isMounted.current && (longPressTimer.current = setTimeout(() => setLongPressMsg(msg), 500)); }}
+                    onTouchEnd={() => clearTimeout(longPressTimer.current)}
+                    onTouchMove={() => clearTimeout(longPressTimer.current)}
+                    onContextMenu={(e) => { e.preventDefault(); setLongPressMsg(msg); }}
+                    className={`rounded-2xl px-3.5 py-2.5 text-sm leading-[1.4] shadow-md break-words select-none ${
+                      msg.role === 'user'
+                        ? 'bg-[#0038a8] text-white rounded-tr-none'
+                        : 'bg-[#2a2f3a] border border-white/5 text-slate-100 rounded-tl-none'
+                    }`}
+                  >
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   </div>
                   {/* 말풍선 메타데이터 (시간 + 안읽음 숫자) - 세로형 Flex 컨테이너 */}
@@ -678,6 +686,64 @@ export default function MobileChat({ user }) {
           </button>
         </div>
       </div>
+
+      {/* 🗨️ 모바일 길게 누르기 바텀시트 */}
+      {longPressMsg && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end justify-center"
+          onClick={() => setLongPressMsg(null)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" />
+          <div
+            className="relative w-full max-w-lg bg-[#1a2035] rounded-t-3xl border-t border-white/10 shadow-2xl animate-in slide-in-from-bottom-4 duration-300 pb-safe"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* 핸들 */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-white/20 rounded-full" />
+            </div>
+
+            {/* 메시지 내용 상단 표시 */}
+            <div className="mx-4 mb-3 px-4 py-3 bg-[#191919] rounded-2xl border border-white/10">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold shrink-0 text-white">
+                  {longPressMsg.sender?.[0] || 'U'}
+                </div>
+                <span className="text-[12px] font-bold text-slate-300">{longPressMsg.sender || (longPressMsg.role === 'user' ? (user?.name || '나') : 'AI Assistant')}</span>
+                <span className="text-[10px] text-slate-500 ml-auto">{formatTime(longPressMsg.ts || longPressMsg.timestamp || Date.now())}</span>
+              </div>
+              <div className="max-h-32 overflow-y-auto" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.08) transparent'}}>
+                <p className="text-[14px] text-white leading-relaxed break-all whitespace-pre-wrap">{longPressMsg.content || longPressMsg.text || ''}</p>
+              </div>
+            </div>
+
+            {/* 액션 목록 */}
+            <div className="divide-y divide-white/5">
+              {(longPressMsg?.role === 'user' || String(longPressMsg?.sender ?? '').trim() === String(user?.employee_id ?? '').trim() || String(longPressMsg?.sender ?? '').trim() === String(user?.name ?? '').trim()) && (
+                <button
+                  onClick={() => { handleDeleteMessage(longPressMsg.id || longPressMsg.seq || longPressMsg.inc_id); setLongPressMsg(null); }}
+                  className="w-full flex items-center gap-4 px-6 py-3.5 hover:bg-red-500/10 transition-colors text-left group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-red-500/15 group-hover:bg-red-500/25 flex items-center justify-center transition-colors">
+                    <X className="w-4 h-4 text-red-400 stroke-[3]" />
+                  </div>
+                  <span className="text-[15px] text-red-400 font-bold">내 메시지 삭제</span>
+                </button>
+              )}
+              <button
+                onClick={() => setLongPressMsg(null)}
+                className="w-full flex items-center gap-4 px-6 py-3.5 hover:bg-white/5 transition-colors text-left"
+              >
+                <div className="w-9 h-9 rounded-full bg-slate-700/50 flex items-center justify-center">
+                  <X className="w-4 h-4 text-slate-400" />
+                </div>
+                <span className="text-[15px] text-slate-400 font-medium">취소</span>
+              </button>
+            </div>
+            <div className="h-6" /> {/* safe area padding */}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2462,6 +2462,17 @@ export default function ChatPage() {
                 </div>
                 <span className="text-[15px] text-white font-medium">{longPressMsg.is_key_event ? '타임라인 해제' : '타임라인 등록'}</span>
               </button>
+              {(longPressMsg?.type === 'me' || String(longPressMsg?.sender ?? '').trim() === String(currentUser?.employee_id ?? '').trim() || String(longPressMsg?.sender ?? '').trim() === String(currentUser?.name ?? '').trim()) && (
+                <button
+                  onClick={() => { handleDeleteMessage(longPressMsg.seq || longPressMsg.id || longPressMsg.inc_id); setLongPressMsg(null); }}
+                  className="w-full flex items-center gap-4 px-6 py-3.5 hover:bg-red-500/10 transition-colors text-left group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-red-500/15 group-hover:bg-red-500/25 flex items-center justify-center transition-colors">
+                    <X className="w-4 h-4 text-red-400 stroke-[3]" />
+                  </div>
+                  <span className="text-[15px] text-red-400 font-bold">내 메시지 삭제</span>
+                </button>
+              )}
               <button
                 onClick={() => setLongPressMsg(null)}
                 className="w-full flex items-center gap-4 px-6 py-3.5 hover:bg-white/5 transition-colors text-left"
