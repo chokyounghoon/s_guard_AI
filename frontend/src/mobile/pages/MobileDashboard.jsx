@@ -1345,14 +1345,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
         </div>
       )}
-      <nav className="mobile-top-nav flex justify-between items-end px-2.5 sm:px-4 sticky top-0 z-[100]"
+      <nav className="mobile-top-nav flex justify-between items-end px-2.5 sm:px-4 sticky top-0 z-[100] backdrop-blur-md"
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingBottom: '12px',
           height: 'calc(62px + env(safe-area-inset-top, 0px))',
-          background: '#121212', 
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(0, 229, 255, 0.15)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.9)'
         }}>
 
         {/* Left: logo + icon buttons */}
@@ -1607,7 +1609,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 
       {/* ── MAIN BENTO GRID SCROLL ───────────────────────────────── */}
-      <div className="px-3.5 pt-3.5 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="px-3.5 pt-5 sm:pt-6 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
 
         {/* ── PANEL 1: SMS FEED (Bento Wide) ── */}
         {(() => {
