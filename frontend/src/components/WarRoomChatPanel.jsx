@@ -41,6 +41,8 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [longPressMsg, setLongPressMsg] = useState(null);
+  const longPressTimer = useRef(null);
   const textareaRef = useRef(null);
 
   const AI_AGENTS = [
@@ -184,8 +186,23 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
     };
   }, [incidentId, isVisible, currentUser.employee_id, currentUser.name]);
 
-  const handleDeleteMessage = (msgId) => {
-    setMessages(prev => prev.filter(m => (m.id || m.seq) !== msgId));
+  const handleDeleteMessage = async (msgId) => {
+    try {
+      const cleanIncId = String(incidentId).replace('INC-', '');
+      const res = await fetch(`${API_BASE}/warroom/chat/${cleanIncId}/${msgId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAccessToken()}`
+        }
+      });
+      if (res.ok) {
+        setMessages(prev => prev.filter(m => (m.id || m.seq || m.inc_id) !== msgId));
+      } else {
+        console.error("Failed to delete message from DB in popup");
+      }
+    } catch (err) {
+      console.error("Error deleting message in popup:", err);
+    }
   };
 
   const scrollToBottom = () => {
@@ -432,7 +449,12 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                     
                     <div className={`flex items-end gap-1.5 ${msg.type === 'me' ? 'flex-row-reverse' : 'flex-row'}`}>
                       {/* 말풍선 본체 */}
-                      <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.4] shadow-md break-words whitespace-pre-wrap
+                      <div 
+                        onTouchStart={() => { longPressTimer.current = setTimeout(() => setLongPressMsg(msg), 500); }}
+                        onTouchEnd={() => clearTimeout(longPressTimer.current)}
+                        onTouchMove={() => clearTimeout(longPressTimer.current)}
+                        onContextMenu={(e) => { e.preventDefault(); setLongPressMsg(msg); }}
+                        className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.4] shadow-md break-words whitespace-pre-wrap select-none
                         ${msg.type === 'me' 
                           ? 'bg-[#0038a8] text-white rounded-tr-none' 
                           : 'bg-[#2a2f3a] text-slate-100 rounded-tl-none border border-white/5'
@@ -464,6 +486,60 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                 <span className="inline-block w-2 h-2 rounded-full bg-[#00ff88] animate-ping shrink-0 shadow-[0_0_8px_#00ff88]" />
                 <span className="truncate">AI가 S-Guard 내부 시스템 및 지식 기반을 연동하여 실시간 답변을 생성 중입니다...</span>
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* 🗨️ 팝업창 길게 누르기 바텀시트 */}
+        {longPressMsg && (
+          <div
+            className="absolute inset-0 z-[200] flex items-end justify-center"
+            onClick={() => setLongPressMsg(null)}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" />
+            <div
+              className="relative w-full max-w-lg bg-[#1a2035] rounded-t-3xl border-t border-white/10 shadow-2xl animate-in slide-in-from-bottom-4 duration-300 pb-4"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-white/20 rounded-full" />
+              </div>
+
+              <div className="mx-4 mb-3 px-4 py-3 bg-[#191919] rounded-2xl border border-white/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold shrink-0 text-white">
+                    {longPressMsg.sender_name?.[0] || longPressMsg.sender?.[0] || 'U'}
+                  </div>
+                  <span className="text-[12px] font-bold text-slate-300">{longPressMsg.sender_name || longPressMsg.sender || (longPressMsg.type === 'me' ? (currentUser?.name || '나') : 'AI Assistant')}</span>
+                  <span className="text-[10px] text-slate-500 ml-auto">{longPressMsg.time}</span>
+                </div>
+                <div className="max-h-32 overflow-y-auto" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.08) transparent'}}>
+                  <p className="text-[14px] text-white leading-relaxed break-all whitespace-pre-wrap">{longPressMsg.text || longPressMsg.content || ''}</p>
+                </div>
+              </div>
+
+              <div className="divide-y divide-white/5">
+                {(longPressMsg?.type === 'me' || String(longPressMsg?.sender ?? '').trim() === String(currentUser?.employee_id ?? '').trim() || String(longPressMsg?.sender ?? '').trim() === String(currentUser?.name ?? '').trim()) && (
+                  <button
+                    onClick={() => { handleDeleteMessage(longPressMsg.id || longPressMsg.seq || longPressMsg.inc_id); setLongPressMsg(null); }}
+                    className="w-full flex items-center gap-4 px-6 py-3.5 hover:bg-red-500/10 transition-colors text-left group"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-red-500/15 group-hover:bg-red-500/25 flex items-center justify-center transition-colors">
+                      <X className="w-4 h-4 text-red-400 stroke-[3]" />
+                    </div>
+                    <span className="text-[15px] text-red-400 font-bold">내 메시지 삭제</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setLongPressMsg(null)}
+                  className="w-full flex items-center gap-4 px-6 py-3.5 hover:bg-white/5 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-full bg-slate-700/50 flex items-center justify-center">
+                    <X className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <span className="text-[15px] text-slate-400 font-medium">취소</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
