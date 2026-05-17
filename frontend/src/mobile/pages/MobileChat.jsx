@@ -332,15 +332,38 @@ export default function MobileChat({ user }) {
             body: JSON.stringify({
               inputs: {},
               query: `[${incidentId || "INC_000"}] ${aiQueryText}`.trim(),
-              response_mode: "blocking",
+              response_mode: "streaming",
               user: cleanUser
             })
           });
           if (difyRes.ok) {
-            const difyData = await difyRes.json();
-            const aiAnswer = difyData.answer;
-            
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            const reader = difyRes.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+            let accumulatedAnswer = "";
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop(); // keep incomplete last line
+
+              for (const line of lines) {
+                if (line.trim().startsWith('data:')) {
+                  const jsonStr = line.replace(/^data:\s*/, '').trim();
+                  if (!jsonStr || jsonStr === '[DONE]') continue;
+                  try {
+                    const parsed = JSON.parse(jsonStr);
+                    if (parsed.answer) {
+                      accumulatedAnswer += parsed.answer;
+                    }
+                  } catch (e) {}
+                }
+              }
+            }
+
+            if (accumulatedAnswer.trim() && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
               wsRef.current.send(JSON.stringify({
                 type: "CHAT_SEND",
                 incident_id: incidentId,
@@ -348,7 +371,7 @@ export default function MobileChat({ user }) {
                 name: aiAgentName,
                 role: 'assistant',
                 msg_type: "ai_analysis",
-                text: aiAnswer
+                text: accumulatedAnswer.trim()
               }));
             }
           } else {
@@ -432,6 +455,35 @@ export default function MobileChat({ user }) {
 
         {messages.map((msg) => {
           const avatarUrl = msg.avatar_url || null;
+          const isAiAgent = msg.role === 'assistant' || msg.msg_type === 'ai_analysis' || /agent|expert/i.test(msg.sender || msg.name || '');
+
+          if (isAiAgent) {
+            return (
+              <div key={msg.id} className="w-full my-4 bg-gradient-to-br from-[#051329] to-[#0a1b3a] border border-[#00e5ff]/30 rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,229,255,0.15)] animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 border border-[#00e5ff]/50 flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.3)] shrink-0">
+                      <Bot className="w-4 h-4 text-[#00e5ff]" />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-black text-white text-sm tracking-wide">{msg.name || msg.sender_name || msg.sender || 'AI Assistant'}</span>
+                      <span className="px-2 py-0.5 rounded-md bg-[#00ff88]/10 border border-[#00ff88]/40 text-[#00ff88] text-[10px] font-mono font-bold tracking-wider uppercase shadow-[0_0_8px_rgba(0,255,136,0.2)]">
+                        [S-GUARD AI System]
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-400 text-[10px] font-mono shrink-0">
+                    <Sparkles className="w-3 h-3 text-[#00e5ff]" />
+                    <span>{formatTime(msg.ts || msg.time)}</span>
+                  </div>
+                </div>
+                <div className="prose prose-invert prose-sm max-w-none text-slate-100 leading-relaxed prose-headings:text-[#00e5ff] prose-a:text-[#00ff88] prose-strong:text-[#00ff88] prose-strong:bg-[#00ff88]/10 prose-strong:px-1 prose-strong:py-0.5 prose-strong:rounded">
+                  <ReactMarkdown>{msg.content || msg.text || ''}</ReactMarkdown>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div key={msg.id} className={`flex gap-2 items-end ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} mb-3`}>
               <div className="relative w-8 h-8 shrink-0 self-start mt-0.5">
@@ -446,10 +498,9 @@ export default function MobileChat({ user }) {
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${avatarUrl ? 'hidden' : 'flex'} ${
                   msg.role === 'user'
                     ? 'bg-[#00236e]/20 border border-[#00236e]/30 text-white/70'
-                    : msg.role === 'assistant' ? 'bg-[#242424] border border-white/10 text-slate-300'
                     : 'bg-[#333333] border border-white/5 text-slate-400'
                 }`}>
-                  {msg.role === 'user' ? (user?.name?.[0] || 'U') : msg.role === 'assistant' ? <Bot className="w-4 h-4" /> : (msg.sender?.[0] || '?')}
+                  {msg.role === 'user' ? (user?.name?.[0] || 'U') : (msg.sender?.[0] || '?')}
                 </div>
               </div>
               <div className={`flex flex-col max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -461,14 +512,9 @@ export default function MobileChat({ user }) {
                   <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-[1.4] shadow-md break-words ${
                     msg.role === 'user'
                       ? 'bg-[#0038a8] text-white rounded-tr-none'
-                      : msg.role === 'assistant'
-                      ? 'bg-[#242424] border border-[#333] text-slate-200 rounded-tl-none'
                       : 'bg-[#2a2f3a] border border-white/5 text-slate-100 rounded-tl-none'
                   }`}>
-                    {msg.role === 'assistant'
-                      ? <div className="prose prose-invert prose-sm max-w-none prose-p:my-1"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
-                      : <p className="whitespace-pre-wrap">{msg.content}</p>
-                    }
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
                   </div>
                   {/* 말풍선 메타데이터 (시간 + 안읽음 숫자) - 세로형 Flex 컨테이너 */}
                   <div className={`flex flex-col justify-end shrink-0 select-none pb-0.5 ${msg.role === 'user' ? 'items-end mr-0.5' : 'items-start ml-0.5'}`}>

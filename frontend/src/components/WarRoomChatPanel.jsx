@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info } from 'lucide-react';
+import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info, Bot } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { getAccessToken } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -225,24 +226,47 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
           body: JSON.stringify({
             inputs: {},
             query: `[${incidentId || "INC_000"}] ${aiQueryText}`.trim(),
-            response_mode: "blocking",
+            response_mode: "streaming",
             user: cleanUser
           })
         });
         if (difyRes.ok) {
-          const difyData = await difyRes.json();
-          const aiAnswer = difyData.answer;
-          
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          const reader = difyRes.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+          let buffer = "";
+          let accumulatedAnswer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // incomplete last line kept in buffer
+
+            for (const line of lines) {
+              if (line.trim().startsWith('data:')) {
+                const jsonStr = line.replace(/^data:\s*/, '').trim();
+                if (!jsonStr || jsonStr === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  if (parsed.answer) {
+                    accumulatedAnswer += parsed.answer;
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+
+          if (accumulatedAnswer.trim() && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({
               type: "CHAT_SEND",
               incident_id: incidentId,
               sender: aiAgentName,
               name: aiAgentName,
-              role: aiAgentName,
+              role: 'assistant',
               profile_picture: null,
-              msg_type: "assistant",
-              text: aiAnswer
+              msg_type: "mention_reply",
+              text: accumulatedAnswer.trim()
             }));
           }
         } else {
@@ -304,16 +328,47 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
 
         {messages
           .filter(m => 
-            m.type !== 'ai' && 
-            m.type !== 'ai_analysis' && 
-            m.type !== 'system' && 
-            m.role !== 'assistant' && 
-            m.role !== 'AI Expert' &&
-            !/Agent/i.test(m.sender_name || m.sender || '') &&
-            !/Agent/i.test(m.role || '')
+            m.msg_type === 'mention_reply' || m.role === 'assistant' || m.role === 'AI Expert' || (
+              m.type !== 'ai' && 
+              m.type !== 'ai_analysis' && 
+              m.type !== 'system' && 
+              m.role !== 'assistant' && 
+              m.role !== 'AI Expert' &&
+              !/Agent/i.test(m.sender_name || m.sender || '') &&
+              !/Agent/i.test(m.role || '')
+            )
           )
           .map((msg, idx) => {
             const avatarSrc = msg.avatar_url || (msg.profile_picture ? (msg.profile_picture.startsWith('http') || msg.profile_picture.startsWith('data:image') ? msg.profile_picture : `https://sguardai.khcho0421.workers.dev${msg.profile_picture}`) : null);
+            const isAiAgent = msg.msg_type === 'mention_reply' || msg.role === 'assistant' || msg.role === 'AI Expert' || /Agent|Expert/i.test(msg.sender_name || msg.sender || msg.name || '');
+
+            if (isAiAgent) {
+              return (
+                <div key={msg.id || idx} className="w-full my-4 bg-gradient-to-br from-[#051329] to-[#0a1b3a] border border-[#00e5ff]/30 rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,229,255,0.15)] animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 border border-[#00e5ff]/50 flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.3)] shrink-0">
+                        <Bot className="w-4 h-4 text-[#00e5ff]" />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-black text-white text-sm tracking-wide">{msg.name || msg.sender_name || msg.sender || 'AI Assistant'}</span>
+                        <span className="px-2 py-0.5 rounded-md bg-[#00ff88]/10 border border-[#00ff88]/40 text-[#00ff88] text-[10px] font-mono font-bold tracking-wider uppercase shadow-[0_0_8px_rgba(0,255,136,0.2)]">
+                          [S-GUARD AI System]
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-slate-400 text-[10px] font-mono shrink-0">
+                      <Sparkles className="w-3 h-3 text-[#00e5ff]" />
+                      <span>{msg.time || msg.ts ? formatKst(msg.time || msg.ts) : ''}</span>
+                    </div>
+                  </div>
+                  <div className="prose prose-invert prose-sm max-w-none text-slate-100 leading-relaxed prose-headings:text-[#00e5ff] prose-a:text-[#00ff88] prose-strong:text-[#00ff88] prose-strong:bg-[#00ff88]/10 prose-strong:px-1 prose-strong:py-0.5 prose-strong:rounded">
+                    <ReactMarkdown>{msg.text || msg.content || ''}</ReactMarkdown>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div 
                 key={msg.id || idx} 
