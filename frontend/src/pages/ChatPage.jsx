@@ -461,10 +461,20 @@ const ChatMessageRow = React.memo(({
          JSON.stringify(prev.msg.reactions) === JSON.stringify(next.msg.reactions);
 });
 
+const AI_AGENTS = [
+  { id: 'expert', name: 'AI Expert', label: 'S-Autopilot Expert Advisor' },
+  { id: 'security', name: 'Security Agent', label: '보안 전문가 (Security Agent)' },
+  { id: 'db', name: 'DB Agent', label: 'DB 전문가 (DB Agent)' },
+  { id: 'devops', name: 'DevOps Agent', label: '인프라 전문가 (DevOps Agent)' },
+  { id: 'leader', name: 'Leader Agent', label: '총괄 매니저 (Leader Agent)' }
+];
+
 // ── 🚀 1단계 최적화: 타이핑 시 부모 리렌더링을 0%로 만드는 완벽 격리 입력창 ──
 const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadingFile, selectedFiles }) => {
   const [localText, setLocalText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
   const textareaRef = useRef(null);
 
   const handleSend = () => {
@@ -472,22 +482,67 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
     if (uploadingFile) return;
     onSendMessage(localText);
     setLocalText('');
+    setShowMentionMenu(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = '24px';
     }
   };
 
   return (
-    <div className="flex items-center gap-2 w-full">
+    <div className="flex items-center gap-2 w-full relative">
+      {/* Mention Menu */}
+      {showMentionMenu && (
+        <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#1a2035] border border-white/10 rounded-2xl p-1.5 shadow-2xl z-[100]">
+          {AI_AGENTS.filter(a => a.name.toLowerCase().includes(mentionFilter) || a.label.toLowerCase().includes(mentionFilter)).map(agent => (
+            <div 
+              key={agent.id}
+              onClick={() => {
+                const lastAtPos = localText.lastIndexOf('@');
+                const newVal = localText.slice(0, lastAtPos) + `@${agent.name} `;
+                setLocalText(newVal);
+                setShowMentionMenu(false);
+                if (textareaRef.current) textareaRef.current.focus();
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
+            >
+              <div className="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                <span className="text-[10px]">🤖</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold text-white truncate">{agent.name}</span>
+                <span className="text-[9px] text-slate-400 truncate">{agent.label}</span>
+              </div>
+            </div>
+          ))}
+          {AI_AGENTS.filter(a => a.name.toLowerCase().includes(mentionFilter) || a.label.toLowerCase().includes(mentionFilter)).length === 0 && (
+            <div className="px-3 py-2 text-xs text-slate-500 text-center">검색 결과가 없습니다</div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all px-1 rounded-[18px] flex-1" style={{ minHeight: 36 }}>
         <textarea ref={textareaRef} id="main-chat-input" rows={1}
           disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료'}
           value={localText}
           onChange={(e) => {
-            setLocalText(e.target.value);
+            const val = e.target.value;
+            setLocalText(val);
             onTyping();
             e.target.style.height = 'auto';
             e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+
+            const lastAtPos = val.lastIndexOf('@');
+            if (lastAtPos !== -1) {
+              const textAfterAt = val.slice(lastAtPos + 1);
+              if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+                setShowMentionMenu(true);
+                setMentionFilter(textAfterAt.toLowerCase());
+              } else {
+                setShowMentionMenu(false);
+              }
+            } else {
+              setShowMentionMenu(false);
+            }
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1296,6 +1351,25 @@ export default function ChatPage() {
       }
 
       if (hasText) {
+        let isAiQuery = false;
+        let aiQueryText = inputText;
+        let aiAgentName = 'AI Expert';
+        
+        const agentNames = ['AI Expert', 'Security Agent', 'DB Agent', 'DevOps Agent', 'Leader Agent'];
+        for (const agentName of agentNames) {
+          if (inputText.includes(`@${agentName}`)) {
+            isAiQuery = true;
+            aiAgentName = agentName;
+            aiQueryText = inputText.replace(`@${agentName}`, '').trim();
+            break;
+          }
+        }
+        
+        if (!isAiQuery && inputText.trim().startsWith('@')) {
+          isAiQuery = true;
+          aiQueryText = inputText.replace(/^@[^\s]+/, '').trim();
+        }
+
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({
             type: "CHAT_SEND",
@@ -1330,6 +1404,47 @@ export default function ChatPage() {
             text: inputText
           });
         }
+
+        // 🚀 Dify API 호출
+        if (isAiQuery) {
+          const callDify = async () => {
+            try {
+              const apiKey = 'app-ZDaVB8EWtA5vmTYJLmbysdQq';
+              const difyRes = await fetch('https://api.dify.ai/v1/chat-messages', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${apiKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  inputs: {},
+                  query: `[${incidentId}] ${aiQueryText}`,
+                  response_mode: "blocking",
+                  user: currentUser.employee_id || "sguard_user"
+                })
+              });
+              if (difyRes.ok) {
+                const difyData = await difyRes.json();
+                const aiAnswer = difyData.answer;
+                
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  wsRef.current.send(JSON.stringify({
+                    type: "CHAT_SEND",
+                    incident_id: incidentId,
+                    sender: `system_${aiAgentName.replace(/ /g, '_').toLowerCase()}`,
+                    name: aiAgentName,
+                    role: 'assistant',
+                    msg_type: "ai_analysis",
+                    text: aiAnswer
+                  }));
+                }
+              }
+            } catch (e) {
+              console.error("Dify API error", e);
+            }
+          };
+          callDify();
+        }
       }
       setReplyTo(null);
     } catch (err) {
@@ -1340,88 +1455,8 @@ export default function ChatPage() {
   }, [selectedFiles, uploadingFile, incidentId, currentUser, replyTo]);
 
   const handleSendMessage = async () => {
-    const hasText = mainInput.trim();
-    const hasFiles = selectedFiles.length > 0;
-    
-    if (!hasText && !hasFiles) return;
-    if (uploadingFile) return;
-
-    setUploadingFile(true);
-    
-    try {
-      if (hasFiles) {
-        const apiBase = 'https://sguardai.khcho0421.workers.dev';
-        for (const fileObj of selectedFiles) {
-          const formData = new FormData();
-          formData.append('file', fileObj.file);
-          formData.append('incident_id', incidentId);
-          formData.append('uploaded_by', currentUser.name || '익명');
-          const uploadRes = await fetch(`${apiBase}/warroom/upload`, { 
-            method: 'POST', 
-            headers: getAuthHeaders({ 'Content-Type': null }), // Let browser set multipart boundary
-            body: formData 
-          });
-          if (uploadRes.ok) {
-            const uploadData = await uploadRes.json();
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({
-                type: "CHAT_SEND",
-                incident_id: incidentId,
-                sender: currentUser.employee_id,
-                name: currentUser.name,
-                role: currentUser.role,
-                msg_type: "file",
-                text: `[첨부파일] ${fileObj.file.name}|${uploadData.url}|${fileObj.file.type}`
-              }));
-            }
-          }
-        }
-        setSelectedFiles([]);
-      }
-
-      if (hasText) {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            type: "CHAT_SEND",
-            incident_id: incidentId,
-            sender: currentUser.employee_id,
-            name: currentUser.name,
-            role: currentUser.role,
-            msg_type: "user",
-            text: mainInput,
-            reply_to: replyTo?.seq
-          }));
-          
-          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-          setTimeout(() => {
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({
-                type: "TYPING_STOP",
-                user_id: currentUser.employee_id,
-                name: currentUser.name
-              }));
-            }
-          }, 50);
-        } else {
-          await saveChatToDb({
-            incident_id: incidentId,
-            sender: currentUser.employee_id,
-            name: currentUser.name,
-            sender_name: currentUser.name,
-            role: currentUser.role,
-            profile_picture: cleanProfilePic(currentUser.profile_picture),
-            type: 'me',
-            text: mainInput
-          });
-        }
-        setMainInput('');
-        setReplyTo(null);
-      }
-    } catch (err) {
-      console.error("Failed to send message/files", err);
-    } finally {
-      setUploadingFile(false);
-    }
+    await handleSendMessageFromInput(mainInput);
+    setMainInput('');
   };
 
   const handleLeaveRoom = async () => {

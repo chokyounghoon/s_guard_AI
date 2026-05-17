@@ -59,6 +59,16 @@ export default function MobileChat({ user }) {
   const [participants, setParticipants] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  
+  const AI_AGENTS = [
+    { id: 'expert', name: 'AI Expert', label: 'S-Autopilot Expert' },
+    { id: 'security', name: 'Security Agent', label: '보안 전문가' },
+    { id: 'db', name: 'DB Agent', label: 'DB 전문가' },
+    { id: 'devops', name: 'DevOps Agent', label: '인프라 전문가' },
+    { id: 'leader', name: 'Leader Agent', label: '총괄 매니저' }
+  ];
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const wsRef = useRef(null);
@@ -243,7 +253,26 @@ export default function MobileChat({ user }) {
     const normId = String(incidentId);
     setSending(true);
     setInput('');
+    setShowMentionMenu(false);
     if (textareaRef.current) textareaRef.current.style.height = '14px';
+
+    let isAiQuery = false;
+    let aiQueryText = text;
+    let aiAgentName = 'AI Expert';
+    
+    for (const agent of AI_AGENTS) {
+      if (text.includes(`@${agent.name}`)) {
+        isAiQuery = true;
+        aiAgentName = agent.name;
+        aiQueryText = text.replace(`@${agent.name}`, '').trim();
+        break;
+      }
+    }
+    
+    if (!isAiQuery && text.trim().startsWith('@')) {
+      isAiQuery = true;
+      aiQueryText = text.replace(/^@[^\s]+/, '').trim();
+    }
 
     // 로컬에 즉시 표시
     const tempMsg = {
@@ -287,6 +316,48 @@ export default function MobileChat({ user }) {
         }),
       });
     } catch (_) {}
+
+    // Dify API 호출
+    if (isAiQuery) {
+      const callDify = async () => {
+        try {
+          const apiKey = 'app-ZDaVB8EWtA5vmTYJLmbysdQq';
+          const difyRes = await fetch('https://api.dify.ai/v1/chat-messages', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              inputs: {},
+              query: `[${incidentId}] ${aiQueryText}`,
+              response_mode: "blocking",
+              user: user?.employee_id || "sguard_user"
+            })
+          });
+          if (difyRes.ok) {
+            const difyData = await difyRes.json();
+            const aiAnswer = difyData.answer;
+            
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({
+                type: "CHAT_SEND",
+                incident_id: incidentId,
+                sender: `system_${aiAgentName.replace(/ /g, '_').toLowerCase()}`,
+                name: aiAgentName,
+                role: 'assistant',
+                msg_type: "ai_analysis",
+                text: aiAnswer
+              }));
+            }
+          }
+        } catch (e) {
+          console.error("Dify API error", e);
+        }
+      };
+      callDify();
+    }
+
     setSending(false);
   }, [input, sending, incidentId, user, participants.length]);
 
@@ -411,8 +482,39 @@ export default function MobileChat({ user }) {
       </div>
 
       {/* 입력 영역 (초슬림 모바일 버전) */}
-      <div className="bg-[#191919] border-t border-[#242424] px-2 py-1.5 shrink-0"
+      <div className="bg-[#191919] border-t border-[#242424] px-2 py-1.5 shrink-0 relative"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}>
+        
+        {/* Mention Menu */}
+        {showMentionMenu && (
+          <div className="absolute bottom-full left-2 right-2 mb-2 bg-[#1a2035] border border-white/10 rounded-2xl p-1.5 shadow-2xl z-[100] max-h-48 overflow-y-auto">
+            {AI_AGENTS.filter(a => a.name.toLowerCase().includes(mentionFilter) || a.label.toLowerCase().includes(mentionFilter)).map(agent => (
+              <div 
+                key={agent.id}
+                onClick={() => {
+                  const lastAtPos = input.lastIndexOf('@');
+                  const newVal = input.slice(0, lastAtPos) + `@${agent.name} `;
+                  setInput(newVal);
+                  setShowMentionMenu(false);
+                  if (textareaRef.current) textareaRef.current.focus();
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 active:bg-white/20 cursor-pointer transition-colors"
+              >
+                <div className="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                  <span className="text-[10px]">🤖</span>
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold text-white truncate">{agent.name}</span>
+                  <span className="text-[9px] text-slate-400 truncate">{agent.label}</span>
+                </div>
+              </div>
+            ))}
+            {AI_AGENTS.filter(a => a.name.toLowerCase().includes(mentionFilter) || a.label.toLowerCase().includes(mentionFilter)).length === 0 && (
+              <div className="px-3 py-2 text-xs text-slate-500 text-center">검색 결과가 없습니다</div>
+            )}
+          </div>
+        )}
+
         <div className="flex items-end gap-1">
           {/* 파일 첨부/기능 (Plus) */}
           <button className="flex items-center justify-center rounded-full bg-[#2A2A2A] border border-white/10 text-slate-300 transition-all active:scale-90 flex-none mb-0.5"
@@ -426,9 +528,23 @@ export default function MobileChat({ user }) {
               ref={textareaRef}
               value={input}
               onChange={(e) => {
-                setInput(e.target.value);
+                const val = e.target.value;
+                setInput(val);
                 e.target.style.height = 'auto';
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+
+                const lastAtPos = val.lastIndexOf('@');
+                if (lastAtPos !== -1) {
+                  const textAfterAt = val.slice(lastAtPos + 1);
+                  if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+                    setShowMentionMenu(true);
+                    setMentionFilter(textAfterAt.toLowerCase());
+                  } else {
+                    setShowMentionMenu(false);
+                  }
+                } else {
+                  setShowMentionMenu(false);
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
