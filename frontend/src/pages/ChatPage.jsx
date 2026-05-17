@@ -2013,6 +2013,7 @@ export default function ChatPage() {
               onToggleReactionMenu={(seq) => setActiveReactionMsg(activeReactionMsg === seq ? null : seq)}
               onReply={setReplyTo}
               onAddReaction={handleAddReaction}
+              onDelete={handleDeleteMessage}
             />
           );
         })}
