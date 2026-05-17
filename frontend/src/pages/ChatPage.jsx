@@ -229,7 +229,7 @@ const renderAttachment = (attachment, isMe) => {
 // ── 🚀 3단계 최적화: 완벽하게 격리 및 메모이제이션된 개별 메시지 행 ──
 const ChatMessageRow = React.memo(({
   msg, isContinuous, isMe, isResolved, currentUser, mainMessages, activeReactionMsg,
-  onLongPress, onToggleBookmark, onToggleReactionMenu, onReply, onAddReaction
+  onLongPress, onToggleBookmark, onToggleReactionMenu, onReply, onAddReaction, onDelete
 }) => {
   const longPressTimer = useRef(null);
   const avatarSrc = msg.avatar_url || (msg.profile_picture ? (msg.profile_picture.startsWith('http') || msg.profile_picture.startsWith('data:image') ? msg.profile_picture : `${API_BASE}${msg.profile_picture}`) : null);
@@ -254,6 +254,15 @@ const ChatMessageRow = React.memo(({
           <div className="flex items-center gap-1 text-slate-400 text-[10px] font-mono shrink-0">
             <Sparkles className="w-3 h-3 text-[#00e5ff]" />
             <span>{msg.time}</span>
+            {onDelete && (
+              <button 
+                onClick={() => onDelete(msg.seq || msg.id)}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors ml-1"
+                title="메시지 삭제"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
         <div className="pt-2">
@@ -1204,6 +1213,10 @@ export default function ChatPage() {
       setIsSearching(false);
     }
   };
+
+  const handleDeleteMessage = useCallback((msgId) => {
+    setMainMessages(prev => prev.filter(m => (m.seq || m.id) !== msgId));
+  }, []);
 
   // Warp/Jump to message function
   const handleWarpToMessage = (target_incident_id, seq) => {

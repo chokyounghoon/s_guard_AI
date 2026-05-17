@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info, Bot } from 'lucide-react';
+import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info, Bot, X } from 'lucide-react';
 import AICardMarkdown from './AICardMarkdown';
 import { getAccessToken } from '../lib/authStore';
 
@@ -177,9 +177,22 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
     };
   }, [incidentId, isVisible, currentUser.employee_id, currentUser.name]);
 
-  const handleSendMessage = async () => {
-    const text = inputValue.trim();
-    if (!text || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+  const handleDeleteMessage = (msgId) => {
+    setMessages(prev => prev.filter(m => (m.id || m.seq) !== msgId));
+  };
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const handleSendMessage = async (customText = null) => {
+    const text = typeof customText === 'string' ? customText : inputValue;
+    if (!text.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
     setInputValue('');
     setShowMentionMenu(false);
@@ -360,6 +373,13 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                     <div className="flex items-center gap-1 text-slate-400 text-[10px] font-mono shrink-0">
                       <Sparkles className="w-3 h-3 text-[#00e5ff]" />
                       <span>{msg.time || msg.ts ? formatKst(msg.time || msg.ts) : ''}</span>
+                      <button 
+                        onClick={() => handleDeleteMessage(msg.id || msg.seq)}
+                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors ml-1"
+                        title="메시지 삭제"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
                   <div className="pt-2">
