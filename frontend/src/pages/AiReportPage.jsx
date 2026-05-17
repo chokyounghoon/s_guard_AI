@@ -288,6 +288,55 @@ export default function AiReportPage() {
     setCheckedActionItems(prev => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
+  // 🚀 탭 목록 및 제스처 스와이프 연동
+  const tabs = useMemo(() => [
+    { id: 'summary',   label: 'AI 분석 요약' },
+    { id: 'agents',    label: 'Agent 로그' },
+    { id: 'chat',      label: 'War-Room 요약' },
+    { id: 'files',     label: '첨부파일' },
+    { id: 'ai_report', label: '✨ AI 종합보고서' },
+  ], []);
+
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+
+    const dx = touchStartX.current - touchEndX;
+    const dy = touchStartY.current - touchEndY;
+
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      const currentIndex = tabs.findIndex(t => t.id === activeTab);
+      if (currentIndex === -1) return;
+
+      if (dx > 0 && currentIndex < tabs.length - 1) {
+        // 좌측으로 스와이프 (다음 탭)
+        if (navigator.vibrate) navigator.vibrate(30);
+        const nextId = tabs[currentIndex + 1].id;
+        setActiveTab(nextId);
+        const el = document.getElementById(`tab-${nextId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      } else if (dx < 0 && currentIndex > 0) {
+        // 우측으로 스와이프 (이전 탭)
+        if (navigator.vibrate) navigator.vibrate(30);
+        const prevId = tabs[currentIndex - 1].id;
+        setActiveTab(prevId);
+        const el = document.getElementById(`tab-${prevId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
   // 🚀 탭 바 가로 스크롤 인디케이터 상태
   const tabsRef = useRef(null);
   const [hasMoreTabs, setHasMoreTabs] = useState(false);
@@ -776,13 +825,7 @@ export default function AiReportPage() {
     }
   };
 
-  const tabs = [
-    { id: 'summary',   label: 'AI 분석 요약' },
-    { id: 'agents',    label: 'Agent 로그' },
-    { id: 'chat',      label: 'War-Room 요약' },
-    { id: 'files',     label: '첨부파일' },
-    { id: 'ai_report', label: '✨ AI 종합보고서' },
-  ];
+
 
   const sev = report?.severity || 'NORMAL';
   const sevClass = severityColors[sev] || severityColors.NORMAL;
@@ -952,7 +995,11 @@ export default function AiReportPage() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-20 overflow-y-auto custom-scrollbar">
+      <main
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-20 overflow-y-auto custom-scrollbar"
+      >
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
             <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
