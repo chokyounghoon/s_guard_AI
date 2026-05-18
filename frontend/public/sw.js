@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v35.0'; // Robust deep-linking and SPA navigation
+const CACHE_NAME = 'sguard-v35.1'; // Robust deep-linking and SPA navigation
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -170,18 +170,17 @@ self.addEventListener('notificationclick', (event) => {
       // 🎯 2. Try to find any app window on same origin and navigate
       if (windowClients.length > 0) {
         const client = windowClients.find(c => c.focused) || windowClients[0];
-        console.log('[SW] Reusing existing window, sending postMessage and navigating...');
+        console.log('[SW] Reusing existing window, sending postMessage for SPA routing...');
         
         if ('focus' in client) {
           client.focus();
         }
+        
+        // Let the React App handle the soft navigation via PUSH_NAVIGATE message.
+        // DO NOT call client.navigate(absoluteUrl) as it causes a destructive hard reload 
+        // that aborts the postMessage event and breaks iOS PWA routing.
         client.postMessage({ type: 'PUSH_NAVIGATE', url: absoluteUrl });
-        if ('navigate' in client) {
-          return client.navigate(absoluteUrl).catch(err => {
-            console.error('[SW] Navigate failed, opening new window:', err);
-            return clients.openWindow(absoluteUrl);
-          });
-        }
+        return;
       }
 
       // 🎯 3. No windows found, open new
