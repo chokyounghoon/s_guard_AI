@@ -404,9 +404,9 @@ export default function UserManagementPage() {
             <button onClick={() => goBack()} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </button>
-            <div className="min-w-0">
-              <h1 className="text-base font-black tracking-tight" style={{ background:'linear-gradient(90deg,#f1f5f9,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>사용자 계정 관리</h1>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color:'rgba(129,140,248,0.55)' }}>User Identity Management</p>
+            <div className="min-w-0 flex flex-col justify-center">
+              <h1 className="text-base font-black tracking-tight truncate whitespace-nowrap" style={{ background:'linear-gradient(90deg,#f1f5f9,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>계정 관리</h1>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] truncate whitespace-nowrap" style={{ color:'rgba(129,140,248,0.55)' }}>Account Management</p>
             </div>
           </div>
 
