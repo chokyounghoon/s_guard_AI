@@ -297,7 +297,7 @@ function AppContent() {
     };
     localStorage.removeItem('sguard_jwt');
     checkSession();
-  }, [navigate, isAuthPage]);
+  }, []); // Run only once on app mount
 
   // 🛡️ Debug: Governance Guard Status
   const debugKey = `${userProfile?.employee_id}_${userProfile?.terms_agreed_at}_${location.pathname}`;
