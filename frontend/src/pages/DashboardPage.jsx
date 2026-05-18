@@ -300,6 +300,24 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [isMyAssignOpen, setIsMyAssignOpen] = useState(true);
   const [isOpeningWarRoom, setIsOpeningWarRoom] = useState(false);
 
+  const [showSmsScrollIndicator, setShowSmsScrollIndicator] = useState(false);
+  const smsListContainerRef = React.useRef(null);
+
+  const checkSmsScroll = React.useCallback(() => {
+    if (!smsListContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = smsListContainerRef.current;
+    if (scrollHeight > clientHeight + 15 && scrollTop + clientHeight < scrollHeight - 35) {
+      setShowSmsScrollIndicator(true);
+    } else {
+      setShowSmsScrollIndicator(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const timer = setTimeout(checkSmsScroll, 150);
+    return () => clearTimeout(timer);
+  }, [visibleSms, checkSmsScroll]);
+
   const handleOpenWarRoomFromInsight = async (smsMessage, analysisText) => {
     if (isOpeningWarRoom) return;
     const currentSms = smsMessage || selectedSmsRef.current;
@@ -1699,7 +1717,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
           <div className="flex-1 overflow-hidden flex flex-col">
-          <div className={`bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border border-[#00e5ff]/40 shadow-[0_0_25px_rgba(0,229,255,0.2)] h-full overflow-hidden flex flex-col backdrop-blur-2xl
+          <div className={`bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border border-[#00e5ff]/40 shadow-[0_0_25px_rgba(0,229,255,0.2)] h-full overflow-hidden flex flex-col relative backdrop-blur-2xl
             ${(() => { const v = Number(selectedSms?.received_count); const t = (() => { try { const s = localStorage.getItem('sguard_alert_thresholds_v3'); if (s) { const p = JSON.parse(s); return p.critical?.errorCount || 10; } } catch{} return 10; })(); return v > t ? 'sms-pulse-critical' : v > 3 ? 'sms-pulse-major' : ''; })()}`}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-3.5">
@@ -1791,7 +1809,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <div 
+                ref={smsListContainerRef}
+                onScroll={checkSmsScroll}
+                className="flex-1 overflow-y-auto custom-scrollbar"
+              >
                 {visibleSms.length > 0 ? (
                   <div className="p-3 space-y-2">
                     {visibleSms.map((msg) => {
@@ -1928,6 +1950,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
                 )}
               </div>
+
+              {/* Floating scroll indicator */}
+              {showSmsScrollIndicator && (
+                <div 
+                  onClick={() => {
+                    if (smsListContainerRef.current) {
+                      smsListContainerRef.current.scrollTo({ top: smsListContainerRef.current.scrollHeight, behavior: 'smooth' });
+                    }
+                  }}
+                  className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#00e5ff] text-slate-900 font-black text-xs shadow-[0_0_25px_rgba(0,229,255,0.8)] border border-white/20 transition-all hover:scale-105 active:scale-95 select-none"
+                >
+                  <span>아래 수신내역 더보기</span>
+                  <ChevronDown className="w-4 h-4 text-slate-900 shrink-0" />
+                </div>
+              )}
             </div>
 
           </div>{/* end flex-1 wrapper */}
