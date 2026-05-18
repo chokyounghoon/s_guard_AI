@@ -289,6 +289,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   }, [visibleSms, selectedSms, insightSms, showAgentPanel, agentMessages.length, incidentWorkflowSteps.length]);
 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const isFirstMountRef = React.useRef(true);
   const [warRooms, setWarRooms] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
   const [myAssignments, setMyAssignments] = useState([]);
@@ -522,17 +523,26 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
   // Fetch War-Rooms & SMS periodically
   useEffect(() => {
-    setIsInitialLoading(true);
-    Promise.allSettled([
-      fetchSMSMessages(),
-      fetchWarRooms(),
-      fetchActivityLogs(),
-      fetchMyAssignments(),
-      fetchUserActivityHistory(),
-      fetchSettings()
-    ]).finally(() => {
-      setIsInitialLoading(false);
-    });
+    if (isFirstMountRef.current) {
+      setIsInitialLoading(true);
+      Promise.allSettled([
+        fetchSMSMessages(),
+        fetchWarRooms(),
+        fetchActivityLogs(),
+        fetchMyAssignments(),
+        fetchUserActivityHistory(),
+        fetchSettings()
+      ]).finally(() => {
+        setIsInitialLoading(false);
+        isFirstMountRef.current = false;
+      });
+    } else {
+      fetchSMSMessages();
+      fetchWarRooms();
+      fetchActivityLogs();
+      fetchMyAssignments();
+      fetchUserActivityHistory();
+    }
     // 🚀 Performance Optimization: Reduce polling pressure during active AI analysis
     const pollIntervalMultiplier = isAnalyzingActive ? 4 : 1; // 4x slower during analysis
 
