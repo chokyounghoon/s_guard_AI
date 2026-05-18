@@ -191,10 +191,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   }, [refreshCodes]);
 
   const FLOW_STEPS = [
-    { id: 'SMS', label: 'SMS 수신 및 장애 인지', icon: Bell },
-    { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료', icon: Brain },
-    { id: 'WARROOM', label: '워룸생성 및 할당완료', icon: Users },
-    { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', icon: CheckCircle }
+    { id: 'SMS', label: 'SMS 수신 및 장애 인지', icon: Bell, color: 'blue' },
+    { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료', icon: Brain, color: 'cyan' },
+    { id: 'WARROOM', label: '워룸생성 및 할당완료', icon: Users, color: 'indigo' },
+    { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', icon: CheckCircle, color: 'purple' }
   ];
 
   // Helper for Date/Duration Formatting
@@ -2012,8 +2012,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     </div>
                   </span>
                   <div className="min-w-0">
-                    <h3 className="font-black text-white text-base tracking-tight">처리 현황</h3>
-                    <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Incident Handling Progress</span>
+                    <h3 className="font-black text-white text-base tracking-tight whitespace-nowrap">처리 현황</h3>
+                    <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap hidden sm:block">Incident Handling Progress</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -2069,7 +2069,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               return (
                                 <div key={label} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[8px] font-black ${
                                   isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                  : isActive ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                  : isActive ? 'bg-[#00e5ff]/15 border-[#00e5ff]/30 text-[#00e5ff] shadow-[0_0_10px_rgba(0,229,255,0.2)] animate-pulse'
                                   : 'bg-white/3 border-white/5 text-slate-600'
                                 }`}>
                                   <span className="opacity-60">{label}</span>
@@ -2084,12 +2084,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-hidden p-5">
-                <div className="relative h-full">
-                  <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-purple-500/50 to-transparent" />
-
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                <div className="relative min-h-full">
                   {selectedIncidentIdFlow ? (
-                    <div className="flex flex-col h-full relative" style={{ minHeight: '100%' }}>
+                    <div className="flex flex-col relative space-y-4">
                       {(() => {
                         const stepTimestamps = FLOW_STEPS.map(step => {
                           let sData = incidentWorkflowSteps.find(s => s.id === step.id);
@@ -2107,85 +2105,114 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           return Math.max(0, end - start);
                         });
 
-                        const totalDuration = durations.reduce((a, b) => a + b, 0) || 1;
-
                         return FLOW_STEPS.map((step, sIdx) => {
                           const stepData = incidentWorkflowSteps.find(s => s.id === step.id) || 
                                            (step.id === 'RAG_AGENT' ? (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')) : null);
                           const isCompleted = !!stepData;
                           const isNextStep = !isCompleted && (sIdx === 0 || !!(incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) || (FLOW_STEPS[sIdx-1].id === 'RAG_AGENT' && (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')))));
 
-                          const rawWeight = sIdx < FLOW_STEPS.length - 1 ? (durations[sIdx] / totalDuration) : 0;
-                          const flexWeight = sIdx < FLOW_STEPS.length - 1 ? (0.2 + rawWeight * 0.8) : 0;
+                          const durationMs = sIdx < FLOW_STEPS.length - 1 ? durations[sIdx] : 0;
+                          const pb = durationMs === 0 ? 32 : Math.min(140, Math.max(36, Math.round(32 + (durationMs / 60000) * 1.5)));
+
+                          const boxStyles = {
+                            blue: isCompleted ? 'bg-blue-500/20 border-blue-400 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.4)] scale-105 font-black' : isNextStep ? 'bg-blue-500/30 border-blue-400 text-blue-400 shadow-[0_0_25px_rgba(59,130,246,0.6)] animate-pulse scale-110 font-black' : 'bg-white/5 border-white/15 text-slate-500 opacity-40',
+                            cyan: isCompleted ? 'bg-[#00e5ff]/20 border-[#00e5ff] text-[#00e5ff] shadow-[0_0_20px_rgba(0,229,255,0.4)] scale-105 font-black' : isNextStep ? 'bg-[#00e5ff]/30 border-[#00e5ff] text-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.6)] animate-pulse scale-110 font-black' : 'bg-white/5 border-white/15 text-slate-500 opacity-40',
+                            indigo: isCompleted ? 'bg-indigo-500/20 border-indigo-400 text-indigo-400 shadow-[0_0_20px_rgba(129,140,248,0.4)] scale-105 font-black' : isNextStep ? 'bg-indigo-500/30 border-indigo-400 text-indigo-400 shadow-[0_0_25px_rgba(129,140,248,0.6)] animate-pulse scale-110 font-black' : 'bg-white/5 border-white/15 text-slate-500 opacity-40',
+                            purple: isCompleted ? 'bg-purple-500/20 border-purple-400 text-purple-400 shadow-[0_0_20px_rgba(192,132,252,0.4)] scale-105 font-black' : isNextStep ? 'bg-purple-500/30 border-purple-400 text-purple-400 shadow-[0_0_25px_rgba(192,132,252,0.6)] animate-pulse scale-110 font-black' : 'bg-white/5 border-white/15 text-slate-500 opacity-40'
+                          }[step.color || 'cyan'];
+
+                          const lineColor = isCompleted
+                            ? step.color === 'blue' ? '#3b82f6'
+                            : step.color === 'cyan' ? '#00e5ff'
+                            : step.color === 'indigo' ? '#818cf8'
+                            : '#c084fc'
+                            : 'rgba(255,255,255,0.08)';
+
+                          const lineShadow = isCompleted
+                            ? step.color === 'blue' ? '0 0 12px rgba(59,130,246,0.6)'
+                            : step.color === 'cyan' ? '0 0 12px rgba(0,229,255,0.6)'
+                            : step.color === 'indigo' ? '0 0 12px rgba(129,140,248,0.6)'
+                            : '0 0 12px rgba(192,132,252,0.6)'
+                            : 'none';
 
                           return (
-                            <React.Fragment key={step.id}>
-                              <div className="relative pl-12 group shrink-0">
-                                <span className={`data-ring-wrapper data-ring-sm absolute left-0 top-0 z-10 ${isNextStep ? 'data-ring-spinning' : ''}`} style={{ width: 28, height: 28 }}>
-                                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all duration-700
-                                    ${isCompleted 
-                                      ? 'bg-[#00e5ff] border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.6)] scale-110 font-black' 
-                                      : isNextStep 
-                                      ? 'bg-[#00e5ff]/20 border-[#00e5ff] shadow-[0_0_12px_rgba(0,229,255,0.4)] animate-pulse' 
-                                      : 'bg-white/5 border-white/10 opacity-40'}`}>
-                                    <step.icon className={`w-3.5 h-3.5 ${isCompleted ? 'text-black font-black' : isNextStep ? 'text-[#00e5ff]' : 'text-slate-500'}`} />
+                            <div key={step.id} className="relative pl-14 transition-all duration-500 flex flex-col" style={{ paddingBottom: pb + 'px', opacity: isCompleted || isNextStep ? 1 : 0.4 }}>
+                              {/* Continuous Connecting Line */}
+                              {sIdx < FLOW_STEPS.length - 1 && (
+                                <div className="absolute left-[17px] top-9 bottom-0 w-[2px] transition-all duration-500" style={{
+                                  background: lineColor,
+                                  boxShadow: lineShadow
+                                }} />
+                              )}
+
+                              {/* Step Icon Box */}
+                              <div className="absolute left-0 top-0 z-20">
+                                <span className={`data-ring-wrapper data-ring-sm shrink-0 ${isNextStep ? 'data-ring-spinning' : ''}`} style={{ width: 36, height: 36 }}>
+                                  <div className={`w-9 h-9 rounded-2xl flex items-center justify-center border transition-all duration-700 ${boxStyles}`}>
+                                    <step.icon size={18} className={isCompleted || isNextStep ? '' : 'text-slate-500'} />
                                   </div>
                                 </span>
-                                <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
-                                  <div className="flex items-center gap-3 mb-1">
-                                    <h4 className={`font-black tracking-tight text-sm ${isCompleted ? 'text-white' : (isNextStep ? 'text-blue-400' : 'text-gray-500')}`}>
-                                      {step.label}
-                                    </h4>
-                                    {isCompleted && (
-                                      <span className="text-[9px] text-white/50 font-mono">
-                                        {formatYYMMDD(stepData.timestamp)}
+                              </div>
+
+                              {/* Interval Time Badge */}
+                              {durationMs > 1000 && sIdx < FLOW_STEPS.length - 1 && (
+                                <div className="absolute left-[38px] top-[calc(50%+18px)] -translate-y-1/2 z-30">
+                                  <div className={`px-3 py-1 rounded-xl border flex items-center gap-2 font-mono text-[11px] font-black shadow-xl transition-all ${
+                                    durationMs > 300000
+                                      ? 'bg-[#ff4a4a]/20 border-[#ff4a4a]/50 text-[#ff4a4a] shadow-[0_0_15px_rgba(255,74,74,0.3)]'
+                                      : durationMs > 60000
+                                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                                      : 'bg-[#00e5ff]/20 border-[#00e5ff]/50 text-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.3)]'
+                                  }`}>
+                                    <Clock size={13} className={durationMs > 60000 ? 'animate-spin' : ''} />
+                                    <span className="tracking-wider">{formatDuration(durationMs)}</span>
+                                    {(isCompleted && !stepTimestamps[sIdx+1]) && (
+                                      <span className="flex h-2 w-2 relative ml-1">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00e5ff] opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00e5ff]"></span>
                                       </span>
                                     )}
                                   </div>
-                                  <p className={`text-[11px] leading-snug ${isCompleted ? 'text-slate-400' : (isNextStep ? 'text-slate-300' : 'text-slate-600')}`}>
-                                    {isCompleted ? (stepData.detail?.length > 60 ? stepData.detail.slice(0,60)+'...' : stepData.detail) : (isNextStep ? '분석 진행 중...' : '대기 중')}
-                                  </p>
-                                </div>
-                              </div>
-                              {sIdx < FLOW_STEPS.length - 1 && (
-                                <div className="relative ml-[13px] flex-1 min-h-[20px]" style={{ flexGrow: flexWeight }}>
-                                  <div className={`absolute left-0 top-0 bottom-0 w-[2px] transition-colors duration-500
-                                    ${isCompleted ? 'bg-blue-600' : 'bg-white/5'}`} />
-                                  {/* Interval Time Badge (Dynamic Color & Active State) */}
-                                  {durations[sIdx] > 10000 && (
-                                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded border flex items-center gap-1.5 transition-all duration-500 z-20
-                                      ${durations[sIdx] > 300000 
-                                        ? 'bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
-                                        : durations[sIdx] > 60000 
-                                        ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.2)]' 
-                                        : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}
-                                      ${(isCompleted && !stepTimestamps[sIdx+1]) ? 'animate-pulse scale-110 border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : ''}`}>
-                                      <Clock className={`w-2.5 h-2.5 ${(isCompleted && !stepTimestamps[sIdx+1]) || durations[sIdx] > 60000 ? 'animate-spin' : ''}`} />
-                                      <span className={`text-[9px] font-mono font-black ${(isCompleted && !stepTimestamps[sIdx+1]) ? 'text-[10px]' : ''}`}>
-                                        {formatDuration(durations[sIdx])}
-                                      </span>
-                                      {(isCompleted && !stepTimestamps[sIdx+1]) && (
-                                        <span className="flex h-1.5 w-1.5 relative">
-                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
                                 </div>
                               )}
-                            </React.Fragment>
+
+                              {/* Step Text & Meta */}
+                              <div className="flex flex-col min-h-[36px] justify-center ml-2">
+                                <div className="flex items-center gap-3 mb-1.5">
+                                  <h4 className={`font-black tracking-tight text-[14.5px] ${
+                                    isCompleted ? 'text-white' : isNextStep ? 'text-[#00e5ff] text-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-slate-500'
+                                  }`}>
+                                    {step.label}
+                                  </h4>
+                                  {isCompleted && (
+                                    <span className="text-[10px] text-[#00e5ff] font-mono font-bold bg-[#00e5ff]/10 px-2 py-0.5 rounded-lg border border-[#00e5ff]/25 shadow-sm">
+                                      {formatYYMMDD(stepData.timestamp)}
+                                    </span>
+                                  )}
+                                  {isNextStep && (
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse text-[#00e5ff] bg-[#00e5ff]/15 border border-[#00e5ff]/40 shadow-[0_0_10px_rgba(0,229,255,0.3)]">
+                                      진행중
+                                    </span>
+                                  )}
+                                </div>
+                                <p className={`text-[13px] leading-relaxed tracking-tight ${
+                                  isCompleted ? 'text-slate-200 font-normal' : isNextStep ? 'text-[#00e5ff]/90 font-bold animate-pulse' : 'text-slate-600'
+                                }`}>
+                                  {isCompleted ? stepData.detail : isNextStep ? 'AI 및 시스템 분석 실시간 연동 중...' : '대기 중'}
+                                </p>
+                              </div>
+                            </div>
                           );
                         });
                       })()}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-24 opacity-20 grayscale transition-all duration-1000">
-                      <Activity className="w-16 h-16 mb-4 text-blue-400 animate-pulse" />
-                      <h3 className="text-sm font-black tracking-tight text-white mb-2">인시던트 대응 모니터링 활성화 대기 중</h3>
-                      <p className="text-[10px] text-slate-500 max-w-[200px] text-center font-medium leading-relaxed">
-                        좌측 '조치 리스트'에서 인시던트를 선택하시면,<br/>
-                        실시간 MTTR 및 7단계 정밀 대응 흐름이 즉시 활성화됩니다.
+                    <div className="flex flex-col items-center justify-center py-28 opacity-30 transition-all duration-1000">
+                      <Activity className="w-14 h-14 mb-4 text-[#00e5ff] animate-pulse filter drop-shadow-[0_0_10px_rgba(0,229,255,0.5)]" />
+                      <h3 className="text-sm font-black tracking-tight text-[#00e5ff] mb-2 uppercase whitespace-nowrap">인시던트 대응 모니터링 활성화 대기 중</h3>
+                      <p className="text-xs text-slate-400 max-w-[240px] text-center font-medium leading-relaxed">
+                        실시간 SMS 수신 내역 또는 목록에서 인시던트를 선택하시면,<br/>
+                        정밀 대응 흐름 타임라인이 즉시 가동됩니다.
                       </p>
                     </div>
                   )}
