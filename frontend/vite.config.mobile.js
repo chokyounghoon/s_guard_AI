@@ -43,6 +43,14 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.mobile.html'),
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          ui: ['framer-motion', 'lucide-react', 'react-hot-toast'],
+          markdown: ['react-markdown', 'remark-gfm', 'html2pdf.js']
+        }
+      }
     },
   },
 
