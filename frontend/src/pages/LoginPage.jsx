@@ -16,21 +16,46 @@ const OtpBoxes = React.memo(({ value, onChange, disabled, inputRef: extRef }) =>
   const localRef = useRef(null);
   const inputRef = extRef || localRef;
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? '');
+  const [activeIndex, setActiveIndex] = useState(value.length);
 
-  // OTP가 아직 미완성(6자리 미만)일 때만 오토포커스
-  // OtpSection이 LoginPage 내부 컴포넌트라 re-render 시 리마운트됨 → value 체크로 포커스 탈취 방지
+  React.useEffect(() => {
+    setActiveIndex(value.length);
+  }, [value]);
+
   React.useEffect(() => {
     if (!disabled && value.length < 6) inputRef.current?.focus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const updateActiveIndexFromCaret = () => {
+    if (inputRef.current && !disabled) {
+      setActiveIndex(inputRef.current.selectionStart ?? value.length);
+    }
+  };
+
   const handleChange = (e) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 6);
     onChange(val);
+    setTimeout(updateActiveIndexFromCaret, 0);
+  };
+
+  const handleBoxClick = (i, e) => {
+    e.stopPropagation();
+    if (disabled) return;
+    if (inputRef.current) {
+      inputRef.current.focus();
+      const targetIndex = Math.min(i, value.length);
+      if (targetIndex < value.length) {
+        inputRef.current.setSelectionRange(targetIndex, targetIndex + 1);
+      } else {
+        inputRef.current.setSelectionRange(value.length, value.length);
+      }
+      setActiveIndex(targetIndex);
+    }
   };
 
   return (
     <div 
-      onClick={() => inputRef.current?.focus()}
+      onClick={() => { inputRef.current?.focus(); setTimeout(updateActiveIndexFromCaret, 0); }}
       style={{ position: 'relative', width: 270, margin: '0 auto', height: 56, cursor: 'text' }}
     >
       {/* 🔑 실제로 타이핑을 받는 네이티브 입력창 */}
@@ -43,6 +68,8 @@ const OtpBoxes = React.memo(({ value, onChange, disabled, inputRef: extRef }) =>
         maxLength={6}
         value={value}
         onChange={handleChange}
+        onKeyUp={updateActiveIndexFromCaret}
+        onSelect={updateActiveIndexFromCaret}
         disabled={disabled}
         style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -53,40 +80,51 @@ const OtpBoxes = React.memo(({ value, onChange, disabled, inputRef: extRef }) =>
           border: 'none', outline: 'none',
           padding: 0, margin: 0, zIndex: 10,
           fontSize: 18,         // 16px 이상이어야 iOS 줌인 방지
-          WebkitTapHighlightColor: 'transparent'
+          WebkitTapHighlightColor: 'transparent',
+          pointerEvents: 'none' // 클릭 이벤트가 하위 박스로 전달되도록 설정
         }}
       />
 
       {/* 👁️ 시각적 레이어 (배경) */}
       <div style={{
         display: 'flex', gap: 7, justifyContent: 'center', width: '100%', height: '100%',
-        pointerEvents: 'none', position: 'absolute', top: 0, left: 0
+        position: 'absolute', top: 0, left: 0
       }}>
         {[0, 1, 2, 3, 4, 5].map(i => {
           const isFilled = digits[i] !== '';
-          const isCurrent = i === value.length && !disabled;
+          const isCurrent = activeIndex === i && !disabled;
           return (
             <div
               key={i}
+              onClick={(e) => handleBoxClick(i, e)}
               style={{
                 width: 40, height: 56,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 28, fontWeight: 900,
                 color: '#60a5fa',
-                background: isFilled ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.03)',
+                background: isFilled ? (isCurrent ? 'rgba(96,165,250,0.35)' : 'rgba(96,165,250,0.18)') : (isCurrent ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.03)'),
                 border: isCurrent
                   ? '2.5px solid #60a5fa'
                   : isFilled
                   ? '2px solid rgba(96,165,250,0.7)'
                   : '1.5px solid rgba(255,255,255,0.12)',
                 borderRadius: 12,
-                boxShadow: isCurrent ? '0 0 15px rgba(96,165,250,0.4)' : 'none',
-                textShadow: isFilled ? '0 0 12px rgba(96,165,250,0.6)' : 'none',
+                boxShadow: isCurrent ? '0 0 15px rgba(96,165,250,0.5)' : 'none',
+                textShadow: isFilled ? (isCurrent ? '0 0 15px #ffffff, 0 0 20px #60a5fa' : '0 0 12px rgba(96,165,250,0.6)') : 'none',
                 transition: 'all 0.1s ease',
-                flexShrink: 0
+                flexShrink: 0,
+                cursor: disabled ? 'not-allowed' : 'pointer'
               }}
             >
-              {digits[i] || (isCurrent ? (
+              {digits[i] ? (
+                <span style={{ 
+                  color: isCurrent ? '#ffffff' : '#60a5fa',
+                  borderBottom: isCurrent ? '3px solid #ffffff' : 'none',
+                  paddingBottom: isCurrent ? 2 : 0,
+                  display: 'inline-block',
+                  lineHeight: 1
+                }}>{digits[i]}</span>
+              ) : (isCurrent ? (
                 <span style={{ 
                   width: 2.5, height: 28, background: '#60a5fa', borderRadius: 2,
                   boxShadow: '0 0 10px rgba(96,165,250,0.8)',
