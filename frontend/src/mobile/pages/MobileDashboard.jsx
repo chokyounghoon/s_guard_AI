@@ -1395,13 +1395,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   const isProcessing = incidentStatus === 'INC_002';
                   const isCompleted = incidentStatus === 'INC_003';
                   
-                  const btnCls = isCompleted 
-                    ? 'bg-[#00e5ff]/20 text-[#00e5ff] border-[#00e5ff]/30'
-                    : isProcessing
-                      ? 'bg-[#00e5ff]/20 text-[#00e5ff] border-[#00e5ff]/30'
-                      : sev === 'CRITICAL' ? 'bg-[#00e5ff] text-slate-200 shadow-[0_0_12px_rgba(0,229,255,0.6)] border-[#00e5ff]'
-                      : sev === 'MAJOR'    ? 'bg-[#00e5ff] text-slate-200 shadow-[0_0_12px_rgba(0,229,255,0.6)] border-[#00e5ff]'
-                      :                      'bg-[#00e5ff] text-slate-200 shadow-[0_0_12px_rgba(0,229,255,0.6)] border-[#00e5ff]';
+                  const btnCls = (isCompleted || isProcessing)
+                    ? 'bg-[#121820] text-slate-300 border-white/15 shadow-sm font-bold'
+                    : 'bg-[#081820] text-[#00e5ff] border-[#00e5ff]/50 shadow-[0_0_12px_rgba(0,229,255,0.25)] animate-pulse font-black';
 
                   return (
                     <button
