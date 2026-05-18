@@ -169,6 +169,25 @@ export const isPathAllowed = (path) => {
   if (!Array.isArray(paths)) return true;
   if (paths.length === 0) return false;
   
+  // 🔗 하위 경로를 상위 권한 경로로 매핑 (Nested Routes Mapping)
+  const aliasMap = {
+    '/chat-summary': '/chat',
+    '/activity-detail': '/activity',
+    '/assignment-detail': '/assignments',
+    '/my-assignments': '/assignments',
+    '/mobile-report-search': '/search',
+    '/workflow': '/incident-list',
+    '/report': '/incident-list'
+  };
+
+  for (const [childPath, parentPath] of Object.entries(aliasMap)) {
+    if (path === childPath || path.startsWith(childPath + '/')) {
+      if (paths.some(p => parentPath === p || parentPath.startsWith(p + '/'))) {
+        return true;
+      }
+    }
+  }
+  
   return paths.some(p => path === p || path.startsWith(p + '/'));
 };
 
