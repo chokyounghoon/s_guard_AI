@@ -12,8 +12,9 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 const S = { A: 'A', B: 'B', C1: 'C1', C2: 'C2', RESET_A: 'RESET_A', RESET_B: 'RESET_B' };
 
 
-const OtpBoxes = React.memo(({ value, onChange, disabled }) => {
-  const inputRef = useRef(null);
+const OtpBoxes = React.memo(({ value, onChange, disabled, inputRef: extRef }) => {
+  const localRef = useRef(null);
+  const inputRef = extRef || localRef;
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? '');
 
   // OTP가 아직 미완성(6자리 미만)일 때만 오토포커스
@@ -87,8 +88,9 @@ const OtpBoxes = React.memo(({ value, onChange, disabled }) => {
             >
               {digits[i] || (isCurrent ? (
                 <span style={{ 
-                  width: 2, height: 26, background: '#60a5fa', borderRadius: 2,
-                  animation: 'blink 1s step-end infinite' 
+                  width: 2.5, height: 28, background: '#60a5fa', borderRadius: 2,
+                  boxShadow: '0 0 10px rgba(96,165,250,0.8)',
+                  animation: 'blink 0.7s step-end infinite' 
                 }} />
               ) : null)}
             </div>
@@ -133,6 +135,7 @@ function PwStrength({ pw }) {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const otpInputRef = useRef(null);
 
   const [state, setState]             = useState(S.A);
   const [employeeId, setEmployeeId]   = useState('');
@@ -458,6 +461,16 @@ export default function LoginPage() {
     </button>
   );
 
+  const handleResetOtp = () => {
+    setOtp('');
+    clearErr();
+    setTimeout(() => {
+      if (otpInputRef.current) {
+        otpInputRef.current.focus();
+      }
+    }, 50);
+  };
+
   const OtpSection = ({ isNew }) => (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
       <div style={{ textAlign:'center', background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.15)', borderRadius:12, padding:'12px 16px' }}>
@@ -467,7 +480,7 @@ export default function LoginPage() {
         </div>
         <p style={{ color:'rgba(255,255,255,0.45)', fontSize:12, margin:0 }}>위 이메일로 발송된 6자리 인증번호를 입력해 주세요.</p>
       </div>
-      <OtpBoxes value={otp} onChange={v=>{ setOtp(v); clearErr(); }} disabled={loading||otpExpired} />
+      <OtpBoxes value={otp} onChange={v=>{ setOtp(v); clearErr(); }} disabled={loading||otpExpired} inputRef={otpInputRef} />
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
           <span style={{ color:'rgba(255,255,255,0.35)', fontSize:12 }}>유효시간</span>
@@ -476,10 +489,16 @@ export default function LoginPage() {
             : <Timer timerKey={timerKey} secs={180} onExpire={()=>setOtpExpired(true)} />
           }
         </div>
-        <button type="button" onClick={state?.startsWith?.('RESET') ? handleRequestReset : handleResend} disabled={loading||resendCnt>=3}
-          style={{ display:'flex', alignItems:'center', gap:4, color: resendCnt>=3?'rgba(255,255,255,0.2)':'#60a5fa', fontSize:12, background:'none', border:'none', cursor: resendCnt>=3?'not-allowed':'pointer', fontFamily:'inherit', fontWeight:500 }}>
-          <RotateCcw size={12} />재발송{resendCnt>0&&` (${resendCnt}/3)`}
-        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <button type="button" onClick={handleResetOtp} disabled={loading||otpExpired||!otp}
+            style={{ display:'flex', alignItems:'center', gap:4, color: (!otp||loading||otpExpired)?'rgba(255,255,255,0.2)':'#f87171', fontSize:12, background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.2)', padding:'5px 10px', borderRadius:8, cursor: (!otp||loading||otpExpired)?'not-allowed':'pointer', fontFamily:'inherit', fontWeight:600, transition:'all 0.2s' }}>
+            <RotateCcw size={12} />초기화
+          </button>
+          <button type="button" onClick={state?.startsWith?.('RESET') ? handleRequestReset : handleResend} disabled={loading||resendCnt>=3}
+            style={{ display:'flex', alignItems:'center', gap:4, color: resendCnt>=3?'rgba(255,255,255,0.2)':'#60a5fa', fontSize:12, background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.2)', padding:'5px 10px', borderRadius:8, cursor: resendCnt>=3?'not-allowed':'pointer', fontFamily:'inherit', fontWeight:600, transition:'all 0.2s' }}>
+            <RotateCcw size={12} />재발송{resendCnt>0&&` (${resendCnt}/3)`}
+          </button>
+        </div>
       </div>
       <BackBtn 
         to={state?.startsWith?.('RESET') ? S.RESET_A : (isNewUser ? S.B : S.C1)} 
