@@ -1825,10 +1825,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   smsListContainerRef.current.scrollTo({ top: smsListContainerRef.current.scrollHeight, behavior: 'smooth' });
                 }
               }}
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#00e5ff] text-slate-900 font-black text-xs shadow-[0_0_25px_rgba(0,229,255,0.8)] border border-white/20 transition-all hover:scale-105 active:scale-95 select-none"
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#081820] text-[#00e5ff] border border-[#00e5ff]/50 font-black text-xs shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all hover:scale-105 active:scale-95 select-none"
             >
               <span>아래 수신내역 더보기</span>
-              <ChevronDown className="w-4 h-4 text-slate-900 shrink-0" />
+              <ChevronDown className="w-4 h-4 text-[#00e5ff] shrink-0" />
             </div>
           )}
         </div>
@@ -2265,6 +2265,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
   const [partMap, setPartMap]           = useState({}); // team.code    → depth4[]
   const [subpartMap, setSubpartMap]     = useState({}); // part.code    → depth5[]
   const [showIosManual, setShowIosManual] = useState(false);
+  const [showAndroidManual, setShowAndroidManual] = useState(false);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -2751,7 +2752,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             <div className="pt-6 pb-2 flex flex-col space-y-3 shrink-0 border-t border-white/5">
               <div className="flex gap-3">
                 <button
-                  onClick={() => { window.location.href = '/s-bridge.apk?v=' + Date.now(); }}
+                  onClick={() => setShowAndroidManual(true)}
                   className="flex-1 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/40 hover:to-cyan-600/40 text-[#00e5ff] font-black py-3.5 px-3 rounded-2xl transition-all flex items-center justify-center gap-2 border border-[#00e5ff]/30 shadow-[0_4px_20px_rgba(0,229,255,0.2)] active:scale-[0.98]"
                 >
                   <Download className="w-4 h-4 shrink-0" />
@@ -2863,6 +2864,82 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
           </div>
         )}
+
+        {/* Android S-bridge 설치 매뉴얼 모달 */}
+        {showAndroidManual && (
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+            <div className="relative w-full max-w-md bg-[#0b1322] border border-blue-500/40 rounded-[28px] p-6 sm:p-8 shadow-[0_0_50px_rgba(0,229,255,0.3)] flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10 shrink-0">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600/30 to-cyan-600/30 border border-blue-500/40 text-[#00e5ff] flex items-center justify-center shrink-0 shadow-inner shadow-blue-500/20">
+                    <Download className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight whitespace-nowrap">Android S-bridge 설치 매뉴얼</h3>
+                </div>
+                <button 
+                  onClick={() => setShowAndroidManual(false)} 
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto pr-2 space-y-6 flex-1 text-slate-300 text-xs sm:text-sm custom-scrollbar">
+                <div className="space-y-2">
+                  <h4 className="flex items-center gap-2 text-[#00e5ff] font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-[#00e5ff] text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">1</span>
+                    Play 프로텍트 설정 진입
+                  </h4>
+                  <ul className="pl-7 leading-relaxed text-slate-400 list-disc space-y-1">
+                    <li>Google Play 스토어 앱을 실행합니다.</li>
+                    <li>우측 상단의 <span className="text-white font-bold">프로필 아이콘(내 계정)</span>을 탭합니다.</li>
+                    <li>메뉴 목록 중 <span className="text-white font-bold">Play 프로텍트</span>를 선택합니다.</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="flex items-center gap-2 text-[#00e5ff] font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-[#00e5ff] text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">2</span>
+                    실시간 검사 비활성화
+                  </h4>
+                  <ul className="pl-7 leading-relaxed text-slate-400 list-disc space-y-1">
+                    <li>화면 우측 상단의 <span className="text-white font-bold">톱니바퀴(설정)</span> 아이콘을 클릭합니다.</li>
+                    <li><span className="text-red-400 font-bold">Play 프로텍트로 앱 검사</span> 스위치를 끕니다.</li>
+                    <li>확인 팝업 창에서 <span className="text-white font-bold">종료</span> 버튼을 누릅니다.</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="flex items-center gap-2 text-emerald-400 font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-emerald-400 text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">3</span>
+                    앱 설치 및 복구
+                  </h4>
+                  <ul className="pl-7 leading-relaxed text-slate-400 list-disc space-y-1">
+                    <li>하단의 <span className="text-white font-bold">APK 다운로드 시작</span> 버튼을 클릭하여 설치합니다.</li>
+                    <li>설치 완료 후 반드시 다시 Play 프로텍트 설정으로 돌아가 <span className="text-emerald-400 font-bold">앱 검사</span>를 활성화(켜기) 상태로 되돌려 주세요.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-white/10 shrink-0">
+                <button
+                  onClick={() => {
+                    window.location.href = '/s-bridge.apk?v=' + Date.now();
+                    setShowAndroidManual(false);
+                  }}
+                  className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_10px_25px_rgba(0,229,255,0.4)] active:scale-95 transition-all truncate border border-blue-400/30"
+                >
+                  <Download className="w-5 h-5 shrink-0" />
+                  <span className="truncate tracking-wide font-black">Android S-bridge APK 다운로드 시작</span>
+                </button>
+                <p className="text-[11px] text-center text-slate-500 mt-3.5">
+                  보안 정책에 따라 설치 파일은 사내 네트워크에서만 다운로드 가능할 수 있습니다.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
 
       </div>
     </div>
