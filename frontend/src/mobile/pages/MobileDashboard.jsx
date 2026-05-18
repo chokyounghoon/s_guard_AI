@@ -302,6 +302,24 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [isMyAssignOpen, setIsMyAssignOpen] = useState(true);
   const [isOpeningWarRoom, setIsOpeningWarRoom] = useState(false);
 
+  const [showSmsScrollIndicator, setShowSmsScrollIndicator] = useState(false);
+  const smsListContainerRef = React.useRef(null);
+
+  const checkSmsScroll = React.useCallback(() => {
+    if (!smsListContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = smsListContainerRef.current;
+    if (scrollHeight > clientHeight + 15 && scrollTop + clientHeight < scrollHeight - 35) {
+      setShowSmsScrollIndicator(true);
+    } else {
+      setShowSmsScrollIndicator(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const timer = setTimeout(checkSmsScroll, 150);
+    return () => clearTimeout(timer);
+  }, [visibleSms, checkSmsScroll]);
+
   const handleOpenWarRoomFromInsight = useCallback(async (smsMessage, analysisText) => {
     if (isOpeningWarRoom) return;
     const currentSms = smsMessage || selectedSmsRef.current;
@@ -1617,7 +1635,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           const borderGlow = isCrit ? 'rgba(0,229,255,0.6)' : 'rgba(0,229,255,0.5)';
           const borderColor = isCrit ? '#00e5ff' : '#00e5ff';
           return (
-        <div className="md:col-span-2 transition-all duration-300 shadow-2xl" style={{
+        <div className="md:col-span-2 transition-all duration-300 shadow-2xl relative" style={{
           background: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
           border: `1px solid ${borderColor}`,
           borderRadius: 24,
@@ -1682,7 +1700,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
 
           {/* SMS list */}
-          <div className="overflow-y-auto max-h-[420px] p-3 space-y-2 custom-scrollbar">
+          <div 
+            ref={smsListContainerRef}
+            onScroll={checkSmsScroll}
+            className="overflow-y-auto max-h-[420px] p-3 space-y-2 custom-scrollbar"
+          >
             {visibleSms.length > 0 ? visibleSms.map((msg) => {
               const isSel = selectedSms?.inc_id === msg.inc_id;
               const isCrit = msg.severity === 'CRITICAL';
@@ -1798,6 +1820,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               </div>
             )}
           </div>
+
+          {/* Floating scroll indicator */}
+          {showSmsScrollIndicator && (
+            <div 
+              onClick={() => {
+                if (smsListContainerRef.current) {
+                  smsListContainerRef.current.scrollTo({ top: smsListContainerRef.current.scrollHeight, behavior: 'smooth' });
+                }
+              }}
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#00e5ff] text-slate-900 font-black text-xs shadow-[0_0_25px_rgba(0,229,255,0.8)] border border-white/20 transition-all hover:scale-105 active:scale-95 select-none"
+            >
+              <span>아래 수신내역 더보기</span>
+              <ChevronDown className="w-4 h-4 text-slate-900 shrink-0" />
+            </div>
+          )}
         </div>
           );
         })()}
