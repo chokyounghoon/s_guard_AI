@@ -117,9 +117,7 @@ window.fetch = async (...args) => {
 };
 
 ReactDOM.createRoot(document.getElementById('mobile-root')).render(
-  <React.StrictMode>
-    <MobileApp />
-  </React.StrictMode>
+  <MobileApp />
 );
 
 // 🕹️ S-Guard AI Mobile PWA Service Worker Registration
