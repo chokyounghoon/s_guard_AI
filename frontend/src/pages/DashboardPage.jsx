@@ -316,9 +316,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     const smsTitle = `${formattedUiId} | ${truncatedMsg}`;
     
     // Check if War-Room already exists
-    const existingRoom = warRooms.find(r => r.id === incidentId);
+    const existingRoom = warRooms.find(r => String(r.id) === String(incidentId) || String(r.inc_id) === String(incidentId));
     if (existingRoom) {
       navigate(`/chat/${incidentId}`);
+      setIsOpeningWarRoom(false);
       return;
     }
 
