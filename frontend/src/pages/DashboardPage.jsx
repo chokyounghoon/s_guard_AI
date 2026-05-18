@@ -1703,8 +1703,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-3.5">
                     <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-[#00e5ff]/20 p-2.5 rounded-xl border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.3)] shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
-                        <MessageSquare className="w-5 h-5 text-[#00e5ff]" />
+                      <div className={`bg-blue-500/20 p-2.5 rounded-xl border border-blue-400/40 shadow-[0_0_15px_rgba(59,130,246,0.3)] shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
+                        <MessageSquare className="w-5 h-5 text-blue-400" />
                       </div>
                     </span>
                     <div>
@@ -1955,8 +1955,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-[#00e5ff]/20 border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.2)] p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
-                        <Sparkles className="w-5 h-5 text-[#00e5ff]" />
+                      <div className={`bg-indigo-500/20 border border-indigo-400/40 shadow-[0_0_15px_rgba(129,140,248,0.3)] p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
+                        <Sparkles className="w-5 h-5 text-indigo-400" />
                       </div>
                     </span>
                     <div className="min-w-0">
@@ -2007,8 +2007,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`data-ring-wrapper shrink-0 ${isFlowSpinning ? 'data-ring-spinning' : ''}`}>
-                    <div className={`bg-[#00e5ff]/20 border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.2)] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
-                      <Activity className="w-5 h-5 text-[#00e5ff]" />
+                    <div className={`bg-purple-500/20 border border-purple-400/40 shadow-[0_0_15px_rgba(192,132,252,0.3)] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
+                      <Activity className="w-5 h-5 text-purple-400" />
                     </div>
                   </span>
                   <div className="min-w-0">
