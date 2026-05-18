@@ -7,6 +7,7 @@ import AIThinkingIndicator from '../components/AIThinkingIndicator';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 import ServerStatusChart from '../components/chat/ServerStatusChart';
 import MarkdownViewer from '../components/MarkdownViewer';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useCodebook } from '../context/CodebookContext';
 
 const agentColors = {
@@ -626,6 +627,7 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const { allCodes } = useCodebook();
   
   const getStatusName = (code) => {
@@ -1793,7 +1795,7 @@ export default function ChatPage() {
 
       <header className="flex justify-between items-center px-3 py-2 sticky top-0 bg-[#191919]/90 backdrop-blur-md z-50 border-b border-[#242424]">
         <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 pr-2">
-          <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors shrink-0">
+          <button onClick={() => goBack()} className="p-1 rounded-full hover:bg-white/10 transition-colors shrink-0">
             <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </button>
           <div className="flex flex-col min-w-0 flex-1 pr-2">

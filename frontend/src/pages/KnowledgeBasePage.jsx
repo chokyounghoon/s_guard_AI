@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, Filter, FileText, Image as ImageIcon, Link as LinkIcon, Trash2, Edit3, X, ChevronRight, BookOpen, Tag, Calendar, User, ArrowLeft, Sparkles, Zap, LayoutDashboard, List, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
@@ -217,7 +218,7 @@ ${formData.content}`;
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => goBack()}
             className="p-2 rounded-full hover:bg-white/5 text-slate-400 transition-all active:scale-90"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -601,7 +602,7 @@ ${formData.content}`;
       </div>
 
       {/* Add/Edit Modal */}
-      {showAddModal && (
+      {showAddModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
           <div className="relative w-full max-w-2xl bg-[#1a1f2e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -699,7 +700,8 @@ ${formData.content}`;
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

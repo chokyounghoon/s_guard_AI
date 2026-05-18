@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Inbox, 
   MessageSquare, 
@@ -301,7 +302,7 @@ export default function InboxPage() {
       </main>
 
       {/* Detail Slide-up Modal */}
-      {selectedMsg && (
+      {selectedMsg && createPortal(
         <div className="fixed inset-0 z-[200] flex items-end">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setSelectedMsg(null)} />
           <div className="relative w-full max-h-[92vh] bg-[#0d0f14] rounded-t-[3rem] border-t border-white/10 flex flex-col animate-in slide-in-from-bottom duration-500 z-10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
@@ -352,7 +353,8 @@ export default function InboxPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

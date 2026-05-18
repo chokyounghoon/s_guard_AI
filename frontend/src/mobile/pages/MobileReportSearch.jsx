@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Search, Calendar, User, Briefcase,
@@ -7,6 +8,7 @@ import {
   ShieldAlert, Zap
 } from 'lucide-react';
 import { getAuthHeaders } from '../../lib/authStore';
+import { useBackNavigation } from '../../hooks/useBackNavigation';
 import { SMS_WORKER_URL as API_BASE } from '../../config/api';
 
 function flattenTree(nodes, depth = 0, result = []) {
@@ -33,7 +35,7 @@ function OrgPickerModal({ onSelect, onClose }) {
 
   const filtered = q ? orgs.filter(o => o.name?.includes(q)) : orgs;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}>
       <div className="mt-auto rounded-t-3xl border-t border-white/10 flex flex-col max-h-[72vh]"
         style={{ background: 'linear-gradient(180deg, #0d1117 0%, #080c14 100%)' }}>
@@ -80,7 +82,8 @@ function OrgPickerModal({ onSelect, onClose }) {
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -168,6 +171,7 @@ function SkeletonCard() {
 export default function MobileReportSearch() {
   const navigate = useNavigate();
   const location = useLocation();
+  const goBack = useBackNavigation('/dashboard');
 
   const getLocalDate = (date) => {
     const offset = date.getTimezoneOffset() * 60000;
@@ -233,7 +237,7 @@ export default function MobileReportSearch() {
       {/* ── Sticky Header (Slim 1-line + Quick Search) ───────────── */}
       <div className="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur-md border-b border-white/10 px-4 py-3 flex flex-col gap-2.5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors">
+          <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors">
             <ArrowLeft size={16} />
           </button>
           <div className="flex-1 min-w-0">
@@ -316,7 +320,7 @@ export default function MobileReportSearch() {
       </div>
 
       {/* ── Bottom Sheet Modal (상세 검색 필터) ────────────────── */}
-      {showFilterSheet && (
+      {showFilterSheet && createPortal(
         <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/75 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowFilterSheet(false)}>
           <div className="bg-[#12151a] border-t border-white/10 rounded-t-3xl p-6 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto select-none" onClick={e => e.stopPropagation()}>
             <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-1" />
@@ -385,7 +389,8 @@ export default function MobileReportSearch() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {showOrg && (

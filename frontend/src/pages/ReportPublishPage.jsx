@@ -1,15 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Check, CheckCircle2, FileText, Mail } from 'lucide-react';
+import { useBackNavigation } from '../hooks/useBackNavigation';
+import { X, Check, FileText, Mail } from 'lucide-react';
 
 export default function ReportPublishPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
 
   return (
     <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-24">
       {/* Header */}
       <header className="flex items-center justify-between p-5 sticky top-0 bg-[#0f1421]/90 backdrop-blur-md z-40 border-b border-white/5">
-        <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
+        <button onClick={() => goBack()} className="p-1 rounded-full hover:bg-white/10 transition-colors">
           <X className="w-6 h-6 text-white" />
         </button>
         <h1 className="font-bold text-xl tracking-tight">보고서 전송</h1>
@@ -117,7 +119,7 @@ export default function ReportPublishPage() {
             >
                 최종 전송하기
             </button>
-            <button onClick={() => navigate(-1)} className="w-full bg-transparent border border-white/10 text-slate-400 h-14 rounded-2xl font-bold text-lg hover:bg-white/5 transition-all">
+            <button onClick={() => goBack()} className="w-full bg-transparent border border-white/10 text-slate-400 h-14 rounded-2xl font-bold text-lg hover:bg-white/5 transition-all">
                 취소
             </button>
         </div>

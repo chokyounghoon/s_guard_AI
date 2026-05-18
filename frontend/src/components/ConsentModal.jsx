@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ShieldCheck, Globe, Scale, ChevronRight, Check, AlertCircle, Lock } from 'lucide-react';
 
 const ConsentModal = ({ userProfile, setUserProfile }) => {
@@ -69,7 +70,7 @@ const ConsentModal = ({ userProfile, setUserProfile }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] bg-[#080a0f] flex items-center justify-center p-4 sm:p-6 overflow-hidden">
       <div className="absolute inset-0 bg-blue-600/5 backdrop-blur-3xl animate-pulse" />
       
@@ -165,7 +166,8 @@ const ConsentModal = ({ userProfile, setUserProfile }) => {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Keyboard, Bell, Phone, UserCircle, ShieldCheck, Lock } from 'lucide-react';
 import { getUserProfile, getAllowedPaths, addAuthListener } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
 
 export default function BottomMenu({ currentPath, activePopup, onClosePopups, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu, allowedPaths: _ignored }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   // authStore 직접 구독
@@ -33,6 +34,13 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
       sessionStorage.removeItem('console_return_pending');
     }
   }, [initialOpenMoreMenu]);
+
+  useEffect(() => {
+    if (location.state?.openMoreMenu) {
+      setShowMoreMenu(true);
+      window.history.replaceState({}, '');
+    }
+  }, [location.state?.openMoreMenu]);
 
   useEffect(() => {
     // 탭 이동(경로 변경) 시 더보기 메뉴 팝업 자동 닫기

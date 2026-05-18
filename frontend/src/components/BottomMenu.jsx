@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, Lock } from 'lucide-react';
 import { getUserProfile, getAllowedPaths, addAuthListener } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu, allowedPaths: _ignored }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   // authStore 직접 구독
@@ -30,6 +31,13 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
   useEffect(() => {
     if (initialOpenMoreMenu) setShowMoreMenu(true);
   }, [initialOpenMoreMenu]);
+
+  useEffect(() => {
+    if (location.state?.openMoreMenu) {
+      setShowMoreMenu(true);
+      window.history.replaceState({}, '');
+    }
+  }, [location.state?.openMoreMenu]);
 
 
   return (

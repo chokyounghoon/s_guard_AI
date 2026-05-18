@@ -4,11 +4,13 @@ import {
   ArrowLeft, Activity, Filter, Clock, ChevronRight,
   AlertCircle, MessageSquare, Brain, CheckCircle, Search
 } from 'lucide-react';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useCodebook } from '../context/CodebookContext';
 
 export default function IncidentListPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const goBack = useBackNavigation('/dashboard');
   const queryParams = new URLSearchParams(location.search);
   const type = queryParams.get('type') || 'AI';
   const category = queryParams.get('category') || 'All';
@@ -75,7 +77,7 @@ export default function IncidentListPage() {
     <div className="min-h-screen bg-[#06080c] text-white flex flex-col p-4 space-y-4">
       {/* Header */}
       <header className="flex items-center space-x-4 bg-[#11141d] p-4 rounded-3xl border border-white/5 sticky top-0 z-50">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+        <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-6 h-6" />
         </button>
         <div>

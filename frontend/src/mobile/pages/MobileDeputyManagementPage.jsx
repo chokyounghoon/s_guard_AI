@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Users, ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Search, Shield, Building2, UserCircle, Network, ChevronRight, X, MapPin, Loader2 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../../lib/authStore';
+import { useBackNavigation } from '../../hooks/useBackNavigation';
 import { toast } from 'react-hot-toast';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function MobileDeputyManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [myProfile, setMyProfile] = useState(null);
   const [substitutes, setSubstitutes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -222,7 +225,7 @@ export default function MobileDeputyManagementPage() {
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }} className="flex flex-col bg-[#07090f] text-white min-h-screen pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#07090f]/95 backdrop-blur-xl border-b border-white/5 px-4 py-4 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 active:scale-90 transition-all flex-shrink-0">
+        <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 active:scale-90 transition-all flex-shrink-0">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
@@ -295,7 +298,7 @@ export default function MobileDeputyManagementPage() {
       </main>
 
       {/* Modal */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#07090f' }}>
           {/* Modal Header */}
           <div className="px-4 pt-12 pb-4 border-b border-white/5 flex items-center gap-3 flex-shrink-0">
@@ -390,7 +393,8 @@ export default function MobileDeputyManagementPage() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

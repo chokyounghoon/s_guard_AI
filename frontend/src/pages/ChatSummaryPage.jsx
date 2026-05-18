@@ -34,6 +34,7 @@ import MarkdownViewer from '../components/MarkdownViewer';
 import html2pdf from 'html2pdf.js';
 import BottomMenu from '../components/BottomMenu';
 import { getAccessToken } from '../lib/authStore';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import './ChatSummaryPage.css';
 
 const getAuthHeader = () => {
@@ -54,6 +55,7 @@ const cleanAiText = (str = '') => {
 export default function ChatSummaryPage() {
   const { incidentId } = useParams();
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCopied, setIsCopied] = useState(false);
@@ -820,7 +822,7 @@ export default function ChatSummaryPage() {
       {/* ── 헤더 (고정) ── */}
       <header className="shrink-0 bg-[#0f1421]/95 backdrop-blur-md border-b border-white/5 z-50 print:hidden">
         <div className="flex items-center gap-2 px-3 py-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-all active:scale-95 shrink-0">
+          <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/10 transition-all active:scale-95 shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">

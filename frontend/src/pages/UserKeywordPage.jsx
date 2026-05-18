@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { 
@@ -405,13 +406,14 @@ export default function UserKeywordPage({ userProfile }) {
         </div>
       </div>
 
-      {loading && (
-        <div className="fixed inset-0 z-50 bg-[#080b12]/60 backdrop-blur-sm flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
-            <p className="text-cyan-500 text-xs font-black animate-pulse uppercase tracking-[0.2em]">Loading Config</p>
+      {loading && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-[#080b12]/80 backdrop-blur-md flex items-center justify-center pointer-events-auto" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' }}>
+          <div className="flex flex-col items-center justify-center gap-3 m-auto">
+            <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin shadow-[0_0_15px_rgba(6,182,212,0.5)]" />
+            <p className="text-cyan-400 text-xs font-black animate-pulse uppercase tracking-[0.25em]">Loading Config</p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -5,11 +5,13 @@ import AgentDiscussionPanel from '../../components/AgentDiscussionPanel';
 import WarRoomChatPanel from '../../components/WarRoomChatPanel';
 import AiInsightPanel from '../../components/AiInsightPanel';
 import { getAuthHeaders } from '../../lib/authStore';
+import { useBackNavigation } from '../../hooks/useBackNavigation';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function MobileExpertAdvisor({ user }) {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const { incidentId } = useParams();
 
   const [smsData, setSmsData] = useState(null);
@@ -79,7 +81,7 @@ export default function MobileExpertAdvisor({ user }) {
       <header className="sticky top-0 z-40 bg-[#060a12]/90 backdrop-blur-xl border-b border-white/5 px-4 pt-6 pb-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => goBack()}
             className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
           >
             <ArrowLeft className="w-4 h-4 text-slate-300" />
@@ -165,7 +167,7 @@ export default function MobileExpertAdvisor({ user }) {
                   isVisible={true}
                   embedded={true}
                   incident={smsData}
-                  onClose={() => navigate(-1)}
+                  onClose={() => goBack()}
                 />
               </div>
             )}

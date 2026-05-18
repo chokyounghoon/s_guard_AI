@@ -1,12 +1,13 @@
 import React from 'react';
 import { ArrowLeft, MoreVertical, Server, Clock, AlertCircle, Copy, Sparkles, MessageSquare, FileText, Play, Home, CheckSquare, BarChart2, Settings } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import AiResponseGuide from '../components/AiResponseGuide';
 
 export default function AssignmentDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const goBack = useBackNavigation('/dashboard');
   const queryParams = new URLSearchParams(location.search);
   const status = queryParams.get('status') || 'Open';
   const isCompleted = status === 'Completed' || status === '처리완료' || status === '확인 완료';
@@ -22,7 +23,7 @@ export default function AssignmentDetailPage() {
       
       {/* Header */}
       <header className="flex justify-between items-center p-4 sticky top-0 bg-[#0f111a]/80 backdrop-blur-md z-50 border-b border-white/5">
-        <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
+        <button onClick={() => goBack()} className="p-1 rounded-full hover:bg-white/10 transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
         </button>
         <span className="font-bold text-lg tracking-wide">할당 내역 상세</span>
@@ -148,7 +149,7 @@ export default function AssignmentDetailPage() {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 w-full bg-[#0f111a] border-t border-white/10 px-6 py-3 flex justify-between items-center z-50 pb-safe">
-        <div className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => navigate('/dashboard')}>
+        <div className="flex flex-col items-center space-y-1 text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => goBack()}>
             <Home className="w-6 h-6" />
             <span className="text-[10px] font-medium">홈</span>
         </div>

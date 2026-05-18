@@ -4,7 +4,8 @@ import {
   Activity, ChevronLeft, RefreshCw, CheckCircle2,
   ChevronRight, Loader2, Search, CalendarDays, Bot
 } from 'lucide-react';
-import { getAccessToken } from '../../lib/authStore';
+import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
+import { useBackNavigation } from '../../hooks/useBackNavigation';
 import PullToRefresh from '../components/PullToRefresh';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -36,6 +37,7 @@ const formatDate = (ts) => {
 
 export default function MobileActivity({ user, onAiClick }) {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [rawLogs, setRawLogs] = useState([]);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +103,7 @@ export default function MobileActivity({ user, onAiClick }) {
       {/* 헤더 */}
       <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 px-4 pt-4 pb-3">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90">
+          <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90">
             <ChevronLeft className="w-5 h-5 text-slate-300" />
           </button>
           <div className="flex-1">

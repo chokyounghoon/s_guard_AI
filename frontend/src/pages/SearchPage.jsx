@@ -5,6 +5,7 @@ import {
   FileText, ChevronRight, X, TrendingUp, AlertTriangle, CheckCircle, Zap,
   Building2, User, MessageSquare, List
 } from 'lucide-react';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { SMS_WORKER_URL } from '../config/api';
 
 const getDefaultConfig = () => {
@@ -25,6 +26,7 @@ const getDefaultConfig = () => {
 export default function SearchPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const goBack = useBackNavigation('/dashboard');
   const [searchParams, setSearchParams] = useState({
     incidentId: '',
     incidentName: location.state?.keyword || '',
@@ -302,7 +304,7 @@ export default function SearchPage() {
     <div className="min-h-screen bg-[#0a0e17] text-white font-sans flex flex-col pb-24">
       <header className="flex items-center justify-between p-5 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-50 border-b border-white/5">
         <div className="flex items-center space-x-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+          <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/10 transition-colors">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div>

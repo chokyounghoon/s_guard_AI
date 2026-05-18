@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldCheck, ArrowLeft, Save, Plus, Check, X,
@@ -7,6 +8,7 @@ import {
   Users, Shield, Code, Eye, EyeOff, Star
 } from 'lucide-react';
 import { getAuthHeaders, setAllowedPaths, getUserProfile } from '../lib/authStore';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { toast } from 'react-hot-toast';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -26,6 +28,7 @@ const defaultColor = { bg: 'bg-indigo-500/15', border: 'border-indigo-500/40', t
 
 export default function PermissionManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [roles, setRoles] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
   const [permissions, setPermissions] = useState([]);
@@ -154,7 +157,7 @@ export default function PermissionManagementPage() {
       <header className="sticky top-0 z-40 bg-[#07090f]/95 backdrop-blur-xl border-b border-white/5 flex-shrink-0">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/dashboard')}
+            <button onClick={() => goBack()}
               className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/8">
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </button>
@@ -259,7 +262,7 @@ export default function PermissionManagementPage() {
       </div>
 
       {/* Role Select Bottom Sheet */}
-      {showRoleSheet && (
+      {showRoleSheet && createPortal(
         <div className="fixed inset-0 z-[110] flex items-end">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setShowRoleSheet(false)} />
           <div className="relative w-full bg-[#0c1018] border-t border-white/10 rounded-t-[2rem] z-10 pb-[env(safe-area-inset-bottom,16px)]">
@@ -291,11 +294,12 @@ export default function PermissionManagementPage() {
               })}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Add Role Modal */}
-      {showRoleModal && (
+      {showRoleModal && createPortal(
         <div className="fixed inset-0 z-[120] flex items-end">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowRoleModal(false)} />
           <div className="relative w-full bg-[#0e1118] border-t border-white/10 rounded-t-[2rem] z-10 pb-[env(safe-area-inset-bottom,16px)]">
@@ -334,7 +338,8 @@ export default function PermissionManagementPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

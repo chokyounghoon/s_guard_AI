@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, RefreshCw, Save, Sparkles, Hash, Tag,
   Smartphone, Copy, Check, Zap, Clock, Search, Send, CheckCircle2
 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../../lib/authStore';
+import { useBackNavigation } from '../../hooks/useBackNavigation';
 import { toast } from 'react-hot-toast';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function MobileUserKeywordPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [keywords, setKeywords] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -147,7 +150,7 @@ export default function MobileUserKeywordPage() {
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }} className="min-h-screen bg-[#07090f] text-white pb-28">
       <header className="sticky top-0 z-50 bg-[#07090f]/95 backdrop-blur-xl border-b border-white/5 px-4 py-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 active:scale-90 flex-shrink-0">
+          <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 active:scale-90 flex-shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
@@ -302,16 +305,17 @@ export default function MobileUserKeywordPage() {
         </div>
       </main>
 
-      {loading && (
-        <div className="fixed inset-0 z-[100] bg-[#05070a]/60 backdrop-blur-md flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative w-12 h-12">
+      {loading && createPortal(
+        <div className="fixed inset-0 z-[1000] bg-[#05070a]/80 backdrop-blur-md flex items-center justify-center pointer-events-auto" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' }}>
+          <div className="flex flex-col items-center justify-center gap-4 m-auto">
+            <div className="relative w-12 h-12 shadow-[0_0_15px_rgba(6,182,212,0.5)] rounded-full">
               <div className="absolute inset-0 border-4 border-cyan-500/20 rounded-full" />
               <div className="absolute inset-0 border-4 border-t-cyan-500 rounded-full animate-spin" />
             </div>
-            <p className="text-cyan-500 text-[11px] font-black uppercase tracking-[0.3em] animate-pulse">Encrypting</p>
+            <p className="text-cyan-400 text-[11px] font-black uppercase tracking-[0.3em] animate-pulse">Encrypting</p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `

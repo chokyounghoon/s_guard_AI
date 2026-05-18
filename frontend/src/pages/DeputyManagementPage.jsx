@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown,
@@ -6,12 +7,14 @@ import {
   ChevronRight, X, MapPin, Loader2
 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { toast } from 'react-hot-toast';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 export default function DeputyManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [myProfile, setMyProfile] = useState(null);
   const [substitutes, setSubstitutes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -319,7 +322,7 @@ export default function DeputyManagementPage() {
 
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 bg-[#07090f]/90 backdrop-blur-xl border-b border-white/5 px-5 py-4 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-white/5 text-slate-400">
+        <button onClick={() => goBack()} className="p-2 -ml-2 rounded-full hover:bg-white/5 text-slate-400">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1">
@@ -426,7 +429,7 @@ export default function DeputyManagementPage() {
       </main>
 
       {/* ═══════════════════════ MODAL (Bottom Sheet) ═══════════════════════ */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 z-[200] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={closeModal} />
 
@@ -589,7 +592,8 @@ export default function DeputyManagementPage() {
             )}
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

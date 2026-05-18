@@ -5,9 +5,11 @@ import {
   AlertTriangle, CheckCircle, Shield,
   Trash2, Save, Filter
 } from 'lucide-react';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 
 export default function KeywordManagementPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [search, setSearch] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState('CRITICAL');
@@ -62,7 +64,7 @@ export default function KeywordManagementPage() {
       {/* Header */}
       <header className="flex justify-between items-center p-5 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-50 border-b border-white/5">
         <div className="flex items-center space-x-4">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+          <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/10 transition-colors">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div>

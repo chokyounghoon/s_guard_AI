@@ -5,6 +5,7 @@ import {
   AlertTriangle, Mic, Square, Wifi, WifiOff, Plus, Sparkles, X
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
+import { useBackNavigation } from '../../hooks/useBackNavigation';
 import AICardMarkdown from '../../components/AICardMarkdown';
 import { useCodebook } from '../../context/CodebookContext';
 
@@ -44,6 +45,7 @@ const formatTime = (ts) => {
 export default function MobileChat({ user }) {
   const { incidentId } = useParams();
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const { allCodes } = useCodebook();
 
   const getStatusName = (code) => {
@@ -428,7 +430,7 @@ export default function MobileChat({ user }) {
       {/* 헤더 */}
       <header className="flex items-center gap-3 px-4 py-3 bg-[#191919] border-b border-[#242424] shrink-0"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 active:scale-90 transition-all">
+        <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/10 active:scale-90 transition-all">
           <ChevronLeft className="w-5 h-5 text-slate-300" />
         </button>
         <div className="flex items-center gap-2 flex-1 min-w-0">

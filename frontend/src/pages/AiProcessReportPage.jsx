@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { ArrowLeft, CheckCircle, Clock, FileText, Share2, Download, ChevronRight, Zap, Shield, AlertTriangle, X, Sparkles, User, Check, MessageSquare } from 'lucide-react';
 
 export default function AiProcessReportPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
   const [loading, setLoading] = useState(true);
   const [memo, setMemo] = useState('');
   const [modalStep, setModalStep] = useState(null); // 'preview', 'selection', or null
@@ -48,7 +51,7 @@ export default function AiProcessReportPage() {
     <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-safe">
       {/* Header */}
       <header className="flex items-center p-4 sticky top-0 bg-[#0f1421]/90 backdrop-blur-md z-40 border-b border-white/5">
-        <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors mr-3">
+        <button onClick={() => goBack()} className="p-1 rounded-full hover:bg-white/10 transition-colors mr-3">
           <ArrowLeft className="w-6 h-6 text-white" />
         </button>
         <span className="font-bold text-lg">AI 처리 분석 보고서</span>
@@ -170,7 +173,7 @@ export default function AiProcessReportPage() {
       </main>
 
       {/* Unified Multi-step Modal */}
-      {modalStep && (
+      {modalStep && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-[#06080c]/95 backdrop-blur-md" onClick={() => setModalStep(null)} />
           
@@ -392,7 +395,8 @@ export default function AiProcessReportPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Action Footer */}

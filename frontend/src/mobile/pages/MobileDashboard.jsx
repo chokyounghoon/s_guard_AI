@@ -127,19 +127,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     return liveAllowedPaths.some(p => path === p || path.startsWith(p + '/'));
   };
 
-  const [showMoreMenuFromConsole, setShowMoreMenuFromConsole] = useState(false);
   const [showAgentPanel, setShowAgentPanel] = useState(false);
-
-  // 더보기 서브페이지에서 뒤로가기 시 콘솔 자동 오픈
-  useEffect(() => {
-    const fromState = location.state?.openMoreMenu;
-    const fromStorage = sessionStorage.getItem('console_return_pending') === '1';
-    if (fromState || fromStorage) {
-      setShowMoreMenuFromConsole(true);
-      sessionStorage.removeItem('console_return_pending');
-      window.history.replaceState({}, '');
-    }
-  }, [location.key]); // location.key는 매 navigation마다 갱신됨
 
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState('ai'); // 'ai' or 'human'
@@ -1437,7 +1425,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 
         {/* Right: Icon buttons + AI button + profile */}
-        <div className="flex items-center gap-1 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2">
           <div className="flex items-center gap-1 mr-0.5">
             {/* Orbital Command */}
             <button onClick={() => {
@@ -1449,9 +1437,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             }}
               disabled={!checkAllowed('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
-              style={{ border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.08)', boxShadow: '0 0 10px rgba(0,229,255,0.25)' }}>
-              <Cpu size={14} style={{ color: '#00e5ff' }} />
+              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
+              style={{ background: 'transparent' }}>
+              <Cpu size={16} style={{ color: '#00e5ff' }} />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#10b981] shadow-[0_0_6px_#10b981]" />
               {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
             </button>
 
@@ -1465,30 +1454,30 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             }}
               disabled={!checkAllowed('/alert-monitor')}
               onPointerDown={() => handleTooltipStart('Alert Monitor')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60 relative ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
-              style={{ border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.08)', boxShadow: '0 0 10px rgba(0,229,255,0.25)' }}>
-              <BellDot size={14} style={{ color: '#00e5ff' }} />
+              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
+              style={{ background: 'transparent' }}>
+              <BellDot size={16} style={{ color: '#00e5ff' }} />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#f59e0b] shadow-[0_0_6px_#f59e0b]" />
               {!checkAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
             </button>
 
             {/* Threshold */}
             <button onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
               onPointerDown={() => handleTooltipStart('Threshold')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60"
-              style={{
-                border: showThresholdSettings ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.15)',
-                background: showThresholdSettings ? 'rgba(0,229,255,0.1)' : 'transparent',
-                boxShadow: showThresholdSettings ? '0 0 10px rgba(0,229,255,0.3)' : 'none'
-              }}>
-              <Settings size={14} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#00e5ff' : '#94a3b8', transition: 'transform 0.3s' }} />
+              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${showThresholdSettings ? 'bg-white/10' : ''}`}
+              style={{ background: 'transparent' }}>
+              <Settings size={16} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#00e5ff' : '#94a3b8', transition: 'transform 0.3s' }} />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#ec4899] shadow-[0_0_6px_#ec4899]" />
             </button>
           </div>
 
+          {/* AI Assistant */}
           <button onClick={onAiClick}
             onPointerDown={() => handleTooltipStart('AI Assistant')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:opacity-60"
-            style={{ border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.1)', boxShadow: '0 0 10px rgba(0,229,255,0.3)' }}>
-            <Bot size={14} style={{ color: '#00e5ff' }} />
+            className="w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer"
+            style={{ background: 'transparent' }}>
+            <Bot size={16} style={{ color: '#00e5ff' }} />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#00e5ff] shadow-[0_0_6px_#00e5ff]" />
           </button>
 
           <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 active:opacity-60 shrink-0 ml-0.5">

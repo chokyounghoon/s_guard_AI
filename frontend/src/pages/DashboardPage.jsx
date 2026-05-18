@@ -127,18 +127,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     return liveAllowedPaths.some(p => path === p || path.startsWith(p + '/'));
   };
 
-  const [showMoreMenuFromConsole, setShowMoreMenuFromConsole] = useState(false);
   const location = useLocation();
   const [showAgentPanel, setShowAgentPanel] = useState(false);
-
-  // 더보기 서브페이지에서 뒤로가기 시 콘솔 자동 오픈
-  useEffect(() => {
-    if (location.state?.openMoreMenu) {
-      setShowMoreMenuFromConsole(true);
-      // state 소비 후 초기화
-      window.history.replaceState({}, '');
-    }
-  }, [location.state?.openMoreMenu]);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showWarRoomPopup, setShowWarRoomPopup] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState('ai'); // 'ai' or 'human'
@@ -2356,15 +2346,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       </div>
     </div>
 
-    <BottomMenu 
-        currentPath="/dashboard" 
-        user={userProfile}
-        onWarRoomClick={() => {
-          fetchWarRooms();
-          setShowWarRoomPopup(true);
-        }} 
-        initialOpenMoreMenu={showMoreMenuFromConsole}
-      />
+
       {/* 🚀 Dynamic Save Toast for Thresholds */}
       {saveStatus && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#0a1c20] border border-[#00e5ff] text-[#00e5ff] shadow-[0_0_20px_rgba(0,229,255,0.4)] text-xs font-black px-6 py-3.5 rounded-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">

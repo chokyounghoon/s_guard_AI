@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
@@ -615,7 +616,7 @@ export default function UserManagementPage() {
         )}
 
         {/* ── 사용자 액션 관리 바텀 시트 / 모달 ── */}
-        {actionTargetUser && (
+        {actionTargetUser && createPortal(
           <div className="fixed inset-0 z-[400] flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in duration-200">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setActionTargetUser(null)} />
             <div className="relative w-full max-w-md bg-[#11141d] border-t sm:border border-white/10 sm:rounded-[32px] rounded-t-[32px] p-6 sm:p-8 shadow-2xl space-y-6 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto custom-scrollbar">
@@ -716,12 +717,13 @@ export default function UserManagementPage() {
                 닫기
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </main>
 
       {/* Organization Selection Modal */}
-      {isOrgModalOpen && (
+      {isOrgModalOpen && createPortal(
         <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 sm:p-6">
            <div className="absolute inset-0 bg-[#05070a]/80 backdrop-blur-md" onClick={() => setIsOrgModalOpen(false)} />
            <div className="relative w-full max-w-xl bg-[#11141d] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[85vh] flex flex-col">
@@ -816,11 +818,12 @@ export default function UserManagementPage() {
                  </div>
               </div>
            </div>
-        </div>
+        </div>,
+        document.body
       )}
  
       {/* User Registration Modal */}
-      {isAddModalOpen && (
+      {isAddModalOpen && createPortal(
         <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 sm:p-6">
            <div className="absolute inset-0 bg-[#05070a]/90 backdrop-blur-md" onClick={() => setIsAddModalOpen(false)} />
            <div className="relative w-full max-w-2xl bg-[#11141d] border border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[85vh] flex flex-col">
@@ -917,10 +920,11 @@ export default function UserManagementPage() {
                     >
                       사용자 생성 완료
                     </button>
-                 </div>
-              </div>
-           </div>
-        </div>
+                  </div>
+               </div>
+            </div>
+         </div>,
+         document.body
       )}
     </div>
   );

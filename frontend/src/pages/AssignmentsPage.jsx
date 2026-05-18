@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Bell, Search, SlidersHorizontal, Clock, User, ChevronRight, AlertCircle } from 'lucide-react';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { getAuthHeaders } from '../lib/authStore';
 
 export default function AssignmentsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const goBack = useBackNavigation('/dashboard');
   const queryParams = new URLSearchParams(location.search);
   const initialTab = queryParams.get('tab') || '전체';
 
@@ -84,7 +86,7 @@ export default function AssignmentsPage() {
       {/* Header */}
       <header className="flex items-center justify-between p-5 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-40 border-b border-white/5">
         <div className="flex items-center space-x-3">
-          <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
+          <button onClick={() => goBack()} className="p-1 rounded-full hover:bg-white/10 transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
           <h1 className="text-xl font-bold tracking-tight">나의 할당 내역</h1>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, MoreVertical, Sparkles, AlertTriangle, ListChecks, History, User, FileDown, Share2 } from 'lucide-react';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
 const chartData = [
@@ -13,12 +14,13 @@ const chartData = [
 
 export default function ActivityDetailPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/dashboard');
 
   return (
     <div className="min-h-screen bg-[#0f1421] text-white font-sans flex flex-col pb-8">
       {/* Header */}
       <header className="flex items-start p-5 sticky top-0 bg-[#0f1421]/90 backdrop-blur-md z-40 space-x-4">
-        <button onClick={() => navigate(-1)} className="mt-1 p-1 rounded-full hover:bg-white/10 transition-colors">
+        <button onClick={() => goBack()} className="mt-1 p-1 rounded-full hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-6 h-6 text-white" />
         </button>
         <h1 className="font-bold text-lg leading-tight flex-1">
