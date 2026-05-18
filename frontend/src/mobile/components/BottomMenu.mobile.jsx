@@ -29,8 +29,9 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
   };
 
   useEffect(() => {
+    const isDashboard = currentPath === '/dashboard' || currentPath === '/';
     const pending = sessionStorage.getItem('console_return_pending') === '1';
-    if (initialOpenMoreMenu || location.state?.openMoreMenu || pending) {
+    if (isDashboard && (initialOpenMoreMenu || location.state?.openMoreMenu || pending)) {
       setShowMoreMenu(true);
       sessionStorage.removeItem('console_return_pending');
       window.history.replaceState({}, '');
