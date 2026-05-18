@@ -62,6 +62,7 @@ const OtpBoxes = React.memo(({ value, onChange, disabled, inputRef: extRef }) =>
       <input
         ref={inputRef}
         type="text"
+        className="otp-hidden-input"
         inputMode="numeric"
         pattern="[0-9]*"
         autoComplete="one-time-code"
@@ -73,7 +74,7 @@ const OtpBoxes = React.memo(({ value, onChange, disabled, inputRef: extRef }) =>
         disabled={disabled}
         style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
-          opacity: 1,           // 0이면 일부 브라우저에서 포커스 제외됨
+          opacity: 0.001,       // 0에 가깝게 설정하여 네이티브 드래그/선택 상자가 아예 보이지 않도록 차단
           color: 'transparent', // 글자만 투명하게
           background: 'transparent',
           caretColor: 'transparent',
@@ -748,6 +749,14 @@ export default function LoginPage() {
         @keyframes blink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
+        }
+        .otp-hidden-input::selection {
+          background: transparent !important;
+          color: transparent !important;
+        }
+        .otp-hidden-input::-moz-selection {
+          background: transparent !important;
+          color: transparent !important;
         }
         .keyword-loop-container {
           display: flex;
