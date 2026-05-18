@@ -289,18 +289,18 @@ export default function MobileLoginPage() {
       {showIosManual && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
           <div className="relative w-full max-w-lg bg-[#0f172a] border border-purple-500/30 rounded-[28px] p-6 sm:p-8 shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex items-start justify-between gap-3 mb-6">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="p-3 rounded-2xl bg-purple-600/20 text-purple-400 shrink-0">
-                  <Apple className="w-6 h-6" />
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-400 flex items-center justify-center shrink-0">
+                  <Apple className="w-5 h-5 shrink-0" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight break-keep leading-snug">iOS 단축어 연동 매뉴얼</h3>
+                <h3 className="text-base sm:text-lg font-black text-white tracking-tight whitespace-nowrap">iOS 단축어 연동 매뉴얼</h3>
               </div>
               <button 
                 onClick={() => setShowIosManual(false)} 
-                className="p-2 rounded-full hover:bg-white/10 text-slate-400 shrink-0 -mr-1 -mt-1"
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 shrink-0" />
               </button>
             </div>
 

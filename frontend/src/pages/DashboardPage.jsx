@@ -2955,17 +2955,17 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
           <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
             <div className="relative w-full max-w-md bg-[#0b1322] border border-blue-500/40 rounded-[28px] p-6 sm:p-8 shadow-[0_0_50px_rgba(0,229,255,0.3)] flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10 shrink-0">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600/30 to-cyan-600/30 border border-blue-500/40 text-[#00e5ff] flex items-center justify-center shrink-0 shadow-inner shadow-blue-500/20">
-                    <Download className="w-6 h-6" />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600/30 to-cyan-600/30 border border-blue-500/40 text-[#00e5ff] flex items-center justify-center shrink-0 shadow-inner shadow-blue-500/20">
+                    <Download className="w-5 h-5 shrink-0" />
                   </div>
-                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight whitespace-nowrap">Android S-bridge 설치 매뉴얼</h3>
+                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight whitespace-nowrap">Android S-bridge 설치 매뉴얼</h3>
                 </div>
                 <button 
                   onClick={() => setShowAndroidManual(false)} 
                   className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 shrink-0" />
                 </button>
               </div>
 
@@ -3030,17 +3030,17 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
           <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
             <div className="relative w-full max-w-md bg-[#0b1322] border border-purple-500/40 rounded-[28px] p-6 sm:p-8 shadow-[0_0_50px_rgba(168,85,247,0.3)] flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10 shrink-0">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600/30 to-pink-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0 shadow-inner shadow-purple-500/20">
-                    <Apple className="w-6 h-6" />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600/30 to-pink-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0 shadow-inner shadow-purple-500/20">
+                    <Apple className="w-5 h-5 shrink-0" />
                   </div>
-                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight whitespace-nowrap">iOS 단축어 연동 매뉴얼</h3>
+                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight whitespace-nowrap">iOS 단축어 연동 매뉴얼</h3>
                 </div>
                 <button 
                   onClick={() => setShowIosManual(false)} 
                   className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 shrink-0" />
                 </button>
               </div>
 
