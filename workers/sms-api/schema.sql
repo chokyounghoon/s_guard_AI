@@ -470,3 +470,32 @@ INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('지식 베�
 INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('코드북 관리', '/admin/codebook', 'Code', 9);
 INSERT OR IGNORE INTO menus (name, path, icon, sort_order) VALUES ('시스템 로그', '/admin/logs', 'History', 10);
 
+-- ==========================================
+-- 🚀 D1 / SQLite 성능 최적화 복합 인덱스 (B-Tree)
+-- ==========================================
+
+-- 1. 사용자 및 로그인 이력 인덱스
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_login_history_user_time ON login_history(user_id, login_time DESC);
+
+-- 2. 침해사고(Incidents) 및 활동 로그 인덱스
+CREATE INDEX IF NOT EXISTS idx_incidents_status_created ON incidents(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_incidents_assigned ON incidents(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_inc_time ON activity_logs(inc_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user_time ON activity_logs(user_id, created_at DESC);
+
+-- 3. SMS 수신 내역 인덱스
+CREATE INDEX IF NOT EXISTS idx_received_messages_time ON received_messages(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_received_messages_sender ON received_messages(sender);
+CREATE INDEX IF NOT EXISTS idx_received_messages_employee ON received_messages(employee_id);
+
+-- 4. 워룸(War-Room) 채팅 및 첨부파일 인덱스
+CREATE INDEX IF NOT EXISTS idx_warroom_chats_inc_seq ON warroom_chats(inc_id, seq);
+CREATE INDEX IF NOT EXISTS idx_warroom_chats_time ON warroom_chats(inc_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_warroom_attachments_inc ON warroom_attachments(inc_id, timestamp DESC);
+
+-- 5. 인박스(Inbox) 메시지함 인덱스
+CREATE INDEX IF NOT EXISTS idx_inbox_items_user_folder ON inbox_items(user_id, folder, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inbox_items_unread ON inbox_items(user_id, is_read);
