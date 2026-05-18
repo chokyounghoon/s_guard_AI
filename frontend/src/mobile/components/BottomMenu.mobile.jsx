@@ -29,23 +29,15 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
   };
 
   useEffect(() => {
-    if (initialOpenMoreMenu) {
+    const pending = sessionStorage.getItem('console_return_pending') === '1';
+    if (initialOpenMoreMenu || location.state?.openMoreMenu || pending) {
       setShowMoreMenu(true);
       sessionStorage.removeItem('console_return_pending');
-    }
-  }, [initialOpenMoreMenu]);
-
-  useEffect(() => {
-    if (location.state?.openMoreMenu) {
-      setShowMoreMenu(true);
       window.history.replaceState({}, '');
+    } else {
+      setShowMoreMenu(false);
     }
-  }, [location.state?.openMoreMenu]);
-
-  useEffect(() => {
-    // 탭 이동(경로 변경) 시 더보기 메뉴 팝업 자동 닫기
-    setShowMoreMenu(false);
-  }, [currentPath]);
+  }, [currentPath, location.state, initialOpenMoreMenu]);
 
 
   return (

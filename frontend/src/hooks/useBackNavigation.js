@@ -14,7 +14,7 @@ export function useBackNavigation(fallbackPath = '/dashboard') {
     const fromConsole = location.state?.from === 'system-console' || sessionStorage.getItem('console_return_pending') === '1';
 
     if (fromConsole) {
-      sessionStorage.removeItem('console_return_pending');
+      sessionStorage.setItem('console_return_pending', '1');
       navigate('/dashboard', { state: { openMoreMenu: true }, replace: true });
     } else {
       // 일반 뒤로가기

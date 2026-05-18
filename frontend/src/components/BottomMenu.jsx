@@ -29,15 +29,15 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
   };
 
   useEffect(() => {
-    if (initialOpenMoreMenu) setShowMoreMenu(true);
-  }, [initialOpenMoreMenu]);
-
-  useEffect(() => {
-    if (location.state?.openMoreMenu) {
+    const pending = sessionStorage.getItem('console_return_pending') === '1';
+    if (initialOpenMoreMenu || location.state?.openMoreMenu || pending) {
       setShowMoreMenu(true);
+      sessionStorage.removeItem('console_return_pending');
       window.history.replaceState({}, '');
+    } else {
+      setShowMoreMenu(false);
     }
-  }, [location.state?.openMoreMenu]);
+  }, [currentPath, location.state, initialOpenMoreMenu]);
 
 
   return (
