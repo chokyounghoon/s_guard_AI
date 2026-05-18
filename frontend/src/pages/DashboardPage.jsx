@@ -1375,7 +1375,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
   return (
     <>
-    <div className={`h-screen overflow-hidden text-white font-sans relative flex flex-col${isSmsSpinning || isAiAnalyzing || isFlowSpinning ? ' hud-fetching' : ''}`} style={{ background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)' }}>
+    <div className={`h-screen overflow-hidden text-white font-sans relative flex flex-col${isSmsSpinning || isAiAnalyzing || isFlowSpinning ? ' hud-fetching' : ''}`} style={{ background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d272b 0%, #081619 40%, #050a15 100%)' }}>
       {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
       {isNavCollapsed && (
         <div className="fixed top-3 left-4 z-50">
@@ -1698,13 +1698,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
           <div className="flex-1 overflow-hidden flex flex-col">
-          <div className={`bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl h-full overflow-hidden flex flex-col hud-card hud-corners
+          <div className={`bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border border-[#00e5ff]/40 shadow-[0_0_25px_rgba(0,229,255,0.2)] h-full overflow-hidden flex flex-col backdrop-blur-2xl
             ${(() => { const v = Number(selectedSms?.received_count); const t = (() => { try { const s = localStorage.getItem('sguard_alert_thresholds_v3'); if (s) { const p = JSON.parse(s); return p.critical?.errorCount || 10; } } catch{} return 10; })(); return v > t ? 'sms-pulse-critical' : v > 3 ? 'sms-pulse-major' : ''; })()}`}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-3.5">
                     <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-blue-600/20 p-2.5 rounded-xl border border-blue-500/30 shadow-sm shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
-                        <MessageSquare className="w-5 h-5 text-blue-400" />
+                      <div className={`bg-[#00e5ff]/20 p-2.5 rounded-xl border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.3)] shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
+                        <MessageSquare className="w-5 h-5 text-[#00e5ff]" />
                       </div>
                     </span>
                     <div>
@@ -1720,10 +1720,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     }}
                     className="flex items-center gap-2 cursor-pointer group select-none"
                   >
-                    <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${hideCompletedSms ? 'text-blue-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${hideCompletedSms ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
                       Hide Done
                     </span>
-                    <div className={`w-10 h-5 rounded-full p-1 transition-all duration-300 relative ${hideCompletedSms ? 'bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]' : 'bg-slate-800'}`}>
+                    <div className={`w-10 h-5 rounded-full p-1 transition-all duration-300 relative ${hideCompletedSms ? 'bg-[#00e5ff] shadow-[0_0_10px_rgba(0,229,255,0.4)]' : 'bg-slate-800'}`}>
                       <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-md ${hideCompletedSms ? 'translate-x-5' : 'translate-x-0'}`} />
                     </div>
                   </div>
@@ -1733,14 +1733,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   {(() => {
                     const hasUnanalyzed = smsMessages.length > 0 && smsMessages.some(m => !m.is_analyzed || Number(m.is_analyzed) === 0);
                     return (
-                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-500 ${hasUnanalyzed ? 'bg-blue-500/10 border-blue-500/30' : 'bg-white/[0.03] border-white/10 opacity-40'}`}>
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all duration-500 ${hasUnanalyzed ? 'bg-[#00e5ff]/10 border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.2)]' : 'bg-white/[0.03] border-white/10 opacity-40'}`}>
                         <span className="relative flex h-2 w-2">
                           {hasUnanalyzed && (
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00e5ff] opacity-75"></span>
                           )}
-                          <span className={`relative inline-flex rounded-full h-2 w-2 ${hasUnanalyzed ? 'bg-blue-500' : 'bg-slate-600'}`}></span>
+                          <span className={`relative inline-flex rounded-full h-2 w-2 ${hasUnanalyzed ? 'bg-[#00e5ff]' : 'bg-slate-600'}`}></span>
                         </span>
-                        <span className={`text-[10px] font-mono tracking-wider font-black ${hasUnanalyzed ? 'text-blue-400' : 'text-slate-500'}`}>
+                        <span className={`text-[10px] font-mono tracking-wider font-black ${hasUnanalyzed ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
                           {hasUnanalyzed ? 'LIVE' : 'DONE'}
                         </span>
                       </div>
@@ -1750,22 +1750,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               </div>
 
               {/* 🛠️ similarity Threshold Control Panel */}
-              <div className={`transition-all duration-500 ease-in-out bg-blue-600/5 border-y border-white/5 ${showThresholdSettings ? 'max-h-64 opacity-100 p-6' : 'max-h-0 opacity-0 overflow-hidden py-0'}`}>
+              <div className={`transition-all duration-500 ease-in-out bg-[#00e5ff]/5 border-y border-white/5 ${showThresholdSettings ? 'max-h-64 opacity-100 p-6' : 'max-h-0 opacity-0 overflow-hidden py-0'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-blue-400" />
+                        <Zap className="w-4 h-4 text-[#00e5ff]" />
                         <span className="text-sm font-bold text-white uppercase tracking-wider">Technical threshold</span>
                       </div>
-                      <span className="text-xs font-mono font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">{(thresholds.technical * 100).toFixed(0)}%</span>
+                      <span className="text-xs font-mono font-black text-[#00e5ff] bg-[#00e5ff]/10 px-2 py-0.5 rounded border border-[#00e5ff]/20">{(thresholds.technical * 100).toFixed(0)}%</span>
                     </div>
                     <input 
                       type="range" min="0.5" max="1.0" step="0.01" 
                       value={thresholds.technical}
                       onChange={(e) => setThresholds(prev => ({ ...prev, technical: parseFloat(e.target.value) }))}
                       onMouseUp={() => updateThreshold('similarity_threshold_technical', thresholds.technical)}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#00e5ff]"
                     />
                     <p className="text-[10px] text-slate-500 leading-relaxed italic">장애 키워드가 포함된 문자의 지식베이스 매칭 강도를 조절합니다.</p>
                   </div>
@@ -1792,7 +1792,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {visibleSms.length > 0 ? (
-                  <div className="p-3 space-y-1.5">
+                  <div className="p-3 space-y-2">
                     {visibleSms.map((msg) => {
                       const isSelected = selectedSms?.inc_id === msg.inc_id;
                       return (
@@ -1811,7 +1811,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               setSelectedIncidentIdFlow(msg.inc_id);
                               
                               // 🚀 Trigger "Lively" animation for Flow panel
-                              // (setIsFlowSpinning is handled inside fetchWorkflow useEffect)
                             } else {
                               // 선택 해제
                               setSelectedSms(null);
@@ -1821,36 +1820,41 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               setAgentMessages([]);
                             }
                           }}
-                          style={{ border: `1px solid ${isSelected ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.04)'}` }}
-                          className={`rounded-2xl py-2 px-4 flex flex-col group transition-all cursor-pointer ${
-                            isSelected ? 'bg-yellow-500/5 ring-1 ring-yellow-500/30' : 'bg-[#11141d] hover:border-yellow-500/30'
-                          }`}
+                          style={{
+                            background: isSelected ? 'rgba(0,229,255,0.08)' : 'rgba(18,21,26,0.85)',
+                            borderTop: '1px solid rgba(255,255,255,0.05)',
+                            borderRight: '1px solid rgba(255,255,255,0.05)',
+                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            borderLeft: isSelected ? '4px solid #00e5ff' : '4px solid #00e5ff',
+                            boxShadow: isSelected ? '0 0 15px rgba(0,229,255,0.25)' : '0 4px 15px rgba(0,0,0,0.4)'
+                          }}
+                          className="rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98]"
                         >
                           {/* 상단: 제목 + 배지 */}
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-yellow-600/20' : 'bg-blue-600/10'}`}>
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#00e5ff]/20' : 'bg-[#00e5ff]/10'}`}>
                                 {msg.keyword_detected
-                                  ? <AlertCircle className="w-4 h-4 text-yellow-300" />
-                                  : <Info className={`w-4 h-4 ${isSelected ? 'text-yellow-400' : 'text-blue-400'}`} />
+                                  ? <AlertCircle className="w-4 h-4 text-[#00e5ff]" />
+                                  : <Info className="w-4 h-4 text-[#00e5ff]" />
                                 }
                               </div>
-                              <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-yellow-400' : 'text-white'}`}>
+                              <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-[#00e5ff] text-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-white'}`}>
                                 {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
                               </h4>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1.5 shrink-0">
                               {(msg.incident_status === '처리완료' || msg.incident_status === 'Completed' || msg.status === '처리완료' || msg.status === 'Completed' || Number(msg.is_analyzed) >= 1) && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${msg.inc_id}`); }}
-                                  className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 whitespace-nowrap shadow-[0_0_8px_rgba(217,70,239,0.2)]"
+                                  className="h-6 flex items-center gap-1 px-2.5 rounded-lg text-[9px] font-black text-[#ff4a4a] bg-[#ff4a4a]/15 border border-[#ff4a4a]/30 hover:bg-[#ff4a4a]/25 whitespace-nowrap shadow-[0_0_8px_rgba(255,74,74,0.2)] active:scale-95 transition-all"
                                 >
                                   REPORT
                                 </button>
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                                className="h-6 flex items-center gap-1 px-2 rounded-lg text-[8.5px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 whitespace-nowrap"
+                                className="h-6 flex items-center gap-1.5 px-2.5 rounded-lg text-[9px] font-black text-[#00e5ff] bg-[#00e5ff]/15 border border-[#00e5ff]/30 hover:bg-[#00e5ff]/25 whitespace-nowrap shadow-[0_0_8px_rgba(0,229,255,0.2)] active:scale-95 transition-all"
                               >
                                 진행상태 <ExternalLink className="w-2.5 h-2.5" />
                               </button>
@@ -1859,38 +1863,52 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                           {/* 중단: 발신자 + 사번 + 분석 상태 뱃지 */}
                           <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <p className="text-[8.5px] text-slate-500 font-bold">발신: <span className="text-slate-400 font-mono">{msg.sender}</span></p>
+                            <p className="text-[9px] text-slate-400 font-bold">발신: <span className="text-slate-200 font-mono font-semibold">{msg.sender}</span></p>
                             {msg.employee_id && (
-                              <span className="h-5 flex items-center gap-1 bg-blue-500/10 px-1.5 rounded-md border border-blue-500/20 text-[8.5px] text-blue-400 font-mono font-black shrink-0">
-                                {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
+                              <span className="h-5 flex items-center gap-1 bg-white/5 px-2 rounded-lg border border-white/15 text-[9px] text-slate-300 font-mono font-bold shrink-0">
+                                👤 {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
                               </span>
                             )}
-                            <span className={`h-5 flex items-center px-2 rounded-md border text-[8.5px] font-black whitespace-nowrap transition-all shrink-0 ml-auto sm:ml-0 ${
+                            <span className={`h-5 flex items-center px-2.5 rounded-lg border text-[9px] font-black whitespace-nowrap transition-all shrink-0 ml-auto sm:ml-0 ${
                               msg.incident_status === '처리완료'
                                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
                                 : Number(msg.is_analyzed) >= 1
                                   ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.2)]'
-                                  : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'
+                                  : 'bg-[#00e5ff]/15 text-[#00e5ff] border-[#00e5ff]/30 shadow-[0_0_8px_rgba(0,229,255,0.2)] animate-pulse'
                             }`}>
                               {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
                             </span>
                           </div>
 
                           {/* 하단: 메시지 본문 + 타임스탬프 */}
-                          <div className="flex flex-col gap-1">
-                            <p className={`text-[13px] leading-relaxed font-medium break-all whitespace-pre-wrap transition-colors ${isSelected ? 'text-yellow-100' : 'text-slate-300'}`}>
+                          <div className="flex flex-col gap-1.5 mt-1">
+                            <p className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
                               {msg.message}
                             </p>
-                            {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (
-                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[8px] font-black uppercase w-fit ${
-                                msg.similarity_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                              }`}>
-                                <Zap className="w-2 h-2" />
-                                Match {(msg.similarity_score * 100).toFixed(1)}%
-                              </div>
-                            )}
+                            {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (() => {
+                              const score = msg.similarity_score;
+                              let matchColor = '#00e5ff';
+                              let matchBg = 'rgba(0,229,255,0.1)';
+                              let matchBorder = 'rgba(0,229,255,0.2)';
+                              if (score >= 0.8) {
+                                matchColor = '#f87171';
+                                matchBg = 'rgba(248,113,113,0.15)';
+                                matchBorder = 'rgba(248,113,113,0.3)';
+                              } else if (score >= 0.5) {
+                                matchColor = '#fb923c';
+                                matchBg = 'rgba(251,146,60,0.15)';
+                                matchBorder = 'rgba(251,146,60,0.3)';
+                              }
+                              return (
+                                <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider font-mono w-fit"
+                                  style={{ color: matchColor, background: matchBg, borderColor: matchBorder }}>
+                                  <Zap className="w-3 h-3 shrink-0" />
+                                  Match {(score * 100).toFixed(1)}%
+                                </div>
+                              );
+                            })()}
                             <div className="flex justify-end border-t border-white/5 pt-1 mt-0.5">
-                              <span className="text-[8px] text-slate-600 font-bold font-mono opacity-50">{formatYYMMDD(msg.timestamp)}</span>
+                              <span className="text-[9px] text-slate-500 font-bold font-mono">{formatYYMMDD(msg.timestamp)}</span>
                             </div>
                           </div>
                         </div>
@@ -1899,12 +1917,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-blue-500/10 flex items-center justify-center">
-                      <MessageSquare className="w-6 h-6 text-blue-400" />
+                    <div className="w-12 h-12 rounded-2xl bg-[#00e5ff]/10 border border-[#00e5ff]/20 flex items-center justify-center">
+                      <MessageSquare className="w-6 h-6 text-[#00e5ff]" />
                     </div>
                     <div className="text-center space-y-1">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-wider">수신된 SMS 없음</p>
-                      <p className="text-[10px] text-slate-600">장애 SMS가 수신되면 여기에 표시됩니다</p>
+                      <p className="text-xs font-black text-[#00e5ff] uppercase tracking-wider">수신된 SMS 없음</p>
+                      <p className="text-[10px] text-slate-500">장애 SMS가 수신되면 여기에 표시됩니다</p>
                     </div>
                   </div>
                 )}
@@ -1932,13 +1950,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
           <div className="flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-hidden flex flex-col">
-              <div className={`bg-[#0a0c12] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 hud-card hud-corners ${selectedSms ? 'border-yellow-500/40 shadow-yellow-500/10' : 'border-white/5'}`}>
+              <div className={`bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 backdrop-blur-2xl ${selectedSms ? 'border-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.25)]' : 'border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.15)]'}`}>
                 {/* Header */}
                 <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-indigo-500/20 border border-indigo-500/30 p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
-                        <Sparkles className="w-5 h-5 text-indigo-300" />
+                      <div className={`bg-[#00e5ff]/20 border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.2)] p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
+                        <Sparkles className="w-5 h-5 text-[#00e5ff]" />
                       </div>
                     </span>
                     <div className="min-w-0">
@@ -1984,13 +2002,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {/* ── 4/4: 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-hidden">
             {/* Activity History Flow Area */}
-            <div className="bg-[#0f1421] rounded-3xl border border-white/5 shadow-xl flex-1 overflow-hidden flex flex-col hud-card hud-corners">
+            <div className="bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border border-[#00e5ff]/40 shadow-[0_0_25px_rgba(0,229,255,0.2)] flex-1 overflow-hidden flex flex-col backdrop-blur-2xl">
               {/* Header */}
               <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`data-ring-wrapper shrink-0 ${isFlowSpinning ? 'data-ring-spinning' : ''}`}>
-                    <div className={`bg-purple-500/20 border border-purple-500/30 p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
-                      <Activity className="w-5 h-5 text-purple-400" />
+                    <div className={`bg-[#00e5ff]/20 border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.2)] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
+                      <Activity className="w-5 h-5 text-[#00e5ff]" />
                     </div>
                   </span>
                   <div className="min-w-0">
@@ -2028,8 +2046,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                             <div className="flex items-center gap-1">
                               <span className="text-[8px] uppercase tracking-tight text-slate-500 font-bold">MTTR</span>
                               <div className="flex items-center gap-1">
-                                <div className={`w-1 h-1 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`} />
-                                <span className={`text-[12px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400 bloom-green' : 'text-blue-400 bloom-cyan'}`}>
+                                <div className={`w-1 h-1 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-[#00e5ff] animate-pulse'}`} />
+                                <span className={`text-[12px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400 bloom-green' : 'text-[#00e5ff] bloom-cyan'}`}>
                                   {formatDuration(durationMs)}
                                 </span>
                               </div>
@@ -2106,11 +2124,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 <span className={`data-ring-wrapper data-ring-sm absolute left-0 top-0 z-10 ${isNextStep ? 'data-ring-spinning' : ''}`} style={{ width: 28, height: 28 }}>
                                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all duration-700
                                     ${isCompleted 
-                                      ? 'bg-blue-600/30 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110' 
+                                      ? 'bg-[#00e5ff] border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.6)] scale-110 font-black' 
                                       : isNextStep 
-                                      ? 'bg-yellow-500/20 border-transparent shadow-[0_0_10px_rgba(234,179,8,0.3)]' 
+                                      ? 'bg-[#00e5ff]/20 border-[#00e5ff] shadow-[0_0_12px_rgba(0,229,255,0.4)] animate-pulse' 
                                       : 'bg-white/5 border-white/10 opacity-40'}`}>
-                                    <step.icon className={`w-3.5 h-3.5 ${isCompleted ? 'text-blue-400' : isNextStep ? 'text-yellow-400' : 'text-slate-500'}`} />
+                                    <step.icon className={`w-3.5 h-3.5 ${isCompleted ? 'text-black font-black' : isNextStep ? 'text-[#00e5ff]' : 'text-slate-500'}`} />
                                   </div>
                                 </span>
                                 <div className={`transition-all duration-700 ${isCompleted ? 'opacity-100' : (isNextStep ? 'opacity-100 translate-x-1' : 'opacity-30')}`}>
@@ -2225,7 +2243,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     setShowWarRoomPopup(false);
                     navigate(`/chat/${room.id}`);
                   }}
-                  className="bg-[#11141d] p-4 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98]"
+                  className="bg-[#102428] p-4 rounded-2xl border border-[#00e5ff]/30 hover:border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.15)] transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98]"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -2296,7 +2314,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       />
       {/* 🚀 Dynamic Save Toast for Thresholds */}
       {saveStatus && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#1a1f2e] border border-emerald-500/30 text-emerald-400 text-xs font-black px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#0a1c20] border border-[#00e5ff] text-[#00e5ff] shadow-[0_0_20px_rgba(0,229,255,0.4)] text-xs font-black px-6 py-3.5 rounded-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
           <CheckCircle className="w-4 h-4 animate-bounce" />
           <span>{saveStatus}</span>
         </div>

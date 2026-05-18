@@ -676,28 +676,28 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const showWarRoomButton = analysisComplete;
 
   return (
-    <div className={`rounded-3xl border shadow-2xl relative h-full flex flex-col transition-all duration-500
+    <div className={`rounded-3xl border shadow-2xl relative h-full flex flex-col transition-all duration-500 backdrop-blur-2xl
       ${isAnalyzingSms && isCritical
-        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-red-500/40 shadow-red-900/20'
+        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.3)]'
         : selectedSms
-        ? 'bg-gradient-to-br from-[#1a1b10] to-[#11141d] border-yellow-500/40 shadow-yellow-500/10'
-        : 'bg-gradient-to-br from-[#141928] via-[#161c2b] to-[#0e1018] border-blue-500/20 shadow-blue-900/20'}`}>
+        ? 'bg-gradient-to-b from-[#102428] to-[#081619] border-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.25)]'
+        : 'bg-gradient-to-b from-[#102428]/80 to-[#081619]/80 border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.15)]'}`}>
       {/* 고정 헤더 영역 */}
       <div className="shrink-0 p-4 sm:p-5 border-b border-white/5 relative">
-      <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/3 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/5 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none" />
 
       {/* 헤더 - SMS 수신내역과 동일한 구조 */}
       <div className="flex items-center justify-between gap-3 relative z-10">
         {/* 왼쪽: 아이콘 + 타이틀 */}
         <div className="flex items-center gap-3 min-w-0">
           <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms ? 'data-ring-spinning' : ''} ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
-            <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : isAnalyzingSms ? 'bg-yellow-500/20 border-yellow-500/30' : 'bg-blue-600/20 border-blue-500/30'}`}>
+            <div className={`p-2.5 rounded-xl border shadow-[0_0_15px_rgba(0,229,255,0.2)] ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : 'bg-[#00e5ff]/20 border-[#00e5ff]/30'}`}>
               {isAnalyzingSms && isCritical
                 ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
                 : isAnalyzingSms
-                ? <MessageSquare className="w-5 h-5 text-yellow-400 animate-pulse" />
-                : <Brain className="w-5 h-5 text-blue-400" />
+                ? <MessageSquare className="w-5 h-5 text-[#00e5ff] animate-pulse" />
+                : <Brain className="w-5 h-5 text-[#00e5ff]" />
               }
             </div>
           </span>
