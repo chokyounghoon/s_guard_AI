@@ -300,11 +300,12 @@ function AppContent() {
   }, [navigate, isAuthPage]);
 
   // 🛡️ Debug: Governance Guard Status
+  const debugKey = `${userProfile?.employee_id}_${userProfile?.terms_agreed_at}_${location.pathname}`;
   useEffect(() => {
     if (userProfile && !isAuthPage) {
       console.log(`[Governance-Debug] Page: ${location.pathname}, Terms Agreed At: "${userProfile.terms_agreed_at}", Should Show Modal: ${(!userProfile.terms_agreed_at && !isAuthPage)}`);
     }
-  }, [userProfile, location.pathname, isAuthPage]);
+  }, [debugKey, isAuthPage]);
 
   useEffect(() => {
     if (!isRefreshing && userProfile && isAuthPage) {

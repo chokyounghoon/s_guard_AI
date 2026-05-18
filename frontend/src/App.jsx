@@ -333,11 +333,12 @@ function AppContent() {
   }, []); // Run only once on app mount
 
   // 🛡️ Debug: Governance Guard Status
+  const debugKey = `${userProfile?.employee_id}_${userProfile?.terms_agreed_at}_${location.pathname}`;
   useEffect(() => {
     if (userProfile && !isAuthPage) {
       console.log(`[Governance-Debug] Page: ${location.pathname}, Terms Agreed At: "${userProfile.terms_agreed_at}", Should Show Modal: ${(!userProfile.terms_agreed_at && !isAuthPage)}`);
     }
-  }, [userProfile, location.pathname, isAuthPage]);
+  }, [debugKey, isAuthPage]);
 
   // 🔄 Authenticated User Auto-Redirect: 로그인된 상태에서 로그인 페이지 접근 시 대시보드로 이동
   useEffect(() => {
