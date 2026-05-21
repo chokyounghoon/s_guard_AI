@@ -385,17 +385,17 @@ app.post('/register-token', async (c) => {
         user_id TEXT NOT NULL UNIQUE,
         fcm_token TEXT NOT NULL,
         platform TEXT DEFAULT 'android',
-        created_at TEXT DEFAULT (datetime('now','localtime')),
-        updated_at TEXT DEFAULT (datetime('now','localtime'))
+        created_at TEXT DEFAULT (datetime('now','+9 hours')),
+        updated_at TEXT DEFAULT (datetime('now','+9 hours'))
       )
     `).run();
     await db.prepare(`
       INSERT INTO fcm_tokens (user_id, fcm_token, platform, updated_at)
-      VALUES (?, ?, ?, datetime('now','localtime'))
+      VALUES (?, ?, ?, datetime('now','+9 hours'))
       ON CONFLICT(user_id) DO UPDATE SET
         fcm_token = excluded.fcm_token,
         platform  = excluded.platform,
-        updated_at = datetime('now','localtime')
+        updated_at = datetime('now','+9 hours')
     `).bind(user_id, token, platform).run();
     console.log(`[FCM-Register] ✅ user_id=${user_id}, platform=${platform}, token=${token.substring(0, 20)}...`);
     return c.json({ success: true, message: 'FCM token registered' });
