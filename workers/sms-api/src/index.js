@@ -321,6 +321,7 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/codebook') ||
     path.startsWith('/rbac/permissions') ||
     path.startsWith('/call/') ||            // ⚡ 앱 Webhook 수신 경로 (Public 허용)
+    path === '/register-token' ||           // ⚡ Android FCM 토큰 등록 — JWT 없이 앱 시작 시 호출
     (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
     
   console.log(`[Auth-Access] Path: ${path} | isPublic: ${isPublic}`);
