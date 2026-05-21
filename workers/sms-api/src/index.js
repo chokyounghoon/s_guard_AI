@@ -370,14 +370,19 @@ app.get('/auth/push-vapid-public', (c) => {
 app.post('/register-token', async (c) => {
   const db = c.env.DB;
   try {
-    const { user_id, device_token, platform } = await c.req.json();
-    if (!user_id || !device_token) {
-      return c.json({ error: 'user_id and device_token required' }, 400);
+    const body = await c.req.json();
+    const user_id = body.user_id;
+    // Android 앱은 fcm_token, 웹/구형 앱은 device_token으로 보낼 수 있음 — 둘 다 허용
+    const token = body.fcm_token || body.device_token;
+    const platform = body.platform || 'android';
+
+    if (!user_id || !token) {
+      return c.json({ error: 'user_id and fcm_token (or device_token) required' }, 400);
     }
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS fcm_tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT NOT NULL,
+        user_id TEXT NOT NULL UNIQUE,
         fcm_token TEXT NOT NULL,
         platform TEXT DEFAULT 'android',
         created_at TEXT DEFAULT (datetime('now','localtime')),
@@ -391,18 +396,11 @@ app.post('/register-token', async (c) => {
         fcm_token = excluded.fcm_token,
         platform  = excluded.platform,
         updated_at = datetime('now','localtime')
-    `).bind(user_id, device_token, platform || 'android').run();
-    console.log(`[FCM-Register] user_id=${user_id}, platform=${platform}`);
+    `).bind(user_id, token, platform).run();
+    console.log(`[FCM-Register] ✅ user_id=${user_id}, platform=${platform}, token=${token.substring(0, 20)}...`);
     return c.json({ success: true, message: 'FCM token registered' });
   } catch (e) {
-    // UNIQUE 제약 없을 수 있으므로 upsert 재시도
-    try {
-      const db2 = c.env.DB;
-      const { user_id, device_token, platform } = await c.req.json().catch(() => ({}));
-      await db2.prepare(`UPDATE fcm_tokens SET fcm_token=?, platform=?, updated_at=datetime('now','localtime') WHERE user_id=?`)
-        .bind(device_token, platform||'android', user_id).run();
-      return c.json({ success: true });
-    } catch (_) {}
+    console.error(`[FCM-Register] ❌ Error: ${e.message}`);
     return c.json({ error: e.message }, 500);
   }
 });
