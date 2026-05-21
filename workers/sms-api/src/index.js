@@ -364,7 +364,50 @@ app.get('/auth/push-vapid-public', (c) => {
   return c.json({ publicKey: c.env.VAPID_PUBLIC_KEY || '' });
 });
 
+// ── Android FCM 토큰 등록 (앱 → Worker) ──────────────────────────────────────
+// 인증 없이 호출 가능 (앱 시작/토큰 갱신 시 호출)
+app.post('/register-token', async (c) => {
+  const db = c.env.DB;
+  try {
+    const { user_id, device_token, platform } = await c.req.json();
+    if (!user_id || !device_token) {
+      return c.json({ error: 'user_id and device_token required' }, 400);
+    }
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS fcm_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        fcm_token TEXT NOT NULL,
+        platform TEXT DEFAULT 'android',
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `).run();
+    await db.prepare(`
+      INSERT INTO fcm_tokens (user_id, fcm_token, platform, updated_at)
+      VALUES (?, ?, ?, datetime('now','localtime'))
+      ON CONFLICT(user_id) DO UPDATE SET
+        fcm_token = excluded.fcm_token,
+        platform  = excluded.platform,
+        updated_at = datetime('now','localtime')
+    `).bind(user_id, device_token, platform || 'android').run();
+    console.log(`[FCM-Register] user_id=${user_id}, platform=${platform}`);
+    return c.json({ success: true, message: 'FCM token registered' });
+  } catch (e) {
+    // UNIQUE 제약 없을 수 있으므로 upsert 재시도
+    try {
+      const db2 = c.env.DB;
+      const { user_id, device_token, platform } = await c.req.json().catch(() => ({}));
+      await db2.prepare(`UPDATE fcm_tokens SET fcm_token=?, platform=?, updated_at=datetime('now','localtime') WHERE user_id=?`)
+        .bind(device_token, platform||'android', user_id).run();
+      return c.json({ success: true });
+    } catch (_) {}
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 app.post('/auth/push-subscribe', async (c) => {
+
   const user = c.get('user');
   const db = c.env.DB;
   const { subscription } = await c.req.json();
@@ -10399,33 +10442,69 @@ app.post('/scallert/test-push', async (c) => {
       return c.json({ error: 'target_user_id and phone_number are required' }, 400);
     }
 
-    const payload = {
-      tag: 'scallert-call-trigger',
-      priority: 100,
-      data: {
-        action: 'CALL',
-        phone_number: phone_number,
-        log_title: 'S-Callert Trigger'
-      }
-    };
-
-    const results = await sendPushNotification(c, target_user_id, payload);
-    
-    // 로그 남기기 (TB_SCL_TEST_LOG 형식에 맞춤)
     const now = getKst();
+    let success = false;
+    let method = '';
+    let resultDetail = '';
+
+    // ① FCM 토큰 조회 (Android 앱 등록 토큰)
+    let fcmRow = null;
+    try {
+      fcmRow = await db.prepare(`SELECT fcm_token FROM fcm_tokens WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1`)
+        .bind(target_user_id).first();
+    } catch (_) {}
+
+    if (fcmRow?.fcm_token) {
+      // FCM HTTP Legacy API로 Android 앱에 직접 전송
+      const fcmServerKey = c.env.FCM_SERVER_KEY;
+      if (!fcmServerKey) {
+        return c.json({ error: 'FCM_SERVER_KEY not configured in Worker secrets' }, 500);
+      }
+      const fcmPayload = {
+        to: fcmRow.fcm_token,
+        priority: 'high',
+        data: {
+          action: 'CALL',
+          phone_number: phone_number,
+          log_title: 'S-Callert Trigger'
+        }
+      };
+      const fcmRes = await fetch('https://fcm.googleapis.com/fcm/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `key=${fcmServerKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(fcmPayload)
+      });
+      const fcmBody = await fcmRes.text();
+      success = fcmRes.ok && fcmBody.includes('"success":1');
+      method = 'FCM_TOKEN';
+      resultDetail = fcmBody.substring(0, 500);
+      console.log(`[FCM-Push] user=${target_user_id} status=${fcmRes.status} body=${fcmBody.substring(0,100)}`);
+    } else {
+      // ② fallback: VAPID Web Push (브라우저 구독)
+      const payload = {
+        tag: 'scallert-call-trigger',
+        priority: 100,
+        data: { action: 'CALL', phone_number, log_title: 'S-Callert Trigger' }
+      };
+      const results = await sendPushNotification(c, target_user_id, payload);
+      success = results?.length > 0 && results.some(r => r.ok);
+      method = 'VAPID_WEB_PUSH';
+      resultDetail = JSON.stringify(results).substring(0, 500);
+    }
+
+    // 로그 저장
     await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_TEST_LOG (
       LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT, API_URL TEXT,
       API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
       ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
     )`).run();
-    
-    const success = results && results.length > 0 && !results[0].error && results.some(r => r.ok);
-    const statusText = JSON.stringify(results);
-
     await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID,API_URL,API_METHOD,REQ_PARAMS,STATUS_CODE,RESPONSE_BODY,ELAPSED_MS,SUCCESS,TESTED_BY,TESTED_AT) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .bind('PUSH_TEST', 'VAPID_PUSH_SYSTEM', 'PUSH', JSON.stringify({ target_user_id, phone_number }), 200, statusText.substring(0, 2000), 0, success ? 'Y' : 'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
+      .bind('PUSH_TEST', method, 'PUSH', JSON.stringify({ target_user_id, phone_number }), success ? 200 : 500, resultDetail, 0, success ? 'Y' : 'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
 
-    return c.json({ success, results });
+    return c.json({ success, method, detail: resultDetail });
   } catch (e) {
     return c.json({ error: e.message }, 500);
   }
