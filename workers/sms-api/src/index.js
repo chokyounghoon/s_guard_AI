@@ -320,6 +320,7 @@ const authMiddleware = async (c, next) => {
     path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
     path.startsWith('/codebook') ||
     path.startsWith('/rbac/permissions') ||
+    path.startsWith('/call/') ||            // ⚡ 앱 Webhook 수신 경로 (Public 허용)
     (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
     
   console.log(`[Auth-Access] Path: ${path} | isPublic: ${isPublic}`);
@@ -487,15 +488,23 @@ const sendPushNotification = async (c, userId, payload) => {
 
     for (const sub of uniqueSubs) {
       try {
-        const notificationPayload = {
-          title:   payload.title    || '[S-GUARD]',
-          body:    payload.body     || '새 알림이 수신되었습니다.',
-          tag:     payload.tag      || 'sguard-alert',
-          url:     payload.url      || '/inbox',
-          inc_id:  payload.inc_id   || null,
-          priority: payload.priority || 50,
-          vibrate: (payload.priority || 50) >= 80 ? [300, 100, 300] : [200, 100, 200]
-        };
+        // data-only 모드: action 등 데이터만 있는 경우 (Android remoteMessage.data 활용)
+        const notificationPayload = (payload.data && !payload.title)
+          ? {
+              tag:      payload.tag      || 'sguard-data',
+              priority: payload.priority || 100,
+              data:     payload.data
+            }
+          : {
+              title:    payload.title    || '[S-GUARD]',
+              body:     payload.body     || '새 알림이 수신되었습니다.',
+              tag:      payload.tag      || 'sguard-alert',
+              url:      payload.url      || '/inbox',
+              inc_id:   payload.inc_id   || null,
+              priority: payload.priority || 50,
+              vibrate:  (payload.priority || 50) >= 80 ? [300, 100, 300] : [200, 100, 200],
+              data:     payload.data     || null
+            };
         const payloadStr = JSON.stringify(notificationPayload);
         console.log('[Push] Sending to', sub.endpoint.substring(0, 40), '| payload:', payloadStr.substring(0, 80));
 
@@ -7772,6 +7781,9 @@ app.post('/warroom/resolve-only', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
     .bind(user_id, now, normId).run();
   
+  await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, now, user_id || 'SYSTEM', normId).run();
+
   await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id, normId).run();
 
@@ -7790,6 +7802,9 @@ app.post('/ai/warroom/close', async (c) => {
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, user_id || 'SYSTEM', normId).run()
     
+  await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
+    .bind(now, now, user_id || 'SYSTEM', normId).run();
+
   // Cascading update for all participants
   await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id || 'SYSTEM', normId).run();
@@ -8394,7 +8409,9 @@ app.get('/warroom/chat/:id', async (c) => {
   const sms_body = (inc && inc.description) ? inc.description : ''   // ← 원본 SMS 텍스트
   if (inc) {
     if (!description && inc.description) description = inc.description
-    if (inc.status && inc.status !== 'INC_001') status = inc.status
+    if (status !== 'CLOSED' && status !== 'INC_003' && inc.status && inc.status !== 'INC_001') {
+      status = inc.status;
+    }
   }
 
   // Get messages
@@ -10274,6 +10291,144 @@ app.get('/scallert/strategies/:id/test-logs', async (c) => {
     const { results } = await db.prepare("SELECT * FROM TB_SCL_TEST_LOG WHERE STRATEGY_ID = ? ORDER BY LOG_ID DESC LIMIT ?").bind(id, limit).all();
     return c.json(results || []);
   } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// ── 앱 발신/통화 상태 보고 Webhook ────────────────────────────────────────────────
+app.post('/call/event', async (c) => {
+  const db = c.env.DB;
+  try {
+    const payload = await c.req.json();
+    const { employee_id, phone_number, event_type, timestamp } = payload;
+
+    if (!employee_id || !phone_number || !event_type) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    const now = getKst();
+    const date = new Date(timestamp || Date.now());
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstDate = new Date(date.getTime() + kstOffset);
+    const eventTimeStr = kstDate.toISOString().replace('T', ' ').substring(0, 19);
+
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_APP_EVENT_LOG (
+      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+      EMPLOYEE_ID TEXT,
+      PHONE_NUMBER TEXT,
+      EVENT_TYPE TEXT,
+      TIMESTAMP INTEGER,
+      EVENT_TIME TEXT,
+      REG_DT TEXT
+    )`).run();
+
+    await db.prepare(`
+      INSERT INTO TB_SCL_APP_EVENT_LOG (EMPLOYEE_ID, PHONE_NUMBER, EVENT_TYPE, TIMESTAMP, EVENT_TIME, REG_DT)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(employee_id, phone_number, event_type, timestamp || Date.now(), eventTimeStr, now).run();
+
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get('/scallert/app-events', async (c) => {
+  const db = c.env.DB;
+  const limit = Number(c.req.query('limit') || 50);
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_APP_EVENT_LOG (
+      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+      EMPLOYEE_ID TEXT,
+      PHONE_NUMBER TEXT,
+      EVENT_TYPE TEXT,
+      TIMESTAMP INTEGER,
+      EVENT_TIME TEXT,
+      REG_DT TEXT
+    )`).run();
+
+    const { results } = await db.prepare("SELECT * FROM TB_SCL_APP_EVENT_LOG ORDER BY LOG_ID DESC LIMIT ?").bind(limit).all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get('/scallert/devices/:userId', async (c) => {
+  const userId = c.req.param('userId');
+  const db = c.env.DB;
+  try {
+    const { results } = await db.prepare("SELECT user_id, endpoint, mod_dt FROM push_subscriptions WHERE user_id = ?").bind(userId).all();
+    return c.json({
+      registered: results.length > 0,
+      count: results.length,
+      devices: results.map(r => ({
+        user_id: r.user_id,
+        endpoint_preview: r.endpoint ? r.endpoint.substring(0, 50) + '...' : '',
+        mod_dt: r.mod_dt
+      }))
+    });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get('/scallert/push-devices', async (c) => {
+  const db = c.env.DB;
+  try {
+    const { results } = await db.prepare(`
+      SELECT p.user_id, p.endpoint, p.mod_dt, u.name as emp_nm
+      FROM push_subscriptions p
+      LEFT JOIN users u ON p.user_id = u.employee_id
+      WHERE p.mod_dt = (
+        SELECT MAX(mod_dt) 
+        FROM push_subscriptions 
+        WHERE user_id = p.user_id
+      )
+      ORDER BY p.mod_dt DESC
+    `).all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post('/scallert/test-push', async (c) => {
+  const db = c.env.DB;
+  try {
+    const { target_user_id, phone_number } = await c.req.json();
+    if (!target_user_id || !phone_number) {
+      return c.json({ error: 'target_user_id and phone_number are required' }, 400);
+    }
+
+    const payload = {
+      tag: 'scallert-call-trigger',
+      priority: 100,
+      data: {
+        action: 'CALL',
+        phone_number: phone_number,
+        log_title: 'S-Callert Trigger'
+      }
+    };
+
+    const results = await sendPushNotification(c, target_user_id, payload);
+    
+    // 로그 남기기 (TB_SCL_TEST_LOG 형식에 맞춤)
+    const now = getKst();
+    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_TEST_LOG (
+      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT, API_URL TEXT,
+      API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
+      ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
+    )`).run();
+    
+    const success = results && results.length > 0 && !results[0].error && results.some(r => r.ok);
+    const statusText = JSON.stringify(results);
+
+    await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID,API_URL,API_METHOD,REQ_PARAMS,STATUS_CODE,RESPONSE_BODY,ELAPSED_MS,SUCCESS,TESTED_BY,TESTED_AT) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      .bind('PUSH_TEST', 'VAPID_PUSH_SYSTEM', 'PUSH', JSON.stringify({ target_user_id, phone_number }), 200, statusText.substring(0, 2000), 0, success ? 'Y' : 'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
+
+    return c.json({ success, results });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
 });
 
 // ── WebSocket Upgrade Route ──────────────────────────────────────────────────

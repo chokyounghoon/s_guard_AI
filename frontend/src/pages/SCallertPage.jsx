@@ -8,7 +8,7 @@ import {
   ChevronDown, Zap, Clock, AlertCircle,
   CheckCircle2, PhoneOff, PhoneMissed, Loader2,
   Settings, Play, Terminal, Globe, Key, Timer,
-  ChevronUp, Copy, CheckCheck
+  ChevronUp, Copy, CheckCheck, Smartphone
 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
 import { SMS_WORKER_URL } from '../config/api';
@@ -124,7 +124,23 @@ export default function SCallertPage() {
   }, []);
 
   // ── PDS API 설정 ──────────────────────────────────
-  const [pdsConfig, setPdsConfig]         = useState({ api_url: '', api_method: 'POST', api_headers: {}, api_params: {}, timeout_sec: 10 });
+  const [pdsConfig, setPdsConfig]         = useState({
+    api_url: 'https://fcm.googleapis.com/fcm/send',
+    api_method: 'POST',
+    api_headers: {
+      'TTL': '60',
+      'Urgency': 'high',
+      'Authorization': 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY',
+      'Crypto-Key': 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY'
+    },
+    api_params: {
+      data: {
+        action: 'CALL',
+        phone_number: '01012345678'
+      }
+    },
+    timeout_sec: 10
+  });
   const [cfgEditing, setCfgEditing]       = useState(false);
   const [cfgSaving, setCfgSaving]         = useState(false);
   const [testLogs, setTestLogs]           = useState([]);
@@ -132,9 +148,33 @@ export default function SCallertPage() {
   const [lastTestResult, setLastTestResult] = useState(null);
   const [logExpanded, setLogExpanded]     = useState(true);
   const [copiedLog, setCopiedLog]         = useState(null);
-  // header/param 편집용 임시 state
-  const [cfgHeaderRows, setCfgHeaderRows] = useState([{ key: '', val: '' }]);
-  const [cfgParamRows,  setCfgParamRows]  = useState([{ key: '', val: '' }]);
+  const [cfgHeaderRows, setCfgHeaderRows] = useState([
+    { key: 'TTL', val: '60' },
+    { key: 'Urgency', val: 'high' },
+    { key: 'Authorization', val: 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' },
+    { key: 'Crypto-Key', val: 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' }
+  ]);
+  const [cfgBodyText, setCfgBodyText]     = useState(JSON.stringify({
+    data: {
+      action: 'CALL',
+      phone_number: '01012345678'
+    }
+  }, null, 2));
+
+  // ── 앱 Webhook 및 테스트 수신 관련 ────────────────
+  const [appEvents, setAppEvents]         = useState([]);
+  const [appEventsLoading, setAppEventsLoading] = useState(false);
+  const [autoRefreshEvents, setAutoRefreshEvents] = useState(true);
+  const [testPhoneNumber, setTestPhoneNumber] = useState('01012345678');
+  // Mock Webhook 발송용 임시 state
+  const [mockEmpId, setMockEmpId]         = useState('12345');
+  const [mockPhone, setMockPhone]         = useState('01012345678');
+  const [mockSending, setMockSending]     = useState(false);
+  const [filterCurrentTargets, setFilterCurrentTargets] = useState(false);
+
+  // ── 등록 기기 정보 관련 ────────────────────────
+  const [pushDevices, setPushDevices]     = useState([]);
+  const [selectedDeviceUid, setSelectedDeviceUid] = useState('');
 
 
   // ── 담당자 목록 로드 ─────────────────────────────
@@ -148,6 +188,72 @@ export default function SCallertPage() {
     } catch (e) { console.error(e); }
     finally { setTgtLoading(false); }
   }, []);
+
+  const fetchAppEvents = useCallback(async () => {
+    setAppEventsLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/scallert/app-events?limit=50`, { headers: getAuthHeaders() });
+      const data = await r.json();
+      setAppEvents(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Failed to fetch app events:', e);
+    } finally {
+      setAppEventsLoading(false);
+    }
+  }, []);
+
+  const fetchPushDevices = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/scallert/push-devices`, { headers: getAuthHeaders() });
+      const data = await r.json();
+      const list = Array.isArray(data) ? data : [];
+      setPushDevices(list);
+      if (list.length > 0 && !selectedDeviceUid) {
+        setSelectedDeviceUid(list[0].user_id);
+      }
+    } catch (e) {
+      console.error('Failed to fetch push devices:', e);
+    }
+  }, [selectedDeviceUid]);
+
+  const handleSendMockEvent = async (type) => {
+    setMockSending(true);
+    try {
+      const payload = {
+        employee_id: mockEmpId,
+        phone_number: mockPhone,
+        event_type: type,
+        timestamp: Date.now()
+      };
+      const r = await fetch(`${API_BASE}/call/event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (r.ok) {
+        await fetchAppEvents();
+      } else {
+        alert('Mock Webhook 발송 실패');
+      }
+    } catch (e) {
+      alert('오류: ' + e.message);
+    } finally {
+      setMockSending(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAppEvents();
+    fetchPushDevices();
+  }, [fetchAppEvents, fetchPushDevices]);
+
+  useEffect(() => {
+    if (!autoRefreshEvents) return;
+    const timer = setInterval(() => {
+      fetchAppEvents();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [autoRefreshEvents, fetchAppEvents]);
 
   // ── 발신 이력 로드 ───────────────────────────────
   const fetchHists = useCallback(async (sid) => {
@@ -167,14 +273,76 @@ export default function SCallertPage() {
     try {
       const r = await fetch(`${API_BASE}/scallert/strategies/${sid}/config`, { headers: getAuthHeaders() });
       const data = await r.json();
-      if (data && !data.error) {
+      if (data && !data.error && data.API_URL) {
         const headers = typeof data.API_HEADERS === 'string' ? JSON.parse(data.API_HEADERS || '{}') : (data.API_HEADERS || {});
         const params  = typeof data.API_PARAMS  === 'string' ? JSON.parse(data.API_PARAMS  || '{}') : (data.API_PARAMS  || {});
-        setPdsConfig({ api_url: data.API_URL || '', api_method: data.API_METHOD || 'POST', api_headers: headers, api_params: params, timeout_sec: data.TIMEOUT_SEC || 10 });
+        setPdsConfig({ api_url: data.API_URL, api_method: data.API_METHOD || 'POST', api_headers: headers, api_params: params, timeout_sec: data.TIMEOUT_SEC || 10 });
         setCfgHeaderRows(Object.entries(headers).length ? Object.entries(headers).map(([k,v])=>({key:k,val:v})) : [{key:'',val:''}]);
-        setCfgParamRows(Object.entries(params).length   ? Object.entries(params).map(([k,v])=>({key:k,val:v}))   : [{key:'',val:''}]);
+        setCfgBodyText(JSON.stringify(params, null, 2));
+      } else {
+        // Fallback to default template (FCM) when no configuration is stored
+        setPdsConfig({
+          api_url: 'https://fcm.googleapis.com/fcm/send',
+          api_method: 'POST',
+          api_headers: {
+            'TTL': '60',
+            'Urgency': 'high',
+            'Authorization': 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY',
+            'Crypto-Key': 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY'
+          },
+          api_params: {
+            data: {
+              action: 'CALL',
+              phone_number: '01012345678'
+            }
+          },
+          timeout_sec: 10
+        });
+        setCfgHeaderRows([
+          { key: 'TTL', val: '60' },
+          { key: 'Urgency', val: 'high' },
+          { key: 'Authorization', val: 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' },
+          { key: 'Crypto-Key', val: 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' }
+        ]);
+        setCfgBodyText(JSON.stringify({
+          data: {
+            action: 'CALL',
+            phone_number: '01012345678'
+          }
+        }, null, 2));
       }
-    } catch {}
+    } catch {
+      // Fallback in case of network/fetch errors
+      setPdsConfig({
+        api_url: 'https://fcm.googleapis.com/fcm/send',
+        api_method: 'POST',
+        api_headers: {
+          'TTL': '60',
+          'Urgency': 'high',
+          'Authorization': 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY',
+          'Crypto-Key': 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY'
+        },
+        api_params: {
+          data: {
+            action: 'CALL',
+            phone_number: '01012345678'
+          }
+        },
+        timeout_sec: 10
+      });
+      setCfgHeaderRows([
+        { key: 'TTL', val: '60' },
+        { key: 'Urgency', val: 'high' },
+        { key: 'Authorization', val: 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' },
+        { key: 'Crypto-Key', val: 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' }
+      ]);
+      setCfgBodyText(JSON.stringify({
+        data: {
+          action: 'CALL',
+          phone_number: '01012345678'
+        }
+      }, null, 2));
+    }
   }, []);
 
   const fetchTestLogs = useCallback(async (sid) => {
@@ -323,13 +491,59 @@ export default function SCallertPage() {
 
   const currentStrategy = strategies.find(s => s.strategy_id === selectedSid);
 
+  // ── 템플릿 선택 적용 ──────────────────────────────
+  const applyPresetTemplate = (type) => {
+    if (type === 'fcm_webpush') {
+      setPdsConfig(p => ({
+        ...p,
+        api_url: 'https://fcm.googleapis.com/fcm/send',
+        api_method: 'POST',
+        timeout_sec: 10
+      }));
+      setCfgHeaderRows([
+        { key: 'TTL', val: '60' },
+        { key: 'Urgency', val: 'high' },
+        { key: 'Authorization', val: 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' },
+        { key: 'Crypto-Key', val: 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' }
+      ]);
+      setCfgBodyText(JSON.stringify({
+        data: {
+          action: 'CALL',
+          phone_number: '01012345678'
+        }
+      }, null, 2));
+    } else if (type === 'standard_pds') {
+      setPdsConfig(p => ({
+        ...p,
+        api_url: 'https://api.sguard.com/pds/call',
+        api_method: 'POST',
+        timeout_sec: 10
+      }));
+      setCfgHeaderRows([
+        { key: 'Content-Type', val: 'application/json' }
+      ]);
+      setCfgBodyText(JSON.stringify({
+        caller_id: 'SGUARD',
+        phone_number: '01012345678',
+        message: '장애 상황 통보 전화를 발신합니다.'
+      }, null, 2));
+    }
+  };
+
   // ── PDS Config 저장 ──────────────────────────────
   const handleCfgSave = async () => {
+    let parsedParams = {};
+    try {
+      parsedParams = JSON.parse(cfgBodyText || '{}');
+    } catch (e) {
+      alert('JSON Body 형식이 올바르지 않습니다: ' + e.message);
+      return;
+    }
+
     setCfgSaving(true);
     try {
       const headers = {}; cfgHeaderRows.filter(r=>r.key).forEach(r=>headers[r.key]=r.val);
-      const params  = {}; cfgParamRows.filter(r=>r.key).forEach(r=>params[r.key]=r.val);
-      const body = { ...pdsConfig, api_headers: headers, api_params: params, reg_id: userProfile?.employee_id||'SYSTEM' };
+      const body = { ...pdsConfig, api_headers: headers, api_params: parsedParams, reg_id: userProfile?.employee_id||'SYSTEM' };
       const r = await fetch(`${API_BASE}/scallert/strategies/${selectedSid}/config`, { method:'POST', headers: getAuthHeaders(), body: JSON.stringify(body) });
       if (r.ok) { setCfgEditing(false); alert('API 설정이 저장되었습니다.'); }
       else { const e = await r.json(); alert('저장 실패: ' + (e.error||'')); }
@@ -339,17 +553,62 @@ export default function SCallertPage() {
 
   // ── 테스트 콜 실행 ────────────────────────────────
   const handleTestCall = async () => {
+    let parsedParams = {};
+    try {
+      parsedParams = JSON.parse(cfgBodyText || '{}');
+    } catch (e) {
+      alert('JSON Body 형식이 올바르지 않습니다: ' + e.message);
+      return;
+    }
+
+    // 테스트용 전화번호 동적 주입
+    if (parsedParams && parsedParams.data) {
+      parsedParams.data.phone_number = testPhoneNumber;
+    } else {
+      parsedParams.phone_number = testPhoneNumber;
+    }
+
     setTestLoading(true); setLastTestResult(null);
     try {
       const headers = {}; cfgHeaderRows.filter(r=>r.key).forEach(r=>headers[r.key]=r.val);
-      const params  = {}; cfgParamRows.filter(r=>r.key).forEach(r=>params[r.key]=r.val);
-      const body = { ...pdsConfig, api_headers: headers, api_params: params, tested_by: userProfile?.employee_id||'SYSTEM' };
+      const body = { ...pdsConfig, api_headers: headers, api_params: parsedParams, tested_by: userProfile?.employee_id||'SYSTEM' };
       const r = await fetch(`${API_BASE}/scallert/strategies/${selectedSid}/test-call`, { method:'POST', headers: getAuthHeaders(), body: JSON.stringify(body) });
       const data = await r.json();
       setLastTestResult(data);
       await fetchTestLogs(selectedSid);
     } catch (e) { setLastTestResult({ success: false, response: e.message, elapsed_ms: 0 }); }
     finally { setTestLoading(false); }
+  };
+
+  const handlePushTestCall = async () => {
+    if (!selectedDeviceUid) {
+      alert('발신할 기기(사번)를 선택해주세요.');
+      return;
+    }
+    setTestLoading(true); setLastTestResult(null);
+    try {
+      const r = await fetch(`${API_BASE}/scallert/test-push`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          target_user_id: selectedDeviceUid,
+          phone_number: testPhoneNumber
+        })
+      });
+      const data = await r.json();
+      setLastTestResult({
+        success: data.success,
+        response: JSON.stringify(data.results),
+        elapsed_ms: 0
+      });
+      await fetchTestLogs(selectedSid);
+      alert('기기 푸시 발신 명령을 성공적으로 전송했습니다.');
+    } catch (e) {
+      setLastTestResult({ success: false, response: e.message, elapsed_ms: 0 });
+      alert('오류: ' + e.message);
+    } finally {
+      setTestLoading(false);
+    }
   };
 
   return (
@@ -713,22 +972,33 @@ export default function SCallertPage() {
                 <p className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap" style={{ color:'#06b6d4' }}>Endpoint Config & Test</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5">
+                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest whitespace-nowrap">테스트 번호</span>
+                <input
+                  type="text"
+                  value={testPhoneNumber}
+                  onChange={e => setTestPhoneNumber(e.target.value)}
+                  placeholder="01012345678"
+                  className="w-24 bg-transparent text-[11px] text-emerald-400 font-mono font-bold focus:outline-none"
+                />
+              </div>
+
               {!cfgEditing ? (
-                <button onClick={()=>setCfgEditing(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap" style={{ background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#06b6d4' }}>
+                <button onClick={()=>setCfgEditing(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap cursor-pointer" style={{ background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#06b6d4' }}>
                   <Edit3 size={13} /> 설정 편집
                 </button>
               ) : (
                 <div className="flex gap-2">
                   <button onClick={()=>setCfgEditing(false)} className="px-3 py-2 rounded-xl text-xs font-black border border-white/10 bg-white/5 text-slate-400"><X size={13} /></button>
-                  <button onClick={handleCfgSave} disabled={cfgSaving} className="px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2" style={{ background:'linear-gradient(135deg,#06b6d4,#0ea5e9)', color:'#000', boxShadow:'0 4px 14px rgba(6,182,212,0.25)' }}>
+                  <button onClick={handleCfgSave} disabled={cfgSaving} className="px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer" style={{ background:'linear-gradient(135deg,#06b6d4,#0ea5e9)', color:'#000', boxShadow:'0 4px 14px rgba(6,182,212,0.25)' }}>
                     {cfgSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} 저장
                   </button>
                 </div>
               )}
               <button
                 onClick={handleTestCall} disabled={testLoading || !pdsConfig.api_url}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap cursor-pointer"
                 style={{
                   background: testLoading||!pdsConfig.api_url ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#10b981,#059669)',
                   border: '1px solid rgba(16,185,129,0.3)', color: testLoading||!pdsConfig.api_url ? '#334155' : '#fff',
@@ -737,6 +1007,53 @@ export default function SCallertPage() {
               >
                 {testLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                 테스트 콜
+              </button>
+            </div>
+          </div>
+
+          {/* 발신 기기 선택 (기기 푸시 테스트) */}
+          <div className="p-4 mb-4 bg-white/[0.02] border border-white/5 rounded-2.5xl relative z-10 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
+                <Smartphone size={15} className="text-orange-400" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white">테스트 발송 기기 선택</p>
+                <p className="text-[9px] font-bold text-orange-400/80 uppercase tracking-wider">Select Caller Device (Push Target)</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 flex-1 max-w-md">
+              <select
+                value={selectedDeviceUid}
+                onChange={e => setSelectedDeviceUid(e.target.value)}
+                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50 cursor-pointer"
+              >
+                {pushDevices.length === 0 ? (
+                  <option value="">등록된 푸시 기기 없음</option>
+                ) : (
+                  pushDevices.map(dev => (
+                    <option key={dev.user_id} value={dev.user_id}>
+                      {dev.emp_nm ? `${dev.emp_nm} (${dev.user_id})` : `사번: ${dev.user_id}`} — {dev.mod_dt?.slice(0, 16).replace('T', ' ')}
+                    </option>
+                  ))
+                )}
+              </select>
+
+              <button
+                type="button"
+                onClick={handlePushTestCall}
+                disabled={testLoading || !selectedDeviceUid}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap cursor-pointer"
+                style={{
+                  background: testLoading || !selectedDeviceUid ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#f97316,#ea580c)',
+                  border: '1px solid rgba(249,115,22,0.3)',
+                  color: testLoading || !selectedDeviceUid ? '#475569' : '#fff',
+                  boxShadow: testLoading || !selectedDeviceUid ? 'none' : '0 4px 14px rgba(249,115,22,0.25)'
+                }}
+              >
+                {testLoading ? <Loader2 size={13} className="animate-spin" /> : <Smartphone size={13} />}
+                기기 푸시 테스트 발신
               </button>
             </div>
           </div>
@@ -777,6 +1094,27 @@ export default function SCallertPage() {
             </div>
           </div>
 
+          {/* 템플릿 선택기 */}
+          {cfgEditing && (
+            <div className="relative z-10 flex flex-wrap gap-2 items-center mb-4 p-3 bg-white/[0.02] border border-white/5 rounded-2xl">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">템플릿 빠른 설정:</span>
+              <button
+                type="button"
+                onClick={() => applyPresetTemplate('fcm_webpush')}
+                className="px-2.5 py-1 text-[10px] font-bold bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-lg hover:bg-cyan-500 hover:text-black transition-all active:scale-95 cursor-pointer"
+              >
+                FCM / Web Push 자동 발신 (Android)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPresetTemplate('standard_pds')}
+                className="px-2.5 py-1 text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg hover:bg-amber-500 hover:text-black transition-all active:scale-95 cursor-pointer"
+              >
+                기본 PDS API
+              </button>
+            </div>
+          )}
+
           {/* Headers + Params */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 relative z-10">
             {/* Headers */}
@@ -796,9 +1134,9 @@ export default function SCallertPage() {
                       <button onClick={()=>setCfgHeaderRows(r=>r.filter((_,j)=>j!==i))} className="text-slate-600 hover:text-red-400"><X size={12}/></button>
                     </div>
                   ) : row.key ? (
-                    <div key={i} className="flex gap-2 text-[11px] font-mono">
+                    <div key={i} className="flex gap-2 text-[11px] font-mono font-bold leading-normal">
                       <span className="text-slate-400 shrink-0">{row.key}:</span>
-                      <span className="text-cyan-300 truncate">{row.val}</span>
+                      <span className="text-cyan-300 select-all whitespace-pre-wrap break-all">{row.val}</span>
                     </div>
                   ) : null
                 ))}
@@ -808,27 +1146,22 @@ export default function SCallertPage() {
             {/* Params */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><Terminal size={10} /> Request Parameters</p>
-                {cfgEditing && <button onClick={()=>setCfgParamRows(r=>[...r,{key:'',val:''}])} className="text-[9px] text-cyan-500 font-black">+ 추가</button>}
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><Terminal size={10} /> Request Body (JSON)</p>
               </div>
-              <div className="space-y-1.5 bg-black/30 rounded-xl border border-white/5 p-3 min-h-[80px]">
-                {cfgParamRows.map((row,i)=>(
-                  cfgEditing ? (
-                    <div key={i} className="flex gap-2">
-                      <input value={row.key} onChange={e=>setCfgParamRows(rows=>{const n=[...rows];n[i]={...n[i],key:e.target.value};return n;})} placeholder="Key"
-                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white focus:outline-none font-mono" />
-                      <input value={row.val} onChange={e=>setCfgParamRows(rows=>{const n=[...rows];n[i]={...n[i],val:e.target.value};return n;})} placeholder="Value"
-                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-amber-300 focus:outline-none font-mono" />
-                      <button onClick={()=>setCfgParamRows(r=>r.filter((_,j)=>j!==i))} className="text-slate-600 hover:text-red-400"><X size={12}/></button>
-                    </div>
-                  ) : row.key ? (
-                    <div key={i} className="flex gap-2 text-[11px] font-mono">
-                      <span className="text-slate-400 shrink-0">{row.key}:</span>
-                      <span className="text-amber-300 truncate">{row.val}</span>
-                    </div>
-                  ) : null
-                ))}
-                {!cfgEditing && !cfgParamRows.some(r=>r.key) && <p className="text-[10px] text-slate-600">파라미터 없음</p>}
+              <div className="bg-black/30 rounded-xl border border-white/5 p-3 min-h-[120px] flex flex-col justify-stretch">
+                {cfgEditing ? (
+                  <textarea
+                    value={cfgBodyText}
+                    onChange={e => setCfgBodyText(e.target.value)}
+                    placeholder='{\n  "data": {\n    "action": "CALL",\n    "phone_number": "01012345678"\n  }\n}'
+                    rows={6}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-[11px] text-amber-300 focus:outline-none font-mono resize-y"
+                  />
+                ) : (
+                  <pre className="text-amber-300 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-48 custom-scrollbar">
+                    {cfgBodyText || '{}'}
+                  </pre>
+                )}
               </div>
             </div>
           </div>
@@ -886,6 +1219,189 @@ export default function SCallertPage() {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+        )}
+
+        {selectedSid && (
+        <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden mt-6">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
+
+          {/* 헤더 */}
+          <div className="flex items-center justify-between mb-6 relative z-10">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background:'rgba(16,185,129,0.12)', border:'1px solid rgba(16,185,129,0.3)' }}>
+                <Activity size={15} color="#10b981" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-white whitespace-nowrap">앱 통화 상태 실시간 수신 이력</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 whitespace-nowrap">App Call Status Webhook Logs</p>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 필터 */}
+              <button
+                onClick={() => setFilterCurrentTargets(v => !v)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all cursor-pointer ${
+                  filterCurrentTargets 
+                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                }`}
+              >
+                현재 전략 대상자만 필터
+              </button>
+
+              {/* 실시간 감지 감시기 */}
+              <button
+                onClick={() => setAutoRefreshEvents(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all cursor-pointer ${
+                  autoRefreshEvents 
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${autoRefreshEvents ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                {autoRefreshEvents ? '실시간 감지 ON' : '실시간 감지 OFF'}
+              </button>
+
+              {/* 수동 새로고침 */}
+              <button
+                onClick={fetchAppEvents}
+                disabled={appEventsLoading}
+                className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw size={13} className={appEventsLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </div>
+
+          {/* Webhook 테스트 전송 패널 */}
+          <div className="mb-6 p-4 bg-white/[0.02] border border-white/5 rounded-2.5xl relative z-10">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
+              <Globe size={11} className="text-cyan-400" /> 앱 Webhook 모의 테스트 발송 (Mock Trigger)
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2 flex-1 min-w-[120px]">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">사번</span>
+                <input
+                  type="text"
+                  value={mockEmpId}
+                  onChange={e => setMockEmpId(e.target.value)}
+                  placeholder="12345"
+                  className="w-full bg-transparent text-xs text-white focus:outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2 flex-[1.5] min-w-[150px]">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">전화번호</span>
+                <input
+                  type="text"
+                  value={mockPhone}
+                  onChange={e => setMockPhone(e.target.value)}
+                  placeholder="01012345678"
+                  className="w-full bg-transparent text-xs text-white focus:outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSendMockEvent('CONNECTED')}
+                  disabled={mockSending}
+                  className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500 border border-emerald-500/30 hover:text-black text-emerald-400 rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer"
+                >
+                  CONNECTED 발송
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendMockEvent('DISCONNECTED')}
+                  disabled={mockSending}
+                  className="px-3 py-2 bg-slate-500/10 hover:bg-slate-500 border border-slate-500/30 hover:text-black text-slate-400 rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer"
+                >
+                  DISCONNECTED 발송
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendMockEvent('MISSED')}
+                  disabled={mockSending}
+                  className="px-3 py-2 bg-red-500/10 hover:bg-red-500 border border-red-500/30 hover:text-black text-red-400 rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer"
+                >
+                  MISSED 발송
+                </button>
+              </div>
+            </div>
+            <p className="text-[9px] text-slate-600 mt-2">
+              * 입력한 사번과 번호로 앱 수신 Webhook API(<code className="font-mono bg-white/5 px-1 py-0.5 rounded text-amber-500">POST /call/event</code>)를 모의 호출하여 실시간 통화 감지를 테스트합니다.
+            </p>
+          </div>
+
+          {/* 수신 로그 테이블 */}
+          <div className="relative z-10 bg-black/40 rounded-2.5xl border border-white/5 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px] font-mono text-left border-collapse">
+                <thead>
+                  <tr className="bg-white/[0.02] border-b border-white/5 text-[9px] font-black uppercase text-slate-500 tracking-wider">
+                    <th className="px-4 py-3">수신 시각 (KST)</th>
+                    <th className="px-4 py-3">사번</th>
+                    <th className="px-4 py-3">대상자 명</th>
+                    <th className="px-4 py-3">수신 전화번호</th>
+                    <th className="px-4 py-3 text-center">통화 상태 이벤트</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const filtered = appEvents.filter(evt => {
+                      if (!filterCurrentTargets) return true;
+                      // Filter by target matching in the currently selected strategy
+                      return targets.some(t => t.EMP_ID === evt.EMPLOYEE_ID || t.MOBILE_NO === evt.PHONE_NUMBER);
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={5} className="text-center py-10 text-slate-600">
+                            {filterCurrentTargets ? '현재 전략 대상자 매칭 내역 없음' : '수신된 통화 상태 내역 없음'}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((evt) => {
+                      // Map employee_id to target name or user name
+                      const matchedTarget = targets.find(t => t.EMP_ID === evt.EMPLOYEE_ID);
+                      const targetName = matchedTarget ? matchedTarget.EMP_NM : '-';
+
+                      return (
+                        <tr key={evt.LOG_ID} className="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                          <td className="px-4 py-2.5 text-slate-400">{evt.EVENT_TIME || evt.REG_DT?.slice(0, 19)}</td>
+                          <td className="px-4 py-2.5 text-slate-200 font-bold">{evt.EMPLOYEE_ID}</td>
+                          <td className="px-4 py-2.5 text-cyan-300 font-bold">{targetName}</td>
+                          <td className="px-4 py-2.5 text-slate-300">{evt.PHONE_NUMBER}</td>
+                          <td className="px-4 py-2.5 text-center">
+                            {evt.EVENT_TYPE === 'CONNECTED' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                CONNECTED
+                              </span>
+                            )}
+                            {evt.EVENT_TYPE === 'DISCONNECTED' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-500/10 text-slate-400 border border-white/5">
+                                DISCONNECTED
+                              </span>
+                            )}
+                            {evt.EVENT_TYPE === 'MISSED' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500/10 text-red-400 border border-red-500/20">
+                                MISSED
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
         )}

@@ -14,6 +14,14 @@ const linkIncidentIds = (text) => {
   });
 };
 
+const maskName = (name) => {
+  if (!name) return '';
+  const str = String(name).trim();
+  if (str.length <= 1) return str;
+  if (str.length === 2) return str[0] + '*';
+  return str[0] + '*'.repeat(str.length - 2) + str[str.length - 1];
+};
+
 const getApiUrl = (endpoint) => {
   // 🚀 AI 스트리밍 성능 최적화: Vite Proxy를 거치지 않고 Worker로 직접 호출합니다.
   return `https://sguardai.khcho0421.workers.dev${endpoint}`;
@@ -722,12 +730,49 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         </div>
 
-        {/* 오른쪽: 분석 중 스피너만 표시 */}
+        {/* 오른쪽: 분석 중 스피너 또는 War-Room 이동 버튼 */}
         <div className="flex items-center gap-2 shrink-0">
-          {isAnalyzingSms && (
+          {isAnalyzingSms ? (
             <div className="flex items-center gap-1.5 px-1.5">
               <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : (
+            !hideWarRoomButton && analysisComplete && selectedSms && (() => {
+              const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
+              const incidentStatus = selectedSms.status || selectedSms.inc_status || 'INC_001';
+              const isProcessing = incidentStatus === 'INC_002';
+              const isCompleted = incidentStatus === 'INC_003';
+              
+              const btnCls = isCompleted 
+                ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-600/30'
+                : isProcessing
+                ? 'bg-[#00e5ff]/20 text-[#00e5ff] border-[#00e5ff]/30 hover:bg-[#00e5ff]/30'
+                : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)]'
+                : sev === 'MAJOR'    ? 'bg-orange-600 text-white shadow-[0_0_10px_rgba(249,115,22,0.3)]'
+                :                      'bg-blue-600 text-white shadow-[0_0_10px_rgba(37,99,235,0.3)]';
+
+              return (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isOpening) return;
+                    onOpenWarRoom(selectedSms);
+                  }}
+                  disabled={isOpening}
+                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[11px] transition-all active:scale-[0.98] border border-white/10 ${btnCls} disabled:opacity-50`}
+                >
+                  {isOpening ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Users className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {isOpening ? '개설 중' : isCompleted ? '사후 분석' : isProcessing ? 'War-Room 이동' : 'War-Room 개설'}
+                  </span>
+                </button>
+              );
+            })()
           )}
         </div>
       </div>
@@ -915,7 +960,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     {selectedSms.receivers.map((r, i) => (
                       <span key={i} className="text-[11px] font-bold text-white bg-[#0a1518]/80 px-3 py-1.5 rounded-xl font-mono border border-[#00e5ff]/40 flex items-center gap-2 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
                         <span className="w-2 h-2 rounded-full bg-[#00e5ff] shadow-[0_0_8px_#00e5ff] animate-pulse" />
-                        {r}
+                        {maskName(r)}
                       </span>
                     ))}
                   </div>
@@ -1012,47 +1057,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         )}
 
-        {/* 🚀 War-Room Action (Original Position Restored) */}
-        {!hideWarRoomButton && analysisComplete && selectedSms && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-700 delay-150">
-             {(() => {
-                const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
-                const incidentStatus = selectedSms.status || selectedSms.inc_status || 'INC_001';
-                const isProcessing = incidentStatus === 'INC_002';
-                const isCompleted = incidentStatus === 'INC_003';
-                
-                const btnCls = isCompleted 
-                  ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-600/30'
-                  : isProcessing
-                  ? 'bg-[#00e5ff]/20 text-[#00e5ff] border-[#00e5ff]/30 hover:bg-[#00e5ff]/30'
-                  : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)] animate-pulse'
-                  : sev === 'MAJOR'    ? 'bg-orange-600 text-white shadow-[0_0_10px_rgba(249,115,22,0.3)]'
-                  :                      'bg-blue-600 text-white shadow-[0_0_10px_rgba(37,99,235,0.3)]';
-
-                return (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (isOpening) return;
-                      onOpenWarRoom(selectedSms);
-                    }}
-                    disabled={isOpening}
-                    className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] border border-white/10 ${btnCls} disabled:opacity-50`}
-                  >
-                    {isOpening ? (
-                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <Users className="w-5 h-5" />
-                    )}
-                    <span>
-                      {isOpening ? '개설 진행 중...' : isCompleted ? '사후 분석 보고서' : isProcessing ? 'War-Room으로 이동' : 'War-Room 개설하기'}
-                    </span>
-                  </button>
-                );
-             })()}
-          </div>
-        )}
       </div>
 
       {/* Detailed Feedback Modal (Popup) */}

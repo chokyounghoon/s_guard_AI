@@ -570,7 +570,7 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
 
       <div className="flex items-center bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all px-1 rounded-[18px] flex-1" style={{ minHeight: 36 }}>
         <textarea ref={textareaRef} id="main-chat-input" rows={1}
-          disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료'}
+          disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료' || roomStatus === 'INC_003'}
           value={localText}
           onChange={(e) => {
             const val = e.target.value;
@@ -598,7 +598,7 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
             }
           }}
           onFocus={() => setShowEmojiPicker(false)}
-          placeholder={(roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료') ? '종료된 워룸은 입력할 수 없습니다' : '메시지를 입력하세요...'}
+          placeholder={(roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료' || roomStatus === 'INC_003') ? '종료된 워룸은 입력할 수 없습니다' : '메시지를 입력하세요...'}
           className="flex-1 bg-transparent py-[7px] pl-3 pr-1 text-[14px] text-white focus:outline-none placeholder:text-[#666666] resize-none overflow-y-auto leading-tight"
           style={{ minHeight: 32, maxHeight: 120 }}
         />
@@ -670,7 +670,7 @@ export default function ChatPage() {
   const [showAiPanel, setShowAiPanel] = useState(false);  // AI Summary 패널 (헤더 버튼)
   const [summaryLockOwner, setSummaryLockOwner] = useState(null);
 
-  const isResolved = ['CLOSED', '최종완료', '처리완료', 'Completed', '완료'].includes(roomStatus);
+  const isResolved = ['CLOSED', '최종완료', '처리완료', 'Completed', '완료', 'INC_003'].includes(roomStatus);
 
 
   // Main Chat State
@@ -1809,7 +1809,7 @@ export default function ChatPage() {
                 })()}
               </span>
               <span className={`text-[10px] px-2 py-0.5 rounded font-black tracking-tight uppercase shrink-0 border ${
-                roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '완료' || roomStatus === '최종완료' || roomStatus === '처리완료'
+                roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '완료' || roomStatus === '최종완료' || roomStatus === '처리완료' || roomStatus === 'INC_003'
                   ? 'bg-slate-500/20 text-slate-300 border-slate-500/30 font-normal'
                   : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse font-black'
               }`}>

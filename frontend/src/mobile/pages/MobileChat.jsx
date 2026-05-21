@@ -63,6 +63,7 @@ export default function MobileChat({ user }) {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [incidentInfo, setIncidentInfo] = useState(null);
+  const isResolved = ['CLOSED', '최종완료', '처리완료', 'Completed', '완료', 'INC_003'].includes(incidentInfo?.status || '');
   const [participants, setParticipants] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -452,11 +453,19 @@ export default function MobileChat({ user }) {
         <div className="flex items-center gap-2 shrink-0">
           {/* W/R 분석 버튼 추가 - PC 버전과 동일한 스트리밍 페이지로 연결 */}
           <button
-            onClick={() => navigate(`/chat-summary/${incidentId}`)}
-            className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center active:scale-95 transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+            onClick={() => {
+              if (isResolved) return;
+              navigate(`/chat-summary/${incidentId}`);
+            }}
+            disabled={isResolved}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-all ${
+              isResolved
+                ? 'bg-slate-800 text-slate-500 border border-[#242424] cursor-not-allowed opacity-60'
+                : 'bg-indigo-500/10 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
+            }`}
             title="W/R 분석"
           >
-            <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+            <Sparkles className={`w-4 h-4 ${isResolved ? 'text-slate-600' : 'text-indigo-400 animate-pulse'}`} />
           </button>
 
           <div className="flex flex-col items-end gap-0.5 ml-1">

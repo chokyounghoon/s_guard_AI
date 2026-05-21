@@ -20,6 +20,151 @@ const SHINHAN_COMPANIES = [
   '신한자산신탁', '신한펀드파트너스', '신한금융플러스', '신한큐브리스크컨설팅',
 ];
 
+const parseSMS = (message) => {
+  if (!message) return null;
+  
+  let parts = [];
+  if (message.includes('▶')) {
+    parts = message.split('▶').map(p => p.trim()).filter(Boolean);
+  } else if (message.includes('\n')) {
+    parts = message.split('\n').map(p => p.trim()).filter(Boolean);
+  } else {
+    return null;
+  }
+  
+  if (parts.length === 0) return null;
+  
+  let title = '';
+  let startIndex = 0;
+  
+  if (!parts[0].includes(':')) {
+    title = parts[0];
+    startIndex = 1;
+  }
+  
+  const items = [];
+  for (let i = startIndex; i < parts.length; i++) {
+    const part = parts[i];
+    const colonIndex = part.indexOf(':');
+    if (colonIndex !== -1) {
+      const key = part.substring(0, colonIndex).trim();
+      const val = part.substring(colonIndex + 1).trim();
+      items.push({ key, value: val });
+    } else {
+      items.push({ key: part, value: '' });
+    }
+  }
+  
+  return { title, items };
+};
+
+const cleanValue = (val) => {
+  if (!val) return '';
+  let cleaned = val.trim();
+  
+  const match = cleaned.match(/^\[(.*?)\](.*)$/);
+  if (match) {
+    const inside = match[1].trim();
+    const extra = match[2].trim();
+    
+    let formattedInside = inside;
+    if (/^\d{8}$/.test(inside)) {
+      formattedInside = `${inside.substring(0, 4)}-${inside.substring(4, 6)}-${inside.substring(6, 8)}`;
+    }
+    
+    if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(inside)) {
+      formattedInside = inside;
+    }
+    
+    if (extra) {
+      if (extra.startsWith('%')) {
+        cleaned = `${formattedInside}%`;
+      } else {
+        cleaned = `${formattedInside} ${extra}`;
+      }
+    } else {
+      cleaned = formattedInside;
+    }
+  }
+  
+  return cleaned;
+};
+
+const renderFormattedSMS = (message, severity) => {
+  const parsed = parseSMS(message);
+  if (!parsed) {
+    return (
+      <p className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
+        {message}
+      </p>
+    );
+  }
+
+  const { title, items } = parsed;
+  const sev = String(severity || '').toUpperCase();
+  
+  let headerBg = 'bg-[#00e5ff]/10 border-[#00e5ff]/20 text-[#00e5ff]';
+  let bulletColor = 'bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]';
+  
+  if (sev === 'CRITICAL') {
+    headerBg = 'bg-red-500/10 border-red-500/20 text-red-400';
+    bulletColor = 'bg-red-500 shadow-[0_0_8px_#ef4444]';
+  } else if (sev === 'MAJOR' || sev === 'WARNING' || sev === 'HIGH') {
+    headerBg = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
+    bulletColor = 'bg-amber-500 shadow-[0_0_8px_#f59e0b]';
+  }
+
+  return (
+    <div className="flex flex-col gap-2 w-full text-slate-200">
+      {title && (
+        <div className={`text-[13px] font-black border px-3 py-2 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
+          <span className={`w-2 h-2 rounded-full animate-pulse ${bulletColor}`} />
+          <span>{title}</span>
+        </div>
+      )}
+      <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden p-2.5 grid grid-cols-[auto_auto] gap-x-5 gap-y-1.5 items-start">
+        {items.map((item, idx) => {
+          const isError = item.key.includes('오류') || item.key.includes('초과');
+          let cleanedVal = cleanValue(item.value);
+          if (item.key === '거래집계일시') {
+            const timeMatch = cleanedVal.match(/\d{2}:\d{2}:\d{2}/);
+            if (timeMatch) cleanedVal = timeMatch[0];
+          }
+          const hasValue = cleanedVal && cleanedVal !== '-' && cleanedVal !== '0' && cleanedVal !== '[-]' && cleanedVal !== '[0]';
+          const highlight = isError && hasValue;
+          
+          if (!item.value) {
+            return (
+              <div key={idx} className="col-span-2 text-[11px] font-bold text-slate-400 bg-white/5 -mx-2.5 px-2.5 py-1 border-y border-white/5">
+                {item.key}
+              </div>
+            );
+          }
+          
+          return (
+            <div key={idx} className="flex items-start gap-1 text-[11px] leading-tight min-w-0">
+              <span className={`font-bold shrink-0 whitespace-nowrap ${highlight ? 'text-red-300' : 'text-slate-400'}`}>
+                {item.key}:
+              </span>
+              <span className={`font-mono text-left ${
+                item.key.includes('메시지') || 
+                item.key.includes('수신자') || 
+                item.key.includes('노드') || 
+                item.key.includes('건수') || 
+                item.key.includes('명')
+                  ? 'break-all'
+                  : 'whitespace-nowrap'
+              } ${highlight ? 'text-red-400 font-black' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
+                {cleanedVal}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ── 데이터 입력 서브 컴포넌트 ─────────────────────
 function SelectWithOther({ label, icon: Icon, options, value, onChange, required, disabled }) {
   // options can be a list of strings or list of { name, code }
@@ -1440,7 +1585,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ background: 'transparent' }}>
               <Cpu size={16} style={{ color: '#00e5ff' }} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#10b981] shadow-[0_0_6px_#10b981]" />
               {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
             </button>
 
@@ -1457,7 +1601,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ background: 'transparent' }}>
               <BellDot size={16} style={{ color: '#00e5ff' }} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#f59e0b] shadow-[0_0_6px_#f59e0b]" />
               {!checkAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
             </button>
 
@@ -1467,7 +1610,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${showThresholdSettings ? 'bg-white/10' : ''}`}
               style={{ background: 'transparent' }}>
               <Settings size={16} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#00e5ff' : '#94a3b8', transition: 'transform 0.3s' }} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#ec4899] shadow-[0_0_6px_#ec4899]" />
             </button>
           </div>
 
@@ -1477,7 +1619,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             className="w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer"
             style={{ background: 'transparent' }}>
             <Bot size={16} style={{ color: '#00e5ff' }} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#00e5ff] shadow-[0_0_6px_#00e5ff]" />
           </button>
 
           <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 active:opacity-60 shrink-0 ml-0.5">
@@ -1739,9 +1880,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
 
                   {/* Main Contents: SMS Message */}
-                  <p className="text-[14px] font-bold leading-relaxed break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
-                    {msg.message}
-                  </p>
+                  {renderFormattedSMS(msg.message, msg.severity)}
 
                   {/* Sub Contents: Sender & Employee Chip */}
                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">

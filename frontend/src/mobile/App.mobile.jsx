@@ -37,6 +37,7 @@ import ReportViewPage        from '../pages/ReportViewPage';
 import AlertMonitorPage      from '../pages/AlertMonitorPage';
 import UserKeywordPage       from '../pages/UserKeywordPage';
 import SCallertPage          from '../pages/SCallertPage';
+import MobileSCallertPage    from './pages/MobileSCallertPage';
 import PermissionManagementPage from '../pages/PermissionManagementPage';
 import DeputyManagementPage from '../pages/DeputyManagementPage';
 import MobileDeputyManagementPage from './pages/MobileDeputyManagementPage';
@@ -399,7 +400,7 @@ function AppContent() {
         <Route path="/report/:incId"           element={<PR><ReportViewPage /></PR>} />
         <Route path="/alert-monitor"           element={<PR><MobileAlertMonitor /></PR>} />
         <Route path="/user-keyword"             element={<PR><MobileUserKeywordPage /></PR>} />
-        <Route path="/s-callert"                element={<PR><SCallertPage /></PR>} />
+        <Route path="/s-callert"                element={<PR><MobileSCallertPage /></PR>} />
         <Route path="/admin/permissions" element={<PR><PermissionManagementPage /></PR>} />
         <Route path="/admin/deputy" element={<PR><MobileDeputyManagementPage /></PR>} />
       </Routes>
