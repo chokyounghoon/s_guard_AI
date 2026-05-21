@@ -10387,7 +10387,12 @@ app.get('/scallert/app-events', async (c) => {
       REG_DT TEXT
     )`).run();
 
-    const { results } = await db.prepare("SELECT * FROM TB_SCL_APP_EVENT_LOG ORDER BY LOG_ID DESC LIMIT ?").bind(limit).all();
+    const { results } = await db.prepare(`
+      SELECT e.*, u.name as emp_nm
+      FROM TB_SCL_APP_EVENT_LOG e
+      LEFT JOIN users u ON e.EMPLOYEE_ID = u.employee_id
+      ORDER BY e.LOG_ID DESC LIMIT ?
+    `).bind(limit).all();
     return c.json(results || []);
   } catch (e) {
     return c.json({ error: e.message }, 500);

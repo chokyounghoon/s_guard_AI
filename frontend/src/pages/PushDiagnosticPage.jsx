@@ -117,6 +117,13 @@ export default function PushDiagnosticPage() {
   const [customTitle, setCustomTitle] = useState('[S-Guard] 커스텀 테스트');
   const [customBody,  setCustomBody]  = useState('이것은 커스텀 데이터 테스트 메시지입니다. 📱');
   const [customLoad,  setCustomLoad]  = useState(false);
+  const [isMobile,    setIsMobile]    = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const addLog = (msg, type = 'info') =>
     setLog(prev => [{ msg, type, time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }, ...prev].slice(0, 50));
@@ -282,12 +289,10 @@ export default function PushDiagnosticPage() {
 
   return (
     <div style={{
-      minHeight: '100dvh',
+      minHeight: '100vh',
       background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)',
       color: '#fff',
       fontFamily: "'Inter', 'Noto Sans KR', sans-serif",
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
     }}>
 
       {/* ── Hero ────────────────────────────────────────────── */}
@@ -354,7 +359,7 @@ export default function PushDiagnosticPage() {
       }}>
 
         {/* ── 2-column top grid ─────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
 
           {/* 브라우저 환경 */}
           <Card icon={Wifi} title="브라우저 환경" accent="#3b82f6">
@@ -433,7 +438,7 @@ export default function PushDiagnosticPage() {
         </div>
 
         {/* ── 2-column bottom grid ───────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
 
           {/* 액션 */}
           <Card icon={Zap} title="액션" accent="#6366f1">
