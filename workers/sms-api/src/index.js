@@ -10455,33 +10455,66 @@ app.post('/scallert/test-push', async (c) => {
     } catch (_) {}
 
     if (fcmRow?.fcm_token) {
-      // FCM HTTP Legacy API로 Android 앱에 직접 전송
-      const fcmServerKey = c.env.FCM_SERVER_KEY;
-      if (!fcmServerKey) {
-        return c.json({ error: 'FCM_SERVER_KEY not configured in Worker secrets' }, 500);
+      // FCM v1 API (서비스 계정 기반 OAuth2)
+      const saJson = c.env.FCM_SERVICE_ACCOUNT;
+      if (!saJson) {
+        return c.json({ error: 'FCM_SERVICE_ACCOUNT not configured in Worker secrets' }, 500);
       }
-      const fcmPayload = {
-        to: fcmRow.fcm_token,
-        priority: 'high',
-        data: {
-          action: 'CALL',
-          phone_number: phone_number,
-          log_title: 'S-Callert Trigger'
-        }
-      };
-      const fcmRes = await fetch('https://fcm.googleapis.com/fcm/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `key=${fcmServerKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(fcmPayload)
-      });
-      const fcmBody = await fcmRes.text();
-      success = fcmRes.ok && fcmBody.includes('"success":1');
-      method = 'FCM_TOKEN';
-      resultDetail = fcmBody.substring(0, 500);
-      console.log(`[FCM-Push] user=${target_user_id} status=${fcmRes.status} body=${fcmBody.substring(0,100)}`);
+      try {
+        const sa = JSON.parse(saJson);
+        const projectId = sa.project_id;
+
+        // 1. JWT 생성 (RS256)
+        const now = Math.floor(Date.now() / 1000);
+        const jwtHeader  = { alg: 'RS256', typ: 'JWT' };
+        const jwtPayload = {
+          iss:  sa.client_email,
+          scope: 'https://www.googleapis.com/auth/firebase.messaging',
+          aud:  'https://oauth2.googleapis.com/token',
+          iat:  now,
+          exp:  now + 3600
+        };
+        const b64url = (obj) => btoa(JSON.stringify(obj)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+        const toSign = `${b64url(jwtHeader)}.${b64url(jwtPayload)}`;
+
+        const pemContents = sa.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
+        const keyData = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+        const privateKey = await crypto.subtle.importKey('pkcs8', keyData, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+        const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, new TextEncoder().encode(toSign));
+        const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+        const jwt = `${toSign}.${sig}`;
+
+        // 2. Access Token 발급
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenData.access_token) throw new Error(`Token error: ${JSON.stringify(tokenData)}`);
+
+        // 3. FCM v1 API 호출
+        const fcmRes = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: {
+              token: fcmRow.fcm_token,
+              data: { action: 'CALL', phone_number: String(phone_number), log_title: 'S-Callert Trigger' },
+              android: { priority: 'HIGH' }
+            }
+          })
+        });
+        const fcmBody = await fcmRes.text();
+        success = fcmRes.ok;
+        method = 'FCM_V1';
+        resultDetail = fcmBody.substring(0, 500);
+        console.log(`[FCM-v1] user=${target_user_id} status=${fcmRes.status} body=${fcmBody.substring(0,120)}`);
+      } catch (fcmErr) {
+        method = 'FCM_V1_ERROR';
+        resultDetail = fcmErr.message;
+        success = false;
+      }
     } else {
       // ② fallback: VAPID Web Push (브라우저 구독)
       const payload = {
