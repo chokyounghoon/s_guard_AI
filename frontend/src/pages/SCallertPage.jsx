@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
@@ -1409,7 +1408,7 @@ export default function SCallertPage() {
       </main>
 
       {/* ── 전략 생성 모달 ──────────────────────────── */}
-      {showCreateModal && createPortal(
+      {showCreateModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-[#04070f]/80 backdrop-blur-md" onClick={() => setShowCreateModal(false)} />
           
@@ -1504,8 +1503,7 @@ export default function SCallertPage() {
               </div>
             </div>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );
