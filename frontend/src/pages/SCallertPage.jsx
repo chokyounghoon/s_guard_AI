@@ -617,7 +617,7 @@ export default function SCallertPage() {
 
       {/* ── 헤더 ───────────────────────────────────── */}
       <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{ background: 'rgba(4,7,15,0.94)', borderColor: 'rgba(251,146,60,0.15)' }}>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="w-full max-w-[2000px] mx-auto px-4 lg:px-6 2xl:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => goBack()}
