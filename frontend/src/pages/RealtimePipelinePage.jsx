@@ -876,7 +876,7 @@ export default function RealtimePipelinePage() {
                 const isBottleneck = st.dObj?.min > 60;
                 return (
                   <React.Fragment key={st.id}>
-                    <div className="relative z-10 flex flex-col items-center gap-1.5">
+                    <div className="relative z-10 flex flex-col items-center gap-1.5 shrink-0">
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_8px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-2 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_8px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
                         {isDone ? <CheckCircle2 size={12} /> : i + 1}
                       </div>
@@ -889,19 +889,22 @@ export default function RealtimePipelinePage() {
                       const isNextStepActive = nextStep.active;
                       const isArrowBottleneck = durationObj?.min > 60;
                       return (
-                        <div className="flex-1 flex flex-col items-center justify-center px-1">
-                          <div className="w-7 h-7 flex items-center justify-center">
-                            <svg className={`w-4 h-4 ${isNextStepDone ? 'text-[#00e5ff]' : isNextStepActive ? 'text-[#00e5ff] animate-pulse' : 'text-slate-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                        <div className="flex-1 flex flex-col items-center justify-center px-2 min-w-[50px]">
+                          <div className="w-full flex items-center relative h-7">
+                            <div className={`h-[3px] w-full rounded transition-all ${isNextStepDone ? (isArrowBottleneck ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.4)]') : isNextStepActive ? 'bg-[#00e5ff]/40 animate-pulse' : 'bg-slate-800'}`} />
+                            <svg className={`w-3 h-3 absolute right-0 transition-all ${isNextStepDone ? (isArrowBottleneck ? 'text-orange-500' : 'text-[#00e5ff]') : isNextStepActive ? 'text-[#00e5ff] animate-pulse' : 'text-slate-800'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4.5" style={{ transform: 'translateX(2px)' }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                             </svg>
                           </div>
-                          {durationObj ? (
-                            <span className={`text-[8px] font-bold px-1 py-0.5 rounded shadow-sm font-mono mt-1 whitespace-nowrap ${isArrowBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-slate-900 text-[#ffffff] border border-white/20'}`}>
-                              {durationObj.text}
-                            </span>
-                          ) : (
-                            <span className="text-[8px] text-slate-600 font-mono mt-1">-</span>
-                          )}
+                          <div className="h-5 flex items-center justify-center mt-0.5">
+                            {durationObj ? (
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap ${isArrowBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.05)]'}`}>
+                                {durationObj.text}
+                              </span>
+                            ) : (
+                              <span className="text-[8px] text-slate-600 font-mono">-</span>
+                            )}
+                          </div>
                         </div>
                       );
                     })()}
