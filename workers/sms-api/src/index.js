@@ -3644,8 +3644,30 @@ app.post('/sms/receive', async (c) => {
   // Eager Loading: Trigger background AI immediately for new insert
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
-  // 🔔 즉시 푸시 - 할당된 모든 사용자에게 일괄 전송
   const msgPreview = (message || '내용 없음').substring(0, 100);
+
+  // 🚀 NEW: Trigger SSE Broadcast via Global DO
+  try {
+    const doId = c.env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+    const room = c.env.WARROOM_DO.get(doId);
+    c.executionCtx.waitUntil(room.fetch(new Request("https://dummy/broadcast-sse", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "new_incident",
+        timestamp: new Date().toISOString(),
+        data: {
+          inc_id: newIncId,
+          message: `[${maskedSender}] ${msgPreview}`,
+          severity: "NORMAL",
+          keyword: detectedCount > 0 ? "Detected" : "None"
+        }
+      })
+    })).catch(e => console.error("[SSE] Broadcast trigger error:", e)));
+  } catch (e) {
+    console.error("[SSE] Failed to setup DO broadcast:", e);
+  }
+
+  // 🔔 즉시 푸시 - 할당된 모든 사용자에게 일괄 전송
   const immediatePushPayload = {
     title: `[S-GUARD] 장애 키워드 감지`,
     body: `새로운 시스템 이벤트가 감지되었습니다.\n${msgPreview}`,
@@ -9580,9 +9602,48 @@ export class WarRoom {
     this.env = env;
     this.sessions = new Map(); // Store active connections: WebSocket -> UserInfo
     this.announcement = null; // Current pinned message
+    this.sseWriters = new Set(); // 🚀 SSE 연결 클라이언트 저장
   }
 
   async fetch(request) {
+    const url = new URL(request.url);
+
+    // ── 🚀 SSE (Server-Sent Events) 브로드캐스트 라우팅 ──
+    if (url.pathname.endsWith('/sse')) {
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      this.sseWriters.add(writer);
+      
+      // Ping
+      writer.write(new TextEncoder().encode("data: connected\n\n")).catch(() => {});
+      
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    }
+
+    if (url.pathname.endsWith('/broadcast-sse')) {
+      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+      try {
+        const bodyStr = await request.text();
+        const enc = new TextEncoder().encode(`data: ${bodyStr}\n\n`);
+        
+        for (const writer of this.sseWriters) {
+          writer.write(enc).catch(() => {
+            this.sseWriters.delete(writer); // 연결 끊김 감지 및 삭제
+          });
+        }
+        return new Response("OK");
+      } catch (e) {
+        return new Response(e.message, { status: 500 });
+      }
+    }
+
     const upgradeHeader = request.headers.get("Upgrade");
     if (!upgradeHeader || upgradeHeader.toLowerCase() !== "websocket") {
       return new Response("Expected Upgrade: websocket", { status: 426 });
@@ -10591,6 +10652,16 @@ app.get('/warroom/ws/:id', async (c) => {
   const doId = c.env.WARROOM_DO.idFromName(id);
   const room = c.env.WARROOM_DO.get(doId);
   return room.fetch(c.req.raw);
+});
+
+// ── SSE Global Notification Stream ───────────────────────────────────────────
+app.get('/sms/notification-stream', async (c) => {
+  // 🚀 WARROOM_DO를 글로벌 싱글톤 메시지 브로커로 활용
+  const doId = c.env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+  const room = c.env.WARROOM_DO.get(doId);
+  // 전달할 때 뒤에 /sse 를 붙여서 DO가 이를 인식하도록 함
+  const req = new Request(c.req.url + "/sse", c.req.raw);
+  return room.fetch(req);
 });
 
 export default app
