@@ -19,7 +19,7 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
   }, []);
 
   const checkAllowed = (path) => {
-    if (!path || path === '/dashboard') return true;
+    if (!path || path === '/dashboard' || path === '/realtime-pipeline') return true;
     const u = getUserProfile();
     if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
     if (liveAllowedPaths === null || liveAllowedPaths === undefined) return true;
@@ -156,6 +156,7 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
             {/* 그리드: 2열 (전체 시스템 콘솔 메뉴 복구) */}
             <div className="flex-1 overflow-y-auto p-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
               {[
+                { label: 'Pipeline\nTracker', sub: '실시간 파이프라인', icon: Layers, path: '/realtime-pipeline', color: '#00ff88' },
                 { label: 'Personal\nKW', sub: '개인 키워드', icon: Keyboard, path: '/user-keyword', color: '#00e5ff' },
                 { label: 'Deputy\nMgmt', sub: '대직자 관리', icon: UserCircle, path: '/admin/deputy', color: '#00ff88' },
                 { label: 'RBAC\nSetting', sub: '권한 관리', icon: ShieldCheck, path: '/admin/permissions', color: '#a855f7', adminOnly: true },

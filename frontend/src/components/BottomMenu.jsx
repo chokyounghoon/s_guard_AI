@@ -19,7 +19,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
   }, []);
 
   const checkAllowed = (path) => {
-    if (!path || path === '/dashboard') return true;
+    if (!path || path === '/dashboard' || path === '/realtime-pipeline') return true;
     const u = getUserProfile();
     if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
     if (liveAllowedPaths === null || liveAllowedPaths === undefined) return true;
@@ -140,6 +140,7 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             {/* 그리드: 2열 (PC 버전 - s-callert 만) */}
             <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {[
+                { label: '실시간 파이프라인', sub: 'REALTIME PIPELINE', icon: Layers, path: '/realtime-pipeline', color: '#00e5ff' },
                 { label: '대직자 관리', sub: 'DEPUTY MGMT', icon: UserCircle, path: '/admin/deputy', color: '#10b981' },
                 { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
                 { label: '권한 관리', sub: 'RBAC SETTING', icon: Shield, path: '/admin/permissions', color: '#6366f1', adminOnly: true },

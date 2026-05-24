@@ -3715,7 +3715,20 @@ app.get('/sms/notification-stream', async (c) => {
         }
 
         // Check for new SMS every 3 seconds
-        const latest = await db.prepare("SELECT * FROM received_messages ORDER BY timestamp DESC LIMIT 1").first()
+        const latest = await db.prepare(`
+          SELECT r.*, u.name as sender_name,
+                 COALESCE(oh.name, u.honbu) as bumun,
+                 COALESCE(ot.name, u.team) as honbu,
+                 COALESCE(op.name, u.part) as team,
+                 COALESCE(os.name, u.subpart) as part
+          FROM received_messages r
+          LEFT JOIN users u ON r.employee_id = u.employee_id
+          LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+          LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+          LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+          LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+          ORDER BY r.timestamp DESC LIMIT 1
+        `).first()
         const currentKey = latest ? `${latest.inc_id}_${latest.timestamp}` : null;
         
         if (latest && currentKey !== lastSeenKey) {
@@ -3726,11 +3739,16 @@ app.get('/sms/notification-stream', async (c) => {
             data: JSON.stringify({
               inc_id: latest.inc_id,
               sender: latest.sender,
+              sender_name: latest.sender_name || '',
               message: latest.message,
               timestamp: latest.timestamp,
               keyword_detected: parseInt(String(latest.keyword_detected || '0')),
               response_message: latest.response_message,
-              received_count: parseInt(String(latest.received_count || '1'))
+              received_count: parseInt(String(latest.received_count || '1')),
+              bumun: latest.bumun || '',
+              honbu: latest.honbu || '',
+              team: latest.team || '',
+              part: latest.part || ''
             })
           })
         }
@@ -3784,11 +3802,18 @@ app.get('/sms/recent', async (c) => {
   
   let baseQuery = `
     SELECT * FROM (
-      SELECT r.*, u.name, u.role, u.team, u.part,
+      SELECT r.*, u.name, u.role, 
+             COALESCE(oh.name, u.honbu) as bumun,
+             COALESCE(ot.name, u.team) as honbu, 
+             COALESCE(op.name, u.part) as team,
+             COALESCE(os.name, u.subpart) as part,
              ai.similarity_score, ai.similarity_reason,
+             ai.reg_dt as ai_dt,
+             wl.reg_dt as warroom_dt,
+             i.updated_at as closed_dt,
              (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE ai2.inc_id = r.inc_id) as is_analyzed,
              COALESCE(
-               (SELECT 'INC_003' FROM warroom_list wl WHERE wl.inc_id = r.inc_id AND (wl.status = 'CLOSED' OR wl.status = '최종완료' OR wl.status = 'Completed' OR wl.status = '처리완료') LIMIT 1),
+               (SELECT 'INC_003' FROM warroom_list wl2 WHERE wl2.inc_id = r.inc_id AND (wl2.status = 'CLOSED' OR wl2.status = '최종완료' OR wl2.status = 'Completed' OR wl2.status = '처리완료') LIMIT 1),
                (SELECT CASE 
                  WHEN status = 'Open' THEN 'INC_001' 
                  WHEN status = '미처리' THEN 'INC_001' 
@@ -3808,6 +3833,12 @@ app.get('/sms/recent', async (c) => {
       FROM received_messages r
       LEFT JOIN users u ON r.employee_id = u.employee_id
       LEFT JOIN autopilot_insight ai ON ai.inc_id = r.inc_id
+      LEFT JOIN warroom_list wl ON wl.inc_id = r.inc_id
+      LEFT JOIN incidents i ON i.inc_id = r.inc_id
+      LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+      LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+      LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+      LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
     )
     WHERE 1=1
   `
@@ -3827,9 +3858,16 @@ app.get('/sms/recent', async (c) => {
     sender_name: r.name || '',
     sender_team: r.team || '',
     sender_part: r.part || '',
+    bumun: r.bumun || '',
+    honbu: r.honbu || '',
+    team: r.team || '',
+    part: r.part || '',
     message: r.message, 
     employee_id: r.employee_id,
     timestamp: r.timestamp, 
+    ai_dt: r.ai_dt || null,
+    warroom_dt: r.warroom_dt || null,
+    closed_dt: r.closed_dt || null,
     keyword_detected: parseInt(String(r.keyword_detected || '0')),
     response_message: r.response_message,
     received_count: parseInt(String(r.received_count || '1')),

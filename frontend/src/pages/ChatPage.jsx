@@ -486,7 +486,7 @@ const ChatMessageRow = React.memo(({
       {msg.type === 'system' && (
         <div className="flex justify-center my-3">
           <div className="bg-[#1a1a1a] rounded-full px-4 py-1.5 max-w-[280px]">
-            <p className="text-[12px] text-center whitespace-pre-wrap" style={{color:'#777777'}} dangerouslySetInnerHTML={{ __html: msg.text }} />
+            <div className="text-[12px] text-center whitespace-pre-wrap" style={{color:'#777777'}} dangerouslySetInnerHTML={{ __html: msg.text }} />
           </div>
         </div>
       )}

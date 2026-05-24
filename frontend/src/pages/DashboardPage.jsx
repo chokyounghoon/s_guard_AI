@@ -94,9 +94,9 @@ const renderFormattedSMS = (message, severity) => {
   const parsed = parseSMS(message);
   if (!parsed) {
     return (
-      <p className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
+      <div className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
         {message}
-      </p>
+      </div>
     );
   }
 
@@ -262,7 +262,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
   // 실제 권한 체크 헬퍼 (로컴 state 기반)
   const checkAllowed = (path) => {
-    if (!path || path === '/dashboard') return true;
+    if (!path || path === '/dashboard' || path === '/realtime-pipeline') return true;
     const u = getUserProfile();
     if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
     // liveAllowedPaths가 null = 로딩 중 또는 전체허용
@@ -307,6 +307,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [isFlowCollapsed, setIsFlowCollapsed] = useState(false);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [selectedIncidentIdFlow, setSelectedIncidentIdFlow] = useState(null);
+  const [showFullTimeline, setShowFullTimeline] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
   const [totalSmsVolume, setTotalSmsVolume] = useState(0);
@@ -366,6 +367,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     const mi = String(d.getMinutes()).padStart(2, '0');
     const ss = String(d.getSeconds()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+  };
+
+  const formatDtTimeOnly = (dateStr) => {
+    if (!dateStr) return '';
+    let d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}/${dd} ${hh}:${mi}`;
   };
 
   const getKstDate = (daysAgo = 0) => {
@@ -1638,6 +1650,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         {/* ── 2행: PC/태블릿 전용 메뉴 링크 (lg 이상) ── */}
         <div className="hidden lg:flex items-stretch border-t border-white/5">
           {[
+            { label: 'Realtime Pipeline', icon: Layers,    path: '/realtime-pipeline',      color: '#00e5ff' },
             { label: 'Orbital Command', icon: Cpu,         path: '/orbital-command',        color: '#06b6d4' },
             { label: 'Alert Monitor',   icon: BellDot,     path: '/alert-monitor',          color: '#ef4444' },
             { label: 'Personal KW',     icon: Keyboard,    path: '/user-keyword',           color: '#06b6d4' },
@@ -2040,9 +2053,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                           {/* 하단: 메시지 본문 + 타임스탬프 */}
                           <div className="flex flex-col gap-1.5 mt-1">
-                            <p className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
+                            <div className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
                               {renderFormattedSMS(msg.message, msg.severity)}
-                            </p>
+                            </div>
                             {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (() => {
                               const score = msg.similarity_score;
                               let matchColor = '#00e5ff';
@@ -2177,195 +2190,247 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             {/* Activity History Flow Area */}
             <div className="bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border border-[#00e5ff]/40 shadow-[0_0_25px_rgba(0,229,255,0.2)] flex-1 overflow-hidden flex flex-col backdrop-blur-2xl">
               {/* Header */}
-              <div className="p-4 sm:p-5 border-b border-white/5 flex flex-wrap items-start justify-between gap-4 shrink-0">
+              <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between gap-4 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`data-ring-wrapper shrink-0 ${isFlowSpinning ? 'data-ring-spinning' : ''}`}>
-                    <div className={`bg-purple-500/20 border border-purple-400/40 shadow-[0_0_15px_rgba(192,132,252,0.3)] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
-                      <Activity className="w-5 h-5 text-purple-400" />
+                    <div className={`bg-cyan-500/20 border border-cyan-400/40 shadow-[0_0_15px_rgba(0,229,255,0.3)] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
+                      <Activity className="w-5 h-5 text-[#00e5ff]" />
                     </div>
                   </span>
                   <div className="min-w-0 flex flex-col justify-center">
-                    <h3 className="font-black text-white text-base sm:text-lg tracking-tight whitespace-nowrap">처리 현황</h3>
+                    <h3 className="font-black text-white text-base sm:text-lg tracking-tight whitespace-nowrap">장애 처리 현황</h3>
                     <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap hidden sm:block mt-0.5">Incident Handling Progress</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                    {/* 시간 정보: DETECTION + MTTR 한 줄 */}
-                    {selectedIncidentIdFlow && (() => {
-                      const assignment = myAssignments.find(a => String(a.inc_id) === String(selectedIncidentIdFlow)) ||
-                                         smsMessages.find(a => String(a.inc_id) === String(selectedIncidentIdFlow));
-                      const startStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
-                      const endStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-                      const startTime = startStep ? new Date(startStep.timestamp) : (assignment ? new Date(assignment.timestamp || assignment.assigned_at) : null);
-                      const endTime = endStep ? new Date(endStep.timestamp) : null;
-                      if (!startTime) return null;
-                      const durationMs = (endTime || currentTime) - startTime;
-                      const isClosed = !!endTime;
-
-                      const smsStep     = incidentWorkflowSteps.find(s => s.id === 'SMS');
-                      const ragStep     = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                      const warStep     = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
-                      const knwStep     = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-
-                      return (
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5 bg-[#0b1017] px-2.5 py-1 rounded-lg border border-white/5 shadow-sm">
-                              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">DET</span>
-                              <span className="text-[11px] font-black font-mono text-white">
-                                {formatYYMMDD(startTime)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 bg-[#0b1017] px-3 py-1 rounded-lg border border-[#00e5ff]/20 shadow-[0_0_12px_rgba(0,229,255,0.15)]">
-                              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">MTTR</span>
-                              <div className="flex items-center gap-1">
-                                <div className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-500 bloom-green' : 'bg-[#00e5ff] animate-pulse bloom-cyan'}`} />
-                                <span className={`text-[13px] font-black font-mono tabular-nums ${isClosed ? 'text-emerald-400' : 'text-[#00e5ff]'}`}>
-                                  {formatDuration(durationMs)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap items-center justify-end gap-1.5">
-                            {[
-                              { label: '인지', from: smsStep, to: ragStep },
-                              { label: '분석', from: ragStep, to: warStep },
-                              { label: '워룸', from: warStep, to: knwStep },
-                              { label: '완료', from: smsStep, to: knwStep },
-                            ].map(({ label, from, to }) => {
-                              const isDone = label === '완료' ? !!knwStep : !!to;
-                              const isActive = !!from && !to;
-                              const ms = from ? ((to ? new Date(to.timestamp) : currentTime) - new Date(from.timestamp)) : 0;
-                              const m = Math.floor(ms / 60000);
-                              const s = Math.floor((ms % 60000) / 1000);
-                              const timeStr = from ? (m > 0 ? `${m}m${s}s` : `${s}s`) : '-';
-                              return (
-                                <div key={label} className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-black shadow-sm transition-all ${
-                                  isDone ? 'bg-[#061510] border-emerald-500/30 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
-                                  : isActive ? 'bg-[#06141a] border-[#00e5ff]/40 text-[#00e5ff] shadow-[0_0_12px_rgba(0,229,255,0.25)] animate-pulse'
-                                  : 'bg-[#10151c] border-white/5 text-slate-500'
-                                }`}>
-                                  <span className="opacity-70 text-[9px]">{label}</span>
-                                  <span className="font-mono tracking-tight">{timeStr}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                </div>
+                {selectedIncidentIdFlow && (() => {
+                  const isClosedFlow = incidentWorkflowSteps.some(s => s.id === 'KNOWLEDGE');
+                  return isClosedFlow ? (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-inner">
+                      <CheckCircle2 size={12} />COMPLETED FLOW
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-[#00e5ff] bg-[#00e5ff]/10 border border-[#00e5ff]/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-pulse shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#00e5ff] animate-ping" />LIVE FLOW
+                    </span>
+                  );
+                })()}
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="relative min-h-full">
                   {selectedIncidentIdFlow ? (
-                    <div className="flex flex-col relative space-y-4">
+                    <div className="flex flex-col">
+                      {/* 가로 프로그레스 바 & 활동 링 */}
                       {(() => {
-                        const stepTimestamps = FLOW_STEPS.map(step => {
-                          let sData = incidentWorkflowSteps.find(s => s.id === step.id);
-                          if (!sData && step.id === 'RAG_AGENT') {
-                            sData = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
-                          }
-                          return sData ? new Date(sData.timestamp) : null;
-                        });
+                        const smsStep = incidentWorkflowSteps.find(s => s.id === 'SMS');
+                        const ragStep = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                        const warStep = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
+                        const knwStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
+                        const diffObj = (a, b) => { if (!a) return null; const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp); const m = Math.floor(ms/60000), s2 = Math.floor((ms%60000)/1000); return { text: m > 0 ? `${m}m ${s2}s` : `${s2}s`, min: m }; };
 
-                        const durations = FLOW_STEPS.slice(0, -1).map((_, i) => {
-                          const start = stepTimestamps[i];
-                          const next  = stepTimestamps[i+1];
-                          if (!start) return 0;
-                          const end = next || (i === FLOW_STEPS.findIndex(t => !stepTimestamps[FLOW_STEPS.indexOf(t)]) - 1 ? currentTime : start);
-                          return Math.max(0, end - start);
-                        });
+                        const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - new Date(smsStep?.timestamp || currentTime);
+                        const isClosed = !!knwStep;
 
-                        return FLOW_STEPS.map((step, sIdx) => {
-                          const stepData = incidentWorkflowSteps.find(s => s.id === step.id) || 
-                                           (step.id === 'RAG_AGENT' ? (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')) : null);
-                          const isCompleted = !!stepData;
-                          const isNextStep = !isCompleted && (sIdx === 0 || !!(incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) || (FLOW_STEPS[sIdx-1].id === 'RAG_AGENT' && (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')))));
+                        const steps = [
+                          { id: 'SMS', label: '인지', done: !!ragStep || !!knwStep, active: !!smsStep && !ragStep, dObj: null },
+                          { id: 'RAG', label: '분석', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, dObj: diffObj(smsStep, ragStep) },
+                          { id: 'WARROOM', label: '워룸', done: !!knwStep, active: !!warStep && !knwStep, dObj: diffObj(ragStep, warStep) },
+                          { id: 'KNOWLEDGE', label: '완료', done: !!knwStep, active: !!knwStep, dObj: diffObj(warStep, knwStep) }
+                        ];
 
-                          const durationMs = sIdx < FLOW_STEPS.length - 1 ? durations[sIdx] : 0;
-                          const pb = durationMs === 0 ? 32 : Math.min(140, Math.max(36, Math.round(32 + (durationMs / 60000) * 1.5)));
-                          const isBottleneck = isCompleted && !stepTimestamps[sIdx+1] && durationMs > 60000;
+                        const radius = 70;
+                        const circum = 2 * Math.PI * radius;
+                        const progressPct = knwStep ? 100 : warStep ? 75 : ragStep ? 50 : smsStep ? 25 : 0;
+                        const offset = circum - (progressPct / 100) * circum;
 
-                          // 1px 단일 원형 테두리 및 명도/글로우 상태별 분리
-                          const boxStyles = isCompleted
-                            ? 'bg-[#0f1622] border-slate-700 text-slate-400 shadow-none font-bold'
-                            : isNextStep
-                            ? 'bg-[#00e5ff]/20 border-[#00e5ff] text-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.8)] animate-pulse scale-110 font-black z-30'
-                            : 'bg-[#080c12] border-white/10 text-slate-600 shadow-none opacity-40';
+                        const ringColor = isClosed ? '#10b981' : '#00e5ff';
+                        const ringShadow = isClosed ? 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.3))' : 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.5))';
 
-                          const lineStyle = isBottleneck
-                            ? { background: 'linear-gradient(180deg, #c084fc 0%, #f43f5e 50%, #ef4444 100%)', boxShadow: '0 0 15px rgba(239, 68, 68, 0.6)' }
-                            : isCompleted
-                            ? { background: step.color === 'blue' ? '#3b82f6' : step.color === 'cyan' ? '#00e5ff' : step.color === 'indigo' ? '#818cf8' : '#c084fc', boxShadow: 'none' }
-                            : { background: 'rgba(255,255,255,0.08)', boxShadow: 'none' };
+                        const selectedSms = myAssignments.find(a => String(a.inc_id) === String(selectedIncidentIdFlow)) ||
+                                            smsMessages.find(a => String(a.inc_id) === String(selectedIncidentIdFlow));
 
-                          return (
-                            <div key={step.id} className="relative pl-14 transition-all duration-500 flex flex-col justify-center" style={{ paddingBottom: pb + 'px', opacity: isCompleted || isNextStep ? 1 : 0.4 }}>
-                              {/* 수직 연결선 */}
-                              {sIdx < FLOW_STEPS.length - 1 && (
-                                <div className="absolute left-[19px] top-10 bottom-0 w-[2px] transition-all duration-500" style={lineStyle} />
-                              )}
-
-                              {/* 단순화된 1px 원형 노드 아이콘 */}
-                              <div className="absolute left-0 top-0 z-20">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-700 ${boxStyles}`}>
-                                  <step.icon size={18} className={isNextStep ? 'text-[#00e5ff]' : isCompleted ? 'text-slate-300' : 'text-slate-600'} />
-                                </div>
-                              </div>
-
-                              {/* 타이틀 및 우측 정렬된 배지/타임스탬프 영역 */}
-                              <div className="flex flex-col min-h-[40px] justify-center ml-2">
-                                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5 w-full">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <h4 className={`font-black tracking-tight text-[15px] truncate ${
-                                      isNextStep ? 'text-[#00e5ff] text-shadow-[0_0_12px_rgba(0,229,255,0.6)]' : isCompleted ? 'text-white' : 'text-slate-500'
-                                    }`}>
-                                      {step.label}
-                                    </h4>
-                                    {isNextStep && (
-                                      <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse text-[#00e5ff] bg-[#00e5ff]/20 border border-[#00e5ff]/50 shadow-[0_0_12px_rgba(0,229,255,0.4)] font-mono">
-                                        진행중
+                        return (
+                          <div className="flex flex-col">
+                            {/* 가로 프로그레스 바 (Horizontal Stepper) */}
+                            <div className="flex items-center justify-between px-6 py-5 bg-black/20 border-b border-white/5 relative shrink-0">
+                              <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-1 bg-slate-800/60 z-0" />
+                              {steps.map((st, i) => {
+                                const isDone = st.done;
+                                const isActive = st.active;
+                                const isBottleneck = st.dObj?.min > 60;
+                                return (
+                                  <div key={st.id} className="relative z-10 flex flex-col items-center gap-1.5">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                                      {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                                    </div>
+                                    <span className={`text-[11px] font-black tracking-tight ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
+                                    {st.dObj && (
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded shadow-sm font-mono ${isBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-slate-900 text-[#ffffff] border border-white/20'}`}>
+                                        {st.dObj.text}
                                       </span>
                                     )}
                                   </div>
+                                );
+                              })}
+                            </div>
 
-                                  {/* 우측 정렬: 타임스탬프 + 통일된 소요 시간 배지 */}
-                                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                    {isCompleted && (
-                                      <span className="text-[10px] text-slate-300 font-mono font-bold bg-[#0d131d] px-2.5 py-1 rounded-md border border-white/10 shadow-sm">
-                                        {formatYYMMDD(stepData.timestamp)}
-                                      </span>
-                                    )}
-                                    {durationMs > 1000 && sIdx < FLOW_STEPS.length - 1 && (
-                                      <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 font-mono text-xs font-black transition-all ${
-                                        isBottleneck
-                                          ? 'bg-red-500/20 text-red-300 shadow-[0_0_20px_rgba(239,68,68,0.7)] animate-pulse border-0 font-bold'
-                                          : 'bg-[#0d131d] text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.15)]'
-                                      }`}>
-                                        <Clock size={12} className={isBottleneck ? 'animate-spin text-red-400 shrink-0' : 'text-[#00e5ff] shrink-0'} />
-                                        <span className="tracking-wider">{formatDuration(durationMs)}</span>
-                                        {isBottleneck && (
-                                          <span className="flex h-2 w-2 relative ml-0.5">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                            {/* 애플워치 스타일 활동 링 (Activity Ring) */}
+                            <div className="py-8 flex flex-col items-center justify-center bg-gradient-to-b from-black/40 to-transparent relative shrink-0">
+                              <div className="relative w-52 h-52 flex items-center justify-center">
+                                <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
+                                  <defs>
+                                    <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                      <stop offset="0%" stopColor={ringColor} />
+                                      <stop offset="100%" stopColor={isClosed ? '#059669' : '#00e5ff'} />
+                                    </linearGradient>
+                                  </defs>
+                                  <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter={ringShadow} />
+                                </svg>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">MTTR TIMER</span>
+                                  <span className="text-3xl font-black font-mono tracking-tighter tabular-nums" style={{ color: ringColor, textShadow: isClosed ? '0 0 10px rgba(16,185,129,0.3)' : '0 0 15px rgba(0,229,255,0.8)' }}>
+                                    {formatDuration(durationMs)}
+                                  </span>
+                                  <span className={`text-[11px] font-bold mt-2 px-3 py-1 rounded-full border shadow-inner ${isClosed ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-300'}`}>
+                                    {isClosed ? `조치 완료 (SAFE - ${formatDtTimeOnly(knwStep ? new Date(knwStep.timestamp) : null)})` : '실시간 대응 중'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 워룸 이동/개설 액션 및 아코디언 버튼 */}
+                            <div className="px-6 pb-6 flex flex-col gap-3 shrink-0">
+                              {warStep && !knwStep && (() => {
+                                const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
+                                return roomExists ? (
+                                  <button onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)} className="skeuo-btn w-full py-3.5 bg-gradient-to-r from-[#00e5ff]/20 to-[#00e5ff]/10 border border-[#00e5ff]/50 rounded-xl font-bold text-sm text-[#00e5ff] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+                                    <Zap size={16} />해당 워룸으로 이동<ChevronRight size={16} />
+                                  </button>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
+                                    disabled={isOpeningWarRoom}
+                                    className={`skeuo-btn w-full py-3.5 bg-gradient-to-r from-[#00e5ff]/20 to-[#00e5ff]/10 border border-[#00e5ff]/50 rounded-xl font-bold text-sm text-[#00e5ff] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)] ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  >
+                                    <Users size={16} />{isOpeningWarRoom ? '워룸 개설 진행 중...' : '긴급 워룸 개설하기'}
+                                  </button>
+                                );
+                              })()}
+
+                              <button
+                                onClick={() => setShowFullTimeline(!showFullTimeline)}
+                                className="w-full py-3.5 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl text-slate-300 font-bold text-xs flex items-center justify-between transition-all shadow-sm"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Clock size={16} className="text-[#00e5ff]" />
+                                  전체 스텝 상세 히스토리 타임라인 {showFullTimeline ? '접기' : '보기'}
+                                </span>
+                                {showFullTimeline ? <ChevronUp size={22} className="text-[#00e5ff] shrink-0 ml-auto" /> : <ChevronDown size={22} className="text-slate-300 shrink-0 ml-auto" />}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* 기존 상세 Timeline (아코디언 토글 시에만 노출) */}
+                      <div className={`transition-all duration-300 overflow-hidden px-6 pb-6 ${showFullTimeline ? 'block border-t border-white/5 bg-black/20 pt-6' : 'hidden'}`}>
+                        <div className="flex flex-col relative space-y-4">
+                          {(() => {
+                            const stepTimestamps = FLOW_STEPS.map(step => {
+                              let sData = incidentWorkflowSteps.find(s => s.id === step.id);
+                              if (!sData && step.id === 'RAG_AGENT') {
+                                sData = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                              }
+                              return sData ? new Date(sData.timestamp) : null;
+                            });
+
+                            const durations = FLOW_STEPS.slice(0, -1).map((_, i) => {
+                              const start = stepTimestamps[i];
+                              const next  = stepTimestamps[i+1];
+                              if (!start) return 0;
+                              const end = next || (i === FLOW_STEPS.findIndex(t => !stepTimestamps[FLOW_STEPS.indexOf(t)]) - 1 ? currentTime : start);
+                              return Math.max(0, end - start);
+                            });
+
+                            return FLOW_STEPS.map((step, sIdx) => {
+                              const stepData = incidentWorkflowSteps.find(s => s.id === step.id) || 
+                                               (step.id === 'RAG_AGENT' ? (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')) : null);
+                              const isCompleted = !!stepData;
+                              const isNextStep = !isCompleted && (sIdx === 0 || !!(incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) || (FLOW_STEPS[sIdx-1].id === 'RAG_AGENT' && (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')))));
+
+                              const durationMs = sIdx < FLOW_STEPS.length - 1 ? durations[sIdx] : 0;
+                              const pb = durationMs === 0 ? 32 : Math.min(140, Math.max(36, Math.round(32 + (durationMs / 60000) * 1.5)));
+                              const isBottleneck = isCompleted && !stepTimestamps[sIdx+1] && durationMs > 60000;
+
+                              const boxStyles = isCompleted
+                                ? 'bg-[#0f1622] border-slate-700 text-slate-400 shadow-none font-bold'
+                                : isNextStep
+                                ? 'bg-[#00e5ff]/20 border-[#00e5ff] text-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.8)] animate-pulse scale-110 font-black z-30'
+                                : 'bg-[#080c12] border-white/10 text-slate-600 shadow-none opacity-40';
+
+                              const lineStyle = isBottleneck
+                                ? { background: 'linear-gradient(180deg, #c084fc 0%, #f43f5e 50%, #ef4444 100%)', boxShadow: '0 0 15px rgba(239, 68, 68, 0.6)' }
+                                : isCompleted
+                                ? { background: step.color === 'blue' ? '#3b82f6' : step.color === 'cyan' ? '#00e5ff' : step.color === 'indigo' ? '#818cf8' : '#c084fc', boxShadow: 'none' }
+                                : { background: 'rgba(255,255,255,0.08)', boxShadow: 'none' };
+
+                              return (
+                                <div key={step.id} className="relative pl-14 transition-all duration-500 flex flex-col justify-center" style={{ paddingBottom: pb + 'px', opacity: isCompleted || isNextStep ? 1 : 0.4 }}>
+                                  {sIdx < FLOW_STEPS.length - 1 && (
+                                    <div className="absolute left-[19px] top-10 bottom-0 w-[2px] transition-all duration-500" style={lineStyle} />
+                                  )}
+
+                                  <div className="absolute left-0 top-0 z-20">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-700 ${boxStyles}`}>
+                                      <step.icon size={18} className={isNextStep ? 'text-[#00e5ff]' : isCompleted ? 'text-slate-300' : 'text-slate-600'} />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col min-h-[40px] justify-center ml-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5 w-full">
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <h4 className={`font-black tracking-tight text-[15px] truncate ${
+                                          isNextStep ? 'text-[#00e5ff] text-shadow-[0_0_12px_rgba(0,229,255,0.6)]' : isCompleted ? 'text-white' : 'text-slate-500'
+                                        }`}>
+                                          {step.label}
+                                        </h4>
+                                        {isNextStep && (
+                                          <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse text-[#00e5ff] bg-[#00e5ff]/20 border border-[#00e5ff]/50 shadow-[0_0_12px_rgba(0,229,255,0.4)] font-mono">
+                                            진행중
                                           </span>
                                         )}
                                       </div>
-                                    )}
+
+                                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                        {isCompleted && (
+                                          <span className="text-[10px] text-slate-300 font-mono font-bold bg-[#0d131d] px-2.5 py-1 rounded-md border border-white/10 shadow-sm">
+                                            {formatYYMMDD(stepData.timestamp)}
+                                          </span>
+                                        )}
+                                        {durationMs > 1000 && sIdx < FLOW_STEPS.length - 1 && (
+                                          <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 font-mono text-xs font-black transition-all ${
+                                            isBottleneck
+                                              ? 'bg-red-500/20 text-red-300 shadow-[0_0_20px_rgba(239, 68, 68, 0.7)] animate-pulse border-0 font-bold'
+                                              : 'bg-[#0d131d] text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.15)]'
+                                          }`}>
+                                            <Clock size={12} className={isBottleneck ? 'animate-spin text-red-400 shrink-0' : 'text-[#00e5ff] shrink-0'} />
+                                            <span className="tracking-wider">{formatDuration(durationMs)}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <p className={`text-[13px] leading-relaxed tracking-tight ${
+                                      isNextStep ? 'text-[#00e5ff]/90 font-bold animate-pulse' : isCompleted ? 'text-slate-300 font-normal' : 'text-slate-600 font-normal'
+                                    }`}>
+                                      {isCompleted ? stepData.detail : isNextStep ? 'AI 및 시스템 분석 실시간 연동 중...' : '대기 중'}
+                                    </p>
                                   </div>
                                 </div>
-                                <p className={`text-[13px] leading-relaxed tracking-tight ${
-                                  isNextStep ? 'text-[#00e5ff]/90 font-bold animate-pulse' : isCompleted ? 'text-slate-300 font-normal' : 'text-slate-600 font-normal'
-                                }`}>
-                                  {isCompleted ? stepData.detail : isNextStep ? 'AI 및 시스템 분석 실시간 연동 중...' : '대기 중'}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-28 opacity-30 transition-all duration-1000">

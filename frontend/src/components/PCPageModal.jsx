@@ -16,9 +16,17 @@ export default function PCPageModal({ children }) {
     ? window.matchMedia('(min-width: 1024px)').matches
     : false;
 
+  const isIframe = typeof window !== 'undefined'
+    ? window.self !== window.top
+    : false;
+
   const handleClose = useCallback(() => {
     navigate('/dashboard', { replace: true });
   }, [navigate]);
+
+  if (isIframe) {
+    return <>{children}</>;
+  }
 
   // ESC 키로 닫기
   useEffect(() => {

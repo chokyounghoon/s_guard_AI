@@ -34,6 +34,7 @@ import ReportViewPage from './pages/ReportViewPage';
 import OrbitalCommandPage from './pages/OrbitalCommandPage';
 import SecurityLogPage from './pages/SecurityLogPage';
 import ProcessingFlowPage from './pages/ProcessingFlowPage';
+import RealtimePipelinePage from './pages/RealtimePipelinePage';
 import PushDiagnosticPage from './pages/PushDiagnosticPage';
 import AlertMonitorPage from './pages/AlertMonitorPage';
 import UserKeywordPage from './pages/UserKeywordPage';
@@ -438,6 +439,7 @@ function AppContent() {
         <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AlertMonitorPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SCallertPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/realtime-pipeline"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><RealtimePipelinePage /></ProtectedRoute>} />
       </Routes>
 
       {/* ⚖️ Governance & Mandatory Consent Guard */}

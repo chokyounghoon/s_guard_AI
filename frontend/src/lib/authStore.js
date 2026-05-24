@@ -155,7 +155,7 @@ export const getAllowedPaths = () => {
 
 export const isPathAllowed = (path) => {
   if (!path) return true;
-  if (path === '/' || path === '/dashboard' || path.startsWith('/dashboard/')) return true;
+  if (path === '/' || path === '/dashboard' || path.startsWith('/dashboard/') || path === '/realtime-pipeline') return true;
 
   const u = getUserProfile();
   if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) {

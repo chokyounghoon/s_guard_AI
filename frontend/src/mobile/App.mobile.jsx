@@ -32,6 +32,7 @@ import InboxPage              from '../pages/InboxPage';
 import OrbitalCommandPage     from '../pages/OrbitalCommandPage';
 import SecurityLogPage        from '../pages/SecurityLogPage';
 import ProcessingFlowPage     from '../pages/ProcessingFlowPage';
+import RealtimePipelinePage   from '../pages/RealtimePipelinePage';
 import PushDiagnosticPage     from '../pages/PushDiagnosticPage';
 import ReportViewPage        from '../pages/ReportViewPage';
 import AlertMonitorPage      from '../pages/AlertMonitorPage';
@@ -401,6 +402,7 @@ function AppContent() {
         <Route path="/alert-monitor"           element={<PR><MobileAlertMonitor /></PR>} />
         <Route path="/user-keyword"             element={<PR><MobileUserKeywordPage /></PR>} />
         <Route path="/s-callert"                element={<PR><MobileSCallertPage /></PR>} />
+        <Route path="/realtime-pipeline"        element={<PR><RealtimePipelinePage /></PR>} />
         <Route path="/admin/permissions" element={<PR><PermissionManagementPage /></PR>} />
         <Route path="/admin/deputy" element={<PR><MobileDeputyManagementPage /></PR>} />
       </Routes>

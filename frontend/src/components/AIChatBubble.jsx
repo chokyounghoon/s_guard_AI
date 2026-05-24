@@ -197,7 +197,7 @@ export default function AIChatBubble({ message, query, incidentId, onCopy, onSha
         let processed = trimmed;
         processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-white">$1</strong>').replace(/\*\*/g, '');
         elements.push(
-          <p key={idx} className="my-1.5 leading-relaxed text-[13px] text-slate-200 break-words font-normal" dangerouslySetInnerHTML={{ __html: processed }} />
+          <div key={idx} className="my-1.5 leading-relaxed text-[13px] text-slate-200 break-words font-normal" dangerouslySetInnerHTML={{ __html: processed }} />
         );
       }
     });

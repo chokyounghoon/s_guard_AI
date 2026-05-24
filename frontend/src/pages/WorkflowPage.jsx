@@ -223,12 +223,19 @@ export default function WorkflowPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between bg-white/[0.02] rounded-2xl p-3.5 border border-white/5 mt-3 text-xs">
+        <div className="flex items-center justify-between bg-white/[0.02] rounded-2xl p-3.5 border border-white/5 mt-3 text-xs flex-wrap gap-y-2">
           <div className="flex items-center gap-2">
             <Calendar className="w-3.5 h-3.5 text-slate-500" />
             <span className="text-slate-400 font-bold">인지시각:</span>
             <span className="font-mono font-bold text-slate-200">{fmt(incidentData?.created_at) || '-'}</span>
           </div>
+          {isClosed && endT && (
+            <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-slate-400 font-bold">완료시각:</span>
+              <span className="font-mono font-bold text-emerald-400">{fmt(endT)}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 border-l border-white/10 pl-4">
             <User className="w-3.5 h-3.5 text-slate-500" />
             <span className="text-slate-400 font-bold">발신자:</span>
@@ -380,25 +387,27 @@ export default function WorkflowPage() {
                 let intervalText = null;
                 let intervalMinutes = 0;
                 let isElapsedLive = false;
-                if (done && sIdx < FLOW_STEPS.length - 1) {
-                  const nextId = FLOW_STEPS[sIdx+1].id;
-                  let nextLog = workflowLogs.find(l => l.id === nextId);
-                  if (!nextLog && nextId === 'RAG_AGENT') {
-                    nextLog = workflowLogs.find(l => l.id === 'RAG') || workflowLogs.find(l => l.id === 'AGENT');
+                if (sIdx > 0) {
+                  const prevStep = FLOW_STEPS[sIdx - 1];
+                  let prevLog = workflowLogs.find(l => l.id === prevStep.id);
+                  if (!prevLog && prevStep.id === 'RAG_AGENT') {
+                    prevLog = workflowLogs.find(l => l.id === 'RAG') || workflowLogs.find(l => l.id === 'AGENT');
                   }
-                  if (nextLog) {
-                    const diff = new Date(nextLog.timestamp) - new Date(log.timestamp);
-                    const m = Math.floor(diff / 60000);
-                    const sec = Math.floor((diff % 60000) / 1000);
-                    intervalMinutes = m;
-                    intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요` : m > 0 ? `⏱ ${m}분 ${sec}초 소요` : `⏱ ${sec}초 소요`;
-                  } else if (sIdx === firstPending - 1) {
-                    isElapsedLive = true;
-                    const diff = currentTime - new Date(log.timestamp);
-                    const m = Math.floor(diff / 60000);
-                    const sec = Math.floor((diff % 60000) / 1000);
-                    intervalMinutes = m;
-                    intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과` : m > 0 ? `⏱ ${m}분 ${sec}초 경과` : `⏱ ${sec}초 경과`;
+                  if (prevLog) {
+                    if (done) {
+                      const diff = new Date(log.timestamp) - new Date(prevLog.timestamp);
+                      const m = Math.floor(diff / 60000);
+                      const sec = Math.floor((diff % 60000) / 1000);
+                      intervalMinutes = m;
+                      intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 소요` : m > 0 ? `⏱ ${m}분 ${sec}초 소요` : `⏱ ${sec}초 소요`;
+                    } else if (sIdx === firstPending) {
+                      isElapsedLive = true;
+                      const diff = currentTime - new Date(prevLog.timestamp);
+                      const m = Math.floor(diff / 60000);
+                      const sec = Math.floor((diff % 60000) / 1000);
+                      intervalMinutes = m;
+                      intervalText = m > 60 ? `⏱ ${Math.floor(m/60)}시간 ${m%60}분 경과` : m > 0 ? `⏱ ${m}분 ${sec}초 경과` : `⏱ ${sec}초 경과`;
+                    }
                   }
                 }
 
@@ -448,7 +457,7 @@ export default function WorkflowPage() {
                       </div>
 
                       {/* 소요 시간 라벨 (소요시간 vs 경과시간 Live Dot 분리) */}
-                      {intervalText && sIdx < FLOW_STEPS.length - 1 && (
+                      {intervalText && sIdx > 0 && (
                         <div className="mt-3.5 flex justify-end">
                           {isElapsedLive ? (
                             <span className="text-[11px] font-black px-3 py-1 rounded-full border bg-orange-500/15 text-orange-400 border-orange-500/30 shadow-[0_0_12px_rgba(249,115,22,0.25)] flex items-center gap-2">
