@@ -307,7 +307,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [isFlowCollapsed, setIsFlowCollapsed] = useState(false);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [selectedIncidentIdFlow, setSelectedIncidentIdFlow] = useState(null);
-  const [showFullTimeline, setShowFullTimeline] = useState(false);
+  const [showFullTimeline, setShowFullTimeline] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
   const [totalSmsVolume, setTotalSmsVolume] = useState(0);
@@ -654,8 +654,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       return;
     }
 
-    const fetchWorkflow = async () => {
-      setIsFlowSpinning(true);
+    const fetchWorkflow = async (isInitial = false) => {
+      if (isInitial) setIsFlowSpinning(true);
       try {
         const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`, {
           headers: getAuthHeaders()
@@ -664,15 +664,19 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         setIncidentWorkflowSteps(data.steps || []);
       } catch (e) {
         console.error('Workflow fetch failed:', e);
-        alert("원활한 서비스 조회를 위해 페이지를 새로고침합니다.");
-        window.location.reload();
       } finally {
-        setIsFlowSpinning(false);
+        if (isInitial) setIsFlowSpinning(false);
       }
     };
 
-    fetchWorkflow();
-  }, [selectedIncidentIdFlow]);
+    fetchWorkflow(true);
+
+    const interval = setInterval(() => {
+      fetchWorkflow(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedIncidentIdFlow, apiBase]);
 
   // 상단 S-Autopilot Insight 패널은 항상 최신 SMS만 분석하도록 고정
   // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
@@ -2358,7 +2362,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               const isCompleted = !!stepData;
                               const isNextStep = !isCompleted && (sIdx === 0 || !!(incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) || (FLOW_STEPS[sIdx-1].id === 'RAG_AGENT' && (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')))));
 
-                              const durationMs = sIdx < FLOW_STEPS.length - 1 ? durations[sIdx] : 0;
+                              const durationMs = sIdx > 0 ? durations[sIdx - 1] : 0;
                               const pb = durationMs === 0 ? 32 : Math.min(140, Math.max(36, Math.round(32 + (durationMs / 60000) * 1.5)));
                               const isBottleneck = isCompleted && !stepTimestamps[sIdx+1] && durationMs > 60000;
 
@@ -2407,7 +2411,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                             {formatYYMMDD(stepData.timestamp)}
                                           </span>
                                         )}
-                                        {durationMs > 1000 && sIdx < FLOW_STEPS.length - 1 && (
+                                        {durationMs > 1000 && sIdx > 0 && (
                                           <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 font-mono text-xs font-black transition-all ${
                                             isBottleneck
                                               ? 'bg-red-500/20 text-red-300 shadow-[0_0_20px_rgba(239, 68, 68, 0.7)] animate-pulse border-0 font-bold'
