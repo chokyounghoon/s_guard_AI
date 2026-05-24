@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown,
@@ -429,8 +428,8 @@ export default function DeputyManagementPage() {
       </main>
 
       {/* ═══════════════════════ MODAL (Bottom Sheet) ═══════════════════════ */}
-      {showModal && createPortal(
-        <div className="fixed inset-0 z-[200] flex flex-col justify-end">
+      {showModal && (
+        <div className="fixed inset-0 z-[400] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={closeModal} />
 
           <div className="relative w-full bg-[#0d1117] rounded-t-[32px] border-t border-white/8 shadow-2xl flex flex-col"
@@ -592,8 +591,7 @@ export default function DeputyManagementPage() {
             )}
 
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );
