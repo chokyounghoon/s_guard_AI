@@ -329,7 +329,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const FLOW_STEPS = [
     { id: 'SMS', label: 'SMS 수신 및 장애 인지', icon: Bell, color: 'blue' },
     { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료', icon: Brain, color: 'cyan' },
-    { id: 'WARROOM', label: '워룸생성 및 할당완료', icon: Users, color: 'indigo' },
+    { id: 'WARROOM', label: '워룸 생성 및 할당 완료(처리중)', icon: Users, color: 'indigo' },
     { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', icon: CheckCircle, color: 'purple' }
   ];
 
@@ -2363,8 +2363,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               const isNextStep = !isCompleted && (sIdx === 0 || !!(incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx-1].id) || (FLOW_STEPS[sIdx-1].id === 'RAG_AGENT' && (incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT')))));
 
                               const durationMs = sIdx > 0 ? durations[sIdx - 1] : 0;
-                              const pb = durationMs === 0 ? 32 : Math.min(140, Math.max(36, Math.round(32 + (durationMs / 60000) * 1.5)));
-                              const isBottleneck = isCompleted && !stepTimestamps[sIdx+1] && durationMs > 60000;
+                              const nextDurationMs = sIdx < FLOW_STEPS.length - 1 ? durations[sIdx] : 0;
+                              const pb = nextDurationMs === 0 ? 32 : Math.min(140, Math.max(36, Math.round(32 + (nextDurationMs / 60000) * 1.5)));
+                              const isBottleneck = !isCompleted && isNextStep && durationMs > 60000;
+                              const isLineBottleneck = sIdx < FLOW_STEPS.length - 1 && !stepTimestamps[sIdx+1] && nextDurationMs > 60000;
 
                               const boxStyles = isCompleted
                                 ? 'bg-[#0f1622] border-slate-700 text-slate-400 shadow-none font-bold'
@@ -2372,7 +2374,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 ? 'bg-[#00e5ff]/20 border-[#00e5ff] text-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.8)] animate-pulse scale-110 font-black z-30'
                                 : 'bg-[#080c12] border-white/10 text-slate-600 shadow-none opacity-40';
 
-                              const lineStyle = isBottleneck
+                              const lineStyle = isLineBottleneck
                                 ? { background: 'linear-gradient(180deg, #c084fc 0%, #f43f5e 50%, #ef4444 100%)', boxShadow: '0 0 15px rgba(239, 68, 68, 0.6)' }
                                 : isCompleted
                                 ? { background: step.color === 'blue' ? '#3b82f6' : step.color === 'cyan' ? '#00e5ff' : step.color === 'indigo' ? '#818cf8' : '#c084fc', boxShadow: 'none' }

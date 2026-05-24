@@ -324,7 +324,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const FLOW_STEPS = [
     { id: 'SMS', label: 'SMS 수신 및 장애 인지' },
     { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료' },
-    { id: 'WARROOM', label: '워룸생성 및 할당완료' },
+    { id: 'WARROOM', label: '워룸 생성 및 할당 완료(처리중)' },
     { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료' }
   ];
 
@@ -2258,12 +2258,52 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     if(step.id==='WARROOM'&&stepData?.detail?.includes('2.0님'))stepData.detail=stepData.detail.replace('2.0님','조경훈님');
                     const isCompleted=!!stepData, isNextStep=sIdx===firstPendingIdx;
                     let intervalText=null, intervalMinutes=0;
-                    if(isCompleted&&sIdx<FLOW_STEPS.length-1){const nextId=FLOW_STEPS[sIdx+1].id;let next=incidentWorkflowSteps.find(s=>s.id===nextId);if(!next&&nextId==='RAG_AGENT')next=incidentWorkflowSteps.find(s=>s.id==='RAG')||incidentWorkflowSteps.find(s=>s.id==='AGENT');if(next){const ms=new Date(next.timestamp)-new Date(stepData.timestamp);const m=Math.floor(ms/60000),sec=Math.floor((ms%60000)/1000);intervalMinutes=m;intervalText=m>60?`⏱ ${Math.floor(m/60)}h ${m%60}m`:m>0?`⏱ ${m}m ${sec}s`:`⏱ ${sec}s`;}else if(sIdx===firstPendingIdx-1){const ms=currentTime-new Date(stepData.timestamp);const m=Math.floor(ms/60000),sec=Math.floor((ms%60000)/1000);intervalMinutes=m;intervalText=m>60?`⏱ ${Math.floor(m/60)}h ${m%60}m 경과`:m>0?`⏱ ${m}m ${sec}s 경과`:`⏱ ${sec}s 경과`;}}
-                    const isBottleneck = intervalMinutes > 60;
-                    const pb = intervalMinutes===0?24:Math.min(160,Math.max(24,Math.round(24+intervalMinutes*0.2)));
+                    if (sIdx > 0) {
+                      let prevStep = FLOW_STEPS[sIdx - 1];
+                      let prevLog = incidentWorkflowSteps.find(s => s.id === prevStep.id);
+                      if (!prevLog && prevStep.id === 'RAG_AGENT') {
+                        prevLog = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                      }
+                      if (!prevLog && prevStep.id === 'SMS' && selectedSms) {
+                        prevLog = { timestamp: selectedSms.timestamp || selectedSms.reg_dt };
+                      }
+                      
+                      if (prevLog && prevLog.timestamp) {
+                        if (isCompleted) {
+                          const ms = new Date(stepData.timestamp) - new Date(prevLog.timestamp);
+                          const m = Math.floor(ms / 60000), sec = Math.floor((ms % 60000) / 1000);
+                          intervalMinutes = m;
+                          intervalText = m > 60 ? `⏱ ${Math.floor(m / 60)}h ${m % 60}m` : m > 0 ? `⏱ ${m}m ${sec}s` : `⏱ ${sec}s`;
+                        } else if (isNextStep) {
+                          const ms = currentTime - new Date(prevLog.timestamp);
+                          const m = Math.floor(ms / 60000), sec = Math.floor((ms % 60000) / 1000);
+                          intervalMinutes = m;
+                          intervalText = m > 60 ? `⏱ ${Math.floor(m / 60)}h ${m % 60}m 경과` : m > 0 ? `⏱ ${m}m ${sec}s 경과` : `⏱ ${sec}s 경과`;
+                        }
+                      }
+                    }
+
+                    const isBottleneck = isNextStep && intervalMinutes > 60;
+                    
+                    let transMs = 0;
+                    if (sIdx < FLOW_STEPS.length - 1 && isCompleted) {
+                      const nextStep = FLOW_STEPS[sIdx + 1];
+                      let nextLog = incidentWorkflowSteps.find(s => s.id === nextStep.id);
+                      if (!nextLog && nextStep.id === 'RAG_AGENT') {
+                        nextLog = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
+                      }
+                      if (nextLog && nextLog.timestamp) {
+                        transMs = new Date(nextLog.timestamp) - new Date(stepData.timestamp);
+                      } else if (sIdx + 1 === firstPendingIdx) {
+                        transMs = currentTime - new Date(stepData.timestamp);
+                      }
+                    }
+                    const transMins = Math.floor(transMs / 60000);
+                    const isLineBottleneck = sIdx < FLOW_STEPS.length - 1 && !incidentWorkflowSteps.find(s => s.id === FLOW_STEPS[sIdx+1].id) && transMins > 60;
+                    const pb = sIdx === FLOW_STEPS.length - 1 ? 24 : Math.min(160, Math.max(24, Math.round(24 + transMins * 0.2)));
                     return (
                       <div key={step.id} className="relative pl-10 transition-all duration-300" style={{ paddingBottom: pb+'px', opacity: !isCompleted&&!isNextStep ? 0.3 : 1 }}>
-                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 transition-all" style={{ width: isBottleneck ? '2px' : '1px', background: isBottleneck ? '#fb923c' : isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.1)', boxShadow: isBottleneck ? '0 0 8px rgba(251,146,60,0.5)' : 'none' }} />}
+                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 transition-all" style={{ width: isLineBottleneck ? '2px' : '1px', background: isLineBottleneck ? '#fb923c' : isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.1)', boxShadow: isLineBottleneck ? '0 0 8px rgba(251,146,60,0.5)' : 'none' }} />}
                         <div className="absolute left-0 top-0 w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-md transition-all" style={{ background: isBottleneck ? 'rgba(251,146,60,0.2)' : isCompleted ? 'rgba(0,229,255,0.15)' : isNextStep ? 'rgba(0,229,255,0.2)' : '#0a1c20', border: `1px solid ${isBottleneck ? '#fb923c' : isCompleted ? '#00e5ff' : isNextStep ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, boxShadow: isBottleneck ? '0 0 10px rgba(251,146,60,0.4)' : isCompleted ? 'none' : isNextStep ? '0 0 10px rgba(0,229,255,0.4)' : 'none' }}>
                           {isCompleted ? <CheckCircle2 size={10} style={{ color: isBottleneck ? '#fb923c' : '#00e5ff', opacity: isBottleneck ? 1 : 0.8 }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#00e5ff' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#475569' }} />}
                         </div>
@@ -2276,7 +2316,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? '#94a3b8' : isNextStep ? '#cbd5e1' : '#475569' }}>
                             {isCompleted ? stepData.detail : isNextStep ? '처리 진행 중...' : '대기 중'}
                           </p>
-                          {intervalText && sIdx < FLOW_STEPS.length-1 && (
+                          {intervalText && sIdx > 0 && (
                             <span className="inline-block mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm font-mono" style={{ color: isBottleneck ? '#fb923c' : '#ffffff', border: `1px solid ${isBottleneck ? '#fb923c' : 'rgba(255,255,255,0.3)'}`, background: isBottleneck ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.1)' }}>{intervalText}</span>
                           )}
                           {(isCompleted||isNextStep)&&step.id==='WARROOM'&&(()=>{

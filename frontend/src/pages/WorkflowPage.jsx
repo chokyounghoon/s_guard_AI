@@ -12,8 +12,8 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 const FLOW_STEPS = [
   { id: 'SMS',       label: 'SMS 수신 및 장애 인지',  icon: Terminal,    color: 'blue' },
   { id: 'RAG_AGENT', label: 'AI AGENT 분석 완료',     icon: Zap,         color: 'purple' },
-  { id: 'WARROOM',   label: '워룸 생성 및 할당',       icon: Activity,    color: 'indigo' },
-  { id: 'KNOWLEDGE', label: '장애 대응 및 지식화',     icon: CheckCircle2, color: 'emerald' }
+  { id: 'WARROOM',   label: '워룸 생성 및 할당 완료(처리중)',       icon: Activity,    color: 'indigo' },
+  { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료',     icon: CheckCircle2, color: 'emerald' }
 ];
 
 const parseMciFields = (msg) => {

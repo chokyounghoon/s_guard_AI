@@ -772,7 +772,7 @@ export default function RealtimePipelinePage() {
     const FLOW_STEPS = [
       { id: 'SMS', label: 'SMS 수신 및 장애 인지', icon: <Bell className="w-3.5 h-3.5" />, color: '#3b82f6' },
       { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료', icon: <Brain className="w-3.5 h-3.5" />, color: '#8b5cf6' },
-      { id: 'WARROOM', label: '워룸생성 및 할당완료', icon: <Users className="w-3.5 h-3.5" />, color: '#00e5ff' },
+      { id: 'WARROOM', label: '워룸 생성 및 할당 완료(처리중)', icon: <Users className="w-3.5 h-3.5" />, color: '#00e5ff' },
       { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: '#10b981' }
     ];
 
@@ -796,24 +796,35 @@ export default function RealtimePipelinePage() {
 
       let intervalText = null;
       let intervalMinutes = 0;
+      let isBottleneck = false;
       
-      if (isCompleted && sIdx < FLOW_STEPS.length - 1) {
-        let nextTime = null;
-        if (sIdx === 0) nextTime = t2;
-        else if (sIdx === 1) nextTime = t3;
-        else if (sIdx === 2) nextTime = t4;
+      if (sIdx > 0) {
+        let prevTime = null;
+        if (sIdx === 1) prevTime = t1;
+        else if (sIdx === 2) prevTime = t2;
+        else if (sIdx === 3) prevTime = t3;
 
-        if (nextTime) {
-          const ms = new Date(nextTime) - new Date(stepData.timestamp);
-          const m = Math.floor(ms / 60000), sec = Math.floor((ms % 60000) / 1000);
-          intervalMinutes = m;
-          intervalText = m > 60 ? `⏱ ${Math.floor(m / 60)}h ${m % 60}m` : m > 0 ? `⏱ ${m}m ${sec}s` : `⏱ ${sec}s`;
+        if (prevTime) {
+          if (isCompleted) {
+            let currTime = null;
+            if (sIdx === 1) currTime = t2;
+            else if (sIdx === 2) currTime = t3;
+            else if (sIdx === 3) currTime = t4;
+
+            if (currTime) {
+              const ms = new Date(currTime) - new Date(prevTime);
+              const m = Math.floor(ms / 60000), sec = Math.floor((ms % 60000) / 1000);
+              intervalMinutes = m;
+              intervalText = m > 60 ? `⏱ ${Math.floor(m / 60)}h ${m % 60}m` : m > 0 ? `⏱ ${m}m ${sec}s` : `⏱ ${sec}s`;
+            }
+          } else if (isNextStep) {
+            const ms = currentTime - new Date(prevTime);
+            const m = Math.floor(ms / 60000), sec = Math.floor((ms % 60000) / 1000);
+            intervalMinutes = m;
+            intervalText = m > 60 ? `⏱ ${Math.floor(m / 60)}h ${m % 60}m 경과` : m > 0 ? `⏱ ${m}m ${sec}s` : `⏱ ${sec}s 경과`;
+            isBottleneck = m > 60;
+          }
         }
-      } else if (isNextStep && stepData) {
-        const ms = currentTime - new Date(stepData.timestamp);
-        const m = Math.floor(ms / 60000), sec = Math.floor((ms % 60000) / 1000);
-        intervalMinutes = m;
-        intervalText = m > 60 ? `⏱ ${Math.floor(m / 60)}h ${m % 60}m 경과` : m > 0 ? `⏱ ${m}m ${sec}s` : `⏱ ${sec}s 경과`;
       }
 
       return {
@@ -822,7 +833,7 @@ export default function RealtimePipelinePage() {
         isCompleted,
         isNextStep,
         intervalText,
-        isBottleneck: intervalMinutes > 60
+        isBottleneck
       };
     });
 
