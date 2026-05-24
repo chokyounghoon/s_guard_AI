@@ -23,6 +23,10 @@ const parseDate = (val) => {
   if (!s.includes('T') && s.length >= 16) {
     s = s.substring(0, 10) + 'T' + s.substring(11, 16) + (s.length >= 19 ? s.substring(16, 19) : ':00');
   }
+  // 백엔드에서 넘어오는 시간이 UTC이므로 'Z'를 강제 추가하여 KST로 자동 변환되도록 함
+  if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-') && s.includes('T')) {
+    s += 'Z';
+  }
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 };
@@ -229,10 +233,10 @@ export default function RealtimePipelinePage() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('operator'); 
-  const [period, setPeriod] = useState('all');
-  const [orgLevel, setOrgLevel] = useState('bumun');
-  const [selectedBumun, setSelectedBumun] = useState('all');
-  const [selectedHonbu, setSelectedHonbu] = useState('all');
+  const [period, setPeriod] = useState('today');
+  const [orgLevel, setOrgLevel] = useState('team');
+  const [selectedBumun, setSelectedBumun] = useState('개발운영부문');
+  const [selectedHonbu, setSelectedHonbu] = useState('금융본부');
   const [selectedTeam, setSelectedTeam] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('all');
@@ -242,7 +246,7 @@ export default function RealtimePipelinePage() {
   const [filterHour, setFilterHour] = useState('all');
   const [filterSystem, setFilterSystem] = useState('all');
   const [selectedCardId, setSelectedCardId] = useState(null);
-  const [isSimulationActive, setIsSimulationActive] = useState(false);
+  const [isSimulationActive, setIsSimulationActive] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [workflowPanelId, setWorkflowPanelId] = useState(null);
   const [orgTree, setOrgTree] = useState([]); // Full org chart from /org/tree
@@ -550,6 +554,17 @@ export default function RealtimePipelinePage() {
       .then(tree => setOrgTree(Array.isArray(tree) ? tree : []))
       .catch(() => {});
 
+  }, []);
+
+  useEffect(() => {
+    if (!isSimulationActive) {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      return;
+    }
+
     const token = getAccessToken();
     if (!token) return;
 
@@ -589,8 +604,13 @@ export default function RealtimePipelinePage() {
       } catch (err) {}
     };
 
-    return () => { if (eventSourceRef.current) eventSourceRef.current.close(); };
-  }, []);
+    return () => { 
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [isSimulationActive]);
 
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -611,28 +631,6 @@ export default function RealtimePipelinePage() {
     return () => clearInterval(timerInterval);
   }, [soundEnabled]);
 
-  useEffect(() => {
-    if (!isSimulationActive) return;
-    const simInterval = setInterval(() => {
-      setCards(prev => {
-        let moved = false;
-        return prev.map(card => {
-          if (!moved && card.stage < 4) {
-            moved = true;
-            const nextStage = card.stage + 1;
-            if (nextStage === 3) playAlertSound('info');
-            return { 
-              ...card, stage: nextStage, is_analyzed: nextStage >= 3 ? 1 : card.is_analyzed,
-              incident_status: nextStage === 4 ? 'INC_003' : nextStage === 3 ? 'INC_002' : card.incident_status,
-              timer: nextStage === 3 ? 180 : card.timer
-            };
-          }
-          return card;
-        });
-      });
-    }, 10000);
-    return () => clearInterval(simInterval);
-  }, [isSimulationActive, soundEnabled]);
 
   const formatTime = (secs) => {
     const h = Math.floor(secs / 3600).toString().padStart(2, '0');
@@ -1139,6 +1137,11 @@ export default function RealtimePipelinePage() {
     const teamsForHonbuNodes = selectedHonbuNode ? (selectedHonbuNode.children || []) : [];
     const teamsForHonbu = [...new Set(teamsForHonbuNodes.map(node => node.name))].filter(Boolean).sort();
 
+    // Level 5: 파트 (Part) nodes under selected Team
+    const selectedTeamNode = (selectedBumun !== 'all' && selectedHonbu !== 'all' && selectedTeam !== 'all') ? findNodeInTree(orgTree, selectedTeam, 4) : null;
+    const partsForTeamNodes = selectedTeamNode ? (selectedTeamNode.children || []) : [];
+    const partsForTeam = [...new Set(partsForTeamNodes.map(node => node.name))].filter(Boolean).sort();
+
     // Filter cards based on current cascading selection
     const orgFilteredCards = displayedCards.filter(c => {
       if (orgLevel === 'bumun') {
@@ -1176,6 +1179,10 @@ export default function RealtimePipelinePage() {
     } else if (orgLevel === 'team' && selectedBumun !== 'all' && selectedHonbu !== 'all') {
       teamsForHonbu.forEach(t => {
         if (!orgStatsMap[t]) orgStatsMap[t] = { name: t, 수신: 0, 처리대기중: 0, 처리중: 0, 처리완료: 0, incidents: [] };
+      });
+    } else if (orgLevel === 'part' && selectedBumun !== 'all' && selectedHonbu !== 'all' && selectedTeam !== 'all') {
+      partsForTeam.forEach(p => {
+        if (!orgStatsMap[p]) orgStatsMap[p] = { name: p, 수신: 0, 처리대기중: 0, 처리중: 0, 처리완료: 0, incidents: [] };
       });
     }
 
@@ -1276,7 +1283,10 @@ export default function RealtimePipelinePage() {
              </div>
              <div className="flex-1 overflow-hidden relative h-full flex items-center" style={{ WebkitMaskImage: 'linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)' }}>
                {latestIncidents.length > 0 ? (
-                 <div className="whitespace-nowrap animate-marquee flex items-center gap-12 absolute left-0 hover:[animation-play-state:paused]">
+                 <div 
+                   className="whitespace-nowrap animate-marquee flex items-center gap-12 absolute left-0 hover:[animation-play-state:paused]"
+                   style={{ animationPlayState: isSimulationActive ? 'running' : 'paused' }}
+                 >
                    {latestIncidents.map((incident, idx) => (
                      <div 
                        key={`ticker-${incident.inc_id}-${idx}`} 
@@ -1687,7 +1697,9 @@ export default function RealtimePipelinePage() {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[8px] text-slate-600 font-bold font-mono">S{card.stage}</span>
+                          <span className={`text-[9px] font-bold tracking-tight px-1.5 py-0.5 rounded border opacity-80 flex items-center justify-center text-center ${card.stage === 1 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}>
+                            {card.stage === 1 ? '수신' : '분석중'}
+                          </span>
                         )}
                         <button onClick={(e) => { e.stopPropagation(); setWorkflowPanelId(card.inc_id); }} className="ml-1 p-1 bg-white/5 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 rounded transition-colors group-hover:opacity-100 opacity-50" title="워크플로우 상세보기"><ExternalLink className="w-3 h-3" /></button>
                       </div>
