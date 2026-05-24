@@ -2145,23 +2145,42 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               <div className="flex flex-col">
                 {/* 가로 프로그레스 바 (Horizontal Stepper) */}
                 <div className="flex items-center justify-between px-6 py-5 bg-black/20 border-b border-white/5 relative">
-                  <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-1 bg-slate-800 z-0" />
                   {steps.map((st, i) => {
                     const isDone = st.done;
                     const isActive = st.active;
                     const isBottleneck = st.dObj?.min > 60;
                     return (
-                      <div key={st.id} className="relative z-10 flex flex-col items-center gap-1.5">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                          {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                      <React.Fragment key={st.id}>
+                        <div className="relative z-10 flex flex-col items-center gap-1.5">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                            {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                          </div>
+                          <span className={`text-[11px] font-black tracking-tight ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
                         </div>
-                        <span className={`text-[11px] font-black tracking-tight ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
-                        {st.dObj && (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded shadow-sm font-mono ${isBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-slate-900 text-[#ffffff] border border-white/20'}`}>
-                            {st.dObj.text}
-                          </span>
-                        )}
-                      </div>
+                        {i < steps.length - 1 && (() => {
+                          const nextStep = steps[i + 1];
+                          const durationObj = nextStep.dObj;
+                          const isNextStepDone = nextStep.done;
+                          const isNextStepActive = nextStep.active;
+                          const isArrowBottleneck = durationObj?.min > 60;
+                          return (
+                            <div className="flex-1 flex flex-col items-center justify-center px-1">
+                              <div className="w-8 h-8 flex items-center justify-center">
+                                <svg className={`w-5 h-5 ${isNextStepDone ? 'text-[#00e5ff]' : isNextStepActive ? 'text-[#00e5ff] animate-pulse' : 'text-slate-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                </svg>
+                              </div>
+                              {durationObj ? (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded shadow-sm font-mono mt-1.5 whitespace-nowrap ${isArrowBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-slate-900 text-[#ffffff] border border-white/20'}`}>
+                                  {durationObj.text}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-600 font-mono mt-1.5">-</span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </React.Fragment>
                     );
                   })}
                 </div>

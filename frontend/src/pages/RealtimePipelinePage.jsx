@@ -867,37 +867,45 @@ export default function RealtimePipelinePage() {
             </div>
           </div>
 
-          {/* Right Grid: 4-Step Stepper arranged in a 2x2 grid (cols-7) */}
-          <div className="col-span-7 flex flex-col justify-center gap-2">
-            <div className="grid grid-cols-2 gap-2">
+          {/* Right Grid: 4-Step Stepper arranged in a horizontal line with arrows (cols-7) */}
+          <div className="col-span-7 flex flex-col justify-center gap-3">
+            <div className="flex items-center justify-between px-3 py-4 bg-black/20 rounded-xl border border-white/5 relative">
               {steps.map((st, i) => {
                 const isDone = st.done;
                 const isActive = st.active;
                 const isBottleneck = st.dObj?.min > 60;
                 return (
-                  <div key={st.id} 
-                       className={`flex flex-col p-1.5 rounded-lg border transition-all ${
-                         isDone 
-                           ? (isBottleneck ? 'bg-orange-500/10 border-orange-500/30' : 'bg-[#00e5ff]/5 border-[#00e5ff]/20') 
-                           : isActive 
-                             ? 'bg-[#00e5ff]/15 border-[#00e5ff]/40 shadow-[0_0_8px_rgba(0,229,255,0.15)] animate-pulse' 
-                             : 'bg-slate-900/40 border-white/5'
-                       }`}>
-                    <div className="flex items-center gap-1.5">
-                      <div className={`w-4 h-4 rounded-full flex items-center justify-center font-bold text-[8px] shrink-0 ${isDone ? (isBottleneck ? 'bg-orange-500 text-black' : 'bg-[#00e5ff] text-black') : isActive ? 'bg-[#00e5ff] text-black' : 'bg-slate-800 text-slate-500'}`}>
-                        {isDone ? '✓' : i + 1}
+                  <React.Fragment key={st.id}>
+                    <div className="relative z-10 flex flex-col items-center gap-1.5">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_8px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-2 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_8px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                        {isDone ? <CheckCircle2 size={12} /> : i + 1}
                       </div>
-                      <span className={`text-[9px] font-black tracking-tight ${isBottleneck ? 'text-orange-400' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
-                        {st.label}
-                      </span>
+                      <span className={`text-[9px] font-black tracking-tight ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
                     </div>
-                    <div className="mt-1 flex items-baseline justify-between gap-1">
-                      <span className="text-[7px] text-slate-500 uppercase font-bold">소요:</span>
-                      <span className={`text-[8.5px] font-bold font-mono ${isBottleneck ? 'text-orange-400' : isDone || isActive ? 'text-white' : 'text-slate-600'}`}>
-                        {st.dObj ? st.dObj.text : '-'}
-                      </span>
-                    </div>
-                  </div>
+                    {i < steps.length - 1 && (() => {
+                      const nextStep = steps[i + 1];
+                      const durationObj = nextStep.dObj;
+                      const isNextStepDone = nextStep.done;
+                      const isNextStepActive = nextStep.active;
+                      const isArrowBottleneck = durationObj?.min > 60;
+                      return (
+                        <div className="flex-1 flex flex-col items-center justify-center px-1">
+                          <div className="w-7 h-7 flex items-center justify-center">
+                            <svg className={`w-4 h-4 ${isNextStepDone ? 'text-[#00e5ff]' : isNextStepActive ? 'text-[#00e5ff] animate-pulse' : 'text-slate-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                            </svg>
+                          </div>
+                          {durationObj ? (
+                            <span className={`text-[8px] font-bold px-1 py-0.5 rounded shadow-sm font-mono mt-1 whitespace-nowrap ${isArrowBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-slate-900 text-[#ffffff] border border-white/20'}`}>
+                              {durationObj.text}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] text-slate-600 font-mono mt-1">-</span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </React.Fragment>
                 );
               })}
             </div>
