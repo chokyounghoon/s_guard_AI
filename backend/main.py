@@ -449,7 +449,27 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# SSE 연결 관리자
+class SSEManager:
+    def __init__(self):
+        self.queues: List[asyncio.Queue] = []
 
+    async def subscribe(self) -> asyncio.Queue:
+        q = asyncio.Queue()
+        self.queues.append(q)
+        logger.info(f"SSE 클라이언트 연결됨. 총 연결: {len(self.queues)}")
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue):
+        if q in self.queues:
+            self.queues.remove(q)
+            logger.info(f"SSE 클라이언트 연결 해제. 총 연결: {len(self.queues)}")
+
+    async def broadcast(self, message: dict):
+        for q in self.queues:
+            await q.put(message)
+
+sse_manager = SSEManager()
 # Pydantic 모델
 class SMSMessage(BaseModel):
     sender: str
@@ -690,7 +710,31 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
     # 웹소켓 브로드캐스트
     await manager.broadcast(notification)
     
+    # SSE 브로드캐스트
+    await sse_manager.broadcast(notification)
+    
     return {"status": "success", "inc_id": inc_id, "incident_code": incident_code}
+
+@app.get("/sms/notification-stream")
+async def notification_stream(request: Request, token: Optional[str] = None):
+    q = await sse_manager.subscribe()
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    message = await asyncio.wait_for(q.get(), timeout=1.0)
+                    yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            sse_manager.unsubscribe(q)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.get("/sms/recent")
 async def get_recent_messages(limit: int = 10):
