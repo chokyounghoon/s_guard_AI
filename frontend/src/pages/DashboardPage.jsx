@@ -2256,34 +2256,71 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         return (
                           <div className="flex flex-col">
                             {/* 가로 프로그레스 바 (Horizontal Stepper) */}
-                            <div className="flex items-center justify-between px-6 py-5 bg-black/20 border-b border-white/5 relative shrink-0">
-                              {steps.map((st, i) => {
-                                const isDone = st.done;
-                                const isActive = st.active;
-                                const isBottleneck = st.dObj?.min > 60;
-                                return (
-                                  <React.Fragment key={st.id}>
-                                    <div className="relative z-10 flex flex-col items-center gap-1.5 shrink-0">
-                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                                        {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                            <div className="flex flex-col gap-y-2 px-6 py-6 bg-black/20 border-b border-white/5 relative shrink-0">
+                              {/* Row 1: Circles & Long Arrow Lines */}
+                              <div className="flex items-center justify-between w-full">
+                                {steps.map((st, i) => {
+                                  const isDone = st.done;
+                                  const isActive = st.active;
+                                  const isBottleneck = st.dObj?.min > 60;
+                                  return (
+                                    <React.Fragment key={`r1-${st.id}`}>
+                                      <div className="w-20 flex justify-center shrink-0">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                                          {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                                        </div>
                                       </div>
-                                      <span className={`text-[11px] font-black tracking-tight ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
-                                    </div>
-                                    {i < steps.length - 1 && (() => {
-                                      const nextStep = steps[i + 1];
-                                      const durationObj = nextStep.dObj;
-                                      const isNextStepDone = nextStep.done;
-                                      const isNextStepActive = nextStep.active;
-                                      const isArrowBottleneck = durationObj?.min > 60;
-                                      return (
-                                        <div className="flex-1 flex flex-col items-center justify-center px-2 min-w-[60px]">
-                                          <div className="w-full flex items-center relative h-8">
+                                      {i < steps.length - 1 && (() => {
+                                        const nextStep = steps[i + 1];
+                                        const durationObj = nextStep.dObj;
+                                        const isNextStepDone = nextStep.done;
+                                        const isNextStepActive = nextStep.active;
+                                        const isArrowBottleneck = durationObj?.min > 60;
+                                        return (
+                                          <div className="flex-1 flex items-center relative h-8 min-w-[60px] px-2">
                                             <div className={`h-[3px] w-full rounded transition-all ${isNextStepDone ? (isArrowBottleneck ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.4)]') : isNextStepActive ? 'bg-[#00e5ff]/40 animate-pulse' : 'bg-slate-800'}`} />
                                             <svg className={`w-3.5 h-3.5 absolute right-0 transition-all ${isNextStepDone ? (isArrowBottleneck ? 'text-orange-500' : 'text-[#00e5ff]') : isNextStepActive ? 'text-[#00e5ff] animate-pulse' : 'text-slate-800'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4.5" style={{ transform: 'translateX(2px)' }}>
                                               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                                             </svg>
                                           </div>
-                                          <div className="h-6 flex items-center justify-center mt-1">
+                                        );
+                                      })()}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Row 2: Step Labels */}
+                              <div className="flex items-center justify-between w-full">
+                                {steps.map((st, i) => {
+                                  const isDone = st.done;
+                                  const isActive = st.active;
+                                  const isBottleneck = st.dObj?.min > 60;
+                                  return (
+                                    <React.Fragment key={`r2-${st.id}`}>
+                                      <div className="w-20 text-center shrink-0">
+                                        <span className={`text-[11px] font-black tracking-tight whitespace-nowrap ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
+                                      </div>
+                                      {i < steps.length - 1 && (
+                                        <div className="flex-1 min-w-[60px] px-2" />
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Row 3: Elapsed Durations */}
+                              <div className="flex items-center justify-between w-full mt-1">
+                                {steps.map((st, i) => {
+                                  return (
+                                    <React.Fragment key={`r3-${st.id}`}>
+                                      <div className="w-20 shrink-0" />
+                                      {i < steps.length - 1 && (() => {
+                                        const nextStep = steps[i + 1];
+                                        const durationObj = nextStep.dObj;
+                                        const isArrowBottleneck = durationObj?.min > 60;
+                                        return (
+                                          <div className="flex-1 flex justify-center px-2 min-w-[60px]">
                                             {durationObj ? (
                                               <span className={`text-[11px] font-black px-2.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap ${isArrowBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.05)]'}`}>
                                                 {durationObj.text}
@@ -2292,12 +2329,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                               <span className="text-[10px] text-slate-600 font-mono">-</span>
                                             )}
                                           </div>
-                                        </div>
-                                      );
-                                    })()}
-                                  </React.Fragment>
-                                );
-                              })}
+                                        );
+                                      })()}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
                             </div>
 
                             {/* 애플워치 스타일 활동 링 (Activity Ring) */}
