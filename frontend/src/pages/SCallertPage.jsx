@@ -496,21 +496,16 @@ export default function SCallertPage() {
     if (type === 'fcm_webpush') {
       setPdsConfig(p => ({
         ...p,
-        api_url: 'https://fcm.googleapis.com/fcm/send',
+        api_url: `${API_BASE}/scallert/test-push`,
         api_method: 'POST',
         timeout_sec: 10
       }));
       setCfgHeaderRows([
-        { key: 'TTL', val: '60' },
-        { key: 'Urgency', val: 'high' },
-        { key: 'Authorization', val: 'vapid t=<JWT_TOKEN>, k=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' },
-        { key: 'Crypto-Key', val: 'p256ecdsa=BG_0lRtHOt0V6Q7cxfS9l6jIGFY3MIJHdKz4kdtQyR-WkVq61LE316pLJghlKKP_tpxW2dec1ZLS2aFYLhJbASY' }
+        { key: 'Content-Type', val: 'application/json' }
       ]);
       setCfgBodyText(JSON.stringify({
-        data: {
-          action: 'CALL',
-          phone_number: '01012345678'
-        }
+        target_user_id: "DEVICE_TOKEN",
+        phone_number: "01012345678"
       }, null, 2));
     } else if (type === 'standard_pds') {
       setPdsConfig(p => ({
@@ -1148,10 +1143,16 @@ export default function SCallertPage() {
         <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
           
-          <SectionHeader icon={Activity} title="Incident Call Tracking" sub="장애 ID별 발신 현황" color="#10b981">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Live Monitoring</span>
+          <SectionHeader icon={Activity} title="수신자 시뮬레이션" sub="수신자 모의 훈련 및 발신 현황" color="#10b981">
+            <div className="flex items-center gap-2">
+              <button className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-1.5 cursor-pointer active:scale-95">
+                <Play size={12} />
+                <span>시뮬레이션 시작</span>
+              </button>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hidden sm:flex">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Live Monitoring</span>
+              </div>
             </div>
           </SectionHeader>
 
