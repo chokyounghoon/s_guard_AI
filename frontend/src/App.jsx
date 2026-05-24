@@ -438,7 +438,7 @@ function AppContent() {
         <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OrbitalCommandPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AlertMonitorPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
-        <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SCallertPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SCallertPage /></ProtectedRoute>} />
         <Route path="/realtime-pipeline"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><RealtimePipelinePage /></ProtectedRoute>} />
       </Routes>
 
