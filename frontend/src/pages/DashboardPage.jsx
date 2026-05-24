@@ -2318,11 +2318,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                       {i < steps.length - 1 && (() => {
                                         const nextStep = steps[i + 1];
                                         const durationObj = nextStep.dObj;
-                                        const isArrowBottleneck = durationObj?.min > 60;
+                                        const isNextActive = nextStep.active;
+                                        const isNextDone = nextStep.done;
+                                        const isArrowBottleneck = isNextActive && durationObj?.min > 60;
                                         return (
                                           <div className="flex-1 flex justify-center px-2 min-w-[60px]">
                                             {durationObj ? (
-                                              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap ${isArrowBottleneck ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' : 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.05)]'}`}>
+                                              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap ${
+                                                isArrowBottleneck 
+                                                  ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' 
+                                                  : isNextActive 
+                                                    ? 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/50 animate-pulse'
+                                                    : isNextDone
+                                                      ? 'bg-[#00e5ff]/5 text-[#00e5ff]/80 border border-[#00e5ff]/20'
+                                                      : 'bg-slate-900/40 text-slate-600 border border-slate-800'
+                                              }`}>
                                                 {durationObj.text}
                                               </span>
                                             ) : (
