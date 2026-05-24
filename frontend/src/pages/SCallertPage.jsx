@@ -208,7 +208,8 @@ export default function SCallertPage() {
       const list = Array.isArray(data) ? data : [];
       setPushDevices(list);
       if (list.length > 0 && !selectedDeviceUid) {
-        setSelectedDeviceUid(list[0].user_id);
+        const defaultDevice = list.find(dev => dev.emp_nm === '조경훈') || list[0];
+        setSelectedDeviceUid(defaultDevice.user_id);
       }
     } catch (e) {
       console.error('Failed to fetch push devices:', e);
