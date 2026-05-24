@@ -2236,10 +2236,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         const isClosed = !!knwStep;
 
                         const steps = [
-                          { id: 'SMS', label: '인지', done: !!smsStep || !!ragStep || !!warStep || !!knwStep, active: false, dObj: null },
-                          { id: 'RAG', label: '분석', done: !!ragStep || !!warStep || !!knwStep, active: !!smsStep && !ragStep, dObj: diffObj(smsStep, ragStep) },
-                          { id: 'WARROOM', label: '워룸', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, dObj: diffObj(ragStep, warStep) },
-                          { id: 'KNOWLEDGE', label: '완료', done: !!knwStep, active: !!warStep && !knwStep, dObj: diffObj(warStep, knwStep) }
+                          { id: 'SMS', label: '문자수신', done: !!smsStep || !!ragStep || !!warStep || !!knwStep, active: false, dObj: null },
+                          { id: 'RAG', label: 'RAG분석완료', done: !!ragStep || !!warStep || !!knwStep, active: !!smsStep && !ragStep, dObj: diffObj(smsStep, ragStep) },
+                          { id: 'WARROOM', label: '담당자인지(워룸개설)', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, dObj: diffObj(ragStep, warStep) },
+                          { id: 'KNOWLEDGE', label: '처리완료(보고/지식화)', done: !!knwStep, active: !!warStep && !knwStep, dObj: diffObj(warStep, knwStep) }
                         ];
 
                         const radius = 70;

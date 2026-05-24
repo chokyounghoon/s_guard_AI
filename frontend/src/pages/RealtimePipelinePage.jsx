@@ -746,10 +746,10 @@ export default function RealtimePipelinePage() {
     const isClosed = stage >= 4;
 
     const steps = [
-      { id: 'SMS', label: '인지', done: stage >= 1, active: false, dObj: null },
-      { id: 'RAG', label: '분석', done: stage >= 2, active: stage === 1, dObj: diffObj(t1, t2) },
-      { id: 'WARROOM', label: '워룸', done: stage >= 3, active: stage === 2, dObj: diffObj(t2, t3) },
-      { id: 'KNOWLEDGE', label: '완료', done: stage >= 4, active: stage === 3, dObj: diffObj(t3, t4) }
+      { id: 'SMS', label: '문자수신', done: stage >= 1, active: false, dObj: null },
+      { id: 'RAG', label: 'RAG분석완료', done: stage >= 2, active: stage === 1, dObj: diffObj(t1, t2) },
+      { id: 'WARROOM', label: '담당자인지(워룸개설)', done: stage >= 3, active: stage === 2, dObj: diffObj(t2, t3) },
+      { id: 'KNOWLEDGE', label: '처리완료(보고/지식화)', done: stage >= 4, active: stage === 3, dObj: diffObj(t3, t4) }
     ];
 
     const radius = 70;
