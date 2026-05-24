@@ -670,7 +670,10 @@ export default function SCallertPage() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto max-w-5xl mx-auto w-full px-4 py-6 space-y-6 pb-24">
+      <main className="flex-1 overflow-y-auto w-full px-4 lg:px-6 2xl:px-8 py-6 pb-24 mx-auto max-w-[2000px]">
+  <div className="flex flex-col xl:flex-row gap-6 items-start">
+    {/* Left Column: Rule & PDS */}
+    <div className="w-full xl:w-7/12 flex flex-col gap-6">
 
         {/* ════════════════════════════════════════════
             1️⃣  RULE SETTING
@@ -863,94 +866,6 @@ export default function SCallertPage() {
               </div>
             )}
           </div>
-        </section>
-
-        {/* ════════════════════════════════════════════
-            2️⃣  INCIDENT CALL TRACKING (장애 ID 기반 발신 현황)
-        ════════════════════════════════════════════ */}
-        <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
-          
-          <SectionHeader icon={Activity} title="Incident Call Tracking" sub="장애 ID별 발신 현황" color="#10b981">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Live Monitoring</span>
-            </div>
-          </SectionHeader>
-
-          {histLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-600">
-              <Loader2 size={24} className="animate-spin opacity-20" />
-              <p className="text-[10px] font-black uppercase tracking-widest">Loading Event Logs...</p>
-            </div>
-          ) : hists.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 bg-black/20 rounded-2xl border border-dashed border-white/5">
-              <PhoneOff size={32} className="opacity-10 text-white" />
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">No Incident Traffic Recorded</p>
-            </div>
-          ) : (
-            <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-1 mt-4">
-              {/* 장애 ID별로 그룹화하여 렌더링 */}
-              {Object.entries(
-                hists.reduce((acc, h) => {
-                  const key = h.inc_id || h.igw_txn_id || 'UNKNOWN';
-                  if (!acc[key]) acc[key] = [];
-                  acc[key].push(h);
-                  return acc;
-                }, {})
-              ).map(([incId, logs]) => (
-                <div key={incId} className="bg-white/[0.02] rounded-3xl border border-white/5 overflow-hidden transition-all hover:border-white/10 shadow-lg">
-                  {/* 그룹 헤더: 장애 ID */}
-                  <div className="px-5 py-4 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-400 font-mono">
-                        ID: {incId}
-                      </div>
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Incident Event</span>
-                    </div>
-                    <div className="text-[9px] font-bold text-slate-600 font-mono">
-                      Total {logs.length} Calls
-                    </div>
-                  </div>
-
-                  {/* 그룹 내부: 대상자별 발신 이력 */}
-                  <div className="p-4 space-y-2">
-                    {logs.map((log) => (
-                      <div key={log.log_id} className="flex items-center gap-4 bg-black/20 rounded-2xl px-4 py-3 border border-white/[0.03] hover:bg-white/[0.01] transition-all">
-                        {/* 회차 */}
-                        <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                          <span className="text-[10px] font-black text-white font-mono">{log.attempt_seq}</span>
-                        </div>
-
-                        {/* 대상자 정보 */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-sm font-black text-slate-200">{log.emp_nm || log.emp_id}</span>
-                            <span className="text-[10px] font-bold text-slate-500 font-mono">{log.mobile_no || '-'}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600 uppercase tracking-tight">
-                            <Clock size={10} />
-                            <span>{log.call_dt?.replace('T', ' ').slice(0, 19)}</span>
-                          </div>
-                        </div>
-
-                        {/* PDS 결과 */}
-                        <div className="shrink-0 flex items-center gap-4">
-                          <div className="w-[1px] h-6 bg-white/5" />
-                          <PdsBadge code={log.pds_result_cd} />
-                          {log.pds_result_cd === 'SUCCESS' && (
-                            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
-                              <Check size={12} className="text-emerald-400" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         {/* ════════════════════════════════════════════
@@ -1222,7 +1137,99 @@ export default function SCallertPage() {
         </section>
         )}
 
-        {selectedSid && (
+    </div>
+
+    {/* Right Column: Incident Call & App Call Status */}
+    <div className="w-full xl:w-5/12 flex flex-col gap-6">
+      {/* ════════════════════════════════════════════
+            2️⃣  INCIDENT CALL TRACKING (장애 ID 기반 발신 현황)
+        ════════════════════════════════════════════ */}
+        <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
+          
+          <SectionHeader icon={Activity} title="Incident Call Tracking" sub="장애 ID별 발신 현황" color="#10b981">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Live Monitoring</span>
+            </div>
+          </SectionHeader>
+
+          {histLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-600">
+              <Loader2 size={24} className="animate-spin opacity-20" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Loading Event Logs...</p>
+            </div>
+          ) : hists.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 bg-black/20 rounded-2xl border border-dashed border-white/5">
+              <PhoneOff size={32} className="opacity-10 text-white" />
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">No Incident Traffic Recorded</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-1 mt-4">
+              {/* 장애 ID별로 그룹화하여 렌더링 */}
+              {Object.entries(
+                hists.reduce((acc, h) => {
+                  const key = h.inc_id || h.igw_txn_id || 'UNKNOWN';
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(h);
+                  return acc;
+                }, {})
+              ).map(([incId, logs]) => (
+                <div key={incId} className="bg-white/[0.02] rounded-3xl border border-white/5 overflow-hidden transition-all hover:border-white/10 shadow-lg">
+                  {/* 그룹 헤더: 장애 ID */}
+                  <div className="px-5 py-4 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-400 font-mono">
+                        ID: {incId}
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Incident Event</span>
+                    </div>
+                    <div className="text-[9px] font-bold text-slate-600 font-mono">
+                      Total {logs.length} Calls
+                    </div>
+                  </div>
+
+                  {/* 그룹 내부: 대상자별 발신 이력 */}
+                  <div className="p-4 space-y-2">
+                    {logs.map((log) => (
+                      <div key={log.log_id} className="flex items-center gap-4 bg-black/20 rounded-2xl px-4 py-3 border border-white/[0.03] hover:bg-white/[0.01] transition-all">
+                        {/* 회차 */}
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                          <span className="text-[10px] font-black text-white font-mono">{log.attempt_seq}</span>
+                        </div>
+
+                        {/* 대상자 정보 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-sm font-black text-slate-200">{log.emp_nm || log.emp_id}</span>
+                            <span className="text-[10px] font-bold text-slate-500 font-mono">{log.mobile_no || '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600 uppercase tracking-tight">
+                            <Clock size={10} />
+                            <span>{log.call_dt?.replace('T', ' ').slice(0, 19)}</span>
+                          </div>
+                        </div>
+
+                        {/* PDS 결과 */}
+                        <div className="shrink-0 flex items-center gap-4">
+                          <div className="w-[1px] h-6 bg-white/5" />
+                          <PdsBadge code={log.pds_result_cd} />
+                          {log.pds_result_cd === 'SUCCESS' && (
+                            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                              <Check size={12} className="text-emerald-400" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+                {selectedSid && (
         <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden mt-6">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
 
@@ -1405,6 +1412,8 @@ export default function SCallertPage() {
         </section>
         )}
 
+    </div>
+  </div>
       </main>
 
       {/* ── 전략 생성 모달 ──────────────────────────── */}
