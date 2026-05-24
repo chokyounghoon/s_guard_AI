@@ -406,18 +406,18 @@ export default function DeputyManagementPage() {
 
                 {/* 순서 조절 */}
                 <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                  <button disabled={index === 0} onClick={() => movePriority(index, -1)}
+                  <button disabled={index === 0} onClick={(e) => { e.stopPropagation(); movePriority(index, -1); }}
                     className="p-1.5 rounded-lg bg-white/5 hover:bg-blue-600/20 hover:text-blue-400 disabled:opacity-20 transition-all">
                     <ChevronUp className="w-3.5 h-3.5" />
                   </button>
-                  <button disabled={index === substitutes.length - 1} onClick={() => movePriority(index, 1)}
+                  <button disabled={index === substitutes.length - 1} onClick={(e) => { e.stopPropagation(); movePriority(index, 1); }}
                     className="p-1.5 rounded-lg bg-white/5 hover:bg-blue-600/20 hover:text-blue-400 disabled:opacity-20 transition-all">
                     <ChevronDown className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
                 {/* 삭제 */}
-                <button onClick={() => removeDeputy(item.id)}
+                <button onClick={(e) => { e.stopPropagation(); removeDeputy(item.id); }}
                   className="p-2.5 rounded-2xl text-red-500/25 hover:text-red-500 hover:bg-red-500/10 transition-all">
                   <Trash2 className="w-4.5 h-4.5" />
                 </button>
@@ -427,12 +427,12 @@ export default function DeputyManagementPage() {
         )}
       </main>
 
-      {/* ═══════════════════════ MODAL (Bottom Sheet) ═══════════════════════ */}
+      {/* ═══════════════════════ MODAL (Responsive: Bottom Sheet on Mobile, Popup on PC) ═══════════════════════ */}
       {showModal && (
-        <div className="fixed inset-0 z-[400] flex flex-col justify-end">
+        <div className="fixed inset-0 z-[400] flex flex-col justify-end lg:justify-center lg:items-center lg:p-6">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={closeModal} />
 
-          <div className="relative w-full bg-[#0d1117] rounded-t-[32px] border-t border-white/8 shadow-2xl flex flex-col"
+          <div className="relative w-full lg:max-w-3xl bg-[#0d1117] rounded-t-[32px] lg:rounded-[32px] border-t lg:border border-white/8 shadow-2xl flex flex-col"
             style={{ maxHeight: '90vh' }}>
 
             {/* Pull bar */}
