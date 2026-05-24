@@ -36,13 +36,13 @@ const CodeBlock = ({ children, className }) => {
 };
 
 const highlightString = (str) => {
-  const regex = /(\b\d+(?:\.\d+)?%|행원 권한 누락|권한 점검 프로세스 가동|오류율|급증|누락|실패|초과|지연|권한|장애|원인|오류|비정상|중단|불가|예외|버그|에러|정상|복구|점검|가동|해결|성공|안정|재시작)/g;
+  const regex = /(\b\d+(?:\.\d+)?%|행원 권한 누락|권한 점검 프로세스 가동|오류율|급증|누락|실패|초과|지연|권한|비정상|중단|불가|예외|버그|정상|복구|점검|가동|해결|성공|안정|재시작)/g;
   const parts = str.split(regex);
   return parts.map((part, index) => {
     if (/^\d+(?:\.\d+)?%$/.test(part)) {
       return <span key={index} className="font-mono font-black text-[#fb923c] px-1.5 py-0.5 bg-orange-500/15 border border-orange-500/30 rounded shadow-sm mx-0.5 inline-block">{part}</span>;
     }
-    if (/^(행원 권한 누락|오류율|급증|누락|실패|초과|지연|권한|장애|원인|오류|비정상|중단|불가|예외|버그|에러)$/.test(part)) {
+    if (/^(행원 권한 누락|오류율|급증|누락|실패|초과|지연|권한|비정상|중단|불가|예외|버그)$/.test(part)) {
       return <span key={index} className="font-black text-white underline decoration-amber-500 decoration-2 underline-offset-4 bg-amber-500/15 px-1.5 py-0.5 rounded border-b border-amber-500 mx-0.5 shadow-[0_0_10px_rgba(245,158,11,0.2)] inline-block">{part}</span>;
     }
     if (/^(권한 점검 프로세스 가동|정상|복구|점검|가동|해결|성공|안정|재시작)$/.test(part)) {
