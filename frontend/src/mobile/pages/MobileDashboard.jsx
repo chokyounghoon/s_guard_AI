@@ -685,21 +685,40 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     const assignmentInterval = isAnalyzingActive ? null : setInterval(fetchMyAssignments, 20000);
     const historyInterval = isAnalyzingActive ? null : setInterval(fetchUserActivityHistory, 30000);
 
-    // 🚀 NEW: Real-time SMS Stream (SSE) — use real JWT for query param auth
-    const token = getAccessToken();
-    const sse = new EventSource(`${apiBase}/sms/notification-stream${token ? `?token=${token}` : ''}`);
-    sse.addEventListener('new_sms', (event) => {
-      console.log('Real-time SMS Event:', event.data);
-      // Immediately pull fresh data when a new SMS notification arrives
-      fetchSMSMessages();
-    });
+    // 🚀 Real-time SMS Stream (SSE) — 지수 백오프 자동 재연결
+    let sseInstance = null;
+    let sseRetry = 0;
+    let sseRetryTimer = null;
 
-    sse.onerror = () => {
-       console.warn('SMS SSE Connection failed, falling back to polling.');
-       sse.close();
-       // Retry after 5 seconds to recover from transient network/worker issues
-       setTimeout(() => { fetchSMSMessages(); }, 5000);
+    const connectSSE = () => {
+      const sseToken = getAccessToken();
+      if (!sseToken) return;
+
+      if (sseInstance) { sseInstance.close(); sseInstance = null; }
+
+      const newSse = new EventSource(`${apiBase}/sms/notification-stream${sseToken ? `?token=${sseToken}` : ''}`);
+      sseInstance = newSse;
+
+      // ⚠️ 'new_sms' → 'sms_received' 수정 (서버가 sms_received로 전송)
+      newSse.addEventListener('sms_received', (event) => {
+        console.log('[MobileDashboard SSE] sms_received:', event.data);
+        sseRetry = 0;
+        fetchSMSMessages();
+      });
+
+      newSse.addEventListener('connected', () => { sseRetry = 0; });
+
+      newSse.onerror = () => {
+        console.warn('[MobileDashboard SSE] Connection failed, retrying...');
+        newSse.close();
+        sseInstance = null;
+        const delay = Math.min(1000 * Math.pow(2, sseRetry), 30000);
+        sseRetry += 1;
+        sseRetryTimer = setTimeout(connectSSE, delay);
+      };
     };
+
+    connectSSE();
 
     return () => {
       clearInterval(smsInterval);
@@ -707,7 +726,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       clearInterval(activityInterval);
       clearInterval(assignmentInterval);
       if (historyInterval) clearInterval(historyInterval);
-      sse.close();
+      clearTimeout(sseRetryTimer);
+      if (sseInstance) { sseInstance.close(); sseInstance = null; }
     };
   }, [userProfile, assignmentDateRange, hideCompletedSms, isAnalyzingActive]);
 

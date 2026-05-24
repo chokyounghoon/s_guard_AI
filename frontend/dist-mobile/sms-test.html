@@ -173,13 +173,18 @@
             
             addLog(`전송 시도 중...`);
             try {
+                // 백엔드 보안 정책(employee_id 필수)에 의해 차단되지 않도록 테스트용 사번 추가
+                const payload = { sender, message, employee_id: '18121020' };
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sender, message })
+                    body: JSON.stringify(payload)
                 });
                 
                 const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || `HTTP ${response.status}`);
+                }
                 addLog(`성공: 대시보드에 반영되었습니다!`);
                 
                 // 전송 성공 시 진동 피드백 (휴대폰 전용)

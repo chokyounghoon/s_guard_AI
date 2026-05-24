@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
@@ -7,7 +7,7 @@ import {
   ChevronDown, Zap, Clock, AlertCircle,
   CheckCircle2, PhoneOff, PhoneMissed, Loader2,
   Settings, Play, Terminal, Globe, Key, Timer,
-  ChevronUp, Copy, CheckCheck, Smartphone
+  ChevronUp, Copy, CheckCheck, Smartphone, Repeat
 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
 import { SMS_WORKER_URL } from '../config/api';
@@ -19,18 +19,27 @@ const STRATEGY_CONT_OPTIONS = [
   { id: '1', label: '메시지 수신자별 순차 통화' },
   { id: '2', label: '메시지 수신자 및 AA, 파트장' },
   { id: '3', label: '메시지 수신자의 파트 전원' },
+  { id: '4', label: '대직자 발신' },
 ];
 
 // ─── PDS 결과 코드 배지 ────────────────────────────────────────
 function PdsBadge({ code }) {
   const map = {
-    SUCCESS:  { label: '성공',   cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-    FAIL:     { label: '실패',   cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
-    BUSY:     { label: '통화중', cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
-    NOANSWER: { label: '무응답', cls: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
-    PENDING:  { label: '대기',   cls: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+    SUCCESS:        { label: '성공',     cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+    FAIL:           { label: '실패',     cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+    BUSY:           { label: '통화중',   cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
+    NOANSWER:       { label: '무응답',   cls: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
+    PENDING:        { label: '대기',     cls: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+    DIALING:        { label: '발신시작', cls: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' },
+    RINGING:        { label: '신호송출', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+    CONNECTED:      { label: '걸기중',   cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+    DISCONNECTED:   { label: '통화종료', cls: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' },
+    FAIL_VOICEMAIL: { label: '소리샘종료', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
+    MISSED:         { label: '부재중',   cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+    FAILED:         { label: '발신실패', cls: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
   };
-  const { label, cls } = map[code] || { label: code || '-', cls: 'bg-white/5 text-slate-500 border-white/10' };
+  const upperCode = (code || '').toUpperCase();
+  const { label, cls } = map[upperCode] || { label: code || '-', cls: 'bg-white/5 text-slate-500 border-white/10' };
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider ${cls}`}>
       {label}
@@ -86,14 +95,37 @@ export default function SCallertPage() {
     strategy_cont: '1',
     apply_start_dt: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
     apply_end_dt: '2099-12-31T23:59',
+    priority: 99,
+    delay_sec: 0,
+    valid_conditions: [],
     max_call_cnt: 3,
   });
 
   // ── 담당자 목록 ─────────────────────────────────
   const [targets, setTargets]             = useState([]);
+  const [mySubstitutes, setMySubstitutes] = useState([]);
   const [tgtLoading, setTgtLoading]       = useState(false);
   const [editRow, setEditRow]             = useState(null);   // { idx, ...fields }
   const [addRow, setAddRow]               = useState(null);   // { emp_id, emp_nm, mobile_no }
+  const [userPhones, setUserPhones]       = useState({});
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/users`, { headers: getAuthHeaders() });
+      if (r.ok) {
+        const list = await r.json();
+        const phoneMap = {};
+        list.forEach(u => {
+          if (u.employee_id && u.phone) {
+            phoneMap[String(u.employee_id).trim()] = u.phone;
+          }
+        });
+        setUserPhones(phoneMap);
+      }
+    } catch (e) {
+      console.error('Failed to fetch users for phone mapping:', e);
+    }
+  }, []);
 
   // ── 발신 이력 ────────────────────────────────────
   const [hists, setHists]                 = useState([]);
@@ -106,17 +138,25 @@ export default function SCallertPage() {
       const r = await fetch(`${API_BASE}/scallert/strategies`, { headers: getAuthHeaders() });
       if (!r.ok) return null;
       const data = await r.json();
-      const list = (data.strategies || data || []).map(s => ({
-        ...s,
-        // 소문자 정규화 (DB는 대문자 컴럼명)
-        strategy_id:   s.strategy_id   || s.STRATEGY_ID,
-        strategy_nm:   s.strategy_nm   || s.STRATEGY_NM,
-        strategy_cont: s.strategy_cont || s.STRATEGY_CONT,
-        apply_start_dt: s.apply_start_dt || s.APPLY_START_DT,
-        apply_end_dt:   s.apply_end_dt   || s.APPLY_END_DT,
-        max_call_cnt:   s.max_call_cnt   || s.MAX_CALL_CNT,
-        use_yn:         s.use_yn         || s.USE_YN,
-      }));
+      const list = (data.strategies || data || []).map(s => {
+        const priorityVal = s.priority !== undefined ? s.priority : (s.PRIORITY !== undefined ? s.PRIORITY : 99);
+        const delayVal = s.delay_sec !== undefined ? s.delay_sec : (s.DELAY_SEC !== undefined ? s.DELAY_SEC : 0);
+        let validConds = s.valid_conditions || s.VALID_CONDITIONS || '[]';
+        return {
+          ...s,
+          // 소문자 정규화 (DB는 대문자 컴럼명)
+          strategy_id:   s.strategy_id   || s.STRATEGY_ID,
+          strategy_nm:   s.strategy_nm   || s.STRATEGY_NM,
+          strategy_cont: s.strategy_cont || s.STRATEGY_CONT,
+          apply_start_dt: s.apply_start_dt || s.APPLY_START_DT,
+          apply_end_dt:   s.apply_end_dt   || s.APPLY_END_DT,
+          max_call_cnt:   s.max_call_cnt   || s.MAX_CALL_CNT,
+          use_yn:         s.use_yn         || s.USE_YN,
+          priority:       Number(priorityVal),
+          delay_sec:      Number(delayVal),
+          valid_conditions: validConds,
+        };
+      });
       setStrategies(list);
       return list;
     } catch (e) { console.error(e); return null; }
@@ -165,11 +205,112 @@ export default function SCallertPage() {
   const [appEventsLoading, setAppEventsLoading] = useState(false);
   const [autoRefreshEvents, setAutoRefreshEvents] = useState(true);
   const [testPhoneNumber, setTestPhoneNumber] = useState('01012345678');
-  // Mock Webhook 발송용 임시 state
   const [mockEmpId, setMockEmpId]         = useState('12345');
   const [mockPhone, setMockPhone]         = useState('01012345678');
   const [mockSending, setMockSending]     = useState(false);
+  const [mockConnectedTime, setMockConnectedTime] = useState(null);
+  const [mockElapsed, setMockElapsed]     = useState(0);
+  const [mockResultText, setMockResultText] = useState('');
   const [filterCurrentTargets, setFilterCurrentTargets] = useState(false);
+
+  // 전역 푸시 연동을 위해 localStorage에 상태 동기화
+  useEffect(() => {
+    if (testPhoneNumber) localStorage.setItem('scallert_test_phone', testPhoneNumber);
+  }, [testPhoneNumber]);
+
+  useEffect(() => {
+    if (selectedDeviceUid) localStorage.setItem('scallert_test_device', selectedDeviceUid);
+  }, [selectedDeviceUid]);
+
+  const [ticker, setTicker] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTicker(t => t + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getLatestCallStatus = () => {
+    const cleanTestPhone = testPhoneNumber.replace(/[^0-9]/g, '');
+    const cleanMockPhone = mockPhone.replace(/[^0-9]/g, '');
+    if (!cleanTestPhone && !cleanMockPhone) return null;
+
+    const filtered = appEvents
+      .filter(evt => {
+        const cleanEvtPhone = (evt.PHONE_NUMBER || '').replace(/[^0-9]/g, '');
+        return (cleanTestPhone && cleanEvtPhone === cleanTestPhone) || (cleanMockPhone && cleanEvtPhone === cleanMockPhone);
+      })
+      .sort((a, b) => {
+        const tsA = a.TIMESTAMP || new Date(a.REG_DT || 0).getTime() || 0;
+        const tsB = b.TIMESTAMP || new Date(b.REG_DT || 0).getTime() || 0;
+        return tsB - tsA;
+      });
+
+    if (filtered.length === 0) return null;
+
+    const latest = filtered[0];
+    const latestType = (latest.EVENT_TYPE || '').toUpperCase();
+    const latestTs = latest.TIMESTAMP || new Date(latest.REG_DT || 0).getTime() || Date.now();
+
+    if (latestType === 'CONNECTED') {
+      const elapsed = Math.max(0, Math.floor((Date.now() - latestTs) / 1000));
+      return {
+        status: 'CONNECTED',
+        text: `🟢 걸기중 (${elapsed}초 경과)`,
+        isSuccess: null
+      };
+    }
+    if (latestType === 'DIALING' || latestType === 'RINGING') {
+      return {
+        status: latestType,
+        text: `⚡ ${latestType === 'DIALING' ? '발신 시작' : '신호 송출 중'}`,
+        isSuccess: null
+      };
+    }
+
+    if (latestType === 'DISCONNECTED') {
+      const connectedEvt = filtered.find(evt => {
+        const type = (evt.EVENT_TYPE || '').toUpperCase();
+        const ts = evt.TIMESTAMP || new Date(evt.REG_DT || 0).getTime() || 0;
+        return type === 'CONNECTED' && ts < latestTs;
+      });
+      if (connectedEvt) {
+        const connTs = connectedEvt.TIMESTAMP || new Date(connectedEvt.REG_DT || 0).getTime();
+        const duration = Math.max(0, Math.floor((latestTs - connTs) / 1000));
+        const isSuccess = duration > 0 && duration <= 50;
+        return {
+          status: 'DISCONNECTED',
+          text: isSuccess ? `✅ 통화 성공 (${duration}초)` : `❌ 통화 실패 (${duration}초 - 50초 초과)`,
+          isSuccess
+        };
+      } else {
+        return {
+          status: 'DISCONNECTED',
+          text: `ℹ️ 통화 종료`,
+          isSuccess: false
+        };
+      }
+    }
+
+    if (latestType === 'MISSED') {
+      return {
+        status: 'MISSED',
+        text: `❌ 부재중 (통화 실패)`,
+        isSuccess: false
+      };
+    }
+
+    if (latestType === 'FAILED') {
+      return {
+        status: 'FAILED',
+        text: `❌ 발신 실패`,
+        isSuccess: false
+      };
+    }
+
+    return null;
+  };
+
 
   // ── 등록 기기 정보 관련 ────────────────────────
   const [pushDevices, setPushDevices]     = useState([]);
@@ -219,12 +360,37 @@ export default function SCallertPage() {
   const handleSendMockEvent = async (type) => {
     setMockSending(true);
     try {
+      const nowTs = Date.now();
+      const target = activeTargets.length > 0 ? activeTargets[0] : null;
+      const useEmpId = target ? (target.emp_id || target.EMP_ID) : '12345';
+      const usePhone = target ? (target.mobile_no || target.MOBILE_NO) : '01012345678';
+      
       const payload = {
-        employee_id: mockEmpId,
-        phone_number: mockPhone,
+        employee_id: useEmpId,
+        phone_number: usePhone,
         event_type: type,
-        timestamp: Date.now()
+        timestamp: nowTs
       };
+      
+      if (type === 'CONNECTED') {
+        setMockConnectedTime(nowTs);
+        setMockResultText('');
+      } else if (type === 'DISCONNECTED') {
+        if (mockConnectedTime) {
+          const elapsed = Math.floor((nowTs - mockConnectedTime) / 1000);
+          if (elapsed > 0 && elapsed <= 50) {
+            setMockResultText(`✅ ${elapsed}초 (50초 이내: 통화 성공)`);
+          } else {
+            setMockResultText(`❌ ${elapsed}초 (50초 초과: 통화 실패)`);
+          }
+          setMockConnectedTime(null);
+        } else {
+          setMockResultText('⚠️ 연결(CONNECTED) 기록 없음');
+        }
+      } else {
+        setMockResultText('');
+      }
+
       const r = await fetch(`${API_BASE}/call/event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -232,6 +398,9 @@ export default function SCallertPage() {
       });
       if (r.ok) {
         await fetchAppEvents();
+        setTimeout(() => {
+          if (selectedSid) fetchHists(selectedSid);
+        }, 1000);
       } else {
         alert('Mock Webhook 발송 실패');
       }
@@ -241,6 +410,17 @@ export default function SCallertPage() {
       setMockSending(false);
     }
   };
+
+  useEffect(() => {
+    if (!mockConnectedTime) {
+      setMockElapsed(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setMockElapsed(Math.floor((Date.now() - mockConnectedTime) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [mockConnectedTime]);
 
   useEffect(() => {
     fetchAppEvents();
@@ -354,19 +534,59 @@ export default function SCallertPage() {
     } catch {}
   }, []);
 
-  // ── 초기 로드: 화면 진입 시 첣 번째 전략 자동 선택 ───────────
+  const fetchMySubstitutes = useCallback(async (userId) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`${API_BASE}/rbac/substitutes/${userId}`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setMySubstitutes(data.substitutes || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch substitutes:', e);
+    }
+  }, []);
+
   useEffect(() => {
+    if (userProfile?.employee_id) {
+      fetchMySubstitutes(userProfile.employee_id);
+    }
+  }, [userProfile?.employee_id, fetchMySubstitutes]);
+
+  // ── 초기 로드: 화면 진입 시 첫 번째 전략 자동 선택 및 스크롤 허용 ───────────
+  useEffect(() => {
+    // SCallertPage 진입 시 body overflow를 auto로 설정하여 전체 스크롤 활성화
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.overflow = 'auto';
+
+    fetchUsers();
     fetchStrategies().then(list => {
       if (list && list.length > 0 && !selectedSid) {
         setSelectedSid(list[0].strategy_id);
       }
     });
+
+    return () => {
+      // 페이지를 떠날 때 원래대로 복구
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    };
   }, []);
 
   useEffect(() => {
     if (!selectedSid) return;
     const s = strategies.find(s => s.strategy_id === selectedSid);
-    if (s) setRuleForm({ ...s });
+    if (s) {
+      let parsedConds = [];
+      try {
+        parsedConds = typeof s.valid_conditions === 'string'
+          ? JSON.parse(s.valid_conditions)
+          : (Array.isArray(s.valid_conditions) ? s.valid_conditions : []);
+      } catch (e) {
+        console.error('Failed to parse valid_conditions:', e);
+      }
+      setRuleForm({ ...s, valid_conditions: parsedConds });
+    }
     setRuleEditing(false);
     fetchTargets(selectedSid);
     fetchHists(selectedSid);
@@ -377,7 +597,7 @@ export default function SCallertPage() {
     clearInterval(pollRef.current);
     pollRef.current = setInterval(() => fetchHists(selectedSid), 30000);
     return () => clearInterval(pollRef.current);
-  }, [selectedSid, strategies.length]);
+  }, [selectedSid, strategies]);
 
   // ── Rule Save ────────────────────────────────────
   const handleRuleSave = async () => {
@@ -390,6 +610,9 @@ export default function SCallertPage() {
         body: JSON.stringify({
           strategy_nm:    ruleForm.strategy_nm,
           strategy_cont:  ruleForm.strategy_cont,
+          priority:       Number(ruleForm.priority ?? 99),
+          delay_sec:      Number(ruleForm.delay_sec ?? 0),
+          valid_conditions: Array.isArray(ruleForm.valid_conditions) ? ruleForm.valid_conditions : [],
           apply_start_dt: ruleForm.apply_start_dt,
           apply_end_dt:   ruleForm.apply_end_dt,
           max_call_cnt:   Number(ruleForm.max_call_cnt),
@@ -476,6 +699,56 @@ export default function SCallertPage() {
         fetchTargets(selectedSid);
       } else alert('저장에 실패했습니다.');
     } catch (e) { console.error(e); }
+  };
+
+  const handleStartSimulation = async () => {
+    if (!selectedSid) {
+      alert('전략이 선택되지 않았습니다.');
+      return;
+    }
+    
+    if (activeTargets.length === 0) {
+      alert('적용할 대상자가 없습니다.');
+      return;
+    }
+    
+    if (!window.confirm('현재 표시된 발신 대상자 명단을 수신 대상(TB_SCL_TARGET_INFO)으로 덮어쓰기/적용 하시겠습니까?')) return;
+    
+    try {
+      // 1. Delete all existing targets for this strategy
+      for (const t of targets) {
+        if (t.seq_no || t.SEQ_NO) {
+          await fetch(`${API_BASE}/scallert/targets/${t.seq_no || t.SEQ_NO}`, {
+            method: 'DELETE', headers: getAuthHeaders(),
+          });
+        }
+      }
+      
+      // 2. Insert new targets from activeTargets
+      for (const [idx, t] of activeTargets.entries()) {
+        const emp_id = String(t.emp_id || t.EMP_ID).trim();
+        const emp_nm = String(t.emp_nm || t.EMP_NM).trim();
+        const mobile_no = String(t.mobile_no || t.MOBILE_NO).trim();
+        
+        await fetch(`${API_BASE}/scallert/strategies/${selectedSid}/targets`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ 
+            emp_id, 
+            emp_nm, 
+            mobile_no, 
+            sort_ord: idx + 1,
+            mod_id: userProfile?.employee_id || 'SYSTEM' 
+          }),
+        });
+      }
+      
+      alert('대상자 목록 덮어쓰기가 완료되었습니다.');
+      fetchTargets(selectedSid);
+    } catch (e) {
+      console.error(e);
+      alert('오류가 발생했습니다.');
+    }
   };
 
   const handleTargetDelete = async (seq_no) => {
@@ -575,6 +848,25 @@ export default function SCallertPage() {
     finally { setTestLoading(false); }
   };
 
+  const handleCallTarget = async (item) => {
+    if (!selectedSid) return;
+    try {
+      const r = await fetch(`${API_BASE}/scallert/strategies/${selectedSid}/call-target`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ emp_id: item.emp_id || item.EMP_ID })
+      });
+      const data = await r.json();
+      if (data.success) {
+        fetchHists(selectedSid);
+      } else {
+        alert('발신 실패: ' + (data.error || '알 수 없는 오류'));
+      }
+    } catch (e) {
+      alert('오류: ' + e.message);
+    }
+  };
+
   const handlePushTestCall = async () => {
     if (!selectedDeviceUid) {
       alert('발신할 기기(사번)를 선택해주세요.');
@@ -606,10 +898,126 @@ export default function SCallertPage() {
     }
   };
 
+
+  const handleToggleStrategy = async (s) => {
+    const newStatus = s.use_yn === 'Y' ? 'N' : 'Y';
+    try {
+      const r = await fetch(`${API_BASE}/scallert/strategies/${s.strategy_id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ use_yn: newStatus, mod_id: userProfile?.employee_id || 'SYSTEM' })
+      });
+      if (r.ok) {
+        fetchStrategies(selectedSid);
+        if (s.strategy_id === selectedSid && ruleForm)
+          setRuleForm(prev => ({ ...prev, use_yn: newStatus }));
+      }
+    } catch (e) { console.error(e); alert('상태 변경 실패'); }
+  };
+  const [nowTime, setNowTime] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTime(new Date());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const activeTargets = useMemo(() => {
+    const isSub = ruleForm?.strategy_cont === '4';
+    if (isSub) {
+      return mySubstitutes.map((sub, index) => {
+        const phoneFromUsers = userPhones[String(sub.deputy_id).trim()];
+        return {
+          seq_no: sub.id,
+          emp_id: sub.deputy_id,
+          emp_nm: sub.deputy_name,
+          mobile_no: (phoneFromUsers && phoneFromUsers !== '010-0000-0000') ? phoneFromUsers : (sub.deputy_phone || '010-0000-0000'),
+          sort_ord: index + 1
+        };
+      });
+    }
+    return targets.map(t => {
+      const empId = String(t.EMP_ID || t.emp_id || '').trim();
+      const phoneFromUsers = userPhones[empId];
+      return {
+        ...t,
+        emp_id: empId,
+        emp_nm: t.EMP_NM || t.emp_nm,
+        mobile_no: (phoneFromUsers && phoneFromUsers !== '010-0000-0000') ? phoneFromUsers : (t.MOBILE_NO || t.mobile_no || '010-0000-0000')
+      };
+    });
+  }, [ruleForm?.strategy_cont, mySubstitutes, targets, userPhones]);
+
+  const isSubstituteType = ruleForm?.strategy_cont === '4';
+
+  const strategyStatus = useMemo(() => {
+    if (!ruleForm) return { active: false, reason: '선택된 전략 없음' };
+    if (ruleForm.use_yn !== 'Y') return { active: false, reason: '사용 중지됨' };
+
+    const start = ruleForm.apply_start_dt ? new Date(ruleForm.apply_start_dt) : null;
+    const end = ruleForm.apply_end_dt ? new Date(ruleForm.apply_end_dt) : null;
+
+    if (start && nowTime < start) return { active: false, reason: '적용 대기 (시작일 미도달)' };
+    if (end && nowTime > end) return { active: false, reason: '적용 만료 (종료일 경과)' };
+
+    const conds = ruleForm.valid_conditions || [];
+    if (conds.length === 0) return { active: true, reason: '상시 적용 (조건 없음)' };
+
+    const day = nowTime.getDay(); // 0: 일요일, 6: 토요일
+    const hour = nowTime.getHours();
+    const isWeekend = (day === 0 || day === 6);
+    const isDaytime = (hour >= 9 && hour < 18);
+
+    const hasDaytime = conds.includes('DAYTIME');
+    const hasWeekend = conds.includes('WEEKEND');
+    const hasNight18 = conds.includes('NIGHT_18');
+    const hasNight19 = conds.includes('NIGHT_19');
+    const hasNight20 = conds.includes('NIGHT_20');
+
+    let matched = false;
+    let matchReasons = [];
+
+    if (hasDaytime && isDaytime && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 주간');
+    }
+    if (hasWeekend && isWeekend) {
+      matched = true;
+      matchReasons.push('주말');
+    }
+    if (hasNight18 && (hour >= 18 || hour < 9) && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 야간(18시이후)');
+    }
+    if (hasNight19 && (hour >= 19 || hour < 9) && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 야간(19시이후)');
+    }
+    if (hasNight20 && (hour >= 20 || hour < 9) && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 야간(20시이후)');
+    }
+
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const timeStr = `${dayNames[day]}요일 ${hour}시`;
+
+    if (matched) {
+      return { active: true, reason: `적용 중 (${matchReasons.join(', ')})` };
+    } else {
+      let failReason = '적용 시간 아님';
+      if (isWeekend && !hasWeekend) {
+        failReason = `주말 조건 미선택 (${timeStr})`;
+      } else {
+        failReason = `조건 미충족 (${timeStr})`;
+      }
+      return { active: false, reason: failReason };
+    }
+  }, [ruleForm, nowTime]);
+
   return (
     <div
-      className="text-white font-sans flex flex-col overflow-hidden"
-      style={{ background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)', height: '100dvh' }}
+      className="text-white font-sans flex flex-col min-h-screen"
+      style={{ background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' }}
     >
       {/* 배경 그로우 */}
       <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-orange-600/5 blur-[160px] rounded-full -z-10 pointer-events-none" />
@@ -617,64 +1025,91 @@ export default function SCallertPage() {
 
       {/* ── 헤더 ───────────────────────────────────── */}
       <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{ background: 'rgba(4,7,15,0.94)', borderColor: 'rgba(251,146,60,0.15)' }}>
-        <div className="w-full max-w-[2000px] mx-auto px-4 lg:px-6 2xl:px-8 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              onClick={() => goBack()}
-              style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
-            >
-              <ArrowLeft className="w-4 h-4 text-slate-400" />
-            </button>
-            <div className="shrink-0">
-              <div className="flex items-center gap-2">
-                <Phone size={14} color="#fb923c" />
-                <h1 className="text-base font-black tracking-tight whitespace-nowrap" style={{ background:'linear-gradient(90deg,#f1f5f9,#fb923c)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
-                  S-callert
-                </h1>
-              </div>
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color:'rgba(251,146,60,0.6)' }}>
-                PDS 자동호출관리
-              </p>
+        <div className="w-full max-w-[2000px] mx-auto px-4 lg:px-6 2xl:px-8 py-3 flex items-center gap-3">
+          <button
+            onClick={() => goBack()}
+            style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-400" />
+          </button>
+          <div className="shrink-0">
+            <div className="flex items-center gap-2">
+              <Phone size={14} color="#fb923c" />
+              <h1 className="text-base font-black tracking-tight whitespace-nowrap" style={{ background:'linear-gradient(90deg,#f1f5f9,#fb923c)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
+                S-callert
+              </h1>
             </div>
-          </div>
-          {/* 전략 선택기 및 추가 버튼 */}
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <select
-                value={selectedSid}
-                onChange={e => setSelectedSid(e.target.value)}
-                className="appearance-none bg-[#0f1420] border border-orange-500/20 text-orange-300 text-xs font-black rounded-xl px-3 py-2.5 pr-7 focus:outline-none focus:border-orange-500/50 cursor-pointer shadow-[0_0_15px_rgba(251,146,60,0.05)] max-w-[130px] truncate"
-              >
-                {strategies.length === 0
-                  ? <option value="">전략 없음</option>
-                  : strategies.map(s => (
-                      <option key={s.strategy_id} value={s.strategy_id}>{s.strategy_nm}</option>
-                    ))
-                }
-              </select>
-              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-orange-400 pointer-events-none" />
-            </div>
-            
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="w-[38px] h-[38px] rounded-xl flex items-center justify-center bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-black transition-all shadow-[0_0_15px_rgba(251,146,60,0.1)] active:scale-95"
-              title="새 전략 추가"
-            >
-              <Plus size={18} />
-            </button>
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color:'rgba(251,146,60,0.6)' }}>
+              PDS 자동호출관리
+            </p>
           </div>
         </div>
       </header>
+      <main className="w-full px-4 lg:px-6 2xl:px-8 py-6 mx-auto max-w-[2000px]">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
 
-      <main className="flex-1 overflow-y-auto w-full px-4 lg:px-6 2xl:px-8 py-6 pb-24 mx-auto max-w-[2000px]">
-  <div className="flex flex-col xl:flex-row gap-6 items-start">
-    {/* Left Column: Rule & PDS */}
-    <div className="w-full xl:w-7/12 flex flex-col gap-6">
 
-        {/* ════════════════════════════════════════════
-            1️⃣  RULE SETTING
-        ════════════════════════════════════════════ */}
-        <section className={`relative group transition-all duration-500 rounded-[2rem] overflow-hidden border ${ruleEditing ? 'border-orange-500/40 bg-orange-500/5 shadow-[0_0_40px_rgba(251,146,60,0.1)]' : 'border-white/5 bg-[#0c1020]/60'} backdrop-blur-xl`}>
+          {/* ── Left Column: Strategy List ── */}
+          <div className="xl:col-span-3 xl:sticky xl:top-[80px] flex flex-col gap-6">
+            <section className="flex flex-col bg-[#0c1020]/60 border border-white/5 rounded-[2rem] overflow-hidden backdrop-blur-xl">
+              <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-orange-400" />
+                  <h2 className="text-sm font-black text-white tracking-tight">전략 목록</h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400">{strategies.length}건</span>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-black transition-all active:scale-95"
+                  title="새 전략 추가"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+              <div className="p-3 overflow-y-auto flex-1 space-y-2 custom-scrollbar pb-20">
+                {strategies.length === 0 ? (
+                  <p className="text-center text-slate-500 text-xs py-10 font-bold">등록된 전략이 없습니다.</p>
+                ) : (
+                  strategies.map(s => (
+                    <div
+                      key={s.strategy_id}
+                      onClick={() => setSelectedSid(s.strategy_id)}
+                      className={`cursor-pointer rounded-2xl p-4 border transition-all ${
+                        selectedSid === s.strategy_id
+                          ? 'bg-orange-500/10 border-orange-500/40 shadow-[0_0_15px_rgba(251,146,60,0.1)]'
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3 gap-2">
+                        <span className={`text-sm font-black break-words leading-tight ${selectedSid === s.strategy_id ? 'text-orange-300' : 'text-slate-300'}`}>
+                          {s.strategy_nm}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleToggleStrategy(s); }}
+                          className={`shrink-0 w-[38px] h-[20px] rounded-full relative transition-colors ${s.use_yn === 'Y' ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                        >
+                          <div
+                            className={`w-[16px] h-[16px] rounded-full bg-white absolute top-[2px] transition-all ${s.use_yn === 'Y' ? 'left-[20px]' : 'left-[2px]'}`}
+                            style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
+                          />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 text-slate-400">순위: {s.priority ?? 99}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${s.use_yn === 'Y' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-slate-500'}`}>
+                          {s.use_yn === 'Y' ? '가동중' : '중지'}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* ── Center Column: Rule Setting + App Events ── */}
+          <div className="xl:col-span-5 flex flex-col gap-6 pb-20">
+            <section className={`relative group transition-all duration-500 rounded-[2rem] overflow-hidden border ${ruleEditing ? 'border-orange-500/40 bg-orange-500/5 shadow-[0_0_40px_rgba(251,146,60,0.1)]' : 'border-white/5 bg-[#0c1020]/60'} backdrop-blur-xl`}>
           <div className="absolute inset-0 bg-gradient-to-br from-orange-600/[0.03] to-transparent pointer-events-none" />
           
           <div className="p-6 relative z-10">
@@ -760,28 +1195,67 @@ export default function SCallertPage() {
                   )}
                 </div>
 
-                {/* 발신 횟수 */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Activity size={10} className="text-amber-500/60" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">최대 발신</p>
+                {/* 우선순위, 발동 대기(지연), 최대 반복 횟수 */}
+                <div className="md:col-span-5 grid grid-cols-3 gap-4">
+                  {/* 우선순위 */}
+                  <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <Settings className="w-4 h-4" />
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest">우선순위 (Priority)</h4>
+                    </div>
+                    {ruleEditing ? (
+                      <select
+                        value={ruleForm.priority ?? 99}
+                        onChange={e => setRuleForm({ ...ruleForm, priority: e.target.value })}
+                        className="w-full bg-[#070b14] border border-orange-500/20 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
+                      >
+                        {Array.from({ length: 99 }, (_, i) => i + 1).map(n => (
+                          <option key={n} value={n}>{n} 순위</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-sm font-black text-white font-mono">{ruleForm.priority ?? 99} 순위</span>
+                    )}
                   </div>
-                  {ruleEditing ? (
-                    <div className="flex items-center gap-2">
+
+                  {/* 발동 대기 (지연 타이머) */}
+                  <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                    <div className="flex items-center gap-2 text-blue-400">
+                      <Clock className="w-4 h-4" />
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest">발동 대기 (초)</h4>
+                    </div>
+                    {ruleEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        max="600"
+                        step="5"
+                        value={ruleForm.delay_sec ?? 0}
+                        onChange={e => setRuleForm({ ...ruleForm, delay_sec: e.target.value })}
+                        className="w-full bg-[#070b14] border border-blue-500/20 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      />
+                    ) : (
+                      <span className="text-sm font-black text-white font-mono">{ruleForm.delay_sec ?? 0} 초</span>
+                    )}
+                  </div>
+
+                  {/* 최대 반복 횟수 */}
+                  <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <Repeat className="w-4 h-4" />
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest">최대 반복 횟수</h4>
+                    </div>
+                    {ruleEditing ? (
                       <input
                         type="number"
                         value={ruleForm.max_call_cnt || ''}
                         onChange={e => setRuleForm(p => ({ ...p, max_call_cnt: e.target.value }))}
-                        className="w-full bg-[#0a0e1a]/80 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-400 font-black focus:outline-none focus:border-amber-500/60 transition-all font-mono"
+                        className="w-full bg-[#0a0e1a]/80 border border-amber-500/20 rounded-xl px-3 py-2 text-sm text-amber-400 font-black focus:outline-none focus:border-amber-500/60 transition-all font-mono"
                       />
-                      <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">회</span>
-                    </div>
-                  ) : (
-                    <div className="px-4 py-3 rounded-xl bg-amber-500/5 border border-amber-500/10 flex items-center justify-between">
-                      <span className="text-sm font-black text-amber-400 font-mono">{ruleForm.max_call_cnt}</span>
-                      <span className="text-[10px] font-bold text-amber-500/40 uppercase">Times</span>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-sm font-black text-amber-400 font-mono">{ruleForm.max_call_cnt} 회</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* 기간 설정 (Date Range) */}
@@ -814,6 +1288,48 @@ export default function SCallertPage() {
                         <span>{ruleForm.apply_end_dt?.replace('T', ' ') || '∞'}</span>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* PDS 발신 유효 조건 (Valid Conditions) */}
+                <div className="md:col-span-5 space-y-2 mt-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 size={10} className="text-emerald-500/60" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">PDS 발신 유효 조건 (다중 선택)</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {[
+                      { id: 'DAYTIME', label: '주간 발신 허용 (09시~18시)' },
+                      { id: 'WEEKEND', label: '주말(토/일) 발신 허용' },
+                      { id: 'NIGHT_18', label: '야간 발신 허용 (18시 이후)' },
+                      { id: 'NIGHT_19', label: '야간 발신 허용 (19시 이후)' },
+                      { id: 'NIGHT_20', label: '야간 발신 허용 (20시 이후)' }
+                    ].map(cond => {
+                      const isChecked = Array.isArray(ruleForm.valid_conditions) && ruleForm.valid_conditions.includes(cond.id);
+                      return (
+                        <div
+                          key={cond.id}
+                          onClick={() => {
+                            if (!ruleEditing) return;
+                            let newConds = Array.isArray(ruleForm.valid_conditions) ? [...ruleForm.valid_conditions] : [];
+                            if (isChecked) {
+                              newConds = newConds.filter(c => c !== cond.id);
+                            } else {
+                              newConds.push(cond.id);
+                            }
+                            setRuleForm({ ...ruleForm, valid_conditions: newConds });
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold transition-all ${
+                            ruleEditing ? 'cursor-pointer hover:bg-black/40' : 'cursor-not-allowed opacity-75'
+                          } ${isChecked ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-black/20 border-white/5 text-slate-400'}`}
+                        >
+                          <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${isChecked ? 'bg-emerald-500 border-emerald-500 text-black' : 'border-slate-600 bg-transparent'}`}>
+                            {isChecked && <Check size={10} strokeWidth={4} />}
+                          </div>
+                          {cond.label}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -863,12 +1379,8 @@ export default function SCallertPage() {
             )}
           </div>
         </section>
-
-        {/* ════════════════════════════════════════════
-            3️⃣  PDS API 설정 관리
-        ════════════════════════════════════════════ */}
-        {selectedSid && (
-        <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
+            {selectedSid && (
+<section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/[0.02] to-transparent pointer-events-none" />
 
           {/* 헤더 */}
@@ -928,7 +1440,25 @@ export default function SCallertPage() {
                 <Smartphone size={15} className="text-orange-400" />
               </div>
               <div>
-                <p className="text-xs font-black text-white">테스트 발송 기기 선택</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-black text-white">테스트 발송 기기 선택</p>
+                  {(() => {
+                    const status = getLatestCallStatus();
+                    if (!status) return null;
+                    const bgClass = status.status === 'CONNECTED'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 animate-pulse'
+                      : status.isSuccess === true
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : status.isSuccess === false
+                      ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                      : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+                    return (
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border ${bgClass}`}>
+                        {status.text}
+                      </span>
+                    );
+                  })()}
+                </div>
                 <p className="text-[9px] font-bold text-orange-400/80 uppercase tracking-wider">Select Caller Device (Push Target)</p>
               </div>
             </div>
@@ -1131,23 +1661,22 @@ export default function SCallertPage() {
             )}
           </div>
         </section>
-        )}
+)}
+          </div>
 
-    </div>
-
-    {/* Right Column: Incident Call & App Call Status */}
-    <div className="w-full xl:w-5/12 flex flex-col gap-6">
-      {/* ════════════════════════════════════════════
-            2️⃣  INCIDENT CALL TRACKING (장애 ID 기반 발신 현황)
-        ════════════════════════════════════════════ */}
-        <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
+          {/* ── Right Column: Sim (top) + PDS API (bottom) ── */}
+          <div className="xl:col-span-4 xl:sticky xl:top-[80px] flex flex-col gap-6 pb-20">
+            <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
           
           <SectionHeader icon={Activity} title="수신자 시뮬레이션" sub="수신자 모의 훈련 및 발신 현황" color="#10b981">
             <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-1.5 cursor-pointer active:scale-95">
+              <button 
+                onClick={handleStartSimulation}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
                 <Play size={12} />
-                <span>시뮬레이션 시작</span>
+                <span>대상자 덮어쓰기 적용</span>
               </button>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hidden sm:flex">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -1155,6 +1684,103 @@ export default function SCallertPage() {
               </div>
             </div>
           </SectionHeader>
+
+          {/* 실제 콜 발신 대상자 명단 */}
+          {ruleForm && (
+            <div className={`mb-4 p-3 rounded-2xl border flex items-center justify-between transition-all ${
+              strategyStatus.active 
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    strategyStatus.active ? 'bg-emerald-400' : 'bg-red-400'
+                  }`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                    strategyStatus.active ? 'bg-emerald-500' : 'bg-red-500'
+                  }`}></span>
+                </span>
+                <span className="text-[10px] font-black tracking-wide uppercase">
+                  {strategyStatus.active ? '전략 적용 중 (Active)' : '전략 미적용 (Inactive)'}
+                </span>
+              </div>
+              <span className="text-[10px] font-bold opacity-80">{strategyStatus.reason}</span>
+            </div>
+          )}
+
+
+          <div className="mt-4 mb-6 relative z-10">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <Users size={11} className="text-emerald-400" />
+                실제 콜 발신 대상자 명단 {isSubstituteType && <span className="text-cyan-400 font-bold bg-cyan-400/10 px-1.5 py-0.5 rounded text-[8px]">대직자 발신</span>}
+              </span>
+              <span className="text-[9px] font-bold text-slate-400 font-mono bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+                총 {activeTargets.length}명
+              </span>
+            </div>
+
+            {tgtLoading ? (
+              <div className="flex items-center gap-2 text-slate-500 py-3 text-xs justify-center">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading Targets...
+              </div>
+            ) : activeTargets.length === 0 ? (
+              <div className="p-4 text-center rounded-2xl bg-black/20 border border-dashed border-white/5 text-[10px] text-slate-500">
+                등록된 발신 대상자가 없습니다.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                {activeTargets.map((item, idx) => {
+                  const targetCall = hists.find(h => String(h.emp_id || h.EMP_ID).trim() === String(item.emp_id || item.EMP_ID).trim());
+                  return (
+                    <div 
+                      key={item.seq_no || item.SEQ_NO || item.emp_id || item.EMP_ID || idx} 
+                      onClick={() => handleCallTarget(item)}
+                      className="cursor-pointer flex items-center justify-between bg-black/35 border border-white/5 rounded-2xl p-3 hover:border-emerald-500/30 hover:bg-emerald-500/5 hover:scale-[1.01] transition-all"
+                      title="클릭 시 수동 발신 시도"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-black font-mono">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-black text-white">{item.emp_nm || item.EMP_NM}</span>
+                            <span className="text-[9px] text-slate-500 font-mono">({item.emp_id || item.EMP_ID})</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono font-bold mt-0.5 block">{item.mobile_no || item.MOBILE_NO}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {targetCall && (
+                          <div className="flex items-center gap-1.5 mr-2">
+                            <span className="text-[9px] font-bold text-slate-400 font-mono bg-white/5 border border-white/10 rounded-md px-1.5 py-0.5">
+                              {targetCall.attempt_seq}회차
+                            </span>
+                            <PdsBadge code={targetCall.pds_result_cd} />
+                            {targetCall.duration_sec !== undefined && targetCall.duration_sec !== null && targetCall.duration_sec > 0 && (
+                              <span className="text-[9px] font-mono text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 rounded-md px-1.5 py-0.5">
+                                {targetCall.duration_sec}초
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {isSubstituteType ? (
+                          <span className="text-[8px] font-black text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 rounded px-1.5 py-0.5">대직자</span>
+                        ) : (
+                          <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 rounded px-1.5 py-0.5">상시</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 구분선 */}
+          <div className="h-[1px] bg-white/5 my-4" />
 
           {histLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-600">
@@ -1209,6 +1835,9 @@ export default function SCallertPage() {
                           <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600 uppercase tracking-tight">
                             <Clock size={10} />
                             <span>{log.call_dt?.replace('T', ' ').slice(0, 19)}</span>
+                            {log.duration_sec !== undefined && log.duration_sec !== null && log.duration_sec > 0 && (
+                              <span className="text-cyan-400 font-mono">({log.duration_sec}초)</span>
+                            )}
                           </div>
                         </div>
 
@@ -1230,9 +1859,7 @@ export default function SCallertPage() {
             </div>
           )}
         </section>
-
-                {selectedSid && (
-        <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden mt-6">
+            <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
 
           {/* 헤더 */}
@@ -1285,34 +1912,28 @@ export default function SCallertPage() {
           </div>
 
           {/* Webhook 테스트 전송 패널 */}
-          <div className="mb-6 p-4 bg-white/[0.02] border border-white/5 rounded-2.5xl relative z-10">
+          <div className="mb-6 p-4 bg-white/[0.02] border border-white/5 rounded-2.5xl relative z-10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
               <Globe size={11} className="text-cyan-400" /> 앱 Webhook 모의 테스트 발송 (Mock Trigger)
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2 flex-1 min-w-[120px]">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">사번</span>
-                <input
-                  type="text"
-                  value={mockEmpId}
-                  onChange={e => setMockEmpId(e.target.value)}
-                  placeholder="12345"
-                  className="w-full bg-transparent text-xs text-white focus:outline-none font-mono"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2 flex-[1.5] min-w-[150px]">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">전화번호</span>
-                <input
-                  type="text"
-                  value={mockPhone}
-                  onChange={e => setMockPhone(e.target.value)}
-                  placeholder="01012345678"
-                  className="w-full bg-transparent text-xs text-white focus:outline-none font-mono"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSendMockEvent('DIALING')}
+                  disabled={mockSending}
+                  className="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500 border border-cyan-500/30 hover:text-black text-cyan-400 rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer"
+                >
+                  DIALING 발송
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendMockEvent('RINGING')}
+                  disabled={mockSending}
+                  className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500 border border-amber-500/30 hover:text-black text-amber-400 rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer"
+                >
+                  RINGING 발송
+                </button>
                 <button
                   type="button"
                   onClick={() => handleSendMockEvent('CONNECTED')}
@@ -1337,15 +1958,42 @@ export default function SCallertPage() {
                 >
                   MISSED 발송
                 </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendMockEvent('FAILED')}
+                  disabled={mockSending}
+                  className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/30 hover:text-black text-rose-400 rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer"
+                >
+                  FAILED 발송
+                </button>
               </div>
             </div>
+            
+            {/* 통화 경과 시간 및 결과 판단 표시 */}
+            {(mockConnectedTime || mockResultText) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {mockConnectedTime && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>[통화 연결 중] 경과 시간: {mockElapsed}초 (15초 이상 성공 / 미만 실패)</span>
+                  </div>
+                )}
+                {mockResultText && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-300 text-[10px] font-black">
+                    <AlertCircle size={11} className="text-orange-400" />
+                    <span>[시뮬레이션 판단 결과] {mockResultText}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <p className="text-[9px] text-slate-600 mt-2">
               * 입력한 사번과 번호로 앱 수신 Webhook API(<code className="font-mono bg-white/5 px-1 py-0.5 rounded text-amber-500">POST /call/event</code>)를 모의 호출하여 실시간 통화 감지를 테스트합니다.
             </p>
           </div>
 
           {/* 수신 로그 테이블 */}
-          <div className="relative z-10 bg-black/40 rounded-2.5xl border border-white/5 overflow-hidden">
+          <div className="relative z-10 bg-black/40 rounded-2.5xl border border-white/5 overflow-hidden" style={{ maxHeight: 260, overflowY: 'auto' }}>
             <div className="overflow-x-auto">
               <table className="w-full text-[11px] font-mono text-left border-collapse">
                 <thead>
@@ -1387,21 +2035,40 @@ export default function SCallertPage() {
                           <td className="px-4 py-2.5 text-cyan-300 font-bold">{targetName}</td>
                           <td className="px-4 py-2.5 text-slate-300">{evt.PHONE_NUMBER}</td>
                           <td className="px-4 py-2.5 text-center">
-                            {evt.EVENT_TYPE === 'CONNECTED' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                CONNECTED
-                              </span>
-                            )}
-                            {evt.EVENT_TYPE === 'DISCONNECTED' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-500/10 text-slate-400 border border-white/5">
-                                DISCONNECTED
-                              </span>
-                            )}
-                            {evt.EVENT_TYPE === 'MISSED' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500/10 text-red-400 border border-red-500/20">
-                                MISSED
-                              </span>
-                            )}
+                            {(() => {
+                              const et = (evt.EVENT_TYPE || '').toUpperCase();
+                              if (et === 'DIALING') return (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                  DIALING
+                                </span>
+                              );
+                              if (et === 'RINGING') return (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                  RINGING
+                                </span>
+                              );
+                              if (et === 'CONNECTED') return (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                  CONNECTED
+                                </span>
+                              );
+                              if (et === 'DISCONNECTED') return (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-500/10 text-slate-400 border border-white/5">
+                                  DISCONNECTED
+                                </span>
+                              );
+                              if (et === 'MISSED') return (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500/10 text-red-400 border border-red-500/20">
+                                  MISSED
+                                </span>
+                              );
+                              if (et === 'FAILED') return (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                  FAILED
+                                </span>
+                              );
+                              return <span className="text-slate-500 font-mono">{evt.EVENT_TYPE}</span>;
+                            })()}
                           </td>
                         </tr>
                       );
@@ -1412,11 +2079,11 @@ export default function SCallertPage() {
             </div>
           </div>
         </section>
-        )}
+          </div>
 
-    </div>
-  </div>
+        </div>
       </main>
+
 
       {/* ── 전략 생성 모달 ──────────────────────────── */}
       {showCreateModal && (
@@ -1484,16 +2151,75 @@ export default function SCallertPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">최대 발신 횟수</label>
-                  <div className="flex items-center gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">우선순위</label>
+                    <select
+                      value={newStrategy.priority}
+                      onChange={e => setNewStrategy(p => ({ ...p, priority: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:outline-none focus:border-orange-500/50 font-mono tracking-tighter"
+                    >
+                      {Array.from({ length: strategies.length + 1 }, (_, i) => i + 1).map(n => (
+                        <option key={n} value={n}>{n} 순위</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">발동 대기 (초)</label>
                     <input
                       type="number"
-                      value={newStrategy.max_call_cnt}
-                      onChange={e => setNewStrategy(p => ({ ...p, max_call_cnt: e.target.value }))}
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-lg text-amber-400 font-black focus:outline-none focus:border-amber-500/50 font-mono"
+                      min="0"
+                      max="600"
+                      step="5"
+                      value={newStrategy.delay_sec}
+                      onChange={e => setNewStrategy(p => ({ ...p, delay_sec: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500/50 font-mono tracking-tighter"
                     />
-                    <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Times</span>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">최대 발신 횟수</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={newStrategy.max_call_cnt}
+                        onChange={e => setNewStrategy(p => ({ ...p, max_call_cnt: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-amber-400 font-black focus:outline-none focus:border-amber-500/50 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">PDS 발신 유효 조건 (다중 선택)</label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {[
+                      { id: 'DAYTIME', label: '주간 발신 허용 (09시~18시)' },
+                      { id: 'WEEKEND', label: '주말(토/일) 발신 허용' },
+                      { id: 'NIGHT_18', label: '야간 발신 허용 (18시 이후)' },
+                      { id: 'NIGHT_19', label: '야간 발신 허용 (19시 이후)' },
+                      { id: 'NIGHT_20', label: '야간 발신 허용 (20시 이후)' }
+                    ].map(cond => {
+                      const isChecked = Array.isArray(newStrategy.valid_conditions) && newStrategy.valid_conditions.includes(cond.id);
+                      return (
+                        <label key={cond.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all ${isChecked ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-black/20 border-white/5 text-slate-400 hover:bg-black/40'}`}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let newConds = Array.isArray(newStrategy.valid_conditions) ? [...newStrategy.valid_conditions] : [];
+                              if (e.target.checked) newConds.push(cond.id);
+                              else newConds = newConds.filter(c => c !== cond.id);
+                              setNewStrategy({ ...newStrategy, valid_conditions: newConds });
+                            }}
+                            className="hidden"
+                          />
+                          <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${isChecked ? 'bg-emerald-500 border-emerald-500 text-black' : 'border-slate-600 bg-transparent'}`}>
+                            {isChecked && <Check size={10} strokeWidth={4} />}
+                          </div>
+                          {cond.label}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

@@ -15,28 +15,56 @@ export default function MobileSMSAlert() {
   const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) return;
+    let isMounted = true;
+    let esInstance = null;
+    let retryCount = 0;
+    let retryTimer = null;
 
-    const es = new EventSource(`${API_BASE}/sms/notification-stream?token=${token}`);
+    function connect() {
+      const token = getAccessToken();
+      if (!token || !isMounted) return;
 
-    es.addEventListener('sms_received', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        const item = {
-          id: Date.now(),
-          sender: data.sender,
-          message: data.message,
-          keyword: data.keyword_detected === 1 || data.keyword_detected === true,
-          incId: data.inc_id,
-        };
-        setAlert(item);
-        setTimeout(() => setAlert(null), 5000);
-      } catch (_) {}
-    });
+      if (esInstance) { esInstance.close(); esInstance = null; }
 
-    es.onerror = () => {};
-    return () => es.close();
+      const es = new EventSource(`${API_BASE}/sms/notification-stream?token=${token}`);
+      esInstance = es;
+
+      es.addEventListener('sms_received', (e) => {
+        retryCount = 0;
+        try {
+          const data = JSON.parse(e.data);
+          const item = {
+            id: Date.now(),
+            sender: data.sender,
+            message: data.message,
+            keyword: parseInt(String(data.keyword_detected || '0')) > 0,
+            incId: data.inc_id,
+          };
+          if (!isMounted) return;
+          setAlert(item);
+          setTimeout(() => setAlert(null), 5000);
+        } catch (_) {}
+      });
+
+      es.addEventListener('connected', () => { retryCount = 0; });
+
+      es.onerror = () => {
+        es.close();
+        esInstance = null;
+        if (!isMounted) return;
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+        retryCount += 1;
+        retryTimer = setTimeout(connect, delay);
+      };
+    }
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(retryTimer);
+      if (esInstance) { esInstance.close(); esInstance = null; }
+    };
   }, []);
 
   if (!alert) return null;

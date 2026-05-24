@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Phone, Users, Activity, RefreshCw,
@@ -15,16 +15,22 @@ const STRATEGY_CONT_OPTIONS = [
   { id: '1', label: '메시지 수신자별 순차 통화' },
   { id: '2', label: '메시지 수신자 및 AA, 파트장' },
   { id: '3', label: '메시지 수신자의 파트 전원' },
+  { id: '4', label: '대직자 발신' },
 ];
 
 function EventBadge({ type }) {
   const map = {
-    CONNECTED:    { label: '연결', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-    DISCONNECTED: { label: '종료', cls: 'bg-slate-500/20 text-slate-400 border-white/10' },
-    MISSED:       { label: '부재', cls: 'bg-red-500/20 text-red-400 border-red-500/30' },
-    RINGING:      { label: '통화중', cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    DIALING:        { label: '발신', cls: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+    RINGING:        { label: '신호', cls: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+    CONNECTED:      { label: '걸기중', cls: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
+    DISCONNECTED:   { label: '종료', cls: 'bg-slate-500/20 text-slate-400 border-white/10' },
+    SUCCESS:        { label: '성공', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+    FAIL_VOICEMAIL: { label: '소리샘', cls: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+    MISSED:         { label: '부재', cls: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    FAILED:         { label: '실패', cls: 'bg-rose-500/20 text-rose-400 border-rose-500/30' },
   };
-  const { label, cls } = map[type] || { label: type || '-', cls: 'bg-white/5 text-slate-500 border-white/10' };
+  const upperType = (type || '').toUpperCase();
+  const { label, cls } = map[upperType] || { label: type || '-', cls: 'bg-white/5 text-slate-500 border-white/10' };
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${cls}`}>{label}</span>;
 }
 
@@ -71,6 +77,9 @@ export default function MobileSCallertPage() {
     strategy_cont: '1',
     apply_start_dt: new Date().toISOString().slice(0, 16),
     apply_end_dt: '2099-12-31T23:59',
+    priority: 99,
+    delay_sec: 0,
+    valid_conditions: [],
     max_call_cnt: 3,
     use_yn: 'Y'
   });
@@ -82,8 +91,28 @@ export default function MobileSCallertPage() {
 
   // ── 담당자 ──────────────────────────────────────────
   const [targets, setTargets]         = useState([]);
+  const [mySubstitutes, setMySubstitutes] = useState([]);
   const [tgtLoading, setTgtLoading]   = useState(false);
   const [tgtOpen, setTgtOpen]         = useState(false);
+  const [userPhones, setUserPhones]   = useState({});
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/users`, { headers: getAuthHeaders() });
+      if (r.ok) {
+        const list = await r.json();
+        const phoneMap = {};
+        list.forEach(u => {
+          if (u.employee_id && u.phone) {
+            phoneMap[String(u.employee_id).trim()] = u.phone;
+          }
+        });
+        setUserPhones(phoneMap);
+      }
+    } catch (e) {
+      console.error('Failed to fetch users for phone mapping:', e);
+    }
+  }, []);
   
   // 담당자 추가 폼
   const [showAddTgtForm, setShowAddTgtForm] = useState(false);
@@ -123,6 +152,9 @@ export default function MobileSCallertPage() {
         strategy_id: s.strategy_id || s.STRATEGY_ID,
         strategy_nm: s.strategy_nm || s.STRATEGY_NM,
         strategy_cont: s.strategy_cont || s.STRATEGY_CONT || '1',
+        priority: s.priority ?? s.PRIORITY ?? 99,
+        delay_sec: s.delay_sec ?? s.DELAY_SEC ?? 0,
+        valid_conditions: (typeof s.VALID_CONDITIONS === 'string' ? (() => { try { return JSON.parse(s.VALID_CONDITIONS); } catch(e) { return []; } })() : (s.VALID_CONDITIONS || [])),
         apply_start_dt: s.apply_start_dt || s.APPLY_START_DT || '',
         apply_end_dt: s.apply_end_dt || s.APPLY_END_DT || '',
         max_call_cnt: s.max_call_cnt || s.MAX_CALL_CNT || 3,
@@ -148,6 +180,20 @@ export default function MobileSCallertPage() {
       setTargets(data.targets || data || []);
     } catch (e) { console.error(e); }
     finally { setTgtLoading(false); }
+  }, []);
+
+  // ─── 대직자 로드 ──────────────────────────────────────
+  const fetchMySubstitutes = useCallback(async (userId) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`${API_BASE}/rbac/substitutes/${userId}`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setMySubstitutes(data.substitutes || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch substitutes:', e);
+    }
   }, []);
 
   // ─── Push 기기 목록 로드 ──────────────────────────────
@@ -248,6 +294,9 @@ export default function MobileSCallertPage() {
         headers: getAuthHeaders(),
         body: JSON.stringify({
           ...newStrat,
+          priority: Number(newStrat.priority || 99),
+          delay_sec: Number(newStrat.delay_sec || 0),
+          valid_conditions: Array.isArray(newStrat.valid_conditions) ? newStrat.valid_conditions : [],
           max_call_cnt: Number(newStrat.max_call_cnt),
           reg_id: userProfile?.employee_id || 'SYSTEM'
         })
@@ -259,6 +308,9 @@ export default function MobileSCallertPage() {
         setNewStrat({
           strategy_nm: '',
           strategy_cont: '1',
+          priority: 99,
+          delay_sec: 0,
+          valid_conditions: [],
           apply_start_dt: new Date().toISOString().slice(0, 16),
           apply_end_dt: '2099-12-31T23:59',
           max_call_cnt: 3,
@@ -291,6 +343,9 @@ export default function MobileSCallertPage() {
         body: JSON.stringify({
           strategy_nm: stratForm.strategy_nm,
           strategy_cont: stratForm.strategy_cont,
+          priority: Number(stratForm.priority ?? 99),
+          delay_sec: Number(stratForm.delay_sec ?? 0),
+          valid_conditions: Array.isArray(stratForm.valid_conditions) ? stratForm.valid_conditions : [],
           apply_start_dt: stratForm.apply_start_dt,
           apply_end_dt: stratForm.apply_end_dt,
           max_call_cnt: Number(stratForm.max_call_cnt),
@@ -364,7 +419,18 @@ export default function MobileSCallertPage() {
     }
   };
 
-  useEffect(() => { fetchStrategies(); fetchAppEvents(); fetchPushDevices(); }, []);
+  useEffect(() => {
+    if (userProfile?.employee_id) {
+      fetchMySubstitutes(userProfile.employee_id);
+    }
+  }, [userProfile?.employee_id, fetchMySubstitutes]);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchStrategies();
+    fetchAppEvents();
+    fetchPushDevices();
+  }, []);
 
   useEffect(() => {
     if (selectedSid) {
@@ -383,6 +449,106 @@ export default function MobileSCallertPage() {
     const timer = setInterval(fetchAppEvents, 5000);
     return () => clearInterval(timer);
   }, [autoRefresh, fetchAppEvents]);
+
+  const [nowTime, setNowTime] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTime(new Date());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const activeTargets = useMemo(() => {
+    const isSub = stratForm?.strategy_cont === '4';
+    if (isSub) {
+      return mySubstitutes.map((sub, index) => {
+        const phoneFromUsers = userPhones[String(sub.deputy_id).trim()];
+        return {
+          seq_no: sub.id,
+          emp_id: sub.deputy_id,
+          emp_nm: sub.deputy_name,
+          mobile_no: (phoneFromUsers && phoneFromUsers !== '010-0000-0000') ? phoneFromUsers : (sub.deputy_phone || '010-0000-0000'),
+          sort_ord: index + 1
+        };
+      });
+    }
+    return targets.map(t => {
+      const empId = String(t.EMP_ID || t.emp_id || '').trim();
+      const phoneFromUsers = userPhones[empId];
+      return {
+        ...t,
+        emp_id: empId,
+        emp_nm: t.EMP_NM || t.emp_nm,
+        mobile_no: (phoneFromUsers && phoneFromUsers !== '010-0000-0000') ? phoneFromUsers : (t.MOBILE_NO || t.mobile_no || '010-0000-0000')
+      };
+    });
+  }, [stratForm?.strategy_cont, mySubstitutes, targets, userPhones]);
+
+  const isSubstituteType = stratForm?.strategy_cont === '4';
+
+  const strategyStatus = useMemo(() => {
+    if (!stratForm) return { active: false, reason: '선택된 전략 없음' };
+    if (stratForm.use_yn !== 'Y') return { active: false, reason: '사용 중지됨' };
+
+    const start = stratForm.apply_start_dt ? new Date(stratForm.apply_start_dt) : null;
+    const end = stratForm.apply_end_dt ? new Date(stratForm.apply_end_dt) : null;
+
+    if (start && nowTime < start) return { active: false, reason: '적용 대기 (시작일 미도달)' };
+    if (end && nowTime > end) return { active: false, reason: '적용 만료 (종료일 경과)' };
+
+    const conds = stratForm.valid_conditions || [];
+    if (conds.length === 0) return { active: true, reason: '상시 적용 (조건 없음)' };
+
+    const day = nowTime.getDay(); // 0: 일요일, 6: 토요일
+    const hour = nowTime.getHours();
+    const isWeekend = (day === 0 || day === 6);
+    const isDaytime = (hour >= 9 && hour < 18);
+
+    const hasDaytime = conds.includes('DAYTIME');
+    const hasWeekend = conds.includes('WEEKEND');
+    const hasNight18 = conds.includes('NIGHT_18');
+    const hasNight19 = conds.includes('NIGHT_19');
+    const hasNight20 = conds.includes('NIGHT_20');
+
+    let matched = false;
+    let matchReasons = [];
+
+    if (hasDaytime && isDaytime && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 주간');
+    }
+    if (hasWeekend && isWeekend) {
+      matched = true;
+      matchReasons.push('주말');
+    }
+    if (hasNight18 && (hour >= 18 || hour < 9) && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 야간(18시이후)');
+    }
+    if (hasNight19 && (hour >= 19 || hour < 9) && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 야간(19시이후)');
+    }
+    if (hasNight20 && (hour >= 20 || hour < 9) && !isWeekend) {
+      matched = true;
+      matchReasons.push('평일 야간(20시이후)');
+    }
+
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const timeStr = `${dayNames[day]}요일 ${hour}시`;
+
+    if (matched) {
+      return { active: true, reason: `적용 중 (${matchReasons.join(', ')})` };
+    } else {
+      let failReason = '적용 시간 아님';
+      if (isWeekend && !hasWeekend) {
+        failReason = `주말 조건 미선택 (${timeStr})`;
+      } else {
+        failReason = `조건 미충족 (${timeStr})`;
+      }
+      return { active: false, reason: failReason };
+    }
+  }, [stratForm, nowTime]);
 
   return (
     <div className="min-h-screen text-white font-sans pb-24" style={{ background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' }}>
@@ -454,15 +620,40 @@ export default function MobileSCallertPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">최대 발신 횟수</p>
-                      <input
-                        type="number"
-                        value={newStrat.max_call_cnt}
-                        onChange={e => setNewStrat(p => ({ ...p, max_call_cnt: e.target.value }))}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50 font-mono"
-                      />
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">우선순위</p>
+                        <select
+                          value={newStrat.priority}
+                          onChange={e => setNewStrat(p => ({ ...p, priority: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50"
+                        >
+                          {Array.from({ length: strategies.length + 1 }, (_, i) => i + 1).map(n => (
+                            <option key={n} value={n}>{n} 순위</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">발동 대기(초)</p>
+                        <input
+                          type="number"
+                          min="0"
+                          max="600"
+                          step="5"
+                          value={newStrat.delay_sec}
+                          onChange={e => setNewStrat(p => ({ ...p, delay_sec: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">최대 발신</p>
+                        <input
+                          type="number"
+                          value={newStrat.max_call_cnt}
+                          onChange={e => setNewStrat(p => ({ ...p, max_call_cnt: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50 font-mono"
+                        />
+                      </div>
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">사용 여부</p>
@@ -474,6 +665,41 @@ export default function MobileSCallertPage() {
                         <option value="Y">ACTIVE (사용)</option>
                         <option value="N">INACTIVE (미사용)</option>
                       </select>
+                    </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">PDS 발신 유효 조건</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { id: 'DAYTIME', label: '주간 (09~18)' },
+                        { id: 'WEEKEND', label: '주말 허용' },
+                        { id: 'NIGHT_18', label: '야간 (18시~)' },
+                        { id: 'NIGHT_19', label: '야간 (19시~)' },
+                        { id: 'NIGHT_20', label: '야간 (20시~)' }
+                      ].map(cond => {
+                        const isChecked = Array.isArray(newStrat.valid_conditions) && newStrat.valid_conditions.includes(cond.id);
+                        return (
+                          <div
+                            key={cond.id}
+                            onClick={() => {
+                              let newConds = Array.isArray(newStrat.valid_conditions) ? [...newStrat.valid_conditions] : [];
+                              if (isChecked) {
+                                newConds = newConds.filter(c => c !== cond.id);
+                              } else {
+                                newConds.push(cond.id);
+                              }
+                              setNewStrat({ ...newStrat, valid_conditions: newConds });
+                            }}
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-all ${
+                              isChecked ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-black/20 border-white/5 text-slate-400'
+                            }`}
+                          >
+                            <div className={`w-2.5 h-2.5 rounded flex items-center justify-center border ${isChecked ? 'bg-emerald-500 border-emerald-500 text-black' : 'border-slate-600'}`}>
+                              {isChecked && <Check size={8} strokeWidth={4} />}
+                            </div>
+                            {cond.label}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                   <button
@@ -495,7 +721,7 @@ export default function MobileSCallertPage() {
                   <button key={s.strategy_id} onClick={() => setSelectedSid(s.strategy_id)}
                     className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all active:scale-[0.98] ${selectedSid === s.strategy_id ? 'bg-orange-500/10 border-orange-500/40' : 'bg-white/[0.02] border-white/5'}`}>
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-black ${selectedSid === s.strategy_id ? 'text-orange-300' : 'text-slate-300'}`}>{s.strategy_nm}</span>
+                      <span className={`text-sm font-black ${selectedSid === s.strategy_id ? 'text-orange-300' : 'text-slate-300'}`}>[순위: {s.priority ?? s.PRIORITY ?? 99}] {s.strategy_nm}</span>
                       {s.use_yn === 'Y' && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">활성</span>}
                     </div>
                     <p className="text-[10px] text-slate-600 font-mono mt-0.5">ID: {s.strategy_id}</p>
@@ -571,15 +797,47 @@ export default function MobileSCallertPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">최대 발신 회수</p>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">우선순위</p>
+                  {isEditingStrat ? (
+                    <select
+                      value={stratForm.priority}
+                      onChange={e => setStratForm(p => ({ ...p, priority: e.target.value }))}
+                      className="w-full bg-black/40 border border-orange-500/20 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50"
+                    >
+                      {Array.from({ length: Math.max(1, strategies.length) }, (_, i) => i + 1).map(n => (
+                        <option key={n} value={n}>{n} 순위</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs font-bold text-slate-200 px-3 py-2 bg-white/[0.02] border border-white/5 rounded-lg font-mono">{stratForm.priority ?? stratForm.PRIORITY ?? 99} 순위</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">대기 (초)</p>
+                  {isEditingStrat ? (
+                    <input
+                      type="number"
+                      min="0"
+                      max="600"
+                      step="5"
+                      value={stratForm.delay_sec}
+                      onChange={e => setStratForm(p => ({ ...p, delay_sec: e.target.value }))}
+                      className="w-full bg-black/40 border border-orange-500/20 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50 font-mono"
+                    />
+                  ) : (
+                    <p className="text-xs font-bold text-slate-200 px-3 py-2 bg-white/[0.02] border border-white/5 rounded-lg font-mono">{stratForm.delay_sec ?? stratForm.DELAY_SEC ?? 0} 초</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">최대 발신</p>
                   {isEditingStrat ? (
                     <input
                       type="number"
                       value={stratForm.max_call_cnt}
                       onChange={e => setStratForm(p => ({ ...p, max_call_cnt: e.target.value }))}
-                      className="w-full bg-black/40 border border-orange-500/20 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50 font-mono"
+                      className="w-full bg-black/40 border border-orange-500/20 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50 font-mono"
                     />
                   ) : (
                     <p className="text-xs font-bold text-slate-200 px-3 py-2 bg-white/[0.02] border border-white/5 rounded-lg font-mono">{stratForm.max_call_cnt} 회</p>
@@ -605,6 +863,44 @@ export default function MobileSCallertPage() {
                       )}
                     </p>
                   )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">PDS 발신 유효 조건</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  {[
+                    { id: 'DAYTIME', label: '주간 (09~18)' },
+                    { id: 'WEEKEND', label: '주말 허용' },
+                    { id: 'NIGHT_18', label: '야간 (18시~)' },
+                    { id: 'NIGHT_19', label: '야간 (19시~)' },
+                    { id: 'NIGHT_20', label: '야간 (20시~)' }
+                  ].map(cond => {
+                    const isChecked = Array.isArray(stratForm.valid_conditions) && stratForm.valid_conditions.includes(cond.id);
+                    return (
+                      <div
+                        key={cond.id}
+                        onClick={() => {
+                          if (!isEditingStrat) return;
+                          let newConds = Array.isArray(stratForm.valid_conditions) ? [...stratForm.valid_conditions] : [];
+                          if (isChecked) {
+                            newConds = newConds.filter(c => c !== cond.id);
+                          } else {
+                            newConds.push(cond.id);
+                          }
+                          setStratForm({ ...stratForm, valid_conditions: newConds });
+                        }}
+                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${
+                          isEditingStrat ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'
+                        } ${isChecked ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-black/20 border-white/5 text-slate-400'}`}
+                      >
+                        <div className={`w-2.5 h-2.5 rounded flex items-center justify-center border ${isChecked ? 'bg-emerald-500 border-emerald-500 text-black' : 'border-slate-600 bg-transparent'}`}>
+                          {isChecked && <Check size={8} strokeWidth={4} />}
+                        </div>
+                        {cond.label}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -677,15 +973,17 @@ export default function MobileSCallertPage() {
             <div className="flex items-center justify-between">
               <div className="flex-1 cursor-pointer" onClick={() => setTgtOpen(v => !v)}>
                 <CardHeader icon={Users} title="담당자 목록" sub="Call Targets" color="#8b5cf6"
-                  extra={<span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-500/10 text-purple-400 border border-purple-500/20">{targets.length}명</span>} />
+                  extra={<span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-500/10 text-purple-400 border border-purple-500/20">{activeTargets.length}명</span>} />
               </div>
-              <button
-                onClick={() => setShowAddTgtForm(v => !v)}
-                className="mb-3 w-8 h-8 rounded-xl flex items-center justify-center bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500 hover:text-black transition-all active:scale-95"
-                title="담당자 등록"
-              >
-                {showAddTgtForm ? <X size={15} /> : <Plus size={15} />}
-              </button>
+              {!isSubstituteType && (
+                <button
+                  onClick={() => setShowAddTgtForm(v => !v)}
+                  className="mb-3 w-8 h-8 rounded-xl flex items-center justify-center bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500 hover:text-black transition-all active:scale-95"
+                  title="담당자 등록"
+                >
+                  {showAddTgtForm ? <X size={15} /> : <Plus size={15} />}
+                </button>
+              )}
               <div className="cursor-pointer ml-2 mb-3" onClick={() => setTgtOpen(v => !v)}>
                 {tgtOpen ? <ChevronUp size={14} className="text-slate-500 shrink-0 ml-2" /> : <ChevronDown size={14} className="text-slate-500 shrink-0 ml-2" />}
               </div>
@@ -693,8 +991,32 @@ export default function MobileSCallertPage() {
 
             {tgtOpen && (
               <div className="mt-1 space-y-3">
-                {/* 담당자 추가 폼 */}
-                {showAddTgtForm && (
+                {/* 전략 적용 여부 상태 바 */}
+                {stratForm && (
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between transition-all text-[10px] ${
+                    strategyStatus.active 
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                      : 'bg-red-500/10 border-red-500/20 text-red-400'
+                  }`}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                          strategyStatus.active ? 'bg-emerald-400' : 'bg-red-400'
+                        }`}></span>
+                        <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                          strategyStatus.active ? 'bg-emerald-500' : 'bg-red-500'
+                        }`}></span>
+                      </span>
+                      <span className="font-black uppercase">
+                        {strategyStatus.active ? '적용 중 (Active)' : '미적용 (Inactive)'}
+                      </span>
+                    </div>
+                    <span className="font-bold opacity-80">{strategyStatus.reason}</span>
+                  </div>
+                )}
+
+                {/* 담당자 추가 폼 (대직자 발신 유형이 아닐 때만 허용) */}
+                {!isSubstituteType && showAddTgtForm && (
                   <div className="p-3.5 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-3">
                     <p className="text-xs font-black text-purple-400">새 담당자 등록</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -752,28 +1074,35 @@ export default function MobileSCallertPage() {
                 {/* 담당자 리스트 */}
                 {tgtLoading ? (
                   <div className="flex items-center justify-center py-8"><Loader2 size={18} className="animate-spin text-slate-600" /></div>
-                ) : targets.length === 0 ? (
+                ) : activeTargets.length === 0 ? (
                   <div className="text-center py-8"><PhoneOff size={24} className="mx-auto text-slate-700 mb-2" /><p className="text-xs text-slate-600">등록된 담당자 없음</p></div>
                 ) : (
                   <div className="space-y-2">
-                    {targets.map((t, i) => (
+                    {activeTargets.map((t, i) => (
                       <div key={t.seq_no || i} className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-white/[0.02] border border-white/5">
                         <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                           <span className="text-[11px] font-black text-purple-400">{i + 1}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-black text-slate-200 truncate">{t.EMP_NM || t.emp_nm}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">{t.MOBILE_NO || t.mobile_no}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-black text-slate-200 truncate">{t.emp_nm || t.EMP_NM}</p>
+                            {isSubstituteType && (
+                              <span className="text-[8px] font-black text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 rounded px-1.5 py-0.5">대직자</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-mono">{t.mobile_no || t.MOBILE_NO}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[9px] text-slate-600 font-mono">{t.EMP_ID || t.emp_id}</span>
-                          <button
-                            onClick={() => handleDeleteTarget(t.seq_no || t.SEQ_NO)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center bg-red-500/10 border border-red-500/20 text-red-400 active:scale-90"
-                            title="삭제"
-                          >
-                            <Trash2 size={12} />
-                          </button>
+                          <span className="text-[9px] text-slate-600 font-mono">{t.emp_id || t.EMP_ID}</span>
+                          {!isSubstituteType && (
+                            <button
+                              onClick={() => handleDeleteTarget(t.seq_no || t.SEQ_NO)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center bg-red-500/10 border border-red-500/20 text-red-400 active:scale-90"
+                              title="삭제"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

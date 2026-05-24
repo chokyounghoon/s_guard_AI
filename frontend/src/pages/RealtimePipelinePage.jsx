@@ -565,46 +565,72 @@ export default function RealtimePipelinePage() {
       return;
     }
 
-    const token = getAccessToken();
-    if (!token) return;
+    let sseRetry = 0;
+    let sseRetryTimer = null;
 
-    const sse = new EventSource(`${apiBase}/sms/notification-stream?token=${token}`);
-    eventSourceRef.current = sse;
+    const connectSSE = () => {
+      const token = getAccessToken();
+      if (!token) return;
 
-    sse.onmessage = (event) => {
-      try {
-        const raw = JSON.parse(event.data);
-        if (raw && raw.message) {
-          playAlertSound(raw.severity?.toLowerCase() === 'critical' ? 'critical' : 'warning');
-          
-          const newCard = {
-            inc_id: raw.inc_id || `INC-LIVE-${Date.now()}`,
-            message: raw.message,
-            sender_name: raw.sender_name || '실시간유입',
-            severity: raw.severity || 'WARNING',
-            reg_dt: new Date().toISOString(),
-            is_analyzed: 0,
-            stage: 1,
-            timer: 180,
-            assignee: raw.sender_name ? raw.sender_name.charAt(0) + '*' + (raw.sender_name.length > 2 ? raw.sender_name.charAt(raw.sender_name.length - 1) : '') : '미정',
-            bizSystem: getFallbackBizSystem(raw.message),
-            keyword: getFallbackKeyword(raw.message),
-            node: getFallbackNode(raw.message, Date.now()),
-            bumun: raw.bumun || '미분류 부문',
-            honbu: raw.honbu || '미분류 본부',
-            team: raw.team || '미분류 팀',
-            part: raw.part || '미분류 파트',
-            similarityScore: Math.floor(80 + Math.random() * 19)
-          };
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
 
-          setCards(prev => [newCard, ...prev]);
-          if (!selectedCardId) setSelectedCardId(newCard.inc_id);
-          toast.success(`[신규 장애 수신] ${newCard.inc_id} 파이프라인 진입!`);
-        }
-      } catch (err) {}
+      const sse = new EventSource(`${apiBase}/sms/notification-stream?token=${token}`);
+      eventSourceRef.current = sse;
+
+      // onmessage → sms_received named event로 변경 (named events는 onmessage로 린지 않음)
+      sse.addEventListener('sms_received', (event) => {
+        sseRetry = 0;
+        try {
+          const raw = JSON.parse(event.data);
+          if (raw && raw.message) {
+            playAlertSound(raw.severity?.toLowerCase() === 'critical' ? 'critical' : 'warning');
+
+            const newCard = {
+              inc_id: raw.inc_id || `INC-LIVE-${Date.now()}`,
+              message: raw.message,
+              sender_name: raw.sender_name || '실시간유입',
+              severity: raw.severity || 'WARNING',
+              reg_dt: new Date().toISOString(),
+              is_analyzed: 0,
+              stage: 1,
+              timer: 180,
+              assignee: raw.sender_name ? raw.sender_name.charAt(0) + '*' + (raw.sender_name.length > 2 ? raw.sender_name.charAt(raw.sender_name.length - 1) : '') : '미정',
+              bizSystem: getFallbackBizSystem(raw.message),
+              keyword: getFallbackKeyword(raw.message),
+              node: getFallbackNode(raw.message, Date.now()),
+              bumun: raw.bumun || '미분류 부문',
+              honbu: raw.honbu || '미분류 본부',
+              team: raw.team || '미분류 팀',
+              part: raw.part || '미분류 파트',
+              similarityScore: Math.floor(80 + Math.random() * 19)
+            };
+
+            setCards(prev => [newCard, ...prev]);
+            if (!selectedCardId) setSelectedCardId(newCard.inc_id);
+            toast.success(`[신규 장애 수신] ${newCard.inc_id} 파이프라인 진입!`);
+          }
+        } catch (err) {}
+      });
+
+      sse.addEventListener('connected', () => { sseRetry = 0; });
+
+      sse.onerror = () => {
+        console.warn('[Pipeline SSE] Connection failed, retrying...');
+        sse.close();
+        eventSourceRef.current = null;
+        const delay = Math.min(1000 * Math.pow(2, sseRetry), 30000);
+        sseRetry += 1;
+        sseRetryTimer = setTimeout(connectSSE, delay);
+      };
     };
 
-    return () => { 
+    connectSSE();
+
+    return () => {
+      clearTimeout(sseRetryTimer);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;

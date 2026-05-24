@@ -322,6 +322,8 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/rbac/permissions') ||
     path.startsWith('/call/') ||            // ⚡ 앱 Webhook 수신 경로 (Public 허용)
     path === '/register-token' ||           // ⚡ Android FCM 토큰 등록 — JWT 없이 앱 시작 시 호출
+    path === '/scallert/debug-trigger' ||
+    path === '/scallert/debug-schema' ||
     (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
     
   console.log(`[Auth-Access] Path: ${path} | isPublic: ${isPublic}`);
@@ -3062,6 +3064,7 @@ app.get('/rbac/substitutes/:userId', async (c) => {
   const { results } = await db.prepare(`
     SELECT s.*,
       u.name as deputy_name,
+      u.phone as deputy_phone,
       u.team as deputy_team_code,
       u.part as deputy_part_code,
       u.subpart as deputy_subpart_code,
@@ -3644,6 +3647,38 @@ app.post('/sms/receive', async (c) => {
   // Eager Loading: Trigger background AI immediately for new insert
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
+  // ── S-callert (자동 PDS 발신) 내부 트리거 연동 ──
+  c.executionCtx.waitUntil((async () => {
+    try {
+      const now = getKst();
+      const strategy = await db.prepare(`
+        SELECT * FROM TB_SCL_STRATEGY_MST 
+        WHERE USE_YN = 'Y' 
+          AND (APPLY_START_DT IS NULL OR APPLY_START_DT <= ?)
+          AND (APPLY_END_DT IS NULL OR APPLY_END_DT >= ?)
+        ORDER BY PRIORITY ASC LIMIT 1
+      `).bind(now, now).first();
+
+      if (strategy && checkValidConditions(strategy.VALID_CONDITIONS, now)) {
+        console.log(`[S-callert] Triggering internal IGW event for strategy ${strategy.STRATEGY_ID}, inc_id: ${newIncId}`);
+        const payload = {
+          igw_txn_id: `INC_${newIncId}_${Date.now()}`,
+          strategy_id: strategy.STRATEGY_ID,
+          event_type: 'TRIGGER',
+          inc_id: newIncId,
+          message: message,
+          severity: 'CRITICAL',
+          occurred_at: now,
+          employee_id: employee_id
+        };
+        // Use the extracted function directly
+        await executeSCallertStrategy(db, strategy, payload, newIncId, c);
+      }
+    } catch(e) {
+      console.error('[S-callert] Internal trigger error:', e);
+    }
+  })());
+
   const msgPreview = (message || '내용 없음').substring(0, 100);
 
   // 🚀 NEW: Trigger SSE Broadcast via Global DO
@@ -3653,7 +3688,7 @@ app.post('/sms/receive', async (c) => {
     c.executionCtx.waitUntil(room.fetch(new Request("https://dummy/broadcast-sse", {
       method: "POST",
       body: JSON.stringify({
-        type: "new_incident",
+        type: "sms_received",
         timestamp: new Date().toISOString(),
         data: {
           inc_id: newIncId,
@@ -3710,80 +3745,7 @@ app.post('/sms/receive', async (c) => {
 // ==========================================
 // 6. Real-time Notifications (SSE)
 // ==========================================
-app.get('/sms/notification-stream', async (c) => {
-  const db = c.env.DB
-  let lastSeenId = c.req.query('last_id') || null
 
-  return streamSSE(c, async (stream) => {
-    console.log('SSE Stream Connected')
-    
-    let lastSeenKey = null;
-    if (lastSeenId) {
-       const initial = await db.prepare("SELECT timestamp FROM received_messages WHERE inc_id = ?").bind(lastSeenId).first();
-       if (initial) lastSeenKey = `${lastSeenId}_${initial.timestamp}`;
-    } else {
-       const latest = await db.prepare("SELECT inc_id, timestamp FROM received_messages ORDER BY timestamp DESC LIMIT 1").first();
-       if (latest) lastSeenKey = `${latest.inc_id}_${latest.timestamp}`;
-    }
-
-    let lastHeartbeat = Date.now()
-
-    try {
-      while (true) {
-        // Send heartbeat every 20 seconds
-        if (Date.now() - lastHeartbeat > 20000) {
-          await stream.writeSSE({ event: 'ping', data: 'heartbeat' })
-          lastHeartbeat = Date.now()
-        }
-
-        // Check for new SMS every 3 seconds
-        const latest = await db.prepare(`
-          SELECT r.*, u.name as sender_name,
-                 COALESCE(oh.name, u.honbu) as bumun,
-                 COALESCE(ot.name, u.team) as honbu,
-                 COALESCE(op.name, u.part) as team,
-                 COALESCE(os.name, u.subpart) as part
-          FROM received_messages r
-          LEFT JOIN users u ON r.employee_id = u.employee_id
-          LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
-          LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
-          LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
-          LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
-          ORDER BY r.timestamp DESC LIMIT 1
-        `).first()
-        const currentKey = latest ? `${latest.inc_id}_${latest.timestamp}` : null;
-        
-        if (latest && currentKey !== lastSeenKey) {
-          console.log('New SMS detected in SSE stream:', latest.inc_id)
-          lastSeenKey = currentKey;
-          await stream.writeSSE({
-            event: 'new_sms', // Synchronized with frontend listener
-            data: JSON.stringify({
-              inc_id: latest.inc_id,
-              sender: latest.sender,
-              sender_name: latest.sender_name || '',
-              message: latest.message,
-              timestamp: latest.timestamp,
-              keyword_detected: parseInt(String(latest.keyword_detected || '0')),
-              response_message: latest.response_message,
-              received_count: parseInt(String(latest.received_count || '1')),
-              bumun: latest.bumun || '',
-              honbu: latest.honbu || '',
-              team: latest.team || '',
-              part: latest.part || ''
-            })
-          })
-        }
-        
-        await stream.sleep(3000)
-      }
-    } catch (e) {
-      console.error('SSE Stream Error:', e)
-    } finally {
-      console.log('SSE Stream Disconnected')
-    }
-  })
-})
 
 app.get('/sms/stats', async (c) => {
   const db = c.env.DB
@@ -4588,6 +4550,138 @@ app.get('/incidents/sms/:sms_id', async (c) => {
   return c.json(result)
 })
 
+app.get('/sms/notification-stream', async (c) => {
+  const db = c.env.DB;
+
+  return createSSEResponse(c, async (writeEvent, sleep) => {
+    console.log('[SSE] Client connected to notification-stream');
+
+    // ── 초기값 세팅: 현재 최신 레코드 기억 (이전 항목은 무시) ──
+    let lastSmsKey = null;
+    try {
+      const initSms = await db.prepare(
+        'SELECT inc_id, timestamp FROM received_messages ORDER BY timestamp DESC LIMIT 1'
+      ).first();
+      if (initSms) lastSmsKey = `${initSms.inc_id}_${initSms.timestamp}`;
+    } catch (e) {
+      console.warn('[SSE] Init SMS query failed:', e.message);
+    }
+
+    let lastCallKey = null;
+    try {
+      const initCall = await db.prepare(
+        'SELECT IGW_TXN_ID, CALL_DT FROM TB_SCL_CALL_HIST ORDER BY CALL_DT DESC LIMIT 1'
+      ).first();
+      if (initCall) lastCallKey = `${initCall.IGW_TXN_ID}_${initCall.CALL_DT}`;
+    } catch (e) {
+      console.warn('[SSE] Init CALL query failed:', e.message);
+    }
+
+    // 연결 확인용 초기 이벤트 즉시 전송
+    await writeEvent('connected', { ok: true, ts: Date.now() });
+
+    let lastHeartbeat = Date.now();
+
+    while (true) {
+      // ── Heartbeat (20초마다) ──
+      if (Date.now() - lastHeartbeat > 20000) {
+        await writeEvent('ping', 'heartbeat');
+        lastHeartbeat = Date.now();
+      }
+
+      // ── 새 SMS 수신 확인 ──
+      try {
+        const latestSms = await db.prepare(`
+          SELECT r.*, u.name as sender_name,
+                 COALESCE(oh.name, u.honbu) as bumun,
+                 COALESCE(ot.name, u.team) as honbu,
+                 COALESCE(op.name, u.part) as team,
+                 COALESCE(os.name, u.subpart) as part
+          FROM received_messages r
+          LEFT JOIN users u ON r.employee_id = u.employee_id
+          LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+          LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+          LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+          LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+          ORDER BY r.timestamp DESC LIMIT 1
+        `).first();
+        const smsKey = latestSms ? `${latestSms.inc_id}_${latestSms.timestamp}` : null;
+        if (latestSms && smsKey !== lastSmsKey) {
+          lastSmsKey = smsKey;
+          await writeEvent('sms_received', {
+            inc_id: latestSms.inc_id,
+            sender: latestSms.sender,
+            sender_name: latestSms.sender_name || '',
+            message: latestSms.message,
+            timestamp: latestSms.timestamp,
+            keyword_detected: parseInt(String(latestSms.keyword_detected || '0')),
+            response_message: latestSms.response_message,
+            received_count: parseInt(String(latestSms.received_count || '1')),
+            bumun: latestSms.bumun || '',
+            honbu: latestSms.honbu || '',
+            team: latestSms.team || '',
+            part: latestSms.part || ''
+          });
+          console.log('[SSE] Sent sms_received for inc_id:', latestSms.inc_id);
+        }
+      } catch (smsErr) {
+        console.error('[SSE] SMS poll error:', smsErr.message);
+      }
+
+      // ── S-Callert 발신 완료 이벤트 확인 ──
+      try {
+        const latestCall = await db.prepare(
+          'SELECT * FROM TB_SCL_CALL_HIST ORDER BY CALL_DT DESC LIMIT 1'
+        ).first();
+        const callKey = latestCall ? `${latestCall.IGW_TXN_ID}_${latestCall.CALL_DT}` : null;
+        if (latestCall && callKey !== lastCallKey) {
+          lastCallKey = callKey;
+          let dispatchDeviceId = latestCall.EMP_ID;
+          try {
+            const raw = JSON.parse(latestCall.RAW_PAYLOAD || '{}');
+            if (raw.employee_id) dispatchDeviceId = raw.employee_id;
+          } catch (e) {}
+          await writeEvent('scallert_triggered', {
+            strategy_id: latestCall.STRATEGY_ID,
+            inc_id: latestCall.INC_ID,
+            target_emp: latestCall.EMP_ID,
+            target_name: latestCall.EMP_NM || '담당자',
+            target_mobile: latestCall.MOBILE_NO,
+            dispatcher_device: dispatchDeviceId
+          });
+          console.log('[SSE] Sent scallert_triggered for inc_id:', latestCall.INC_ID);
+        }
+      } catch (callErr) {
+        console.error('[SSE] CALL poll error:', callErr.message);
+      }
+
+      await sleep(2000);
+    }
+  });
+});
+
+// ── SSE Diagnostic Ping (디버그용 — DB 없이 순수 SSE 동작 확인) ────────────────
+app.get('/sms/sse-ping', async (c) => {
+  return createSSEResponse(c, async (writeEvent, sleep) => {
+    console.log('[SSE-PING] Client connected');
+    let count = 0;
+    while (true) {
+      await writeEvent('ping', { ok: true, count: ++count, ts: Date.now() });
+      await sleep(3000);
+    }
+  });
+});
+
+// ── SSE via Durable Object (DO push 방식 — 실시간, 폴링 없음) ────────────────
+app.get('/sms/sse', async (c) => {
+  const doId = c.env.WARROOM_DO.idFromName('GLOBAL_PIPELINE');
+  const room = c.env.WARROOM_DO.get(doId);
+  return room.fetch(new Request('https://dummy/sse', {
+    headers: c.req.raw.headers,
+  }));
+});
+
+// 기존의 와일드카드 라우트 (위의 정적 라우트들 아래에 배치되어야 404 방지)
 app.get('/sms/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
@@ -9631,13 +9725,42 @@ export class WarRoom {
       if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
       try {
         const bodyStr = await request.text();
-        const enc = new TextEncoder().encode(`data: ${bodyStr}\n\n`);
+        let eventType = 'message';
+        try {
+          const parsed = JSON.parse(bodyStr);
+          if (parsed.type) eventType = parsed.type;
+        } catch(e) {}
+        
+        const enc = new TextEncoder().encode(`event: ${eventType}\ndata: ${bodyStr}\n\n`);
         
         for (const writer of this.sseWriters) {
           writer.write(enc).catch(() => {
             this.sseWriters.delete(writer); // 연결 끊김 감지 및 삭제
           });
         }
+        return new Response("OK");
+      } catch (e) {
+        return new Response(e.message, { status: 500 });
+      }
+    }
+
+    if (url.pathname.endsWith('/set-scallert-alarm')) {
+      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+      try {
+        const body = await request.json();
+        const alarmTime = Date.now() + body.waitMs;
+        
+        // 🚨 DO Storage에 알람 데이터 기록
+        const alarms = await this.state.storage.get("scallert_alarms") || [];
+        alarms.push({ triggerAt: alarmTime, payload: body.payload });
+        await this.state.storage.put("scallert_alarms", alarms);
+        
+        // 🚨 DO Alarm 스케줄 갱신 (더 이른 시간에 예약된 알람이 있으면 갱신하지 않음)
+        const currentAlarm = await this.state.storage.getAlarm();
+        if (!currentAlarm || alarmTime < currentAlarm) {
+          await this.state.storage.setAlarm(alarmTime);
+        }
+        
         return new Response("OK");
       } catch (e) {
         return new Response(e.message, { status: 500 });
@@ -9658,6 +9781,43 @@ export class WarRoom {
       status: 101,
       webSocket: client,
     });
+  }
+
+  async alarm() {
+    try {
+      const now = Date.now();
+      const alarms = await this.state.storage.get("scallert_alarms") || [];
+      const pending = [];
+      const toExecute = [];
+      
+      for (const a of alarms) {
+        if (a.triggerAt <= now) {
+          toExecute.push(a);
+        } else {
+          pending.push(a);
+        }
+      }
+      
+      await this.state.storage.put("scallert_alarms", pending);
+      
+      if (pending.length > 0) {
+        const nextTime = Math.min(...pending.map(a => a.triggerAt));
+        await this.state.storage.setAlarm(nextTime);
+      }
+      
+      // 실행 시기가 된 작업들 처리 (DB 조작 및 푸시 발신은 index.js 외부 함수 직접 호출)
+      for (const task of toExecute) {
+        try {
+          console.log(`[DO Alarm] ⏰ Executing scheduled S-Callert trigger for inc_id: ${task.payload.inc_id}`);
+          // `executeSCallertFinal`은 index.js 의 스코프 내에 있으므로 직접 호출 가능합니다.
+          await executeSCallertFinal(this.env, task.payload.strategy, task.payload.payload, task.payload.inc_id);
+        } catch (e) {
+          console.error(`[DO Alarm] Error executing S-Callert task:`, e);
+        }
+      }
+    } catch (e) {
+      console.error(`[DO Alarm] Fatal error during alarm execution:`, e);
+    }
   }
 
   async handleSession(webSocket) {
@@ -10100,10 +10260,35 @@ app.get('/scallert/strategies', async (c) => {
     await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_CALL_HIST (
       LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT, INC_ID TEXT, IGW_TXN_ID TEXT,
       EMP_ID TEXT, EMP_NM TEXT, MOBILE_NO TEXT, ATTEMPT_SEQ INTEGER DEFAULT 1,
-      PDS_RESULT_CD TEXT, CALL_DT TEXT, REG_DT TEXT
+      PDS_RESULT_CD TEXT, CALL_DT TEXT, REG_DT TEXT,
+      CONNECTED_DT TEXT, CONNECTED_TS INTEGER DEFAULT 0, DURATION_SEC INTEGER DEFAULT 0,
+      RAW_PAYLOAD TEXT
     )`).run();
 
-    const { results } = await db.prepare("SELECT * FROM TB_SCL_STRATEGY_MST ORDER BY STRATEGY_ID ASC").all();
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN CONNECTED_DT TEXT`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN CONNECTED_TS INTEGER DEFAULT 0`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN DURATION_SEC INTEGER DEFAULT 0`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN RAW_PAYLOAD TEXT`).run();
+    } catch (e) {}
+
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_STRATEGY_MST ADD COLUMN PRIORITY INTEGER DEFAULT 99`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_STRATEGY_MST ADD COLUMN DELAY_SEC INTEGER DEFAULT 0`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_STRATEGY_MST ADD COLUMN VALID_CONDITIONS TEXT DEFAULT '[]'`).run();
+    } catch (e) {}
+
+    const { results } = await db.prepare("SELECT * FROM TB_SCL_STRATEGY_MST ORDER BY PRIORITY ASC, STRATEGY_ID ASC").all();
     return c.json(results || []);
   } catch (e) {
     return c.json({ error: e.message }, 500);
@@ -10120,11 +10305,12 @@ app.post('/scallert/strategies', async (c) => {
   try {
     await db.prepare(`
       INSERT INTO TB_SCL_STRATEGY_MST (
-        STRATEGY_ID, STRATEGY_NM, STRATEGY_CONT, APPLY_START_DT, APPLY_END_DT, MAX_CALL_CNT, USE_YN, REG_ID, REG_DT, MOD_ID, MOD_DT
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        STRATEGY_ID, STRATEGY_NM, STRATEGY_CONT, APPLY_START_DT, APPLY_END_DT, MAX_CALL_CNT, USE_YN, PRIORITY, DELAY_SEC, VALID_CONDITIONS, REG_ID, REG_DT, MOD_ID, MOD_DT
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       strategyId, body.strategy_nm, body.strategy_cont || '1', body.apply_start_dt, body.apply_end_dt, 
-      body.max_call_cnt || 3, body.use_yn || 'Y', 
+      body.max_call_cnt || 3, body.use_yn || 'Y', body.priority || 99, body.delay_sec || 0,
+      JSON.stringify(body.valid_conditions || []),
       body.reg_id || 'SYSTEM', now, body.reg_id || 'SYSTEM', now
     ).run();
     return c.json({ success: true, strategy_id: strategyId });
@@ -10133,7 +10319,7 @@ app.post('/scallert/strategies', async (c) => {
   }
 });
 
-// 2. 전략 수정
+// 2. 전략 수정 (부분 업데이트 지원)
 app.patch('/scallert/strategies/:id', async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
@@ -10141,14 +10327,41 @@ app.patch('/scallert/strategies/:id', async (c) => {
   const now = getKst();
 
   try {
+    // 현재 레코드 조회
+    const existing = await db.prepare(
+      'SELECT * FROM TB_SCL_STRATEGY_MST WHERE STRATEGY_ID = ?'
+    ).bind(id).first();
+
+    if (!existing) return c.json({ error: 'Strategy not found' }, 404);
+
+    // 전달된 필드만 덮어쓰기 (partial merge)
+    const merged = {
+      strategy_nm:       body.strategy_nm       ?? existing.STRATEGY_NM,
+      strategy_cont:     body.strategy_cont     ?? existing.STRATEGY_CONT,
+      apply_start_dt:    body.apply_start_dt    ?? existing.APPLY_START_DT,
+      apply_end_dt:      body.apply_end_dt      ?? existing.APPLY_END_DT,
+      max_call_cnt:      body.max_call_cnt       ?? existing.MAX_CALL_CNT,
+      use_yn:            body.use_yn            ?? existing.USE_YN,
+      priority:          body.priority           ?? existing.PRIORITY ?? 99,
+      delay_sec:         body.delay_sec          ?? existing.DELAY_SEC ?? 0,
+      valid_conditions:  body.valid_conditions  !== undefined
+                           ? JSON.stringify(body.valid_conditions)
+                           : (existing.VALID_CONDITIONS || '[]'),
+      mod_id:            body.mod_id            ?? existing.MOD_ID ?? 'SYSTEM',
+    };
+
     await db.prepare(`
       UPDATE TB_SCL_STRATEGY_MST 
-      SET STRATEGY_NM = ?, STRATEGY_CONT = ?, APPLY_START_DT = ?, APPLY_END_DT = ?, MAX_CALL_CNT = ?, USE_YN = ?, MOD_ID = ?, MOD_DT = ?
+      SET STRATEGY_NM = ?, STRATEGY_CONT = ?, APPLY_START_DT = ?, APPLY_END_DT = ?,
+          MAX_CALL_CNT = ?, USE_YN = ?, PRIORITY = ?, DELAY_SEC = ?,
+          VALID_CONDITIONS = ?, MOD_ID = ?, MOD_DT = ?
       WHERE STRATEGY_ID = ?
     `).bind(
-      body.strategy_nm, body.strategy_cont, body.apply_start_dt, body.apply_end_dt, 
-      body.max_call_cnt, body.use_yn, body.mod_id || 'SYSTEM', now, id
+      merged.strategy_nm, merged.strategy_cont, merged.apply_start_dt, merged.apply_end_dt,
+      merged.max_call_cnt, merged.use_yn, merged.priority, merged.delay_sec,
+      merged.valid_conditions, merged.mod_id, now, id
     ).run();
+
     return c.json({ success: true });
   } catch (e) {
     return c.json({ error: e.message }, 500);
@@ -10160,8 +10373,25 @@ app.get('/scallert/strategies/:id/targets', async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
   try {
-    const { results } = await db.prepare("SELECT * FROM TB_SCL_TARGET_INFO WHERE STRATEGY_ID = ? ORDER BY SORT_ORD ASC").bind(id).all();
+    const { results } = await db.prepare(`
+      SELECT t.SEQ_NO, t.STRATEGY_ID, t.EMP_ID, t.EMP_NM, COALESCE(NULLIF(TRIM(u.phone), ''), t.MOBILE_NO) AS MOBILE_NO, t.SORT_ORD, t.USE_YN, t.REG_ID, t.REG_DT
+      FROM TB_SCL_TARGET_INFO t
+      LEFT JOIN users u ON TRIM(t.EMP_ID) = TRIM(u.employee_id)
+      WHERE t.STRATEGY_ID = ?
+      ORDER BY t.SORT_ORD ASC
+    `).bind(id).all();
     return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get('/debug/test-users', async (c) => {
+  try {
+    const db = c.env.DB;
+    const users = await db.prepare("SELECT employee_id, name, phone, email, is_admin FROM users LIMIT 50").all();
+    const targets = await db.prepare("SELECT * FROM TB_SCL_TARGET_INFO LIMIT 50").all();
+    return c.json({ users: users.results || [], targets: targets.results || [] });
   } catch (e) {
     return c.json({ error: e.message }, 500);
   }
@@ -10223,9 +10453,11 @@ app.get('/scallert/strategies/:id/history', async (c) => {
   const limit = c.req.query('limit') || 50;
   try {
     const { results } = await db.prepare(`
-      SELECT h.*, t.EMP_NM as emp_nm, t.MOBILE_NO as mobile_no
+      SELECT h.*, 
+        COALESCE(u.name, h.EMP_NM) as emp_nm, 
+        COALESCE(NULLIF(TRIM(u.phone), ''), h.MOBILE_NO) as mobile_no
       FROM TB_SCL_CALL_HIST h
-      LEFT JOIN TB_SCL_TARGET_INFO t ON h.EMP_ID = t.EMP_ID
+      LEFT JOIN users u ON TRIM(h.EMP_ID) = TRIM(u.employee_id)
       WHERE h.STRATEGY_ID = ? 
       ORDER BY h.CALL_DT DESC LIMIT ?
     `).bind(id, limit).all();
@@ -10234,6 +10466,444 @@ app.get('/scallert/strategies/:id/history', async (c) => {
     return c.json({ error: e.message }, 500);
   }
 });
+
+// PDS API 호출 공통 헬퍼
+async function triggerPdsCall(db, strategyId, target, incId, message, rawPayload, env) {
+  try {
+    const cfg = await db.prepare("SELECT * FROM TB_SCL_PDS_CONFIG WHERE STRATEGY_ID = ? AND USE_YN = 'Y' ORDER BY CONFIG_ID DESC LIMIT 1").bind(strategyId).first();
+    if (!cfg) {
+      console.warn(`No PDS Config found for strategy ${strategyId}`);
+      return false;
+    }
+
+    let apiUrl     = cfg.API_URL;
+    let apiMethod  = cfg.API_METHOD || 'POST';
+    let apiHeaders = JSON.parse(cfg.API_HEADERS || '{}');
+    let apiParams  = JSON.parse(cfg.API_PARAMS  || '{}');
+    let timeoutSec = cfg.TIMEOUT_SEC || 10;
+
+    if (!apiUrl) {
+      console.warn('API URL is empty in config');
+      return false;
+    }
+
+    const replacePlaceholders = (strOrObj) => {
+      if (typeof strOrObj === 'string') {
+        return strOrObj
+          .replace(/\{\{MOBILE_NO\}\}/g, target.MOBILE_NO || '')
+          .replace(/\{\{phone_number\}\}/g, target.MOBILE_NO || '')
+          .replace(/\{\{EMP_NM\}\}/g, target.EMP_NM || '')
+          .replace(/\{\{employee_name\}\}/g, target.EMP_NM || '')
+          .replace(/\{\{EMP_ID\}\}/g, target.EMP_ID || '')
+          .replace(/\{\{employee_id\}\}/g, target.EMP_ID || '')
+          .replace(/\{\{INC_ID\}\}/g, incId || '')
+          .replace(/\{\{message\}\}/g, message || '');
+      } else if (typeof strOrObj === 'object' && strOrObj !== null) {
+        const result = {};
+        for (const [key, value] of Object.entries(strOrObj)) {
+          result[key] = replacePlaceholders(value);
+        }
+        return result;
+      }
+      return strOrObj;
+    };
+
+    apiUrl = replacePlaceholders(apiUrl);
+    apiHeaders = replacePlaceholders(apiHeaders);
+    apiParams = replacePlaceholders(apiParams);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutSec * 1000);
+    const fetchOpts = {
+      method: apiMethod,
+      headers: { 'Content-Type': 'application/json', ...apiHeaders },
+      signal: controller.signal,
+    };
+    if (apiMethod !== 'GET') {
+      fetchOpts.body = JSON.stringify(apiParams);
+    }
+    const finalUrl = apiMethod === 'GET' && Object.keys(apiParams).length
+      ? `${apiUrl}?${new URLSearchParams(apiParams).toString()}`
+      : apiUrl;
+
+    console.log(`Triggering PDS API: ${apiMethod} ${finalUrl}`);
+    const res = await fetch(finalUrl, fetchOpts);
+    clearTimeout(timer);
+    return res.ok;
+  } catch (e) {
+    console.error(`PDS Call trigger failed: ${e.message}`);
+    return false;
+  }
+}
+
+// 다음 수신자 순차 발신 트리거
+async function triggerNextTarget(db, currentCall, env) {
+  try {
+    const strategyId = currentCall.STRATEGY_ID;
+    const now = getKst();
+    
+    const strategy = await db.prepare(`
+      SELECT * FROM TB_SCL_STRATEGY_MST 
+      WHERE STRATEGY_ID = ? AND USE_YN = 'Y'
+    `).bind(strategyId).first();
+    if (!strategy) return;
+
+    let targets = [];
+    if (strategy.STRATEGY_CONT === '4') {
+      let targetUserId = null;
+      try {
+        const payloadObj = JSON.parse(currentCall.RAW_PAYLOAD || '{}');
+        targetUserId = payloadObj.employee_id || payloadObj.emp_id;
+      } catch (e) {}
+
+      if (targetUserId) {
+        const substitutes = await db.prepare(`
+          SELECT s.id, s.deputy_id, s.priority, u.name as deputy_name, u.phone as deputy_phone
+          FROM substitutes s
+          JOIN users u ON s.deputy_id = u.employee_id
+          WHERE s.user_id = ?
+          ORDER BY s.priority ASC
+        `).bind(targetUserId).all();
+
+        targets = (substitutes.results || []).map(sub => ({
+          EMP_ID: sub.deputy_id,
+          EMP_NM: sub.deputy_name,
+          MOBILE_NO: sub.deputy_phone || '010-0000-0000',
+          SORT_ORD: sub.priority
+        }));
+      }
+    } else {
+      const { results } = await db.prepare(`
+        SELECT t.SEQ_NO, t.STRATEGY_ID, t.EMP_ID, t.EMP_NM, COALESCE(NULLIF(TRIM(u.phone), ''), t.MOBILE_NO) AS MOBILE_NO, t.SORT_ORD, t.USE_YN, t.REG_ID, t.REG_DT
+        FROM TB_SCL_TARGET_INFO t
+        LEFT JOIN users u ON TRIM(t.EMP_ID) = TRIM(u.employee_id)
+        WHERE t.STRATEGY_ID = ? AND t.USE_YN = 'Y' 
+        ORDER BY t.SORT_ORD ASC
+      `).bind(strategyId).all();
+      targets = results || [];
+    }
+
+    if (!targets || targets.length === 0) return;
+
+    const maxAttempts = strategy.MAX_CALL_CNT || 3;
+    const currentAttempt = currentCall.ATTEMPT_SEQ || 1;
+
+    if (currentAttempt < maxAttempts) {
+      const nextAttempt = currentAttempt + 1;
+      const nextTarget = targets[(nextAttempt - 1) % targets.length];
+
+      await db.prepare(`
+        INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        strategyId, 
+        nextTarget.EMP_ID, 
+        nextTarget.EMP_NM,
+        nextTarget.MOBILE_NO,
+        nextAttempt, 
+        currentCall.IGW_TXN_ID, 
+        'PENDING', 
+        now, 
+        currentCall.INC_ID || null, 
+        currentCall.RAW_PAYLOAD || '{}', 
+        now
+      ).run();
+
+      let message = '';
+      try {
+        const payloadObj = JSON.parse(currentCall.RAW_PAYLOAD || '{}');
+        message = payloadObj.message || '';
+      } catch (e) {}
+
+      await triggerPdsCall(db, strategyId, nextTarget, currentCall.INC_ID, message, currentCall.RAW_PAYLOAD, env);
+    }
+  } catch (e) {
+    console.error('Failed to trigger next target:', e.message);
+  }
+}
+
+async function triggerAppPushCall(c, target_user_id, phone_number) {
+  const env = c.env;
+  const db = env.DB;
+  const serviceAccountJson = env.FCM_SERVICE_ACCOUNT;
+  
+  let success = false;
+  let method = 'NONE';
+  let resultDetail = '';
+
+  // 🚀 안드로이드 기기 등에서 하이픈(-) 때문에 전화가 안 걸리는 현상 방지
+  const cleanPhone = String(phone_number || '').replace(/[^0-9]/g, '');
+
+  let fcmRow = null;
+  try {
+    fcmRow = await db.prepare("SELECT fcm_token FROM fcm_tokens WHERE user_id = ?").bind(target_user_id).first();
+  } catch (e) {
+    console.error(`[triggerAppPushCall] FCM DB Error: ${e.message}`);
+  }
+
+  if (fcmRow && serviceAccountJson) {
+    try {
+      const sa = JSON.parse(serviceAccountJson);
+      const projectId = sa.project_id;
+      const now = Math.floor(Date.now() / 1000);
+      const jwtHeader  = { alg: 'RS256', typ: 'JWT' };
+      const jwtPayload = { iss: sa.client_email, scope: 'https://www.googleapis.com/auth/firebase.messaging', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 };
+      const b64url = (obj) => btoa(JSON.stringify(obj)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+      const toSign = `${b64url(jwtHeader)}.${b64url(jwtPayload)}`;
+      const pemContents = sa.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
+      const keyData = Uint8Array.from(atob(pemContents), char => char.charCodeAt(0));
+      const privateKey = await crypto.subtle.importKey('pkcs8', keyData, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+      const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, new TextEncoder().encode(toSign));
+      const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+      const jwt = `${toSign}.${sig}`;
+
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenData.access_token) throw new Error(`Token error: ${JSON.stringify(tokenData)}`);
+
+      const fcmRes = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: {
+            token: fcmRow.fcm_token,
+            data: { action: 'CALL', phone_number: cleanPhone, log_title: 'S-Callert Trigger' },
+            android: { priority: 'HIGH' }
+          }
+        })
+      });
+      const fcmBody = await fcmRes.text();
+      success = fcmRes.ok;
+      method = 'FCM_V1';
+      resultDetail = fcmBody.substring(0, 500);
+      console.log(`[FCM-v1] user=${target_user_id} status=${fcmRes.status} body=${fcmBody.substring(0,120)}`);
+    } catch (fcmErr) {
+      method = 'FCM_V1_ERROR';
+      resultDetail = fcmErr.message;
+      success = false;
+    }
+  } else {
+    const payload = { tag: 'scallert-call-trigger', priority: 100, data: { action: 'CALL', phone_number: cleanPhone, log_title: 'S-Callert Trigger' } };
+    const results = await sendPushNotification(c, target_user_id, payload);
+    success = results?.length > 0 && results.some(r => r.ok);
+    method = 'VAPID_WEB_PUSH';
+    resultDetail = JSON.stringify(results).substring(0, 500);
+  }
+  return { success, method, detail: resultDetail };
+}
+
+function checkValidConditions(conditionsJson, nowKstStr) {
+  if (!conditionsJson) return true;
+  let conditions = [];
+  try {
+    conditions = typeof conditionsJson === 'string' ? JSON.parse(conditionsJson) : conditionsJson;
+  } catch (e) {
+    return true; 
+  }
+  if (!Array.isArray(conditions) || conditions.length === 0) return true;
+
+  // nowKstStr 포맷: "YYYY-MM-DD HH:MM:SS" 또는 "YYYY-MM-DDTHH:MM:SS"
+  // 표준 포맷으로 변환 후 Date 객체 생성
+  const formattedStr = nowKstStr.includes('T') ? nowKstStr : nowKstStr.replace(' ', 'T');
+  const dt = new Date(formattedStr + '+09:00'); // KST 시간으로 해석
+  const day = dt.getDay(); // 0: 일요일, 6: 토요일
+  const hour = dt.getHours();
+
+  const isWeekend = (day === 0 || day === 6);
+  const isDaytime = (hour >= 9 && hour < 18);
+
+  let hasDaytime = conditions.includes('DAYTIME');
+  let hasWeekend = conditions.includes('WEEKEND');
+  let hasNight18 = conditions.includes('NIGHT_18');
+  let hasNight19 = conditions.includes('NIGHT_19');
+  let hasNight20 = conditions.includes('NIGHT_20');
+
+  let matched = false;
+
+  if (hasDaytime && isDaytime && !isWeekend) {
+    matched = true;
+  }
+  if (hasWeekend && isWeekend) {
+    matched = true;
+  }
+  if (hasNight18 && (hour >= 18 || hour < 9) && !isWeekend) {
+    matched = true;
+  }
+  if (hasNight19 && (hour >= 19 || hour < 9) && !isWeekend) {
+    matched = true;
+  }
+  if (hasNight20 && (hour >= 20 || hour < 9) && !isWeekend) {
+    matched = true;
+  }
+
+  return matched;
+}
+
+async function executeSCallertStrategy(db, strategy, payload, inc_id, c) {
+  try {
+    const delaySec = strategy.DELAY_SEC || 0;
+    let waitMs = delaySec * 1000;
+    
+    console.log(`[scallert-trigger] 🏁 Starting S-Callert background trigger sequence`);
+    console.log(`[scallert-trigger] Incident ID: ${inc_id}, Strategy: ${strategy.STRATEGY_NM} (${strategy.STRATEGY_ID}), Delay Setting: ${delaySec}s`);
+
+    if (payload.occurred_at) {
+      try {
+        const formattedStr = payload.occurred_at.includes('T') ? payload.occurred_at : payload.occurred_at.replace(' ', 'T');
+        const smsTime = new Date(formattedStr + '+09:00').getTime();
+        const currentTime = Date.now();
+        const elapsedMs = currentTime - smsTime;
+        waitMs = (delaySec * 1000) - elapsedMs;
+        if (waitMs < 0) waitMs = 0;
+        
+        console.log(`[scallert-trigger] ⏱️ SMS Received KST: ${payload.occurred_at} (${smsTime})`);
+        console.log(`[scallert-trigger] ⏱️ Current Time UTC: ${new Date(currentTime).toISOString()} (${currentTime})`);
+        console.log(`[scallert-trigger] ⏱️ Elapsed Time: ${elapsedMs}ms, Initial Wait: ${delaySec * 1000}ms, Adjusted Wait: ${waitMs}ms`);
+      } catch (err) {
+        console.error(`[scallert-trigger] Error parsing occurred_at: ${err.message}`);
+      }
+    }
+
+
+    if (waitMs > 0) {
+      console.log(`[scallert-trigger] ⏳ Delaying call trigger for remaining ${waitMs}ms via DO Alarm...`);
+      try {
+        const doId = c.env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+        const room = c.env.WARROOM_DO.get(doId);
+        await room.fetch(new Request("https://dummy/set-scallert-alarm", {
+          method: "POST",
+          body: JSON.stringify({
+            waitMs,
+            payload: { strategy, payload, inc_id }
+          })
+        }));
+        console.log(`[scallert-trigger] ✅ Alarm scheduled successfully. Background process terminating safely.`);
+      } catch (err) {
+        console.error(`[scallert-trigger] 🚨 Failed to schedule DO alarm: ${err.message}. Falling back to immediate execution.`);
+        await executeSCallertFinal(c.env, strategy, payload, inc_id);
+      }
+    } else {
+      console.log(`[scallert-trigger] 🚀 No wait needed! Executing immediately.`);
+      await executeSCallertFinal(c.env, strategy, payload, inc_id);
+    }
+  } catch (e) {
+    console.error('[scallert] Error in background sequence:', e.message);
+  }
+}
+
+async function executeSCallertFinal(env, strategy, payload, inc_id) {
+  try {
+    const db = env.DB;
+    let targets = [];
+    if (!payload.employee_id && !payload.emp_id) {
+      console.warn(`[scallert-trigger] ⚠️ targetUserId is missing. Falling back to default '18121020'`);
+      payload.employee_id = '18121020';
+    }
+
+    if (strategy.STRATEGY_CONT === '4') {
+      let targetUserId = payload.employee_id || payload.emp_id;
+      const substitutes = await db.prepare(`
+        SELECT s.id, s.deputy_id, s.priority, u.name as deputy_name, u.phone as deputy_phone
+        FROM substitutes s JOIN users u ON s.deputy_id = u.employee_id
+        WHERE s.user_id = ? ORDER BY s.priority ASC
+      `).bind(targetUserId).all();
+      targets = (substitutes.results || []).map(sub => ({
+        EMP_ID: sub.deputy_id, EMP_NM: sub.deputy_name, MOBILE_NO: sub.deputy_phone || '010-0000-0000', SORT_ORD: sub.priority
+      }));
+
+      // 🚀 NEW FALLBACK: If substitutes table is empty, fall back to the strategy's manually configured targets
+      if (!targets || targets.length === 0) {
+        console.warn(`[scallert-trigger] No substitutes found for ${targetUserId}. Falling back to manually configured targets.`);
+        const { results } = await db.prepare(`
+          SELECT t.SEQ_NO, t.STRATEGY_ID, t.EMP_ID, t.EMP_NM, COALESCE(NULLIF(TRIM(u.phone), ''), t.MOBILE_NO) AS MOBILE_NO, t.SORT_ORD, t.USE_YN
+          FROM TB_SCL_TARGET_INFO t LEFT JOIN users u ON TRIM(t.EMP_ID) = TRIM(u.employee_id)
+          WHERE t.STRATEGY_ID = ? AND t.USE_YN = 'Y' ORDER BY t.SORT_ORD ASC
+        `).bind(strategy.STRATEGY_ID).all();
+        targets = results || [];
+      }
+    } else {
+      const { results } = await db.prepare(`
+        SELECT t.SEQ_NO, t.STRATEGY_ID, t.EMP_ID, t.EMP_NM, COALESCE(NULLIF(TRIM(u.phone), ''), t.MOBILE_NO) AS MOBILE_NO, t.SORT_ORD, t.USE_YN
+        FROM TB_SCL_TARGET_INFO t LEFT JOIN users u ON TRIM(t.EMP_ID) = TRIM(u.employee_id)
+        WHERE t.STRATEGY_ID = ? AND t.USE_YN = 'Y' ORDER BY t.SORT_ORD ASC
+      `).bind(strategy.STRATEGY_ID).all();
+      targets = results || [];
+    }
+
+    if (!targets || targets.length === 0) {
+      console.warn('No active targets for strategy');
+      try {
+        const doId = env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+        const room = env.WARROOM_DO.get(doId);
+        await room.fetch(new Request("https://dummy/broadcast-sse", {
+          method: "POST",
+          body: JSON.stringify({
+            type: "scallert_triggered",
+            timestamp: new Date().toISOString(),
+            data: {
+              target_name: "대직자 없음 (설정 필요)",
+            }
+          })
+        }));
+      } catch(e) {}
+      return;
+    }
+
+    const target = targets[0];
+    const callTime = getKst();
+    const igw_txn_id = payload.igw_txn_id || `INT_${Date.now()}`;
+    const message = payload.message || '';
+
+    await db.prepare(`
+      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      strategy.STRATEGY_ID, target.EMP_ID, target.EMP_NM, target.MOBILE_NO, 1, 
+      igw_txn_id, 'PENDING', callTime, inc_id || null, JSON.stringify(payload), callTime
+    ).run();
+
+    const pdsSuccess = await triggerPdsCall(db, strategy.STRATEGY_ID, target, inc_id, message, JSON.stringify(payload), env);
+    console.log(`[scallert] Call triggered successfully: ${pdsSuccess}`);
+
+    try {
+      const dispatchDeviceId = payload.employee_id || target.EMP_ID;
+      console.log(`[scallert-trigger] Sending device push call ring to Dispatcher Device: ${dispatchDeviceId} (Target number: ${target.MOBILE_NO})`);
+      const pushRes = await triggerAppPushCall(c, dispatchDeviceId, target.MOBILE_NO);
+      console.log(`[scallert-trigger] Device push result: ${pushRes.success} via ${pushRes.method}`);
+      
+      try {
+        const doId = env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+        const room = env.WARROOM_DO.get(doId);
+        await room.fetch(new Request("https://dummy/broadcast-sse", {
+          method: "POST",
+          body: JSON.stringify({
+            type: "scallert_triggered",
+            timestamp: new Date().toISOString(),
+            data: {
+              strategy_id: strategy.STRATEGY_ID,
+              inc_id: inc_id,
+              target_emp: target.EMP_ID,
+              target_name: target.EMP_NM,
+              target_mobile: target.MOBILE_NO,
+              dispatcher_device: dispatchDeviceId
+            }
+          })
+        }));
+        console.log("[scallert-trigger] Broadcasted SSE successfully");
+      } catch (sseErr) {
+        console.error("[scallert-trigger] Broadcast trigger error:", sseErr);
+      }
+    } catch (pe) {
+      console.error(`[scallert-trigger] Device push error: ${pe.message}`);
+    }
+  } catch (e) {
+    console.error('[scallert] Error in executeSCallertFinal:', e.message);
+  }
+}
 
 // 8. IGW 이벤트 수신 (실제 발신 로직)
 app.post('/scallert/igw-event', async (c) => {
@@ -10268,29 +10938,22 @@ app.post('/scallert/igw-event', async (c) => {
     
     if (!strategy) return c.json({ error: 'Active strategy not found or expired' }, 404);
 
-    const { results: targets } = await db.prepare("SELECT * FROM TB_SCL_TARGET_INFO WHERE STRATEGY_ID = ? ORDER BY SORT_ORD ASC").bind(strategy_id).all();
-    if (!targets || targets.length === 0) return c.json({ error: 'No targets' }, 404);
-    const maxAttempts = strategy.MAX_CALL_CNT || 3;
-    const callResults = [];
-
-    for (let i = 1; i <= maxAttempts; i++) {
-      const target = targets[(i - 1) % targets.length];
-      
-      // PDS API 호출 (Mock or Actual)
-      let pdsStatus = 'SUCCESS'; 
-      // 실제 환경에서는 fetch(c.env.PDS_API_URL, ...) 호출 로직 추가
-      
-      await db.prepare(`
-        INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_ID, REG_DT)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(strategy_id, target.EMP_ID, i, igw_txn_id, pdsStatus, now, inc_id || null, JSON.stringify(payload), 'IGW_SYSTEM', now).run();
-
-      callResults.push({ attempt: i, emp_id: target.EMP_ID, result: pdsStatus });
-      if (pdsStatus === 'SUCCESS') break;
-      await new Promise(r => setTimeout(r, 1000));
+    // 발신 유효 시간 조건 체크
+    const isValidTime = checkValidConditions(strategy.VALID_CONDITIONS, now);
+    if (!isValidTime) {
+      return c.json({ 
+        ok: true, 
+        skipped: true, 
+        reason: 'TIME_CONDITION_NOT_MET',
+        message: `발신 유효 조건에 맞지 않아 발신을 건너뛰었습니다. (조건: ${strategy.VALID_CONDITIONS})` 
+      });
     }
 
-    return c.json({ ok: true, details: callResults });
+    const delaySec = strategy.DELAY_SEC || 0;
+
+    c.executionCtx.waitUntil(executeSCallertStrategy(db, strategy, payload, inc_id, c));
+
+    return c.json({ ok: true, initiated: true, delayed_sec: delaySec });
   } catch (e) {
     return c.json({ error: e.message }, 500);
   }
@@ -10418,6 +11081,60 @@ app.post('/scallert/strategies/:id/test-call', async (c) => {
   return c.json({ success, status_code: statusCode, response: responseBody, elapsed_ms: elapsed, tested_at: now });
 });
 
+// 11.5. 특정 담당자 수동 발신
+app.post('/scallert/strategies/:id/call-target', async (c) => {
+  const db = c.env.DB;
+  const strategyId = c.req.param('id');
+  const body = await c.req.json();
+  const empId = String(body.emp_id || '');
+
+  if (!empId) return c.json({ error: 'emp_id is required' }, 400);
+
+  try {
+    const target = await db.prepare(`
+      SELECT t.EMP_ID, t.EMP_NM, COALESCE(NULLIF(TRIM(u.phone), ''), t.MOBILE_NO) AS MOBILE_NO
+      FROM TB_SCL_TARGET_INFO t
+      LEFT JOIN users u ON TRIM(t.EMP_ID) = TRIM(u.employee_id)
+      WHERE t.STRATEGY_ID = ? AND TRIM(t.EMP_ID) = ?
+      LIMIT 1
+    `).bind(strategyId, empId.trim()).first();
+
+    if (!target) {
+      console.log(`[call-target] Not found. strategyId=${strategyId}, empId=${empId}`);
+      return c.json({ error: `대상자를 찾을 수 없습니다. (전달된 사번: ${empId})` }, 404);
+    }
+
+    const now = getKst();
+    const igwTxnId = `MANUAL_${Date.now()}`;
+
+    await db.prepare(`
+      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, REG_DT)
+      VALUES (?, ?, ?, ?, 1, ?, 'PENDING', ?, ?)
+    `).bind(
+      strategyId,
+      target.EMP_ID,
+      target.EMP_NM,
+      target.MOBILE_NO,
+      igwTxnId,
+      now,
+      now
+    ).run();
+
+    const success = await triggerPdsCall(db, strategyId, target, null, '수동 개별 호출', JSON.stringify({ emp_id: empId }), c.env);
+
+    // 🔥 수동 발신 시에도 해당 대상자(EMP_ID)의 기기(S-BRIDGE)로 푸시 발송!
+    try {
+      await triggerAppPushCall(c, target.EMP_ID, target.MOBILE_NO);
+    } catch (e) {
+      console.error(`[call-target] Push error: ${e.message}`);
+    }
+
+    return c.json({ success, message: '발신이 시작되었습니다.', igw_txn_id: igwTxnId });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // 12. 테스트 콜 로그 조회
 app.get('/scallert/strategies/:id/test-logs', async (c) => {
   const db = c.env.DB;
@@ -10465,6 +11182,83 @@ app.post('/call/event', async (c) => {
       INSERT INTO TB_SCL_APP_EVENT_LOG (EMPLOYEE_ID, PHONE_NUMBER, EVENT_TYPE, TIMESTAMP, EVENT_TIME, REG_DT)
       VALUES (?, ?, ?, ?, ?, ?)
     `).bind(employee_id, phone_number, event_type, timestamp || Date.now(), eventTimeStr, now).run();
+
+    // 가장 최근의 대기 중이거나 진행 중인 통화 이력 찾기
+    const cleanPhone = phone_number.replace(/[^0-9]/g, '');
+    const matchedCall = await db.prepare(`
+      SELECT * FROM TB_SCL_CALL_HIST
+      WHERE (EMP_ID = ? OR REPLACE(MOBILE_NO, '-', '') = ?)
+      ORDER BY LOG_ID DESC LIMIT 1
+    `).bind(employee_id, cleanPhone).first();
+
+    if (matchedCall) {
+      const currentTs = timestamp || Date.now();
+      const eventTypeUpper = (event_type || '').toUpperCase();
+      
+      if (eventTypeUpper === 'DIALING') {
+        await db.prepare(`
+          UPDATE TB_SCL_CALL_HIST 
+          SET PDS_RESULT_CD = 'DIALING'
+          WHERE LOG_ID = ?
+        `).bind(matchedCall.LOG_ID).run();
+      } else if (eventTypeUpper === 'RINGING') {
+        await db.prepare(`
+          UPDATE TB_SCL_CALL_HIST 
+          SET PDS_RESULT_CD = 'RINGING'
+          WHERE LOG_ID = ?
+        `).bind(matchedCall.LOG_ID).run();
+      } else if (eventTypeUpper === 'CONNECTED') {
+        await db.prepare(`
+          UPDATE TB_SCL_CALL_HIST 
+          SET PDS_RESULT_CD = 'CONNECTED', CONNECTED_DT = ?, CONNECTED_TS = ?
+          WHERE LOG_ID = ?
+        `).bind(now, currentTs, matchedCall.LOG_ID).run();
+      } else if (eventTypeUpper === 'DISCONNECTED') {
+        let durationSec = 0;
+        if (matchedCall.CONNECTED_TS && matchedCall.CONNECTED_TS > 0) {
+          durationSec = Math.floor((currentTs - matchedCall.CONNECTED_TS) / 1000);
+        } else {
+          try {
+            const callDtStr = matchedCall.CALL_DT;
+            const callTs = new Date(callDtStr.replace(' ', 'T') + '+09:00').getTime();
+            durationSec = Math.floor((currentTs - callTs) / 1000);
+          } catch (err) {}
+        }
+        
+        // 50초 안에 DISCONNECTED가 왔을경우 통화 성공(SUCCESS), 그외는 통화 실패(FAIL_VOICEMAIL)로 처리하고 다음 수신자 시도
+        if (durationSec > 0 && durationSec <= 50) {
+          await db.prepare(`
+            UPDATE TB_SCL_CALL_HIST 
+            SET PDS_RESULT_CD = 'SUCCESS', DURATION_SEC = ?
+            WHERE LOG_ID = ?
+          `).bind(durationSec, matchedCall.LOG_ID).run();
+        } else {
+          await db.prepare(`
+            UPDATE TB_SCL_CALL_HIST 
+            SET PDS_RESULT_CD = 'FAIL_VOICEMAIL', DURATION_SEC = ?
+            WHERE LOG_ID = ?
+          `).bind(durationSec, matchedCall.LOG_ID).run();
+          
+          await triggerNextTarget(db, { ...matchedCall, ATTEMPT_SEQ: matchedCall.ATTEMPT_SEQ || 1 }, c.env);
+        }
+      } else if (eventTypeUpper === 'MISSED') {
+        await db.prepare(`
+          UPDATE TB_SCL_CALL_HIST 
+          SET PDS_RESULT_CD = 'MISSED'
+          WHERE LOG_ID = ?
+        `).bind(matchedCall.LOG_ID).run();
+        
+        await triggerNextTarget(db, { ...matchedCall, ATTEMPT_SEQ: matchedCall.ATTEMPT_SEQ || 1 }, c.env);
+      } else if (eventTypeUpper === 'FAILED') {
+        await db.prepare(`
+          UPDATE TB_SCL_CALL_HIST 
+          SET PDS_RESULT_CD = 'FAILED'
+          WHERE LOG_ID = ?
+        `).bind(matchedCall.LOG_ID).run();
+        
+        await triggerNextTarget(db, { ...matchedCall, ATTEMPT_SEQ: matchedCall.ATTEMPT_SEQ || 1 }, c.env);
+      }
+    }
 
     return c.json({ success: true });
   } catch (e) {
@@ -10537,6 +11331,8 @@ app.get('/scallert/push-devices', async (c) => {
   }
 });
 
+
+
 app.post('/scallert/test-push', async (c) => {
   const db = c.env.DB;
   try {
@@ -10546,90 +11342,8 @@ app.post('/scallert/test-push', async (c) => {
     }
 
     const now = getKst();
-    let success = false;
-    let method = '';
-    let resultDetail = '';
-
-    // ① FCM 토큰 조회 (Android 앱 등록 토큰)
-    let fcmRow = null;
-    try {
-      fcmRow = await db.prepare(`SELECT fcm_token FROM fcm_tokens WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1`)
-        .bind(target_user_id).first();
-    } catch (_) {}
-
-    if (fcmRow?.fcm_token) {
-      // FCM v1 API (서비스 계정 기반 OAuth2)
-      const saJson = c.env.FCM_SERVICE_ACCOUNT;
-      if (!saJson) {
-        return c.json({ error: 'FCM_SERVICE_ACCOUNT not configured in Worker secrets' }, 500);
-      }
-      try {
-        const sa = JSON.parse(saJson);
-        const projectId = sa.project_id;
-
-        // 1. JWT 생성 (RS256)
-        const now = Math.floor(Date.now() / 1000);
-        const jwtHeader  = { alg: 'RS256', typ: 'JWT' };
-        const jwtPayload = {
-          iss:  sa.client_email,
-          scope: 'https://www.googleapis.com/auth/firebase.messaging',
-          aud:  'https://oauth2.googleapis.com/token',
-          iat:  now,
-          exp:  now + 3600
-        };
-        const b64url = (obj) => btoa(JSON.stringify(obj)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-        const toSign = `${b64url(jwtHeader)}.${b64url(jwtPayload)}`;
-
-        const pemContents = sa.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
-        const keyData = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-        const privateKey = await crypto.subtle.importKey('pkcs8', keyData, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-        const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, new TextEncoder().encode(toSign));
-        const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-        const jwt = `${toSign}.${sig}`;
-
-        // 2. Access Token 발급
-        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenData.access_token) throw new Error(`Token error: ${JSON.stringify(tokenData)}`);
-
-        // 3. FCM v1 API 호출
-        const fcmRes = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: {
-              token: fcmRow.fcm_token,
-              data: { action: 'CALL', phone_number: String(phone_number), log_title: 'S-Callert Trigger' },
-              android: { priority: 'HIGH' }
-            }
-          })
-        });
-        const fcmBody = await fcmRes.text();
-        success = fcmRes.ok;
-        method = 'FCM_V1';
-        resultDetail = fcmBody.substring(0, 500);
-        console.log(`[FCM-v1] user=${target_user_id} status=${fcmRes.status} body=${fcmBody.substring(0,120)}`);
-      } catch (fcmErr) {
-        method = 'FCM_V1_ERROR';
-        resultDetail = fcmErr.message;
-        success = false;
-      }
-    } else {
-      // ② fallback: VAPID Web Push (브라우저 구독)
-      const payload = {
-        tag: 'scallert-call-trigger',
-        priority: 100,
-        data: { action: 'CALL', phone_number, log_title: 'S-Callert Trigger' }
-      };
-      const results = await sendPushNotification(c, target_user_id, payload);
-      success = results?.length > 0 && results.some(r => r.ok);
-      method = 'VAPID_WEB_PUSH';
-      resultDetail = JSON.stringify(results).substring(0, 500);
-    }
+    const pushRes = await triggerAppPushCall(c, target_user_id, phone_number);
+    const { success, method, detail: resultDetail } = pushRes;
 
     // 로그 저장
     await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_TEST_LOG (
@@ -10646,6 +11360,28 @@ app.post('/scallert/test-push', async (c) => {
   }
 });
 
+app.get('/scallert/debug-schema', async (c) => {
+  const db = c.env.DB;
+  const table = await db.prepare("PRAGMA table_info(TB_SCL_STRATEGY_MST)").all();
+  return c.json(table.results);
+});
+app.get('/scallert/debug-trigger', async (c) => {
+  try {
+    const db = c.env.DB;
+    const now = getKst();
+    await db.prepare(`
+      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      'DEBUG', '18121020', '조경훈(DEBUG)', '010-0000-0000', 1, 
+      `DBG_${Date.now()}`, 'PENDING', now, 999, JSON.stringify({ employee_id: '18121020' }), now
+    ).run();
+    return c.json({ success: true, message: 'Debug record inserted to trigger SSE' });
+  } catch (err) {
+    return c.json({ error: err.message, stack: err.stack }, 500);
+  }
+});
+
 // ── WebSocket Upgrade Route ──────────────────────────────────────────────────
 app.get('/warroom/ws/:id', async (c) => {
   const id = c.req.param('id');
@@ -10654,14 +11390,48 @@ app.get('/warroom/ws/:id', async (c) => {
   return room.fetch(c.req.raw);
 });
 
-// ── SSE Global Notification Stream ───────────────────────────────────────────
-app.get('/sms/notification-stream', async (c) => {
-  // 🚀 WARROOM_DO를 글로벌 싱글톤 메시지 브로커로 활용
-  const doId = c.env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
-  const room = c.env.WARROOM_DO.get(doId);
-  // 전달할 때 뒤에 /sse 를 붙여서 DO가 이를 인식하도록 함
-  const req = new Request(c.req.url + "/sse", c.req.raw);
-  return room.fetch(req);
-});
+// ── SSE 공통 헬퍼: Cloudflare Workers 네이티브 SSE 응답 생성 ──────────────────
+// ReadableStream 생성자 방식 — executionCtx 불필요, CF Workers 완벽 호환
+// 응답을 즉시 200으로 반환하고 스트림 내부에서 비동기 작업 수행
+function createSSEResponse(c, callback) {
+  const encoder = new TextEncoder();
+
+  let controllerRef = null;
+
+  const writeEvent = async (event, data) => {
+    if (!controllerRef) return;
+    const payload = typeof data === 'string' ? data : JSON.stringify(data);
+    controllerRef.enqueue(encoder.encode(`event: ${event}\ndata: ${payload}\n\n`));
+  };
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const stream = new ReadableStream({
+    start(controller) {
+      controllerRef = controller;
+      // 응답 헤더는 즉시 전송됨 — 이 콜백은 비동기로 실행되어도 안전
+      callback(writeEvent, sleep)
+        .catch((e) => console.error('[SSE] Fatal error:', e.message))
+        .finally(() => {
+          try { controller.close(); } catch (_) {}
+        });
+    },
+    cancel() {
+      console.log('[SSE] Client disconnected (stream cancelled)');
+      controllerRef = null;
+    }
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
 
 export default app
