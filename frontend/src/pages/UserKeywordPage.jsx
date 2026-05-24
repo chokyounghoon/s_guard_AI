@@ -53,11 +53,10 @@ export default function UserKeywordPage({ userProfile }) {
 
   useEffect(() => { 
     fetchUserKeywords(); 
-    const profile = getUserProfile();
-    if (profile?.employee_id) {
-      setTestId(profile.employee_id);
+    if (userProfile?.employee_id) {
+      setTestId(userProfile.employee_id);
     }
-  }, []);
+  }, [userProfile]);
 
   const runProgressBar = (onDone) => {
     setSaveProgress(0);

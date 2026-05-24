@@ -5149,27 +5149,38 @@ app.get('/warroom/rooms', async (c) => {
 
   let sql = `
     SELECT
-      w.inc_id                          AS code,
-      w.inc_id,
-      w.title,
-      w.title                           AS msg,
-      r.message                         AS sms_message,
-      UPPER(COALESCE(w.severity, 'NORMAL')) AS severity,
-      w.status                          AS raw_status,
+      all_inc.inc_id                    AS code,
+      all_inc.inc_id,
+      COALESCE(w.title, i.title, 'INC-' || all_inc.inc_id) AS title,
+      COALESCE(w.title, i.title, 'INC-' || all_inc.inc_id) AS msg,
+      (SELECT rm.message FROM received_messages rm WHERE rm.inc_id = all_inc.inc_id ORDER BY rm.timestamp DESC LIMIT 1) AS sms_message,
+      UPPER(COALESCE(i.severity, w.severity, 'NORMAL')) AS severity,
+      CASE 
+        WHEN UPPER(i.status) = 'CLOSED' OR i.status = '최종완료' OR i.status = 'INC_003' OR UPPER(w.status) = 'CLOSED' THEN 'INC_003'
+        WHEN w.inc_id IS NOT NULL AND (i.status IS NULL OR i.status = 'INC_001' OR i.status = 'OPEN') THEN 'INC_002'
+        ELSE COALESCE(i.status, 'INC_001')
+      END                               AS raw_status,
       w.creator_id,
       w.leader_summary,
-      w.reg_dt,
-      (SELECT COUNT(*) FROM warroom_chats wc WHERE wc.inc_id = w.inc_id)       AS message_count,
-      (SELECT COUNT(*) FROM warroom_attachments wa WHERE wa.inc_id = w.inc_id) AS attachment_count,
-      (SELECT wc2.text FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)     AS last_message,
-      (SELECT u_msg.name FROM warroom_chats wc2 LEFT JOIN users u_msg ON wc2.sender = u_msg.employee_id WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
-      (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = w.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
-    FROM warroom_list w
-    LEFT JOIN received_messages r ON w.inc_id = r.inc_id
+      COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt) AS reg_dt,
+      (SELECT COUNT(*) FROM warroom_chats wc WHERE wc.inc_id = all_inc.inc_id)       AS message_count,
+      (SELECT COUNT(*) FROM warroom_attachments wa WHERE wa.inc_id = all_inc.inc_id) AS attachment_count,
+      (SELECT wc2.text FROM warroom_chats wc2 WHERE wc2.inc_id = all_inc.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)     AS last_message,
+      (SELECT u_msg.name FROM warroom_chats wc2 LEFT JOIN users u_msg ON wc2.sender = u_msg.employee_id WHERE wc2.inc_id = all_inc.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
+      (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = all_inc.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
+    FROM (
+      SELECT inc_id, created_at as reg_dt FROM incidents
+      UNION
+      SELECT inc_id, reg_dt FROM warroom_list
+      UNION
+      SELECT inc_id, timestamp as reg_dt FROM received_messages
+    ) all_inc
+    LEFT JOIN incidents i ON all_inc.inc_id = i.inc_id
+    LEFT JOIN warroom_list w ON all_inc.inc_id = w.inc_id
     WHERE 1=1
   `
 
-  if (q) { sql += ` AND (w.title LIKE ? OR w.inc_id LIKE ?)`; params.push(`%${q}%`, `%${q}%`) }
+  if (q) { sql += ` AND (COALESCE(w.title, i.title, all_inc.inc_id) LIKE ? OR all_inc.inc_id LIKE ?)`; params.push(`%${q}%`, `%${q}%`) }
 
   const startDate = c.req.query('start_date') || ''
   const endDate = c.req.query('end_date') || ''
@@ -5177,33 +5188,26 @@ app.get('/warroom/rooms', async (c) => {
 
   // status 필터: 프론트 값 → DB 실제값으로 변환
   if (statusFilter === 'Completed') {
-    sql += ` AND (UPPER(w.status) = 'CLOSED' OR w.status = '최종완료')`
+    sql += ` AND (UPPER(i.status) = 'CLOSED' OR i.status = '최종완료' OR i.status = 'INC_003' OR UPPER(w.status) = 'CLOSED')`
   } else if (statusFilter === 'Open') {
-    sql += ` AND (w.status IS NULL OR (UPPER(w.status) != 'CLOSED' AND w.status != '최종완료'))`
+    sql += ` AND (i.status IS NULL OR (UPPER(i.status) != 'CLOSED' AND i.status != '최종완료' AND i.status != 'INC_003' AND COALESCE(UPPER(w.status), '') != 'CLOSED'))`
   }
   
-  if (startDate) { sql += ` AND DATE(w.reg_dt) >= DATE(?)`; params.push(startDate) }
-  if (endDate) { sql += ` AND DATE(w.reg_dt) <= DATE(?)`; params.push(endDate) }
+  if (startDate) { sql += ` AND DATE(COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt)) >= DATE(?)`; params.push(startDate) }
+  if (endDate) { sql += ` AND DATE(COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt)) <= DATE(?)`; params.push(endDate) }
   if (assignedTo) {
-    sql += ` AND EXISTS (SELECT 1 FROM incident_assignments ia LEFT JOIN users u_a ON ia.user_id = u_a.employee_id WHERE ia.inc_id = w.inc_id AND (u_a.name LIKE ? OR ia.user_id LIKE ?))`
+    sql += ` AND EXISTS (SELECT 1 FROM incident_assignments ia LEFT JOIN users u_a ON ia.user_id = u_a.employee_id WHERE ia.inc_id = all_inc.inc_id AND (u_a.name LIKE ? OR ia.user_id LIKE ?))`
     params.push(`%${assignedTo}%`, `%${assignedTo}%`)
   }
 
-  sql += ` ORDER BY w.reg_dt DESC LIMIT 50`
+  sql += ` ORDER BY COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt) DESC LIMIT 500`
 
   const stmt = db.prepare(sql)
   const { results } = await stmt.bind(...params).all()
 
-  // DB status → 프론트 기대값 변환
+  // DB status 그대로 프론트에 전달하여 프론트에서 4단계(접수중/진행중/완료)로 처리하도록 함
   const mapped = (results || []).map(r => {
-    const raw = r.raw_status
-    let status
-    if (!raw || (raw.toUpperCase() !== 'CLOSED' && raw !== '최종완료')) {
-      status = 'Open'
-    } else {
-      status = 'Completed'
-    }
-    return { ...r, status, raw_status: undefined }
+    return { ...r, status: r.raw_status, raw_status: undefined }
   })
 
   return c.json({ rooms: mapped })
@@ -10255,13 +10259,18 @@ app.get('/scallert/strategies', async (c) => {
       SEQ_NO INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT NOT NULL,
       EMP_ID TEXT NOT NULL, EMP_NM TEXT NOT NULL, MOBILE_NO TEXT NOT NULL,
       SORT_ORD INTEGER DEFAULT 0, USE_YN TEXT NOT NULL DEFAULT 'Y',
+      SUCCESS_CNT INTEGER DEFAULT 0,
       REG_ID TEXT, REG_DT TEXT, MOD_ID TEXT, MOD_DT TEXT
     )`).run();
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_TARGET_INFO ADD COLUMN SUCCESS_CNT INTEGER DEFAULT 0`).run();
+    } catch (e) { /* already exists */ }
     await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_CALL_HIST (
       LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT, STRATEGY_ID TEXT, INC_ID TEXT, IGW_TXN_ID TEXT,
       EMP_ID TEXT, EMP_NM TEXT, MOBILE_NO TEXT, ATTEMPT_SEQ INTEGER DEFAULT 1,
       PDS_RESULT_CD TEXT, CALL_DT TEXT, REG_DT TEXT,
       CONNECTED_DT TEXT, CONNECTED_TS INTEGER DEFAULT 0, DURATION_SEC INTEGER DEFAULT 0,
+      DISCONNECTED_DT TEXT, SUCCESS_YN TEXT, DISPATCHER_EMP_ID TEXT,
       RAW_PAYLOAD TEXT
     )`).run();
 
@@ -10276,6 +10285,15 @@ app.get('/scallert/strategies', async (c) => {
     } catch (e) {}
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN RAW_PAYLOAD TEXT`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN DISCONNECTED_DT TEXT`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN SUCCESS_YN TEXT`).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN DISPATCHER_EMP_ID TEXT`).run();
     } catch (e) {}
 
     try {
@@ -10585,16 +10603,18 @@ async function triggerNextTarget(db, currentCall, env) {
 
     if (!targets || targets.length === 0) return;
 
-    const maxAttempts = strategy.MAX_CALL_CNT || 3;
+    const maxAttemptsPerTarget = strategy.MAX_CALL_CNT || 3;
+    const totalMaxAttempts = targets.length * maxAttemptsPerTarget;
     const currentAttempt = currentCall.ATTEMPT_SEQ || 1;
 
-    if (currentAttempt < maxAttempts) {
+    if (currentAttempt < totalMaxAttempts) {
       const nextAttempt = currentAttempt + 1;
-      const nextTarget = targets[(nextAttempt - 1) % targets.length];
+      const nextTargetIndex = Math.floor((nextAttempt - 1) / maxAttemptsPerTarget);
+      const nextTarget = targets[nextTargetIndex];
 
       await db.prepare(`
-        INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT, DISPATCHER_EMP_ID)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         strategyId, 
         nextTarget.EMP_ID, 
@@ -10606,7 +10626,8 @@ async function triggerNextTarget(db, currentCall, env) {
         now, 
         currentCall.INC_ID || null, 
         currentCall.RAW_PAYLOAD || '{}', 
-        now
+        now,
+        currentCall.DISPATCHER_EMP_ID || null
       ).run();
 
       let message = '';
@@ -10622,8 +10643,7 @@ async function triggerNextTarget(db, currentCall, env) {
   }
 }
 
-async function triggerAppPushCall(c, target_user_id, phone_number) {
-  const env = c.env;
+async function triggerAppPushCall(env, target_user_id, phone_number) {
   const db = env.DB;
   const serviceAccountJson = env.FCM_SERVICE_ACCOUNT;
   
@@ -10858,21 +10878,34 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
     const igw_txn_id = payload.igw_txn_id || `INT_${Date.now()}`;
     const message = payload.message || '';
 
+    // 🔥 글로벌 디스패처 디바이스 조회 (SCallertPage에서 설정한 테스트 기기)
+    let globalDispatcherId = null;
+    try {
+      const cfgRow = await db.prepare("SELECT config_value FROM system_config WHERE config_key = 'scallert_dispatcher_device'").first();
+      if (cfgRow && cfgRow.config_value) {
+        globalDispatcherId = cfgRow.config_value;
+      }
+    } catch (e) {
+      console.warn(`[scallert-trigger] Could not fetch global dispatcher device: ${e.message}`);
+    }
+
+    const dispatchDeviceId = payload.employee_id || globalDispatcherId || target.EMP_ID;
+
     await db.prepare(`
-      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT, DISPATCHER_EMP_ID)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       strategy.STRATEGY_ID, target.EMP_ID, target.EMP_NM, target.MOBILE_NO, 1, 
-      igw_txn_id, 'PENDING', callTime, inc_id || null, JSON.stringify(payload), callTime
+      igw_txn_id, 'PENDING', callTime, inc_id || null, JSON.stringify(payload), callTime, dispatchDeviceId
+
     ).run();
 
     const pdsSuccess = await triggerPdsCall(db, strategy.STRATEGY_ID, target, inc_id, message, JSON.stringify(payload), env);
     console.log(`[scallert] Call triggered successfully: ${pdsSuccess}`);
 
     try {
-      const dispatchDeviceId = payload.employee_id || target.EMP_ID;
       console.log(`[scallert-trigger] Sending device push call ring to Dispatcher Device: ${dispatchDeviceId} (Target number: ${target.MOBILE_NO})`);
-      const pushRes = await triggerAppPushCall(c, dispatchDeviceId, target.MOBILE_NO);
+      const pushRes = await triggerAppPushCall(env, dispatchDeviceId, target.MOBILE_NO);
       console.log(`[scallert-trigger] Device push result: ${pushRes.success} via ${pushRes.method}`);
       
       try {
@@ -11108,8 +11141,8 @@ app.post('/scallert/strategies/:id/call-target', async (c) => {
     const igwTxnId = `MANUAL_${Date.now()}`;
 
     await db.prepare(`
-      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, REG_DT)
-      VALUES (?, ?, ?, ?, 1, ?, 'PENDING', ?, ?)
+      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, REG_DT, DISPATCHER_EMP_ID)
+      VALUES (?, ?, ?, ?, 1, ?, 'PENDING', ?, ?, ?)
     `).bind(
       strategyId,
       target.EMP_ID,
@@ -11117,14 +11150,15 @@ app.post('/scallert/strategies/:id/call-target', async (c) => {
       target.MOBILE_NO,
       igwTxnId,
       now,
-      now
+      now,
+      target.EMP_ID
     ).run();
 
     const success = await triggerPdsCall(db, strategyId, target, null, '수동 개별 호출', JSON.stringify({ emp_id: empId }), c.env);
 
     // 🔥 수동 발신 시에도 해당 대상자(EMP_ID)의 기기(S-BRIDGE)로 푸시 발송!
     try {
-      await triggerAppPushCall(c, target.EMP_ID, target.MOBILE_NO);
+      await triggerAppPushCall(c.env, target.EMP_ID, target.MOBILE_NO);
     } catch (e) {
       console.error(`[call-target] Push error: ${e.message}`);
     }
@@ -11149,6 +11183,57 @@ app.get('/scallert/strategies/:id/test-logs', async (c) => {
     const { results } = await db.prepare("SELECT * FROM TB_SCL_TEST_LOG WHERE STRATEGY_ID = ? ORDER BY LOG_ID DESC LIMIT ?").bind(id, limit).all();
     return c.json(results || []);
   } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// 13. 전역 통화 이력 조회 (날짜/수신자별 그룹핑용)
+app.get('/scallert/call-history', async (c) => {
+  const db = c.env.DB;
+  const limit = Number(c.req.query('limit') || 200);
+  const startDate = c.req.query('startDate');
+  const endDate = c.req.query('endDate');
+  const honbu = c.req.query('honbu');
+  const team = c.req.query('team');
+  const part = c.req.query('part');
+
+  let baseQuery = `
+    SELECT h.*, u.honbu, u.team, u.part 
+    FROM TB_SCL_CALL_HIST h
+    LEFT JOIN users u ON h.EMP_ID = u.employee_id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (startDate) {
+    baseQuery += ` AND IFNULL(h.CALL_DT, h.REG_DT) >= ?`;
+    params.push(startDate + ' 00:00:00');
+  }
+  if (endDate) {
+    baseQuery += ` AND IFNULL(h.CALL_DT, h.REG_DT) <= ?`;
+    params.push(endDate + ' 23:59:59');
+  }
+  if (honbu) {
+    baseQuery += ` AND u.honbu LIKE ?`;
+    params.push(`%${honbu}%`);
+  }
+  if (team) {
+    baseQuery += ` AND u.team LIKE ?`;
+    params.push(`%${team}%`);
+  }
+  if (part) {
+    baseQuery += ` AND u.part LIKE ?`;
+    params.push(`%${part}%`);
+  }
+
+  baseQuery += ` ORDER BY h.CALL_DT DESC LIMIT ?`;
+  params.push(limit);
+
+  try {
+    const stmt = db.prepare(baseQuery).bind(...params);
+    const { results } = await stmt.all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
 });
 
 // ── 앱 발신/통화 상태 보고 Webhook ────────────────────────────────────────────────
@@ -11229,15 +11314,15 @@ app.post('/call/event', async (c) => {
         if (durationSec > 0 && durationSec <= 50) {
           await db.prepare(`
             UPDATE TB_SCL_CALL_HIST 
-            SET PDS_RESULT_CD = 'SUCCESS', DURATION_SEC = ?
+            SET PDS_RESULT_CD = 'SUCCESS', DURATION_SEC = ?, DISCONNECTED_DT = ?, SUCCESS_YN = 'Y'
             WHERE LOG_ID = ?
-          `).bind(durationSec, matchedCall.LOG_ID).run();
+          `).bind(durationSec, now, matchedCall.LOG_ID).run();
         } else {
           await db.prepare(`
             UPDATE TB_SCL_CALL_HIST 
-            SET PDS_RESULT_CD = 'FAIL_VOICEMAIL', DURATION_SEC = ?
+            SET PDS_RESULT_CD = 'FAIL_VOICEMAIL', DURATION_SEC = ?, DISCONNECTED_DT = ?, SUCCESS_YN = 'N'
             WHERE LOG_ID = ?
-          `).bind(durationSec, matchedCall.LOG_ID).run();
+          `).bind(durationSec, now, matchedCall.LOG_ID).run();
           
           await triggerNextTarget(db, { ...matchedCall, ATTEMPT_SEQ: matchedCall.ATTEMPT_SEQ || 1 }, c.env);
         }
@@ -11342,7 +11427,7 @@ app.post('/scallert/test-push', async (c) => {
     }
 
     const now = getKst();
-    const pushRes = await triggerAppPushCall(c, target_user_id, phone_number);
+    const pushRes = await triggerAppPushCall(c.env, target_user_id, phone_number);
     const { success, method, detail: resultDetail } = pushRes;
 
     // 로그 저장
@@ -11370,11 +11455,11 @@ app.get('/scallert/debug-trigger', async (c) => {
     const db = c.env.DB;
     const now = getKst();
     await db.prepare(`
-      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT, DISPATCHER_EMP_ID)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       'DEBUG', '18121020', '조경훈(DEBUG)', '010-0000-0000', 1, 
-      `DBG_${Date.now()}`, 'PENDING', now, 999, JSON.stringify({ employee_id: '18121020' }), now
+      `DBG_${Date.now()}`, 'PENDING', now, 999, JSON.stringify({ employee_id: '18121020' }), now, '18121020'
     ).run();
     return c.json({ success: true, message: 'Debug record inserted to trigger SSE' });
   } catch (err) {

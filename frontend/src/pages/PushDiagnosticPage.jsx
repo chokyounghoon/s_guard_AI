@@ -298,64 +298,66 @@ export default function PushDiagnosticPage() {
       {/* ── Hero ────────────────────────────────────────────── */}
       <div style={{
         background: 'linear-gradient(160deg, #030a2a 0%, #001155 55%, #002080 100%)',
-        padding: 'calc(50px + env(safe-area-inset-top)) 20px 28px',
+        padding: 'calc(16px + env(safe-area-inset-top)) 16px 16px',
         position: 'relative', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {/* glows */}
-        <div style={{ position: 'absolute', top: -80, right: -60, width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -50, left: -50, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.09) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px)', backgroundSize: '28px 28px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -20, left: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         {/* back */}
         <button
           onClick={() => goBack()}
           style={{
-            position: 'absolute', top: 'calc(14px + env(safe-area-inset-top))', left: 16,
-            background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-            padding: '6px 12px', color: '#fff', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, zIndex: 2,
+            position: 'absolute', left: 16,
+            background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+            padding: '6px 10px', color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, zIndex: 2,
           }}
         >
-          <ArrowLeft size={13} /> 뒤로
+          <ArrowLeft size={12} /> 뒤로
         </button>
 
-        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 16, margin: '0 auto 12px',
+            width: 32, height: 32, borderRadius: 10,
             background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(16,185,129,0.18))',
             border: '1px solid rgba(59,130,246,0.35)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 28px rgba(59,130,246,0.28)',
+            boxShadow: '0 0 16px rgba(59,130,246,0.2)',
           }}>
-            <Radio size={24} color="#60a5fa" />
+            <Radio size={16} color="#60a5fa" />
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 900, letterSpacing: '0.06em', margin: '0 0 3px' }}>Push Diagnostic</h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: '0 0 18px' }}>실시간 알림 상태 진단 및 구독 등록</p>
-
-          {/* Health pill */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 10,
-            background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)',
-            border: `1px solid ${hColor}30`, borderRadius: 50, padding: '7px 18px',
-          }}>
-            <Activity size={13} color={hColor} />
-            <span style={{ fontSize: 12, fontWeight: 900, color: hColor }}>
-              Health {status ? `${healthPct}%` : '—'}
-            </span>
-            <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.1)' }} />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
-              {status ? `${health} / ${healthMax} 정상` : '확인 중...'}
-            </span>
+          <div style={{ textAlign: 'left' }}>
+            <h1 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '0.04em', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              Push Diagnostic
+              {/* Health pill */}
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)',
+                border: `1px solid ${hColor}30`, borderRadius: 20, padding: '3px 8px', marginLeft: 4,
+              }}>
+                <Activity size={10} color={hColor} />
+                <span style={{ fontSize: 10, fontWeight: 900, color: hColor }}>
+                  {status ? `${healthPct}%` : '—'}
+                </span>
+                <span style={{ width: 1, height: 8, background: 'rgba(255,255,255,0.1)' }} />
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                  {status ? `${health}/${healthMax}` : '...'}
+                </span>
+              </div>
+            </h1>
           </div>
         </div>
       </div>
 
       {/* ── Content ─────────────────────────────────────────── */}
       <div style={{
-        padding: '18px 14px',
+        padding: '12px 14px',
         maxWidth: 860, margin: '0 auto',
-        paddingBottom: 'calc(80px + env(safe-area-inset-bottom))',
+        paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
       }}>
 
         {/* ── 2-column top grid ─────────────────────────────── */}
@@ -552,7 +554,7 @@ export default function PushDiagnosticPage() {
               background: 'rgba(0,0,0,0.45)', borderRadius: 10,
               border: '1px solid rgba(99,102,241,0.12)',
               padding: '9px 11px',
-              height: 240, overflowY: 'auto',
+              height: 200, overflowY: 'auto',
               fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 10,
             }}>
               {log.length === 0 && (

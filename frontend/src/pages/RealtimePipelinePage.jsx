@@ -1344,14 +1344,14 @@ export default function RealtimePipelinePage() {
           </div>
         </div>
 
-        <div className="flex-1 flex gap-4 p-4 min-h-0 overflow-hidden relative z-0">
+        <div className="flex-1 flex flex-col xl:flex-row gap-4 p-2 sm:p-4 overflow-y-auto xl:overflow-hidden relative z-0">
           
 
 
-          {/* MIDDLE PANEL */}
-          <div className="flex-1 flex flex-col gap-4 min-h-0 min-w-[500px]">
+          {/* MIDDLE PANEL (Now Left Panel in flex row) */}
+          <div className="w-full xl:min-w-[500px] xl:w-auto xl:flex-1 flex flex-col gap-4 min-h-0">
             {/* Top Row: Charts */}
-            <div className="h-[180px] flex gap-3 shrink-0">
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0 h-auto sm:h-[180px]">
               
               {/* Chart 1 - System Occupancy */}
               <div className="flex-1 min-w-0 bg-[#0b0e17] rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
@@ -1402,7 +1402,7 @@ export default function RealtimePipelinePage() {
               <div className="flex-1 min-w-0 bg-[#0b0e17] rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
                 <div className="flex items-center gap-1.5 mb-1 shrink-0"><TrendingUp className="w-3 h-3 text-[#00e5ff]" /><span className="text-[10px] font-black text-white">실시간 장애 접수 추이</span></div>
                 <div style={{ flex: 1, minHeight: 0, height: 120, width: '100%' }}>
-                  <ResponsiveContainer width="99%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <AreaChart 
                       data={trafficData} 
                       margin={{ top: 5, right: 0, left: -25, bottom: 0 }}
@@ -1547,7 +1547,7 @@ export default function RealtimePipelinePage() {
                             {activeCritical > 0 && <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-[9px] font-bold text-red-400 flex items-center gap-1 animate-pulse border border-red-500/30"><AlertTriangle className="w-2.5 h-2.5" /> 긴급 {activeCritical}건</span>}
                           </div>
                           <div className="h-[90px] w-full shrink-0 min-w-0 min-h-0">
-                            <ResponsiveContainer width="99%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                               <BarChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
                                 <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 8, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
@@ -1609,7 +1609,7 @@ export default function RealtimePipelinePage() {
           </div>
 
           {/* MIDDLE PANEL: INCIDENT LIST PICKER */}
-          <div className="w-[420px] shrink-0 flex flex-col min-h-0">
+          <div className="w-full xl:w-[420px] shrink-0 flex flex-col min-h-[400px] xl:min-h-0">
             <div className="flex-1 bg-[#0b0e17] border border-white/5 rounded-3xl p-4 flex flex-col min-h-0 overflow-hidden shadow-lg">
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-amber-400" /><h4 className="text-sm font-black text-white">인시던트 탐색기</h4></div>
@@ -1737,7 +1737,7 @@ export default function RealtimePipelinePage() {
           </div>
 
           {/* RIGHT PANEL: Timeline & SMS */}
-          <div className="w-[460px] shrink-0 flex flex-col min-h-0">
+          <div className="w-full xl:w-[460px] shrink-0 flex flex-col min-h-[500px] xl:min-h-0">
             
             {/* 상단: 실시간 SMS 수신내역 */}
             <div className="h-[250px] shrink-0 bg-[#0b0e17] rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg mb-4">
@@ -1895,7 +1895,7 @@ export default function RealtimePipelinePage() {
           <div className="col-span-1 row-span-1 bg-gradient-to-br from-[#121622] to-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl relative overflow-hidden group flex flex-col min-h-0">
              <div className="flex items-center gap-2 mb-2 shrink-0"><ShieldCheck className="w-4 h-4 text-emerald-400" /><h3 className="text-xs font-black text-white">SLA 골든타임 준수율</h3></div>
              <div className="flex-1 min-h-0 relative flex items-center justify-center">
-                <ResponsiveContainer width="99%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <PieChart>
                     <defs>
                       <linearGradient id="slaGradient" x1="0" y1="0" x2="1" y2="1">
@@ -1928,7 +1928,7 @@ export default function RealtimePipelinePage() {
               </div>
             </div>
             <div className="flex-1 min-h-0 relative z-10">
-              <ResponsiveContainer width="99%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <ComposedChart data={roiTrendData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
@@ -1949,7 +1949,7 @@ export default function RealtimePipelinePage() {
           <div className="col-span-2 row-span-1 bg-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col min-h-0 relative overflow-hidden">
              <div className="flex items-center gap-2 mb-3 shrink-0"><Activity className="w-4 h-4 text-amber-400" /><h2 className="text-sm font-black text-white">시스템 취약성 및 AI 방어 성과 (Top 5)</h2></div>
              <div className="flex-1 min-h-0">
-              <ResponsiveContainer width="99%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <BarChart layout="vertical" data={systemHealthList} margin={{ top: 0, right: 10, left: 30, bottom: 0 }} barGap={2}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" horizontal={false} />
                   <XAxis type="number" hide />
@@ -1979,7 +1979,7 @@ export default function RealtimePipelinePage() {
             </div>
             
             <div className="flex-1 min-h-0 relative z-10">
-              <ResponsiveContainer width="99%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <ComposedChart data={hourlyMap} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorNight" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>

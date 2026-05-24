@@ -70,48 +70,45 @@ export default function SMSNotification() {
             setNotifications((prev) => prev.filter((n) => n.id !== newNotification.id));
           }, 5000);
 
-          // ── 30초 대기 후 설정된 기기 푸시(전화) 테스트 발신 수행 ──
+          // ── 발동 대기 시간 후 설정된 기기 푸시(전화) 테스트 발신 수행 ──
+          const delaySec = parseInt(localStorage.getItem('scallert_test_delay') || '30', 10);
+          console.log(`⏰ [SMSNotification] 문자 수신 후 ${delaySec}초 대기 시작...`);
+          
           setTimeout(async () => {
-            console.log('⏰ [SMSNotification] 문자 수신 후 30초 경과: 설정된 테스트 발신 실행 시작');
-            try {
-              // S-Callert 페이지에서 설정한 기기/번호를 로컬 스토리지에서 가져옴
-              const targetEmpId = localStorage.getItem('scallert_test_device');
-              const targetPhone = localStorage.getItem('scallert_test_phone');
-              
-              if (!targetEmpId || !targetPhone) {
-                console.log('⚠️ [SMSNotification] S-Callert 설정 화면에서 발송 기기 및 테스트 번호가 선택되지 않았습니다.');
-                return;
-              }
-              
-              console.log(`✅ [SMSNotification] 발송 대상 확인 완료: 기기(사번)=${targetEmpId}, 전화번호=${targetPhone}`);
-              
-              // 3. 실제 기기 푸시 테스트 발신 API 호출
-              console.log('🚀 [SMSNotification] 실제 기기 푸시(전화 걸기) 테스트 API(/scallert/test-push) 호출 중...');
-              const pushRes = await fetch(`${API_BASE}/scallert/test-push`, {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${getAccessToken()}` 
-                },
-                body: JSON.stringify({
-                  target_user_id: targetEmpId,
-                  phone_number: targetPhone
-                })
-              });
-              
-              const pushData = await pushRes.json();
-              if (pushData.success) {
-                console.log('🎉 [SMSNotification] 기기 푸시 발신 성공:', pushData);
-                toast.success(`[자동 발신 성공] 설정된 기기로 푸시 발송이 시작되었습니다.`, { duration: 5000 });
-              } else {
-                console.error('❌ [SMSNotification] 기기 푸시 발신 실패:', pushData);
-                toast.error(`[자동 발신 실패] ${pushData.error || '알 수 없는 오류'}`);
-              }
-              
-            } catch (error) {
-              console.error('💥 [SMSNotification] 발신 자동 수행 중 치명적 오류 발생:', error);
-            }
-          }, 30000);
+            console.log(`⏰ [SMSNotification] ${delaySec}초 경과: 팝업 알림 표시 및 테스트 발신 실행`);
+            
+            toast.custom((t) => (
+              <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-[#1e293b] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-black ring-opacity-5 overflow-hidden border border-red-500/30`}>
+                <div className="flex-1 w-0 p-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 pt-0.5">
+                      <AlertCircle className="h-10 w-10 text-red-500 animate-pulse" />
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <p className="text-sm font-black text-white uppercase tracking-widest">
+                        비상 호출 자동 발신
+                      </p>
+                      <p className="mt-1 text-xs text-slate-300">
+                        발동 대기 시간({delaySec}초)이 경과되어,<br/>등록된 기기로 실제 비상 호출을 시도합니다.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex border-l border-white/10 bg-red-500/10">
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    className="w-full border border-transparent rounded-none rounded-r-2xl p-4 flex items-center justify-center text-sm font-black text-red-400 hover:text-red-300 hover:bg-red-500/20 focus:outline-none transition-all"
+                  >
+                    확인
+                  </button>
+                </div>
+              </div>
+            ), { duration: 5000, position: 'top-center' });
+
+            // ⚠️ [수정됨] 실제 전화 발신 로직은 백엔드(DO Alarm)에서 "대상자의 실제 번호"로 정확하게 수행되므로,
+            // 프론트엔드에서는 '테스트 번호'로 보내는 잘못된 중복 발신 API 호출을 제거합니다.
+            console.log(`✅ [SMSNotification] 자동 발신 알림 표출 완료 (실제 발신은 백엔드에서 대상자 번호로 진행됨)`);
+          }, delaySec * 1000);
 
         } catch (error) {
           console.error('[SSE] sms_received parse error:', error);
@@ -126,7 +123,8 @@ export default function SMSNotification() {
           console.log('🔔 [SSE] S-Callert Triggered:', data);
 
           const targetName = data.target_name || data.data?.target_name || '담당자';
-          toast.success(`[S-Callert 발신 완료]\n${targetName} 님께 푸시 발송됨`, { duration: 4000 });
+          const dispatcherDevice = data.dispatcher_device || data.data?.dispatcher_device || '발송 기기';
+          toast.success(`[S-Callert 발신 완료]\n${dispatcherDevice}에서 ${targetName} 님께 자동 전화 발신 중`, { duration: 5000 });
 
         } catch (error) {
           console.error('[SSE] scallert_triggered parse error:', error);

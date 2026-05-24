@@ -744,12 +744,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               const isCompleted = incidentStatus === 'INC_003';
               
               const btnCls = isCompleted 
-                ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-600/30'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
                 : isProcessing
-                ? 'bg-[#00e5ff]/20 text-[#00e5ff] border-[#00e5ff]/30 hover:bg-[#00e5ff]/30'
-                : sev === 'CRITICAL' ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)]'
-                : sev === 'MAJOR'    ? 'bg-orange-600 text-white shadow-[0_0_10px_rgba(249,115,22,0.3)]'
-                :                      'bg-blue-600 text-white shadow-[0_0_10px_rgba(37,99,235,0.3)]';
+                ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                : sev === 'CRITICAL' ? 'bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)] hover:shadow-[0_0_25px_rgba(239,68,68,0.4)]'
+                : sev === 'MAJOR'    ? 'bg-orange-500/10 text-orange-400 border-orange-500/40 hover:bg-orange-500/20 shadow-[0_0_15px_rgba(249,115,22,0.2)] hover:shadow-[0_0_25px_rgba(249,115,22,0.4)]'
+                :                      'bg-[#0c1020] text-[#00e5ff] border-[#00e5ff]/50 shadow-[0_0_15px_rgba(0,229,255,0.2)] hover:bg-[#00e5ff]/10 hover:shadow-[0_0_25px_rgba(0,229,255,0.4)]';
 
               return (
                 <button
@@ -781,8 +781,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       {analysisComplete && (() => {
         const score = insightData.similarity_score ?? 0;
         const pct = Math.min(100, score * 100);
-        const color = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-yellow-500' : score > 0 ? 'bg-orange-500' : 'bg-slate-600';
-        const textColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-yellow-400' : score > 0 ? 'text-orange-400' : 'text-slate-500';
+        const color = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-cyan-500' : score > 0 ? 'bg-orange-500' : 'bg-slate-600';
+        const textColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-cyan-400' : score > 0 ? 'text-orange-400' : 'text-slate-500';
         const hasReason = !!insightData.similarity_reason;
         return (
           <div className="flex items-center gap-3 mb-4 relative z-10 animate-in fade-in duration-700">
@@ -846,8 +846,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             {(() => {
               const score = insightData.similarity_score ?? 0;
               const pct = Math.min(100, score * 100);
-              const barColor = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-yellow-500' : 'bg-orange-500';
-              const numColor = score > 0.8 ? 'text-emerald-400 bloom-green' : score > 0.6 ? 'text-yellow-400 bloom-orange' : 'text-orange-400';
+              const barColor = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-cyan-500' : 'bg-orange-500';
+              const numColor = score > 0.8 ? 'text-emerald-400 bloom-green' : score > 0.6 ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'text-orange-400';
               const containerExtra = score > 0.8 ? 'bloom-green-box' : score > 0.6 ? 'bloom-orange-box' : '';
               return (
                 <div className={`flex items-center gap-3 mb-5 p-3 bg-white/[0.03] rounded-2xl border border-white/5 transition-all duration-700 ${containerExtra}`}>

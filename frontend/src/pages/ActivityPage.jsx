@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { Search, Calendar, SlidersHorizontal, CheckCircle2, ChevronRight, User, ArrowLeft } from 'lucide-react';
+import { getAuthHeaders } from '../lib/authStore';
 
 export default function ActivityPage() {
   const navigate = useNavigate();
@@ -34,9 +35,18 @@ export default function ActivityPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API_BASE}/activity-logs?limit=50`).then(r => r.json()),
-      fetch(`${API_BASE}/users`).then(r => r.json()),
-      fetch(`${API_BASE}/org/tree`).then(r => r.json())
+      fetch(`${API_BASE}/activity-logs?limit=50`, { headers: getAuthHeaders() }).then(r => {
+        if (!r.ok) throw new Error('Unauthorized');
+        return r.json();
+      }),
+      fetch(`${API_BASE}/users`, { headers: getAuthHeaders() }).then(r => {
+        if (!r.ok) return [];
+        return r.json();
+      }),
+      fetch(`${API_BASE}/org/tree`, { headers: getAuthHeaders() }).then(r => {
+        if (!r.ok) return [];
+        return r.json();
+      })
     ])
       .then(([logData, users, tree]) => {
         setUserData(users);

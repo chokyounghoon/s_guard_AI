@@ -17,9 +17,14 @@ const SEV = {
   NORMAL:   { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.25)',  label: 'NORMAL' },
 };
 const STS = {
-  Open:         { label: '진행중', color: '#10b981' },
+  Open:         { label: '접수중', color: '#3b82f6' },
   'In Progress':{ label: '대응중', color: '#eab308' },
   Completed:    { label: '완료',   color: '#475569' },
+  INC_001:      { label: '접수중', color: '#3b82f6' },
+  INC_002:      { label: '진행중', color: '#10b981' },
+  INC_003:      { label: '완료',   color: '#475569' },
+  최종완료:      { label: '완료',   color: '#475569' },
+  처리완료:      { label: '완료',   color: '#475569' },
 };
 
 function formatTime(iso) {
@@ -86,28 +91,61 @@ export default function WarRoomManagementPage() {
     setJoining(room.code);
     try {
       const u = JSON.parse(localStorage.getItem('sguard_user') || '{}');
-      await fetch(`${API_BASE}/warroom/rooms/${room.code}/join`, {
+      await fetch(`${API_BASE}/warroom/join`, {
         method: 'POST',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_name: u.name || '익명' }),
+        body: JSON.stringify({
+          incident_id: room.code,
+          user_id: u.employee_id || 'SYSTEM',
+          name: u.name || '익명'
+        }),
       });
       setTimeout(() => navigate(`/chat/${room.code}`), 500);
     } catch { navigate(`/chat/${room.code}`); }
     finally { setJoining(null); }
   };
 
-  // DB 원본값 또는 정규화된 값 모두 처리
-  const isActive = (r) => {
-    const s = (r.status || '').toUpperCase();
-    return !s || s === 'OPEN' || s === 'IN PROGRESS' || (s !== 'CLOSED' && s !== '최종완료' && s !== 'COMPLETED');
+  const handleOpenWarRoom = async (room) => {
+    setJoining(room.code);
+    try {
+      const u = JSON.parse(localStorage.getItem('sguard_user') || '{}');
+      // 워룸 개설 API 호출
+      await fetch(`${API_BASE}/ai/warroom/open`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inc_id: room.code,
+          title: room.title || room.code,
+          creator_id: u.employee_id || 'SYSTEM',
+          severity: room.severity || 'NORMAL',
+          leader_summary: room.description || ''
+        }),
+      });
+      // 개설 후 바로 입장 처리
+      await handleJoin(room);
+    } catch {
+      navigate(`/chat/${room.code}`);
+    } finally {
+      setJoining(null);
+    }
   };
+
+  // DB 원본값 또는 정규화된 값 모두 처리
   const isCompleted = (r) => {
     const s = (r.status || '').toUpperCase();
-    return s === 'COMPLETED' || s === 'CLOSED' || r.status === '최종완료';
+    return s === 'COMPLETED' || s === 'CLOSED' || s === '최종완료' || s === '처리완료' || s === 'INC_003';
+  };
+  const isOpen = (r) => {
+    const s = (r.status || '').toUpperCase();
+    return !s || s === 'OPEN' || s === 'INC_001' || s === '접수' || s === '접수중';
+  };
+  const isActive = (r) => {
+    return !isOpen(r) && !isCompleted(r);
   };
   const normSeverity = (r) => (r.severity || 'NORMAL').toUpperCase();
 
   const filtered = rooms.filter(r => {
+    if (activeTab === 'open')      return isOpen(r);
     if (activeTab === 'active')    return isActive(r);
     if (activeTab === 'completed') return isCompleted(r);
     return true;
@@ -123,181 +161,127 @@ export default function WarRoomManagementPage() {
 
   const stats = {
     total:     rooms.length,
+    open:      rooms.filter(r => isOpen(r)).length,
     active:    rooms.filter(r => isActive(r)).length,
     critical:  rooms.filter(r => normSeverity(r) === 'CRITICAL').length,
     completed: rooms.filter(r => isCompleted(r)).length,
   };
 
   return (
-    <div style={{
-      width: '100%', height: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflowY: 'auto',
-      background: 'linear-gradient(160deg, #050810 0%, #090c1a 60%, #050810 100%)',
-      fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
-    }}>
+    <div className="w-full h-full min-h-[100dvh] flex flex-col overflow-y-auto bg-gradient-to-br from-[#050810] via-[#090c1a] to-[#050810] font-['Pretendard','Inter',sans-serif] text-slate-300">
       <style>{`
-        @keyframes spin  { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-        input::placeholder { color:#1e293b; }
-        input:focus,select:focus { outline:none; border-color:rgba(99,102,241,.4)!important; }
-        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-thumb{background:rgba(99,102,241,.2);border-radius:99px}
+        input::placeholder { color: #1e293b; }
+        ::-webkit-scrollbar { width: 3px; } 
+        ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 99px; }
       `}</style>
 
-      {/* ①  헤더 */}
-      <header style={{
-        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '13px 16px',
-        borderBottom: '1px solid rgba(239,68,68,0.12)',
-        background: 'rgba(5,8,16,0.96)', backdropFilter: 'blur(20px)',
-      }}>
-        <button onClick={() => goBack()} style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-        }}>
-          <ChevronLeft size={18} color="#64748b" />
+      {/* ① 헤더 */}
+      <header className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#050810]/95 backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+        <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors z-10">
+          <ChevronLeft size={18} className="text-slate-400" />
         </button>
 
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            fontSize: 16, fontWeight: 900, letterSpacing: '0.04em',
-            background: 'linear-gradient(90deg, #f87171, #fb923c)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>WAR-ROOM 현황</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 1 }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', animation: 'pulse 2s ease infinite' }} />
-            <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.7 }}>INCIDENT CHANNELS</span>
+        <div className="text-center z-10">
+          <div className="text-base font-black tracking-widest bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">WAR-ROOM 현황</div>
+          <div className="flex items-center justify-center gap-1.5 mt-0.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
+            <span className="text-[10px] text-red-500 font-extrabold tracking-widest opacity-80">INCIDENT CHANNELS</span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setShowFilter(f => !f)}
-            style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: showFilter ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
-              border: showFilter ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.08)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            }}>
-            <Filter size={15} color={showFilter ? '#f87171' : '#64748b'} />
+        <div className="flex gap-2 z-10">
+          <button onClick={() => setShowFilter(f => !f)} className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors ${showFilter ? 'bg-red-500/15 border border-red-500/30 text-red-400' : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'}`}>
+            <Filter size={15} />
           </button>
-          <button onClick={() => fetchRooms()} style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}>
-            <RefreshCw size={15} color="#f87171" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          <button onClick={() => fetchRooms()} className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center cursor-pointer hover:bg-red-500/20 transition-colors text-red-400">
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
       </header>
 
-      {/* ②  통계 3개 */}
-      <div style={{
-        flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
-        gap: 8, padding: '10px 16px 0',
-      }}>
+      {/* ② 통계 4개 */}
+      <div className="shrink-0 grid grid-cols-4 gap-2 px-4 pt-4">
         {[
-          { label: '전체',   value: stats.total,     color: '#60a5fa',  Icon: Hash },
-          { label: '진행중', value: stats.active,    color: '#10b981',  Icon: Activity },
-          { label: '완료',   value: stats.completed, color: '#475569',  Icon: CheckCircle2 },
-        ].map(({ label, value, color, Icon }) => (
-          <div key={label} style={{
-            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 14, padding: '10px 8px', textAlign: 'center',
-          }}>
-            <Icon size={14} color={color} style={{ margin: '0 auto 5px' }} />
-            <div style={{ fontSize: 22, fontWeight: 900, color, fontFamily: 'monospace' }}>{value}</div>
-            <div style={{ fontSize: 9, color: '#334155', fontWeight: 800, letterSpacing: '0.04em', marginTop: 2 }}>{label}</div>
+          { label: '전체',   value: stats.total,     color: 'text-blue-400',   bg: 'bg-blue-500/10',     Icon: Hash },
+          { label: '접수중', value: stats.open,      color: 'text-blue-500',   bg: 'bg-blue-600/10',     Icon: AlertCircle },
+          { label: '진행중', value: stats.active,    color: 'text-emerald-400',bg: 'bg-emerald-500/10',  Icon: Activity },
+          { label: '완료',   value: stats.completed, color: 'text-slate-400',  bg: 'bg-slate-500/10',    Icon: CheckCircle2 },
+        ].map(({ label, value, color, bg, Icon }) => (
+          <div key={label} className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center backdrop-blur-md shadow-xl">
+            <div className={`p-1.5 rounded-lg ${bg} mb-1.5`}>
+              <Icon size={12} className={color} />
+            </div>
+            <div className={`text-xl font-black font-mono tracking-tight ${color}`}>{value}</div>
+            <div className="text-[9px] font-black text-slate-500 tracking-wider mt-1">{label}</div>
           </div>
         ))}
       </div>
 
-      {/* ③  검색 */}
-      <div style={{ flexShrink: 0, padding: '10px 16px 0', position: 'relative' }}>
-        <Search size={15} color="#475569" style={{ position: 'absolute', left: 28, top: '50%', transform: 'translateY(-35%)' }} />
+      {/* ③ 검색 */}
+      <div className="shrink-0 px-4 pt-4 relative">
+        <Search size={15} className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-500 mt-2" />
         <input
           type="text" placeholder="코드, 제목, 내용 검색..."
           value={searchQuery} onChange={onSearch}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 12, padding: '12px 14px 12px 38px',
-            color: '#e2e8f0', fontSize: 15, outline: 'none',
-          }}
+          className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-slate-200 text-sm focus:outline-none focus:border-red-500/50 focus:bg-white/[0.05] transition-all placeholder-slate-600 shadow-inner"
         />
       </div>
 
       {/* 필터 패널 */}
       {showFilter && (
-        <div style={{
-          flexShrink: 0, margin: '8px 16px 0',
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 16, padding: '14px',
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div className="shrink-0 mx-4 mt-3 bg-white/[0.02] border border-white/10 rounded-2xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="grid grid-cols-2 gap-3">
             {[
               { label: '시작일', key: 'startDate', type: 'date' },
               { label: '종료일', key: 'endDate',   type: 'date' },
             ].map(f => (
               <div key={f.key}>
-                <div style={{ fontSize: 11, color: '#475569', fontWeight: 800, marginBottom: 5 }}>{f.label}</div>
-                <input type={f.type} value={filters[f.key]}
+                <div className="text-[10px] font-black text-slate-500 tracking-wider mb-1.5">{f.label}</div>
+                <input type={f.type} value={filters[f.key]} style={{colorScheme: 'dark'}}
                   onChange={e => setFilters(p => ({ ...p, [f.key]: e.target.value }))}
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 10, padding: '9px 12px', color: '#e2e8f0', fontSize: 13,
-                  }}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-red-500/50 transition-all"
                 />
               </div>
             ))}
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#475569', fontWeight: 800, marginBottom: 5 }}>담당자</div>
+            <div className="text-[10px] font-black text-slate-500 tracking-wider mb-1.5">담당자</div>
             <input type="text" placeholder="이름 입력..." value={filters.assignee}
               onChange={e => setFilters(p => ({ ...p, assignee: e.target.value }))}
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 10, padding: '9px 12px', color: '#e2e8f0', fontSize: 13,
-              }}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-red-500/50 transition-all"
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="grid grid-cols-2 gap-3 mt-1">
             <button onClick={() => { setFilters({ ...getDefaultDates(), assignee: '' }); setSearchQuery(''); }}
-              style={{ padding: '10px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-xs font-black hover:bg-white/10 transition-colors">
               초기화
             </button>
             <button onClick={() => fetchRooms()}
-              style={{ padding: '10px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+              className="py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] transition-all">
               필터 적용
             </button>
           </div>
         </div>
       )}
 
-      {/* ④  탭 + 정렬 */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 0' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
+      {/* ④ 탭 + 정렬 */}
+      <div className="shrink-0 flex items-center justify-between px-4 pt-4">
+        <div className="flex gap-1.5 bg-white/[0.02] p-1 rounded-2xl border border-white/5">
           {[
             { key: 'all',       label: '전체' },
+            { key: 'open',      label: '접수중' },
             { key: 'active',    label: '진행중' },
             { key: 'completed', label: '완료' },
           ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-              padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
-              fontSize: 13, fontWeight: 800,
-              background: activeTab === t.key ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
-              border: activeTab === t.key ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              color: activeTab === t.key ? '#f87171' : '#475569',
-              transition: 'all 0.15s',
-            }}>{t.label}</button>
+            <button key={t.key} onClick={() => setActiveTab(t.key)} 
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${activeTab === t.key ? 'bg-red-500/20 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'text-slate-500 hover:text-slate-300'}`}>
+              {t.label}
+            </button>
           ))}
         </div>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
-          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 10, padding: '8px 10px', color: '#94a3b8', fontSize: 13, cursor: 'pointer',
-        }}>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} 
+          className="bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-slate-400 text-xs font-bold focus:outline-none cursor-pointer">
           <option value="newest">최신순</option>
           <option value="oldest">오래된순</option>
           <option value="severity">중요도순</option>
@@ -305,137 +289,129 @@ export default function WarRoomManagementPage() {
         </select>
       </div>
 
-      {/* ⑤  룸 목록 (flex:1 스크롤) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 16px 80px' }}>
+      {/* ⑤ 룸 목록 */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-24 custom-scrollbar">
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-            <Loader2 size={24} color="#f87171" style={{ animation: 'spin 1s linear infinite' }} />
+          <div className="flex justify-center items-center h-40">
+            <Loader2 size={24} className="text-red-400 animate-spin opacity-50" />
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 150, gap: 8 }}>
-            <Zap size={32} color="#1e293b" />
-            <span style={{ fontSize: 14, color: '#334155', fontWeight: 700 }}>
-              {searchQuery ? `"${searchQuery}" 결과 없음` : 'War-Room이 없습니다'}
+          <div className="flex flex-col items-center justify-center h-40 gap-3 opacity-50">
+            <Zap size={32} className="text-slate-600" />
+            <span className="text-sm font-black text-slate-500 tracking-tight">
+              {searchQuery ? `"${searchQuery}" 검색 결과가 없습니다` : '등록된 War-Room이 없습니다'}
             </span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="flex flex-col gap-3.5">
             {filtered.map(room => {
               const sev = SEV[normSeverity(room)] || SEV.NORMAL;
-              const sts = STS[room.status] || STS.Open;
+              const isComp = isCompleted(room);
+              const isOp = isOpen(room);
+              const sts = isComp ? STS.Completed : (isOp ? STS.Open : STS.Active);
               const isJoining = joining === room.code;
+              
               return (
-                <div key={room.code} style={{
-                  borderRadius: 20, padding: '16px',
-                  background: `linear-gradient(135deg, ${sev.color}08 0%, rgba(255,255,255,0.02) 100%)`,
-                  border: `1px solid ${sev.border}`,
-                  position: 'relative', overflow: 'hidden',
-                  opacity: isJoining ? 0.7 : 1, transition: 'opacity 0.2s',
-                }}>
+                <div key={room.code} 
+                  className={`rounded-[1.25rem] p-4 relative overflow-hidden backdrop-blur-md transition-all duration-300 ${isJoining ? 'opacity-50 scale-[0.98]' : 'hover:scale-[1.01]'}`}
+                  style={{
+                    background: `linear-gradient(135deg, ${sev.color}15 0%, rgba(255,255,255,0.02) 100%)`,
+                    border: `1px solid ${sev.border}`
+                  }}>
                   {/* 좌측 심각도 바 */}
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, bottom: 0, width: 4,
-                    background: sev.color, borderRadius: '20px 0 0 20px',
-                  }} />
+                  <div className="absolute top-0 left-0 bottom-0 w-1 rounded-l-[1.25rem]" style={{ background: sev.color }} />
 
-                  {/* 1행: 코드 + 심각도 + 상태 */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: sev.color, animation: !isCompleted(room) ? 'pulse 2s ease infinite' : 'none' }} />
-                      <span style={{ fontSize: 12, color: sev.color, fontFamily: 'monospace', fontWeight: 700 }}>{room.code}</span>
+                  {/* 1행: 코드 + 상태 */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${!isComp ? 'animate-pulse' : ''}`} style={{ background: sev.color, boxShadow: `0 0 8px ${sev.color}` }} />
+                      <span className="text-xs font-black font-mono tracking-wider" style={{ color: sev.color }}>{room.code}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 800, color: sev.color,
-                        background: sev.bg, border: `1px solid ${sev.border}`,
-                        borderRadius: 6, padding: '2px 8px',
-                      }}>{sev.label}</span>
-                      {isCompleted(room) && (
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, color: '#475569',
-                          background: 'rgba(71,85,105,0.12)', border: '1px solid rgba(71,85,105,0.2)',
-                          borderRadius: 6, padding: '2px 8px',
-                        }}>완료</span>
+                    <div className="flex gap-2 items-center">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-lg border" style={{ color: sts.color, background: `${sts.color}15`, borderColor: `${sts.color}40` }}>
+                        {sts.label}
+                      </span>
+                      {isComp && (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-lg border border-slate-500/30 bg-slate-500/10 text-slate-400">
+                          종료됨
+                        </span>
                       )}
                     </div>
                   </div>
 
                   {/* 2행: 제목 */}
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', lineHeight: 1.3, marginBottom: 6 }}>
+                  <div className="text-[15px] font-black text-slate-100 leading-snug mb-1.5 tracking-tight">
                     {room.title}
                   </div>
 
                   {/* 3행: 설명 */}
                   {room.description && (
-                    <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.5, marginBottom: 8,
-                      overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    <div className="text-xs text-slate-400 leading-relaxed mb-3 line-clamp-2">
                       {room.description}
                     </div>
                   )}
 
                   {/* 4행: 최근 메시지 */}
-                  {room.last_message && (
-                    <div style={{
-                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-                      borderRadius: 12, padding: '9px 12px', marginBottom: 10,
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 700 }}>
-                          {room.last_message_sender || '시스템'}
-                        </span>
-                        <span style={{ fontSize: 11, color: '#334155', fontFamily: 'monospace' }}>
-                          {formatTime(room.last_message_time)}
-                        </span>
+                  {!isOp && room.last_message && (
+                    <div className="bg-black/20 border border-white/5 rounded-xl p-2.5 mb-3 backdrop-blur-sm">
+                      <div className="flex justify-between mb-1.5">
+                        <span className="text-[10px] font-black text-slate-500">{room.last_message_sender || '시스템'}</span>
+                        <span className="text-[10px] font-mono text-slate-500">{formatTime(room.last_message_time)}</span>
                       </div>
-                      <div style={{ fontSize: 13, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div className="text-[11px] text-slate-300 truncate font-medium">
                         {room.last_message}
                       </div>
                     </div>
                   )}
 
                   {/* 5행: 통계 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <MessageSquare size={12} color="#334155" />
-                      <span style={{ fontSize: 12, color: '#475569', fontWeight: 700 }}>{room.message_count || 0}개</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Paperclip size={12} color="#334155" />
-                      <span style={{ fontSize: 12, color: '#475569', fontWeight: 700 }}>{room.attachment_count || 0}개 첨부</span>
-                    </div>
-                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Clock size={12} color="#334155" />
-                      <span style={{ fontSize: 12, color: '#334155', fontFamily: 'monospace' }}>{formatTime(room.created_at)}</span>
+                  <div className="flex items-center gap-3 mb-3.5">
+                    {!isOp ? (
+                      <>
+                        <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg">
+                          <MessageSquare size={10} className="text-slate-400" />
+                          <span className="text-[10px] font-black text-slate-300">{room.message_count || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg">
+                          <Paperclip size={10} className="text-slate-400" />
+                          <span className="text-[10px] font-black text-slate-300">{room.attachment_count || 0}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-1.5 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+                        <AlertCircle size={10} className="text-blue-400" />
+                        <span className="text-[10px] font-black text-blue-400">워룸 개설 대기중</span>
+                      </div>
+                    )}
+                    <div className="ml-auto flex items-center gap-1.5 opacity-60">
+                      <Clock size={10} className="text-slate-400" />
+                      <span className="text-[10px] font-mono text-slate-400">{formatTime(room.created_at)}</span>
                     </div>
                   </div>
 
                   {/* 6행: 액션 버튼 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <button onClick={() => navigate(`/chat/${room.code}`)} style={{
-                      padding: '12px', borderRadius: 12, cursor: 'pointer',
-                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                      color: '#94a3b8', fontSize: 14, fontWeight: 700,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}>
-                      <Eye size={15} /> 상세보기
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button onClick={() => navigate(`/chat/${room.code}`)} 
+                      className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-black flex items-center justify-center gap-1.5 hover:bg-white/10 transition-colors">
+                      <Eye size={14} /> 상세보기
                     </button>
                     <button
-                      onClick={() => room.status === 'Completed' ? navigate(`/chat/${room.code}`) : handleJoin(room)}
+                      onClick={() => isComp ? navigate(`/chat/${room.code}`) : (isOp ? handleOpenWarRoom(room) : handleJoin(room))}
                       disabled={isJoining}
+                      className="py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-95"
                       style={{
-                        padding: '12px', borderRadius: 12, cursor: 'pointer',
-                        background: room.status === 'Completed' ? 'rgba(71,85,105,0.2)' : sev.bg,
-                        border: room.status === 'Completed' ? '1px solid rgba(71,85,105,0.3)' : `1px solid ${sev.border}`,
-                        color: room.status === 'Completed' ? '#475569' : sev.color,
-                        fontSize: 14, fontWeight: 800,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        transition: 'all 0.15s',
+                        background: isComp ? 'rgba(71,85,105,0.2)' : (isOp ? 'rgba(59,130,246,0.15)' : sev.bg),
+                        border: isComp ? '1px solid rgba(71,85,105,0.3)' : (isOp ? '1px solid rgba(59,130,246,0.3)' : `1px solid ${sev.border}`),
+                        color: isComp ? '#94a3b8' : (isOp ? '#60a5fa' : sev.color),
+                        boxShadow: isComp ? 'none' : (isOp ? '0 0 15px rgba(59,130,246,0.2)' : `0 0 15px ${sev.color}40`)
                       }}>
                       {isJoining
-                        ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> 입장 중</>
-                        : room.status === 'Completed'
-                          ? <><Eye size={15} /> 종료(참관)</>
-                          : <><LogIn size={15} /> 입장하기</>}
+                        ? <><Loader2 size={14} className="animate-spin" /> 처리 중</>
+                        : isComp
+                          ? <><Eye size={14} /> 종료(참관)</>
+                          : isOp
+                            ? <><Zap size={14} /> 워룸 개설</>
+                            : <><LogIn size={14} /> 입장하기</>}
                     </button>
                   </div>
                 </div>
