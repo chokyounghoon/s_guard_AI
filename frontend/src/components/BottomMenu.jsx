@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, Lock } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, ShieldCheck, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, Lock } from 'lucide-react';
 import { getUserProfile, getAllowedPaths, addAuthListener } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
 
@@ -142,6 +142,8 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
               {[
                 { label: '실시간 파이프라인', sub: 'REALTIME PIPELINE', icon: Layers, path: '/realtime-pipeline', color: '#00e5ff' },
                 { label: '대직자 관리', sub: 'DEPUTY MGMT', icon: UserCircle, path: '/admin/deputy', color: '#10b981' },
+                { label: '기술 명세', sub: 'ARCHITECTURE', icon: Cpu, path: '/processing-flow', color: '#a855f7' },
+                { label: '보안 체계', sub: 'SECURITY INFO', icon: ShieldCheck, path: '/security-features', color: '#10b981' },
                 { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
                 { label: '권한 관리', sub: 'RBAC SETTING', icon: Shield, path: '/admin/permissions', color: '#6366f1', adminOnly: true },
                 { label: '사용자 관리', sub: 'USER MGMT', icon: Users, path: '/user-management', color: '#3b82f6', adminOnly: true },

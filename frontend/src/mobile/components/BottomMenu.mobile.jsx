@@ -159,6 +159,8 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
                 { label: 'Pipeline\nTracker', sub: '실시간 파이프라인', icon: Layers, path: '/realtime-pipeline', color: '#00ff88' },
                 { label: 'Personal\nKW', sub: '개인 키워드', icon: Keyboard, path: '/user-keyword', color: '#00e5ff' },
                 { label: 'Deputy\nMgmt', sub: '대직자 관리', icon: UserCircle, path: '/admin/deputy', color: '#00ff88' },
+                { label: 'Architecture\n& Comm', sub: '기술 명세', icon: Cpu, path: '/processing-flow', color: '#a855f7' },
+                { label: 'Security\nFramework', sub: '보안 체계', icon: ShieldCheck, path: '/security-features', color: '#10b981' },
                 { label: 'RBAC\nSetting', sub: '권한 관리', icon: ShieldCheck, path: '/admin/permissions', color: '#a855f7', adminOnly: true },
                 { label: 'Report\nLine', sub: '결재선 관리', icon: Users, path: '/report-line-management', color: '#ffb700' },
                 { label: 'Accounts', sub: '계정 관리', icon: User, path: '/user-management', color: '#00e5ff' },

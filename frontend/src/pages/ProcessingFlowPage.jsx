@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ChevronLeft, ShieldCheck, Database, Cpu, MessageSquare,
-  Lock, EyeOff, Terminal, Layers, Activity, ChevronDown, ChevronUp
+  Lock, EyeOff, Terminal, Layers, Activity, ChevronDown, ChevronUp, Network, Smartphone, Zap
 } from 'lucide-react';
 
 const STEPS = [
@@ -46,8 +46,24 @@ const STEPS = [
     fn: 'performBackgroundAiAnalysis',
     desc: '데이터 저장이 트리거되면 백그라운드에서 AI 엔진(Dify)이 가동됩니다. 유사한 과거 장애 사례를 Vectorize DB에서 검색하고 에이전트별 조치 가이드를 생성합니다.',
     sql: null,
-    active: true,
   },
+  {
+    icon: Network, color: '#facc15',
+    title: '6. Realtime Pipeline (SSE)',
+    subtitle: 'Server-Sent Events 실시간 통신',
+    fn: "new EventSource('/sms/notification-stream')",
+    desc: '폴링(Polling) 방식의 오버헤드를 제거하기 위해 SSE 기술을 도입했습니다. 백엔드에서 장애가 접수되거나 분석이 완료되면 연결된 모든 워룸과 대시보드 클라이언트에게 양방향 연결 없이 단방향으로 초저지연 실시간 이벤트를 푸시합니다.',
+    sql: 'sse.addEventListener("sms_received", (e) => updateUI(e.data))',
+  },
+  {
+    icon: Smartphone, color: '#06b6d4',
+    title: '7. Mobile App & Push (FCM v1)',
+    subtitle: '안드로이드 네이티브 푸시 및 웹 뷰 연동',
+    fn: 'admin.messaging().send()',
+    desc: '레거시 VAPID Web Push에서 최신 FCM v1 HTTP API로 마이그레이션했습니다. Cloudflare Worker에서 Service Account의 OAuth2 토큰을 발급하여 안드로이드 앱으로 Data 페이로드를 안전하게 전송하며 자동 발신(Callert)을 트리거합니다.',
+    sql: 'POST https://fcm.googleapis.com/v1/projects/s-guard-ai/messages:send',
+    active: true,
+  }
 ];
 
 export default function ProcessingFlowPage() {

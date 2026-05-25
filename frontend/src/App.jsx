@@ -48,6 +48,7 @@ import PCPageModal from './components/PCPageModal';
 import MobileActivity     from './mobile/pages/MobileActivity';
 import MobileInbox        from './mobile/pages/MobileInbox';
 import MobileIncidentPush from './mobile/pages/MobileIncidentPush';
+import MobileSecurityFeaturesPage from './mobile/pages/MobileSecurityFeaturesPage';
 
 import BottomMenu from './components/BottomMenu';
 import AIAssistantPanel from './components/AIAssistantPanel';
@@ -427,6 +428,7 @@ function AppContent() {
         <Route path="/keyword-management"      element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><KeywordManagementPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/report-line-management"  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ReportLineManagementPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/security-logs"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SecurityLogPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/security-features"       element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><MobileSecurityFeaturesPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/processing-flow"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ProcessingFlowPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/push-diagnostic"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><PushDiagnosticPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/knowledge-base"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><KnowledgeBasePage /></PCPageModal></ProtectedRoute>} />

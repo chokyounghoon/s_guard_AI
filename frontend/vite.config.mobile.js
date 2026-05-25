@@ -57,11 +57,6 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5174,
-    hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: 5174,
-    },
     // 🚀 로컬 개발 시 Worker API를 프록시 → 외부 HTTPS 왕복 제거 (PC와 동일한 응답속도)
     proxy: {
       '/ai': {

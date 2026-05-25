@@ -39,6 +39,7 @@ import AlertMonitorPage      from '../pages/AlertMonitorPage';
 import UserKeywordPage       from '../pages/UserKeywordPage';
 import SCallertPage          from '../pages/SCallertPage';
 import MobileSCallertPage    from './pages/MobileSCallertPage';
+import MobileSecurityFeaturesPage from './pages/MobileSecurityFeaturesPage';
 import PermissionManagementPage from '../pages/PermissionManagementPage';
 import DeputyManagementPage from '../pages/DeputyManagementPage';
 import MobileDeputyManagementPage from './pages/MobileDeputyManagementPage';
@@ -389,6 +390,7 @@ function AppContent() {
         <Route path="/keyword-management"      element={<PR><KeywordManagementPage /></PR>} />
         <Route path="/report-line-management"  element={<PR><ReportLineManagementPage /></PR>} />
         <Route path="/security-logs"           element={<PR><SecurityLogPage /></PR>} />
+        <Route path="/security-features"       element={<PR><MobileSecurityFeaturesPage /></PR>} />
         <Route path="/processing-flow"         element={<PR><ProcessingFlowPage /></PR>} />
         <Route path="/push-diagnostic"         element={<PR><PushDiagnosticPage /></PR>} />
         <Route path="/knowledge-base"          element={<PR><KnowledgeBasePage /></PR>} />
