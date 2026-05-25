@@ -351,7 +351,10 @@ function AppContent() {
 
   const fetchWarRooms = async () => {
     try {
-      const res = await fetch(`${apiBase}/warroom/rooms`);
+      const { getAuthHeaders } = await import('./lib/authStore');
+      const res = await fetch(`${apiBase}/warroom/rooms?participating=true`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setWarRooms(data.rooms || []);
@@ -510,12 +513,12 @@ function AppContent() {
                   </div>
                   <p className="text-slate-500 text-sm font-bold">진행 중인 War-Room이 없습니다.</p>
                 </div>
-              ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' : true).map((room) => {
+              ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' && r.status !== '완료' && r.status !== 'INC_003' : true).map((room, index) => {
                 const roomId = room.inc_id || room.id;
                 const isCurrent = roomId === currentIncidentId;
                 return (
                   <div
-                    key={roomId}
+                    key={`${roomId}-${index}`}
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
                     className={`p-5 rounded-[2rem] border transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${
                       isCurrent 
@@ -582,11 +585,11 @@ function AppContent() {
                   </div>
                   <p className="text-slate-400 font-bold text-sm">발행된 리포트가 없습니다.</p>
                 </div>
-              ) : warRooms.map((room) => {
+              ) : warRooms.map((room, index) => {
                 const roomId = room.inc_id || room.id;
                 return (
                   <div
-                    key={roomId}
+                    key={`${roomId}-${index}`}
                     onClick={() => { setShowReportPopup(false); navigate(`/ai-report/${roomId}`); }}
                     className="group bg-white/[0.02] p-4 rounded-2xl border border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all cursor-pointer relative overflow-hidden active:scale-[0.98]"
                   >

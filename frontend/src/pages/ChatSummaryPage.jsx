@@ -182,7 +182,7 @@ export default function ChatSummaryPage() {
         });
 
         clearTimeout(timeoutId);
-        console.log(`[ChatSummary] << Response received: HTTP ${response.status} ${response.statusText}`);
+        console.log(`[ChatSummary] << Stream started (HTTP ${response.status} ${response.statusText}). Waiting for chunks...`);
         setLoadingStatus('AI 엔진 연결 성공! 데이터를 분석하고 있습니다...');
 
         if (!response.ok || !response.body) {

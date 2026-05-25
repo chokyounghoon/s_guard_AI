@@ -171,11 +171,11 @@ function getKst() {
 async function generateDeviceHash(c) {
   const ua = c.req.header('user-agent') || 'unknown';
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || '127.0.0.1';
-  
+
   // 유동 IP 대응을 위해 C-Class 대역까지만 사용
   const ipPrefix = ip.split('.').slice(0, 3).join('.');
   const data = `${ua}|${ipPrefix}`;
-  
+
   const encoder = new TextEncoder();
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
   return Array.from(new Uint8Array(hashBuffer))
@@ -198,7 +198,7 @@ async function createAndStoreSession(c, userId) {
       INSERT INTO user_sessions (id, user_id, refresh_token, device_hash, expires_at)
       VALUES (?, ?, ?, ?, ?)
     `).bind(crypto.randomUUID(), userId, refreshToken, deviceHash, expiresAt).run();
-    
+
     return refreshToken;
   } catch (e) {
     console.error(`[Session-Error] Failed to store session for user ${userId}:`, e.message);
@@ -254,7 +254,7 @@ app.use('*', async (c, next) => {
           const boundStmt = originalBind(...args);
           return patchStatement(boundStmt);
         };
-        
+
         return stmt;
       };
 
@@ -273,8 +273,8 @@ app.use('*', cors({
     if (!origin) return null;
     const url = new URL(origin);
     if (
-      url.hostname === 'sguard-frontend.pages.dev' || 
-      url.hostname.endsWith('.pages.dev') || 
+      url.hostname === 'sguard-frontend.pages.dev' ||
+      url.hostname.endsWith('.pages.dev') ||
       url.hostname.endsWith('.workers.dev') ||
       url.hostname === 'localhost' ||
       url.hostname === '127.0.0.1'
@@ -303,11 +303,11 @@ app.use('/warroom/asset/*', async (c, next) => {
 const sendSecurityAlert = async (c, { type, title, detail, urgency = 'NORMAL' }) => {
   const db = c.env.DB;
   if (!db) return;
-  
+
   const now = getKst();
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || 'unknown';
   const ua = c.req.header('user-agent') || 'unknown';
-  
+
   try {
     // 1. Get all admins
     const { results: admins } = await db.prepare("SELECT employee_id FROM users WHERE is_admin = 1 AND is_active = 1").all();
@@ -352,23 +352,23 @@ const verifyDifyAuth = (authHeader, c) => {
 // 🔒 인증 미들웨어 (Auth Middleware)
 const authMiddleware = async (c, next) => {
   const path = c.req.path;
-  
+
   // 🔒 인증 예외 경로 (화이트리스트)
-  const isPublic = 
+  const isPublic =
     path.startsWith('/api/v1/') ||
     path.startsWith('/ai/') ||
-    path === '/' || 
+    path === '/' ||
     path === '/auth/login' ||             // 로그인은 자체 검증
     path === '/auth/refresh' ||            // ⚡ Ghost Token 복구 경로 — 자체 토큰 추출 로직 사용
     path === '/auth/logout' ||             // ⚡ 로귰아웃 — 쿠키 삭제 (JWT 불필요)
     path === '/auth/change-password' ||   // ⚡ 기존 비밀번호로 자체 검증 — JWT 불필요
-    path === '/auth/verify' || 
+    path === '/auth/verify' ||
     path === '/auth/init' ||
     path === '/auth/signup' ||
     path === '/auth/reset/request' ||
-    path === '/auth/reset/verify' || 
-    path === '/auth/agree-terms' || 
-    path === '/sms/receive' || 
+    path === '/auth/reset/verify' ||
+    path === '/auth/agree-terms' ||
+    path === '/sms/receive' ||
     path === '/retrieval' ||
     path === '/upsert' ||          // ⚡ Dify Knowledge Tool — 자체 DIFY_TOOL_KEY 인증 사용
     path.startsWith('/warroom/asset/') ||  // ⚡ R2 파일 서빙 — <img src> 직접 접근이므로 JWT 불가
@@ -384,7 +384,7 @@ const authMiddleware = async (c, next) => {
     path === '/scallert/debug-trigger' ||
     path === '/scallert/debug-schema' ||
     (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
-    
+
   console.log(`[Auth-Access] Path: ${path} | isPublic: ${isPublic}`);
 
   if (isPublic) {
@@ -578,7 +578,7 @@ const sendPushNotification = async (c, userId, payload) => {
     } else {
       subscriptions = await db.prepare("SELECT * FROM push_subscriptions WHERE user_id = ?").bind(userId).all();
     }
-    
+
     if (!subscriptions.results || subscriptions.results.length === 0) {
       return [{ error: 'No subscriptions found for user' }];
     }
@@ -597,20 +597,20 @@ const sendPushNotification = async (c, userId, payload) => {
         // data-only 모드: action 등 데이터만 있는 경우 (Android remoteMessage.data 활용)
         const notificationPayload = (payload.data && !payload.title)
           ? {
-              tag:      payload.tag      || 'sguard-data',
-              priority: payload.priority || 100,
-              data:     payload.data
-            }
+            tag: payload.tag || 'sguard-data',
+            priority: payload.priority || 100,
+            data: payload.data
+          }
           : {
-              title:    payload.title    || '[S-GUARD]',
-              body:     payload.body     || '새 알림이 수신되었습니다.',
-              tag:      payload.tag      || 'sguard-alert',
-              url:      payload.url      || '/inbox',
-              inc_id:   payload.inc_id   || null,
-              priority: payload.priority || 50,
-              vibrate:  (payload.priority || 50) >= 80 ? [300, 100, 300] : [200, 100, 200],
-              data:     payload.data     || null
-            };
+            title: payload.title || '[S-GUARD]',
+            body: payload.body || '새 알림이 수신되었습니다.',
+            tag: payload.tag || 'sguard-alert',
+            url: payload.url || '/inbox',
+            inc_id: payload.inc_id || null,
+            priority: payload.priority || 50,
+            vibrate: (payload.priority || 50) >= 80 ? [300, 100, 300] : [200, 100, 200],
+            data: payload.data || null
+          };
         const payloadStr = JSON.stringify(notificationPayload);
         console.log('[Push] Sending to', sub.endpoint.substring(0, 40), '| payload:', payloadStr.substring(0, 80));
 
@@ -647,7 +647,7 @@ const sendPushNotification = async (c, userId, payload) => {
 app.get('/debug/push-subscriptions', async (c) => {
   const pass = c.req.query('pass');
   if (pass !== 'verify') return c.json({ error: 'Unauthorized' }, 401);
-  
+
   const db = c.env.DB;
   const { results } = await db.prepare("SELECT user_id, endpoint, mod_dt FROM push_subscriptions").all();
   return c.json({ count: results.length, subscriptions: results });
@@ -656,14 +656,14 @@ app.get('/debug/push-subscriptions', async (c) => {
 // 🚀 Database One-time Migration Endpoint (Phase 4: Governance & Bypass)
 app.get('/debug/db-init', async (c) => {
   const pass = c.req.query('pass');
-  
+
   // 실운영 환경 보호 (특수 암호 pass=verify 가 없을 경우에만 차단)
   if (c.env.ENVIRONMENT === 'production' && pass !== 'verify') {
     return c.json({ error: 'Production environment debug access denied. Use ?pass=verify high-privilege code.' }, 403);
   }
   const db = c.env.DB;
   const results = [];
-  
+
   const columns = [
     { name: 'received_count', type: 'INTEGER DEFAULT 1' },
     { name: 'keyword_detected', type: 'INTEGER DEFAULT 0' },
@@ -718,23 +718,23 @@ app.get('/debug/db-init', async (c) => {
   // ai_feedback 신규 가버넌스 컬럼 확장 (Phase 15 고도화)
   const feedbackColumns = [
     // 기존 컬럼
-    { name: 'status',         type: "TEXT DEFAULT 'PENDING'" },
-    { name: 'is_golden',      type: 'INTEGER DEFAULT 0' },
-    { name: 'admin_comment',  type: 'TEXT' },
-    { name: 'voter_count',    type: 'INTEGER DEFAULT 0' },
-    { name: 'audit_log',      type: 'TEXT' },
+    { name: 'status', type: "TEXT DEFAULT 'PENDING'" },
+    { name: 'is_golden', type: 'INTEGER DEFAULT 0' },
+    { name: 'admin_comment', type: 'TEXT' },
+    { name: 'voter_count', type: 'INTEGER DEFAULT 0' },
+    { name: 'audit_log', type: 'TEXT' },
     // 누락 컬럼 (기존 DB에 없어서 INSERT 시 오류 발생)
-    { name: 'incident_id',      type: 'TEXT' },
-    { name: 'vector_id',        type: 'TEXT' },
-    { name: 'error_category',   type: 'TEXT' },
-    { name: 'user_correction',  type: 'TEXT' },
-    { name: 'reason',           type: 'TEXT' },
-    { name: 'context',          type: 'TEXT' },
-    { name: 'point_awarded',    type: 'BOOLEAN DEFAULT FALSE' },
-    { name: 'reg_id',           type: "TEXT DEFAULT 'SYSTEM'" },
-    { name: 'reg_dt',           type: 'DATETIME' },
-    { name: 'mod_id',           type: "TEXT DEFAULT 'SYSTEM'" },
-    { name: 'mod_dt',           type: 'DATETIME' },
+    { name: 'incident_id', type: 'TEXT' },
+    { name: 'vector_id', type: 'TEXT' },
+    { name: 'error_category', type: 'TEXT' },
+    { name: 'user_correction', type: 'TEXT' },
+    { name: 'reason', type: 'TEXT' },
+    { name: 'context', type: 'TEXT' },
+    { name: 'point_awarded', type: 'BOOLEAN DEFAULT FALSE' },
+    { name: 'reg_id', type: "TEXT DEFAULT 'SYSTEM'" },
+    { name: 'reg_dt', type: 'DATETIME' },
+    { name: 'mod_id', type: "TEXT DEFAULT 'SYSTEM'" },
+    { name: 'mod_dt', type: 'DATETIME' },
   ];
 
   for (const col of feedbackColumns) {
@@ -751,7 +751,7 @@ app.get('/debug/db-init', async (c) => {
   } catch (e) {
     results.push({ column: "received_messages.priority_flag", status: "Already exists or skip", error: e.message });
   }
-  
+
   try {
     await db.prepare("ALTER TABLE received_messages ADD COLUMN priority_score REAL DEFAULT 0.0").run();
     results.push({ column: "received_messages.priority_score", status: "Added successfully" });
@@ -772,7 +772,7 @@ app.get('/debug/db-init', async (c) => {
   } catch (e) {
     results.push({ column: "received_messages.category", status: "Already exists or skip", error: e.message });
   }
-  
+
   // Add inbox_items table check
   try {
     await db.prepare(`
@@ -895,7 +895,7 @@ app.get('/debug/db-init', async (c) => {
   } catch (e) { results.push({ table: 'user_stats', status: 'Error', error: e.message }); }
 
   // knowledge_feedback 컬럼 확장
-  try { await db.prepare("ALTER TABLE ai_feedback ADD COLUMN point_awarded BOOLEAN DEFAULT FALSE").run(); } catch(e) {}
+  try { await db.prepare("ALTER TABLE ai_feedback ADD COLUMN point_awarded BOOLEAN DEFAULT FALSE").run(); } catch (e) { }
 
   // 🔐 Security: Create login_history table if not exists
   try {
@@ -920,8 +920,8 @@ app.get('/debug/db-init', async (c) => {
     results.push({ table: 'login_history', status: 'Error', error: e.message });
   }
 
-  return c.json({ 
-    message: 'Phase 18 Leadboard Infrastructure Ready', 
+  return c.json({
+    message: 'Phase 18 Leadboard Infrastructure Ready',
     results,
     timestamp: getKst()
   });
@@ -935,14 +935,14 @@ app.get('/debug/seed-initial-data', async (c) => {
   }
   const db = c.env.DB;
   const now = getKst();
-  
+
   // 1. Check if empty
   const count = await db.prepare("SELECT COUNT(1) as total FROM received_messages").first('total');
-  
+
   // 2. Insert Seed SMS
   const seedIncId = generateIncId();
   const seedMsg = "[S-GUARD] 04/13 21:00 신한은행(BANK_001) 차세대시스템 DB 응답지연(ORA-00600) 발생건수: 155건 노드: DB_NODE_04";
-  
+
   const encryptedSeedMsg = await encryptAES(seedMsg, c.env.AES_SECRET_KEY || DEFAULT_AES_KEY);
   await db.prepare(`
     INSERT INTO received_messages (
@@ -950,10 +950,10 @@ app.get('/debug/seed-initial-data', async (c) => {
       service_name, biz_system, error_code, error_message, channel
     ) VALUES (?, '02-1234-5678', ?, 'SYSTEM', ?, 'PENDING', 1, '신한은행', '차세대시스템', 'ORA-00600', 'DB 응답지연', 'SMS')
   `).bind(seedIncId, encryptedSeedMsg, now).run();
-  
+
   // 3. Trigger Background analysis & Vectorize Sync
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(seedIncId, c.env).catch(e => console.error(e)));
-  
+
   return c.json({
     message: 'Genesis Protocol Launched: Initial Data Seeded',
     inc_id: seedIncId,
@@ -968,7 +968,7 @@ app.get('/debug/vectorize-stats', async (c) => {
     return c.json({ error: 'Production environment debug access denied. Use ?pass=verify high-privilege code.' }, 403);
   }
   if (!c.env.WARROOM_INDEX) return c.json({ error: 'WARROOM_INDEX binding missing' }, 500);
-  
+
   try {
     const stats = await c.env.WARROOM_INDEX.describe();
     return c.json({
@@ -1027,7 +1027,7 @@ const generateIncId = () => {
 const extractSearchMetadata = (text) => {
   if (!text) return {};
   const metadata = {};
-  
+
   // 1. Extract Phone Number (Sender)
   const phoneMatch = text.match(/01[016789][\s\-]?\d{3,4}[\s\-]?\d{4}/);
   if (phoneMatch) metadata.sender = phoneMatch[0].replace(/[\s\-]/g, '');
@@ -1040,7 +1040,7 @@ const extractSearchMetadata = (text) => {
   const now = new Date();
   const kstOffset = 9 * 60 * 60 * 1000;
   const today = new Date(now.getTime() + kstOffset);
-  
+
   if (text.includes('오늘')) {
     metadata.start_date = today.toISOString().split('T')[0] + ' 00:00:00';
     metadata.end_date = today.toISOString().split('T')[0] + ' 23:59:59';
@@ -1071,7 +1071,7 @@ const extractSearchMetadata = (text) => {
 const sendEmail = async (c, { to, subject, html, fromName, fromEmail, replyTo }) => {
   const resendApiKey = c.env.RESEND_API_KEY;
   const brevoApiKey = c.env.BREVO_API_KEY;
-  
+
   const mailFrom = fromEmail || 'noreply@chokerslab.store';
   const mailFromName = fromName || 'S-Guard AI Security';
 
@@ -1082,9 +1082,9 @@ const sendEmail = async (c, { to, subject, html, fromName, fromEmail, replyTo })
     try {
       const rsRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${resendApiKey}`, 
-          'Content-Type': 'application/json' 
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           from: `${mailFromName} <${mailFrom}>`,
@@ -1173,7 +1173,7 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
     if (sms) {
       // Mark as ANALYZING so UI can show a spinner
       await db.prepare("UPDATE received_messages SET status = 'ANALYZING' WHERE inc_id = ?").bind(String(sms_id)).run();
-      
+
       // 🚀 [Activity Log] RAG/AGENT 분석 시작 기록 (중복 방지: 이미 PROCESSING 중이면 생략)
       try {
         const existingLog = await db.prepare("SELECT id FROM activity_logs WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'").bind(String(sms_id)).first();
@@ -1201,7 +1201,7 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
     if (env.WARROOM_INDEX || env.AI) {
       cleanedMessage = cleanMessageForEmbedding(sms.message || '');
       messageVector = await generateEmbedding(cleanedMessage, env);
-      
+
       if (messageVector && messageVector.length === 768 && env.WARROOM_INDEX) {
         await env.WARROOM_INDEX.upsert([{
           id: `inc-${sms_id}`,
@@ -1301,7 +1301,7 @@ ${detailedInfo}`;
             if (kbMatch) {
               matchedContent = kbMatch.content;
               matchedTitle = kbMatch.title;
-              
+
               const matchType = isTechnicalSignal ? "기술 지능형 매칭" : "관제 지식 기반 매칭";
               const inputSnippet = cleanedMessage.length > 150 ? cleanedMessage.substring(0, 150) + "..." : cleanedMessage;
               similarityReason = `[${matchType}] 유사도 분석 완료\n- 출처 DB: ${sourceDB} (매칭 ID: ${matchId})\n- 매칭 기준 항목 제목: ${matchedTitle}\n- 분석에 사용된 입력값: "${inputSnippet}"`;
@@ -1330,10 +1330,10 @@ ${detailedInfo}`;
         ).all();
         configs.results.forEach(c => {
           if (c.config_key === 'similarity_threshold_technical') technicalThreshold = parseFloat(c.config_value);
-          if (c.config_key === 'similarity_threshold_casual')    casualThreshold    = parseFloat(c.config_value);
-          if (c.config_key === 'similarity_threshold_admin')     adminThreshold     = parseFloat(c.config_value);
-          if (c.config_key === 'alert_critical_error_count')     alertCriticalCount = parseFloat(c.config_value);
-          if (c.config_key === 'alert_major_error_count')        alertMajorCount    = parseFloat(c.config_value);
+          if (c.config_key === 'similarity_threshold_casual') casualThreshold = parseFloat(c.config_value);
+          if (c.config_key === 'similarity_threshold_admin') adminThreshold = parseFloat(c.config_value);
+          if (c.config_key === 'alert_critical_error_count') alertCriticalCount = parseFloat(c.config_value);
+          if (c.config_key === 'alert_major_error_count') alertMajorCount = parseFloat(c.config_value);
         });
       } catch (ce) {
         console.error("[Config] Failed to fetch live thresholds, using defaults.", ce);
@@ -1343,7 +1343,7 @@ ${detailedInfo}`;
       const occCount = Number(sms.occurrence_count) || 1;
       const alertSeverity =
         occCount >= alertCriticalCount ? 'CRITICAL' :
-        occCount >= alertMajorCount    ? 'MAJOR'    : 'NORMAL';
+          occCount >= alertMajorCount ? 'MAJOR' : 'NORMAL';
       console.log(`[severity] occ=${occCount} critThr=${alertCriticalCount} majThr=${alertMajorCount} → ${alertSeverity}`);
 
       const effectiveThreshold = isTechnicalSignal ? technicalThreshold : casualThreshold;
@@ -1379,7 +1379,7 @@ ${detailedInfo}`;
           RETURNING id
         `).bind(String(sms_id), `${api_base}/chat-messages`, JSON.stringify({ query: prompt })).first();
         logId = logRes?.id;
-      } catch (le) {}
+      } catch (le) { }
 
       // 1. Chat API — 재시도 로직 포함 (최대 3회, 지수 백오프)
       const controller = new AbortController();
@@ -1387,7 +1387,7 @@ ${detailedInfo}`;
 
       const MAX_RETRIES = 3;
       let lastError = null;
-      
+
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           const difyRes = await fetch(`${api_base}/chat-messages`, {
@@ -1400,8 +1400,8 @@ ${detailedInfo}`;
             body: JSON.stringify({
               inputs: {
                 admin_threshold_value: Number(adminThreshold) || 0.85,
-                technical_threshold:   Number(technicalThreshold) || 0.85,
-                casual_threshold:      Number(casualThreshold)    || 0.95
+                technical_threshold: Number(technicalThreshold) || 0.85,
+                casual_threshold: Number(casualThreshold) || 0.95
               },
               query: prompt,
               response_mode: 'streaming',
@@ -1437,7 +1437,7 @@ ${detailedInfo}`;
                     accumulated += (parsed.answer || '');
                   }
                   if (parsed.event === 'message_end') break;
-                } catch {}
+                } catch { }
               }
             }
 
@@ -1448,7 +1448,7 @@ ${detailedInfo}`;
 
           } else {
             let errBody = '';
-            try { errBody = await difyRes.text(); } catch {}
+            try { errBody = await difyRes.text(); } catch { }
             console.warn(`[Dify Chat] Attempt ${attempt}/${MAX_RETRIES} failed ${difyRes.status}: ${errBody.slice(0, 200)}`);
             lastError = { status: difyRes.status, body: errBody };
 
@@ -1484,7 +1484,7 @@ ${detailedInfo}`;
         try {
           await db.prepare(`UPDATE dify_debug_logs SET status_code=?, error_message=? WHERE id=?`)
             .bind(resultStatus, !fullOutput ? `Chat failed after ${MAX_RETRIES} attempts: status ${resultStatus}` : null, logId).run();
-        } catch {}
+        } catch { }
       }
 
 
@@ -1498,12 +1498,12 @@ ${detailedInfo}`;
               error_message = ?
             WHERE id = ?
           `).bind(
-            resultData ? JSON.stringify(resultData) : null, 
-            resultStatus, 
+            resultData ? JSON.stringify(resultData) : null,
+            resultStatus,
             resultStatus >= 400 ? `Dify API Failed with status ${resultStatus}` : null,
             logId
           ).run();
-        } catch (le) {}
+        } catch (le) { }
       }
 
       // 💾 Persist Result to Insight (outside branch)
@@ -1518,14 +1518,14 @@ ${detailedInfo}`;
             similarity_reason=COALESCE(excluded.similarity_reason, autopilot_insight.similarity_reason)
         `).bind(String(sms_id), fullOutput, alertSeverity ?? 'NORMAL', now, now, similarityScore ?? null, difyReason).run();
         await db.prepare("UPDATE received_messages SET status = 'ANALYZED' WHERE inc_id = ?").bind(String(sms_id)).run();
-        
+
         // 🚀 [Activity Log] RAG/AGENT 분석 완료 기록
         try {
           const updateRes = await db.prepare(`
             UPDATE activity_logs SET status = 'SUCCESS', message = 'AI 지능형 분석 및 전문가 진단이 완료되었습니다.', created_at = ?
             WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
           `).bind(getKst(), String(sms_id)).run();
-          
+
           // 만약 위에서 업데이트가 안 되었다면 (신규 건 등) 중복 확인 후 삽입
           if (updateRes.meta.changes === 0) {
             const hasSuccess = await db.prepare("SELECT id FROM activity_logs WHERE inc_id = ? AND type = 'AGENT' AND status = 'SUCCESS'").bind(String(sms_id)).first();
@@ -1560,7 +1560,7 @@ ${detailedInfo}`;
         // 🛡️ SECURITY: 기술적 에러는 DB에 저장하지 않고 로그만 남김 (캐시 오염 방지)
         console.error(`[AI Background] Analysis Failed: ${sms_id} - ${errorReason}: ${errorMsg}`);
         // DB 저장을 건너뛰어 대시보드가 항상 신선한 데이터를 요구하게 함
-        
+
         await db.prepare("UPDATE received_messages SET status = 'ERROR' WHERE inc_id = ?").bind(String(sms_id)).run();
         // 🚀 [Activity Log] 실패 기록
         try {
@@ -1568,7 +1568,7 @@ ${detailedInfo}`;
             UPDATE activity_logs SET status = 'FAIL', message = 'AI 분석 엔진이 응답하지 않거나 오류가 발생했습니다.', created_at = ?
             WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
           `).bind(getKst(), String(sms_id)).run();
-          
+
           if (failUpdate.meta.changes === 0) {
             const hasFail = await db.prepare("SELECT id FROM activity_logs WHERE inc_id = ? AND type = 'AGENT' AND status = 'FAIL'").bind(String(sms_id)).first();
             if (!hasFail) {
@@ -1578,7 +1578,7 @@ ${detailedInfo}`;
               `).bind(String(sms_id), getKst()).run();
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
 
@@ -1594,15 +1594,15 @@ ${detailedInfo}`;
         UPDATE activity_logs SET status = 'FAIL', message = 'AI 분석 중 치명적 오류가 발생했습니다.', created_at = ?
         WHERE inc_id = ? AND type = 'AGENT' AND status = 'PROCESSING'
       `).bind(getKst(), String(sms_id)).run();
-    } catch (e) {}
-    
+    } catch (e) { }
+
     // Log fatal error to trace
     try {
       await db.prepare(`
         INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
         VALUES (?, 'BG_PROCESS_FATAL', 'CRITICAL_FAILURE', 500, ?)
       `).bind(String(sms_id), err.message).run();
-    } catch (le) {}
+    } catch (le) { }
 
     if (env.SMS_STORAGE) await env.SMS_STORAGE.delete(`lock:analyze:${sms_id}`);
   }
@@ -1612,12 +1612,12 @@ ${detailedInfo}`;
 const hashPassword = async (password) => {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-  
+
   const encoder = new TextEncoder();
   const data = encoder.encode(saltHex + password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  
+
   return `${saltHex}:${hashHex}`;
 }
 
@@ -1645,8 +1645,8 @@ const verifyPassword = async (password, storedHash) => {
 // ──────────────────────────────────────────
 app.post('/auth/init', async (c) => {
   const { employee_id, password, check_only } = await c.req.json();
-  const db  = c.env.DB;
-  const kv  = c.env.SMS_STORAGE;
+  const db = c.env.DB;
+  const kv = c.env.SMS_STORAGE;
 
   // 1. 사번 유효성 검증
   if (!employee_id || String(employee_id).trim() === '') {
@@ -1668,8 +1668,8 @@ app.post('/auth/init', async (c) => {
     return c.json({ detail: '보안 정책에 의해 사용이 중지된 계정입니다.', code: 'SUSPENDED' }, 403);
   }
 
-  const isNew  = user.status === 'PRE_REGISTERED';
-  const mode   = isNew ? 'PRE_REGISTERED' : 'ACTIVE';
+  const isNew = user.status === 'PRE_REGISTERED';
+  const mode = isNew ? 'PRE_REGISTERED' : 'ACTIVE';
 
   // 3. 이메일 마스킹
   const email = user.email || '';
@@ -1692,12 +1692,12 @@ app.post('/auth/init', async (c) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   // 6. Resend API로 OTP 메일 발송
-  const mailFrom    = 'noreply@chokerslab.store';
+  const mailFrom = 'noreply@chokerslab.store';
   const mailFromName = 'S-Guard AI Security';
-  const subject     = isNew
+  const subject = isNew
     ? '[S-Guard] 최초 로그인 인증 코드'
     : '[S-Guard] 로그인 인증 코드';
-  const htmlBody    = `
+  const htmlBody = `
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
       <h2 style="color:#38bdf8;margin-bottom:8px;">🛡️ S-Guard AI</h2>
       <p style="margin-bottom:24px;">${user.name || empId}님, ${isNew ? '최초 등록을 위한 인증번호입니다.' : '로그인 인증번호입니다.'}</p>
@@ -1743,8 +1743,8 @@ app.post('/auth/verify-otp', async (c) => {
     return c.json({ detail: '사번과 인증번호를 모두 입력해 주세요.' }, 400);
   }
 
-  const empId  = String(employee_id).trim();
-  const kvKey  = `otp:${empId}`;
+  const empId = String(employee_id).trim();
+  const kvKey = `otp:${empId}`;
   const stored = kv ? await kv.get(kvKey) : null;
 
   if (!stored) {
@@ -1759,7 +1759,7 @@ app.post('/auth/verify-otp', async (c) => {
   if (kv) await kv.delete(kvKey);
 
   // D1에서 mode 확인 후 응답
-  const db   = c.env.DB;
+  const db = c.env.DB;
   const user = await db
     .prepare("SELECT employee_id, status FROM users WHERE employee_id = ?")
     .bind(empId)
@@ -1782,16 +1782,16 @@ app.post('/auth/verify-otp', async (c) => {
 const generateJWT = async (payload, secret, expirySeconds = 28800) => {
   // UTF-8 안전 base64url 인코딩 (한글 등 멀티바이트 문자 지원)
   const encode = (obj) => {
-    const json  = JSON.stringify(obj);
+    const json = JSON.stringify(obj);
     const bytes = new TextEncoder().encode(json);
     return btoa(String.fromCharCode(...bytes))
       .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   };
 
-  const header  = { alg: 'HS256', typ: 'JWT' };
-  const now     = Math.floor(Date.now() / 1000);
-  const body    = { ...payload, iat: now, exp: now + expirySeconds };
-  const input   = `${encode(header)}.${encode(body)}`;
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const body = { ...payload, iat: now, exp: now + expirySeconds };
+  const input = `${encode(header)}.${encode(body)}`;
 
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret),
@@ -1808,27 +1808,27 @@ const verifyJWT = async (token, secret) => {
   try {
     const [headerB64, bodyB64, sigB64] = token.split('.');
     const input = `${headerB64}.${bodyB64}`;
-    
+
     const key = await crypto.subtle.importKey(
       'raw', new TextEncoder().encode(secret),
       { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
     );
-    
+
     const sigBytes = Uint8Array.from(atob(sigB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
     const ok = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(input));
-    
+
     if (!ok) return null;
-    
+
     // Base64URL decode
     const bodyText = new TextDecoder().decode(Uint8Array.from(atob(bodyB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
     const body = JSON.parse(bodyText);
-    
+
     // Expiry check
     if (body.exp && body.exp < Math.floor(Date.now() / 1000)) {
       console.log('[JWT] Token expired');
       return null;
     }
-    
+
     return body;
   } catch (e) {
     console.error('[JWT] Verification failed:', e.message);
@@ -1843,212 +1843,212 @@ const verifyJWT = async (token, secret) => {
 // ──────────────────────────────────────────
 app.post('/auth/verify', async (c) => {
   try {
-  const { employee_id: rawEmpId, otp, password, mode, consent_personal_info, consent_third_party_ai } = await c.req.json();
-  const empId = String(rawEmpId || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim();
-  const db = c.env.DB;
-  const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
-  const now = getKst();
-  
-  console.log(`[Auth-Verify-Debug] Verifying user: ${empId}, Mode: ${mode}`);
-  const kv  = c.env.SMS_STORAGE;
+    const { employee_id: rawEmpId, otp, password, mode, consent_personal_info, consent_third_party_ai } = await c.req.json();
+    const empId = String(rawEmpId || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim();
+    const db = c.env.DB;
+    const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
+    const now = getKst();
 
-  if (!empId || !otp) {
-    console.error('[Auth-Verify-Fail] Missing employee_id or otp:', { employee_id: !!empId, otp: !!otp });
-    return c.json({ detail: '사번과 인증번호는 필수입니다.', code: 'E1' }, 400);
-  }
+    console.log(`[Auth-Verify-Debug] Verifying user: ${empId}, Mode: ${mode}`);
+    const kv = c.env.SMS_STORAGE;
 
-  // 🛡️ Rate Limiting: 인증 시도 보호 (1분당 5회 제한)
-  if (kv) {
-    const rlKey = `rl:verify:${empId}`;
-    const attempts = await kv.get(rlKey);
-    if (attempts && parseInt(attempts) >= 5) {
-      return c.json({ detail: '인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.', code: 'TOO_MANY_REQUESTS' }, 429);
+    if (!empId || !otp) {
+      console.error('[Auth-Verify-Fail] Missing employee_id or otp:', { employee_id: !!empId, otp: !!otp });
+      return c.json({ detail: '사번과 인증번호는 필수입니다.', code: 'E1' }, 400);
     }
-    await kv.put(rlKey, (parseInt(attempts || '0') + 1).toString(), { expirationTtl: 60 });
-  }
 
-  // 1. OTP 검증
-  const kvKey = `otp:${empId}`;
-  const stored = kv ? await kv.get(kvKey) : null;
-  
-  if (!stored) {
-    console.warn(`[OTP-Error] ${empId}: No OTP found in KV (possibly expired)`);
-    return c.json({ detail: '인증번호가 만료되었습니다. 다시 요청해 주세요.', code: 'E3' }, 400);
-  }
-  
-  const inputOtp = String(otp || '').trim();
-  const serverOtp = String(stored).trim();
-
-  console.log(`[OTP-Audit] ${empId} -> Server: "${serverOtp}", UserInput: "${inputOtp}"`);
-
-  if (serverOtp !== inputOtp) {
-    console.warn(`[OTP-Error] ${empId}: Mismatch! Server expected "${serverOtp}" but got "${inputOtp}"`);
-    return c.json({ detail: '인증번호가 올바르지 않습니다. 정확히 입력해 주세요.', code: 'E4' }, 400);
-  }
-  // OTP 즉시 삭제 (재사용 방지)
-  if (kv) await kv.delete(kvKey);
-
-  // 2. 사용자 조회
-  const user = await db
-    .prepare("SELECT * FROM users WHERE employee_id = ?")
-    .bind(empId).first();
-  if (!user) {
-    return c.json({ detail: '사용자를 찾을 수 없습니다.', code: 'NOT_FOUND' }, 404);
-  }
-  if (user.status === 'SUSPENDED') {
-    return c.json({ detail: '사용이 중지된 계정입니다.', code: 'SUSPENDED' }, 403);
-  }
-
-  const token = `sguard-token-${empId}`;
-
-  // 3. 신규 사용자 — 비밀번호 설정 + ACTIVE 전환
-  if (user.status === 'PRE_REGISTERED') {
-    if (!password || password.length < 8) {
-      console.error('[Auth-Verify-Fail] New user password invalid:', { hasPassword: !!password, length: password?.length });
-      return c.json({ detail: '비밀번호는 8자 이상이어야 합니다.', code: 'E5' }, 400);
+    // 🛡️ Rate Limiting: 인증 시도 보호 (1분당 5회 제한)
+    if (kv) {
+      const rlKey = `rl:verify:${empId}`;
+      const attempts = await kv.get(rlKey);
+      if (attempts && parseInt(attempts) >= 5) {
+        return c.json({ detail: '인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.', code: 'TOO_MANY_REQUESTS' }, 429);
+      }
+      await kv.put(rlKey, (parseInt(attempts || '0') + 1).toString(), { expirationTtl: 60 });
     }
-    const hashed = await hashPassword(password);
-    await db.prepare(`
+
+    // 1. OTP 검증
+    const kvKey = `otp:${empId}`;
+    const stored = kv ? await kv.get(kvKey) : null;
+
+    if (!stored) {
+      console.warn(`[OTP-Error] ${empId}: No OTP found in KV (possibly expired)`);
+      return c.json({ detail: '인증번호가 만료되었습니다. 다시 요청해 주세요.', code: 'E3' }, 400);
+    }
+
+    const inputOtp = String(otp || '').trim();
+    const serverOtp = String(stored).trim();
+
+    console.log(`[OTP-Audit] ${empId} -> Server: "${serverOtp}", UserInput: "${inputOtp}"`);
+
+    if (serverOtp !== inputOtp) {
+      console.warn(`[OTP-Error] ${empId}: Mismatch! Server expected "${serverOtp}" but got "${inputOtp}"`);
+      return c.json({ detail: '인증번호가 올바르지 않습니다. 정확히 입력해 주세요.', code: 'E4' }, 400);
+    }
+    // OTP 즉시 삭제 (재사용 방지)
+    if (kv) await kv.delete(kvKey);
+
+    // 2. 사용자 조회
+    const user = await db
+      .prepare("SELECT * FROM users WHERE employee_id = ?")
+      .bind(empId).first();
+    if (!user) {
+      return c.json({ detail: '사용자를 찾을 수 없습니다.', code: 'NOT_FOUND' }, 404);
+    }
+    if (user.status === 'SUSPENDED') {
+      return c.json({ detail: '사용이 중지된 계정입니다.', code: 'SUSPENDED' }, 403);
+    }
+
+    const token = `sguard-token-${empId}`;
+
+    // 3. 신규 사용자 — 비밀번호 설정 + ACTIVE 전환
+    if (user.status === 'PRE_REGISTERED') {
+      if (!password || password.length < 8) {
+        console.error('[Auth-Verify-Fail] New user password invalid:', { hasPassword: !!password, length: password?.length });
+        return c.json({ detail: '비밀번호는 8자 이상이어야 합니다.', code: 'E5' }, 400);
+      }
+      const hashed = await hashPassword(password);
+      await db.prepare(`
       UPDATE users SET password_hash=?, status='ACTIVE', token=?,
         last_login_at=?, failed_attempts=0, mod_dt=?, mod_id=?,
         consent_personal_info=?, consent_third_party_ai=?, consent_date=?
       WHERE employee_id=?
     `).bind(
-      hashed, 
-      token, 
-      now, 
-      now, 
-      empId, 
-      consent_personal_info ? 1 : 0, 
-      consent_third_party_ai ? 1 : 0, 
-      now, 
-      empId
-    ).run();
-  }
-  // 4. 기존 사용자 — 비밀번호 검증
-  else {
-    if (!password) {
-      console.error('[Auth-Verify-Fail] Existing user missing password');
-      return c.json({ detail: '비밀번호를 입력해 주세요.', code: 'E6' }, 400);
+        hashed,
+        token,
+        now,
+        now,
+        empId,
+        consent_personal_info ? 1 : 0,
+        consent_third_party_ai ? 1 : 0,
+        now,
+        empId
+      ).run();
     }
-    const ok = await verifyPassword(password, user.password_hash);
-    if (!ok) {
-      await db.prepare("UPDATE users SET failed_attempts=failed_attempts+1 WHERE employee_id=?").bind(empId).run();
-      // 🔐 로그인 실패 기록
-      try {
-        const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
-        const ua = c.req.header('User-Agent') || 'unknown';
-        await db.prepare(
-          `INSERT INTO login_history 
+    // 4. 기존 사용자 — 비밀번호 검증
+    else {
+      if (!password) {
+        console.error('[Auth-Verify-Fail] Existing user missing password');
+        return c.json({ detail: '비밀번호를 입력해 주세요.', code: 'E6' }, 400);
+      }
+      const ok = await verifyPassword(password, user.password_hash);
+      if (!ok) {
+        await db.prepare("UPDATE users SET failed_attempts=failed_attempts+1 WHERE employee_id=?").bind(empId).run();
+        // 🔐 로그인 실패 기록
+        try {
+          const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+          const ua = c.req.header('User-Agent') || 'unknown';
+          await db.prepare(
+            `INSERT INTO login_history 
            (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
            VALUES (?, ?, ?, ?, 'FAILURE', DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'), DATETIME('now', '+9 hours'))`
-        ).bind(empId, user.email || '', ip, ua).run();
-      } catch (err) {
-        console.error(`[Auth-Verify-Error] Failed to record login failure:`, err.message);
+          ).bind(empId, user.email || '', ip, ua).run();
+        } catch (err) {
+          console.error(`[Auth-Verify-Error] Failed to record login failure:`, err.message);
+        }
+        return c.json({ detail: '비밀번호가 올바르지 않습니다.', code: 'WRONG_PASSWORD' }, 401);
       }
-      return c.json({ detail: '비밀번호가 올바르지 않습니다.', code: 'WRONG_PASSWORD' }, 401);
-    }
-    await db.prepare(`
+      await db.prepare(`
       UPDATE users SET token=?, last_login_at=?, failed_attempts=0, mod_dt=?, mod_id=?
       WHERE employee_id=?
     `).bind(token, now, now, empId, empId).run();
-  }
+    }
 
-  // 5. 최신 사용자 정보 조회
-  const updated = await db.prepare("SELECT * FROM users WHERE employee_id=?").bind(empId).first();
+    // 5. 최신 사용자 정보 조회
+    const updated = await db.prepare("SELECT * FROM users WHERE employee_id=?").bind(empId).first();
 
-  // 6. Access Token 생성 (단기: 15분)
-  const jwt = await generateJWT({
-    sub:         empId,
-    name:        updated.name,
-    role:        updated.role,
-    is_admin:    updated.is_admin || 0,
-    company:     updated.company,
-    honbu:       updated.honbu,
-    team:        updated.team,
-  }, jwtSecret, 1800); // ⚡ Increased to 30 minutes (1800s) for smoother experience
+    // 6. Access Token 생성 (단기: 15분)
+    const jwt = await generateJWT({
+      sub: empId,
+      name: updated.name,
+      role: updated.role,
+      is_admin: updated.is_admin || 0,
+      company: updated.company,
+      honbu: updated.honbu,
+      team: updated.team,
+    }, jwtSecret, 1800); // ⚡ Increased to 30 minutes (1800s) for smoother experience
 
-  // 7. Refresh Token 생성 및 D1 저장 (장기: 1년)
-  const refreshToken = await createAndStoreSession(c, empId);
+    // 7. Refresh Token 생성 및 D1 저장 (장기: 1년)
+    const refreshToken = await createAndStoreSession(c, empId);
 
-  // 8. HttpOnly 쿠키 설정 (hono/cookie 사용으로 호환성 극대화)
-  if (refreshToken) {
-    setCookie(c, 'sguard_refresh', refreshToken, {
-      path: '/',
-      httpOnly: true,
-      maxAge: 2592000,
-      sameSite: 'None',
-      secure: true,
-    });
-  } else {
-    console.warn('[Session-Warning] Proceeding without refresh token due to DB error.');
-  }
+    // 8. HttpOnly 쿠키 설정 (hono/cookie 사용으로 호환성 극대화)
+    if (refreshToken) {
+      setCookie(c, 'sguard_refresh', refreshToken, {
+        path: '/',
+        httpOnly: true,
+        maxAge: 2592000,
+        sameSite: 'None',
+        secure: true,
+      });
+    } else {
+      console.warn('[Session-Warning] Proceeding without refresh token due to DB error.');
+    }
 
-  // 🔐 로그인 성공 기록 (Success path for /auth/verify)
-  try {
-    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
-    const ua = c.req.header('User-Agent') || 'unknown';
-    const kstNow = getKst();
-    
-    await db.prepare(
-      `INSERT INTO login_history 
+    // 🔐 로그인 성공 기록 (Success path for /auth/verify)
+    try {
+      const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+      const ua = c.req.header('User-Agent') || 'unknown';
+      const kstNow = getKst();
+
+      await db.prepare(
+        `INSERT INTO login_history 
        (user_id, email, ip_address, user_agent, status, login_time, reg_dt, mod_dt) 
        VALUES (?, ?, ?, ?, 'SUCCESS', ?, ?, ?)`
-    ).bind(empId, updated.email || '', ip, ua, kstNow, kstNow, kstNow).run();
+      ).bind(empId, updated.email || '', ip, ua, kstNow, kstNow, kstNow).run();
 
-    console.log(`[Auth-Verify] Login history recorded for user: ${empId}`);
-  } catch (historyErr) {
-    console.error(`[Auth-Verify-History-Error] Failed to record login history for ${empId}:`, historyErr.message);
-  }
+      console.log(`[Auth-Verify] Login history recorded for user: ${empId}`);
+    } catch (historyErr) {
+      console.error(`[Auth-Verify-History-Error] Failed to record login history for ${empId}:`, historyErr.message);
+    }
 
-  return c.json({
-    ok: true,
-    token,                          // 하위 호환성 유지
-    access_token:    jwt,           // 🔒 신규: 메모리 저장용 Access Token
-    ghost_token:     refreshToken,  // 👻 신규: 장기 세션용
-    allowed_paths:   await fetchUserPermissions(db, updated.role),
-    user: {
-      id:              empId,
-      employee_id:     empId,
-      email:           updated.email,
-      name:            updated.name,
-      role:            updated.role,
-      company:         updated.company,
-      honbu:           updated.honbu,
-      team:            updated.team,
-      part:            updated.part,
-      subpart:         updated.subpart,
-      phone:           updated.phone,
-      position:        updated.position,
-      is_admin:        updated.is_admin || 0,
-      status:          updated.status,
+    return c.json({
+      ok: true,
+      token,                          // 하위 호환성 유지
+      access_token: jwt,           // 🔒 신규: 메모리 저장용 Access Token
+      ghost_token: refreshToken,  // 👻 신규: 장기 세션용
+      allowed_paths: await fetchUserPermissions(db, updated.role),
+      user: {
+        id: empId,
+        employee_id: empId,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role,
+        company: updated.company,
+        honbu: updated.honbu,
+        team: updated.team,
+        part: updated.part,
+        subpart: updated.subpart,
+        phone: updated.phone,
+        position: updated.position,
+        is_admin: updated.is_admin || 0,
+        status: updated.status,
+        profile_picture: updated.profile_picture,
+        terms_agreed_at: updated.terms_agreed_at,
+      },
+      // 하위 호환성: 최상위 레벨 필드도 유지
+      id: empId,
+      employee_id: empId,
+      email: updated.email,
+      name: updated.name,
+      role: updated.role,
+      company: updated.company,
+      honbu: updated.honbu,
+      team: updated.team,
+      part: updated.part,
+      subpart: updated.subpart,
+      phone: updated.phone,
+      position: updated.position,
+      is_admin: updated.is_admin || 0,
+      status: updated.status,
       profile_picture: updated.profile_picture,
       terms_agreed_at: updated.terms_agreed_at,
-    },
-    // 하위 호환성: 최상위 레벨 필드도 유지
-    id:              empId,
-    employee_id:     empId,
-    email:           updated.email,
-    name:            updated.name,
-    role:            updated.role,
-    company:         updated.company,
-    honbu:           updated.honbu,
-    team:            updated.team,
-    part:            updated.part,
-    subpart:         updated.subpart,
-    phone:           updated.phone,
-    position:        updated.position,
-    is_admin:        updated.is_admin || 0,
-    status:          updated.status,
-    profile_picture: updated.profile_picture,
-    terms_agreed_at: updated.terms_agreed_at,
     });
   } catch (err) {
     console.error('[auth/verify] Fatal Error:', err.message);
     const origin = c.req.header('Origin') || '*';
-    return c.json({ 
-      detail: `서버 내부 오류가 발생했습니다. (${err.message})`, 
-      code: 'INTERNAL_SERVER_ERROR' 
+    return c.json({
+      detail: `서버 내부 오류가 발생했습니다. (${err.message})`,
+      code: 'INTERNAL_SERVER_ERROR'
     }, 500, {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Credentials': 'true'
@@ -2142,11 +2142,11 @@ async function fetchUserPermissions(db, roleCode) {
 app.post('/auth/login', async (c) => {
   const { email, employee_id: rawEmpId, password } = await c.req.json();
   const db = c.env.DB;
-  
+
   // 🛡️ 로그인 식별자 정제 (email 또는 employee_id 둘 다 지원)
   const loginId = (email || rawEmpId || '').trim();
   const cleanEmpId = String(rawEmpId || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim();
-  
+
   console.log(`[Auth-Login-Debug] Login attempt for: ${loginId} (Cleaned ID: ${cleanEmpId})`);
 
   if (!loginId || !password) {
@@ -2179,16 +2179,16 @@ app.post('/auth/login', async (c) => {
 
   // 🛡️ 계정 상태 체크 (State Machine Enforcement)
   if (user.status === 'SUSPENDED') {
-    return c.json({ 
-      detail: "보안 정책에 의해 사용이 중지된 계정입니다. 관리자에게 문의하세요.", 
-      code: 'ACCOUNT_SUSPENDED' 
+    return c.json({
+      detail: "보안 정책에 의해 사용이 중지된 계정입니다. 관리자에게 문의하세요.",
+      code: 'ACCOUNT_SUSPENDED'
     }, 403);
   }
 
   if (user.status === 'PRE_REGISTERED') {
-    return c.json({ 
-      detail: "최초 가입 인증 및 비밀번호 설정이 필요합니다. 사번인증 페이지에서 인증을 완료해 주세요.", 
-      code: 'REGISTRATION_REQUIRED' 
+    return c.json({
+      detail: "최초 가입 인증 및 비밀번호 설정이 필요합니다. 사번인증 페이지에서 인증을 완료해 주세요.",
+      code: 'REGISTRATION_REQUIRED'
     }, 403);
   }
 
@@ -2212,20 +2212,20 @@ app.post('/auth/login', async (c) => {
   }
 
   const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
-  
+
   // 1. Access Token 생성 (15분)
   const jwt = await generateJWT({
-    sub:         user.employee_id,
+    sub: user.employee_id,
     employee_id: user.employee_id,
-    name:        user.name,
-    role:        user.role,
-    is_admin:    user.is_admin || 0,
-    company:     user.company,
+    name: user.name,
+    role: user.role,
+    is_admin: user.is_admin || 0,
+    company: user.company,
   }, jwtSecret, 1800); // ⚡ Increased to 30 minutes (1800s)
-  
+
   // 2. Refresh Token 생성 및 저장
   const refreshToken = await createAndStoreSession(c, user.employee_id);
-  
+
   // 3. 쿠키 설정 (hono/cookie 사용으로 호환성 극대화)
   if (refreshToken) {
     setCookie(c, 'sguard_refresh', refreshToken, {
@@ -2241,7 +2241,7 @@ app.post('/auth/login', async (c) => {
   try {
     const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
     const ua = c.req.header('User-Agent') || 'unknown';
-    
+
     // 1. History Insert (KST 보정)
     const kstNow = getKst();
     await db.prepare(
@@ -2253,16 +2253,16 @@ app.post('/auth/login', async (c) => {
     // 2. Update Last Login Time
     await db.prepare("UPDATE users SET last_login_at = ?, failed_attempts = 0 WHERE employee_id = ?")
       .bind(kstNow, user.employee_id).run();
-      
+
     console.log(`[Auth] Login success and history recorded for user: ${user.employee_id}`);
   } catch (err) {
     console.error(`[Auth-Critical-Error] Failed to record login history for ${user.employee_id}:`, err.message);
   }
 
-  return c.json({ 
-    ok: true, 
-    user, 
-    token: `sguard-token-${user.employee_id}`, 
+  return c.json({
+    ok: true,
+    user,
+    token: `sguard-token-${user.employee_id}`,
     access_token: jwt,
     ghost_token: refreshToken,
     allowed_paths: await fetchUserPermissions(db, user.role)
@@ -2271,9 +2271,9 @@ app.post('/auth/login', async (c) => {
 
 app.get('/auth/refresh', async (c) => {
   console.log('[Auth-Debug] Refresh Request Headers:', JSON.stringify(Object.fromEntries(c.req.raw.headers)));
-  
+
   let refreshToken = getCookie(c, 'sguard_refresh');
-  
+
   // 👻 Ghost Token Fallback (Authorization Header)
   if (!refreshToken) {
     const authHeader = c.req.header('Authorization');
@@ -2289,10 +2289,10 @@ app.get('/auth/refresh', async (c) => {
   console.log('[Auth-Debug] Final Refresh Token:', refreshToken ? 'PRESENT' : 'MISSING');
 
   if (!refreshToken) {
-    return c.json({ 
-        error: 'No refresh token', 
-        code: 'COOKIE_MISSING',
-        hint: 'Ghost Token fallback failed too'
+    return c.json({
+      error: 'No refresh token',
+      code: 'COOKIE_MISSING',
+      hint: 'Ghost Token fallback failed too'
     }, 401);
   }
 
@@ -2355,19 +2355,19 @@ app.get('/auth/refresh', async (c) => {
 
     // 4. 새 Access Token 발급
     const newAccessToken = await generateJWT({
-      sub:      user.employee_id,
-      name:     user.name,
-      role:     user.role,
+      sub: user.employee_id,
+      name: user.name,
+      role: user.role,
       is_admin: user.is_admin || 0,
-      company:  user.company,
+      company: user.company,
     }, jwtSecret, 1800);
 
     // 👻 Ghost Token 유지 (기존 리프레시 토큰 재사용 또는 신규 발급)
     // 여기서는 기존 리프레시 토큰을 그대로 ghost_token으로 반환하여 세션 유지
-    return c.json({ 
-      ok: true, 
-      access_token: newAccessToken, 
-      ghost_token: refreshToken, 
+    return c.json({
+      ok: true,
+      access_token: newAccessToken,
+      ghost_token: refreshToken,
       user,
       allowed_paths: await fetchUserPermissions(db, user.role)
     });
@@ -2398,7 +2398,7 @@ app.post('/auth/logout', async (c) => {
 
 // 🛡️ API: 세션 유효성 체크 (Navigation Guard용 - D1 실시간 조회)
 app.get('/auth/check', async (c) => {
-  const payload = c.get('user'); 
+  const payload = c.get('user');
   if (!payload || !payload.sub) {
     return c.json({ ok: false, detail: '인증 정보가 없습니다.', code: 'AUTH_NO_PAYLOAD' }, 401);
   }
@@ -2421,8 +2421,8 @@ app.get('/auth/check', async (c) => {
   }
 
   // 성공 시 최신 사용자 정보 반환
-  return c.json({ 
-    ok: true, 
+  return c.json({
+    ok: true,
     user: {
       id: user.employee_id,
       employee_id: user.employee_id,
@@ -2447,7 +2447,7 @@ app.post('/auth/signup', async (c) => {
   const body = await c.req.json()
   const { email, password, name, company, honbu, team, part, subpart, phone, employee_id, position, os_type, role } = body
   const db = c.env.DB
-  
+
   console.log('[Signup Search] employee_id:', employee_id);
 
   if (!employee_id) {
@@ -2462,15 +2462,15 @@ app.post('/auth/signup', async (c) => {
   const hashedPassword = await hashPassword(password)
   const regDt = getKst()
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
-  
+
   // ── 사번(Employee ID) 정제: 'EMP-' 등 접두사 강제 제거 (Type-safe) ──
   const cleanEmpId = String(employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
-  
+
   const finalPhone = (phone || '').trim();
   const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
   const encryptedPhone = await encryptAES(finalPhone, secretKey);
   const finalRole = role || 'analyst';
-  
+
   const res = await db.prepare(
     `INSERT INTO users (
       email, password_hash, name, company, honbu, team, part, subpart, phone, os_type,
@@ -2502,13 +2502,13 @@ app.post('/auth/signup', async (c) => {
 
   const jwtSecret = c.env.JWT_SECRET || 'sguard-jwt-secret-change-me';
   const jwt = await generateJWT({
-    sub:         cleanEmpId,
-    name:        name,
-    role:        finalRole,
-    is_admin:    0,
-    company:     company,
-    honbu:       honbu || '',
-    team:        team || '',
+    sub: cleanEmpId,
+    name: name,
+    role: finalRole,
+    is_admin: 0,
+    company: company,
+    honbu: honbu || '',
+    team: team || '',
   }, jwtSecret, 1800);
 
   const refreshToken = await createAndStoreSession(c, cleanEmpId);
@@ -2522,8 +2522,8 @@ app.post('/auth/signup', async (c) => {
     });
   }
 
-  return c.json({ 
-    status: "success", 
+  return c.json({
+    status: "success",
     debug_v: "20240328_final",
     token: `sguard-token-${cleanEmpId}`,
     access_token: jwt,
@@ -2553,12 +2553,12 @@ app.post('/auth/signup', async (c) => {
 // 🛡️ API: 관리자 전용 사용자 생성
 app.post('/admin/users', async (c) => {
   const body = await c.req.json()
-  const { 
+  const {
     email, name, employee_id, phone, os_type, role, password,
-    company, honbu, team, part, subpart 
+    company, honbu, team, part, subpart
   } = body
   const db = c.env.DB
-  
+
   if (!employee_id || !email || !name) {
     return c.json({ detail: "이름, 사번, 이메일은 필수 입력 항목입니다." }, 400)
   }
@@ -2602,7 +2602,7 @@ app.post('/admin/users', async (c) => {
 app.delete('/users/:employee_id', async (c) => {
   const employee_id = c.req.param('employee_id')
   const db = c.env.DB
-  
+
   if (!employee_id) return c.json({ detail: "사번이 지정되지 않았습니다." }, 400);
 
   try {
@@ -2620,7 +2620,7 @@ app.delete('/users/:employee_id', async (c) => {
 app.post('/auth/reset/request', async (c) => {
   const { employee_id } = await c.req.json()
   const db = c.env.DB
-  
+
   if (!employee_id) return c.json({ detail: "사번이 필요합니다." }, 400);
 
   const user = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(employee_id.trim()).first()
@@ -2676,11 +2676,11 @@ app.post('/auth/reset/verify', async (c) => {
   if (!record) {
     return c.json({ detail: "인증 코드가 올바르지 않거나 만료되었습니다." }, 400)
   }
-  
+
   await db.prepare("UPDATE reset_verifications SET is_verified = 1 WHERE inc_id = ?").bind(record.inc_id).run()
 
   const modDt = getKst()
-  
+
   // 패스워드 제공 시 해당 패스워드로 업데이트, 미제공 시 기존 로직(임시번호) 유지 가능하나 
   // 여기서는 명시적으로 제공된 패스워드 처리를 우선함
   if (password) {
@@ -2709,7 +2709,7 @@ app.post('/auth/reset/verify', async (c) => {
     // 하위 호환성을 위해 임시 비번 로직 유지
     const temp_password = "T" + Math.floor(100000 + Math.random() * 900000).toString() + "!"
     const hashedTempPassword = await hashPassword(temp_password)
-    
+
     await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
       .bind(hashedTempPassword, modDt, employee_id.trim(), employee_id.trim())
       .run()
@@ -2736,7 +2736,7 @@ app.post('/auth/reset/verify', async (c) => {
 app.get('/users', async (c) => {
   const db = c.env.DB
   const { company, honbu, team, part, subpart, orgCode } = c.req.query()
-  
+
   let query = `
     SELECT 
       u.employee_id as id, u.employee_id, u.email, u.name, u.role, u.phone,
@@ -2761,7 +2761,7 @@ app.get('/users', async (c) => {
     WHERE 1=1
   `
   const params = []
-  
+
   if (orgCode) {
     query += " AND (u.company = ? OR u.honbu = ? OR u.team = ? OR u.part = ? OR u.subpart = ?)";
     params.push(orgCode, orgCode, orgCode, orgCode, orgCode);
@@ -2812,30 +2812,30 @@ app.patch('/auth/profile', async (c) => {
   const body = await c.req.json()
   const { user_id, employee_id, name, phone, company, honbu, team, part, subpart, os_type, profile_picture } = body
   console.log('[Auth-Profile-Debug] Received Profile Update:', JSON.stringify(body))
-  
+
   const targetId = String(user_id || employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
   if (!targetId) return c.json({ error: "Missing ID" }, 400)
-  
+
   const modDt = getKst()
   const db = c.env.DB
-  
+
   // 🛡️ SECURITY: Prevent overwriting with null/empty if fields are missing in JSON
   // Only update fields that are explicitly provided (not undefined)
   // To explicitly clear a field, it should be passed as null or "" (depending on preference)
   // Here we use COALESCE in SQL or logic in JS to keep existing values.
-  
+
   const existing = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(targetId).first()
   if (!existing) return c.json({ detail: "User not found" }, 404)
 
-  const finalName    = name !== undefined ? name : existing.name
-  const finalPhone   = phone !== undefined ? phone : existing.phone
+  const finalName = name !== undefined ? name : existing.name
+  const finalPhone = phone !== undefined ? phone : existing.phone
   const finalCompany = company !== undefined ? company : existing.company
-  const finalHonbu   = honbu !== undefined ? honbu : existing.honbu
-  const finalTeam    = team !== undefined ? team : existing.team
-  const finalPart    = part !== undefined ? part : existing.part
+  const finalHonbu = honbu !== undefined ? honbu : existing.honbu
+  const finalTeam = team !== undefined ? team : existing.team
+  const finalPart = part !== undefined ? part : existing.part
   const finalSubpart = subpart !== undefined ? subpart : existing.subpart
-  const finalOsType  = os_type !== undefined ? os_type : existing.os_type
-  const finalPic     = profile_picture !== undefined ? profile_picture : existing.profile_picture
+  const finalOsType = os_type !== undefined ? os_type : existing.os_type
+  const finalPic = profile_picture !== undefined ? profile_picture : existing.profile_picture
 
   const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
   const encryptedPhone = await encryptAES(finalPhone, secretKey);
@@ -2843,7 +2843,7 @@ app.patch('/auth/profile', async (c) => {
   await db.prepare(
     "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, os_type = ?, profile_picture = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
   ).bind(finalName, encryptedPhone, finalCompany, finalHonbu, finalTeam, finalPart, finalSubpart, finalOsType, finalPic, modDt, targetId, targetId).run()
-  
+
   const updated = await db.prepare(`
     SELECT 
       u.*,
@@ -2867,11 +2867,11 @@ app.post('/auth/change-password', async (c) => {
   const db = c.env.DB
   const { user_id, old_password, new_password } = await c.req.json()
   const user = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(user_id).first()
-  
+
   if (!user || !(await verifyPassword(old_password, user.password_hash))) {
     return c.json({ detail: "현재 비밀번호가 올바르지 않습니다." }, 401)
   }
-  
+
   const hashedNewPassword = await hashPassword(new_password)
   const modDt = getKst()
   await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
@@ -2932,20 +2932,20 @@ app.patch('/users/:id/org', async (c) => {
   const id = c.req.param('id')
   const { company, honbu, team, part, subpart, email, phone, os_type } = await c.req.json()
   const modDt = getKst()
-  
+
   const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
   const encryptedPhone = phone ? await encryptAES(phone, secretKey) : null;
-  
+
   const result = await db.prepare(
     "UPDATE users SET company = ?, honbu = ?, team = ?, part = ?, subpart = ?, email = ?, phone = ?, os_type = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
   )
-  .bind(company || null, honbu || null, team || null, part || null, subpart || null, email || null, encryptedPhone, os_type || null, modDt, 'ADMIN', id)
-  .run()
-    
+    .bind(company || null, honbu || null, team || null, part || null, subpart || null, email || null, encryptedPhone, os_type || null, modDt, 'ADMIN', id)
+    .run()
+
   if (result.meta?.changes === 0) {
     return c.json({ detail: "해당 사번의 사용자를 찾을 수 없거나 변경 사항이 없습니다." }, 404)
   }
-  
+
   return c.json({ status: "success" })
 })
 
@@ -3020,7 +3020,7 @@ app.get('/security/logs', async (c) => {
     ORDER BY lh.login_time DESC
     LIMIT 100
   `;
-  
+
   const { results } = await db.prepare(query).all();
   return c.json({ ok: true, logs: results });
 });
@@ -3047,7 +3047,7 @@ app.post('/rbac/roles', async (c) => {
   const db = c.env.DB
   const { role_code, role_name, description } = await c.req.json()
   const modDt = getKst()
-  
+
   await db.prepare(`
     INSERT INTO roles (role_code, role_name, description, reg_dt, mod_dt)
     VALUES (?, ?, ?, ?, ?)
@@ -3056,7 +3056,7 @@ app.post('/rbac/roles', async (c) => {
       description = excluded.description,
       mod_dt = excluded.mod_dt
   `).bind(role_code, role_name, description, modDt, modDt).run()
-  
+
   return c.json({ success: true })
 })
 
@@ -3069,7 +3069,7 @@ app.get('/rbac/menus', async (c) => {
 app.get('/rbac/permissions/:roleCode', async (c) => {
   const roleCode = c.req.param('roleCode')
   const db = c.env.DB
-  
+
   // Get all menus joined with permissions for this role
   const query = `
     SELECT 
@@ -3107,10 +3107,10 @@ app.post('/rbac/permissions', async (c) => {
       `).bind(
         role_code,
         p.menu_id,
-        p.menu_name  || '',
-        p.menu_path  || p.path || '',
-        p.can_read   ? 1 : 0,
-        p.can_write  ? 1 : 0,
+        p.menu_name || '',
+        p.menu_path || p.path || '',
+        p.can_read ? 1 : 0,
+        p.can_write ? 1 : 0,
         p.can_delete ? 1 : 0,
         modDt,
         modDt
@@ -3158,7 +3158,7 @@ app.post('/rbac/substitutes', async (c) => {
   const db = c.env.DB
   const { user_id, deputy_id, priority } = await c.req.json()
   const modDt = getKst()
-  
+
   await db.prepare(`
     INSERT INTO substitutes (user_id, deputy_id, priority, reg_dt, mod_dt)
     VALUES (?, ?, ?, ?, ?)
@@ -3166,7 +3166,7 @@ app.post('/rbac/substitutes', async (c) => {
       priority = excluded.priority,
       mod_dt = excluded.mod_dt
   `).bind(user_id, deputy_id, priority || 1, modDt, modDt).run()
-  
+
   return c.json({ success: true })
 })
 
@@ -3181,12 +3181,12 @@ app.post('/rbac/substitutes/reorder', async (c) => {
   const db = c.env.DB
   const { user_id, items } = await c.req.json() // items: [{id, priority}]
   const modDt = getKst()
-  
+
   for (const item of items) {
     await db.prepare("UPDATE substitutes SET priority = ?, mod_dt = ? WHERE id = ? AND user_id = ?")
       .bind(item.priority, modDt, item.id, user_id).run()
   }
-  
+
   return c.json({ success: true })
 })
 
@@ -3210,77 +3210,77 @@ app.post('/sms/convert-multimodal', async (c) => {
 
   try {
     console.log(`[OCR] Processing multimodal image via Dify Upload + Chat API (Key: ${api_key.substring(0, 10)}...)`)
-    
+
     // 1. Upload the file to Dify first
     const difyUploadForm = new FormData()
     difyUploadForm.append('file', file)
     difyUploadForm.append('user', 'sguard-multimodal-user')
-    
+
     const uploadRes = await fetch(`${api_base}/files/upload`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${api_key}`
-        },
-        body: difyUploadForm
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${api_key}`
+      },
+      body: difyUploadForm
     })
-    
+
     if (!uploadRes.ok) {
-        const errText = await uploadRes.text();
-        console.error(`[OCR] Dify File Upload Error: ${uploadRes.status}`, errText)
-        return c.json({ error: `Dify 파일 임시 업로드 오류 (${uploadRes.status})` }, uploadRes.status)
+      const errText = await uploadRes.text();
+      console.error(`[OCR] Dify File Upload Error: ${uploadRes.status}`, errText)
+      return c.json({ error: `Dify 파일 임시 업로드 오류 (${uploadRes.status})` }, uploadRes.status)
     }
-    
+
     const uploadData = await uploadRes.json()
     console.log(`[OCR] Dify File Upload Success, ID: ${uploadData.id}`)
-    
+
     // 2. Feed the uploaded file ID as 'sms_image' variable (Advanced Chat App structure)
     const response = await fetch(`${api_base}/chat-messages`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${api_key}`,
-            'Content-Type': 'application/json',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${api_key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user: "sguard-multimodal-user",
+        response_mode: "streaming", // Switch to streaming to avoid 504 timeouts
+        query: "이미지 속 텍스트를 정확하게 추출해서 알려주세요. 불필요한 설명은 생략해 주세요.",
+        inputs: {
+          sms_image: {
+            type: "image",
+            transfer_method: "local_file",
+            upload_file_id: uploadData.id
+          }
         },
-        body: JSON.stringify({
-            user: "sguard-multimodal-user",
-            response_mode: "streaming", // Switch to streaming to avoid 504 timeouts
-            query: "이미지 속 텍스트를 정확하게 추출해서 알려주세요. 불필요한 설명은 생략해 주세요.",
-            inputs: {
-                sms_image: {
-                    type: "image",
-                    transfer_method: "local_file",
-                    upload_file_id: uploadData.id
-                }
-            },
-            files: [] // Advanced Chat uses inputs for variables like sms_image
-        })
+        files: [] // Advanced Chat uses inputs for variables like sms_image
+      })
     })
 
     if (!response.ok) {
-        const errText = await response.text();
-        console.error(`[OCR] Dify API Error: ${response.status}`, errText)
-        return c.json({ error: `Dify API 오류 (${response.status})` }, response.status)
+      const errText = await response.text();
+      console.error(`[OCR] Dify API Error: ${response.status}`, errText)
+      return c.json({ error: `Dify API 오류 (${response.status})` }, response.status)
     }
 
     // Proxy the SSE stream to the frontend
     const { readable, writable } = new TransformStream()
     const writer = writable.getWriter()
 
-    ;(async () => {
-      try {
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          // Directly proxy the chunk from Dify
-          await writer.write(value)
+      ; (async () => {
+        try {
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            // Directly proxy the chunk from Dify
+            await writer.write(value)
+          }
+        } catch (e) {
+          console.error(`[OCR] Stream Error:`, e)
+        } finally {
+          await writer.close()
         }
-      } catch(e) {
-        console.error(`[OCR] Stream Error:`, e)
-      } finally {
-        await writer.close()
-      }
-    })()
+      })()
 
     return new Response(readable, {
       headers: {
@@ -3337,11 +3337,11 @@ app.post('/sms/receive', async (c) => {
     return c.json({ error: 'Invalid request body', detail: parseErr.message }, 400);
   }
 
-  let { 
-    sender, message, employee_id, 
-    channel: bodyChannel, if_id: bodyIfId, service_code: bodyServiceCode, service_name: bodyServiceName, 
-    biz_system: bodyBizSystem, error_code: bodyErrorCode, occurrence_count: bodyOccurrenceCount, 
-    occurrence_node: bodyOccurrenceNode, error_message: bodyErrorMessage, occurrence_time: bodyOccurrenceTime, received_at 
+  let {
+    sender, message, employee_id,
+    channel: bodyChannel, if_id: bodyIfId, service_code: bodyServiceCode, service_name: bodyServiceName,
+    biz_system: bodyBizSystem, error_code: bodyErrorCode, occurrence_count: bodyOccurrenceCount,
+    occurrence_node: bodyOccurrenceNode, error_message: bodyErrorMessage, occurrence_time: bodyOccurrenceTime, received_at
   } = body
 
   // 🛡️ 메시지 필수 검증
@@ -3437,7 +3437,7 @@ app.post('/sms/receive', async (c) => {
     .first()
   if (!authorizedUser) {
     console.warn(`[Security] /sms/receive blocked: unknown or inactive employee_id=${employee_id}`)
-    
+
     // 🛡️ 보안 알림 생성
     c.executionCtx.waitUntil(sendSecurityAlert(c, {
       type: 'INVALID_SENDER_ID',
@@ -3460,12 +3460,12 @@ app.post('/sms/receive', async (c) => {
   const kstOffset = 9 * 60 * 60 * 1000
   const kstNow = new Date(now.getTime() + kstOffset)
   const timestamp = kstNow.toISOString().replace('T', ' ').substring(0, 19)
-  
+
   // 🚀 Enhanced Keyword Detection (원본 message 사용 - 키워드 검색은 실제 내용 기준)
   const { results: keywordList } = await db.prepare("SELECT keyword FROM alert_keywords").all()
   const matchedKeywords = []
   const lowerMessage = (message || "").toLowerCase()
-  
+
   for (const k of keywordList) {
     if (k.keyword && lowerMessage.includes(k.keyword.toLowerCase())) {
       matchedKeywords.push(k.keyword)
@@ -3516,45 +3516,45 @@ app.post('/sms/receive', async (c) => {
     // --- AUTO-ASSIGNMENT (DUPLICATE CASE) ---
     const rawReceivers = [];
     for (let i = 1; i <= 20; i++) {
-        const r = body[`receiver_${i}`];
-        if (r && r.trim() !== '' && String(r) !== 'null') rawReceivers.push(r.trim());
+      const r = body[`receiver_${i}`];
+      if (r && r.trim() !== '' && String(r) !== 'null') rawReceivers.push(r.trim());
     }
-    
+
     if (rawReceivers.length > 0) {
-        // Normalize names: remove all internal whitespace
-        const normalizedReceivers = rawReceivers.map(r => r.replace(/\s+/g, '').trim()).filter(Boolean);
-        if (normalizedReceivers.length > 0) {
-            const placeholders = normalizedReceivers.map(() => '?').join(',');
-            try {
-                // 1. 송신자의 조직 및 직급 정보 조회
-                const u_sender = await db.prepare("SELECT company, honbu, team, part, subpart, position FROM users WHERE employee_id = ?").bind(employee_id).first();
-                
-                if (u_sender) {
-                    let scopeFilter = "";
-                    let scopeArgs = [existing.inc_id, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp, u_sender.company];
+      // Normalize names: remove all internal whitespace
+      const normalizedReceivers = rawReceivers.map(r => r.replace(/\s+/g, '').trim()).filter(Boolean);
+      if (normalizedReceivers.length > 0) {
+        const placeholders = normalizedReceivers.map(() => '?').join(',');
+        try {
+          // 1. 송신자의 조직 및 직급 정보 조회
+          const u_sender = await db.prepare("SELECT company, honbu, team, part, subpart, position FROM users WHERE employee_id = ?").bind(employee_id).first();
 
-                    if (u_sender.position >= 'POS_004') {
-                        // 본부장 이상: 본부 전체
-                        scopeFilter = "AND u_target.honbu = ?";
-                        scopeArgs.push(u_sender.honbu);
-                    } else if (u_sender.position === 'POS_003') {
-                        // 팀장: 팀 전체
-                        scopeFilter = "AND u_target.honbu = ? AND u_target.team = ?";
-                        scopeArgs.push(u_sender.honbu, u_sender.team);
-                    } else if (u_sender.position === 'POS_002') {
-                        // 파트장: 파트 전체
-                        scopeFilter = "AND u_target.honbu = ? AND u_target.team = ? AND u_target.part = ?";
-                        scopeArgs.push(u_sender.honbu, u_sender.team, u_sender.part);
-                    } else {
-                        // 일반 팀원: 서브파트 전체
-                        scopeFilter = "AND u_target.honbu = ? AND u_target.team = ? AND u_target.part = ? AND (u_target.subpart = ? OR (u_target.subpart IS NULL AND ? IS NULL))";
-                        scopeArgs.push(u_sender.honbu, u_sender.team, u_sender.part, u_sender.subpart, u_sender.subpart);
-                    }
-                    
-                    // Mentioned receivers filter
-                    scopeArgs.push(...normalizedReceivers, ...normalizedReceivers);
+          if (u_sender) {
+            let scopeFilter = "";
+            let scopeArgs = [existing.inc_id, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp, u_sender.company];
 
-                    const result = await db.prepare(`
+            if (u_sender.position >= 'POS_004') {
+              // 본부장 이상: 본부 전체
+              scopeFilter = "AND u_target.honbu = ?";
+              scopeArgs.push(u_sender.honbu);
+            } else if (u_sender.position === 'POS_003') {
+              // 팀장: 팀 전체
+              scopeFilter = "AND u_target.honbu = ? AND u_target.team = ?";
+              scopeArgs.push(u_sender.honbu, u_sender.team);
+            } else if (u_sender.position === 'POS_002') {
+              // 파트장: 파트 전체
+              scopeFilter = "AND u_target.honbu = ? AND u_target.team = ? AND u_target.part = ?";
+              scopeArgs.push(u_sender.honbu, u_sender.team, u_sender.part);
+            } else {
+              // 일반 팀원: 서브파트 전체
+              scopeFilter = "AND u_target.honbu = ? AND u_target.team = ? AND u_target.part = ? AND (u_target.subpart = ? OR (u_target.subpart IS NULL AND ? IS NULL))";
+              scopeArgs.push(u_sender.honbu, u_sender.team, u_sender.part, u_sender.subpart, u_sender.subpart);
+            }
+
+            // Mentioned receivers filter
+            scopeArgs.push(...normalizedReceivers, ...normalizedReceivers);
+
+            const result = await db.prepare(`
                         INSERT OR IGNORE INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
                         SELECT DISTINCT u_target.employee_id, ?, '미확인', ?, ?, ?, ?, ?, ?
                         FROM users u_source
@@ -3565,14 +3565,14 @@ app.post('/sms/receive', async (c) => {
                           ${scopeFilter}
                           AND (u_source.name IN (${placeholders}) OR u_source.employee_id IN (${placeholders}))
                     `).bind(...scopeArgs).run();
-                    console.log(`[Assignment] Rank-based bulk assignment completed for ${existing.inc_id}. Changes: ${result.meta.changes}`);
-                }
-            } catch (assignError) {
-                console.error(`[Assignment] Error in rank-based bulk assignment for ${existing.inc_id}:`, assignError);
-            }
+            console.log(`[Assignment] Rank-based bulk assignment completed for ${existing.inc_id}. Changes: ${result.meta.changes}`);
+          }
+        } catch (assignError) {
+          console.error(`[Assignment] Error in rank-based bulk assignment for ${existing.inc_id}:`, assignError);
         }
+      }
     } else {
-        console.warn(`[Assignment] No valid normalized receivers for ${existing.inc_id}`);
+      console.warn(`[Assignment] No valid normalized receivers for ${existing.inc_id}`);
     }
 
     // Trigger AI background processing if not already handled
@@ -3620,8 +3620,8 @@ app.post('/sms/receive', async (c) => {
   // \ud560\ub2f9 \ub85c\uc9c1\uc740 \uc6d0\ubcf8 message/sender/receiver \ub370\uc774\ud130\ub97c \uc0ac\uc6a9\ud588\uc73c\uba74\uc73c\ub85c,
   // \uc774\uc81c\ubd80\ud130 D1\uc5d0\ub294 \ube44\uc2dd\ubcc4\ud558\ub41c \ub370\uc774\ud130\ub9cc \uc800\uc7a5\ud569\ub2c8\ub2e4.
   const maskedMessage = maskPII(message)
-  const maskedSender  = maskPII(sender)
-  
+  const maskedSender = maskPII(sender)
+
   const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
   const encryptedMessage = await encryptAES(maskedMessage, secretKey);
   console.log(`[PII & SEC] Applied masking and AES-256 encryption before D1 INSERT for employee_id=${employee_id}`)
@@ -3652,7 +3652,7 @@ app.post('/sms/receive', async (c) => {
       ?, ?, ?, ?, ?, ?
     )
   `).bind(
-    newIncId, maskedSender || null, encryptedMessage || null, employee_id || null, timestamp, detectedCount, 
+    newIncId, maskedSender || null, encryptedMessage || null, employee_id || null, timestamp, detectedCount,
     response_msg || null, initialCount,
     channel || null, if_id || null, service_code || null, service_name || null,
     biz_system || null, error_code || null, parsedCount,
@@ -3680,44 +3680,44 @@ app.post('/sms/receive', async (c) => {
 
   // --- 🚀 NEW: Automatic Assignment by Sender's Rank (New Path) ---
   if (employee_id) {
-     try {
-         const senderUser = await db.prepare("SELECT company, honbu, team, part, subpart, position FROM users WHERE employee_id = ?").bind(employee_id).first();
-         if (senderUser) {
-             let scopeQuery = "";
-             let scopeArgs = [senderUser.company];
+    try {
+      const senderUser = await db.prepare("SELECT company, honbu, team, part, subpart, position FROM users WHERE employee_id = ?").bind(employee_id).first();
+      if (senderUser) {
+        let scopeQuery = "";
+        let scopeArgs = [senderUser.company];
 
-             if (senderUser.position >= 'POS_004') {
-                 // 본부장 이상: 본부 전체
-                 scopeQuery = "WHERE company = ? AND honbu = ?";
-                 scopeArgs.push(senderUser.honbu);
-             } else if (senderUser.position === 'POS_003') {
-                 // 팀장: 팀 전체
-                 scopeQuery = "WHERE company = ? AND honbu = ? AND team = ?";
-                 scopeArgs.push(senderUser.honbu, senderUser.team);
-             } else if (senderUser.position === 'POS_002') {
-                 // 파트장: 파트 전체
-                 scopeQuery = "WHERE company = ? AND honbu = ? AND team = ? AND part = ?";
-                 scopeArgs.push(senderUser.honbu, senderUser.team, senderUser.part);
-             } else {
-                 // 일반 팀원: 서브파트만
-                 scopeQuery = "WHERE company = ? AND honbu = ? AND team = ? AND part = ? AND (subpart = ? OR (subpart IS NULL AND ? IS NULL))";
-                 scopeArgs.push(senderUser.honbu, senderUser.team, senderUser.part, senderUser.subpart, senderUser.subpart);
-             }
+        if (senderUser.position >= 'POS_004') {
+          // 본부장 이상: 본부 전체
+          scopeQuery = "WHERE company = ? AND honbu = ?";
+          scopeArgs.push(senderUser.honbu);
+        } else if (senderUser.position === 'POS_003') {
+          // 팀장: 팀 전체
+          scopeQuery = "WHERE company = ? AND honbu = ? AND team = ?";
+          scopeArgs.push(senderUser.honbu, senderUser.team);
+        } else if (senderUser.position === 'POS_002') {
+          // 파트장: 파트 전체
+          scopeQuery = "WHERE company = ? AND honbu = ? AND team = ? AND part = ?";
+          scopeArgs.push(senderUser.honbu, senderUser.team, senderUser.part);
+        } else {
+          // 일반 팀원: 서브파트만
+          scopeQuery = "WHERE company = ? AND honbu = ? AND team = ? AND part = ? AND (subpart = ? OR (subpart IS NULL AND ? IS NULL))";
+          scopeArgs.push(senderUser.honbu, senderUser.team, senderUser.part, senderUser.subpart, senderUser.subpart);
+        }
 
-             const { results: targetUsers } = await db.prepare(`SELECT employee_id FROM users ${scopeQuery} AND is_active = 1`).bind(...scopeArgs).all();
-             
-             if (targetUsers && targetUsers.length > 0) {
-                 for (const u of targetUsers) {
-                     await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, 'INC_001', ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
-                      .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp).run();
-                 }
-             }
-         }
-     } catch (e) {
-         console.error("Rank-based Auto-assignment error:", e);
-     }
+        const { results: targetUsers } = await db.prepare(`SELECT employee_id FROM users ${scopeQuery} AND is_active = 1`).bind(...scopeArgs).all();
+
+        if (targetUsers && targetUsers.length > 0) {
+          for (const u of targetUsers) {
+            await db.prepare("INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, 'INC_001', ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
+              .bind(u.employee_id, newIncId, timestamp, timestamp, employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp).run();
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Rank-based Auto-assignment error:", e);
+    }
   }
-  
+
   // Eager Loading: Trigger background AI immediately for new insert
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
 
@@ -3748,7 +3748,7 @@ app.post('/sms/receive', async (c) => {
         // Use the extracted function directly
         await executeSCallertStrategy(db, strategy, payload, newIncId, c);
       }
-    } catch(e) {
+    } catch (e) {
       console.error('[S-callert] Internal trigger error:', e);
     }
   })());
@@ -3847,7 +3847,7 @@ app.post('/sms/settings', async (c) => {
   try {
     const now = getKst();
     await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, ?)")
-             .bind(key, String(value), now).run();
+      .bind(key, String(value), now).run();
     return c.json({ success: true, message: `Setting ${key} updated to ${value}` });
   } catch (e) {
     return c.json({ success: false, error: e.message }, 500);
@@ -3858,7 +3858,7 @@ app.get('/sms/recent', async (c) => {
   const limit = c.req.query('limit') || 10
   const excludeCompleted = c.req.query('excludeCompleted') === 'true'
   const db = c.env.DB
-  
+
   let baseQuery = `
     SELECT * FROM (
       SELECT r.*, u.name, u.role, 
@@ -3910,48 +3910,50 @@ app.get('/sms/recent', async (c) => {
 
   const { results } = await db.prepare(baseQuery).bind(...params).all()
 
-  return c.json({ total: results.length, messages: results.map(r => ({ 
-    inc_id: r.inc_id, 
-    id: r.inc_id, 
-    sender: r.sender,
-    sender_name: r.name || '',
-    sender_team: r.team || '',
-    sender_part: r.part || '',
-    bumun: r.bumun || '',
-    honbu: r.honbu || '',
-    team: r.team || '',
-    part: r.part || '',
-    message: r.message, 
-    employee_id: r.employee_id,
-    timestamp: r.timestamp, 
-    ai_dt: r.ai_dt || null,
-    warroom_dt: r.warroom_dt || null,
-    closed_dt: r.closed_dt || null,
-    keyword_detected: parseInt(String(r.keyword_detected || '0')),
-    response_message: r.response_message,
-    received_count: parseInt(String(r.received_count || '1')),
-    similarity_score: r.similarity_score,
-    similarity_reason: r.similarity_reason,
-    channel: r.channel,
-    if_id: r.if_id,
-    service_code: r.service_code,
-    service_name: r.service_name,
-    biz_system: r.biz_system,
-    error_code: r.error_code,
-    occurrence_count: r.occurrence_count,
-    occurrence_node: r.occurrence_node,
-    error_message: r.error_message,
-    occurrence_time: r.occurrence_time,
-    incident_status: r.incident_status || 'INC_001',
-    status: r.incident_status || 'INC_001',
-    is_analyzed: r.is_analyzed,
-    receivers: [
-      r.receiver_1, r.receiver_2, r.receiver_3, r.receiver_4, r.receiver_5,
-      r.receiver_6, r.receiver_7, r.receiver_8, r.receiver_9, r.receiver_10,
-      r.receiver_11, r.receiver_12, r.receiver_13, r.receiver_14, r.receiver_15,
-      r.receiver_16, r.receiver_17, r.receiver_18, r.receiver_19, r.receiver_20
-    ].filter(v => v !== null)
-  })) })
+  return c.json({
+    total: results.length, messages: results.map(r => ({
+      inc_id: r.inc_id,
+      id: r.inc_id,
+      sender: r.sender,
+      sender_name: r.name || '',
+      sender_team: r.team || '',
+      sender_part: r.part || '',
+      bumun: r.bumun || '',
+      honbu: r.honbu || '',
+      team: r.team || '',
+      part: r.part || '',
+      message: r.message,
+      employee_id: r.employee_id,
+      timestamp: r.timestamp,
+      ai_dt: r.ai_dt || null,
+      warroom_dt: r.warroom_dt || null,
+      closed_dt: r.closed_dt || null,
+      keyword_detected: parseInt(String(r.keyword_detected || '0')),
+      response_message: r.response_message,
+      received_count: parseInt(String(r.received_count || '1')),
+      similarity_score: r.similarity_score,
+      similarity_reason: r.similarity_reason,
+      channel: r.channel,
+      if_id: r.if_id,
+      service_code: r.service_code,
+      service_name: r.service_name,
+      biz_system: r.biz_system,
+      error_code: r.error_code,
+      occurrence_count: r.occurrence_count,
+      occurrence_node: r.occurrence_node,
+      error_message: r.error_message,
+      occurrence_time: r.occurrence_time,
+      incident_status: r.incident_status || 'INC_001',
+      status: r.incident_status || 'INC_001',
+      is_analyzed: r.is_analyzed,
+      receivers: [
+        r.receiver_1, r.receiver_2, r.receiver_3, r.receiver_4, r.receiver_5,
+        r.receiver_6, r.receiver_7, r.receiver_8, r.receiver_9, r.receiver_10,
+        r.receiver_11, r.receiver_12, r.receiver_13, r.receiver_14, r.receiver_15,
+        r.receiver_16, r.receiver_17, r.receiver_18, r.receiver_19, r.receiver_20
+      ].filter(v => v !== null)
+    }))
+  })
 })
 
 // 🚀 NEW: SMS Deletion (Supports both direct DELETE and Proxy POST)
@@ -4008,7 +4010,7 @@ app.get('/dashboard/summary', async (c) => {
 
   const db = c.env.DB
   const incidents = await db.prepare("SELECT * FROM incidents ORDER BY created_at DESC LIMIT 5").all()
-  
+
   return c.json({
     systemStatus: { overall: 'Warning', activeAlarms: incidents.results.length },
     autopilotStats: { autoResolved: 15, learningRate: '98%', predictionAccuracy: '95%' }
@@ -4022,8 +4024,8 @@ app.get('/api/v1/system/status', async (c) => {
   // --- 보안: Dify Tool API Key 인증 로직 ---
   const authHeader = c.req.header('Authorization');
   if (!verifyDifyAuth(authHeader, c)) {
-    return c.json({ 
-      error: "401 Unauthorized", 
+    return c.json({
+      error: "401 Unauthorized",
       sent: authHeader || "Missing",
       expected: `Bearer ${c.env.DIFY_TOOL_KEY}`
     }, 401);
@@ -4046,7 +4048,7 @@ app.get('/api/v1/system/status', async (c) => {
       status: isHealthy ? 'Healthy' : 'Warning/Error',
       active_incidents_count: activeIncidents.results.length,
       recent_issues: activeIncidents.results.map(i => i.title),
-      message: isHealthy 
+      message: isHealthy
         ? `${serverName} 서버는 현재 정상적으로 동작 중입니다.`
         : `${serverName} 서버에 ${activeIncidents.results.length}건의 진행 중인 이슈가 있습니다.`
     });
@@ -4064,7 +4066,7 @@ app.get('/api/v1/db/tables', async (c) => {
   if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ error: "401 Unauthorized", sent: authHeader || "Missing", expected: `Bearer ${c.env.DIFY_TOOL_KEY}` }, 401);
   }
-  
+
   const db = c.env.DB;
   try {
     const result = await db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'd1_%'").all();
@@ -4081,7 +4083,7 @@ app.get('/api/v1/db/contents', async (c) => {
   if (!verifyDifyAuth(authHeader, c)) {
     return c.json({ error: "401 Unauthorized", sent: authHeader || "Missing", expected: `Bearer ${c.env.DIFY_TOOL_KEY}` }, 401);
   }
-  
+
   const tableName = c.req.query("table_name");
   if (!tableName) {
     return c.json({ error: "table_name 파라미터가 필요합니다." }, 400);
@@ -4093,7 +4095,7 @@ app.get('/api/v1/db/contents', async (c) => {
     if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
       return c.json({ error: "유효하지 않은 테이블 이름입니다." }, 400);
     }
-    
+
     // 테이블의 최근 데이터를 최대 20개 조회
     const data = await db.prepare(`SELECT * FROM ${tableName} LIMIT 20`).all();
     return c.json({ table: tableName, rows: data.results });
@@ -4111,7 +4113,7 @@ app.get('/api/v1/incident/history', async (c) => {
   const query = c.req.query('query') || '';
   const limit = parseInt(c.req.query('limit') || '5', 10);
   const db = c.env.DB;
-  
+
   try {
     const likeQuery = `%${query}%`;
     const data = await db.prepare(`
@@ -4136,7 +4138,7 @@ app.get('/api/v1/incident/solutions', async (c) => {
   const query = c.req.query('query') || '';
   const limit = parseInt(c.req.query('limit') || '5', 10);
   const db = c.env.DB;
-  
+
   try {
     const likeQuery = `%${query}%`;
     const data = await db.prepare(`
@@ -4168,7 +4170,7 @@ app.get('/ai/governance/stats', async (c) => {
       JOIN received_messages r ON k.inc_id = r.inc_id
       WHERE r.timestamp IS NOT NULL AND k.reg_dt IS NOT NULL
     `).first();
-    
+
     const mttrVal = mttrRes?.avg_minutes || 0;
 
     // 2. Incident & Knowledge Integrity
@@ -4190,7 +4192,7 @@ app.get('/ai/governance/stats', async (c) => {
 
     const activeWarRoomsRes = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM received_messages WHERE received_count > 0").first();
     const activeWarRooms = activeWarRoomsRes?.c || 0;
-    
+
     // Governance Rate: 고유 인시던트 기준, 최대 100%
     const governanceRate = totalInc > 0 ? Math.min(100, Math.round((kbDistinctInc / totalInc) * 100)) : 0;
     const resolveRate = totalInc > 0 ? Math.min(100, Math.round((resolvedInc / totalInc) * 100)) : 0;
@@ -4214,7 +4216,7 @@ app.get('/ai/governance/stats', async (c) => {
       ORDER BY t.synergy_score DESC
       LIMIT 5
     `).all();
-    
+
     const topContributors = topContributorsRes.results || [];
 
     // 4. Intelligence Category Density
@@ -4260,18 +4262,18 @@ app.get('/ai/governance/stats', async (c) => {
     const assignedUsers = assignedUsersRes?.c || 0;
 
     return c.json({
-      incidents: { 
-        total: totalInc, 
-        resolved: resolvedInc, 
+      incidents: {
+        total: totalInc,
+        resolved: resolvedInc,
         rate: resolveRate,
         integrity: governanceRate,
         mttr: Math.round(mttrVal)
       },
-      knowledge: { 
-        total: knowledgeCount, 
+      knowledge: {
+        total: knowledgeCount,
         growth: growthVal
-      }, 
-      warrooms: { 
+      },
+      warrooms: {
         active: activeWarRooms,
         assignedUsers
       },
@@ -4281,14 +4283,14 @@ app.get('/ai/governance/stats', async (c) => {
     });
   } catch (e) {
     console.error("Dream Analytics Error:", e);
-    return c.json({ 
+    return c.json({
       incidents: { total: 0, resolved: 0, rate: 0, integrity: 0, mttr: 0 },
       knowledge: { total: 0, growth: "0%" },
       warrooms: { active: 0 },
       categories: [],
       topContributors: [],
       recentFeed: [],
-      error: e.message 
+      error: e.message
     }, 500);
   }
 });
@@ -4297,7 +4299,7 @@ app.get('/sms/keywords', async (c) => {
   const db = c.env.DB
   const url = new URL(c.req.url)
   const employeeId = c.req.query('employee_id') || c.req.query('id') || c.req.query('userId')
-  
+
   const hasParam = url.searchParams.has('employee_id') || url.searchParams.has('id') || url.searchParams.has('userId')
   if (hasParam && !employeeId) {
     return c.json({ error: "사번(employee_id) 값이 누락되었습니다." }, 400)
@@ -4308,7 +4310,7 @@ app.get('/sms/keywords', async (c) => {
     // 🚀 무조건 user_keywords 테이블만 참조하여 개인 감지 키워드만 반환
     console.log(`[Keyword-API] Fetching EXCLUSIVELY from user_keywords for: ${employeeId}`);
     const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(employeeId).first()
-    
+
     // 사용자가 등록한 키워드가 없으면 기본 장애 키워드 세트를 제공
     let keywordStr = result ? result.keywords : ""
     if (!keywordStr) {
@@ -4316,7 +4318,7 @@ app.get('/sms/keywords', async (c) => {
     }
 
     const keywordList = keywordStr.split('|').map(k => k.trim()).filter(Boolean)
-    
+
     // 개인 키워드를 객체 배열로 변환
     const personalKeywords = keywordList.map(k => ({
       keyword: k,
@@ -4325,7 +4327,7 @@ app.get('/sms/keywords', async (c) => {
       is_personal: true
     }))
 
-    return c.json({ 
+    return c.json({
       success: true,
       employee_id: employeeId,
       keywords: personalKeywords, // 🛡️ 글로벌 키워드 병합 제거
@@ -4360,9 +4362,9 @@ app.get('/sms/user-keywords', async (c) => {
   const user = c.get('user')
   const db = c.env.DB
   const userId = user.employee_id
-  
+
   const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(userId).first()
-  return c.json({ 
+  return c.json({
     keywords: result ? result.keywords : "",
     userId: userId
   })
@@ -4372,13 +4374,13 @@ app.post('/sms/user-keywords', async (c) => {
   const db = c.env.DB
   const userId = user.employee_id || user.sub || user.id;
   const { keywords } = await c.req.json()
-  
+
   if (!userId || userId === 'undefined' || userId === 'null') {
     return c.json({ error: "로그인 정보가 유효하지 않습니다. (사번 누락)", userId: "NONE" }, 401);
   }
-  
+
   const nowKst = getKst()
-  
+
   // 🛡️ Audit 컬럼 추가 및 데이터 무결성 보장
   try {
     await db.prepare(`
@@ -4392,15 +4394,15 @@ app.post('/sms/user-keywords', async (c) => {
         mod_dt = excluded.mod_dt,
         updated_at = excluded.updated_at
     `).bind(userId, keywords, userId, nowKst, userId, nowKst, nowKst).run()
-    
+
     return c.json({ status: "success", userId })
   } catch (err) {
     // 만약 테이블에 Audit 컬럼이 없어서 에러가 난다면 자동 패치 시도 (임시 대응)
     if (err.message.includes("has no column named reg_id")) {
-      await db.prepare("ALTER TABLE user_keywords ADD COLUMN reg_id TEXT").run().catch(()=>{});
-      await db.prepare("ALTER TABLE user_keywords ADD COLUMN reg_dt DATETIME").run().catch(()=>{});
-      await db.prepare("ALTER TABLE user_keywords ADD COLUMN mod_id TEXT").run().catch(()=>{});
-      await db.prepare("ALTER TABLE user_keywords ADD COLUMN mod_dt DATETIME").run().catch(()=>{});
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN reg_id TEXT").run().catch(() => { });
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN reg_dt DATETIME").run().catch(() => { });
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN mod_id TEXT").run().catch(() => { });
+      await db.prepare("ALTER TABLE user_keywords ADD COLUMN mod_dt DATETIME").run().catch(() => { });
       // 재시도
       await db.prepare(`
         INSERT INTO user_keywords (user_id, keywords, updated_at) 
@@ -4418,21 +4420,21 @@ app.post('/sms/user-keywords', async (c) => {
 app.get('/sms/shortcut/keywords', async (c) => {
   const db = c.env.DB
   const userId = c.req.query('userId') || c.req.query('id')
-  
+
   // 🔐 SECURITY: iPhone 단축어 전용 비밀키 확인 (금융권 수준 보안 적용)
   const authKey = c.req.header('X-SGUARD-AUTH')
   if (authKey !== c.env.SHORTCUT_SECRET) {
     return c.json({ error: "Unauthorized: Invalid or missing X-SGUARD-AUTH header" }, 401)
   }
-  
+
   if (!userId) {
     return c.json({ error: "userId is required" }, 400)
   }
-  
+
   // 보안을 위해 token 검증 로직이 필요할 수 있으나, 
   // 여기서는 기본적으로 user_keywords 테이블에서 해당 사용자의 데이터를 조회합니다.
   const result = await db.prepare("SELECT keywords FROM user_keywords WHERE user_id = ?").bind(userId).first()
-  
+
   return c.json({
     userId: userId,
     keywords: result ? result.keywords : "",
@@ -4449,13 +4451,13 @@ app.get('/sms/codebook', async (c) => {
   const category = c.req.query('category')
   let query = "SELECT * FROM code_book WHERE is_active = 1"
   let params = []
-  
+
   if (category) {
     query += " AND category = ?"
     params.push(category)
   }
   query += " ORDER BY category ASC, sort_order ASC"
-  
+
   const { results } = await db.prepare(query).bind(...params).all()
   return c.json({ codes: results })
 })
@@ -4464,19 +4466,19 @@ app.post('/sms/codebook', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  
+
   const res = await db.prepare(`
     INSERT INTO code_book (
       category, code, name, sort_order, is_active, description, 
       reg_id, reg_dt, mod_id, mod_dt
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
-    data.category, data.code, data.name, data.sort_order || 0, 
+    data.category, data.code, data.name, data.sort_order || 0,
     data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
     data.description || null,
     c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now
   ).run()
-  
+
   return c.json({ status: "success", id: res.meta.last_row_id })
 })
 
@@ -4485,7 +4487,7 @@ app.put('/sms/codebook/:id', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  
+
   await db.prepare(`
     UPDATE code_book SET 
       category = ?, code = ?, name = ?, sort_order = ?, 
@@ -4496,7 +4498,7 @@ app.put('/sms/codebook/:id', async (c) => {
     data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
     data.description || null, now, id
   ).run()
-  
+
   return c.json({ status: "success" })
 })
 
@@ -4510,7 +4512,7 @@ app.delete('/sms/codebook/:id', async (c) => {
 app.get('/incidents', async (c) => {
   const db = c.env.DB
   const { inc_id, keyword, startDate, endDate, orgCode, orgName, assignee } = c.req.query()
-  
+
   // High-performance MULTI-JOIN query to check all possible affiliation sources
   // i: incidents
   // ua: the explicit main assignee
@@ -4546,27 +4548,27 @@ app.get('/incidents', async (c) => {
     WHERE 1=1
   `
   const params = []
-  
+
   if (inc_id) {
     query += " AND i.inc_id = ?"
     params.push(inc_id)
   }
-  
+
   if (keyword) {
     query += " AND (i.title LIKE ? OR i.description LIKE ? OR rp.title LIKE ? OR rp.content LIKE ?)"
     params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`)
   }
-  
+
   if (startDate) {
     query += " AND date(i.created_at) >= date(?)"
     params.push(startDate)
   }
-  
+
   if (endDate) {
     query += " AND date(i.created_at) <= date(?)"
     params.push(endDate)
   }
-  
+
   if (orgCode) {
     // 100% Strict Filtering: INCIDENTS are only returned if at least one ASSIGNED user belongs to the selected ORG
     query += ` AND (
@@ -4579,9 +4581,9 @@ app.get('/incidents', async (c) => {
       )
     )`
     // 10 total placeholders (5 for assigned_to IN, 5 for EXISTS)
-    for(let i=0; i<10; i++) params.push(orgCode)
+    for (let i = 0; i < 10; i++) params.push(orgCode)
   }
-  
+
   if (orgName) {
     query += ` AND (
       i.assigned_to IN (SELECT employee_id FROM users WHERE company LIKE ? OR honbu LIKE ? OR team LIKE ? OR part LIKE ? OR subpart LIKE ?)
@@ -4593,18 +4595,18 @@ app.get('/incidents', async (c) => {
       )
     )`
     const likeVal = `%${orgName}%`
-    for(let i=0; i<10; i++) params.push(likeVal)
+    for (let i = 0; i < 10; i++) params.push(likeVal)
   }
-  
+
   if (assignee) {
     // Check if the name or ID exists in the main assignee field OR the assignment list OR the sender (reporter)
     query += " AND (ua.name LIKE ? OR i.assigned_to = ? OR uaa.name LIKE ? OR ia.user_id = ? OR us.name LIKE ? OR r.employee_id = ?)"
     params.push(`%${assignee}%`, assignee, `%${assignee}%`, assignee, `%${assignee}%`, assignee)
   }
-  
+
   query += " GROUP BY i.inc_id"
   query += " ORDER BY i.created_at DESC"
-  
+
   const { results } = await db.prepare(query).bind(...params).all()
   return c.json(results)
 })
@@ -4715,7 +4717,7 @@ app.get('/sms/notification-stream', async (c) => {
           try {
             const raw = JSON.parse(latestCall.RAW_PAYLOAD || '{}');
             if (raw.employee_id) dispatchDeviceId = raw.employee_id;
-          } catch (e) {}
+          } catch (e) { }
           await writeEvent('scallert_triggered', {
             strategy_id: latestCall.STRATEGY_ID,
             inc_id: latestCall.INC_ID,
@@ -4768,17 +4770,17 @@ app.get('/sms/:id', async (c) => {
 app.get('/activity-logs', async (c) => {
   const db = c.env.DB
   const inc_id = c.req.query('inc_id')
-  
+
   let query = "SELECT * FROM activity_logs"
   let params = []
-  
+
   if (inc_id) {
     query += " WHERE inc_id = ?"
     params.push(inc_id)
   }
-  
+
   query += " ORDER BY created_at DESC LIMIT 50"
-  
+
   const { results } = await db.prepare(query).bind(...params).all()
   return c.json({ logs: results })
 })
@@ -4819,18 +4821,18 @@ app.post('/incident-history', async (c) => {
   const data = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  
+
   const res = await db.prepare(`
     INSERT INTO incident_history (
       sms_id, target_system, error_code, problem_description, severity, 
       reg_id, reg_dt, mod_id, mod_dt, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
-    data.sms_id, data.target_system, data.error_code || null, 
+    data.sms_id, data.target_system, data.error_code || null,
     data.problem_description, data.severity,
     c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now, now
   ).run()
-  
+
   return c.json({ status: "success", id: res.meta.last_row_id })
 })
 
@@ -4891,24 +4893,24 @@ app.post('/ai/feedback', async (c) => {
       finalCategory,
       now, safeEmpId, now, safeEmpId, now
     ).run()
-    
+
     const feedbackId = res.meta?.last_row_id || Date.now()
 
     // 🚀 [Phase 7/9] Self-Healing Trigger: Real-time Re-learning (Full Automation)
     if (feedback_type === 'DOWN' && vector_id?.startsWith('kn-')) {
       const kbId = vector_id.replace('kn-', '')
-      
+
       // Execute Real-time Re-learning / Isolation in background
       c.executionCtx.waitUntil((async () => {
         try {
           const now = getKst()
           const kbEntry = await db.prepare("SELECT content, title, version, fail_count FROM knowledge_base WHERE id = ?").bind(kbId).first()
-          
+
           if (kbEntry) {
             if (user_correction) {
               // A. [HEALING] Expert provided a correction -> Apply and Reset Fail Count
               console.log(`[Self-Healing] Real-time healing for KB-${kbId}...`);
-              
+
               const vector = await generateEmbedding(user_correction, c.env)
               if (!vector) throw new Error("Embedding generation failed");
 
@@ -4946,7 +4948,7 @@ app.post('/ai/feedback', async (c) => {
               }
             }
           }
-          
+
           // Cross-Reference: Strong boost for SMS incident
           if (vector_id?.startsWith('inc-') && user_correction) {
             const incId = vector_id.split('_')[0].replace('inc-', '');
@@ -4993,7 +4995,7 @@ app.post('/ai/feedback', async (c) => {
             if (kb) {
               // fail_count도 1 감소시켜 격리 위험 완화
               const newScore = Math.min(1.0, (kb.priority_score || 0.5) + 0.05);
-              const newFail  = Math.max(0, (kb.fail_count || 0) - 1);
+              const newFail = Math.max(0, (kb.fail_count || 0) - 1);
               await db.prepare(
                 "UPDATE knowledge_base SET priority_score = ?, fail_count = ?, priority_flag = 1, mod_dt = ? WHERE id = ?"
               ).bind(newScore, newFail, now, kbId).run();
@@ -5070,7 +5072,7 @@ app.patch('/ai/feedback/:id', async (c) => {
   if (is_golden !== undefined) { updateFields.push("is_golden = ?"); params.push(is_golden); }
   if (admin_comment !== undefined) { updateFields.push("admin_comment = ?"); params.push(admin_comment); }
   if (error_category !== undefined) { updateFields.push("error_category = ?"); params.push(error_category); }
-  
+
   updateFields.push("mod_dt = ?"); params.push(now);
   params.push(id)
 
@@ -5097,12 +5099,12 @@ app.patch('/ai/feedback/:id', async (c) => {
   // Even in Full Automation, Admin can manually trigger sync or re-apply correction
   if (status === 'APPLIED' && feedback.user_correction && feedback.vector_id) {
     const vid = feedback.vector_id
-    
+
     // Process Knowledge Base Sync (kn- prefix)
     if (vid.startsWith('kn-')) {
       const kbId = vid.replace('kn-', '')
       const kbEntry = await db.prepare("SELECT content, title, version FROM knowledge_base WHERE id = ?").bind(kbId).first()
-      
+
       if (kbEntry) {
         // A. Backup to History (If content changed)
         if (kbEntry.content !== feedback.user_correction) {
@@ -5115,7 +5117,7 @@ app.patch('/ai/feedback/:id', async (c) => {
         // B. Update D1 Knowledge Base (Ensure VERIFIED and latest content)
         const nextVersion = (kbEntry.version || 1) + 1
         const pScore = is_golden ? 1.0 : (kbEntry.priority_score || 0.5); // Boost to 1.0 if golden
-        
+
         // Generate Vector (Required for sync)
         let vector = null
         if (c.env.AI) {
@@ -5196,7 +5198,7 @@ app.post('/activity-logs', async (c) => {
   const db = c.env.DB
   const now = getKst()
   const inc_id = data.incident_code ? String(data.incident_code) : null
-  
+
   await db.prepare(`
     INSERT INTO activity_logs (
       inc_id, user_name, user_id, incident_code, incident_title, action, detail, 
@@ -5207,7 +5209,7 @@ app.post('/activity-logs', async (c) => {
     data.action, data.detail || null, data.report_type || '시스템',
     c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now, now
   ).run()
-  
+
   return c.json({ status: "success" })
 })
 
@@ -5257,6 +5259,17 @@ app.get('/warroom/rooms', async (c) => {
 
   if (q) { sql += ` AND (COALESCE(w.title, i.title, all_inc.inc_id) LIKE ? OR all_inc.inc_id LIKE ?)`; params.push(`%${q}%`, `%${q}%`) }
 
+  const participating = c.req.query('participating') === 'true';
+  const userId = c.get('user')?.employee_id;
+  if (participating && userId) {
+    sql += ` AND (
+      w.creator_id = ? OR 
+      EXISTS (SELECT 1 FROM incident_assignments ia WHERE ia.inc_id = all_inc.inc_id AND ia.user_id = ?) OR
+      EXISTS (SELECT 1 FROM warroom_chats wc WHERE wc.inc_id = all_inc.inc_id AND wc.sender = ?)
+    )`;
+    params.push(userId, userId, userId);
+  }
+
   const startDate = c.req.query('start_date') || ''
   const endDate = c.req.query('end_date') || ''
   const assignedTo = c.req.query('assigned_to') || ''
@@ -5267,7 +5280,7 @@ app.get('/warroom/rooms', async (c) => {
   } else if (statusFilter === 'Open') {
     sql += ` AND (i.status IS NULL OR (UPPER(i.status) != 'CLOSED' AND i.status != '최종완료' AND i.status != 'INC_003' AND COALESCE(UPPER(w.status), '') != 'CLOSED'))`
   }
-  
+
   if (startDate) { sql += ` AND DATE(COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt)) >= DATE(?)`; params.push(startDate) }
   if (endDate) { sql += ` AND DATE(COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt)) <= DATE(?)`; params.push(endDate) }
   if (assignedTo) {
@@ -5293,7 +5306,7 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
   const metadata = extractSearchMetadata(query);
   const results = [];
   const seenIds = new Set();
-  
+
   // 1. Path A: SQL Structured Search (High Precision)
   try {
     // A-1. Knowledge Base Exact Match (Reputation Weighted)
@@ -5305,7 +5318,7 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
         WHERE (k.error_code = ? OR k.system_name = ?) AND k.status != 'FAIL'
       `;
       const kbParams = [metadata.error_code || null, metadata.target_system || null];
-      
+
       const { results: kbMatches } = await db.prepare(kbSql).bind(...kbParams).all();
       kbMatches?.forEach(m => {
         const mid = `kn-${m.id}`;
@@ -5313,12 +5326,12 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
           // ⭐ Phase 15 Reputation-Weighted Boost
           const repFactor = (m.reputation_score || 100.0) / 100.0;
           let boost = (m.priority_score || 0) * 0.3 * repFactor;
-          
+
           // 🏆 Phase 17 Master Bonus for Gold/Legendary Guards
           if (m.rank_status === 'Gold Guard' || m.rank_status === 'Legendary Guard') boost += 0.1;
 
           if (m.tags && metadata.error_code && m.tags.includes(metadata.error_code)) boost += 0.2;
-          
+
           const finalScore = Math.min(1.0, 1.0 + boost);
           results.push({ id: mid, score: finalScore, type: 'kb_sql_exact', content: m.content, title: m.title });
           seenIds.add(mid);
@@ -5341,7 +5354,7 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
         if (!seenIds.has(mid)) {
           const repFactor = (m.reputation_score || 100.0) / 100.0;
           let boost = (m.priority_score || 0) * 0.3 * repFactor;
-          
+
           if (m.tags && metadata.keywords.some(k => m.tags.includes(k))) boost += 0.2;
 
           const finalScore = Math.min(1.0, 0.9 + boost);
@@ -5363,7 +5376,7 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
       if (metadata.sender) { smsSql += " AND m.sender = ?"; smsParams.push(metadata.sender); }
       if (metadata.error_code) { smsSql += " AND m.message LIKE ?"; smsParams.push(`%${metadata.error_code}%`); }
       if (metadata.target_system) { smsSql += " AND m.target_system = ?"; smsParams.push(metadata.target_system); }
-      
+
       smsSql += " ORDER BY m.reg_dt DESC LIMIT 10";
       const { results: smsMatches } = await db.prepare(smsSql).bind(...smsParams).all();
       smsMatches?.forEach(m => {
@@ -5371,16 +5384,16 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
         if (!seenIds.has(mid)) {
           const repFactor = (m.reputation_score || 100.0) / 100.0;
           let boost = (m.priority_score || 0) * 0.3 * repFactor;
-          
+
           if (m.tags && metadata.error_code && m.tags.includes(metadata.error_code)) boost += 0.2;
 
           const finalScore = Math.min(1.0, 0.8 + boost);
-          results.push({ 
-            id: mid, 
-            score: finalScore, 
-            type: 'sms_sql_match', 
+          results.push({
+            id: mid,
+            score: finalScore,
+            type: 'sms_sql_match',
             content: m.message,
-            title: `[이력 매칭] ${m.message.substring(0, 30)}...` 
+            title: `[이력 매칭] ${m.message.substring(0, 30)}...`
           });
           seenIds.add(mid);
         }
@@ -5399,7 +5412,7 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
           if (!seenIds.has(m.id)) {
             let pScore = m.metadata?.priority || 0;
             let tags = m.metadata?.tags || "";
-            
+
             // Check D1 for latest score/tags if needed
             if (m.id.startsWith('inc-')) {
               const possibleId = m.id.split('_')[0].replace('inc-', '');
@@ -5437,14 +5450,14 @@ const performHybridSearch = async (query, env, db, topK = 20) => {
 // ==========================================
 app.get('/ai/insight', async (c) => {
   const db = c.env.DB
-  
+
   // 1. Get recent SMS
   const recent_sms = await db.prepare("SELECT * FROM received_messages ORDER BY inc_id DESC").first()
-  
+
   // 2. Calculate prediction counts
   const { results: recent_messages } = await db.prepare("SELECT message FROM received_messages ORDER BY inc_id DESC LIMIT 100").all()
   const prediction_counts = { critical: 0, server: 0, security: 0, report: 0 }
-  
+
   for (const msg of recent_messages) {
     const text = msg.message.toLowerCase()
     if (text.includes("db") || text.includes("데이터베이스")) prediction_counts.critical++
@@ -5462,14 +5475,14 @@ app.get('/ai/insight', async (c) => {
     const norm_id = String(recent_sms.inc_id).trim()
     current_log_id = `KMS-${norm_id}`
     timestamp = recent_sms.timestamp
-    
+
     // Attempt lookup with normalized ID
     const insight = await db.prepare("SELECT content FROM autopilot_insight WHERE inc_id = ?").bind(norm_id).first()
     if (insight) {
       insight_text = insight.content
     } else {
       // 🚀 Only prefix if there is no official insight yet to prevent overlapping with error logs
-      insight_text = `🔍 [Insight] SMS 분석 대기 중: '${recent_sms.message.substring(0,30)}...'`
+      insight_text = `🔍 [Insight] SMS 분석 대기 중: '${recent_sms.message.substring(0, 30)}...'`
     }
   }
 
@@ -5497,15 +5510,15 @@ app.post('/ai/insight/save', async (c) => {
   const { incident_id, content, severity, category, user_id, similarity_score, similarity_reason } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  
+
   const norm_id = String(incident_id || '').trim()
-  
+
   await db.prepare(`
     INSERT OR REPLACE INTO autopilot_insight 
     (inc_id, content, severity, category, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(norm_id, content, severity, category, user_id || c.get('user')?.employee_id || 'SYSTEM', now, user_id || c.get('user')?.employee_id || 'SYSTEM', now, (similarity_score !== undefined && similarity_score !== null) ? similarity_score : null, (similarity_reason !== undefined && similarity_reason !== null) ? similarity_reason : null).run()
-  
+
   return c.json({ status: 'saved', inc_id: norm_id })
 })
 
@@ -5546,9 +5559,9 @@ app.post('/ai/chat', async (c) => {
     for (let attempt = 1; attempt <= 2; attempt++) {
       response = await fetch(`${api_base}/chat-messages`, {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${api_key}`, 
-          'Content-Type': 'application/json' 
+        headers: {
+          'Authorization': `Bearer ${api_key}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       })
@@ -5570,20 +5583,20 @@ app.post('/ai/chat', async (c) => {
     const { readable, writable } = new TransformStream()
     const writer = writable.getWriter()
 
-    ;(async () => {
-      try {
-        const reader = response.body.getReader()
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          await writer.write(value)
+      ; (async () => {
+        try {
+          const reader = response.body.getReader()
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            await writer.write(value)
+          }
+        } catch (e) {
+          console.error(`[AI Chat] Stream Error:`, e)
+        } finally {
+          await writer.close()
         }
-      } catch(e) {
-        console.error(`[AI Chat] Stream Error:`, e)
-      } finally {
-        await writer.close()
-      }
-    })()
+      })()
 
     return new Response(readable, {
       headers: {
@@ -5660,13 +5673,13 @@ app.post('/ai/analyze-sms', async (c) => {
         ORDER BY created_at DESC LIMIT 3
       `;
       const kw = smsInfo.error_code || smsInfo.service_name || 'NEVER_MATCH';
-      fbParams = [`%${kw}%`, `%${smsInfo.service_name || kw}%`, `%${kw}%` ];
+      fbParams = [`%${kw}%`, `%${smsInfo.service_name || kw}%`, `%${kw}%`];
     }
     const { results: pastFeedbacks } = await db.prepare(fbQuery).bind(...fbParams).all();
     if (pastFeedbacks?.length > 0) {
       feedbackContext = "\n\n[💡 과거 관제사 정정 사례 (Few-shot)]\n이번 분석 시 다음 정정 사례를 필수 참고하세요:\n";
       pastFeedbacks.forEach((fb, i) => {
-        feedbackContext += `${i+1}. 질문: ${fb.query}\n   교정: ${fb.user_correction}\n`;
+        feedbackContext += `${i + 1}. 질문: ${fb.query}\n   교정: ${fb.user_correction}\n`;
       });
       feedbackContext += "--------------------------------------\n";
     }
@@ -5698,149 +5711,149 @@ ${feedbackContext}`
   const writer = writable.getWriter()
   const encode = (s) => new TextEncoder().encode(s)
 
-  ;(async () => {
-    try {
-      // 1. Check D1 cache first (unless forced)
-      if (sms_id && !force) {
-        const cached = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
-        if (cached && cached.content) {
-          // 🛑 에러 캐시는 무시하고 실시간 재분석
-          const isStaleError = (
-            cached.content.startsWith('🤖') ||
-            cached.content.startsWith('⚠️ 분석 대기') ||
-            cached.content.includes('AI 엔진 서버 오류') ||
-            cached.content.includes('Dify 측 서버 상태가 불안정') ||
-            cached.content.includes('분석 품질 향상을 위해 대기 시간') ||
-            cached.content.includes('인증 오류') ||
-            cached.content.includes('엔드포인트 오류') ||
-            cached.content.includes('대기 시간 초과')
-          );
+    ; (async () => {
+      try {
+        // 1. Check D1 cache first (unless forced)
+        if (sms_id && !force) {
+          const cached = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
+          if (cached && cached.content) {
+            // 🛑 에러 캐시는 무시하고 실시간 재분석
+            const isStaleError = (
+              cached.content.startsWith('🤖') ||
+              cached.content.startsWith('⚠️ 분석 대기') ||
+              cached.content.includes('AI 엔진 서버 오류') ||
+              cached.content.includes('Dify 측 서버 상태가 불안정') ||
+              cached.content.includes('분석 품질 향상을 위해 대기 시간') ||
+              cached.content.includes('인증 오류') ||
+              cached.content.includes('엔드포인트 오류') ||
+              cached.content.includes('대기 시간 초과')
+            );
 
-          if (isStaleError) {
-            console.log(`[Cache Skip] Stale error cache for ${sms_id} — proceeding to live analysis`);
-          } else {
-            console.log(`[Cache Hit] Serving cached insight for ${sms_id}`);
-            if (cached.similarity_score) {
-              await writer.write(encode(`data: ${JSON.stringify({ similarity_score: cached.similarity_score, similarity_reason: cached.similarity_reason })}\n\n`));
-            }
-            const chars = Array.from(cached.content);
-            const chunkSize = 50;
-            for (let i = 0; i < chars.length; i += chunkSize) {
-              const chunk = chars.slice(i, i + chunkSize).join('');
-              await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
-            }
-            await writer.write(encode('data: [DONE]\n\n'));
-            return;
-          }
-        }
-      }
-
-      // 2. Concurrency Lock check (KV)
-      const lockKey = `lock:analyze:${sms_id}`;
-      const kv = c.env.SMS_STORAGE;
-      if (kv && sms_id) {
-        let lock = await kv.get(lockKey);
-        if (lock === 'processing') {
-          console.log(`[Concurrency] Another user is analyzing ${sms_id}. Waiting...`);
-          // Wait and Poll D1 for the result saved by the other process
-          for (let attempt = 0; attempt < 30; attempt++) {
-            await new Promise(r => setTimeout(r, 1000));
-            const polled = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
-            
-            const isStaleError = (val) => {
-              if (!val) return false;
-              return (
-                val.startsWith('🤖') ||
-                val.startsWith('⚠️ 분석 대기') ||
-                val.includes('AI 엔진 서버 오류') ||
-                val.includes('Dify 측 서버 상태가 불안정') ||
-                val.includes('분석 품질 향상을 위해 대기 시간') ||
-                val.includes('인증 오류') ||
-                val.includes('엔드포인트 오류') ||
-                val.includes('대기 시간 초과')
-              );
-            };
-
-            if (polled && polled.content && !isStaleError(polled.content)) {
-              // Send similarity score first if available
-              if (polled.similarity_score !== null && polled.similarity_score !== undefined) {
-                await writer.write(encode(`data: ${JSON.stringify({ similarity_score: polled.similarity_score, similarity_reason: polled.similarity_reason })}\n\n`));
+            if (isStaleError) {
+              console.log(`[Cache Skip] Stale error cache for ${sms_id} — proceeding to live analysis`);
+            } else {
+              console.log(`[Cache Hit] Serving cached insight for ${sms_id}`);
+              if (cached.similarity_score) {
+                await writer.write(encode(`data: ${JSON.stringify({ similarity_score: cached.similarity_score, similarity_reason: cached.similarity_reason })}\n\n`));
               }
-              const chars = Array.from(polled.content);
-              for (let i = 0; i < chars.length; i += 50) {
-                await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+              const chars = Array.from(cached.content);
+              const chunkSize = 50;
+              for (let i = 0; i < chars.length; i += chunkSize) {
+                const chunk = chars.slice(i, i + chunkSize).join('');
+                await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
               }
               await writer.write(encode('data: [DONE]\n\n'));
               return;
             }
           }
-          throw new Error("분석 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
         }
-        // Acquire Lock
-        await kv.put(lockKey, 'processing', { expirationTtl: 60 });
-      }
 
-      // 3. Hybrid Search: SQL Metadata + Vectorize (Rich Context: Top-K 20)
-      let similarityScore = null;
-      let matchedContent = null;
-      let matchedTitle = null;
-      let matches = [];
-      let similarityReason = null;
+        // 2. Concurrency Lock check (KV)
+        const lockKey = `lock:analyze:${sms_id}`;
+        const kv = c.env.SMS_STORAGE;
+        if (kv && sms_id) {
+          let lock = await kv.get(lockKey);
+          if (lock === 'processing') {
+            console.log(`[Concurrency] Another user is analyzing ${sms_id}. Waiting...`);
+            // Wait and Poll D1 for the result saved by the other process
+            for (let attempt = 0; attempt < 30; attempt++) {
+              await new Promise(r => setTimeout(r, 1000));
+              const polled = await db.prepare("SELECT content, similarity_score, similarity_reason FROM autopilot_insight WHERE inc_id = ?").bind(String(sms_id)).first();
 
-      if (message) {
-        try {
-          await writer.write(encode(`data: ${JSON.stringify({ status: 'searching', message: '🔍 지능형 하이브리드 검색 중(SQL+Vector)...' })}\n\n`));
-          
-          const hybrid = await performHybridSearch(message, c.env, db, 20);
-          matches = hybrid.results;
+              const isStaleError = (val) => {
+                if (!val) return false;
+                return (
+                  val.startsWith('🤖') ||
+                  val.startsWith('⚠️ 분석 대기') ||
+                  val.includes('AI 엔진 서버 오류') ||
+                  val.includes('Dify 측 서버 상태가 불안정') ||
+                  val.includes('분석 품질 향상을 위해 대기 시간') ||
+                  val.includes('인증 오류') ||
+                  val.includes('엔드포인트 오류') ||
+                  val.includes('대기 시간 초과')
+                );
+              };
 
-          if (matches.length > 0) {
-            similarityScore = matches[0].score;
-            matchedTitle = matches[0].title || matches[0].id;
-            const inputSnippet = message.length > 150 ? message.substring(0, 150) + "..." : message;
-            similarityReason = `[지능형 하이브리드 검색] 유사도 분석 완료\n- 출처 DB: Vectorize & SQL Hybrid (매칭 ID: ${matches[0].id})\n- 매칭 기준 제목: ${matchedTitle}\n- 분석에 사용된 입력값(검색어): "${inputSnippet}"`;
-            
-            await writer.write(encode(`data: ${JSON.stringify({ similarity_score: similarityScore, similarity_reason: similarityReason, vector_id: matches[0].id, hybrid_metadata: hybrid.metadata })}\n\n`));
-
-            // 🚀 [Phase 8] Context Tiering: Separate Verified(KB) vs Reference(SMS)
-            const verifiedKB = [];
-            const references = [];
-
-            for (const match of matches) {
-              const mid = match.id;
-              const score = match.score;
-
-              if (mid.startsWith('kn-')) {
-                const kb = await db.prepare("SELECT title, content, version FROM knowledge_base WHERE id = ?").bind(mid.replace('kn-', '')).first();
-                if (kb) verifiedKB.push({ ...kb, score });
-              } else if (mid.startsWith('fb-')) {
-                // Past feedback is handled in feedbackContext already (Rich Few-shot)
-              } else {
-                // Past SMS or others
-                references.push({ content: match.content || match.metadata?.content || mid, score });
+              if (polled && polled.content && !isStaleError(polled.content)) {
+                // Send similarity score first if available
+                if (polled.similarity_score !== null && polled.similarity_score !== undefined) {
+                  await writer.write(encode(`data: ${JSON.stringify({ similarity_score: polled.similarity_score, similarity_reason: polled.similarity_reason })}\n\n`));
+                }
+                const chars = Array.from(polled.content);
+                for (let i = 0; i < chars.length; i += 50) {
+                  await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+                }
+                await writer.write(encode('data: [DONE]\n\n'));
+                return;
               }
             }
-
-            if (verifiedKB.length > 0) {
-              detailedInfo += "\n\n[🛡️ Verified Knowledge (Priority Boosted)]\n";
-              verifiedKB.slice(0, 3).forEach((k, idx) => {
-                detailedInfo += `${idx+1}. ${k.title} (v${k.version || 1}, Priority: ${k.priority_score || 0}): ${k.content.substring(0, 1000)}\n`;
-              });
-            }
-
-            if (references.length > 0) {
-              detailedInfo += "\n\n[📋 Retrieved Logs (Vector Search)]\n";
-              references.slice(0, 5).forEach((r, idx) => {
-                detailedInfo += `${idx+1}. 유사 사례 (Score: ${r.score.toFixed(2)}): ${r.content.substring(0, 500)}\n`;
-              });
-            }
+            throw new Error("분석 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
           }
-        } catch (ve) {
-          console.error('Hybrid search execution error:', ve.message);
+          // Acquire Lock
+          await kv.put(lockKey, 'processing', { expirationTtl: 60 });
         }
 
-      // 4. Decision: Enhanced AI Synthesis with Phase 14 Reasoning Logic
-      const hybridContextLogic = `
+        // 3. Hybrid Search: SQL Metadata + Vectorize (Rich Context: Top-K 20)
+        let similarityScore = null;
+        let matchedContent = null;
+        let matchedTitle = null;
+        let matches = [];
+        let similarityReason = null;
+
+        if (message) {
+          try {
+            await writer.write(encode(`data: ${JSON.stringify({ status: 'searching', message: '🔍 지능형 하이브리드 검색 중(SQL+Vector)...' })}\n\n`));
+
+            const hybrid = await performHybridSearch(message, c.env, db, 20);
+            matches = hybrid.results;
+
+            if (matches.length > 0) {
+              similarityScore = matches[0].score;
+              matchedTitle = matches[0].title || matches[0].id;
+              const inputSnippet = message.length > 150 ? message.substring(0, 150) + "..." : message;
+              similarityReason = `[지능형 하이브리드 검색] 유사도 분석 완료\n- 출처 DB: Vectorize & SQL Hybrid (매칭 ID: ${matches[0].id})\n- 매칭 기준 제목: ${matchedTitle}\n- 분석에 사용된 입력값(검색어): "${inputSnippet}"`;
+
+              await writer.write(encode(`data: ${JSON.stringify({ similarity_score: similarityScore, similarity_reason: similarityReason, vector_id: matches[0].id, hybrid_metadata: hybrid.metadata })}\n\n`));
+
+              // 🚀 [Phase 8] Context Tiering: Separate Verified(KB) vs Reference(SMS)
+              const verifiedKB = [];
+              const references = [];
+
+              for (const match of matches) {
+                const mid = match.id;
+                const score = match.score;
+
+                if (mid.startsWith('kn-')) {
+                  const kb = await db.prepare("SELECT title, content, version FROM knowledge_base WHERE id = ?").bind(mid.replace('kn-', '')).first();
+                  if (kb) verifiedKB.push({ ...kb, score });
+                } else if (mid.startsWith('fb-')) {
+                  // Past feedback is handled in feedbackContext already (Rich Few-shot)
+                } else {
+                  // Past SMS or others
+                  references.push({ content: match.content || match.metadata?.content || mid, score });
+                }
+              }
+
+              if (verifiedKB.length > 0) {
+                detailedInfo += "\n\n[🛡️ Verified Knowledge (Priority Boosted)]\n";
+                verifiedKB.slice(0, 3).forEach((k, idx) => {
+                  detailedInfo += `${idx + 1}. ${k.title} (v${k.version || 1}, Priority: ${k.priority_score || 0}): ${k.content.substring(0, 1000)}\n`;
+                });
+              }
+
+              if (references.length > 0) {
+                detailedInfo += "\n\n[📋 Retrieved Logs (Vector Search)]\n";
+                references.slice(0, 5).forEach((r, idx) => {
+                  detailedInfo += `${idx + 1}. 유사 사례 (Score: ${r.score.toFixed(2)}): ${r.content.substring(0, 500)}\n`;
+                });
+              }
+            }
+          } catch (ve) {
+            console.error('Hybrid search execution error:', ve.message);
+          }
+
+          // 4. Decision: Enhanced AI Synthesis with Phase 14 Reasoning Logic
+          const hybridContextLogic = `
 [Core Logic: Hybrid Context Processing]
 당신에게는 두 종류의 데이터 컨텍스트가 제공됩니다. 이들을 다음의 우선순위에 따라 처리하십시오.
 1. MASTER KNOWLEDGE (Gold/Legendary Guard):
@@ -5858,11 +5871,11 @@ ${feedbackContext}`
 당신은 내부적으로 점수(Score = Vector_Similarity + Priority_Score * 0.3)가 가장 높은 데이터를 신뢰하되, 전문가의 교정 데이터가 있다면 그것을 '학습된 정답'으로 간주하여 답변의 논리적 근거로 삼으십시오.
 `;
 
-      // Send Progress Status for Dify Call
-      await writer.write(encode(`data: ${JSON.stringify({ status: 'analyzing', message: '🤖 AI 심층 진단 분석 중...' })}\n\n`));
+          // Send Progress Status for Dify Call
+          await writer.write(encode(`data: ${JSON.stringify({ status: 'analyzing', message: '🤖 AI 심층 진단 분석 중...' })}\n\n`));
 
-        // 4. Call Dify (Improved with Local Hybrid Context Logic)
-        const prompt = `당신은 S-GUARD 시스템의 지능형 관제 엔진입니다.
+          // 4. Call Dify (Improved with Local Hybrid Context Logic)
+          const prompt = `당신은 S-GUARD 시스템의 지능형 관제 엔진입니다.
 ${hybridContextLogic}
 
 발신자: ${sender}
@@ -5871,119 +5884,119 @@ ${detailedInfo}
 ${feedbackContext}
 
 응답은 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 섹션으로 구성하고, 전문가 의견은 간결하게 작성해 주세요.`
-        
-        let effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
-        const fallbackKey = c.env.DIFY_API_KEY_SUMMARIZER || c.env.DIFY_API_KEY;
-        
-        // Helper to perform Dify call
-        const fetchDify = async (mode, key) => {
-          const endpoint = mode === 'workflow' ? `${api_base}/workflows/run` : `${api_base}/chat-messages`;
-          const payload = mode === 'workflow' 
-            ? { inputs: { query: prompt, chat_log: prompt }, response_mode: 'streaming', user: 'sguard-worker' }
-            : { inputs: {}, query: prompt, response_mode: 'streaming', user: 'sguard-worker' };
-            
-          return await fetch(endpoint, {
-            method: 'POST',
-            headers: { 
-              'Authorization': `Bearer ${key}`, 
-              'Content-Type': 'application/json',
-              'Accept': 'text/event-stream'
-            },
-            body: JSON.stringify(payload)
-          });
-        };
 
-        let difyRes = await fetchDify('chat', effectiveKey);
+          let effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
+          const fallbackKey = c.env.DIFY_API_KEY_SUMMARIZER || c.env.DIFY_API_KEY;
 
-        // 🚀 Retry once on transient server errors (5xx / 429) before falling back
-        if (!difyRes.ok && (difyRes.status >= 500 || difyRes.status === 429)) {
-          const retryDelay = difyRes.status === 429 ? 3000 : 2000;
-          console.warn(`[AI Analyze] Chat API transient error (${difyRes.status}), switching to fallback key...`);
-          await new Promise(r => setTimeout(r, retryDelay));
-          // Use fallbackKey for retry
-          difyRes = await fetchDify('chat', fallbackKey || effectiveKey);
-        }
+          // Helper to perform Dify call
+          const fetchDify = async (mode, key) => {
+            const endpoint = mode === 'workflow' ? `${api_base}/workflows/run` : `${api_base}/chat-messages`;
+            const payload = mode === 'workflow'
+              ? { inputs: { query: prompt, chat_log: prompt }, response_mode: 'streaming', user: 'sguard-worker' }
+              : { inputs: {}, query: prompt, response_mode: 'streaming', user: 'sguard-worker' };
 
-        if (!difyRes.ok) {
-          const status = difyRes.status;
-          console.warn(`[AI Analyze] Chat API failed (Status: ${status}), trying Workflow...`);
-          
-          // Switch to Workflow if Chat fails (typical for mixed app types)
-          difyRes = await fetchDify('workflow', api_key);
+            return await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream'
+              },
+              body: JSON.stringify(payload)
+            });
+          };
 
-          // Retry Workflow once on transient errors too
+          let difyRes = await fetchDify('chat', effectiveKey);
+
+          // 🚀 Retry once on transient server errors (5xx / 429) before falling back
           if (!difyRes.ok && (difyRes.status >= 500 || difyRes.status === 429)) {
-            console.warn(`[AI Analyze] Workflow transient error (${difyRes.status}), retrying...`);
-            await new Promise(r => setTimeout(r, 2000));
-            difyRes = await fetchDify('workflow', api_key);
+            const retryDelay = difyRes.status === 429 ? 3000 : 2000;
+            console.warn(`[AI Analyze] Chat API transient error (${difyRes.status}), switching to fallback key...`);
+            await new Promise(r => setTimeout(r, retryDelay));
+            // Use fallbackKey for retry
+            difyRes = await fetchDify('chat', fallbackKey || effectiveKey);
           }
-          
-          if (!difyRes.ok) {
-            const finalStatus = difyRes.status;
-            let errorMsg = `Dify API 오류 (${finalStatus})`;
-            if (finalStatus === 401) errorMsg = "🤖 AI 엔진 인증 오류 (Dify API Key를 확인해 주세요)";
-            if (finalStatus === 404) errorMsg = "🤖 AI 엔진 엔드포인트 오류 (Dify 설정을 확인해 주세요)";
-            
-            await writer.write(encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`));
-            throw new Error(errorMsg);
-          }
-        }
 
-        if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
-        
-        const reader = difyRes.body.getReader()
-        const decoder = new TextDecoder()
-        let lineBuffer = ""
-        let fullContent = ""
-        
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          lineBuffer += decoder.decode(value, { stream: true })
-          const lines = lineBuffer.split('\n')
-          lineBuffer = lines.pop()
-          
-          for (const line of lines) {
-            const trimmedLine = line.trim()
-            if (!trimmedLine.startsWith('data: ')) continue
-            
-            const dataStr = trimmedLine.substring(6)
-            if (dataStr === '[DONE]') continue
-            
-            try {
-              const data = JSON.parse(dataStr)
-              // 🚀 Support Both Chat Apps and Workflow Apps
-              if (data.event === 'message' || data.event === 'agent_message') {
-                fullContent += (data.answer || "");
-                await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
-              } else if (data.event === 'text_chunk') {
-                const chunk = data.data?.text || "";
-                fullContent += chunk;
-                await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`))
-              } else if (data.event === 'workflow_finished') {
-                const outputs = data.data?.outputs;
-                if (outputs) {
-                  const workflowResult = outputs.text || outputs.result || outputs.output || 
-                                       (Object.values(outputs).find(v => typeof v === 'string') || "");
-                  
-                  if (workflowResult && (!fullContent || !fullContent.includes(workflowResult.substring(0, 10)))) {
-                    fullContent += workflowResult;
-                    await writer.write(encode(`data: ${JSON.stringify({ answer: workflowResult })}\n\n`))
-                  }
-                }
-              }
-            } catch (e) {
-              continue
+          if (!difyRes.ok) {
+            const status = difyRes.status;
+            console.warn(`[AI Analyze] Chat API failed (Status: ${status}), trying Workflow...`);
+
+            // Switch to Workflow if Chat fails (typical for mixed app types)
+            difyRes = await fetchDify('workflow', api_key);
+
+            // Retry Workflow once on transient errors too
+            if (!difyRes.ok && (difyRes.status >= 500 || difyRes.status === 429)) {
+              console.warn(`[AI Analyze] Workflow transient error (${difyRes.status}), retrying...`);
+              await new Promise(r => setTimeout(r, 2000));
+              difyRes = await fetchDify('workflow', api_key);
+            }
+
+            if (!difyRes.ok) {
+              const finalStatus = difyRes.status;
+              let errorMsg = `Dify API 오류 (${finalStatus})`;
+              if (finalStatus === 401) errorMsg = "🤖 AI 엔진 인증 오류 (Dify API Key를 확인해 주세요)";
+              if (finalStatus === 404) errorMsg = "🤖 AI 엔진 엔드포인트 오류 (Dify 설정을 확인해 주세요)";
+
+              await writer.write(encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`));
+              throw new Error(errorMsg);
             }
           }
-        }
-        
-        // Auto-save insight to DB if successful
-        if (fullContent && sms_id) {
-          const now = getKst();
-          const severity = fullContent.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
-          await db.prepare(`
+
+          if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
+
+          const reader = difyRes.body.getReader()
+          const decoder = new TextDecoder()
+          let lineBuffer = ""
+          let fullContent = ""
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            lineBuffer += decoder.decode(value, { stream: true })
+            const lines = lineBuffer.split('\n')
+            lineBuffer = lines.pop()
+
+            for (const line of lines) {
+              const trimmedLine = line.trim()
+              if (!trimmedLine.startsWith('data: ')) continue
+
+              const dataStr = trimmedLine.substring(6)
+              if (dataStr === '[DONE]') continue
+
+              try {
+                const data = JSON.parse(dataStr)
+                // 🚀 Support Both Chat Apps and Workflow Apps
+                if (data.event === 'message' || data.event === 'agent_message') {
+                  fullContent += (data.answer || "");
+                  await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+                } else if (data.event === 'text_chunk') {
+                  const chunk = data.data?.text || "";
+                  fullContent += chunk;
+                  await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`))
+                } else if (data.event === 'workflow_finished') {
+                  const outputs = data.data?.outputs;
+                  if (outputs) {
+                    const workflowResult = outputs.text || outputs.result || outputs.output ||
+                      (Object.values(outputs).find(v => typeof v === 'string') || "");
+
+                    if (workflowResult && (!fullContent || !fullContent.includes(workflowResult.substring(0, 10)))) {
+                      fullContent += workflowResult;
+                      await writer.write(encode(`data: ${JSON.stringify({ answer: workflowResult })}\n\n`))
+                    }
+                  }
+                }
+              } catch (e) {
+                continue
+              }
+            }
+          }
+
+          // Auto-save insight to DB if successful
+          if (fullContent && sms_id) {
+            const now = getKst();
+            const severity = fullContent.toLowerCase().includes('critical') ? 'CRITICAL' : 'INFO';
+            await db.prepare(`
             INSERT INTO autopilot_insight (inc_id, content, severity, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
             VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
             ON CONFLICT(inc_id) DO UPDATE SET 
@@ -5992,22 +6005,22 @@ ${feedbackContext}
               similarity_score=COALESCE(excluded.similarity_score, autopilot_insight.similarity_score),
               similarity_reason=COALESCE(excluded.similarity_reason, autopilot_insight.similarity_reason)
           `).bind(String(sms_id), fullContent, severity, now, now, similarityScore ?? null, similarityReason || matchedTitle || null).run();
+          }
         }
-      }
 
-      // 4. Release Lock
-      if (kv && sms_id) {
-        await kv.delete(lockKey);
-      }
+        // 4. Release Lock
+        if (kv && sms_id) {
+          await kv.delete(lockKey);
+        }
 
-      await writer.write(encode('data: [DONE]\n\n'))
-    } catch (e) {
-      console.error('Analyze-SMS error:', e)
-      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
-    } finally {
-      await writer.close()
-    }
-  })()
+        await writer.write(encode('data: [DONE]\n\n'))
+      } catch (e) {
+        console.error('Analyze-SMS error:', e)
+        await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
+      } finally {
+        await writer.close()
+      }
+    })()
 
   return new Response(readable, {
     headers: {
@@ -6027,7 +6040,7 @@ app.post('/ai/generate-report', async (c) => {
   const db = c.env.DB
 
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
-  
+
   // Frontend mostly passes "INC-12345678", but DB stores raw numbers.
   const rawId = incident_id.startsWith('INC-') ? incident_id.slice(4) : incident_id;
 
@@ -6049,18 +6062,18 @@ app.post('/ai/generate-report', async (c) => {
   // ────────────────────────────────────────────────────
   // 2. 데이터 추출
   // ────────────────────────────────────────────────────
-  const title     = wr?.title || incident_id
-  const severity  = wr?.severity || 'NORMAL'
-  const status    = wr?.status || '-'
-  const creator   = wr?.creator_id || '-'
+  const title = wr?.title || incident_id
+  const severity = wr?.severity || 'NORMAL'
+  const status = wr?.status || '-'
+  const creator = wr?.creator_id || '-'
   const createdAt = wr?.reg_dt || '-'
-  const smsMsg    = sms ? `발신자: ${sms.sender}\n메시지: ${sms.message}` : '(SMS 정보 없음)'
+  const smsMsg = sms ? `발신자: ${sms.sender}\n메시지: ${sms.message}` : '(SMS 정보 없음)'
   const insightTxt = insight?.content || ''
 
   const userChats = (chatLogs || []).filter(m => m.type !== 'system')
   const systemChats = (chatLogs || []).filter(m => m.type === 'system')
   const firstEvent = systemChats[0]?.timestamp || chatLogs[0]?.timestamp || createdAt
-  const lastEvent  = chatLogs[chatLogs.length - 1]?.timestamp || createdAt
+  const lastEvent = chatLogs[chatLogs.length - 1]?.timestamp || createdAt
   const durationMin = firstEvent && lastEvent
     ? Math.max(0, Math.round((new Date(lastEvent) - new Date(firstEvent)) / 60000))
     : 0
@@ -6158,10 +6171,10 @@ ${attachSection}
 
 ${insightTxt ? `S-Autopilot 분석 기반 재발 방지 포인트:
 
-${insightTxt.includes('재발') 
-  ? insightTxt.split('\n').filter(l => l.includes('재발') || l.includes('방지') || l.includes('모니터') || l.includes('개선')).slice(0, 5).join('\n') || '- 상세 내용은 에이전트 로그를 참조하세요.'
-  : '- 장애 원인 분석을 기반으로 재발 방지 대책을 수립하세요.\n- 주기적인 모니터링 강화 및 알림 임계값 검토를 권장합니다.'}` 
-: '- 장애 데이터 부족으로 자동 권고 생략. 담당자 메모를 참조하세요.'}
+${insightTxt.includes('재발')
+        ? insightTxt.split('\n').filter(l => l.includes('재발') || l.includes('방지') || l.includes('모니터') || l.includes('개선')).slice(0, 5).join('\n') || '- 상세 내용은 에이전트 로그를 참조하세요.'
+        : '- 장애 원인 분석을 기반으로 재발 방지 대책을 수립하세요.\n- 주기적인 모니터링 강화 및 알림 임계값 검토를 권장합니다.'}`
+      : '- 장애 데이터 부족으로 자동 권고 생략. 담당자 메모를 참조하세요.'}
 
 ---
 
@@ -6175,22 +6188,22 @@ ${insightTxt.includes('재발')
   const writer = writable.getWriter()
   const encode = (s) => new TextEncoder().encode(s)
 
-  ;(async () => {
-    try {
-      // Use Array.from to correctly slice surrogate pairs (Emojis, Korean characters) without splitting them.
-      const chars = Array.from(report);
-      const chunkSize = 40;
-      for (let i = 0; i < chars.length; i += chunkSize) {
-        const chunk = chars.slice(i, i + chunkSize).join('');
-        await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
+    ; (async () => {
+      try {
+        // Use Array.from to correctly slice surrogate pairs (Emojis, Korean characters) without splitting them.
+        const chars = Array.from(report);
+        const chunkSize = 40;
+        for (let i = 0; i < chars.length; i += chunkSize) {
+          const chunk = chars.slice(i, i + chunkSize).join('');
+          await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
+        }
+        await writer.write(encode('data: [DONE]\n\n'))
+      } catch (e) {
+        await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
+      } finally {
+        await writer.close()
       }
-      await writer.write(encode('data: [DONE]\n\n'))
-    } catch (e) {
-      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
-    } finally {
-      await writer.close()
-    }
-  })()
+    })()
 
   return new Response(readable, {
     headers: {
@@ -6215,50 +6228,50 @@ app.get('/ai/agent-discussion/:id', async (c) => {
   const writer = writable.getWriter()
   const encode = (s) => new TextEncoder().encode(s)
 
-  ;(async () => {
-    try {
-      // 1. Check D1 Cache first
-      const { results: cached } = await db.prepare("SELECT agent_role, content FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all();
-      if (cached && cached.length > 0) {
-        console.log(`[Cache Hit] Serving cached discussion for ${id}`);
-        // Format cached messages to match the expected stream format
-        const fullCachedContent = cached.map(m => `[${m.agent_role}]: ${m.content}`).join('\n\n');
-        const chars = Array.from(fullCachedContent);
-        for (let i = 0; i < chars.length; i += 50) {
-          await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
-        }
-        await writer.write(encode('data: [DONE]\n\n'));
-        return;
-      }
-
-      // 2. Concurrency Lock check (KV)
-      const lockKey = `lock:agent-discussion:${id}`;
-      if (kv) {
-        let lock = await kv.get(lockKey);
-        if (lock === 'processing') {
-          console.log(`[Concurrency] Another user is generating discussion for ${id}. Waiting...`);
-          for (let attempt = 0; attempt < 30; attempt++) {
-            await new Promise(r => setTimeout(r, 1000));
-            const polled = await db.prepare("SELECT agent_role, content FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all();
-            if (polled.results && polled.results.length > 0) {
-              const fullContent = polled.results.map(m => `[${m.agent_role}]: ${m.content}`).join('\n\n');
-              const chars = Array.from(fullContent);
-              for (let i = 0; i < chars.length; i += 50) {
-                await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
-              }
-              await writer.write(encode('data: [DONE]\n\n'));
-              return;
-            }
+    ; (async () => {
+      try {
+        // 1. Check D1 Cache first
+        const { results: cached } = await db.prepare("SELECT agent_role, content FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all();
+        if (cached && cached.length > 0) {
+          console.log(`[Cache Hit] Serving cached discussion for ${id}`);
+          // Format cached messages to match the expected stream format
+          const fullCachedContent = cached.map(m => `[${m.agent_role}]: ${m.content}`).join('\n\n');
+          const chars = Array.from(fullCachedContent);
+          for (let i = 0; i < chars.length; i += 50) {
+            await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
           }
-          throw new Error("분석 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
+          await writer.write(encode('data: [DONE]\n\n'));
+          return;
         }
-        await kv.put(lockKey, 'processing', { expirationTtl: 60 });
-      }
 
-      const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
-      if (!sms) throw new Error("SMS not found");
+        // 2. Concurrency Lock check (KV)
+        const lockKey = `lock:agent-discussion:${id}`;
+        if (kv) {
+          let lock = await kv.get(lockKey);
+          if (lock === 'processing') {
+            console.log(`[Concurrency] Another user is generating discussion for ${id}. Waiting...`);
+            for (let attempt = 0; attempt < 30; attempt++) {
+              await new Promise(r => setTimeout(r, 1000));
+              const polled = await db.prepare("SELECT agent_role, content FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all();
+              if (polled.results && polled.results.length > 0) {
+                const fullContent = polled.results.map(m => `[${m.agent_role}]: ${m.content}`).join('\n\n');
+                const chars = Array.from(fullContent);
+                for (let i = 0; i < chars.length; i += 50) {
+                  await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+                }
+                await writer.write(encode('data: [DONE]\n\n'));
+                return;
+              }
+            }
+            throw new Error("분석 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
+          }
+          await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+        }
 
-      const prompt = `다음 SMS 장애 메시지와 상세 정보를 분석하여 담당 에이전트별로 대응 방안을 알려주세요:
+        const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(id).first()
+        if (!sms) throw new Error("SMS not found");
+
+        const prompt = `다음 SMS 장애 메시지와 상세 정보를 분석하여 담당 에이전트별로 대응 방안을 알려주세요:
 
 발신자: ${sms.sender}
 메시지: ${sms.message}
@@ -6279,79 +6292,79 @@ app.get('/ai/agent-discussion/:id', async (c) => {
 [DevOps]: 서버/인프라 관점 분석
 [Leader]: 종합 의견 및 조치사항`
 
-      const difyRes = await fetch(`${api_base}/chat-messages`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${api_key}`, 
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify({ 
-          inputs: {}, 
-          query: prompt, 
-          response_mode: 'streaming', 
-          conversation_id: '', 
-          user: 'sguard-agent' 
+        const difyRes = await fetch(`${api_base}/chat-messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${api_key}`,
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+          },
+          body: JSON.stringify({
+            inputs: {},
+            query: prompt,
+            response_mode: 'streaming',
+            conversation_id: '',
+            user: 'sguard-agent'
+          })
         })
-      })
 
-      if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
-      
-      const reader = difyRes.body.getReader()
-      const decoder = new TextDecoder()
-      let lineBuffer = ""
-      let fullContent = ""
-      
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        lineBuffer += decoder.decode(value, { stream: true })
-        const lines = lineBuffer.split('\n')
-        lineBuffer = lines.pop()
-        
-        for (const line of lines) {
-          const trimmedLine = line.trim()
-          if (!trimmedLine.startsWith('data: ')) continue
-          
-          const dataStr = trimmedLine.substring(6)
-          if (dataStr === '[DONE]') continue
-          
-          try {
-            const data = JSON.parse(dataStr)
-            if (data.event === 'message' || data.event === 'agent_message') {
-              fullContent += data.answer;
-              await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
-            }
-          } catch (e) { continue }
+        if (!difyRes.ok) throw new Error(`Dify API error: ${difyRes.status}`)
+
+        const reader = difyRes.body.getReader()
+        const decoder = new TextDecoder()
+        let lineBuffer = ""
+        let fullContent = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          lineBuffer += decoder.decode(value, { stream: true })
+          const lines = lineBuffer.split('\n')
+          lineBuffer = lines.pop()
+
+          for (const line of lines) {
+            const trimmedLine = line.trim()
+            if (!trimmedLine.startsWith('data: ')) continue
+
+            const dataStr = trimmedLine.substring(6)
+            if (dataStr === '[DONE]') continue
+
+            try {
+              const data = JSON.parse(dataStr)
+              if (data.event === 'message' || data.event === 'agent_message') {
+                fullContent += data.answer;
+                await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+              }
+            } catch (e) { continue }
+          }
         }
-      }
 
-      // Auto-save parsed agents to aichat_history
-      if (fullContent) {
-        const now = getKst();
-        const agents = ['Security', 'DB', 'DevOps', 'Leader'];
-        for (const agent of agents) {
-          const regex = new RegExp(`\\[${agent}\\]:?\\s*([\\s\\S]*?)(?=\\n\\[|$)`, 'i');
-          const match = fullContent.match(regex);
-          if (match && match[1]) {
-            await db.prepare(`
+        // Auto-save parsed agents to aichat_history
+        if (fullContent) {
+          const now = getKst();
+          const agents = ['Security', 'DB', 'DevOps', 'Leader'];
+          for (const agent of agents) {
+            const regex = new RegExp(`\\[${agent}\\]:?\\s*([\\s\\S]*?)(?=\\n\\[|$)`, 'i');
+            const match = fullContent.match(regex);
+            if (match && match[1]) {
+              await db.prepare(`
               INSERT INTO aichat_history (inc_id, agent_role, content, reg_id, reg_dt, mod_id, mod_dt)
               VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
             `).bind(id, agent, match[1].trim(), now, now).run();
+            }
           }
         }
-      }
 
-      if (kv) await kv.delete(lockKey);
-      await writer.write(encode('data: [DONE]\n\n'))
-    } catch (e) {
-      console.error('Dify Stream Error:', e)
-      await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
-    } finally {
-      await writer.close()
-    }
-  })()
+        if (kv) await kv.delete(lockKey);
+        await writer.write(encode('data: [DONE]\n\n'))
+      } catch (e) {
+        console.error('Dify Stream Error:', e)
+        await writer.write(encode(`data: ${JSON.stringify({ error: e.message })}\n\n`))
+      } finally {
+        await writer.close()
+      }
+    })()
 
   return new Response(readable, {
     headers: {
@@ -6398,312 +6411,312 @@ app.post('/ai/summarize-chat', async (c) => {
   const { incident_id } = await c.req.json()
   const db = c.env.DB
   const kv = c.env.SMS_STORAGE
-  const api_key = "app-owwPp3j2qAvVDZpW2UUiY8L3" 
+  const api_key = "app-owwPp3j2qAvVDZpW2UUiY8L3"
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
 
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
-  
+
   // ID Normalization: Use raw numeric ID (no INC- prefix) for database operations
   const cleanId = String(incident_id || '').replace(/^INC-/i, '');
-   // Use cleanId directly as the primary identifier
+  // Use cleanId directly as the primary identifier
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
   const encode = (s) => new TextEncoder().encode(s)
 
-  ;(async () => {
-    try {
-      // 1. Parallel DB fetch - incident status + cache + timeline data
-      const [incident, cached, incDetail, wfLogsResult] = await Promise.all([
-        db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
-        db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first(),
-        db.prepare("SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
-        db.prepare("SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC").bind(cleanId).all().catch(() => ({ results: [] }))
-      ]);
-      const wfLogs = wfLogsResult?.results || [];
-      
-      const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료', 'INC_003'];
-      const isFinal = finalStatuses.includes(incident?.status || 'Open');
+    ; (async () => {
+      try {
+        // 1. Parallel DB fetch - incident status + cache + timeline data
+        const [incident, cached, incDetail, wfLogsResult] = await Promise.all([
+          db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
+          db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first(),
+          db.prepare("SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
+          db.prepare("SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC").bind(cleanId).all().catch(() => ({ results: [] }))
+        ]);
+        const wfLogs = wfLogsResult?.results || [];
 
-      const isRaw = (val) => {
-        if (!val) return false;
-        const rawPatterns = [/\[analyst\]\s*\d+:/, /\[User\]\s*[^:]+:/, /employee_id:/];
-        return rawPatterns.some(p => p.test(val));
-      };
+        const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료', 'INC_003'];
+        const isFinal = finalStatuses.includes(incident?.status || 'Open');
 
-      const isStaleError = (val) => {
-        if (!val) return false;
-        return (
-          val.startsWith('🤖') ||
-          val.startsWith('⚠️') ||
-          val.includes('AI 엔진 서버 오류') ||
-          val.includes('Dify 측 서버 상태가 불안정') ||
-          val.includes('인증 오류') ||
-          val.includes('엔드포인트 오류') ||
-          val.includes('대기 시간 초과')
-        );
-      };
+        const isRaw = (val) => {
+          if (!val) return false;
+          const rawPatterns = [/\[analyst\]\s*\d+:/, /\[User\]\s*[^:]+:/, /employee_id:/];
+          return rawPatterns.some(p => p.test(val));
+        };
 
-      // For finalized incidents, strictly serve from DB (Prevent Dify call)
-      if (isFinal) {
-        console.log(`[Re-Analysis Prevented] Incident ${cleanId} is final. Attempting DB read...`);
-        
-        // Priority 1: knowledge_base (finalized reports)
-        const kb = await db.prepare("SELECT content FROM knowledge_base WHERE inc_id = ? AND category = 'REPORT'").bind(cleanId).first();
-        if (kb && kb.content && !isRaw(kb.content) && !isStaleError(kb.content)) {
-          console.log(`[Cache Hit] Serving finalized knowledge_base report for ${cleanId}`);
-          // Send immediately without typewriter delay or status message to avoid confusion
-          await writer.write(encode(`data: ${JSON.stringify({ answer: kb.content })}\n\n`));
-          await writer.write(encode('data: [DONE]\n\n'));
-          return;
-        }
+        const isStaleError = (val) => {
+          if (!val) return false;
+          return (
+            val.startsWith('🤖') ||
+            val.startsWith('⚠️') ||
+            val.includes('AI 엔진 서버 오류') ||
+            val.includes('Dify 측 서버 상태가 불안정') ||
+            val.includes('인증 오류') ||
+            val.includes('엔드포인트 오류') ||
+            val.includes('대기 시간 초과')
+          );
+        };
 
-        // Priority 2: chat_summaries
-        if (cached && cached.summary && !isRaw(cached.summary) && !isStaleError(cached.summary)) {
-          console.log(`[Cache Hit] Serving cached summary for finalized incident ${cleanId}`);
-          await writer.write(encode(`data: ${JSON.stringify({ answer: cached.summary })}\n\n`));
-          await writer.write(encode('data: [DONE]\n\n'));
-          return;
-        }
+        // For finalized incidents, strictly serve from DB (Prevent Dify call)
+        if (isFinal) {
+          console.log(`[Re-Analysis Prevented] Incident ${cleanId} is final. Attempting DB read...`);
 
-        // If no valid text in DB, return empty message rather than hitting Dify
-        await writer.write(encode(`data: ${JSON.stringify({ answer: '데이터베이스에 저장된 요약 내역이 존재하지 않습니다.' })}\n\n`));
-        await writer.write(encode('data: [DONE]\n\n'));
-        return;
-      }
-
-      if (cached && cached.summary && !isFinal) {
-        console.log(`[Re-Analysis] Incident ${cleanId} is still active. Bypassing cache to update summary...`);
-        await writer.write(encode(`data: ${JSON.stringify({ status: '대화 내용을 반영하여 리포트를 최신화하고 있습니다...' })}\n\n`));
-      }
-
-
-      // 2. Concurrency Lock check (KV)
-      const lockKey = `lock:summarize-chat:${cleanId}`;
-      if (kv) {
-        let lock = await kv.get(lockKey);
-        if (lock === 'processing') {
-          console.log(`[Concurrency] Another user is summarizing chat for ${cleanId}. Waiting...`);
-          await writer.write(encode(`data: ${JSON.stringify({ status: '분석 중입니다. 처리 중 ...' })}\n\n`));
-          for (let attempt = 0; attempt < 30; attempt++) {
-            await new Promise(r => setTimeout(r, 1000));
-            const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first();
-            if (polled && polled.summary && !isStaleError(polled.summary)) {
-              const chars = Array.from(polled.summary);
-              for (let i = 0; i < chars.length; i += 50) {
-                await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
-              }
-              await writer.write(encode('data: [DONE]\n\n'));
-              return;
-            }
+          // Priority 1: knowledge_base (finalized reports)
+          const kb = await db.prepare("SELECT content FROM knowledge_base WHERE inc_id = ? AND category = 'REPORT'").bind(cleanId).first();
+          if (kb && kb.content && !isRaw(kb.content) && !isStaleError(kb.content)) {
+            console.log(`[Cache Hit] Serving finalized knowledge_base report for ${cleanId}`);
+            // Send immediately without typewriter delay or status message to avoid confusion
+            await writer.write(encode(`data: ${JSON.stringify({ answer: kb.content })}\n\n`));
+            await writer.write(encode('data: [DONE]\n\n'));
+            return;
           }
-          throw new Error("요약 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
+
+          // Priority 2: chat_summaries
+          if (cached && cached.summary && !isRaw(cached.summary) && !isStaleError(cached.summary)) {
+            console.log(`[Cache Hit] Serving cached summary for finalized incident ${cleanId}`);
+            await writer.write(encode(`data: ${JSON.stringify({ answer: cached.summary })}\n\n`));
+            await writer.write(encode('data: [DONE]\n\n'));
+            return;
+          }
+
+          // If no valid text in DB, return empty message rather than hitting Dify
+          await writer.write(encode(`data: ${JSON.stringify({ answer: '데이터베이스에 저장된 요약 내역이 존재하지 않습니다.' })}\n\n`));
+          await writer.write(encode('data: [DONE]\n\n'));
+          return;
         }
-        await kv.put(lockKey, 'processing', { expirationTtl: 60 });
-      }
 
-      // 3. Fetch ONLY user chat history - Using numeric ID
-      const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(cleanId).all()
-      
-      // (incDetail and wfLogs already fetched above in parallel)
-      const wfLogs_data = wfLogs;
-
-      const toKST = (dt) => {
-        if (!dt) return null;
-        try {
-          const d = new Date(dt);
-          return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-        } catch { return null; }
-      };
-
-      const timelineCtx = [];
-      if (incDetail?.reg_dt || incDetail?.created_at) {
-        const t = toKST(incDetail.reg_dt || incDetail.created_at);
-        if (t) timelineCtx.push(`[${t}] SMS 수신 및 장애 인지`);
-      }
-      for (const wf of wfLogs_data) {
-        const t = toKST(wf.completed_at);
-        const label = wf.step_id === 'RAG' || wf.step_id === 'AGENT' ? 'AI 분석 완료'
-          : wf.step_id === 'WARROOM' ? '워룸 생성 및 담당자 배정'
-          : wf.step_id === 'KNOWLEDGE' ? '지식화 및 장애 처리 완료'
-          : wf.step_id;
-        if (t) timelineCtx.push(`[${t}] ${label}`);
-      }
-
-      const transcript = []
-      const combined = [
-        ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender_name || r.sender, text: r.text, timestamp: r.timestamp }))
-      ]
-      
-      combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-
-      for (const msg of combined) {
-        if (msg.text) {
-          const ts = toKST(msg.timestamp);
-          transcript.push(`[${ts || '--:--:--'}] [${msg.role}] ${msg.sender}: ${msg.text}`);
+        if (cached && cached.summary && !isFinal) {
+          console.log(`[Re-Analysis] Incident ${cleanId} is still active. Bypassing cache to update summary...`);
+          await writer.write(encode(`data: ${JSON.stringify({ status: '대화 내용을 반영하여 리포트를 최신화하고 있습니다...' })}\n\n`));
         }
-      }
 
-      // Dify에 전달할 최종 컨텍스트: 인시던트 타임라인 + 채팅 로그
-      const chatLogForDify = [
-        timelineCtx.length > 0 ? `=== 인시던트 이벤트 타임라인 ===
+
+        // 2. Concurrency Lock check (KV)
+        const lockKey = `lock:summarize-chat:${cleanId}`;
+        if (kv) {
+          let lock = await kv.get(lockKey);
+          if (lock === 'processing') {
+            console.log(`[Concurrency] Another user is summarizing chat for ${cleanId}. Waiting...`);
+            await writer.write(encode(`data: ${JSON.stringify({ status: '분석 중입니다. 처리 중 ...' })}\n\n`));
+            for (let attempt = 0; attempt < 30; attempt++) {
+              await new Promise(r => setTimeout(r, 1000));
+              const polled = await db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first();
+              if (polled && polled.summary && !isStaleError(polled.summary)) {
+                const chars = Array.from(polled.summary);
+                for (let i = 0; i < chars.length; i += 50) {
+                  await writer.write(encode(`data: ${JSON.stringify({ answer: chars.slice(i, i + 50).join('') })}\n\n`));
+                }
+                await writer.write(encode('data: [DONE]\n\n'));
+                return;
+              }
+            }
+            throw new Error("요약 대기 시간이 초과되었습니다. 다시 시도해 주세요.");
+          }
+          await kv.put(lockKey, 'processing', { expirationTtl: 60 });
+        }
+
+        // 3. Fetch ONLY user chat history - Using numeric ID
+        const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(cleanId).all()
+
+        // (incDetail and wfLogs already fetched above in parallel)
+        const wfLogs_data = wfLogs;
+
+        const toKST = (dt) => {
+          if (!dt) return null;
+          try {
+            const d = new Date(dt);
+            return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+          } catch { return null; }
+        };
+
+        const timelineCtx = [];
+        if (incDetail?.reg_dt || incDetail?.created_at) {
+          const t = toKST(incDetail.reg_dt || incDetail.created_at);
+          if (t) timelineCtx.push(`[${t}] SMS 수신 및 장애 인지`);
+        }
+        for (const wf of wfLogs_data) {
+          const t = toKST(wf.completed_at);
+          const label = wf.step_id === 'RAG' || wf.step_id === 'AGENT' ? 'AI 분석 완료'
+            : wf.step_id === 'WARROOM' ? '워룸 생성 및 담당자 배정'
+              : wf.step_id === 'KNOWLEDGE' ? '지식화 및 장애 처리 완료'
+                : wf.step_id;
+          if (t) timelineCtx.push(`[${t}] ${label}`);
+        }
+
+        const transcript = []
+        const combined = [
+          ...(wrResults || []).map(r => ({ role: r.role || 'User', sender: r.sender_name || r.sender, text: r.text, timestamp: r.timestamp }))
+        ]
+
+        combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+
+        for (const msg of combined) {
+          if (msg.text) {
+            const ts = toKST(msg.timestamp);
+            transcript.push(`[${ts || '--:--:--'}] [${msg.role}] ${msg.sender}: ${msg.text}`);
+          }
+        }
+
+        // Dify에 전달할 최종 컨텍스트: 인시던트 타임라인 + 채팅 로그
+        const chatLogForDify = [
+          timelineCtx.length > 0 ? `=== 인시던트 이벤트 타임라인 ===
 ${timelineCtx.join('\n')}
 ` : '',
-        `=== 워룸 채팅 내역 ===`,
-        ...transcript
-      ].filter(Boolean).join('\n');
+          `=== 워룸 채팅 내역 ===`,
+          ...transcript
+        ].filter(Boolean).join('\n');
 
-      await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
+        await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
 
-      // 🚀 Heartbeat: Dify 응답 대기 중 5초마다 keep-alive ping → 프론트 타임아웃 방지
-      let heartbeatStopped = false;
-      const heartbeatId = setInterval(async () => {
-        if (heartbeatStopped) return;
-        try {
-          await writer.write(encode(`data: ${JSON.stringify({ status: '⏳ AI 분석 처리 중...' })}\n\n`));
-        } catch {}
-      }, 5000);
-
-      // 🚀 Add AbortController for timeout protection
-      const totalTimeoutController = new AbortController();
-      const totalTimeoutId = setTimeout(() => {
-        totalTimeoutController.abort();
-      }, 90000); // 90 seconds hard limit (Dify workflow can be slow)
-
-      let difyRes = null;
-      const primaryKey = api_key;
-      const fallbackKey = c.env.DIFY_API_KEY_DASHBOARD;
-
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const currentKey = (attempt === 2 && fallbackKey) ? fallbackKey : primaryKey;
-          
-          difyRes = await fetch(`${api_base}/workflows/run`, {
-            method: 'POST',
-            headers: { 
-              'Authorization': `Bearer ${currentKey}`, 
-              'Content-Type': 'application/json',
-              'Accept': 'text/event-stream'
-            },
-            signal: totalTimeoutController.signal,
-            body: JSON.stringify({ 
-              inputs: { chat_log: chatLogForDify, incident_images: [] }, 
-              response_mode: 'streaming', 
-              user: 'sguard-worker' 
-            })
-          });
-
-          if (difyRes.ok) break;
-
-          if (attempt < 2 && (difyRes.status >= 500 || difyRes.status === 429)) {
-            const delay = difyRes.status === 429 ? 3000 : 2000;
-            console.warn(`[AI Summarize] Dify transient error (${difyRes.status}), switching to fallback key...`);
-            await new Promise(r => setTimeout(r, delay));
-          }
-        } catch (e) {
-          if (attempt === 2) throw e;
-          console.warn(`[AI Summarize] Fetch failed, retrying...`, e);
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
-
-      clearTimeout(totalTimeoutId);
-      heartbeatStopped = true;
-      clearInterval(heartbeatId);
-
-      if (!difyRes || !difyRes.ok) {
-        throw new Error(`Dify API error: ${difyRes?.status || 'Unknown'}`);
-      }
-
-      
-      const reader = difyRes.body.getReader()
-      const decoder = new TextDecoder()
-      let lineBuffer = ""
-      let fullContent = ""
-      let firstChunk = true;
-      
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        lineBuffer += decoder.decode(value, { stream: true })
-        const lines = lineBuffer.split('\n')
-        lineBuffer = lines.pop()
-        
-        for (const line of lines) {
-          const trimmedLine = line.trim()
-          if (!trimmedLine.startsWith('data: ')) continue
-          
-          const dataStr = trimmedLine.substring(6)
-          if (dataStr === '[DONE]') continue
-          
+        // 🚀 Heartbeat: Dify 응답 대기 중 5초마다 keep-alive ping → 프론트 타임아웃 방지
+        let heartbeatStopped = false;
+        const heartbeatId = setInterval(async () => {
+          if (heartbeatStopped) return;
           try {
-            const data = JSON.parse(dataStr)
-            
-            // 🚀 Support Both Chat Apps and Workflow Apps
-            if (data.event === 'message' || data.event === 'agent_message') {
-              // Standard Chat App events
-              if (firstChunk) {
-                await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 심층 분석 결과 수신 중...' })}\n\n`));
-                firstChunk = false;
-              }
-              fullContent += (data.answer || "");
-              await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
-            } else if (data.event === 'text_chunk') {
-              // Streaming LLM node in Workflow
-              if (firstChunk) {
-                await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 결과 수신 중...' })}\n\n`));
-                firstChunk = false;
-              }
-              const chunk = data.data?.text || "";
-              fullContent += chunk;
-              await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`))
-            } else if (data.event === 'workflow_finished') {
-              // Final Workflow Output or Node Output
-              const outputs = data.data?.outputs;
-              if (outputs) {
-                // Try to find the primary text output (result, text, output, etc.)
-                const workflowResult = outputs.text || outputs.result || outputs.output || 
-                                     (Object.values(outputs).find(v => typeof v === 'string') || "");
-                
-                // If we haven't received anything through text_chunks, or if this is the final summary
-                if (workflowResult && (!fullContent || !fullContent.includes(workflowResult.substring(0, 10)))) {
-                  if (firstChunk) {
-                    await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 데이터 정리 중...' })}\n\n`));
-                    firstChunk = false;
+            await writer.write(encode(`data: ${JSON.stringify({ status: '⏳ AI 분석 처리 중...' })}\n\n`));
+          } catch { }
+        }, 5000);
+
+        // 🚀 Add AbortController for timeout protection
+        const totalTimeoutController = new AbortController();
+        const totalTimeoutId = setTimeout(() => {
+          totalTimeoutController.abort();
+        }, 90000); // 90 seconds hard limit (Dify workflow can be slow)
+
+        let difyRes = null;
+        const primaryKey = api_key;
+        const fallbackKey = c.env.DIFY_API_KEY_DASHBOARD;
+
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const currentKey = (attempt === 2 && fallbackKey) ? fallbackKey : primaryKey;
+
+            difyRes = await fetch(`${api_base}/workflows/run`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${currentKey}`,
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream'
+              },
+              signal: totalTimeoutController.signal,
+              body: JSON.stringify({
+                inputs: { chat_log: chatLogForDify, incident_images: [] },
+                response_mode: 'streaming',
+                user: 'sguard-worker'
+              })
+            });
+
+            if (difyRes.ok) break;
+
+            if (attempt < 2 && (difyRes.status >= 500 || difyRes.status === 429)) {
+              const delay = difyRes.status === 429 ? 3000 : 2000;
+              console.warn(`[AI Summarize] Dify transient error (${difyRes.status}), switching to fallback key...`);
+              await new Promise(r => setTimeout(r, delay));
+            }
+          } catch (e) {
+            if (attempt === 2) throw e;
+            console.warn(`[AI Summarize] Fetch failed, retrying...`, e);
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
+
+        clearTimeout(totalTimeoutId);
+        heartbeatStopped = true;
+        clearInterval(heartbeatId);
+
+        if (!difyRes || !difyRes.ok) {
+          throw new Error(`Dify API error: ${difyRes?.status || 'Unknown'}`);
+        }
+
+
+        const reader = difyRes.body.getReader()
+        const decoder = new TextDecoder()
+        let lineBuffer = ""
+        let fullContent = ""
+        let firstChunk = true;
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          lineBuffer += decoder.decode(value, { stream: true })
+          const lines = lineBuffer.split('\n')
+          lineBuffer = lines.pop()
+
+          for (const line of lines) {
+            const trimmedLine = line.trim()
+            if (!trimmedLine.startsWith('data: ')) continue
+
+            const dataStr = trimmedLine.substring(6)
+            if (dataStr === '[DONE]') continue
+
+            try {
+              const data = JSON.parse(dataStr)
+
+              // 🚀 Support Both Chat Apps and Workflow Apps
+              if (data.event === 'message' || data.event === 'agent_message') {
+                // Standard Chat App events
+                if (firstChunk) {
+                  await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 심층 분석 결과 수신 중...' })}\n\n`));
+                  firstChunk = false;
+                }
+                fullContent += (data.answer || "");
+                await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
+              } else if (data.event === 'text_chunk') {
+                // Streaming LLM node in Workflow
+                if (firstChunk) {
+                  await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 결과 수신 중...' })}\n\n`));
+                  firstChunk = false;
+                }
+                const chunk = data.data?.text || "";
+                fullContent += chunk;
+                await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`))
+              } else if (data.event === 'workflow_finished') {
+                // Final Workflow Output or Node Output
+                const outputs = data.data?.outputs;
+                if (outputs) {
+                  // Try to find the primary text output (result, text, output, etc.)
+                  const workflowResult = outputs.text || outputs.result || outputs.output ||
+                    (Object.values(outputs).find(v => typeof v === 'string') || "");
+
+                  // If we haven't received anything through text_chunks, or if this is the final summary
+                  if (workflowResult && (!fullContent || !fullContent.includes(workflowResult.substring(0, 10)))) {
+                    if (firstChunk) {
+                      await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 데이터 정리 중...' })}\n\n`));
+                      firstChunk = false;
+                    }
+                    fullContent += workflowResult;
+                    await writer.write(encode(`data: ${JSON.stringify({ answer: workflowResult })}\n\n`))
                   }
-                  fullContent += workflowResult;
-                  await writer.write(encode(`data: ${JSON.stringify({ answer: workflowResult })}\n\n`))
                 }
               }
-            }
-          } catch (e) { continue }
+            } catch (e) { continue }
+          }
         }
-      }
-      
-      // Auto-save summary to DB (only if it's a valid summary, not a raw transcript leak)
-      if (fullContent && !isRaw(fullContent)) {
-        const nowKst = getKst()
-        await db.prepare(`
+
+        // Auto-save summary to DB (only if it's a valid summary, not a raw transcript leak)
+        if (fullContent && !isRaw(fullContent)) {
+          const nowKst = getKst()
+          await db.prepare(`
           INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
           VALUES (?, ?, 'dify-workflow', ?)
           ON CONFLICT(inc_id) DO UPDATE SET summary = excluded.summary, mod_dt = ?
         `).bind(cleanId, fullContent, nowKst, nowKst).run();
-      }
+        }
 
-      if (kv) await kv.delete(lockKey);
-      await writer.write(encode('data: [DONE]\n\n'))
-    } catch (e) {
-      console.error('Summarize-Chat error:', e)
-      const errorMsg = e.name === 'AbortError' 
-        ? '⚠️ 분석 품질 향상을 위해 대기 시간이 초과되었습니다. 현재 대화 내역이 충분하지 않거나 기술적인 이유로 요약이 지연되었습니다. 잠시 후 다시 시도해 주세요.'
-        : `⚠️ 분석 중 예기치 않은 오류가 발생했습니다: ${e.message}`;
-        
-      await writer.write(encode(`data: ${JSON.stringify({ error: errorMsg, status: '분석 중단됨' })}\n\n`))
-    } finally {
-      await writer.close()
-    }
-  })()
+        if (kv) await kv.delete(lockKey);
+        await writer.write(encode('data: [DONE]\n\n'))
+      } catch (e) {
+        console.error('Summarize-Chat error:', e)
+        const errorMsg = e.name === 'AbortError'
+          ? '⚠️ 분석 품질 향상을 위해 대기 시간이 초과되었습니다. 현재 대화 내역이 충분하지 않거나 기술적인 이유로 요약이 지연되었습니다. 잠시 후 다시 시도해 주세요.'
+          : `⚠️ 분석 중 예기치 않은 오류가 발생했습니다: ${e.message}`;
+
+        await writer.write(encode(`data: ${JSON.stringify({ error: errorMsg, status: '분석 중단됨' })}\n\n`))
+      } finally {
+        await writer.close()
+      }
+    })()
 
   return new Response(readable, {
     headers: {
@@ -6725,7 +6738,7 @@ app.get('/api/v1/user/chat-sessions/:user_id', async (c) => {
       messages: row.messages ? JSON.parse(row.messages) : []
     }));
     return c.json({ sessions });
-  } catch(e) {
+  } catch (e) {
     return c.json({ error: "Failed to fetch chat sessions", details: e.message }, 500);
   }
 });
@@ -6742,7 +6755,7 @@ app.post('/api/v1/user/chat-sessions', async (c) => {
       ON CONFLICT(id) DO UPDATE SET title = excluded.title, messages = excluded.messages, updated_at = excluded.updated_at
     `).bind(id, user_id, title, messagesStr, updated_at || getKst()).run();
     return c.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     return c.json({ error: "Failed to save chat session", details: e.message }, 500);
   }
 });
@@ -6753,7 +6766,7 @@ app.delete('/api/v1/user/chat-sessions/:id', async (c) => {
   try {
     await db.prepare("DELETE FROM user_chat_sessions WHERE id = ?").bind(id).run();
     return c.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     return c.json({ error: "Failed to delete chat session", details: e.message }, 500);
   }
 });
@@ -6763,22 +6776,22 @@ app.delete('/api/v1/user/chat-sessions/:id', async (c) => {
 app.get('/ai/chat-history/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
-  
+
   // 1. Try aichat_history (Agent Chat) first
   const { results: aiResults } = await db.prepare("SELECT * FROM aichat_history WHERE inc_id = ? ORDER BY id ASC").bind(id).all()
   if (aiResults && aiResults.length > 0) {
     return c.json({ messages: aiResults.map(r => ({ role: r.agent_role, text: r.content })) })
   }
-  
+
   // 2. Fallback to autopilot_insight (Initial Analysis or Error Message)
   const insight = await db.prepare("SELECT content, severity FROM autopilot_insight WHERE inc_id = ?").bind(id).first()
   if (insight) {
-    return c.json({ 
-      messages: [{ 
-        role: 'AI분석', 
+    return c.json({
+      messages: [{
+        role: 'AI분석',
         text: insight.content,
         severity: insight.severity
-      }] 
+      }]
     })
   }
 
@@ -6790,7 +6803,7 @@ app.post('/ai/chat-history/save', async (c) => {
   console.log(`Saving chat history for incident: ${incident_id}, count: ${messages?.length}`);
   const db = c.env.DB
   const now = getKst()
-  
+
   // 🚀 Deduplication: Clear existing generated chat history for this incident before saving
   await db.prepare(`DELETE FROM aichat_history WHERE inc_id = ?`).bind(incident_id).run();
 
@@ -6800,7 +6813,7 @@ app.post('/ai/chat-history/save', async (c) => {
       INSERT INTO aichat_history (inc_id, agent_role, content, reg_id, reg_dt, mod_id, mod_dt)
       VALUES (?, ?, ?, 'SYSTEM', ?, 'SYSTEM', ?)
     `).bind(incident_id, msg.role, msg.text, now, now)
-    .run()
+      .run()
   }
   return c.json({ status: 'saved', count: messages.length })
 })
@@ -6809,7 +6822,7 @@ app.get('/ai/warroom/lock/:inc_id', async (c) => {
   const inc_id = c.req.param('inc_id');
   const kv = c.env.SMS_STORAGE;
   if (!kv) return c.json({ locked: false });
-  
+
   const owner = await kv.get(`lock:warroom:${inc_id}`);
   return c.json({ locked: !!owner, owner });
 });
@@ -6819,12 +6832,12 @@ app.post('/ai/warroom/lock/:inc_id', async (c) => {
   const { user_name } = await c.req.json();
   const kv = c.env.SMS_STORAGE;
   if (!kv) return c.json({ success: true }); // Fail-safe
-  
+
   const existing = await kv.get(`lock:warroom:${inc_id}`);
   if (existing && existing !== user_name) {
     return c.json({ success: false, owner: existing });
   }
-  
+
   // Set lock with 60s TTL
   await kv.put(`lock:warroom:${inc_id}`, user_name, { expirationTtl: 60 });
   return c.json({ success: true });
@@ -6893,7 +6906,7 @@ app.get('/warroom/search', async (c) => {
 app.get('/warroom/ai-search', async (c) => {
   const query = c.req.query('q');
   if (!query) return c.json({ results: [] });
-  
+
   try {
     const cleanedQuery = cleanMessageForEmbedding(query);
     const queryVector = await generateEmbedding(cleanedQuery, c.env);
@@ -6901,7 +6914,7 @@ app.get('/warroom/ai-search', async (c) => {
 
     const index = c.env.WARROOM_INDEX;
     const matches = await index.query(queryVector, { topK: 10, returnMetadata: true });
-    
+
     const results = matches.matches.map(m => ({
       id: m.id,
       score: m.score,
@@ -6925,7 +6938,7 @@ app.post('/ai/warroom/open', async (c) => {
   const { title, creator_id, severity, leader_summary } = body
   const db = c.env.DB
   const now = getKst()
-  
+
   const normId = String(inc_id);
   // 🛡️ Add 'INC-' to title as requested
   const safeTitle = String(title || normId);
@@ -6938,7 +6951,7 @@ app.post('/ai/warroom/open', async (c) => {
       INSERT INTO warroom_list (inc_id, title, creator_id, severity, leader_summary, reg_dt)
       VALUES (?, ?, ?, ?, ?, ?)
     `).bind(normId, cleanTitle, creator_id, severity, leader_summary || '', now)
-    .run()
+      .run()
   } else if (leader_summary) {
     await db.prepare("UPDATE warroom_list SET leader_summary = ?, mod_dt = ? WHERE inc_id = ?")
       .bind(leader_summary, now, normId).run()
@@ -6960,7 +6973,7 @@ app.post('/ai/warroom/open', async (c) => {
     await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
       .bind(creator_id, normId, now).run()
   }
-      
+
   // 🚀 NEW: Ensure incidents table has a record and set status to 'INC_002' (처리중)
   await db.prepare(`
     INSERT OR IGNORE INTO incidents (inc_id, title, status, severity, incident_type, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at)
@@ -7034,7 +7047,7 @@ app.post('/ai/warroom/open', async (c) => {
         VALUES (?, ?, ?, '워룸 개설', ?, ?)
       `).bind(normId, normId, creator_id, `WAR-ROOM이 개설되었습니다: ${cleanTitle}`, now).run();
     }
-  } catch(e) { console.error('[ActivityLog-WROpen]', e.message); }
+  } catch (e) { console.error('[ActivityLog-WROpen]', e.message); }
 
   return c.json({ status: 'opened', inc_id: normId })
 })
@@ -7045,10 +7058,10 @@ app.post('/ai/report/save', async (c) => {
   const ai = c.env.AI
   const vectorIndex = c.env.WARROOM_INDEX
   const now = getKst()
-  
+
   const normId = String(inc_id);
   const empId = user_id || c.get('user')?.employee_id || 'SYSTEM'
-  
+
   // 1. Log activity
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '보고서 생성', ?, ?)")
     .bind(normId, normId, empId, `리포트 생성됨: ${title}`, now)
@@ -7110,10 +7123,10 @@ app.post('/ai/report/save', async (c) => {
       status = excluded.status,
       error_log = excluded.error_log
   `).bind(
-    normId, 
-    safeTitle, 
-    content, 
-    empId, now, empId, now, 
+    normId,
+    safeTitle,
+    content,
+    empId, now, empId, now,
     embeddingValue,
     status,
     errorMsg
@@ -7139,20 +7152,20 @@ app.get('/warroom/report/:id', async (c) => {
 
   // ID Normalization
   const rawId = idParam;
-  
+
 
   // 1. War-Room base info — inc_id 가 어떤 형태로 저장됐든 매칭
   let wr = await db.prepare(
     "SELECT * FROM warroom_list WHERE inc_id = ?"
   ).bind(rawId).first()
-  
+
   if (!wr) {
     const inc = await db.prepare(
       "SELECT * FROM received_messages WHERE inc_id = ?"
     ).bind(rawId).first()
-    
+
     if (!inc) return c.json({ error: 'Incident not found' }, 404)
-    
+
     wr = {
       inc_id: inc.inc_id,
       title: inc.message ? `[접수] ${inc.message.substring(0, 30)}...` : `INC-${inc.inc_id}`,
@@ -7201,8 +7214,8 @@ app.get('/warroom/report/:id', async (c) => {
 
   // 6. Find leader summary (from warroom_list first, fallback to aichat_history)
   const leaderRow = (agentLogs || []).find(r => r.agent_role === 'Leader')
-  const leaderSummary = (wr.leader_summary && wr.leader_summary.trim()) 
-    ? wr.leader_summary 
+  const leaderSummary = (wr.leader_summary && wr.leader_summary.trim())
+    ? wr.leader_summary
     : (leaderRow ? leaderRow.content : '')
 
   // 7. Derive 6W1H fields from available data
@@ -7220,14 +7233,14 @@ app.get('/warroom/report/:id', async (c) => {
 
   // MTTR: SMS 수신 → 처리완료, fallback: firstChat → lastChat
   const firstChat = (chatLogs || [])[0]
-  const lastChat  = (chatLogs || []).slice(-1)[0]
+  const lastChat = (chatLogs || []).slice(-1)[0]
   let durationMin = null
-  
+
   try {
     const parseDate = (d) => d ? new Date(String(d).replace(' ', 'T')) : null;
     const smsTime = parseDate(smsRow?.timestamp);
     const doneTime = parseDate(doneRow?.done_at);
-    
+
     if (smsTime && doneTime && !isNaN(smsTime) && !isNaN(doneTime)) {
       const ms = doneTime - smsTime;
       if (ms > 0) durationMin = Math.round(ms / 60000);
@@ -7254,7 +7267,7 @@ app.get('/warroom/report/:id', async (c) => {
     const { results: userRows } = await db.prepare(
       `SELECT employee_id, name FROM users WHERE employee_id IN (${placeholders})`
     ).bind(...senderIds).all()
-    ;(userRows || []).forEach(u => { userNameMap[u.employee_id] = u.name })
+      ; (userRows || []).forEach(u => { userNameMap[u.employee_id] = u.name })
   }
   const enrichedChatLogs = (chatLogs || []).map(c => ({
     ...c,
@@ -7297,9 +7310,9 @@ app.get('/warroom/report/:id', async (c) => {
     attachment_count: (attachments || []).length,
     duration_min: durationMin,
     duration_label: durationMin === null ? '-'
-      : durationMin < 1    ? '1분 미만'
-      : durationMin < 60   ? `${durationMin}분`
-      : `${Math.floor(durationMin / 60)}시간 ${durationMin % 60}분`,
+      : durationMin < 1 ? '1분 미만'
+        : durationMin < 60 ? `${durationMin}분`
+          : `${Math.floor(durationMin / 60)}시간 ${durationMin % 60}분`,
   })
 })
 
@@ -7325,7 +7338,7 @@ app.post('/warroom/join', async (c) => {
   const { incident_id, user_id, name, inviter_name } = await c.req.json()
   const db = c.env.DB
   const normId = String(incident_id)
-  
+
   if (!user_id || !incident_id) {
     return c.json({ status: 'error', message: 'user_id and incident_id are required' }, 400)
   }
@@ -7353,7 +7366,7 @@ app.post('/warroom/join', async (c) => {
     await db.prepare(
       "INSERT INTO warroom_chats (inc_id, sender, name, role, type, text, timestamp, seq) VALUES (?,?,?,?,?,?,?,?)"
     ).bind(normId, 'SYSTEM', 'SYSTEM', 'system', 'system', sysText, now, maxSeq?.ns || 1).run();
-  } catch(e) { console.error('[warroom/join] system msg failed:', e.message); }
+  } catch (e) { console.error('[warroom/join] system msg failed:', e.message); }
 
   // 4️⃣ 초대된 사용자에게 푸시 알림
   try {
@@ -7364,7 +7377,7 @@ app.post('/warroom/join', async (c) => {
       body: `${inviter_name || '관리자'}님이 "${incTitle}" 워룸에 초대했습니다.`,
       data: { type: 'warroom_invite', incident_id: normId, url: `/chat/${normId}` }
     });
-  } catch(e) { console.error('[warroom/join] push failed:', e.message); }
+  } catch (e) { console.error('[warroom/join] push failed:', e.message); }
 
   // 5️⃣ [Activity Log] 워룸 참여
   try {
@@ -7375,8 +7388,8 @@ app.post('/warroom/join', async (c) => {
         VALUES (?, ?, ?, '워룸 참여', ?, ?)
       `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', `워룸에 참여했습니다${inviterNote}.`, now).run();
     }
-  } catch(e) { console.error('[ActivityLog-Join]', e.message); }
-    
+  } catch (e) { console.error('[ActivityLog-Join]', e.message); }
+
   return c.json({ status: 'joined', name: displayName })
 })
 
@@ -7401,13 +7414,13 @@ app.post('/api/v1/system/threshold', async (c) => {
   const { threshold } = await c.req.json();
   const db = c.env.DB;
   const kv = c.env.SMS_STORAGE;
-  
+
   try {
     // 🚀 Primary: Save to D1 for AI Engine
     const now = getKst();
     await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, ?)")
-             .bind('similarity_threshold_technical', String(threshold), now).run();
-             
+      .bind('similarity_threshold_technical', String(threshold), now).run();
+
     // 🛡️ Secondary: Save to KV for Legacy UI Compatibility
     if (kv && threshold) {
       await kv.put('config:rag_threshold', threshold.toString());
@@ -7433,14 +7446,14 @@ app.get('/ai/knowledge/sync-status', async (c) => {
           if (checkRes && checkRes.length > 0) {
             await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(item.id).run();
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
 
     const totalRes = await db.prepare("SELECT COUNT(*) as count FROM knowledge_base").first('count');
     const successRes = await db.prepare("SELECT COUNT(*) as count FROM knowledge_base WHERE status = 'SUCCESS'").first('count');
     const pendingRes = await db.prepare("SELECT COUNT(*) as count FROM knowledge_base WHERE status IN ('PENDING', 'FAIL')").first('count');
-    
+
     return c.json({
       total: totalRes || 0,
       success: successRes || 0,
@@ -7459,7 +7472,7 @@ app.post('/ai/knowledge/sync-pending', async (c) => {
 
   try {
     const { results } = await db.prepare("SELECT id, title, content, inc_id, category FROM knowledge_base WHERE status = 'PENDING' OR status = 'FAIL' LIMIT 50").all();
-    
+
     let successCount = 0;
     let failCount = 0;
 
@@ -7467,7 +7480,7 @@ app.post('/ai/knowledge/sync-pending', async (c) => {
       try {
         const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [row.content.substring(0, 3000)] });
         const vector = embeddings.data[0];
-        
+
         if (vector) {
           await db.prepare("UPDATE knowledge_base SET vector = ?, status = 'SYNCING' WHERE id = ?")
             .bind(new Float32Array(vector), row.id).run();
@@ -7481,7 +7494,7 @@ app.post('/ai/knowledge/sync-pending', async (c) => {
               category: row.category || 'general'
             }
           }]);
-          
+
           await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS', error_log = NULL WHERE id = ?").bind(row.id).run();
           successCount++;
         } else {
@@ -7516,7 +7529,7 @@ app.get('/ai/knowledge', async (c) => {
       const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [query] });
       const vector = embeddings.data[0];
       const simResults = await vectorIndex.query(vector, { topK: 15, returnMetadata: true });
-      
+
       const ids = simResults.matches.map(m => m.id.replace('kn-', ''));
       if (ids.length === 0) return c.json({ results: [] });
 
@@ -7524,7 +7537,7 @@ app.get('/ai/knowledge', async (c) => {
       const { results } = await db.prepare(`
         SELECT * FROM knowledge_base WHERE id IN (${placeholders})
       `).bind(...ids).all();
-      
+
       // Sort results by similarity score from Vectorize
       const sortedResults = ids.map(id => results.find(r => String(r.id) === String(id))).filter(Boolean);
       return c.json({ results: sortedResults });
@@ -7542,7 +7555,7 @@ app.get('/ai/knowledge/search', async (c) => {
   const query = c.req.query('q')
   const reqThreshold = c.req.query('threshold')
   if (!query) return c.json({ results: [] })
-  
+
   const db = c.env.DB
   const ai = c.env.AI
   const vectorIndex = c.env.WARROOM_INDEX
@@ -7564,24 +7577,24 @@ app.get('/ai/knowledge/search', async (c) => {
     const cleanedQuery = cleanMessageForEmbedding(query);
     const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [cleanedQuery] });
     const vector = embeddings?.data?.[0];
-    
+
     if (!vector) throw new Error("Failed to generate embedding");
 
     // 3. Vectorize Query
     const simResults = await vectorIndex.query(vector, { topK: 5, returnMetadata: true });
-    
+
     // 4. Threshold Filtering
     const filteredMatches = (simResults.matches || []).filter(m => m.score >= threshold);
     if (filteredMatches.length === 0) {
-       return c.json({ results: [], threshold, message: "No matches found above threshold." });
+      return c.json({ results: [], threshold, message: "No matches found above threshold." });
     }
 
     // 5. Context Fetch from D1 (1:1 Mapping)
     const ids = filteredMatches.map(m => {
-       if (m.id.startsWith('kn-')) return m.id.replace('kn-', '');
-       if (m.id.startsWith('inc-')) return m.id.replace('inc-', '');
-       if (m.id.startsWith('gov-')) return m.id.replace('gov-', '');
-       return m.id;
+      if (m.id.startsWith('kn-')) return m.id.replace('kn-', '');
+      if (m.id.startsWith('inc-')) return m.id.replace('inc-', '');
+      if (m.id.startsWith('gov-')) return m.id.replace('gov-', '');
+      return m.id;
     }).filter(Boolean);
 
     let dbRecords = [];
@@ -7611,7 +7624,7 @@ app.get('/ai/knowledge/search', async (c) => {
     const scoredResults = filteredMatches.map(m => {
       let matchId = m.id.startsWith('kn-') ? m.id.replace('kn-', '') : m.id.replace('inc-', '');
       let dbRec = dbRecords.find(r => String(r.id) === matchId || String(r.inc_id) === matchId);
-      
+
       return dbRec ? {
         ...dbRec,
         score: m.score,
@@ -7621,14 +7634,14 @@ app.get('/ai/knowledge/search', async (c) => {
 
     // AI Reasoning for Top 1 Result (Optional Speedup, limit to top 1)
     if (scoredResults.length > 0) {
-       try {
-         const top1 = scoredResults[0];
-         const reasoningPrompt = `당신은 지능형 관제 시스템입니다. 주어진 쿼리와 이 과거 항목이 왜 연관성이 높은지 1개의 문장으로 설명하세요.\n\n[쿼리]: ${query}\n[항목]: ${top1.title}\n[내용]: ${top1.content?.substring(0, 100)}`;
-         const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: reasoningPrompt });
-         top1.reason = (aiResponse.response || aiResponse).replace(/\n/g, ' ').trim();
-       } catch (err) {
-         console.warn("Reason generation failed:", err.message);
-       }
+      try {
+        const top1 = scoredResults[0];
+        const reasoningPrompt = `당신은 지능형 관제 시스템입니다. 주어진 쿼리와 이 과거 항목이 왜 연관성이 높은지 1개의 문장으로 설명하세요.\n\n[쿼리]: ${query}\n[항목]: ${top1.title}\n[내용]: ${top1.content?.substring(0, 100)}`;
+        const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: reasoningPrompt });
+        top1.reason = (aiResponse.response || aiResponse).replace(/\n/g, ' ').trim();
+      } catch (err) {
+        console.warn("Reason generation failed:", err.message);
+      }
     }
 
     return c.json({ results: scoredResults, threshold });
@@ -7659,7 +7672,7 @@ app.post('/ai/dify/knowledge/upload', async (c) => {
       },
       body: formData
     });
-    
+
     if (!res.ok) {
       const errorText = await res.text();
       return c.json({ error: `Dify upload failed: ${errorText}` }, res.status);
@@ -7683,7 +7696,7 @@ app.post('/ai/dify/knowledge/workflow', async (c) => {
       },
       body: JSON.stringify(body)
     });
-    
+
     if (!res.ok) {
       const errorText = await res.text();
       return c.json({ error: `Dify workflow failed: ${errorText}` }, res.status);
@@ -7697,90 +7710,90 @@ app.post('/ai/dify/knowledge/workflow', async (c) => {
 app.post('/ai/knowledge/save', async (c) => {
   try {
     const body = await c.req.json()
-  const db = c.env.DB
-  const ai = c.env.AI
-  const vectorIndex = c.env.WARROOM_INDEX
-  const now = getKst()
-  const user_id = body.user_id || c.get('user')?.employee_id || 'SYSTEM'
-  
-  // Guard clause against Dify Workflow default template injection (unmapped variables)
-  if ((body.title && body.title.includes('{{sys.')) || (body.content && body.content.includes('{{LLM.'))) {
-    console.log('[KnowledgeBase] Rejected malformed Dify bot update:', body.title);
-    return c.json({ error: 'Malformed workflow update ignored' }, 400)
-  }
-  
-  // Generate embedding if content is provided
-  let vector = null;
-  if (body.content) {
-    try {
-      const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [body.content.substring(0, 3000)] });
-      vector = embeddings.data[0];
-    } catch (e) {
-      console.error("Embedding error:", e);
+    const db = c.env.DB
+    const ai = c.env.AI
+    const vectorIndex = c.env.WARROOM_INDEX
+    const now = getKst()
+    const user_id = body.user_id || c.get('user')?.employee_id || 'SYSTEM'
+
+    // Guard clause against Dify Workflow default template injection (unmapped variables)
+    if ((body.title && body.title.includes('{{sys.')) || (body.content && body.content.includes('{{LLM.'))) {
+      console.log('[KnowledgeBase] Rejected malformed Dify bot update:', body.title);
+      return c.json({ error: 'Malformed workflow update ignored' }, 400)
     }
-  }
-  
-  const embeddingValue = vector ? new Float32Array(vector) : null;
 
-  let status = vector ? 'PENDING' : 'FAIL';
-  let errorMsg = vector ? null : 'Embedding generation failed';
-  let knowledgeId = body.id;
+    // Generate embedding if content is provided
+    let vector = null;
+    if (body.content) {
+      try {
+        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [body.content.substring(0, 3000)] });
+        vector = embeddings.data[0];
+      } catch (e) {
+        console.error("Embedding error:", e);
+      }
+    }
 
-  if (body.id) {
-    // Update
-    await db.prepare(`
+    const embeddingValue = vector ? new Float32Array(vector) : null;
+
+    let status = vector ? 'PENDING' : 'FAIL';
+    let errorMsg = vector ? null : 'Embedding generation failed';
+    let knowledgeId = body.id;
+
+    if (body.id) {
+      // Update
+      await db.prepare(`
       UPDATE knowledge_base 
       SET inc_id = ?, title = ?, content = ?, category = ?, file_url = ?, file_type = ?, tags = ?, mod_id = ?, mod_dt = ?, vector = ?, status = ?, error_log = ?
       WHERE id = ?
     `).bind(
-      body.inc_id || null, body.title, body.content || null, body.category || null, 
-      body.file_url || null, body.file_type || null, body.tags || null, 
-      user_id, now, embeddingValue, status, errorMsg, body.id
-    ).run()
-  } else {
-    // Create
-    const result = await db.prepare(`
+        body.inc_id || null, body.title, body.content || null, body.category || null,
+        body.file_url || null, body.file_type || null, body.tags || null,
+        user_id, now, embeddingValue, status, errorMsg, body.id
+      ).run()
+    } else {
+      // Create
+      const result = await db.prepare(`
       INSERT INTO knowledge_base (inc_id, title, content, category, file_url, file_type, tags, reg_id, reg_dt, mod_id, mod_dt, vector, status, error_log)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      body.inc_id || null, body.title, body.content || null, body.category || null, 
-      body.file_url || null, body.file_type || null, body.tags || null, 
-      user_id, now, user_id, now, embeddingValue, status, errorMsg
-    ).run()
-    knowledgeId = result.meta.last_row_id;
-  }
-
-  // Sync to Vectorize Index
-  if (vector && vectorIndex) {
-    try {
-      await vectorIndex.upsert([{
-        id: `kn-${knowledgeId}`,
-        values: vector,
-        metadata: {
-          title: body.title,
-          incident_id: body.inc_id || '',
-          category: body.category || 'general'
-        }
-      }]);
-      // Update status to SUCCESS after successful vector upsert
-      await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(knowledgeId).run();
-    } catch (e) {
-      console.error("Vectorize sync failed in knowledge save:", e.message);
-      await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = ? WHERE id = ?")
-        .bind(`Vectorize Error: ${e.message}`, knowledgeId).run();
+        body.inc_id || null, body.title, body.content || null, body.category || null,
+        body.file_url || null, body.file_type || null, body.tags || null,
+        user_id, now, user_id, now, embeddingValue, status, errorMsg
+      ).run()
+      knowledgeId = result.meta.last_row_id;
     }
-  }
 
-  // Log activity
-  if (body.inc_id) {
-    try {
-      const user = await db.prepare("SELECT employee_id FROM users WHERE employee_id = ?").bind(String(user_id)).first()
-      const empId = user ? user.employee_id : user_id
-      await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
-      .bind(String(body.inc_id), String(body.inc_id), empId, getKst())
-      .run()
-    } catch(e) {}
-  }
+    // Sync to Vectorize Index
+    if (vector && vectorIndex) {
+      try {
+        await vectorIndex.upsert([{
+          id: `kn-${knowledgeId}`,
+          values: vector,
+          metadata: {
+            title: body.title,
+            incident_id: body.inc_id || '',
+            category: body.category || 'general'
+          }
+        }]);
+        // Update status to SUCCESS after successful vector upsert
+        await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(knowledgeId).run();
+      } catch (e) {
+        console.error("Vectorize sync failed in knowledge save:", e.message);
+        await db.prepare("UPDATE knowledge_base SET status = 'FAIL', error_log = ? WHERE id = ?")
+          .bind(`Vectorize Error: ${e.message}`, knowledgeId).run();
+      }
+    }
+
+    // Log activity
+    if (body.inc_id) {
+      try {
+        const user = await db.prepare("SELECT employee_id FROM users WHERE employee_id = ?").bind(String(user_id)).first()
+        const empId = user ? user.employee_id : user_id
+        await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '지식화 완료', '장애 대응 리포트가 지식베이스에 저장되었습니다.', ?)")
+          .bind(String(body.inc_id), String(body.inc_id), empId, getKst())
+          .run()
+      } catch (e) { }
+    }
 
     return c.json({ status: body.id ? 'updated' : 'created', id: knowledgeId });
   } catch (err) {
@@ -7828,14 +7841,14 @@ app.get('/ai/related-history', async (c) => {
   try {
     const qText = String(query).substring(0, 500);
     const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [qText] });
-    
+
     if (!embeddings || !embeddings.data || !embeddings.data[0]) {
       throw new Error("Embedding generation failed");
     }
 
     const vector = embeddings.data[0];
     const simResults = await vectorIndex.query(vector, { topK: 5, returnMetadata: true });
-    
+
     let reports = [];
     if (simResults && simResults.matches && simResults.matches.length > 0) {
       const ids = simResults.matches.map(m => m.id.replace('kn-', ''));
@@ -7854,9 +7867,9 @@ app.get('/ai/related-history', async (c) => {
       ORDER BY reg_dt DESC LIMIT 3
     `).bind(`%${systemKeyword}%`, `%[SMS]%`).all();
 
-    return c.json({ 
-      history: history || [], 
-      reports: reports || [] 
+    return c.json({
+      history: history || [],
+      reports: reports || []
     });
 
   } catch (err) {
@@ -7872,8 +7885,8 @@ app.post('/retrieval', async (c) => {
     if (!verifyDifyAuth(authHeader, c)) {
       const token = authHeader ? authHeader.replace(/bearer\s+/i, '').trim() : '';
       console.warn(`[Dify Retrieval] Unauthorized access attempt. Received Token: "${token}"`);
-      return c.json({ 
-        error: "401 Unauthorized", 
+      return c.json({
+        error: "401 Unauthorized",
         message: "API Key가 일치하지 않습니다. Dify의 HTTP 요청 노드에서 'Authorization' 헤더에 'Bearer <DIFY_TOOL_KEY>'를 정확히 입력했는지 확인해 주세요.",
         hint: `Received: ${token ? 'Invalid Token' : 'Empty Token'}`
       }, 401);
@@ -7900,7 +7913,7 @@ app.post('/retrieval', async (c) => {
     // 💡 최신 지능형 RAG 동적 경계(Dynamic Boundary) 알고리즘 적용
     // 고정된 가중치(상수) 없이 오직 DB에서 넘어온 파라미터 값들만으로 최종 커트라인을 계산합니다.
     let admin_base = parseFloat(retrieval_setting?.threshold) || 0.85;
-    let tech_mod   = parseFloat(retrieval_setting?.technical_threshold) || 0.85;
+    let tech_mod = parseFloat(retrieval_setting?.technical_threshold) || 0.85;
     let casual_mod = parseFloat(retrieval_setting?.casual_threshold) || 0.95;
 
     let score_threshold = admin_base;
@@ -7920,12 +7933,12 @@ app.post('/retrieval', async (c) => {
       score_threshold = parseFloat(retrieval_setting.score_threshold);
     }
 
-    console.log(`[Retrieval] top_k=${top_k} score_threshold=${score_threshold} query="${query.substring(0,40)}"`);
+    console.log(`[Retrieval] top_k=${top_k} score_threshold=${score_threshold} query="${query.substring(0, 40)}"`);
 
 
     const db = c.env.DB;
     const vectorIndex = c.env.WARROOM_INDEX;
-    
+
     if (!query || !vectorIndex) {
       return c.json({ records: [] });
     }
@@ -7935,11 +7948,11 @@ app.post('/retrieval', async (c) => {
     if (!vector) return c.json({ records: [] });
 
     const simResults = await vectorIndex.query(vector, { topK: top_k, returnMetadata: true });
-    
+
     const records = [];
     if (simResults.matches && simResults.matches.length > 0) {
       const filteredMatches = simResults.matches.filter(m => m.score >= score_threshold);
-      
+
       for (const m of filteredMatches) {
         let kbResult = null;
         const cleanId = m.id.replace(/^kn-|^inc-|^gov-|^INC-/, '').split('_')[0].trim();
@@ -8015,7 +8028,7 @@ app.post('/upsert', async (c) => {
     // 2. Save to D1
     const now = getKst();
     const title = name || `Dify Import: ${new Date().toISOString()}`;
-    
+
     const result = await db.prepare(`
       INSERT INTO knowledge_base (title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector, status)
       VALUES (?, ?, 'Dify 수집', 'DIFY_BOT', ?, 'DIFY_BOT', ?, ?, 'SYNCING')
@@ -8043,10 +8056,10 @@ app.post('/upsert', async (c) => {
       }
     }
 
-    return c.json({ 
-      success: true, 
+    return c.json({
+      success: true,
       id: `kn-${insertId}`,
-      message: "지식이 성공적으로 저장되었습니다." 
+      message: "지식이 성공적으로 저장되었습니다."
     });
 
   } catch (err) {
@@ -8069,7 +8082,7 @@ app.post('/ai/knowledge/sync', async (c) => {
 
   try {
     const { results } = await db.prepare("SELECT id, title, content, inc_id, category FROM knowledge_base").all();
-    
+
     let successCount = 0;
     let failCount = 0;
 
@@ -8077,7 +8090,7 @@ app.post('/ai/knowledge/sync', async (c) => {
       try {
         const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [row.content.substring(0, 3000)] });
         const vector = embeddings.data[0];
-        
+
         if (vector) {
           await db.prepare("UPDATE knowledge_base SET vector = ?, status = 'SYNCING' WHERE id = ?")
             .bind(new Float32Array(vector), row.id).run();
@@ -8091,7 +8104,7 @@ app.post('/ai/knowledge/sync', async (c) => {
               category: row.category || 'general'
             }
           }]);
-          
+
           await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(row.id).run();
           successCount++;
         } else {
@@ -8121,7 +8134,7 @@ app.post('/warroom/resolve-only', async (c) => {
 
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_id = ?, mod_dt = ? WHERE inc_id = ?")
     .bind(user_id, now, normId).run();
-  
+
   await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
 
@@ -8138,23 +8151,23 @@ app.post('/ai/warroom/close', async (c) => {
   const { inc_id, user_id } = await c.req.json()
   const db = c.env.DB
   const now = getKst()
-  
+
   const normId = String(inc_id);
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
-    
+
   await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
 
   // Cascading update for all participants
   await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
-    
+
   // Log termination
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '워룸 종료', '워룸이 종료되고 인시던트 처리가 완료되었습니다.', ?)")
     .bind(normId, normId, user_id, getKst())
     .run()
-    
+
   return c.json({ status: 'closed' })
 })
 
@@ -8166,7 +8179,7 @@ app.post('/ai/incident/assign', async (c) => {
   const { user_id, login_id, inc_id, action, detail, incident_title } = await c.req.json() // Added action, detail, incident_title for logging
   const db = c.env.DB
   const now = getKst()
-  
+
   const normId = String(inc_id);
   try {
     // 1. Verify User Exists in 'users' table
@@ -8178,7 +8191,7 @@ app.post('/ai/incident/assign', async (c) => {
       console.warn(`[Assign] User not found: id=${user_id}, login=${login_id}`);
       return c.json({ error: "담당자를 찾을 수 없습니다. (Employee ID lookup failed)" }, 404)
     }
-    
+
     const empId = user.employee_id;
 
     // 2. Perform Assignment
@@ -8196,7 +8209,7 @@ app.post('/ai/incident/assign', async (c) => {
       `).bind(normId, normId, incident_title || 'SMS 수신 확인', empId, user.name || '알 수 없음', action || '장애 할당', detail || '인시던트가 담당자에게 할당되었습니다.', now)
         .run()
     }
-    
+
     return c.json({ status: 'assigned', user_id: empId, inc_id: normId })
 
   } catch (e) {
@@ -8226,8 +8239,8 @@ app.post('/ai/incident/status', async (c) => {
       INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
       VALUES (?, ?, ?, '상태 변경', ?, ?)
     `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', `담당자 상태가 '${statusLabel}'으로 변경되었습니다.`, now).run();
-  } catch(e) { console.error('[ActivityLog-Status]', e.message); }
-  
+  } catch (e) { console.error('[ActivityLog-Status]', e.message); }
+
   return c.json({ status: 'updated', user_id, inc_id: normId, new_status: status })
 })
 
@@ -8240,7 +8253,7 @@ app.get('/ai/incident/my-assignments', async (c) => {
   const toDate = c.req.query('to')     // YYYY-MM-DD
 
   if (!user_id) return c.json({ assignments: [] })
-  
+
   const db = c.env.DB
   let query = `
     SELECT 
@@ -8289,9 +8302,9 @@ app.get('/ai/incident/my-assignments', async (c) => {
   }
 
   query += " ORDER BY a.assigned_at DESC"
-  
+
   const { results } = await db.prepare(query).bind(...params).all()
-  
+
   return c.json({ total: results.length, assignments: results })
 })
 
@@ -8306,7 +8319,7 @@ app.get('/ai/incident/workflow-details', async (c) => {
 
   const inc_id_str = String(inc_id_param).trim();
   const rawId = inc_id_str;
-  
+
 
   // Aggregate steps from various tables
   const steps = [];
@@ -8335,13 +8348,13 @@ app.get('/ai/incident/workflow-details', async (c) => {
       WHERE w.inc_id = ? 
       LIMIT 1
     `).bind(rawId).first();
-    
+
     if (wr) {
-      steps.push({ 
-        id: 'WARROOM', 
-        label: '워룸 생성', 
-        timestamp: wr.reg_dt, 
-        detail: `${wr.creator_name || wr.creator_id || '시스템'}님에 의해 실시간 대응 워룸이 가동되었습니다.` 
+      steps.push({
+        id: 'WARROOM',
+        label: '워룸 생성',
+        timestamp: wr.reg_dt,
+        detail: `${wr.creator_name || wr.creator_id || '시스템'}님에 의해 실시간 대응 워룸이 가동되었습니다.`
       });
     }
 
@@ -8378,9 +8391,9 @@ app.get('/ai/incident/workflow-details', async (c) => {
       return a;
     });
 
-    return c.json({ 
-      inc_id: inc_id_str, 
-      steps: steps.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)), 
+    return c.json({
+      inc_id: inc_id_str,
+      steps: steps.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
       all_logs: (await db.prepare("SELECT action, created_at, detail FROM activity_logs WHERE incident_code = ? ").bind(rawId).all()).results || [],
       assignees: finalizedAssignees
     });
@@ -8395,7 +8408,7 @@ app.get('/ai/incident/:inc_id', async (c) => {
   const rawId = c.req.param('inc_id')
   const normId = String(rawId)
   const db = c.env.DB
-  
+
   // High-performance query starting from received_messages to ensure no 404s for new SMS
   const incident = await db.prepare(`
     SELECT 
@@ -8416,7 +8429,7 @@ app.get('/ai/incident/:inc_id', async (c) => {
     WHERE r.inc_id = ? 
     LIMIT 1
   `).bind(normId).first()
-  
+
   if (!incident) return c.json({ error: "Not found" }, 404)
   return c.json({ incident })
 })
@@ -8436,7 +8449,7 @@ app.post('/warroom/leave', async (c) => {
       INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
       VALUES (?, ?, ?, '워룸 퇴장', '워룸에서 나갔습니다.', ?)
     `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', now).run();
-  } catch(e) { console.error('[ActivityLog-Leave]', e.message); }
+  } catch (e) { console.error('[ActivityLog-Leave]', e.message); }
   return c.json({ status: 'left', user_id, inc_id })
 })
 
@@ -8444,10 +8457,10 @@ app.patch('/incidents/:id', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
   const rawId = id;
-  
+
   const data = await c.req.json()
   const now = getKst()
-  
+
   let finalTitle = data.title;
   if (!finalTitle || finalTitle === 'SMS 장애 감지') {
     const sms = await db.prepare("SELECT message FROM received_messages WHERE inc_id = ?").bind(rawId).first()
@@ -8465,7 +8478,7 @@ app.patch('/incidents/:id', async (c) => {
         mod_id = ?
     WHERE inc_id = ?
   `).bind(finalTitle || null, data.description || null, data.severity || null, data.status || null, data.assigned_to || null, now, data.user_id || c.get('user')?.employee_id || 'SYSTEM', rawId).run()
-  
+
   return c.json({ status: "success", id: rawId, title: finalTitle })
 })
 
@@ -8484,7 +8497,7 @@ app.post('/ai/warroom/invite', async (c) => {
         VALUES (?, ?, ?, '워룸 초대', '워룸에 초대되어 참여했습니다.', ?)
       `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', now).run();
     }
-  } catch(e) { console.error('[ActivityLog-Invite]', e.message); }
+  } catch (e) { console.error('[ActivityLog-Invite]', e.message); }
   return c.json({ status: 'invited', user_id, inc_id })
 })
 
@@ -8530,7 +8543,7 @@ app.post('/warroom/feedback', async (c) => {
   // 🛡️ Phase 16: Abuse Protection (1-vote per user per incident)
   const existingVote = await db.prepare("SELECT id FROM resolution_feedback WHERE inc_id = ? AND reg_id = ?").bind(incident_id, user_id).first();
   if (existingVote) {
-      return c.json({ status: "rejected", message: "이미 이 인시던트에 대해 피드백을 제출하셨습니다. (1인 1표 제한)" }, 403);
+    return c.json({ status: "rejected", message: "이미 이 인시던트에 대해 피드백을 제출하셨습니다. (1인 1표 제한)" }, 403);
   }
 
   // 🛡️ Phase 15: AI Guardian (Immediate Rejection)
@@ -8558,7 +8571,7 @@ app.post('/warroom/feedback', async (c) => {
 
   // 📈 Reputation & S-Point Reward (Phase 17/18: user_stats Sync)
   await db.prepare("UPDATE users SET s_point = s_point + 1.0 WHERE employee_id = ?").bind(user_id).run();
-  
+
   // Update user_stats (Phase 18 Structure)
   await db.prepare(`
     INSERT INTO user_stats (user_id, user_name, s_point, contribution_count, rank_level, last_active_dt)
@@ -8580,18 +8593,18 @@ app.post('/warroom/feedback', async (c) => {
   `).bind(user_id).run();
 
   if (feedback_type === 'bad') {
-      // Find the original author and penalize
-      const originalAuth = await db.prepare("SELECT reg_id FROM knowledge_base WHERE inc_id = ?").bind(incident_id).first();
-      if (originalAuth) {
-          await db.prepare("UPDATE users SET s_point = s_point - 1.0 WHERE employee_id = ?").bind(originalAuth.reg_id).run();
-      }
+    // Find the original author and penalize
+    const originalAuth = await db.prepare("SELECT reg_id FROM knowledge_base WHERE inc_id = ?").bind(incident_id).first();
+    if (originalAuth) {
+      await db.prepare("UPDATE users SET s_point = s_point - 1.0 WHERE employee_id = ?").bind(originalAuth.reg_id).run();
+    }
   }
 
   // 🏛️ Consensus Engine (Majority Rule Implementation)
   const similarFeedbacks = await db.prepare("SELECT resolution_text, reg_id FROM resolution_feedback WHERE inc_id = ?").bind(incident_id).all();
   if (similarFeedbacks.results && similarFeedbacks.results.length >= 3) {
-      const topResolution = similarFeedbacks.results[0].resolution_text;
-      await db.prepare("UPDATE knowledge_base SET content = ?, status = 'VERIFIED', vote_count = vote_count + 1 WHERE inc_id = ?").bind(topResolution, incident_id).run();
+    const topResolution = similarFeedbacks.results[0].resolution_text;
+    await db.prepare("UPDATE knowledge_base SET content = ?, status = 'VERIFIED', vote_count = vote_count + 1 WHERE inc_id = ?").bind(topResolution, incident_id).run();
   }
 
   return c.json({ status: "success", message: "피드백이 저장되었으며 평판 및 합의 로직이 반영되었습니다." })
@@ -8621,7 +8634,7 @@ app.get('/ai/governance/vulnerability-stats', async (c) => {
 
   try {
     const { results } = await db.prepare(statsSql).bind(dateStr).all();
-    return c.json({ 
+    return c.json({
       period: "Last 30 Days",
       metrics: "Bad/Total Ratio (%)",
       results: results || []
@@ -8657,10 +8670,10 @@ app.post('/auth/agree-terms', async (c) => {
   const { employee_id, version } = await c.req.json();
   const db = c.env.DB;
   const now = getKst();
-  
+
   // 🛡️ Audit Proof: Extract IP and Timestamp
   const userIp = c.req.header('CF-Connecting-IP') || '0.0.0.0';
-  
+
   try {
     await db.prepare(`
       UPDATE users 
@@ -8668,9 +8681,9 @@ app.post('/auth/agree-terms', async (c) => {
       WHERE employee_id = ?
     `).bind(now, userIp, version || 'v1.0', employee_id).run();
 
-    return c.json({ 
-      status: 'success', 
-      message: 'Terms agreement recorded with audit audit proof', 
+    return c.json({
+      status: 'success',
+      message: 'Terms agreement recorded with audit audit proof',
       agreed_at: now,
       ip: userIp
     });
@@ -8684,7 +8697,7 @@ app.post('/incidents', async (c) => {
   const { inc_id, title, description, severity, incident_type, source_sms_id } = await c.req.json()
   const db = c.env.DB
   const rawId = String(inc_id)
-  
+
 
   const existing = await db.prepare("SELECT inc_id FROM incidents WHERE inc_id = ?").bind(rawId).first()
   if (existing) return c.json({ status: 'exists', inc_id: rawId })
@@ -8702,7 +8715,7 @@ app.post('/incidents', async (c) => {
       reg_id, reg_dt, mod_id, mod_dt, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    rawId, finalTitle, description, severity, 'INC_001', incident_type, source_sms_id || null, 
+    rawId, finalTitle, description, severity, 'INC_001', incident_type, source_sms_id || null,
     c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now, now
   ).run()
   return c.json({ status: 'created', inc_id: rawId, title: finalTitle })
@@ -8732,7 +8745,7 @@ app.get('/warroom/chat/:id', async (c) => {
   const db = c.env.DB
 
   // ID Normalization
-  const rawId  = idParam
+  const rawId = idParam
 
   // Always pull title and leader_summary from warroom_list
   const wr = await db.prepare(
@@ -8805,14 +8818,14 @@ app.post('/warroom/chat', async (c) => {
   const db = c.env.DB
   const now = getKst()
   const senderId = sender || 'anonymous'
-  
+
   const lastRow = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(incident_id).first()
   const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1
 
   await db.prepare(
     "INSERT INTO warroom_chats (inc_id, seq, sender, name, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).bind(incident_id, seq, senderId, name || sender_name || senderId, role || 'user', type || 'user', text, now, senderId, now, senderId, now).run()
-  
+
   return c.json({ status: 'saved' })
 })
 
@@ -8857,7 +8870,7 @@ app.post('/warroom/upload', async (c) => {
     return c.json({ error: 'Invalid form data' }, 400)
   }
 
-  const file        = formData.get('file')
+  const file = formData.get('file')
   const incident_id = formData.get('incident_id')  // 워룸 첨부: 필수 | 프로필: 없음
   const employee_id = formData.get('employee_id')  // 프로필 업로드 시 사번
   const uploaded_by = formData.get('uploaded_by') || employee_id || 'Unknown'
@@ -8866,7 +8879,7 @@ app.post('/warroom/upload', async (c) => {
     return c.json({ error: 'file is required' }, 400)
   }
 
-  const fileName  = file.name || `file_${Date.now()}`
+  const fileName = file.name || `file_${Date.now()}`
   const fileBuffer = await file.arrayBuffer()
 
   // ── 프로필 사진 업로드 (incident_id 없음) ──────────────────────────────
@@ -8890,7 +8903,7 @@ app.post('/warroom/upload', async (c) => {
     httpMetadata: { contentType: file.type || 'application/octet-stream' }
   })
 
-  const fileUrl  = `/warroom/asset/${encodeURIComponent(fileKey)}`
+  const fileUrl = `/warroom/asset/${encodeURIComponent(fileKey)}`
   const fileType = file.type || 'application/octet-stream'
 
   await db.prepare(`
@@ -8910,7 +8923,7 @@ app.get('/warroom/asset/:key', async (c) => {
   const key = decodeURIComponent(c.req.param('key'))
   const object = await c.env.WARROOM_ASSETS.get(key)
   if (!object) return c.notFound()
-  
+
   const headers = new Headers()
   object.writeHttpMetadata(headers)
   headers.set('etag', object.httpEtag)
@@ -8918,7 +8931,7 @@ app.get('/warroom/asset/:key', async (c) => {
   headers.set('Access-Control-Allow-Origin', '*')
   headers.set('Cross-Origin-Resource-Policy', 'cross-origin')
   headers.set('Cache-Control', 'public, max-age=31536000, immutable')
-  
+
   return new Response(object.body, { headers })
 })
 
@@ -8962,7 +8975,7 @@ app.post('/ai/send-report-email', async (c) => {
   const formData = await c.req.formData();
   const pdfFile = formData.get('pdf');
   const incident_id = formData.get('incident_id');
-  
+
   if (!pdfFile || !incident_id) {
     return c.json({ error: 'PDF file and incident_id are required' }, 400);
   }
@@ -8983,9 +8996,9 @@ app.post('/ai/send-report-email', async (c) => {
       personalizations: [{
         to: [{ email: recipientEmail, name: '신한DS 팀장님' }]
       }],
-      from: { 
-        email: 'reports@sguardai.khcho0421.workers.dev', 
-        name: 'S-Guard AI Incident Report' 
+      from: {
+        email: 'reports@sguardai.khcho0421.workers.dev',
+        name: 'S-Guard AI Incident Report'
       },
       subject: `[S-Guard] 실시간 시스템 분석 보고서 (${incident_id})`,
       content: [
@@ -9026,7 +9039,7 @@ app.post('/ai/send-report-email', async (c) => {
   const normId = String(incident_id);
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ? WHERE inc_id = ?")
     .bind(now, normId).run();
-    
+
   await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, 'SYSTEM', normId).run();
 
@@ -9053,7 +9066,7 @@ app.post('/ai/register-knowledge', async (c) => {
     const sanitizedContent = content.replace(/🚀 고속 분석 엔진\(Dify\) 최적화 통신을 시작합니다\.\.\.\s*/g, "").trim();
 
     // 1. Generate Embeddings using Cloudflare AI
-    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { 
+    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', {
       text: [sanitizedContent.substring(0, 3000)] // Limit for embedding stability
     });
     const vector = embeddings.data[0];
@@ -9098,8 +9111,8 @@ app.post('/ai/register-knowledge', async (c) => {
       await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(dbInsertId).run();
     }
 
-    return c.json({ 
-      success: true, 
+    return c.json({
+      success: true,
       message: '보고서가 지식 베이스에 성공적으로 등록되었습니다.',
       knowledge_id: dbInsertId
     });
@@ -9138,9 +9151,9 @@ app.post('/ai/governance/approve', async (c) => {
       try {
         const difyRes = await fetch(`${api_base}/chat-messages`, {
           method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${api_key}`, 
-            'Content-Type': 'application/json' 
+          headers: {
+            'Authorization': `Bearer ${api_key}`,
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             inputs: {},
@@ -9157,7 +9170,7 @@ app.post('/ai/governance/approve', async (c) => {
     }
 
     // 2. Generate Embeddings for Vector DB
-    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { 
+    const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', {
       text: [sanitizedContent.substring(0, 3000)]
     });
     const vector = embeddings.data[0];
@@ -9178,12 +9191,12 @@ app.post('/ai/governance/approve', async (c) => {
     // 4. Update Incident Status & Knowledge Base in D1
     const now = getKst();
     let embeddingValue = null;
-    
+
     // 🛡️ Robust Embedding Generation with Logging
     if (ai && sanitizedContent) {
       try {
         console.log(`[RAG] Generating embedding for ${incident_id}...`);
-        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { 
+        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', {
           text: [sanitizedContent.substring(0, 3000)]
         });
         if (embeddings && embeddings.data && embeddings.data[0]) {
@@ -9211,9 +9224,9 @@ app.post('/ai/governance/approve', async (c) => {
         status = 'PENDING'
       RETURNING id
     `).bind(
-      incident_id, 
-      title || `Governance: ${incident_id}`, 
-      sanitizedContent, 
+      incident_id,
+      title || `Governance: ${incident_id}`,
+      sanitizedContent,
       actor,
       now,
       actor,
@@ -9260,7 +9273,7 @@ app.post('/ai/governance/approve', async (c) => {
     try {
       const assignedUsers = await db.prepare("SELECT user_id FROM incident_assignments WHERE inc_id = ?")
         .bind(normId).all();
-      
+
       if (assignedUsers.results && assignedUsers.results.length > 0) {
         const inboxStmt = db.prepare(`
           INSERT INTO inbox_items (
@@ -9269,8 +9282,8 @@ app.post('/ai/governance/approve', async (c) => {
             reg_id, reg_dt, mod_id, mod_dt
           ) VALUES (?, 'REPORT', ?, ?, ?, 'NORMAL', ?, ?, 'System', ?, 'SYSTEM', ?, 'SYSTEM', ?)
         `);
-        
-        const inboxPromises = assignedUsers.results.map(u => 
+
+        const inboxPromises = assignedUsers.results.map(u =>
           inboxStmt.bind(
             u.user_id,
             `보고서 발행: ${incident_id}`,
@@ -9288,8 +9301,8 @@ app.post('/ai/governance/approve', async (c) => {
       console.error("[Inbox] Auto-notify error:", e);
     }
 
-    return c.json({ 
-      success: true, 
+    return c.json({
+      success: true,
       message: '거버넌스 최종 승인 및 RAG 데이터베이스 업데이트가 완료되었습니다.',
       dify_response: difyAnswer
     });
@@ -9330,7 +9343,7 @@ app.get('/api/v1/users/organization', async (c) => {
 app.get('/api/v1/report-lines', async (c) => {
   const db = c.env.DB;
   const owner_id = c.req.query('user_id'); // Passed from frontend or middleware
-  
+
   if (!owner_id) {
     return c.json({ error: 'owner_id (user_id) is required' }, 400);
   }
@@ -9351,7 +9364,7 @@ app.post('/api/v1/report-lines', async (c) => {
   const body = await c.req.json();
   const lines = body.report_lines || [];
   const owner_id = body.owner_id;
-  
+
   if (!owner_id) {
     return c.json({ error: 'owner_id is required for personalized report lines' }, 400);
   }
@@ -9359,28 +9372,28 @@ app.post('/api/v1/report-lines', async (c) => {
   try {
     const stmts = [];
     const now = getKst();
-    
+
     // Only delete lines belonging to the current owner
     stmts.push(db.prepare("DELETE FROM report_lines WHERE owner_id = ?").bind(owner_id));
-    
+
     for (let i = 0; i < lines.length; i++) {
-        const ln = lines[i];
-        stmts.push(
-            db.prepare("INSERT INTO report_lines (owner_id, hierarchy_level, role_name, user_id, user_name, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            .bind(
-                owner_id, 
-                i + 1, 
-                ln.role_name || '결재자', 
-                ln.user_id, 
-                ln.user_name || '',
-                owner_id, // Setting registrant as the owner themselves
-                now,
-                owner_id,
-                now
-            )
-        );
+      const ln = lines[i];
+      stmts.push(
+        db.prepare("INSERT INTO report_lines (owner_id, hierarchy_level, role_name, user_id, user_name, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(
+            owner_id,
+            i + 1,
+            ln.role_name || '결재자',
+            ln.user_id,
+            ln.user_name || '',
+            owner_id, // Setting registrant as the owner themselves
+            now,
+            owner_id,
+            now
+          )
+      );
     }
-    
+
     await db.batch(stmts);
     return c.json({ success: true, message: '보고 라인이 성공적으로 저장되었습니다.' });
   } catch (err) {
@@ -9403,7 +9416,7 @@ app.get('/warroom/attachments/:id', async (c) => {
 app.get('/ai/warroom/my-rooms', async (c) => {
   const user_id = c.req.query('user_id')
   if (!user_id) return c.json({ rooms: [] })
-  
+
   const { results } = await c.env.DB.prepare(`
     SELECT w.*, r.message AS sms_message
     FROM warroom_list w
@@ -9412,7 +9425,7 @@ app.get('/ai/warroom/my-rooms', async (c) => {
     WHERE uw.user_id = ?
     ORDER BY w.reg_dt DESC
   `).bind(user_id).all()
-  
+
   const mapped2 = (results || []).map(r => ({
     ...r,
     severity: (r.severity || 'NORMAL').toUpperCase(),
@@ -9424,7 +9437,7 @@ app.post('/warroom/dm', async (c) => {
   const db = c.env.DB
   const { sender_id, receiver_id, message } = await c.req.json()
   const now = getKst()
-  
+
   if (!sender_id || !receiver_id || !message) {
     return c.json({ error: 'sender_id, receiver_id, and message are required' }, 400)
   }
@@ -9458,7 +9471,7 @@ app.get('/warroom/dm/:user_id', async (c) => {
     FROM direct_messages
     WHERE sender_id = ? OR receiver_id = ?
   `).bind(user_id, user_id, user_id).all()
-  
+
   return c.json(results || [])
 })
 
@@ -9468,7 +9481,7 @@ app.get('/inbox', async (c) => {
   const user = c.get('user')
   const user_id = c.req.query('user_id') || user?.employee_id
   const folder = c.req.query('folder') || 'INBOX'
-  
+
   if (!user_id) return c.json({ error: 'user_id is required' }, 400)
 
   let query = `
@@ -9483,20 +9496,20 @@ app.get('/inbox', async (c) => {
     WHERE i.user_id = ?
   `
   const params = [user_id]
-  
+
   if (folder) {
     query += " AND i.folder = ?"
     params.push(folder)
   }
-  
+
   query += " ORDER BY i.created_at DESC"
 
   const { results } = await db.prepare(query).bind(...params).all()
-  
+
   // 조직명 변환 (results 배열 가공)
   const finalResults = []
   const orgCache = {}
-  
+
   for (const item of results) {
     let orgName = '상담'
     const targetCode = item.sender_part || item.sender_team
@@ -9526,7 +9539,7 @@ app.get('/inbox', async (c) => {
 app.post('/api/v1/reports/submit', async (c) => {
   const db = c.env.DB
   const body = await c.req.json()
-  const { 
+  const {
     incident_id, sender_id, sender_name,
     title, content, preview, urgency = 'NORMAL'
   } = body
@@ -9535,7 +9548,7 @@ app.post('/api/v1/reports/submit', async (c) => {
 
   try {
     const now = getKst()
-    
+
     const normId = String(incident_id);
     const incIdWithPrefix = `INC-${normId}`;
 
@@ -9553,7 +9566,7 @@ app.post('/api/v1/reports/submit', async (c) => {
     await db.prepare(`
       UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?
     `).bind(now, now, sender_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
-    
+
     // 2. Generate embedding for Vector Search
     const ai = c.env.AI;
     let vector = null;
@@ -9636,7 +9649,7 @@ app.post('/api/v1/reports/submit', async (c) => {
           ) SELECT ?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'INBOX', ?, ?
           WHERE EXISTS (SELECT 1 FROM users WHERE employee_id = ?)
         `).bind(
-          sup.user_id, sender_id, sender_name, 
+          sup.user_id, sender_id, sender_name,
           title, content, preview || content.substring(0, 100), urgency,
           incident_id, now, now, sup.user_id
         ).run()
@@ -9655,7 +9668,7 @@ app.post('/api/v1/reports/submit', async (c) => {
         ) SELECT ?, 'REPORT', ?, ?, ?, ?, ?, ?, ?, 'SENT', ?, ?
         WHERE EXISTS (SELECT 1 FROM users WHERE employee_id = ?)
       `).bind(
-        sender_id, sender_id, sender_name, 
+        sender_id, sender_id, sender_name,
         title, content, preview || content.substring(0, 100), urgency,
         incident_id, now, now, sender_id
       ).run()
@@ -9663,8 +9676,8 @@ app.post('/api/v1/reports/submit', async (c) => {
       console.warn(`[Submit-Warn] Failed to save copy to sender ${sender_id}:`, e.message);
     }
 
-    return c.json({ 
-      success: true, 
+    return c.json({
+      success: true,
       recipient_count: superiors.length,
       superiors: superiors.map(s => s.user_name)
     })
@@ -9756,9 +9769,9 @@ app.get('/reports/:inc_id', async (c) => {
         }
 
         const companyName = await resolveCode(u.company)
-        const honbuName   = await resolveCode(u.honbu)
-        const teamName    = await resolveCode(u.team)
-        const partName    = await resolveCode(u.part)
+        const honbuName = await resolveCode(u.honbu)
+        const teamName = await resolveCode(u.team)
+        const partName = await resolveCode(u.part)
 
         const parts = [companyName, honbuName, teamName, partName, u.name].filter(Boolean)
         userOrgPath = parts.join(' / ')
@@ -9783,9 +9796,9 @@ app.get('/reports/:inc_id', async (c) => {
 app.post('/inbox', async (c) => {
   const db = c.env.DB
   const body = await c.req.json()
-  const { 
-    user_id, type, sender_id, sender_name, 
-    title, content, preview, urgency, 
+  const {
+    user_id, type, sender_id, sender_name,
+    title, content, preview, urgency,
     inc_id, action_link, folder = 'INBOX'
   } = body
   const now = getKst()
@@ -9820,7 +9833,7 @@ app.patch('/inbox/:id/read', async (c) => {
 
   await db.prepare("UPDATE inbox_items SET is_read = 1, mod_dt = ? WHERE id = ?")
     .bind(now, id).run()
-    
+
   return c.json({ status: 'success' })
 })
 
@@ -9829,7 +9842,7 @@ app.delete('/inbox/:id', async (c) => {
   const id = c.req.param('id')
 
   await db.prepare("DELETE FROM inbox_items WHERE id = ?").bind(id).run()
-  
+
   return c.json({ status: 'success' })
 })
 
@@ -9852,10 +9865,10 @@ export class WarRoom {
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();
       this.sseWriters.add(writer);
-      
+
       // Ping
-      writer.write(new TextEncoder().encode("data: connected\n\n")).catch(() => {});
-      
+      writer.write(new TextEncoder().encode("data: connected\n\n")).catch(() => { });
+
       return new Response(readable, {
         headers: {
           "Content-Type": "text/event-stream",
@@ -9874,10 +9887,10 @@ export class WarRoom {
         try {
           const parsed = JSON.parse(bodyStr);
           if (parsed.type) eventType = parsed.type;
-        } catch(e) {}
-        
+        } catch (e) { }
+
         const enc = new TextEncoder().encode(`event: ${eventType}\ndata: ${bodyStr}\n\n`);
-        
+
         for (const writer of this.sseWriters) {
           writer.write(enc).catch(() => {
             this.sseWriters.delete(writer); // 연결 끊김 감지 및 삭제
@@ -9894,18 +9907,18 @@ export class WarRoom {
       try {
         const body = await request.json();
         const alarmTime = Date.now() + body.waitMs;
-        
+
         // 🚨 DO Storage에 알람 데이터 기록
         const alarms = await this.state.storage.get("scallert_alarms") || [];
         alarms.push({ triggerAt: alarmTime, payload: body.payload });
         await this.state.storage.put("scallert_alarms", alarms);
-        
+
         // 🚨 DO Alarm 스케줄 갱신 (더 이른 시간에 예약된 알람이 있으면 갱신하지 않음)
         const currentAlarm = await this.state.storage.getAlarm();
         if (!currentAlarm || alarmTime < currentAlarm) {
           await this.state.storage.setAlarm(alarmTime);
         }
-        
+
         return new Response("OK");
       } catch (e) {
         return new Response(e.message, { status: 500 });
@@ -9934,7 +9947,7 @@ export class WarRoom {
       const alarms = await this.state.storage.get("scallert_alarms") || [];
       const pending = [];
       const toExecute = [];
-      
+
       for (const a of alarms) {
         if (a.triggerAt <= now) {
           toExecute.push(a);
@@ -9942,14 +9955,14 @@ export class WarRoom {
           pending.push(a);
         }
       }
-      
+
       await this.state.storage.put("scallert_alarms", pending);
-      
+
       if (pending.length > 0) {
         const nextTime = Math.min(...pending.map(a => a.triggerAt));
         await this.state.storage.setAlarm(nextTime);
       }
-      
+
       // 실행 시기가 된 작업들 처리 (DB 조작 및 푸시 발신은 index.js 외부 함수 직접 호출)
       for (const task of toExecute) {
         try {
@@ -9968,7 +9981,7 @@ export class WarRoom {
   async handleSession(webSocket) {
     webSocket.accept();
     console.log("[DO] WebSocket Accepted");
-    
+
     // Initial session setup - track visibility (assume visible on connect)
     this.sessions.set(webSocket, { online: true, visible: true });
 
@@ -10035,7 +10048,7 @@ export class WarRoom {
         session.incident_id = data.incident_id; // Track which room
         session.visible = true;                 // Assume visible on join
         console.log(`[DO] [${this.state.id.toString()}] User JOIN: ${data.name} (${data.user_id})`);
-        
+
         // 🚀 NEW: Auto-update status to 'INC_002' when a user joins the warroom
         if (data.user_id && data.incident_id) {
           this.state.waitUntil((async () => {
@@ -10065,17 +10078,17 @@ export class WarRoom {
         this.broadcast({ type: "PRESENCE_IN", user_id: data.user_id, name: data.name });
         // Send current online list to the new joiner
         const onlineUsers = Array.from(this.sessions.values()).map(s => ({ user_id: s.user_id, name: s.name }));
-        ws.send(JSON.stringify({ 
-          type: "ONLINE_LIST", 
+        ws.send(JSON.stringify({
+          type: "ONLINE_LIST",
           users: onlineUsers,
-          announcement: this.announcement 
+          announcement: this.announcement
         }));
         break;
 
       case "CHAT_SEND": {
         // 1. Save to D1
         const db = this.env.DB;
-        const now = getKst(); 
+        const now = getKst();
         const msgText = data.text || '';  // ── null 방어
         const lastRow = await db.prepare("SELECT MAX(seq) as max_seq FROM warroom_chats WHERE inc_id = ?").bind(data.incident_id).first();
         const seq = (lastRow && lastRow.max_seq) ? lastRow.max_seq + 1 : 1;
@@ -10106,7 +10119,7 @@ export class WarRoom {
           try {
             const userRow = await db.prepare("SELECT profile_picture FROM users WHERE employee_id = ?").bind(data.sender).first();
             senderProfilePic = userRow?.profile_picture || null;
-          } catch (_) {}
+          } catch (_) { }
         }
 
         // 2. Broadcast
@@ -10133,17 +10146,17 @@ export class WarRoom {
           try {
             const db = this.env.DB;
             const incId = data.incident_id;
-            
+
             // Get all active user_ids in this DO session (visible in room)
             const onlineVisibleUserIds = Array.from(this.sessions.values())
               .filter(s => s.user_id && s.visible)
               .map(s => s.user_id);
-            
+
             // Get all room members from D1 (incident_assignments)
             const { results: members } = await db.prepare(`
               SELECT DISTINCT user_id FROM incident_assignments WHERE inc_id = ?
             `).bind(String(incId)).all();
-            
+
             // Get all push subscriptions for members NOT currently in the room
             const absentUserIds = members
               .map(m => m.user_id)
@@ -10159,9 +10172,9 @@ export class WarRoom {
                 title: `[S-Guard] 새 메시지 (${data.name || data.sender})`,
                 body: data.text,
                 inc_id: String(incId),
-                tag: `chat-${incId}`, 
-                priority: 1,           
-                url: `/#/chat/${incId}`  
+                tag: `chat-${incId}`,
+                priority: 1,
+                url: `/#/chat/${incId}`
               };
 
               console.log('[DO-Push] Sending payload:', JSON.stringify(pushPayload));
@@ -10176,7 +10189,7 @@ export class WarRoom {
                     this.env.VAPID_PRIVATE_KEY,
                     'mailto:admin@chokerslab.store'
                   );
-                  
+
                   if (response.status === 410 || response.status === 404) {
                     await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
                   }
@@ -10214,7 +10227,7 @@ export class WarRoom {
         this.state.waitUntil((async () => {
           const kv = this.env.SMS_STORAGE;
           const lockKey = `lock:summary-ws:${data.incident_id}`;
-          
+
           try {
             // Check Lock
             if (kv) {
@@ -10231,21 +10244,21 @@ export class WarRoom {
             const chats = await db.prepare(
               "SELECT wc.sender, wc.text, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? ORDER BY wc.seq DESC LIMIT 50"
             ).bind(data.incident_id).all();
-            
+
             if (chats.results.length === 0) {
               if (kv) await kv.delete(lockKey);
               return;
             }
-            
+
             const chatLog = chats.results.reverse().map(c => `${c.sender_name || c.sender}: ${c.text}`).join("\n");
             const prompt = `Below is a chat log from an incident war room. Please provide a concise summary (3-4 bullet points) in Korean of the current status, key observations, and any actions taken.\n\nChat Log:\n${chatLog}\n\nSummary (Korean):`;
-            
+
             const response = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt });
-            
+
             this.broadcast({
               type: "AI_SUMMARY",
               incident_id: data.incident_id,
-              summary: response.response || response 
+              summary: response.response || response
             });
 
             if (kv) await kv.delete(lockKey);
@@ -10271,7 +10284,7 @@ export class WarRoom {
         const db_react = this.env.DB;
         const chatRow = await db_react.prepare("SELECT reactions FROM warroom_chats WHERE inc_id = ? AND seq = ?")
           .bind(data.incident_id, data.seq).first();
-        
+
         if (chatRow) {
           let reactions = JSON.parse(chatRow.reactions || '{}');
           if (!reactions[data.emoji]) reactions[data.emoji] = [];
@@ -10281,10 +10294,10 @@ export class WarRoom {
             // Toggle off
             reactions[data.emoji] = reactions[data.emoji].filter(id => id !== data.user_id);
           }
-          
+
           await db_react.prepare("UPDATE warroom_chats SET reactions = ? WHERE inc_id = ? AND seq = ?")
             .bind(JSON.stringify(reactions), data.incident_id, data.seq).run();
-          
+
           this.broadcast({
             type: "REACTION_UPDATE",
             incident_id: data.incident_id,
@@ -10300,11 +10313,11 @@ export class WarRoom {
           // Decrement read_count in D1 — guard: only if this user hasn't already read
           await db.prepare("UPDATE warroom_chats SET read_count = CASE WHEN read_count > 0 THEN read_count - 1 ELSE 0 END WHERE inc_id = ? AND seq = ?")
             .bind(data.incident_id, data.seq).run();
-          
+
           // Fetch actual updated value to broadcast (prevents client-side -1 drift)
           const updated = await db.prepare("SELECT read_count FROM warroom_chats WHERE inc_id = ? AND seq = ?")
             .bind(data.incident_id, data.seq).first();
-          
+
           this.broadcast({
             type: "READ_UPDATE",
             incident_id: data.incident_id,
@@ -10322,7 +10335,7 @@ export class WarRoom {
       case "TYPING_STOP":
         this.broadcast({ type: "TYPING", user_id: data.user_id, name: data.name, is_typing: false }, ws);
         break;
-      
+
       // 🗨️ PRESENCE: Page Visibility API integration
       case "PAGE_VISIBLE":
         session.visible = true;
@@ -10359,10 +10372,10 @@ export class WarRoom {
           await this.env.DB.prepare("UPDATE warroom_chats SET is_key_event = ? WHERE inc_id = ? AND seq = ?")
             .bind(data.is_key_event ? 1 : 0, data.incident_id, data.seq).run();
         })());
-        this.broadcast({ 
-          type: "BOOKMARK_UPDATE", 
-          seq: data.seq, 
-          is_key_event: !!data.is_key_event 
+        this.broadcast({
+          type: "BOOKMARK_UPDATE",
+          seq: data.seq,
+          is_key_event: !!data.is_key_event
         });
         break;
 
@@ -10417,35 +10430,35 @@ app.get('/scallert/strategies', async (c) => {
 
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN CONNECTED_DT TEXT`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN CONNECTED_TS INTEGER DEFAULT 0`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN DURATION_SEC INTEGER DEFAULT 0`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN RAW_PAYLOAD TEXT`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN DISCONNECTED_DT TEXT`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN SUCCESS_YN TEXT`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN DISPATCHER_EMP_ID TEXT`).run();
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       await db.prepare(`ALTER TABLE TB_SCL_STRATEGY_MST ADD COLUMN PRIORITY INTEGER DEFAULT 99`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_STRATEGY_MST ADD COLUMN DELAY_SEC INTEGER DEFAULT 0`).run();
-    } catch (e) {}
+    } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_STRATEGY_MST ADD COLUMN VALID_CONDITIONS TEXT DEFAULT '[]'`).run();
-    } catch (e) {}
+    } catch (e) { }
 
     const { results } = await db.prepare("SELECT * FROM TB_SCL_STRATEGY_MST ORDER BY PRIORITY ASC, STRATEGY_ID ASC").all();
     return c.json(results || []);
@@ -10467,7 +10480,7 @@ app.post('/scallert/strategies', async (c) => {
         STRATEGY_ID, STRATEGY_NM, STRATEGY_CONT, APPLY_START_DT, APPLY_END_DT, MAX_CALL_CNT, USE_YN, PRIORITY, DELAY_SEC, VALID_CONDITIONS, REG_ID, REG_DT, MOD_ID, MOD_DT
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      strategyId, body.strategy_nm, body.strategy_cont || '1', body.apply_start_dt, body.apply_end_dt, 
+      strategyId, body.strategy_nm, body.strategy_cont || '1', body.apply_start_dt, body.apply_end_dt,
       body.max_call_cnt || 3, body.use_yn || 'Y', body.priority || 99, body.delay_sec || 0,
       JSON.stringify(body.valid_conditions || []),
       c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now
@@ -10495,18 +10508,18 @@ app.patch('/scallert/strategies/:id', async (c) => {
 
     // 전달된 필드만 덮어쓰기 (partial merge)
     const merged = {
-      strategy_nm:       body.strategy_nm       ?? existing.STRATEGY_NM,
-      strategy_cont:     body.strategy_cont     ?? existing.STRATEGY_CONT,
-      apply_start_dt:    body.apply_start_dt    ?? existing.APPLY_START_DT,
-      apply_end_dt:      body.apply_end_dt      ?? existing.APPLY_END_DT,
-      max_call_cnt:      body.max_call_cnt       ?? existing.MAX_CALL_CNT,
-      use_yn:            body.use_yn            ?? existing.USE_YN,
-      priority:          body.priority           ?? existing.PRIORITY ?? 99,
-      delay_sec:         body.delay_sec          ?? existing.DELAY_SEC ?? 0,
-      valid_conditions:  body.valid_conditions  !== undefined
-                           ? JSON.stringify(body.valid_conditions)
-                           : (existing.VALID_CONDITIONS || '[]'),
-      mod_id:            body.mod_id            ?? existing.MOD_ID ?? 'SYSTEM',
+      strategy_nm: body.strategy_nm ?? existing.STRATEGY_NM,
+      strategy_cont: body.strategy_cont ?? existing.STRATEGY_CONT,
+      apply_start_dt: body.apply_start_dt ?? existing.APPLY_START_DT,
+      apply_end_dt: body.apply_end_dt ?? existing.APPLY_END_DT,
+      max_call_cnt: body.max_call_cnt ?? existing.MAX_CALL_CNT,
+      use_yn: body.use_yn ?? existing.USE_YN,
+      priority: body.priority ?? existing.PRIORITY ?? 99,
+      delay_sec: body.delay_sec ?? existing.DELAY_SEC ?? 0,
+      valid_conditions: body.valid_conditions !== undefined
+        ? JSON.stringify(body.valid_conditions)
+        : (existing.VALID_CONDITIONS || '[]'),
+      mod_id: body.mod_id ?? existing.MOD_ID ?? 'SYSTEM',
     };
 
     await db.prepare(`
@@ -10639,10 +10652,10 @@ async function triggerPdsCall(db, strategyId, target, incId, message, rawPayload
       return false;
     }
 
-    let apiUrl     = cfg.API_URL;
-    let apiMethod  = cfg.API_METHOD || 'POST';
+    let apiUrl = cfg.API_URL;
+    let apiMethod = cfg.API_METHOD || 'POST';
     let apiHeaders = JSON.parse(cfg.API_HEADERS || '{}');
-    let apiParams  = JSON.parse(cfg.API_PARAMS  || '{}');
+    let apiParams = JSON.parse(cfg.API_PARAMS || '{}');
     let timeoutSec = cfg.TIMEOUT_SEC || 10;
 
     if (!apiUrl) {
@@ -10704,7 +10717,7 @@ async function triggerNextTarget(db, currentCall, env) {
   try {
     const strategyId = currentCall.STRATEGY_ID;
     const now = getKst();
-    
+
     const strategy = await db.prepare(`
       SELECT * FROM TB_SCL_STRATEGY_MST 
       WHERE STRATEGY_ID = ? AND USE_YN = 'Y'
@@ -10717,7 +10730,7 @@ async function triggerNextTarget(db, currentCall, env) {
       try {
         const payloadObj = JSON.parse(currentCall.RAW_PAYLOAD || '{}');
         targetUserId = payloadObj.employee_id || payloadObj.emp_id;
-      } catch (e) {}
+      } catch (e) { }
 
       if (targetUserId) {
         const substitutes = await db.prepare(`
@@ -10761,16 +10774,16 @@ async function triggerNextTarget(db, currentCall, env) {
         INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT, DISPATCHER_EMP_ID)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        strategyId, 
-        nextTarget.EMP_ID, 
+        strategyId,
+        nextTarget.EMP_ID,
         nextTarget.EMP_NM,
         nextTarget.MOBILE_NO,
-        nextAttempt, 
-        currentCall.IGW_TXN_ID, 
-        'PENDING', 
-        now, 
-        currentCall.INC_ID || null, 
-        currentCall.RAW_PAYLOAD || '{}', 
+        nextAttempt,
+        currentCall.IGW_TXN_ID,
+        'PENDING',
+        now,
+        currentCall.INC_ID || null,
+        currentCall.RAW_PAYLOAD || '{}',
         now,
         currentCall.DISPATCHER_EMP_ID || null
       ).run();
@@ -10779,7 +10792,7 @@ async function triggerNextTarget(db, currentCall, env) {
       try {
         const payloadObj = JSON.parse(currentCall.RAW_PAYLOAD || '{}');
         message = payloadObj.message || '';
-      } catch (e) {}
+      } catch (e) { }
 
       await triggerPdsCall(db, strategyId, nextTarget, currentCall.INC_ID, message, currentCall.RAW_PAYLOAD, env);
     }
@@ -10791,7 +10804,7 @@ async function triggerNextTarget(db, currentCall, env) {
 async function triggerAppPushCall(env, target_user_id, phone_number) {
   const db = env.DB;
   const serviceAccountJson = env.FCM_SERVICE_ACCOUNT;
-  
+
   let success = false;
   let method = 'NONE';
   let resultDetail = '';
@@ -10818,15 +10831,15 @@ async function triggerAppPushCall(env, target_user_id, phone_number) {
       const sa = JSON.parse(serviceAccountJson);
       const projectId = sa.project_id;
       const now = Math.floor(Date.now() / 1000);
-      const jwtHeader  = { alg: 'RS256', typ: 'JWT' };
+      const jwtHeader = { alg: 'RS256', typ: 'JWT' };
       const jwtPayload = { iss: sa.client_email, scope: 'https://www.googleapis.com/auth/firebase.messaging', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 };
-      const b64url = (obj) => btoa(JSON.stringify(obj)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+      const b64url = (obj) => btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
       const toSign = `${b64url(jwtHeader)}.${b64url(jwtPayload)}`;
       const pemContents = sa.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
       const keyData = Uint8Array.from(atob(pemContents), char => char.charCodeAt(0));
       const privateKey = await crypto.subtle.importKey('pkcs8', keyData, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
       const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, new TextEncoder().encode(toSign));
-      const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+      const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
       const jwt = `${toSign}.${sig}`;
 
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -10852,7 +10865,7 @@ async function triggerAppPushCall(env, target_user_id, phone_number) {
       success = fcmRes.ok;
       method = 'FCM_V1';
       resultDetail = fcmBody.substring(0, 500);
-      console.log(`[FCM-v1] user=${target_user_id} status=${fcmRes.status} body=${fcmBody.substring(0,120)}`);
+      console.log(`[FCM-v1] user=${target_user_id} status=${fcmRes.status} body=${fcmBody.substring(0, 120)}`);
     } catch (fcmErr) {
       method = 'FCM_V1_ERROR';
       resultDetail = fcmErr.message;
@@ -10874,7 +10887,7 @@ function checkValidConditions(conditionsJson, nowKstStr) {
   try {
     conditions = typeof conditionsJson === 'string' ? JSON.parse(conditionsJson) : conditionsJson;
   } catch (e) {
-    return true; 
+    return true;
   }
   if (!Array.isArray(conditions) || conditions.length === 0) return true;
 
@@ -10919,7 +10932,7 @@ async function executeSCallertStrategy(db, strategy, payload, inc_id, c) {
   try {
     const delaySec = strategy.DELAY_SEC || 0;
     let waitMs = delaySec * 1000;
-    
+
     console.log(`[scallert-trigger] 🏁 Starting S-Callert background trigger sequence`);
     console.log(`[scallert-trigger] Incident ID: ${inc_id}, Strategy: ${strategy.STRATEGY_NM} (${strategy.STRATEGY_ID}), Delay Setting: ${delaySec}s`);
 
@@ -10931,7 +10944,7 @@ async function executeSCallertStrategy(db, strategy, payload, inc_id, c) {
         const elapsedMs = currentTime - smsTime;
         waitMs = (delaySec * 1000) - elapsedMs;
         if (waitMs < 0) waitMs = 0;
-        
+
         console.log(`[scallert-trigger] ⏱️ SMS Received KST: ${payload.occurred_at} (${smsTime})`);
         console.log(`[scallert-trigger] ⏱️ Current Time UTC: ${new Date(currentTime).toISOString()} (${currentTime})`);
         console.log(`[scallert-trigger] ⏱️ Elapsed Time: ${elapsedMs}ms, Initial Wait: ${delaySec * 1000}ms, Adjusted Wait: ${waitMs}ms`);
@@ -11021,7 +11034,7 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
             }
           })
         }));
-      } catch(e) {}
+      } catch (e) { }
       return;
     }
 
@@ -11054,7 +11067,7 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
       INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT, DISPATCHER_EMP_ID)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      strategy.STRATEGY_ID, target.EMP_ID, target.EMP_NM, target.MOBILE_NO, 1, 
+      strategy.STRATEGY_ID, target.EMP_ID, target.EMP_NM, target.MOBILE_NO, 1,
       igw_txn_id, 'PENDING', callTime, inc_id || null, JSON.stringify(payload), callTime, dispatchDeviceId
     ).run();
 
@@ -11065,7 +11078,7 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
       console.log(`[scallert-trigger] Sending device push call ring to Dispatcher Device: ${dispatchDeviceId} (Target number: ${finalMobileNo})`);
       const pushRes = await triggerAppPushCall(env, dispatchDeviceId, finalMobileNo);
       console.log(`[scallert-trigger] Device push result: ${pushRes.success} via ${pushRes.method}`);
-      
+
       // 🚀 DEBUG: 자동 발신 결과가 왜 실패하는지 확인하기 위해 UI(테스트 로그)에 기록
       try {
         await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID, API_URL, API_METHOD, REQ_PARAMS, STATUS_CODE, RESPONSE_BODY, ELAPSED_MS, SUCCESS, TESTED_BY, TESTED_AT) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -11073,7 +11086,7 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
       } catch (logErr) {
         console.error("Failed to log pushRes", logErr);
       }
-      
+
       try {
         // 앱 푸시 결과에 따라 이력 테이블 상태 즉시 업데이트 (UI 통화성공/실패 반영)
         const newStatus = pushRes.success ? 'SUCCESS' : 'FAILED';
@@ -11082,7 +11095,7 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
       } catch (updErr) {
         console.error("Failed to update PDS_RESULT_CD", updErr);
       }
-      
+
       try {
         const doId = env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
         const room = env.WARROOM_DO.get(doId);
@@ -11118,7 +11131,7 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
 app.post('/scallert/igw-event', async (c) => {
   const db = c.env.DB;
   const igwSecret = c.req.header('x-igw-secret');
-  
+
   // IGW 시크릿 검증 (Environment 변수 IGW_SECRET 사용)
   if (igwSecret !== c.env.IGW_SECRET && c.env.ENVIRONMENT === 'production') {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -11144,17 +11157,17 @@ app.post('/scallert/igw-event', async (c) => {
         AND (APPLY_START_DT IS NULL OR APPLY_START_DT <= ?)
         AND (APPLY_END_DT IS NULL OR APPLY_END_DT >= ?)
     `).bind(strategy_id, now, now).first();
-    
+
     if (!strategy) return c.json({ error: 'Active strategy not found or expired' }, 404);
 
     // 발신 유효 시간 조건 체크
     const isValidTime = checkValidConditions(strategy.VALID_CONDITIONS, now);
     if (!isValidTime) {
-      return c.json({ 
-        ok: true, 
-        skipped: true, 
+      return c.json({
+        ok: true,
+        skipped: true,
         reason: 'TIME_CONDITION_NOT_MET',
-        message: `발신 유효 조건에 맞지 않아 발신을 건너뛰었습니다. (조건: ${strategy.VALID_CONDITIONS})` 
+        message: `발신 유효 조건에 맞지 않아 발신을 건너뛰었습니다. (조건: ${strategy.VALID_CONDITIONS})`
       });
     }
 
@@ -11209,13 +11222,13 @@ app.post('/scallert/strategies/:id/config', async (c) => {
     const existing = await db.prepare("SELECT CONFIG_ID FROM TB_SCL_PDS_CONFIG WHERE STRATEGY_ID = ? ORDER BY CONFIG_ID DESC LIMIT 1").bind(id).first();
     if (existing) {
       await db.prepare(`UPDATE TB_SCL_PDS_CONFIG SET API_URL=?,API_METHOD=?,API_HEADERS=?,API_PARAMS=?,TIMEOUT_SEC=?,MOD_ID=?,MOD_DT=? WHERE CONFIG_ID=?`)
-        .bind(body.api_url||'', body.api_method||'POST', JSON.stringify(body.api_headers||{}), JSON.stringify(body.api_params||{}),
-              body.timeout_sec||10, c.get('user')?.employee_id || 'SYSTEM', now, existing.CONFIG_ID).run();
+        .bind(body.api_url || '', body.api_method || 'POST', JSON.stringify(body.api_headers || {}), JSON.stringify(body.api_params || {}),
+          body.timeout_sec || 10, c.get('user')?.employee_id || 'SYSTEM', now, existing.CONFIG_ID).run();
       return c.json({ success: true, config_id: existing.CONFIG_ID });
     } else {
       const res = await db.prepare(`INSERT INTO TB_SCL_PDS_CONFIG (STRATEGY_ID,API_URL,API_METHOD,API_HEADERS,API_PARAMS,TIMEOUT_SEC,USE_YN,REG_ID,REG_DT,MOD_ID,MOD_DT) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-        .bind(id, body.api_url||'', body.api_method||'POST', JSON.stringify(body.api_headers||{}), JSON.stringify(body.api_params||{}),
-              body.timeout_sec||10, 'Y', c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now).run();
+        .bind(id, body.api_url || '', body.api_method || 'POST', JSON.stringify(body.api_headers || {}), JSON.stringify(body.api_params || {}),
+          body.timeout_sec || 10, 'Y', c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now).run();
       return c.json({ success: true, config_id: res.meta.last_row_id });
     }
   } catch (e) { return c.json({ error: e.message }, 500); }
@@ -11230,23 +11243,23 @@ app.post('/scallert/strategies/:id/test-call', async (c) => {
   const startMs = Date.now();
 
   // 설정 로드 (요청 body 우선, 없으면 DB)
-  let apiUrl     = body.api_url;
-  let apiMethod  = body.api_method || 'POST';
+  let apiUrl = body.api_url;
+  let apiMethod = body.api_method || 'POST';
   let apiHeaders = body.api_headers || {};
-  let apiParams  = body.api_params  || {};
+  let apiParams = body.api_params || {};
   let timeoutSec = body.timeout_sec || 10;
 
   if (!apiUrl) {
     try {
       const cfg = await db.prepare("SELECT * FROM TB_SCL_PDS_CONFIG WHERE STRATEGY_ID = ? AND USE_YN = 'Y' ORDER BY CONFIG_ID DESC LIMIT 1").bind(id).first();
       if (cfg) {
-        apiUrl     = cfg.API_URL;
-        apiMethod  = cfg.API_METHOD || 'POST';
+        apiUrl = cfg.API_URL;
+        apiMethod = cfg.API_METHOD || 'POST';
         apiHeaders = JSON.parse(cfg.API_HEADERS || '{}');
-        apiParams  = JSON.parse(cfg.API_PARAMS  || '{}');
+        apiParams = JSON.parse(cfg.API_PARAMS || '{}');
         timeoutSec = cfg.TIMEOUT_SEC || 10;
       }
-    } catch {}
+    } catch { }
   }
 
   if (!apiUrl) return c.json({ error: 'API URL이 설정되지 않았습니다.' }, 400);
@@ -11283,13 +11296,13 @@ app.post('/scallert/strategies/:id/test-call', async (c) => {
       API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
       ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
     )`).run();
-    
+
     const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
     const encryptedParams = await encryptAES(JSON.stringify(apiParams), secretKey);
 
     await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID,API_URL,API_METHOD,REQ_PARAMS,STATUS_CODE,RESPONSE_BODY,ELAPSED_MS,SUCCESS,TESTED_BY,TESTED_AT) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .bind(id, apiUrl, apiMethod, encryptedParams, statusCode, responseBody.substring(0,2000), elapsed, success?'Y':'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
-  } catch {}
+      .bind(id, apiUrl, apiMethod, encryptedParams, statusCode, responseBody.substring(0, 2000), elapsed, success ? 'Y' : 'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
+  } catch { }
 
   return c.json({ success, status_code: statusCode, response: responseBody, elapsed_ms: elapsed, tested_at: now });
 });
@@ -11462,7 +11475,7 @@ app.post('/call/event', async (c) => {
     if (matchedCall) {
       const currentTs = timestamp || Date.now();
       const eventTypeUpper = (event_type || '').toUpperCase();
-      
+
       if (eventTypeUpper === 'DIALING') {
         await db.prepare(`
           UPDATE TB_SCL_CALL_HIST 
@@ -11490,9 +11503,9 @@ app.post('/call/event', async (c) => {
             const callDtStr = matchedCall.CALL_DT;
             const callTs = new Date(callDtStr.replace(' ', 'T') + '+09:00').getTime();
             durationSec = Math.floor((currentTs - callTs) / 1000);
-          } catch (err) {}
+          } catch (err) { }
         }
-        
+
         // 통화가 연결되어 단 1초라도 유지되었다면 통화 성공(SUCCESS)으로 간주 (사용자가 받자마자 끊은 경우 포함)
         if (durationSec > 0) {
           await db.prepare(`
@@ -11506,7 +11519,7 @@ app.post('/call/event', async (c) => {
             SET PDS_RESULT_CD = 'FAIL_VOICEMAIL', DURATION_SEC = ?, DISCONNECTED_DT = ?, SUCCESS_YN = 'N'
             WHERE LOG_ID = ?
           `).bind(durationSec, now, matchedCall.LOG_ID).run();
-          
+
           await triggerNextTarget(db, { ...matchedCall, ATTEMPT_SEQ: matchedCall.ATTEMPT_SEQ || 1 }, c.env);
         }
       } else if (eventTypeUpper === 'MISSED') {
@@ -11515,7 +11528,7 @@ app.post('/call/event', async (c) => {
           SET PDS_RESULT_CD = 'MISSED'
           WHERE LOG_ID = ?
         `).bind(matchedCall.LOG_ID).run();
-        
+
         await triggerNextTarget(db, { ...matchedCall, ATTEMPT_SEQ: matchedCall.ATTEMPT_SEQ || 1 }, c.env);
       } else if (eventTypeUpper === 'FAILED') {
         await db.prepare(`
@@ -11523,7 +11536,7 @@ app.post('/call/event', async (c) => {
           SET PDS_RESULT_CD = 'FAILED'
           WHERE LOG_ID = ?
         `).bind(matchedCall.LOG_ID).run();
-        
+
         await triggerNextTarget(db, { ...matchedCall, ATTEMPT_SEQ: matchedCall.ATTEMPT_SEQ || 1 }, c.env);
       }
     }
@@ -11559,9 +11572,9 @@ app.get('/scallert/app-events', async (c) => {
     const decryptedResults = await Promise.all((results || []).map(async (row) => {
       let decryptedPhone = row.PHONE_NUMBER;
       if (typeof decryptedPhone === 'string' && decryptedPhone.startsWith('aesgcm:')) {
-         try {
-           decryptedPhone = await decryptAES(decryptedPhone, secretKey);
-         } catch(e) {}
+        try {
+          decryptedPhone = await decryptAES(decryptedPhone, secretKey);
+        } catch (e) { }
       }
       return { ...row, PHONE_NUMBER: decryptedPhone };
     }));
@@ -11631,7 +11644,7 @@ app.post('/scallert/test-push', async (c) => {
       API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
       ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
     )`).run();
-    
+
     const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
     const encryptedPushParams = await encryptAES(JSON.stringify({ target_user_id, phone_number }), secretKey);
 
@@ -11657,7 +11670,7 @@ app.get('/scallert/debug-trigger', async (c) => {
       INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT, DISPATCHER_EMP_ID)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      'DEBUG', '18121020', '조경훈(DEBUG)', '010-0000-0000', 1, 
+      'DEBUG', '18121020', '조경훈(DEBUG)', '010-0000-0000', 1,
       `DBG_${Date.now()}`, 'PENDING', now, 999, JSON.stringify({ employee_id: '18121020' }), now, '18121020'
     ).run();
     return c.json({ success: true, message: 'Debug record inserted to trigger SSE' });
@@ -11697,7 +11710,7 @@ function createSSEResponse(c, callback) {
       callback(writeEvent, sleep)
         .catch((e) => console.error('[SSE] Fatal error:', e.message))
         .finally(() => {
-          try { controller.close(); } catch (_) {}
+          try { controller.close(); } catch (_) { }
         });
     },
     cancel() {
@@ -11736,7 +11749,7 @@ app.post('/debug/encrypt-migration', async (c) => {
     // raw로 읽어야 하지만, monkey patch는 'aesgcm:'이 아닌 텍스트는 그대로 반환합니다.
     // 따라서 기존 평문 데이터는 평문 그대로 읽힙니다.
     const { results: users } = await db.prepare("SELECT employee_id, phone FROM users WHERE phone IS NOT NULL AND phone != '' AND phone NOT LIKE 'aesgcm:%'").all();
-    
+
     if (users && users.length > 0) {
       for (const u of users) {
         if (!u.phone.startsWith('aesgcm:')) {
@@ -11749,7 +11762,7 @@ app.post('/debug/encrypt-migration', async (c) => {
 
     // 2. received_messages 테이블의 message 가 평문인 경우
     const { results: messages } = await db.prepare("SELECT inc_id, message FROM received_messages WHERE message IS NOT NULL AND message != '' AND message NOT LIKE 'aesgcm:%'").all();
-    
+
     if (messages && messages.length > 0) {
       for (const m of messages) {
         if (!m.message.startsWith('aesgcm:')) {
@@ -11763,7 +11776,7 @@ app.post('/debug/encrypt-migration', async (c) => {
     // 3. TB_SCL_TARGET_INFO 테이블의 MOBILE_NO 가 평문인 경우
     let migratedTargets = 0;
     const { results: targets } = await db.prepare("SELECT SEQ_NO, MOBILE_NO FROM TB_SCL_TARGET_INFO WHERE MOBILE_NO IS NOT NULL AND MOBILE_NO != '' AND MOBILE_NO NOT LIKE 'aesgcm:%'").all();
-    
+
     if (targets && targets.length > 0) {
       for (const t of targets) {
         if (!t.MOBILE_NO.startsWith('aesgcm:')) {
@@ -11787,7 +11800,7 @@ app.post('/debug/encrypt-migration', async (c) => {
           }
         }
       }
-    } catch(e) {
+    } catch (e) {
       // 테이블이 없을 수도 있으므로 무시
     }
 
@@ -11807,7 +11820,7 @@ app.post('/debug/encrypt-migration', async (c) => {
 
 app.get('/debug/raw-db', async (c) => {
   const db = c.env.DB;
-  
+
   // SQL 레벨에서 문자열을 변형하여 미들웨어(Monkey patch)의 'aesgcm:' 검사를 우회합니다.
   const { results: users } = await db.prepare("SELECT employee_id, 'RAW:' || phone as raw_phone FROM users LIMIT 5").all();
   const { results: msgs } = await db.prepare("SELECT inc_id, 'RAW:' || message as raw_message FROM received_messages LIMIT 5").all();
@@ -11818,7 +11831,7 @@ app.get('/debug/raw-db', async (c) => {
   let testError = null;
   try {
     testEncryption = await encryptAES("010-1234-5678", secretKey);
-  } catch(e) {
+  } catch (e) {
     testError = e.message;
   }
 
@@ -11827,11 +11840,40 @@ app.get('/debug/raw-db', async (c) => {
   try {
     // 18121020 user's raw phone
     testDecryption = await decryptAES("aesgcm:4Ll6zVYsHzhvKDMk:VE8AcC37ucfUlrzDXpbTKZqJyL8qb4psYN3CKxA=", secretKey);
-  } catch(e) {
+  } catch (e) {
     testDecryptionError = e.message;
   }
 
   return c.json({ users, msgs, testEncryption, testError, testDecryption, testDecryptionError });
+});
+
+// 🚀 NEW: Admin Incident Complete Cleanup
+app.delete('/admin/incident-cleanup/:id', async (c) => {
+  const inc_id = c.req.param('id');
+  const db = c.env.DB;
+  const normId = String(inc_id);
+  
+  try {
+    const tablesWithIncId = [
+      'received_messages', 'incident_assignments', 'incidents', 
+      'warroom_list', 'sms_history', 'aichat_history', 'autopilot_insight',
+      'incident_history', 'chat_summaries', 'postmortems'
+    ];
+    
+    for (const table of tablesWithIncId) {
+      try { await db.prepare(`DELETE FROM ${table} WHERE inc_id = ?`).bind(normId).run(); } catch(e) {}
+    }
+    
+    // Some tables might use incident_id instead
+    const tablesWithIncidentId = ['warroom_chats', 'warroom_attachments', 'ai_feedback'];
+    for (const table of tablesWithIncidentId) {
+      try { await db.prepare(`DELETE FROM ${table} WHERE incident_id = ?`).bind(normId).run(); } catch(e) {}
+    }
+
+    return c.json({ status: 'success', message: `Incident ${normId} fully deleted` });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
 });
 
 export default app

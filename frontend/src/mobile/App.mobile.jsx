@@ -32,7 +32,7 @@ import InboxPage              from '../pages/InboxPage';
 import OrbitalCommandPage     from '../pages/OrbitalCommandPage';
 import SecurityLogPage        from '../pages/SecurityLogPage';
 import ProcessingFlowPage     from '../pages/ProcessingFlowPage';
-import RealtimePipelinePage   from '../pages/RealtimePipelinePage';
+import MobileRealtimePipelinePage from './pages/MobileRealtimePipelinePage';
 import PushDiagnosticPage     from '../pages/PushDiagnosticPage';
 import ReportViewPage        from '../pages/ReportViewPage';
 import AlertMonitorPage      from '../pages/AlertMonitorPage';
@@ -318,7 +318,7 @@ function AppContent() {
 
   const fetchWarRooms = async () => {
     try {
-      const res = await fetch(`${API_BASE}/warroom/rooms`, {
+      const res = await fetch(`${API_BASE}/warroom/rooms?participating=true`, {
         headers: getAuthHeaders()
       });
       if (res.ok) {
@@ -402,7 +402,7 @@ function AppContent() {
         <Route path="/alert-monitor"           element={<PR><MobileAlertMonitor /></PR>} />
         <Route path="/user-keyword"             element={<PR><MobileUserKeywordPage /></PR>} />
         <Route path="/s-callert"                element={<PR><MobileSCallertPage /></PR>} />
-        <Route path="/realtime-pipeline"        element={<PR><RealtimePipelinePage /></PR>} />
+        <Route path="/realtime-pipeline"        element={<PR><MobileRealtimePipelinePage /></PR>} />
         <Route path="/admin/permissions" element={<PR><PermissionManagementPage /></PR>} />
         <Route path="/admin/deputy" element={<PR><MobileDeputyManagementPage /></PR>} />
       </Routes>
@@ -500,7 +500,7 @@ function AppContent() {
                   </div>
                   <p style={{ color: '#475569', fontSize: 14, fontWeight: 600 }}>진행 중인 War-Room이 없습니다.</p>
                 </div>
-              ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' && r.status !== '완료' : true).map((room) => {
+              ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' && r.status !== '완료' && r.status !== 'INC_003' : true).map((room, index) => {
                 const roomId = room.inc_id || room.code || room.id;
                 const rawId = String(roomId || '').replace(/^INC-/i, '');
                 const isCurrent = String(roomId) === String(currentIncidentId);
@@ -521,7 +521,7 @@ function AppContent() {
 
                 return (
                   <div
-                    key={roomId}
+                    key={`${roomId}-${index}`}
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
                     className="skeuo-card hover:border-[#00e5ff]/50 active:scale-[0.98] active:translate-y-0.5 transition-all duration-200 group"
                     style={{
@@ -685,7 +685,7 @@ function AppContent() {
                   </div>
                   <p style={{ color: '#475569', fontSize: 14, fontWeight: 600 }}>발행된 리포트가 없습니다.</p>
                 </div>
-              ) : warRooms.map((room) => {
+              ) : warRooms.map((room, index) => {
                 const roomId = room.inc_id || room.id;
                 const rawId = String(roomId);
 
@@ -721,7 +721,7 @@ function AppContent() {
 
                 return (
                   <div
-                    key={roomId}
+                    key={`${roomId}-${index}`}
                     onClick={() => { setShowReportPopup(false); navigate(`/ai-report/${roomId}`); }}
                     onTouchStart={handleLongPressStart}
                     onTouchMove={handleLongPressMove}

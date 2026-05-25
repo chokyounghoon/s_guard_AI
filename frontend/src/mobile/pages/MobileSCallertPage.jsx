@@ -127,6 +127,9 @@ export default function MobileSCallertPage() {
   // ── PDS Config ──────────────────────────────────────
   const [pdsConfig, setPdsConfig]     = useState(null);
   const [cfgBodyText, setCfgBodyText] = useState('{"data":{"action":"CALL","phone_number":"01012345678"}}');
+  const [cfgEditing, setCfgEditing]   = useState(false);
+  const [cfgSaving, setCfgSaving]     = useState(false);
+  const [cfgHeaderRows, setCfgHeaderRows] = useState([]);
   const [testPhone, setTestPhone]     = useState('01012345678');
   const [callLoading, setCallLoading] = useState(false);
   const [callResult, setCallResult]   = useState(null);
@@ -141,6 +144,68 @@ export default function MobileSCallertPage() {
   const [pushDevices, setPushDevices] = useState([]);
   const [devicesOpen, setDevicesOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState('');
+
+  // ── 발신 이력 (Global Histories) ──────────────────────────
+  const [globalHistories, setGlobalHistories] = useState([]);
+  const [globalHistoriesLoading, setGlobalHistoriesLoading] = useState(false);
+  const [histOpen, setHistOpen] = useState(false);
+  const [histStartDate, setHistStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [histEndDate, setHistEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  
+  const [histHonbu, setHistHonbu] = useState(userProfile?.honbu || '');
+  const [histTeam, setHistTeam] = useState(userProfile?.team || '');
+  const [histPart, setHistPart] = useState(userProfile?.part || '');
+  const [histResultFilter, setHistResultFilter] = useState('ALL');
+
+  const [flatOrgs, setFlatOrgs] = useState([]);
+
+  const fetchOrgTree = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/org/tree`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const flat = [];
+        const traverse = (nodes) => {
+          nodes.forEach(n => {
+            flat.push(n);
+            if (n.children && n.children.length > 0) traverse(n.children);
+          });
+        };
+        traverse(data || []);
+        setFlatOrgs(flat);
+      }
+    } catch (e) { console.error('Failed to fetch org tree:', e); }
+  }, []);
+
+  const fetchGlobalHistories = useCallback(async () => {
+    setGlobalHistoriesLoading(true);
+    try {
+      let url = `${API_BASE}/scallert/call-history?startDate=${histStartDate}&endDate=${histEndDate}`;
+      if (histHonbu) url += `&honbu=${encodeURIComponent(histHonbu)}`;
+      if (histTeam) url += `&team=${encodeURIComponent(histTeam)}`;
+      if (histPart) url += `&part=${encodeURIComponent(histPart)}`;
+      
+      const r = await fetch(url, { headers: getAuthHeaders() });
+      const text = await r.text();
+      let data = [];
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (err) {
+          console.warn("Invalid JSON from API:", text);
+        }
+      }
+      setGlobalHistories(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setGlobalHistoriesLoading(false);
+    }
+  }, [histStartDate, histEndDate, histHonbu, histTeam, histPart]);
 
   // ─── 전략 목록 로드 ───────────────────────────────────
   const fetchStrategies = useCallback(async (selectId = null) => {
@@ -219,13 +284,36 @@ export default function MobileSCallertPage() {
         const params  = typeof data.API_PARAMS  === 'string' ? JSON.parse(data.API_PARAMS  || '{}') : (data.API_PARAMS  || {});
         setPdsConfig({ api_url: data.API_URL, api_method: data.API_METHOD || 'POST', api_headers: headers, api_params: params, timeout_sec: data.TIMEOUT_SEC || 10 });
         setCfgBodyText(JSON.stringify(params, null, 2));
+        setCfgHeaderRows(Object.entries(headers).map(([k, v]) => ({ key: k, val: String(v) })));
       } else {
         const def = { data: { action: 'CALL', phone_number: '01012345678' } };
-        setPdsConfig({ api_url: 'https://fcm.googleapis.com/fcm/send', api_method: 'POST', api_headers: { 'TTL': '60', 'Urgency': 'high' }, api_params: def, timeout_sec: 10 });
+        const defHeaders = { 'TTL': '60', 'Urgency': 'high' };
+        setPdsConfig({ api_url: 'https://fcm.googleapis.com/fcm/send', api_method: 'POST', api_headers: defHeaders, api_params: def, timeout_sec: 10 });
         setCfgBodyText(JSON.stringify(def, null, 2));
+        setCfgHeaderRows(Object.entries(defHeaders).map(([k, v]) => ({ key: k, val: String(v) })));
       }
     } catch (e) { console.error('pds-config error:', e); }
   }, []);
+
+  const handleCfgSave = async () => {
+    let parsedParams = {};
+    try {
+      parsedParams = JSON.parse(cfgBodyText || '{}');
+    } catch (e) {
+      alert('JSON Body 형식이 올바르지 않습니다: ' + e.message);
+      return;
+    }
+
+    setCfgSaving(true);
+    try {
+      const headers = {}; cfgHeaderRows.filter(r => r.key).forEach(r => headers[r.key] = r.val);
+      const body = { ...pdsConfig, api_headers: headers, api_params: parsedParams, reg_id: userProfile?.employee_id || 'SYSTEM' };
+      const r = await fetch(`${API_BASE}/scallert/strategies/${selectedSid}/config`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body) });
+      if (r.ok) { setCfgEditing(false); alert('API 설정이 저장되었습니다.'); }
+      else { const e = await r.json(); alert('저장 실패: ' + (e.error || '')); }
+    } catch (e) { alert('오류: ' + e.message); }
+    finally { setCfgSaving(false); }
+  };
 
   // ─── 앱 이벤트 로드 ───────────────────────────────────
   const fetchAppEvents = useCallback(async () => {
@@ -430,6 +518,8 @@ export default function MobileSCallertPage() {
     fetchStrategies();
     fetchAppEvents();
     fetchPushDevices();
+    fetchOrgTree();
+    fetchGlobalHistories();
   }, []);
 
   useEffect(() => {
@@ -907,63 +997,160 @@ export default function MobileSCallertPage() {
           </Card>
         )}
 
-        {/* 2. PDS 테스트 발신 */}
+        {/* 2. PDS API 설정 및 테스트 발신 */}
         {selectedSid && (
           <Card accent="#10b981">
-            <CardHeader icon={Phone} title="PDS 테스트 발신" sub="Test Call via PDS API" color="#10b981" />
-            {pdsConfig?.api_url && (
-              <div className="mb-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5">
-                <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">발신 API Endpoint</p>
-                <p className="text-[10px] text-cyan-400 font-mono break-all">{pdsConfig.api_url}</p>
-              </div>
-            )}
-
-            {/* 발신자(핸드폰) 선택 */}
-            <div className="mb-3">
-              <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1.5">발신 기기 선택 (콜이 나가는 핸드폰)</p>
-              <div className="relative">
-                <select
-                  value={selectedDevice}
-                  onChange={e => setSelectedDevice(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer appearance-none"
-                >
-                  {pushDevices.length === 0
-                    ? <option value="">등록된 기기 없음 (앱 로그인 필요)</option>
-                    : pushDevices.map(dev => (
-                        <option key={dev.user_id} value={dev.user_id}>
-                          {dev.emp_nm ? `${dev.emp_nm} (${dev.user_id})` : `사번: ${dev.user_id}`}
-                        </option>
-                      ))
-                  }
-                </select>
-                <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <CardHeader icon={Phone} title="PDS API 설정 및 발신" sub="Config & Test via PDS API" color="#10b981" />
+              <div className="flex gap-2 mb-3">
+                {!cfgEditing ? (
+                  <button onClick={() => setCfgEditing(true)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-black border transition-all active:scale-95" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981' }}>
+                    <Edit3 size={11} className="inline mr-1"/> 설정 편집
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={() => setCfgEditing(false)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-black border border-white/10 bg-white/5 text-slate-400 active:scale-95"><X size={11} /></button>
+                    <button onClick={handleCfgSave} disabled={cfgSaving} className="px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1 bg-emerald-500 text-black active:scale-95">
+                      {cfgSaving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} 저장
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="mb-4">
-              <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1.5">수신 전화번호 (발신 대상)</p>
-              <input type="tel" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="01012345678"
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-emerald-400 font-mono focus:outline-none focus:border-emerald-500/50" />
-            </div>
-            <button onClick={handleTestCall} disabled={callLoading || !pdsConfig?.api_url}
-              className="w-full py-3.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
-              style={{
-                background: callLoading || !pdsConfig?.api_url ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#10b981,#059669)',
-                color: callLoading || !pdsConfig?.api_url ? '#334155' : '#fff',
-                boxShadow: callLoading || !pdsConfig?.api_url ? 'none' : '0 8px 20px rgba(16,185,129,0.3)'
-              }}>
-              {callLoading ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
-              {callLoading ? 'API 발신 중...' : 'PDS 발신 테스트 실행'}
-            </button>
-            {callResult && (
-              <div className={`mt-3 px-3 py-2.5 rounded-xl border ${callResult.ok ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-                <div className={`flex items-center gap-2 text-xs font-bold mb-1 ${callResult.ok ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {callResult.ok ? <Check size={13} /> : <X size={13} />}
-                  {callResult.msg}
+            {pdsConfig && (
+              <div className="mb-4 space-y-3">
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1"><Globe size={10} /> API URL</p>
+                  {cfgEditing ? (
+                    <input value={pdsConfig.api_url} onChange={e => setPdsConfig(p => ({ ...p, api_url: e.target.value }))}
+                      className="w-full bg-black/40 border border-emerald-500/20 rounded-lg px-3 py-2 text-[10px] text-white focus:outline-none focus:border-emerald-500/50 font-mono" />
+                  ) : (
+                    <div className="px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 font-mono text-[10px] text-emerald-300 break-all">{pdsConfig.api_url || '미설정'}</div>
+                  )}
                 </div>
-                {callResult.detail && <p className="text-[10px] text-slate-500 font-mono break-all">{callResult.detail.substring(0, 120)}</p>}
+
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-1">
+                    <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Method</p>
+                    {cfgEditing ? (
+                      <select value={pdsConfig.api_method} onChange={e => setPdsConfig(p => ({ ...p, api_method: e.target.value }))}
+                        className="w-full bg-black/40 border border-emerald-500/20 rounded-lg px-2 py-2 text-[10px] text-white focus:outline-none">
+                        {['POST', 'GET', 'PUT', 'PATCH'].map(m => <option key={m}>{m}</option>)}
+                      </select>
+                    ) : (
+                      <div className="px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 text-[10px] font-black text-emerald-400">{pdsConfig.api_method}</div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1"><Clock size={10} /> Timeout</p>
+                    {cfgEditing ? (
+                      <div className="flex items-center gap-1 bg-black/40 border border-emerald-500/20 rounded-lg px-2">
+                        <input type="number" value={pdsConfig.timeout_sec} onChange={e => setPdsConfig(p => ({ ...p, timeout_sec: Number(e.target.value) }))} min={1} max={60}
+                          className="w-full bg-transparent py-2 text-[10px] text-amber-400 font-black focus:outline-none font-mono" />
+                        <span className="text-[10px] text-slate-600">s</span>
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 text-[10px] font-black text-amber-400">{pdsConfig.timeout_sec}s</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Headers</p>
+                    {cfgEditing && <button onClick={() => setCfgHeaderRows(r => [...r, { key: '', val: '' }])} className="text-[9px] text-emerald-500 font-black">+ 추가</button>}
+                  </div>
+                  <div className="bg-black/30 rounded-lg border border-white/5 p-2 space-y-1">
+                    {cfgHeaderRows.map((row, i) => (
+                      cfgEditing ? (
+                        <div key={i} className="flex gap-1.5">
+                          <input value={row.key} onChange={e => setCfgHeaderRows(rows => { const n = [...rows]; n[i] = { ...n[i], key: e.target.value }; return n; })} placeholder="Key"
+                            className="flex-1 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[9px] text-white focus:outline-none font-mono min-w-0" />
+                          <input value={row.val} onChange={e => setCfgHeaderRows(rows => { const n = [...rows]; n[i] = { ...n[i], val: e.target.value }; return n; })} placeholder="Value"
+                            className="flex-1 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[9px] text-emerald-300 focus:outline-none font-mono min-w-0" />
+                          <button onClick={() => setCfgHeaderRows(r => r.filter((_, j) => j !== i))} className="text-slate-600 hover:text-red-400"><X size={10} /></button>
+                        </div>
+                      ) : row.key ? (
+                        <div key={i} className="flex gap-2 text-[9px] font-mono font-bold leading-normal">
+                          <span className="text-slate-400 shrink-0">{row.key}:</span>
+                          <span className="text-emerald-300 break-all">{row.val}</span>
+                        </div>
+                      ) : null
+                    ))}
+                    {!cfgEditing && !cfgHeaderRows.some(r => r.key) && <p className="text-[9px] text-slate-600 text-center py-1">헤더 없음</p>}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Request Body (JSON)</p>
+                  {cfgEditing ? (
+                    <textarea
+                      value={cfgBodyText}
+                      onChange={e => setCfgBodyText(e.target.value)}
+                      rows={5}
+                      className="w-full bg-black/30 border border-white/5 rounded-lg p-2 text-[9px] text-amber-300 focus:outline-none font-mono resize-y"
+                    />
+                  ) : (
+                    <div className="bg-black/30 rounded-lg border border-white/5 p-2 max-h-32 overflow-y-auto custom-scrollbar">
+                      <pre className="text-amber-300 text-[9px] font-mono whitespace-pre-wrap break-all">{cfgBodyText || '{}'}</pre>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
+
+            <div className="border-t border-white/5 pt-4">
+              <p className="text-xs font-black text-white mb-3">수동 PDS 콜 테스트</p>
+              {/* 발신자(핸드폰) 선택 */}
+              <div className="mb-3">
+                <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1.5">발신 기기 선택 (콜이 나가는 핸드폰)</p>
+                <div className="relative">
+                  <select
+                    value={selectedDevice}
+                    onChange={e => setSelectedDevice(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer appearance-none"
+                  >
+                    {pushDevices.length === 0
+                      ? <option value="">등록된 기기 없음 (앱 로그인 필요)</option>
+                      : pushDevices.map(dev => (
+                          <option key={dev.user_id} value={dev.user_id}>
+                            {dev.emp_nm ? `${dev.emp_nm} (${dev.user_id})` : `사번: ${dev.user_id}`}
+                          </option>
+                        ))
+                    }
+                  </select>
+                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1.5">수신 전화번호 (발신 대상)</p>
+                <input type="tel" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="01012345678"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500/50" />
+              </div>
+              
+              <button onClick={handleTestCall} disabled={callLoading || !pdsConfig?.api_url}
+                className="w-full py-3 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.97]"
+                style={{
+                  background: callLoading || !pdsConfig?.api_url ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#10b981,#059669)',
+                  color: callLoading || !pdsConfig?.api_url ? '#334155' : '#fff',
+                  boxShadow: callLoading || !pdsConfig?.api_url ? 'none' : '0 4px 10px rgba(16,185,129,0.3)'
+                }}>
+                {callLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                {callLoading ? 'API 발신 중...' : 'PDS 발신 테스트 실행'}
+              </button>
+              
+              {callResult && (
+                <div className={`mt-3 px-3 py-2.5 rounded-xl border ${callResult.ok ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                  <div className={`flex items-center gap-1.5 text-[10px] font-bold mb-1 ${callResult.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {callResult.ok ? <Check size={11} /> : <X size={11} />}
+                    {callResult.msg}
+                  </div>
+                  {callResult.detail && <p className="text-[9px] text-slate-500 font-mono break-all">{callResult.detail.substring(0, 150)}</p>}
+                </div>
+              )}
+            </div>
           </Card>
         )}
 
@@ -1187,6 +1374,121 @@ export default function MobileSCallertPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* 5. 발신 이력 현황 (Global Call History) */}
+        <Card accent="#0ea5e9">
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setHistOpen(v => !v)}>
+            <CardHeader icon={Phone} title="발신 이력 현황" sub="Global Call History" color="#0ea5e9"
+              extra={<span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{globalHistories.length}건</span>} />
+            {histOpen ? <ChevronUp size={14} className="text-slate-500 shrink-0 ml-2 mb-3" /> : <ChevronDown size={14} className="text-slate-500 shrink-0 ml-2 mb-3" />}
+          </div>
+          
+          {histOpen && (
+            <div className="mt-1 space-y-3">
+              {/* 필터 영역 */}
+              <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-2">
+                <div className="flex gap-2">
+                  <input type="date" value={histStartDate} onChange={e => setHistStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white focus:outline-none" />
+                  <span className="text-white/50 text-xs py-1.5">~</span>
+                  <input type="date" value={histEndDate} onChange={e => setHistEndDate(e.target.value)} style={{ colorScheme: 'dark' }} className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white focus:outline-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(() => {
+                    const honbuList = flatOrgs.filter(o => o.depth === 2);
+                    const teamList = flatOrgs.filter(o => o.depth === 3 && (!histHonbu || o.parent_id === honbuList.find(h => h.code === histHonbu)?.id));
+                    const partList = flatOrgs.filter(o => o.depth === 4 && (!histTeam || o.parent_id === flatOrgs.find(t => t.code === histTeam)?.id));
+                    return (
+                      <>
+                        <select value={histHonbu} onChange={e => { setHistHonbu(e.target.value); setHistTeam(''); setHistPart(''); }} className="bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white focus:outline-none">
+                          <option value="">본부 전체</option>
+                          {honbuList.map(h => <option key={h.code} value={h.code}>{h.name}</option>)}
+                        </select>
+                        <select value={histTeam} onChange={e => { setHistTeam(e.target.value); setHistPart(''); }} className="bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white focus:outline-none">
+                          <option value="">팀 전체</option>
+                          {teamList.map(t => <option key={t.code} value={t.code}>{t.name}</option>)}
+                        </select>
+                        <select value={histPart} onChange={e => setHistPart(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white focus:outline-none">
+                          <option value="">파트 전체</option>
+                          {partList.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                        </select>
+                        <select value={histResultFilter} onChange={e => setHistResultFilter(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white focus:outline-none">
+                          <option value="ALL">상태 전체</option>
+                          <option value="SUCCESS">통화성공</option>
+                          <option value="FAIL">통화실패</option>
+                        </select>
+                      </>
+                    );
+                  })()}
+                </div>
+                <button onClick={fetchGlobalHistories} className="w-full py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-[11px] font-bold active:scale-95 transition-all">
+                  조회하기
+                </button>
+              </div>
+
+              {/* 리스트 영역 */}
+              {globalHistoriesLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-slate-600">
+                  <Loader2 size={20} className="animate-spin opacity-40" />
+                  <span className="text-[10px] font-black tracking-widest uppercase">Loading History...</span>
+                </div>
+              ) : globalHistories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-slate-500">
+                  <PhoneOff size={20} className="opacity-40" />
+                  <span className="text-[10px] font-black tracking-widest uppercase">통화 이력이 없습니다</span>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
+                  {globalHistories.filter(hist => {
+                    const isSuccess = hist.PDS_RESULT_CD === 'SUCCESS' || (hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC > 0);
+                    const isFail = hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC === 0;
+                    if (histResultFilter === 'SUCCESS') return isSuccess;
+                    if (histResultFilter === 'FAIL') return isFail;
+                    return true;
+                  }).map((hist, idx) => {
+                    const isSuccess = hist.PDS_RESULT_CD === 'SUCCESS' || (hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC > 0);
+                    const isFail = hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC === 0;
+                    const strategyObj = strategies.find(s => s.strategy_id === hist.STRATEGY_ID);
+                    const strategyName = hist.STRATEGY_NM || strategyObj?.strategy_nm || '알 수 없는 전략';
+                    
+                    return (
+                      <div key={hist.LOG_ID || idx} className="bg-black/30 border border-white/5 rounded-xl p-3 flex flex-col gap-2">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-black text-white">{hist.EMP_NM ? hist.EMP_NM : '알 수 없음'}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">{hist.MOBILE_NO}</span>
+                            </div>
+                            <div className="text-[9px] text-slate-500 mt-1 truncate max-w-[180px]">{strategyName}</div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 text-[9px]">
+                            <span className="text-slate-500 font-mono">{(hist.CALL_DT || hist.REG_DT || '').substring(5, 16).replace('T', ' ')}</span>
+                            <span className="text-[10px] text-slate-400 font-bold bg-white/5 px-1.5 py-0.5 rounded">{hist.ATTEMPT_SEQ}회차</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] pt-2 border-t border-white/5">
+                          {(isSuccess || isFail) ? (
+                            <span className={`font-black tracking-wide border rounded px-1.5 py-0.5 ${isSuccess ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-red-500/15 text-red-400 border-red-500/30'}`}>
+                              {isSuccess ? '통화성공' : '통화실패'}
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border-slate-500/30`}>
+                              {hist.PDS_RESULT_CD || '-'}
+                            </span>
+                          )}
+                          {hist.DURATION_SEC > 0 && (
+                            <span className="font-mono text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 px-1.5 py-0.5 rounded">
+                              {hist.DURATION_SEC}초
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
