@@ -11,8 +11,9 @@ import {
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ComposedChart
+  Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ComposedChart
 } from 'recharts';
+import ReactECharts from 'echarts-for-react';
 import { getAccessToken, getAuthHeaders, getUserProfile } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
 
@@ -1245,7 +1246,7 @@ export default function RealtimePipelinePage() {
       .slice(0, 5);
 
     return (
-      <div className="flex-1 flex flex-col h-full bg-[#07090f] min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col h-full bg-zinc-950 min-h-0 overflow-hidden">
         
         {/* Full-width Funnel Header with Broadcasting Ticker */}
         <div className="flex-shrink-0 flex items-center px-4 py-2 border-b border-white/5 bg-[#0b0e17]/50 z-10 relative gap-6">
@@ -1344,7 +1345,7 @@ export default function RealtimePipelinePage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col xl:flex-row gap-4 p-2 sm:p-4 overflow-y-auto xl:overflow-hidden relative z-0">
+        <div className="flex-1 flex flex-col xl:flex-row gap-6 p-4 sm:p-6 overflow-y-auto xl:overflow-hidden relative z-0">
           
 
 
@@ -1354,7 +1355,7 @@ export default function RealtimePipelinePage() {
             <div className="flex flex-col sm:flex-row gap-3 shrink-0 h-auto sm:h-[180px]">
               
               {/* Chart 1 - System Occupancy */}
-              <div className="flex-1 min-w-0 bg-[#0b0e17] rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
+              <div className="flex-1 min-w-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
                 <div className="flex items-center gap-1.5 mb-1 shrink-0"><Layers className="w-3 h-3 text-[#00e5ff]" /><span className="text-[10px] font-black text-white">시스템 점유비</span></div>
                 <div className="flex-1 flex flex-col justify-center px-2 py-1">
                   {(() => {
@@ -1399,7 +1400,7 @@ export default function RealtimePipelinePage() {
               </div>
 
               {/* Chart 3 - Hourly Traffic (Renamed to 실시간 장애 접수 추이) */}
-              <div className="flex-1 min-w-0 bg-[#0b0e17] rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
+              <div className="flex-1 min-w-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
                 <div className="flex items-center gap-1.5 mb-1 shrink-0"><TrendingUp className="w-3 h-3 text-[#00e5ff]" /><span className="text-[10px] font-black text-white">실시간 장애 접수 추이</span></div>
                 <div style={{ flex: 1, minHeight: 0, height: 120, width: '100%' }}>
                   <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
@@ -1427,7 +1428,7 @@ export default function RealtimePipelinePage() {
             </div>
 
             {/* Bottom Row: Organizational Grid */}
-            <div className="flex-1 bg-[#0b0e17] rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
+            <div className="flex-1 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <Network className="w-4 h-4 text-blue-400" />
@@ -1547,27 +1548,87 @@ export default function RealtimePipelinePage() {
                             {activeCritical > 0 && <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-[9px] font-bold text-red-400 flex items-center gap-1 animate-pulse border border-red-500/30"><AlertTriangle className="w-2.5 h-2.5" /> 긴급 {activeCritical}건</span>}
                           </div>
                           <div className="h-[90px] w-full shrink-0 min-w-0 min-h-0">
-                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                              <BarChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
-                                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 8, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-                                <Bar dataKey="count" radius={[2, 2, 0, 0]} barSize={18}>
-                                  {chartData.map((entry, index) => (
-                                    <Cell 
-                                      key={`cell-${index}`} 
-                                      fill={entry.fill} 
-                                      className="cursor-pointer hover:opacity-80 transition-opacity"
-                                      onClick={() => {
-                                        setFilterOrgName(org.name);
-                                        setFilterOrgStage(entry.name);
-                                      }}
-                                    />
-                                  ))}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                grid: { top: 20, right: 5, bottom: 20, left: 5, containLabel: false },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  axisPointer: { type: 'shadow' },
+                                  backgroundColor: '#0f172a',
+                                  borderColor: 'rgba(255,255,255,0.1)',
+                                  textStyle: { color: '#fff', fontSize: 10, fontWeight: 'bold' }
+                                },
+                                xAxis: {
+                                  type: 'category',
+                                  data: chartData.map(d => d.name),
+                                  axisLine: { show: false },
+                                  axisTick: { show: false },
+                                  axisLabel: { color: '#64748b', fontSize: 8, fontWeight: 'bold', interval: 0 }
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { show: false },
+                                  axisLine: { show: false },
+                                  axisTick: { show: false },
+                                  splitLine: { 
+                                    show: true,
+                                    lineStyle: { type: 'dashed', color: 'rgba(255,255,255,0.05)' } 
+                                  }
+                                },
+                                series: [
+                                  {
+                                    type: 'bar',
+                                    barWidth: '60%',
+                                    data: chartData.map(entry => {
+                                      let topColor = '#00E5FF';
+                                      let bottomColor = 'rgba(0,229,255,0.1)';
+                                      let shadowColor = 'rgba(0,229,255,0.6)';
+                            
+                                      if (entry.name === '대기중') {
+                                        topColor = '#FF9100';
+                                        bottomColor = 'rgba(255,145,0,0.1)';
+                                        shadowColor = 'rgba(255,145,0,0.6)';
+                                      } else if (entry.name === '처리중') {
+                                        topColor = '#FF1744';
+                                        bottomColor = 'rgba(255,23,68,0.1)';
+                                        shadowColor = 'rgba(255,23,68,0.6)';
+                                      }
+                            
+                                      return {
+                                        value: entry.count,
+                                        itemStyle: {
+                                          color: {
+                                            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                                            colorStops: [
+                                              { offset: 0, color: topColor },
+                                              { offset: 1, color: bottomColor }
+                                            ]
+                                          },
+                                          borderRadius: [4, 4, 0, 0],
+                                          shadowBlur: 15,
+                                          shadowColor: shadowColor
+                                        }
+                                      };
+                                    }),
+                                    label: {
+                                      show: true,
+                                      position: 'top',
+                                      color: '#fff',
+                                      fontWeight: 'bold',
+                                      fontSize: 10,
+                                      formatter: (params) => params.value > 0 ? params.value : ''
+                                    }
+                                  }
+                                ]
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                              onEvents={{
+                                click: (params) => {
+                                  setFilterOrgName(org.name);
+                                  setFilterOrgStage(params.name);
+                                }
+                              }}
+                            />
                           </div>
                           <div className="mt-auto pt-2 border-t border-white/5 grid grid-cols-4 gap-1 shrink-0">
                             <div 
@@ -1610,7 +1671,7 @@ export default function RealtimePipelinePage() {
 
           {/* MIDDLE PANEL: INCIDENT LIST PICKER */}
           <div className="w-full xl:w-[420px] shrink-0 flex flex-col min-h-[400px] xl:min-h-0">
-            <div className="flex-1 bg-[#0b0e17] border border-white/5 rounded-3xl p-4 flex flex-col min-h-0 overflow-hidden shadow-lg">
+            <div className="flex-1 bg-zinc-900/40 backdrop-blur-sm border border-white/5 rounded-3xl p-4 flex flex-col min-h-0 overflow-hidden shadow-lg">
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-amber-400" /><h4 className="text-sm font-black text-white">인시던트 탐색기</h4></div>
                 <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono font-bold text-slate-400">{searchedCards.length} 건</span>
@@ -1700,34 +1761,56 @@ export default function RealtimePipelinePage() {
                   if (card.stage === 4) stageColor = 'bg-emerald-500';
 
                   return (
-                    <div key={card.inc_id} onClick={() => { setSelectedCardId(card.inc_id); }} className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${isSelected ? 'bg-[#181d2c] border-[#00e5ff]/50 shadow-[0_0_10px_rgba(0,229,255,0.15)]' : 'bg-[#121622]/60 border-white/5 hover:bg-[#121622]'}`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${stageColor}`} />
-                        <div className="truncate">
-                          <div className="flex items-center gap-1.5"><span className="text-[10px] font-black text-white font-mono">{card.inc_id}</span><span className={`text-[7px] font-mono px-1 rounded ${isCritical ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>{card.severity.substring(0,4)}</span></div>
-                          <span className="text-[8px] text-slate-500 font-bold block mt-0.5 truncate">{card.bizSystem}</span>
+                    <div key={card.inc_id} onClick={() => { setSelectedCardId(card.inc_id); }} className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2.5 group ${
+                      isSelected ? 'bg-zinc-800 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)]' 
+                      : card.stage === 1 ? 'bg-zinc-800 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:border-red-500/70'
+                      : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'
+                    }`}>
+                      <div className="flex items-center justify-between min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${stageColor}`} />
+                          <span className="text-[12px] font-black text-white font-mono">{card.inc_id}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {/* Badges */}
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isCritical ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>{card.severity}</span>
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">{card.bizSystem}</span>
                         </div>
                       </div>
-                      <div className="shrink-0 flex items-center gap-2">
-                        {card.stage === 3 ? (
-                          <span className="text-[8px] font-mono text-amber-400 font-bold bg-amber-500/10 px-1 py-0.5 rounded">
-                            {formatTime(getElapsedSeconds(card.reg_dt))}
-                          </span>
-                        ) : card.stage === 4 ? (
-                          <div className="flex flex-col items-end gap-0.5 text-[8px] font-mono font-bold leading-tight">
-                            <span className="text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded">
-                              MTTR: {formatTime(getMttrSeconds(card.reg_dt, card.closed_dt))}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-white truncate max-w-[150px]">{card.keyword || '서버/네트워크 이상'}</span>
+                        <div className="shrink-0 flex items-center gap-2">
+                          {card.stage === 1 ? (
+                            <div className="flex items-center gap-1.5 bg-red-500/10 px-2 py-1 rounded-lg border border-red-500/20">
+                              <span className="text-[9px] text-red-400/80 font-bold uppercase tracking-wider">인지대기</span>
+                              <span className="text-[11px] font-mono text-red-400 font-black animate-pulse">
+                                {(() => {
+                                  const elapsed = getElapsedSeconds(card.reg_dt);
+                                  const remaining = Math.max(180 - elapsed, 0);
+                                  const m = Math.floor(remaining / 60);
+                                  const s = remaining % 60;
+                                  return `${m}:${s.toString().padStart(2, '0')}`;
+                                })()}
+                              </span>
+                            </div>
+                          ) : card.stage === 3 ? (
+                            <span className="text-[10px] font-mono text-amber-400 font-bold bg-amber-500/10 px-2 py-1 rounded-lg">
+                              진행 {formatTime(getElapsedSeconds(card.reg_dt))}
                             </span>
-                            <span className="text-slate-500 scale-90 origin-right">
-                              {card.closed_dt ? formatDtTimeOnly(parseDate(card.closed_dt)) : '-'}
+                          ) : card.stage === 4 ? (
+                            <div className="flex flex-col items-end gap-0.5 text-[9px] font-mono font-bold leading-tight">
+                              <span className="text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
+                                MTTR: {formatTime(getMttrSeconds(card.reg_dt, card.closed_dt))}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className={`text-[9px] font-bold tracking-widest px-2 py-1 rounded-lg border flex items-center justify-center text-center uppercase ${card.stage === 1 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}>
+                              분석완료
                             </span>
-                          </div>
-                        ) : (
-                          <span className={`text-[9px] font-bold tracking-tight px-1.5 py-0.5 rounded border opacity-80 flex items-center justify-center text-center ${card.stage === 1 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}>
-                            {card.stage === 1 ? '수신' : '분석중'}
-                          </span>
-                        )}
-                        <button onClick={(e) => { e.stopPropagation(); setWorkflowPanelId(card.inc_id); }} className="ml-1 p-1 bg-white/5 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 rounded transition-colors group-hover:opacity-100 opacity-50" title="워크플로우 상세보기"><ExternalLink className="w-3 h-3" /></button>
+                          )}
+                          <span className="text-[10px] text-zinc-400 font-mono">{card.reg_dt ? formatDtTimeOnly(parseDate(card.reg_dt)) : '-'}</span>
+                          <button onClick={(e) => { e.stopPropagation(); setWorkflowPanelId(card.inc_id); }} className="p-1 hover:bg-zinc-700 text-zinc-500 hover:text-white rounded transition-colors group-hover:opacity-100 opacity-0" title="워크플로우 상세보기"><ExternalLink className="w-3.5 h-3.5" /></button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1740,7 +1823,7 @@ export default function RealtimePipelinePage() {
           <div className="w-full xl:w-[460px] shrink-0 flex flex-col min-h-[500px] xl:min-h-0">
             
             {/* 상단: 실시간 SMS 수신내역 */}
-            <div className="h-[250px] shrink-0 bg-[#0b0e17] rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg mb-4">
+            <div className="h-[250px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg mb-4">
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <div className="flex items-center gap-1.5">
                   <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
@@ -1946,7 +2029,7 @@ export default function RealtimePipelinePage() {
             </div>
           </div>
 
-          <div className="col-span-2 row-span-1 bg-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col min-h-0 relative overflow-hidden">
+          <div className="col-span-2 row-span-1 bg-zinc-900/40 backdrop-blur-sm rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col min-h-0 relative overflow-hidden">
              <div className="flex items-center gap-2 mb-3 shrink-0"><Activity className="w-4 h-4 text-amber-400" /><h2 className="text-sm font-black text-white">시스템 취약성 및 AI 방어 성과 (Top 5)</h2></div>
              <div className="flex-1 min-h-0">
               <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
@@ -1965,7 +2048,7 @@ export default function RealtimePipelinePage() {
           </div>
 
           {/* ROW 3: 24H ZERO BLIND SPOT */}
-          <div className="col-span-4 row-span-1 bg-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col relative overflow-hidden min-h-0">
+          <div className="col-span-4 row-span-1 bg-zinc-900/40 backdrop-blur-sm rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col relative overflow-hidden min-h-0">
             <div className="absolute right-0 bottom-0 w-[60%] h-full bg-gradient-to-l from-blue-900/10 to-transparent pointer-events-none" />
             <div className="flex items-center justify-between mb-4 relative z-10 shrink-0">
               <div className="flex items-center gap-3">
@@ -2001,12 +2084,12 @@ export default function RealtimePipelinePage() {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#07090f] text-[#cbd5e1] font-sans flex flex-col pb-[60px] select-none">
+    <div className="h-screen w-screen overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col pb-[60px] select-none">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full pointer-events-none" />
 
       {/* 🚀 Header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#07090f]/90 backdrop-blur-md z-[200]">
+      <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md z-[200]">
         <div className="flex items-center gap-3">
           <button onClick={() => goBack()} className="w-9 h-9 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center cursor-pointer active:scale-95"><ChevronLeft size={18} className="text-slate-400" /></button>
           <div>
@@ -2043,7 +2126,7 @@ export default function RealtimePipelinePage() {
           />
           {/* Panel */}
           <div
-            className="relative w-full bg-[#07090f] border-t border-white/10 rounded-t-3xl shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col"
+            className="relative w-full bg-zinc-950 border-t border-white/10 rounded-t-3xl shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col"
             style={{ height: '85vh', animation: 'slideUp 0.35s cubic-bezier(0.32,0.72,0,1)' }}
           >
             {/* Handle bar */}
