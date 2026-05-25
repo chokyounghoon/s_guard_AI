@@ -249,16 +249,9 @@ export default function MobileLoginPage() {
           )}
         </button>
 
-        {/* 회원가입 / 비밀번호 재설정 링크 */}
+        {/* 비밀번호 재설정 링크 */}
         {step === 'id' && (
           <div className="mt-6 flex items-center justify-center gap-4 text-xs font-bold">
-            <button 
-              onClick={() => navigate('/signup')} 
-              className="text-slate-400 hover:text-white transition-colors"
-            >
-              회원가입
-            </button>
-            <div className="w-[1px] h-3 bg-white/10" />
             <button 
               onClick={() => navigate('/reset-password')} 
               className="text-slate-400 hover:text-white transition-colors"

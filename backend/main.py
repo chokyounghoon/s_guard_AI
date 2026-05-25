@@ -27,6 +27,9 @@ import websockets
 import asyncio
 from dotenv import load_dotenv
 
+# Tokenizer import
+from utils.tokenizer import tokenizer
+
 # .env 파일 로드
 load_dotenv()
 
@@ -117,10 +120,14 @@ class InboxItem(BaseModel):
     action_link: Optional[str] = None
 
 # Dify API Configuration
-DIFY_API_KEY_DASHBOARD = os.getenv("DIFY_API_KEY_DASHBOARD", "app-TSlqmp329iKOzpXUP90iC6Kw")
-DIFY_API_KEY_ASSISTANT = os.getenv("DIFY_API_KEY_ASSISTANT", "app-ZDaVB8EWtA5vmTYJLmbysdQq")
-DIFY_API_KEY_SUMMARIZER = os.getenv("DIFY_API_KEY_SUMMARIZER", "app-owwPp3j2qAvVDZpW2UUiY8L3")
-DIFY_API_KEY_GOVERNANCE = os.getenv("DIFY_API_KEY_GOVERNANCE", "app-QHxJQTBSKJlTw2gVeGgTk915")
+DIFY_API_KEY_DASHBOARD = os.getenv("DIFY_API_KEY_DASHBOARD")
+DIFY_API_KEY_ASSISTANT = os.getenv("DIFY_API_KEY_ASSISTANT")
+DIFY_API_KEY_SUMMARIZER = os.getenv("DIFY_API_KEY_SUMMARIZER")
+DIFY_API_KEY_GOVERNANCE = os.getenv("DIFY_API_KEY_GOVERNANCE")
+
+if not DIFY_API_KEY_DASHBOARD:
+    raise ValueError("CRITICAL SECURITY ERROR: DIFY_API_KEY_DASHBOARD is not set in environment variables.")
+
 DIFY_API_KEY = DIFY_API_KEY_DASHBOARD # ✅ Default to Dashboard (Chat App)
 DIFY_API_BASE = os.getenv("DIFY_API_BASE", "https://api.dify.ai/v1")
 DIFY_DATASET_ID = os.getenv("DIFY_DATASET_ID", "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
@@ -166,8 +173,15 @@ class DifyClient:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
+        tokenized_inputs = {}
+        for k, v in inputs.items():
+            if isinstance(v, str):
+                tokenized_inputs[k] = tokenizer.tokenize(v, session_id=user)
+            else:
+                tokenized_inputs[k] = v
+
         payload = {
-            "inputs": inputs,
+            "inputs": tokenized_inputs,
             "response_mode": "streaming",
             "user": user
         }
@@ -185,7 +199,8 @@ class DifyClient:
                             return
                         async for line in response.aiter_lines():
                             if line:
-                                yield line + "\n\n"
+                                detokenized_line = tokenizer.detokenize(line, session_id=user)
+                                yield detokenized_line + "\n\n"
                 except Exception as e:
                     logger.error(f"Dify Workflow system error: {e}")
                     yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
@@ -216,9 +231,19 @@ class DifyClient:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
+        
+        tokenized_inputs = {}
+        for k, v in inputs.items():
+            if isinstance(v, str):
+                tokenized_inputs[k] = tokenizer.tokenize(v, session_id=user)
+            else:
+                tokenized_inputs[k] = v
+                
+        tokenized_query = tokenizer.tokenize(query, session_id=user)
+
         payload = {
-            "inputs": inputs,
-            "query": query,
+            "inputs": tokenized_inputs,
+            "query": tokenized_query,
             "response_mode": "streaming",
             "user": user,
             "files": files
@@ -291,6 +316,7 @@ class DifyClient:
                                 if event in ("message", "agent_message"):
                                     answer = data.get("answer", "")
                                     if answer:
+                                        answer = tokenizer.detokenize(answer, session_id=user)
                                         emitted_any_answer = True
                                         yield f"data: {json.dumps({'answer': answer}, ensure_ascii=False)}\n\n"
                                     continue
@@ -300,6 +326,7 @@ class DifyClient:
                                     outputs = (data.get("data") or {}).get("outputs") or {}
                                     answer = outputs.get("answer") if isinstance(outputs, dict) else None
                                     if isinstance(answer, str) and answer:
+                                        answer = tokenizer.detokenize(answer, session_id=user)
                                         emitted_any_answer = True
                                         yield f"data: {json.dumps({'answer': answer}, ensure_ascii=False)}\n\n"
                                         yield "data: [DONE]\n\n"
@@ -346,6 +373,7 @@ class DifyClient:
                                         logger.info(f"Dify raw result extracted: type={type(answer).__name__} val={repr(answer)[:100]}")
                                         
                                         if isinstance(answer, str) and answer.strip():
+                                            answer = tokenizer.detokenize(answer, session_id=user)
                                             logger.info(f"Dify workflow polling found result in outputs (status={status})")
                                             yield f"data: {json.dumps({'answer': answer}, ensure_ascii=False)}\n\n"
                                             yield "data: [DONE]\n\n"

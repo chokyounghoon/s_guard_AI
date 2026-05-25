@@ -477,19 +477,22 @@ app.post('/auth/push-subscribe', async (c) => {
   }
 
   try {
+    const now = getKst();
     await db.prepare(`
-      INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, mod_dt)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(endpoint) DO UPDATE SET
         user_id = excluded.user_id,
         p256dh = excluded.p256dh,
         auth = excluded.auth,
-        mod_dt = CURRENT_TIMESTAMP
+        mod_dt = ?
     `).bind(
       subscription.endpoint,
       user.employee_id,
       subscription.keys.p256dh,
-      subscription.keys.auth
+      subscription.keys.auth,
+      now,
+      now
     ).run();
 
     return c.json({ success: true, message: 'Push subscription saved' });
@@ -2683,7 +2686,7 @@ app.post('/auth/reset/verify', async (c) => {
   if (password) {
     const hashedPw = await hashPassword(password)
     await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ?, status = 'ACTIVE' WHERE employee_id = ?")
-      .bind(hashedPw, modDt, 'SYSTEM', employee_id.trim())
+      .bind(hashedPw, modDt, employee_id.trim(), employee_id.trim())
       .run()
 
     // 🛡️ 성공 안내 메일 발송
@@ -2708,7 +2711,7 @@ app.post('/auth/reset/verify', async (c) => {
     const hashedTempPassword = await hashPassword(temp_password)
     
     await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
-      .bind(hashedTempPassword, modDt, 'SYSTEM', employee_id.trim())
+      .bind(hashedTempPassword, modDt, employee_id.trim(), employee_id.trim())
       .run()
 
     await sendEmail(c, {
@@ -3842,8 +3845,9 @@ app.post('/sms/settings', async (c) => {
   const { key, value } = body;
 
   try {
-    await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-             .bind(key, String(value)).run();
+    const now = getKst();
+    await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, ?)")
+             .bind(key, String(value), now).run();
     return c.json({ success: true, message: `Setting ${key} updated to ${value}` });
   } catch (e) {
     return c.json({ success: false, error: e.message }, 500);
@@ -4470,7 +4474,7 @@ app.post('/sms/codebook', async (c) => {
     data.category, data.code, data.name, data.sort_order || 0, 
     data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
     data.description || null,
-    data.reg_id || 'SYSTEM', now, data.mod_id || 'SYSTEM', now
+    c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now
   ).run()
   
   return c.json({ status: "success", id: res.meta.last_row_id })
@@ -4801,7 +4805,7 @@ app.post('/incidents', async (c) => {
       rawId, finalTitle, data.description || null, data.severity || 'NORMAL',
       data.status || 'INC_001', data.incident_type || 'AI', data.assigned_to || null,
       data.source_sms_id || null, data.ai_insight || null,
-      'SYSTEM', now, 'SYSTEM', now, now, now
+      c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now, now, now
     ).run()
 
     return c.json({ status: "success", id: rawId, title: finalTitle })
@@ -4824,7 +4828,7 @@ app.post('/incident-history', async (c) => {
   `).bind(
     data.sms_id, data.target_system, data.error_code || null, 
     data.problem_description, data.severity,
-    'SYSTEM', now, 'SYSTEM', now, now
+    c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now, now
   ).run()
   
   return c.json({ status: "success", id: res.meta.last_row_id })
@@ -5201,7 +5205,7 @@ app.post('/activity-logs', async (c) => {
   `).bind(
     inc_id || 'UNKNOWN', data.user_name || 'System', data.user_id || null, inc_id, data.incident_title || null,
     data.action, data.detail || null, data.report_type || '시스템',
-    'SYSTEM', now, 'SYSTEM', now, now
+    c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now, now
   ).run()
   
   return c.json({ status: "success" })
@@ -5500,7 +5504,7 @@ app.post('/ai/insight/save', async (c) => {
     INSERT OR REPLACE INTO autopilot_insight 
     (inc_id, content, severity, category, reg_id, reg_dt, mod_id, mod_dt, similarity_score, similarity_reason)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(norm_id, content, severity, category, user_id || 'SYSTEM', now, user_id || 'SYSTEM', now, (similarity_score !== undefined && similarity_score !== null) ? similarity_score : null, (similarity_reason !== undefined && similarity_reason !== null) ? similarity_reason : null).run()
+  `).bind(norm_id, content, severity, category, user_id || c.get('user')?.employee_id || 'SYSTEM', now, user_id || c.get('user')?.employee_id || 'SYSTEM', now, (similarity_score !== undefined && similarity_score !== null) ? similarity_score : null, (similarity_reason !== undefined && similarity_reason !== null) ? similarity_reason : null).run()
   
   return c.json({ status: 'saved', inc_id: norm_id })
 })
@@ -6375,14 +6379,15 @@ app.post('/db/summary', async (c) => {
   const { inc_id, summary, model } = await c.req.json()
   const db = c.env.DB
   try {
+    const now = getKst();
     await db.prepare(`
       INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?)
       ON CONFLICT(inc_id) DO UPDATE SET 
         summary = excluded.summary,
         model = excluded.model,
-        mod_dt = CURRENT_TIMESTAMP
-    `).bind(inc_id, summary, model || 'dify-summarizer').run()
+        mod_dt = ?
+    `).bind(inc_id, summary, model || 'dify-summarizer', now, now).run()
     return c.json({ success: true })
   } catch (e) {
     return c.json({ error: e.message }, 500)
@@ -6960,10 +6965,10 @@ app.post('/ai/warroom/open', async (c) => {
   await db.prepare(`
     INSERT OR IGNORE INTO incidents (inc_id, title, status, severity, incident_type, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at)
     VALUES (?, ?, 'INC_002', ?, 'AI', ?, ?, ?, ?, ?, ?)
-  `).bind(normId, cleanTitle, severity || 'NORMAL', creator_id || 'SYSTEM', now, creator_id || 'SYSTEM', now, now, now).run()
+  `).bind(normId, cleanTitle, severity || 'NORMAL', creator_id || c.get('user')?.employee_id || 'SYSTEM', now, creator_id || c.get('user')?.employee_id || 'SYSTEM', now, now, now).run()
 
   await db.prepare("UPDATE incidents SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, now, creator_id || 'SYSTEM', normId).run()
+    .bind(now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
 
   // 🚀 NEW: Ensure creator is in incident_assignments with status 'INC_002'
   await db.prepare(`
@@ -6972,13 +6977,13 @@ app.post('/ai/warroom/open', async (c) => {
     ON CONFLICT(user_id, inc_id) 
     DO UPDATE SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ?
   `).bind(
-    creator_id, normId, now, now, creator_id || 'SYSTEM', now, creator_id || 'SYSTEM', now,
-    now, now, creator_id || 'SYSTEM'
+    creator_id, normId, now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM', now, creator_id || c.get('user')?.employee_id || 'SYSTEM', now,
+    now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM'
   ).run();
 
   // Update assignment status to 'INC_002' for all assignees of this incident
   await db.prepare("UPDATE incident_assignments SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, now, creator_id || 'SYSTEM', normId).run()
+    .bind(now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
 
   // Release Lock if exists (KV cleanup)
   const kv = c.env.SMS_STORAGE;
@@ -7042,7 +7047,7 @@ app.post('/ai/report/save', async (c) => {
   const now = getKst()
   
   const normId = String(inc_id);
-  const empId = user_id || 'SYSTEM'
+  const empId = user_id || c.get('user')?.employee_id || 'SYSTEM'
   
   // 1. Log activity
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '보고서 생성', ?, ?)")
@@ -7368,7 +7373,7 @@ app.post('/warroom/join', async (c) => {
       await db.prepare(`
         INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
         VALUES (?, ?, ?, '워룸 참여', ?, ?)
-      `).bind(normId, normId, user_id || 'SYSTEM', `워룸에 참여했습니다${inviterNote}.`, now).run();
+      `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', `워룸에 참여했습니다${inviterNote}.`, now).run();
     }
   } catch(e) { console.error('[ActivityLog-Join]', e.message); }
     
@@ -7399,8 +7404,9 @@ app.post('/api/v1/system/threshold', async (c) => {
   
   try {
     // 🚀 Primary: Save to D1 for AI Engine
-    await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-             .bind('similarity_threshold_technical', String(threshold)).run();
+    const now = getKst();
+    await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, ?)")
+             .bind('similarity_threshold_technical', String(threshold), now).run();
              
     // 🛡️ Secondary: Save to KV for Legacy UI Compatibility
     if (kv && threshold) {
@@ -7695,7 +7701,7 @@ app.post('/ai/knowledge/save', async (c) => {
   const ai = c.env.AI
   const vectorIndex = c.env.WARROOM_INDEX
   const now = getKst()
-  const user_id = body.user_id || 'SYSTEM'
+  const user_id = body.user_id || c.get('user')?.employee_id || 'SYSTEM'
   
   // Guard clause against Dify Workflow default template injection (unmapped variables)
   if ((body.title && body.title.includes('{{sys.')) || (body.content && body.content.includes('{{LLM.'))) {
@@ -8117,7 +8123,7 @@ app.post('/warroom/resolve-only', async (c) => {
     .bind(user_id, now, normId).run();
   
   await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, now, user_id || 'SYSTEM', normId).run();
+    .bind(now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
 
   await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
     .bind(now, now, user_id, normId).run();
@@ -8135,14 +8141,14 @@ app.post('/ai/warroom/close', async (c) => {
   
   const normId = String(inc_id);
   await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, user_id || 'SYSTEM', normId).run()
+    .bind(now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
     
   await db.prepare("UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, now, user_id || 'SYSTEM', normId).run();
+    .bind(now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
 
   // Cascading update for all participants
   await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, now, user_id || 'SYSTEM', normId).run();
+    .bind(now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
     
   // Log termination
   await db.prepare("INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at) VALUES (?, ?, ?, '워룸 종료', '워룸이 종료되고 인시던트 처리가 완료되었습니다.', ?)")
@@ -8211,7 +8217,7 @@ app.post('/ai/incident/status', async (c) => {
     UPDATE incident_assignments 
     SET status = ?, updated_at = ?, mod_dt = ?, mod_id = ?
     WHERE user_id = ? AND inc_id = ?
-  `).bind(status, now, now, user_id || 'SYSTEM', user_id, normId).run()
+  `).bind(status, now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', user_id, normId).run()
 
   // 🚀 [Activity Log] 인시던트 상태 변경
   try {
@@ -8219,7 +8225,7 @@ app.post('/ai/incident/status', async (c) => {
     await db.prepare(`
       INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
       VALUES (?, ?, ?, '상태 변경', ?, ?)
-    `).bind(normId, normId, user_id || 'SYSTEM', `담당자 상태가 '${statusLabel}'으로 변경되었습니다.`, now).run();
+    `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', `담당자 상태가 '${statusLabel}'으로 변경되었습니다.`, now).run();
   } catch(e) { console.error('[ActivityLog-Status]', e.message); }
   
   return c.json({ status: 'updated', user_id, inc_id: normId, new_status: status })
@@ -8429,7 +8435,7 @@ app.post('/warroom/leave', async (c) => {
     await db.prepare(`
       INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
       VALUES (?, ?, ?, '워룸 퇴장', '워룸에서 나갔습니다.', ?)
-    `).bind(normId, normId, user_id || 'SYSTEM', now).run();
+    `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', now).run();
   } catch(e) { console.error('[ActivityLog-Leave]', e.message); }
   return c.json({ status: 'left', user_id, inc_id })
 })
@@ -8458,7 +8464,7 @@ app.patch('/incidents/:id', async (c) => {
         mod_dt = ?,
         mod_id = ?
     WHERE inc_id = ?
-  `).bind(finalTitle || null, data.description || null, data.severity || null, data.status || null, data.assigned_to || null, now, data.user_id || 'SYSTEM', rawId).run()
+  `).bind(finalTitle || null, data.description || null, data.severity || null, data.status || null, data.assigned_to || null, now, data.user_id || c.get('user')?.employee_id || 'SYSTEM', rawId).run()
   
   return c.json({ status: "success", id: rawId, title: finalTitle })
 })
@@ -8476,7 +8482,7 @@ app.post('/ai/warroom/invite', async (c) => {
       await db.prepare(`
         INSERT INTO activity_logs (inc_id, incident_code, user_id, action, detail, created_at)
         VALUES (?, ?, ?, '워룸 초대', '워룸에 초대되어 참여했습니다.', ?)
-      `).bind(normId, normId, user_id || 'SYSTEM', now).run();
+      `).bind(normId, normId, user_id || c.get('user')?.employee_id || 'SYSTEM', now).run();
     }
   } catch(e) { console.error('[ActivityLog-Invite]', e.message); }
   return c.json({ status: 'invited', user_id, inc_id })
@@ -8697,7 +8703,7 @@ app.post('/incidents', async (c) => {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     rawId, finalTitle, description, severity, 'INC_001', incident_type, source_sms_id || null, 
-    'SYSTEM', now, 'SYSTEM', now, now
+    c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now, now
   ).run()
   return c.json({ status: 'created', inc_id: rawId, title: finalTitle })
 })
@@ -8929,15 +8935,15 @@ app.post('/warroom/resolve', async (c) => {
   try {
     // 1. Update War-Room Status
     await db.prepare("UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-      .bind(now, user_id || 'SYSTEM', incident_id).run();
+      .bind(now, user_id || c.get('user')?.employee_id || 'SYSTEM', incident_id).run();
 
     // 2. Update Incident Status to 'INC_003'
     await db.prepare("UPDATE incidents SET status = 'INC_003', mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-      .bind(now, user_id || 'SYSTEM', normId).run();
+      .bind(now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
 
     // 3. Update ALL incident assignments to 'INC_003' (check both ID formats)
     await db.prepare("UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-      .bind(now, now, user_id || 'SYSTEM', normId).run();
+      .bind(now, now, user_id || c.get('user')?.employee_id || 'SYSTEM', normId).run();
 
     return c.json({ success: true, status: '최종완료' });
   } catch (err) {
@@ -9056,7 +9062,7 @@ app.post('/ai/register-knowledge', async (c) => {
 
     // 2. Insert into D1 (knowledge_base table)
     const now = getKst();
-    const actor = user_id || 'SYSTEM';
+    const actor = user_id || c.get('user')?.employee_id || 'SYSTEM';
 
     const result = await db.prepare(`
       INSERT INTO knowledge_base (
@@ -9192,7 +9198,7 @@ app.post('/ai/governance/approve', async (c) => {
     }
 
     // UPSERT Knowledge: Ensure exactly 1 row per inc_id
-    const actor = user_id || 'SYSTEM';
+    const actor = user_id || c.get('user')?.employee_id || 'SYSTEM';
     const kbResult = await db.prepare(`
       INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector, status)
       VALUES (?, ?, ?, '거버넌스 승인', ?, ?, ?, ?, ?, 'PENDING')
@@ -9536,17 +9542,17 @@ app.post('/api/v1/reports/submit', async (c) => {
     // 1. Update Incident Status to 'INC_003'
     await db.prepare(`
       UPDATE incidents SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?
-    `).bind(now, now, sender_id || 'SYSTEM', normId).run()
+    `).bind(now, now, sender_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
 
     // 1-1. Update WarRoom Status to 'CLOSED'
     await db.prepare(`
       UPDATE warroom_list SET status = 'CLOSED', mod_dt = ?, mod_id = ? WHERE inc_id = ?
-    `).bind(now, sender_id || 'SYSTEM', normId).run()
+    `).bind(now, sender_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
 
     // 1-2. Update All Assignees Status to 'INC_003'
     await db.prepare(`
       UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?
-    `).bind(now, now, sender_id || 'SYSTEM', normId).run()
+    `).bind(now, now, sender_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
     
     // 2. Generate embedding for Vector Search
     const ai = c.env.AI;
@@ -9800,7 +9806,7 @@ app.post('/inbox', async (c) => {
     user_id, type, sender_id || null, sender_name || 'System',
     title, content || null, preview || null, urgency || 'NORMAL',
     inc_id || null, action_link || null, now,
-    'SYSTEM', now, 'SYSTEM', now,
+    c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now,
     user_id
   ).run()
 
@@ -10047,7 +10053,7 @@ export class WarRoom {
 
               // 🚀 NEW: Also update incidents table status to 'INC_002'
               await this.env.DB.prepare("UPDATE incidents SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-                .bind(now, now, data.user_id || 'SYSTEM', data.incident_id).run();
+                .bind(now, now, data.user_id || c.get('user')?.employee_id || 'SYSTEM', data.incident_id).run();
 
               console.log(`[DO] [${data.incident_id}] Status updated to 'INC_002' for joiner: ${data.user_id}`);
             } catch (e) {
@@ -10464,7 +10470,7 @@ app.post('/scallert/strategies', async (c) => {
       strategyId, body.strategy_nm, body.strategy_cont || '1', body.apply_start_dt, body.apply_end_dt, 
       body.max_call_cnt || 3, body.use_yn || 'Y', body.priority || 99, body.delay_sec || 0,
       JSON.stringify(body.valid_conditions || []),
-      body.reg_id || 'SYSTEM', now, body.reg_id || 'SYSTEM', now
+      c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now
     ).run();
     return c.json({ success: true, strategy_id: strategyId });
   } catch (e) {
@@ -10563,7 +10569,7 @@ app.post('/scallert/strategies/:id/targets', async (c) => {
     const res = await db.prepare(`
       INSERT INTO TB_SCL_TARGET_INFO (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, SORT_ORD, REG_ID, REG_DT)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(id, body.emp_id, body.emp_nm, encryptedMobileNo, body.sort_ord || 0, body.mod_id || 'SYSTEM', now).run();
+    `).bind(id, body.emp_id, body.emp_nm, encryptedMobileNo, body.sort_ord || 0, c.get('user')?.employee_id || 'SYSTEM', now).run();
     return c.json({ success: true, seq_no: res.meta.last_row_id });
   } catch (e) {
     return c.json({ error: e.message }, 500);
@@ -10584,7 +10590,7 @@ app.patch('/scallert/targets/:seq', async (c) => {
       UPDATE TB_SCL_TARGET_INFO 
       SET EMP_ID = ?, EMP_NM = ?, MOBILE_NO = ?, SORT_ORD = ?, MOD_ID = ?, MOD_DT = ?
       WHERE SEQ_NO = ?
-    `).bind(body.emp_id, body.emp_nm, encryptedMobileNo, body.sort_ord || 0, body.mod_id || 'SYSTEM', now, seq).run();
+    `).bind(body.emp_id, body.emp_nm, encryptedMobileNo, body.sort_ord || 0, c.get('user')?.employee_id || 'SYSTEM', now, seq).run();
     return c.json({ success: true });
   } catch (e) {
     return c.json({ error: e.message }, 500);
@@ -11037,12 +11043,11 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
 
     const dispatchDeviceId = payload.employee_id || globalDispatcherId || target.EMP_ID;
 
-    // 🚀 FIXED: DO Alarm 환경에서는 DB 패치가 안 되어 암호화된 상태로 넘어오므로 여기서 수동 복호화
+    // 🚀 FIXED: DO Alarm 환경에서는 DB 패치가 안 되어 암호화된 상태로 넘어오므로 앱 푸시 발송용으로만 임시 복호화 수행 (DB 저장용 target.MOBILE_NO는 암호화 원본 유지)
     let finalMobileNo = target.MOBILE_NO;
     if (typeof finalMobileNo === 'string' && finalMobileNo.startsWith('aesgcm:')) {
       const secretKey = env.AES_SECRET_KEY || 'sguard-default-256-bit-secret-key-12345!';
       finalMobileNo = await decryptAES(finalMobileNo, secretKey);
-      target.MOBILE_NO = finalMobileNo; // update object for subsequent logs
     }
 
     await db.prepare(`
@@ -11205,12 +11210,12 @@ app.post('/scallert/strategies/:id/config', async (c) => {
     if (existing) {
       await db.prepare(`UPDATE TB_SCL_PDS_CONFIG SET API_URL=?,API_METHOD=?,API_HEADERS=?,API_PARAMS=?,TIMEOUT_SEC=?,MOD_ID=?,MOD_DT=? WHERE CONFIG_ID=?`)
         .bind(body.api_url||'', body.api_method||'POST', JSON.stringify(body.api_headers||{}), JSON.stringify(body.api_params||{}),
-              body.timeout_sec||10, body.reg_id||'SYSTEM', now, existing.CONFIG_ID).run();
+              body.timeout_sec||10, c.get('user')?.employee_id || 'SYSTEM', now, existing.CONFIG_ID).run();
       return c.json({ success: true, config_id: existing.CONFIG_ID });
     } else {
       const res = await db.prepare(`INSERT INTO TB_SCL_PDS_CONFIG (STRATEGY_ID,API_URL,API_METHOD,API_HEADERS,API_PARAMS,TIMEOUT_SEC,USE_YN,REG_ID,REG_DT,MOD_ID,MOD_DT) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
         .bind(id, body.api_url||'', body.api_method||'POST', JSON.stringify(body.api_headers||{}), JSON.stringify(body.api_params||{}),
-              body.timeout_sec||10, 'Y', body.reg_id||'SYSTEM', now, body.reg_id||'SYSTEM', now).run();
+              body.timeout_sec||10, 'Y', c.get('user')?.employee_id || 'SYSTEM', now, c.get('user')?.employee_id || 'SYSTEM', now).run();
       return c.json({ success: true, config_id: res.meta.last_row_id });
     }
   } catch (e) { return c.json({ error: e.message }, 500); }
@@ -11283,7 +11288,7 @@ app.post('/scallert/strategies/:id/test-call', async (c) => {
     const encryptedParams = await encryptAES(JSON.stringify(apiParams), secretKey);
 
     await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID,API_URL,API_METHOD,REQ_PARAMS,STATUS_CODE,RESPONSE_BODY,ELAPSED_MS,SUCCESS,TESTED_BY,TESTED_AT) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .bind(id, apiUrl, apiMethod, encryptedParams, statusCode, responseBody.substring(0,2000), elapsed, success?'Y':'N', body.tested_by||'SYSTEM', now).run();
+      .bind(id, apiUrl, apiMethod, encryptedParams, statusCode, responseBody.substring(0,2000), elapsed, success?'Y':'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
   } catch {}
 
   return c.json({ success, status_code: statusCode, response: responseBody, elapsed_ms: elapsed, tested_at: now });
@@ -11438,18 +11443,21 @@ app.post('/call/event', async (c) => {
       REG_DT TEXT
     )`).run();
 
+    const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+    const encryptedPhone = await encryptAES(phone_number, secretKey);
+
     await db.prepare(`
       INSERT INTO TB_SCL_APP_EVENT_LOG (EMPLOYEE_ID, PHONE_NUMBER, EVENT_TYPE, TIMESTAMP, EVENT_TIME, REG_DT)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(employee_id, phone_number, event_type, timestamp || Date.now(), eventTimeStr, now).run();
+    `).bind(employee_id, encryptedPhone, event_type, timestamp || Date.now(), eventTimeStr, now).run();
 
     // 가장 최근의 대기 중이거나 진행 중인 통화 이력 찾기
-    const cleanPhone = phone_number.replace(/[^0-9]/g, '');
+    // 보안 패치: PII 보호를 위해 평문 phone_number 매칭 제거, employee_id 만으로 매칭
     const matchedCall = await db.prepare(`
       SELECT * FROM TB_SCL_CALL_HIST
-      WHERE (EMP_ID = ? OR REPLACE(MOBILE_NO, '-', '') = ?)
+      WHERE EMP_ID = ?
       ORDER BY LOG_ID DESC LIMIT 1
-    `).bind(employee_id, cleanPhone).first();
+    `).bind(employee_id).first();
 
     if (matchedCall) {
       const currentTs = timestamp || Date.now();
@@ -11546,7 +11554,19 @@ app.get('/scallert/app-events', async (c) => {
       LEFT JOIN users u ON e.EMPLOYEE_ID = u.employee_id
       ORDER BY e.LOG_ID DESC LIMIT ?
     `).bind(limit).all();
-    return c.json(results || []);
+
+    const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+    const decryptedResults = await Promise.all((results || []).map(async (row) => {
+      let decryptedPhone = row.PHONE_NUMBER;
+      if (typeof decryptedPhone === 'string' && decryptedPhone.startsWith('aesgcm:')) {
+         try {
+           decryptedPhone = await decryptAES(decryptedPhone, secretKey);
+         } catch(e) {}
+      }
+      return { ...row, PHONE_NUMBER: decryptedPhone };
+    }));
+
+    return c.json(decryptedResults);
   } catch (e) {
     return c.json({ error: e.message }, 500);
   }
