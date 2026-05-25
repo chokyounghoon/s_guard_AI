@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
 import { SMS_WORKER_URL } from '../config/api';
+import { maskName, maskPhone } from '../utils/maskingUtils';
 
 const API_BASE = SMS_WORKER_URL || 'https://sguardai.khcho0421.workers.dev';
 
@@ -232,6 +233,7 @@ export default function SCallertPage() {
   const [appEvents, setAppEvents] = useState([]);
   const [appEventsLoading, setAppEventsLoading] = useState(false);
   const [autoRefreshEvents, setAutoRefreshEvents] = useState(true);
+  const [appEventsExpanded, setAppEventsExpanded] = useState(true);
   const [testPhoneNumber, setTestPhoneNumber] = useState('01012345678');
   const [mockEmpId, setMockEmpId] = useState('12345');
   const [mockPhone, setMockPhone] = useState('01012345678');
@@ -253,6 +255,7 @@ export default function SCallertPage() {
   const [histHonbu, setHistHonbu] = useState(userProfile?.honbu || '');
   const [histTeam, setHistTeam] = useState(userProfile?.team || '');
   const [histPart, setHistPart] = useState(userProfile?.part || '');
+  const [histResultFilter, setHistResultFilter] = useState('ALL');
 
   const [ticker, setTicker] = useState(0);
   useEffect(() => {
@@ -1533,10 +1536,10 @@ export default function SCallertPage() {
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-black text-white">{item.emp_nm || item.EMP_NM}</span>
+                                <span className="text-xs font-black text-white">{maskName(item.emp_nm || item.EMP_NM)}</span>
                                 <span className="text-[9px] text-slate-500 font-mono">({item.emp_id || item.EMP_ID})</span>
                               </div>
-                              <span className="text-[10px] text-slate-400 font-mono font-bold mt-0.5 block">{item.mobile_no || item.MOBILE_NO}</span>
+                              <span className="text-[10px] text-slate-400 font-mono font-bold mt-0.5 block">{maskPhone(item.mobile_no || item.MOBILE_NO)}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1593,12 +1596,14 @@ export default function SCallertPage() {
                     <Activity size={15} color="#10b981" />
                   </div>
                   <div>
-                    <p className="text-sm font-black text-white whitespace-nowrap">앱 통화 상태 실시간 수신 이력</p>
+                    <p className="text-sm font-black text-white whitespace-nowrap cursor-pointer" onClick={() => setAppEventsExpanded(v => !v)}>
+                      앱 통화 상태 실시간 수신 이력
+                    </p>
                     <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 whitespace-nowrap">App Call Status Webhook Logs</p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end flex-1 gap-2">
                   {/* 필터 */}
                   <button
                     onClick={() => setFilterCurrentTargets(v => !v)}
@@ -1630,12 +1635,22 @@ export default function SCallertPage() {
                   >
                     <RefreshCw size={13} className={appEventsLoading ? 'animate-spin' : ''} />
                   </button>
+
+                  {/* 접기/펼치기 토글 */}
+                  <button
+                    onClick={() => setAppEventsExpanded(v => !v)}
+                    className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 hover:text-white transition-all cursor-pointer ml-1"
+                  >
+                    {appEventsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
                 </div>
               </div>
 
-              {/* Webhook 상태 필터 패널 */}
-              <div className="mb-6 p-4 bg-white/[0.02] border border-white/5 rounded-2.5xl relative z-10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
+              {/* Webhook 상태 필터 패널 및 테이블 */}
+              {appEventsExpanded && (
+                <>
+                  <div className="mb-6 p-4 bg-white/[0.02] border border-white/5 rounded-2.5xl relative z-10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
                   <Globe size={11} className="text-cyan-400" /> 통화 상태 필터 (Status Filter)
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
@@ -1744,8 +1759,8 @@ export default function SCallertPage() {
                             <tr key={evt.LOG_ID} className="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
                               <td className="px-4 py-2.5 text-slate-400">{evt.EVENT_TIME || evt.REG_DT?.slice(0, 19)}</td>
                               <td className="px-4 py-2.5 text-slate-200 font-bold">{targetId}</td>
-                              <td className="px-4 py-2.5 text-cyan-300 font-bold">{targetName}</td>
-                              <td className="px-4 py-2.5 text-slate-300">{evt.PHONE_NUMBER}</td>
+                              <td className="px-4 py-2.5 text-cyan-300 font-bold">{maskName(targetName)}</td>
+                              <td className="px-4 py-2.5 text-slate-300">{maskPhone(evt.PHONE_NUMBER)}</td>
                               <td className="px-4 py-2.5 text-center">
                                 {(() => {
                                   const et = (evt.EVENT_TYPE || '').toUpperCase();
@@ -1789,7 +1804,9 @@ export default function SCallertPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+                  </div>
+                </>
+              )}
             </section>
           </div>
             {/* Column 2: Global Call History + PDS API 설정 */}
@@ -1823,6 +1840,11 @@ export default function SCallertPage() {
                           <option value="">파트 전체</option>
                           {partList.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                         </select>
+                        <select value={histResultFilter} onChange={e => setHistResultFilter(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-[11px] text-white focus:outline-none focus:border-cyan-500 w-24">
+                          <option value="ALL">상태 전체</option>
+                          <option value="SUCCESS">통화성공</option>
+                          <option value="FAIL">통화실패</option>
+                        </select>
                       </>
                     );
                   })()}
@@ -1845,15 +1867,25 @@ export default function SCallertPage() {
                     </div>
                   ) : (
                     <div className="space-y-3 relative z-10 flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0">
-                      {globalHistories.map((hist, idx) => {
-                        const isSuccess = hist.PDS_RESULT_CD === 'SUCCESS' || (hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC >= 15);
-                        const isFail = hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC < 15;
+                      {globalHistories.filter(hist => {
+                        const isSuccess = hist.PDS_RESULT_CD === 'SUCCESS' || (hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC > 0);
+                        const isFail = hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC === 0;
+                        if (histResultFilter === 'SUCCESS') return isSuccess;
+                        if (histResultFilter === 'FAIL') return isFail;
+                        return true;
+                      }).map((hist, idx) => {
+                        const isSuccess = hist.PDS_RESULT_CD === 'SUCCESS' || (hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC > 0);
+                        const isFail = hist.PDS_RESULT_CD === 'DISCONNECTED' && hist.DURATION_SEC === 0;
 
                         const targetName = hist.EMP_NM ? `${hist.EMP_NM}` : '알 수 없음';
                         const targetPhone = hist.MOBILE_NO || '';
 
-                        // org path
-                        const orgPath = [hist.honbu, hist.team, hist.part].filter(Boolean).join(' > ');
+                        // org path (map code to name)
+                        const orgNameMap = Object.fromEntries(flatOrgs.map(o => [o.code, o.name]));
+                        const orgPath = [hist.honbu, hist.team, hist.part]
+                          .filter(Boolean)
+                          .map(code => orgNameMap[code] || code)
+                          .join(' > ');
 
                         const strategyObj = strategies.find(s => s.strategy_id === hist.STRATEGY_ID);
                         const strategyName = hist.STRATEGY_NM || strategyObj?.strategy_nm || '알 수 없는 전략';
@@ -1863,8 +1895,8 @@ export default function SCallertPage() {
                             <div className="flex items-start justify-between">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs font-black text-white">{targetName}</span>
-                                  <span className="text-[10px] text-slate-400 font-mono">{targetPhone}</span>
+                                  <span className="text-xs font-black text-white">{maskName(targetName)}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{maskPhone(targetPhone)}</span>
                                 </div>
                                 {orgPath && <div className="text-[9px] text-slate-500 mt-1">{orgPath}</div>}
                               </div>

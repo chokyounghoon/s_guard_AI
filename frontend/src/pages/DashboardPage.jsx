@@ -12,6 +12,7 @@ import BottomMenu from '../components/BottomMenu';
 import { useCodebook } from '../context/CodebookContext';
 import { getAccessToken, clearSession, getAuthHeaders, getUserProfile, getAllowedPaths, addAuthListener } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
+import { maskName, maskEmail, maskPhone } from '../utils/maskingUtils';
 
 const SHINHAN_COMPANIES = [
   '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
@@ -2057,10 +2058,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                           {/* 중단: 발신자 + 사번 + 분석 상태 뱃지 */}
                           <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <p className="text-[9px] text-slate-400 font-bold">발신: <span className="text-slate-200 font-mono font-semibold">{msg.sender}</span></p>
+                            <p className="text-[9px] text-slate-400 font-bold">발신: <span className="text-slate-200 font-mono font-semibold">{maskPhone(msg.sender)}</span></p>
                             {msg.employee_id && (
                               <span className="h-5 flex items-center gap-1 bg-white/5 px-2 rounded-lg border border-white/15 text-[9px] text-slate-300 font-mono font-bold shrink-0">
-                                👤 {msg.employee_id} {msg.sender_name && `(${msg.sender_name})`}
+                                👤 {msg.employee_id} {msg.sender_name && `(${maskName(msg.sender_name)})`}
                               </span>
                             )}
                             <span className={`h-5 flex items-center px-2.5 rounded-lg border text-[9px] font-black whitespace-nowrap transition-all shrink-0 ml-auto sm:ml-0 ${
@@ -3007,8 +3008,8 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               />
   
               <div>
-                <h3 className="text-lg font-bold text-white leading-tight">{formData.name}</h3>
-                <p className="text-xs text-slate-400">{profile.email}</p>
+                <h3 className="text-lg font-bold text-white leading-tight">{maskName(formData.name)}</h3>
+                <p className="text-xs text-slate-400">{maskEmail(profile.email)}</p>
               </div>
             </div>
 

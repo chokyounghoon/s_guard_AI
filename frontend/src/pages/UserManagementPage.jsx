@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getAccessToken, getUserProfile, getAuthHeaders } from '../lib/authStore';
 import { SMS_WORKER_URL } from '../config/api';
+import { maskName, maskEmail, maskPhone } from '../utils/maskingUtils';
 
 export default function UserManagementPage() {
   const navigate = useNavigate();
@@ -504,7 +505,7 @@ export default function UserManagementPage() {
                       <span className="text-base font-bold text-white flex items-center gap-1.5">
                         <span className="text-slate-500">[</span>
                         <span className="text-sm">{user.status === 'ACTIVE' ? '🟢' : user.status === 'PRE_REGISTERED' ? '🟡' : '🔴'}</span>
-                        <span className="group-hover:text-blue-400 transition-colors tracking-tight">{user.name}</span>
+                        <span className="group-hover:text-blue-400 transition-colors tracking-tight">{maskName(user.name)}</span>
                         <span className="text-slate-500">]</span>
                       </span>
                       <span className="text-[12px] font-bold text-indigo-400 uppercase tracking-wider ml-1">{user.role || 'USER'}</span>
@@ -534,7 +535,7 @@ export default function UserManagementPage() {
                     {/* 1줄: 이름 + 상태배지 + OS기종배지 */}
                     <div className="flex items-center gap-2 flex-wrap justify-center">
                       <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-blue-400 transition-colors truncate">
-                        {user.name}
+                        {maskName(user.name)}
                       </h3>
                       <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${user.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : user.status === 'PRE_REGISTERED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
                         {user.status === 'ACTIVE' ? '정상 🟢' : user.status === 'PRE_REGISTERED' ? '가입대기 🟡' : '사용중지 🔴'}
@@ -558,14 +559,14 @@ export default function UserManagementPage() {
                     <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap justify-center">
                       <div className="flex items-center gap-1.5">
                         <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span className="truncate max-w-[180px] sm:max-w-none">{user.email}</span>
+                        <span className="truncate max-w-[180px] sm:max-w-none">{maskEmail(user.email)}</span>
                       </div>
                       {user.phone && (
                         <>
                           <span className="text-slate-600 hidden sm:inline">•</span>
                           <div className="flex items-center gap-1.5">
                             <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                            <span>{user.phone}</span>
+                            <span>{maskPhone(user.phone)}</span>
                           </div>
                         </>
                       )}
@@ -631,7 +632,7 @@ export default function UserManagementPage() {
                     )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">{actionTargetUser.name}</h3>
+                    <h3 className="text-lg font-bold text-white">{maskName(actionTargetUser.name)}</h3>
                     <p className="text-xs font-mono text-slate-500">ID: #{actionTargetUser.employee_id}</p>
                   </div>
                 </div>

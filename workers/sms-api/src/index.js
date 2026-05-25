@@ -3,6 +3,9 @@ import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
 import { secureHeaders } from 'hono/secure-headers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { encryptAES, decryptAES } from './cryptoUtils'
+
+const DEFAULT_AES_KEY = 'sguard-default-256-bit-secret-key-12345!' // 프로덕션에서는 env.AES_SECRET_KEY 사용
 
 // 🔔 Web Push: SubtleCrypto 기반 직접 구현 (RFC 8291 aes128gcm + VAPID)
 function b64urlToBytes(b64url) {
@@ -204,6 +207,62 @@ async function createAndStoreSession(c, userId) {
 }
 
 const app = new Hono()
+
+// 🛡️ SECURITY: D1 DB 자동 복호화 미들웨어 (Monkey Patching)
+app.use('*', async (c, next) => {
+  if (c.env && c.env.DB && !c.env.DB.__patched) {
+    c.env.DB.__patched = true;
+    const originalPrepare = c.env.DB.prepare.bind(c.env.DB);
+    const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+
+    c.env.DB.prepare = (query) => {
+      const patchStatement = (stmt) => {
+        const originalFirst = stmt.first.bind(stmt);
+        const originalAll = stmt.all.bind(stmt);
+        const originalBind = stmt.bind.bind(stmt);
+
+        const decryptRow = async (row) => {
+          if (!row || typeof row !== 'object') return row;
+          let cloned = null;
+          for (const key of Object.keys(row)) {
+            if (typeof row[key] === 'string' && row[key].startsWith('aesgcm:')) {
+              if (!cloned) cloned = { ...row };
+              cloned[key] = await decryptAES(cloned[key], secretKey);
+            }
+          }
+          return cloned || row;
+        };
+
+        stmt.first = async (...args) => {
+          const res = await originalFirst(...args);
+          return await decryptRow(res);
+        };
+
+        stmt.all = async (...args) => {
+          const res = await originalAll(...args);
+          if (res && res.results && Array.isArray(res.results)) {
+            const newResults = [];
+            for (const row of res.results) {
+              newResults.push(await decryptRow(row));
+            }
+            return { ...res, results: newResults };
+          }
+          return res;
+        };
+
+        stmt.bind = (...args) => {
+          const boundStmt = originalBind(...args);
+          return patchStatement(boundStmt);
+        };
+        
+        return stmt;
+      };
+
+      return patchStatement(originalPrepare(query));
+    };
+  }
+  await next();
+})
 
 // 🛡️ 엔터프라이즈 보안 헤더 적용 (CSP, XSS, Frame Options 등)
 // crossOriginResourcePolicy: false — /warroom/asset/* 경로에서 수동으로 cross-origin 설정
@@ -881,12 +940,13 @@ app.get('/debug/seed-initial-data', async (c) => {
   const seedIncId = generateIncId();
   const seedMsg = "[S-GUARD] 04/13 21:00 신한은행(BANK_001) 차세대시스템 DB 응답지연(ORA-00600) 발생건수: 155건 노드: DB_NODE_04";
   
+  const encryptedSeedMsg = await encryptAES(seedMsg, c.env.AES_SECRET_KEY || DEFAULT_AES_KEY);
   await db.prepare(`
     INSERT INTO received_messages (
       inc_id, sender, message, employee_id, timestamp, status, received_count,
       service_name, biz_system, error_code, error_message, channel
     ) VALUES (?, '02-1234-5678', ?, 'SYSTEM', ?, 'PENDING', 1, '신한은행', '차세대시스템', 'ORA-00600', 'DB 응답지연', 'SMS')
-  `).bind(seedIncId, seedMsg, now).run();
+  `).bind(seedIncId, encryptedSeedMsg, now).run();
   
   // 3. Trigger Background analysis & Vectorize Sync
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(seedIncId, c.env).catch(e => console.error(e)));
@@ -2404,6 +2464,8 @@ app.post('/auth/signup', async (c) => {
   const cleanEmpId = String(employee_id || '').replace(/^EMP-/i, '').replace(/^SH-/i, '').trim()
   
   const finalPhone = (phone || '').trim();
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  const encryptedPhone = await encryptAES(finalPhone, secretKey);
   const finalRole = role || 'analyst';
   
   const res = await db.prepare(
@@ -2413,7 +2475,7 @@ app.post('/auth/signup', async (c) => {
       reg_id, reg_dt, mod_id, mod_dt, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', finalPhone, os_type || 'android',
+    email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', encryptedPhone, os_type || 'android',
     cleanEmpId, position || 'POS_001', finalRole, 1, 0, token, 'ACTIVE',
     cleanEmpId, regDt, cleanEmpId, regDt, regDt
   ).run()
@@ -2772,9 +2834,12 @@ app.patch('/auth/profile', async (c) => {
   const finalOsType  = os_type !== undefined ? os_type : existing.os_type
   const finalPic     = profile_picture !== undefined ? profile_picture : existing.profile_picture
 
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  const encryptedPhone = await encryptAES(finalPhone, secretKey);
+
   await db.prepare(
     "UPDATE users SET name = ?, phone = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, os_type = ?, profile_picture = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
-  ).bind(finalName, finalPhone, finalCompany, finalHonbu, finalTeam, finalPart, finalSubpart, finalOsType, finalPic, modDt, targetId, targetId).run()
+  ).bind(finalName, encryptedPhone, finalCompany, finalHonbu, finalTeam, finalPart, finalSubpart, finalOsType, finalPic, modDt, targetId, targetId).run()
   
   const updated = await db.prepare(`
     SELECT 
@@ -2865,10 +2930,13 @@ app.patch('/users/:id/org', async (c) => {
   const { company, honbu, team, part, subpart, email, phone, os_type } = await c.req.json()
   const modDt = getKst()
   
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  const encryptedPhone = phone ? await encryptAES(phone, secretKey) : null;
+  
   const result = await db.prepare(
     "UPDATE users SET company = ?, honbu = ?, team = ?, part = ?, subpart = ?, email = ?, phone = ?, os_type = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?"
   )
-  .bind(company || null, honbu || null, team || null, part || null, subpart || null, email || null, phone || null, os_type || null, modDt, 'ADMIN', id)
+  .bind(company || null, honbu || null, team || null, part || null, subpart || null, email || null, encryptedPhone, os_type || null, modDt, 'ADMIN', id)
   .run()
     
   if (result.meta?.changes === 0) {
@@ -3550,7 +3618,10 @@ app.post('/sms/receive', async (c) => {
   // \uc774\uc81c\ubd80\ud130 D1\uc5d0\ub294 \ube44\uc2dd\ubcc4\ud558\ub41c \ub370\uc774\ud130\ub9cc \uc800\uc7a5\ud569\ub2c8\ub2e4.
   const maskedMessage = maskPII(message)
   const maskedSender  = maskPII(sender)
-  console.log(`[PII] Applied masking before D1 INSERT for employee_id=${employee_id}`)
+  
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  const encryptedMessage = await encryptAES(maskedMessage, secretKey);
+  console.log(`[PII & SEC] Applied masking and AES-256 encryption before D1 INSERT for employee_id=${employee_id}`)
   // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   await db.prepare(`
@@ -3578,7 +3649,7 @@ app.post('/sms/receive', async (c) => {
       ?, ?, ?, ?, ?, ?
     )
   `).bind(
-    newIncId, maskedSender || null, maskedMessage || null, employee_id || null, timestamp, detectedCount, 
+    newIncId, maskedSender || null, encryptedMessage || null, employee_id || null, timestamp, detectedCount, 
     response_msg || null, initialCount,
     channel || null, if_id || null, service_code || null, service_name || null,
     biz_system || null, error_code || null, parsedCount,
@@ -7066,10 +7137,27 @@ app.get('/warroom/report/:id', async (c) => {
   
 
   // 1. War-Room base info — inc_id 가 어떤 형태로 저장됐든 매칭
-  const wr = await db.prepare(
+  let wr = await db.prepare(
     "SELECT * FROM warroom_list WHERE inc_id = ?"
   ).bind(rawId).first()
-  if (!wr) return c.json({ error: 'War-Room not found' }, 404)
+  
+  if (!wr) {
+    const inc = await db.prepare(
+      "SELECT * FROM received_messages WHERE inc_id = ?"
+    ).bind(rawId).first()
+    
+    if (!inc) return c.json({ error: 'Incident not found' }, 404)
+    
+    wr = {
+      inc_id: inc.inc_id,
+      title: inc.message ? `[접수] ${inc.message.substring(0, 30)}...` : `INC-${inc.inc_id}`,
+      severity: 'NORMAL',
+      status: inc.status || 'OPEN',
+      creator_id: 'SYSTEM',
+      reg_dt: inc.timestamp,
+      leader_summary: ''
+    }
+  }
 
   // 2. S-Autopilot Insight (full AI analysis)
   const insight = await db.prepare(
@@ -7552,6 +7640,53 @@ app.get('/ai/knowledge/:id', async (c) => {
   if (!result) return c.json({ error: "Not found" }, 404)
   return c.json(result)
 })
+
+app.post('/ai/dify/knowledge/upload', async (c) => {
+  const difyKey = c.env.DIFY_KNOWLEDGE_KEY || 'app-QHxJQTBSKJlTw2gVeGgTk915';
+  const difyBase = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1';
+  try {
+    const formData = await c.req.formData();
+    const res = await fetch(`${difyBase}/files/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${difyKey}`
+      },
+      body: formData
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      return c.json({ error: `Dify upload failed: ${errorText}` }, res.status);
+    }
+    return c.json(await res.json());
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.post('/ai/dify/knowledge/workflow', async (c) => {
+  const difyKey = c.env.DIFY_KNOWLEDGE_KEY || 'app-QHxJQTBSKJlTw2gVeGgTk915';
+  const difyBase = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1';
+  try {
+    const body = await c.req.json();
+    const res = await fetch(`${difyBase}/workflows/run`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${difyKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      return c.json({ error: `Dify workflow failed: ${errorText}` }, res.status);
+    }
+    return c.json(await res.json());
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
 
 app.post('/ai/knowledge/save', async (c) => {
   try {
@@ -10421,12 +10556,14 @@ app.post('/scallert/strategies/:id/targets', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   const now = getKst();
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  const encryptedMobileNo = body.mobile_no ? await encryptAES(body.mobile_no, secretKey) : null;
 
   try {
     const res = await db.prepare(`
       INSERT INTO TB_SCL_TARGET_INFO (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, SORT_ORD, REG_ID, REG_DT)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(id, body.emp_id, body.emp_nm, body.mobile_no, body.sort_ord || 0, body.mod_id || 'SYSTEM', now).run();
+    `).bind(id, body.emp_id, body.emp_nm, encryptedMobileNo, body.sort_ord || 0, body.mod_id || 'SYSTEM', now).run();
     return c.json({ success: true, seq_no: res.meta.last_row_id });
   } catch (e) {
     return c.json({ error: e.message }, 500);
@@ -10439,13 +10576,15 @@ app.patch('/scallert/targets/:seq', async (c) => {
   const seq = c.req.param('seq');
   const body = await c.req.json();
   const now = getKst();
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  const encryptedMobileNo = body.mobile_no ? await encryptAES(body.mobile_no, secretKey) : null;
 
   try {
     await db.prepare(`
       UPDATE TB_SCL_TARGET_INFO 
       SET EMP_ID = ?, EMP_NM = ?, MOBILE_NO = ?, SORT_ORD = ?, MOD_ID = ?, MOD_DT = ?
       WHERE SEQ_NO = ?
-    `).bind(body.emp_id, body.emp_nm, body.mobile_no, body.sort_ord || 0, body.mod_id || 'SYSTEM', now, seq).run();
+    `).bind(body.emp_id, body.emp_nm, encryptedMobileNo, body.sort_ord || 0, body.mod_id || 'SYSTEM', now, seq).run();
     return c.json({ success: true });
   } catch (e) {
     return c.json({ error: e.message }, 500);
@@ -10651,8 +10790,15 @@ async function triggerAppPushCall(env, target_user_id, phone_number) {
   let method = 'NONE';
   let resultDetail = '';
 
+  // 🚨 방어 로직: 복호화 실패 문자열이 그대로 유입되어 임의의 숫자로 발신되는 심각한 버그 차단
+  const rawPhone = String(phone_number || '');
+  if (rawPhone.includes('aesgcm:') || rawPhone.includes('[DECRYPT_ERROR')) {
+    console.error(`[triggerAppPushCall] CRITICAL AVERTED: Phone number decryption failed. Aborting push. payload=${rawPhone}`);
+    return { success: false, method: 'NONE', error: 'Decryption failed, aborted dial' };
+  }
+
   // 🚀 안드로이드 기기 등에서 하이픈(-) 때문에 전화가 안 걸리는 현상 방지
-  const cleanPhone = String(phone_number || '').replace(/[^0-9]/g, '');
+  const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
 
   let fcmRow = null;
   try {
@@ -10891,22 +11037,46 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
 
     const dispatchDeviceId = payload.employee_id || globalDispatcherId || target.EMP_ID;
 
+    // 🚀 FIXED: DO Alarm 환경에서는 DB 패치가 안 되어 암호화된 상태로 넘어오므로 여기서 수동 복호화
+    let finalMobileNo = target.MOBILE_NO;
+    if (typeof finalMobileNo === 'string' && finalMobileNo.startsWith('aesgcm:')) {
+      const secretKey = env.AES_SECRET_KEY || 'sguard-default-256-bit-secret-key-12345!';
+      finalMobileNo = await decryptAES(finalMobileNo, secretKey);
+      target.MOBILE_NO = finalMobileNo; // update object for subsequent logs
+    }
+
     await db.prepare(`
       INSERT INTO TB_SCL_CALL_HIST (STRATEGY_ID, EMP_ID, EMP_NM, MOBILE_NO, ATTEMPT_SEQ, IGW_TXN_ID, PDS_RESULT_CD, CALL_DT, INC_ID, RAW_PAYLOAD, REG_DT, DISPATCHER_EMP_ID)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       strategy.STRATEGY_ID, target.EMP_ID, target.EMP_NM, target.MOBILE_NO, 1, 
       igw_txn_id, 'PENDING', callTime, inc_id || null, JSON.stringify(payload), callTime, dispatchDeviceId
-
     ).run();
 
     const pdsSuccess = await triggerPdsCall(db, strategy.STRATEGY_ID, target, inc_id, message, JSON.stringify(payload), env);
     console.log(`[scallert] Call triggered successfully: ${pdsSuccess}`);
 
     try {
-      console.log(`[scallert-trigger] Sending device push call ring to Dispatcher Device: ${dispatchDeviceId} (Target number: ${target.MOBILE_NO})`);
-      const pushRes = await triggerAppPushCall(env, dispatchDeviceId, target.MOBILE_NO);
+      console.log(`[scallert-trigger] Sending device push call ring to Dispatcher Device: ${dispatchDeviceId} (Target number: ${finalMobileNo})`);
+      const pushRes = await triggerAppPushCall(env, dispatchDeviceId, finalMobileNo);
       console.log(`[scallert-trigger] Device push result: ${pushRes.success} via ${pushRes.method}`);
+      
+      // 🚀 DEBUG: 자동 발신 결과가 왜 실패하는지 확인하기 위해 UI(테스트 로그)에 기록
+      try {
+        await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID, API_URL, API_METHOD, REQ_PARAMS, STATUS_CODE, RESPONSE_BODY, ELAPSED_MS, SUCCESS, TESTED_BY, TESTED_AT) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(strategy.STRATEGY_ID, 'AUTO_PUSH_TEST', 'PUSH', JSON.stringify({ dispatchDeviceId, mobile: target.MOBILE_NO }), pushRes.success ? 200 : 500, JSON.stringify(pushRes), 0, pushRes.success ? 'Y' : 'N', 'SYSTEM', getKst()).run();
+      } catch (logErr) {
+        console.error("Failed to log pushRes", logErr);
+      }
+      
+      try {
+        // 앱 푸시 결과에 따라 이력 테이블 상태 즉시 업데이트 (UI 통화성공/실패 반영)
+        const newStatus = pushRes.success ? 'SUCCESS' : 'FAILED';
+        await db.prepare(`UPDATE TB_SCL_CALL_HIST SET PDS_RESULT_CD = ? WHERE IGW_TXN_ID = ? AND STRATEGY_ID = ?`)
+          .bind(newStatus, igw_txn_id, strategy.STRATEGY_ID).run();
+      } catch (updErr) {
+        console.error("Failed to update PDS_RESULT_CD", updErr);
+      }
       
       try {
         const doId = env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
@@ -10922,7 +11092,8 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
               target_emp: target.EMP_ID,
               target_name: target.EMP_NM,
               target_mobile: target.MOBILE_NO,
-              dispatcher_device: dispatchDeviceId
+              dispatcher_device: dispatchDeviceId,
+              push_result: pushRes
             }
           })
         }));
@@ -11107,8 +11278,12 @@ app.post('/scallert/strategies/:id/test-call', async (c) => {
       API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
       ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
     )`).run();
+    
+    const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+    const encryptedParams = await encryptAES(JSON.stringify(apiParams), secretKey);
+
     await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID,API_URL,API_METHOD,REQ_PARAMS,STATUS_CODE,RESPONSE_BODY,ELAPSED_MS,SUCCESS,TESTED_BY,TESTED_AT) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .bind(id, apiUrl, apiMethod, JSON.stringify(apiParams), statusCode, responseBody.substring(0,2000), elapsed, success?'Y':'N', body.tested_by||'SYSTEM', now).run();
+      .bind(id, apiUrl, apiMethod, encryptedParams, statusCode, responseBody.substring(0,2000), elapsed, success?'Y':'N', body.tested_by||'SYSTEM', now).run();
   } catch {}
 
   return c.json({ success, status_code: statusCode, response: responseBody, elapsed_ms: elapsed, tested_at: now });
@@ -11310,8 +11485,8 @@ app.post('/call/event', async (c) => {
           } catch (err) {}
         }
         
-        // 50초 안에 DISCONNECTED가 왔을경우 통화 성공(SUCCESS), 그외는 통화 실패(FAIL_VOICEMAIL)로 처리하고 다음 수신자 시도
-        if (durationSec > 0 && durationSec <= 50) {
+        // 통화가 연결되어 단 1초라도 유지되었다면 통화 성공(SUCCESS)으로 간주 (사용자가 받자마자 끊은 경우 포함)
+        if (durationSec > 0) {
           await db.prepare(`
             UPDATE TB_SCL_CALL_HIST 
             SET PDS_RESULT_CD = 'SUCCESS', DURATION_SEC = ?, DISCONNECTED_DT = ?, SUCCESS_YN = 'Y'
@@ -11436,8 +11611,12 @@ app.post('/scallert/test-push', async (c) => {
       API_METHOD TEXT, REQ_PARAMS TEXT, STATUS_CODE INTEGER, RESPONSE_BODY TEXT,
       ELAPSED_MS INTEGER, SUCCESS TEXT, TESTED_BY TEXT, TESTED_AT TEXT
     )`).run();
+    
+    const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+    const encryptedPushParams = await encryptAES(JSON.stringify({ target_user_id, phone_number }), secretKey);
+
     await db.prepare(`INSERT INTO TB_SCL_TEST_LOG (STRATEGY_ID,API_URL,API_METHOD,REQ_PARAMS,STATUS_CODE,RESPONSE_BODY,ELAPSED_MS,SUCCESS,TESTED_BY,TESTED_AT) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .bind('PUSH_TEST', method, 'PUSH', JSON.stringify({ target_user_id, phone_number }), success ? 200 : 500, resultDetail, 0, success ? 'Y' : 'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
+      .bind('PUSH_TEST', method, 'PUSH', encryptedPushParams, success ? 200 : 500, resultDetail, 0, success ? 'Y' : 'N', c.get('user')?.employee_id || 'SYSTEM', now).run();
 
     return c.json({ success, method, detail: resultDetail });
   } catch (e) {
@@ -11518,5 +11697,121 @@ function createSSEResponse(c, callback) {
     },
   });
 }
+
+// 🛡️ SECURITY: 기존 평문 데이터 일괄 AES-256 암호화 마이그레이션
+app.post('/debug/encrypt-migration', async (c) => {
+  const pass = c.req.query('pass');
+  if (c.env.ENVIRONMENT === 'production' && pass !== 'verify') {
+    return c.json({ error: 'Production environment debug access denied. Use ?pass=verify' }, 403);
+  }
+
+  const db = c.env.DB;
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  let migratedUsers = 0;
+  let migratedMessages = 0;
+
+  try {
+    // 1. users 테이블의 phone 이 평문인 경우
+    // monkey patch 가 적용되어 있으므로 DB에서 바로 읽으면 안되고, monkey patch를 끄거나, 
+    // raw로 읽어야 하지만, monkey patch는 'aesgcm:'이 아닌 텍스트는 그대로 반환합니다.
+    // 따라서 기존 평문 데이터는 평문 그대로 읽힙니다.
+    const { results: users } = await db.prepare("SELECT employee_id, phone FROM users WHERE phone IS NOT NULL AND phone != '' AND phone NOT LIKE 'aesgcm:%'").all();
+    
+    if (users && users.length > 0) {
+      for (const u of users) {
+        if (!u.phone.startsWith('aesgcm:')) {
+          const encrypted = await encryptAES(u.phone, secretKey);
+          await db.prepare("UPDATE users SET phone = ? WHERE employee_id = ?").bind(encrypted, u.employee_id).run();
+          migratedUsers++;
+        }
+      }
+    }
+
+    // 2. received_messages 테이블의 message 가 평문인 경우
+    const { results: messages } = await db.prepare("SELECT inc_id, message FROM received_messages WHERE message IS NOT NULL AND message != '' AND message NOT LIKE 'aesgcm:%'").all();
+    
+    if (messages && messages.length > 0) {
+      for (const m of messages) {
+        if (!m.message.startsWith('aesgcm:')) {
+          const encrypted = await encryptAES(m.message, secretKey);
+          await db.prepare("UPDATE received_messages SET message = ? WHERE inc_id = ?").bind(encrypted, m.inc_id).run();
+          migratedMessages++;
+        }
+      }
+    }
+
+    // 3. TB_SCL_TARGET_INFO 테이블의 MOBILE_NO 가 평문인 경우
+    let migratedTargets = 0;
+    const { results: targets } = await db.prepare("SELECT SEQ_NO, MOBILE_NO FROM TB_SCL_TARGET_INFO WHERE MOBILE_NO IS NOT NULL AND MOBILE_NO != '' AND MOBILE_NO NOT LIKE 'aesgcm:%'").all();
+    
+    if (targets && targets.length > 0) {
+      for (const t of targets) {
+        if (!t.MOBILE_NO.startsWith('aesgcm:')) {
+          const encrypted = await encryptAES(t.MOBILE_NO, secretKey);
+          await db.prepare("UPDATE TB_SCL_TARGET_INFO SET MOBILE_NO = ? WHERE SEQ_NO = ?").bind(encrypted, t.SEQ_NO).run();
+          migratedTargets++;
+        }
+      }
+    }
+
+    // 4. TB_SCL_TEST_LOG 테이블의 REQ_PARAMS 가 평문인 경우
+    let migratedTestLogs = 0;
+    try {
+      const { results: testLogs } = await db.prepare("SELECT LOG_ID, REQ_PARAMS FROM TB_SCL_TEST_LOG WHERE REQ_PARAMS IS NOT NULL AND REQ_PARAMS != '' AND REQ_PARAMS NOT LIKE 'aesgcm:%'").all();
+      if (testLogs && testLogs.length > 0) {
+        for (const t of testLogs) {
+          if (!t.REQ_PARAMS.startsWith('aesgcm:')) {
+            const encrypted = await encryptAES(t.REQ_PARAMS, secretKey);
+            await db.prepare("UPDATE TB_SCL_TEST_LOG SET REQ_PARAMS = ? WHERE LOG_ID = ?").bind(encrypted, t.LOG_ID).run();
+            migratedTestLogs++;
+          }
+        }
+      }
+    } catch(e) {
+      // 테이블이 없을 수도 있으므로 무시
+    }
+
+    return c.json({
+      status: "success",
+      message: "Data encryption migration completed.",
+      migrated_users: migratedUsers,
+      migrated_messages: migratedMessages,
+      migrated_targets: migratedTargets,
+      migrated_test_logs: migratedTestLogs
+    });
+  } catch (err) {
+    console.error("[Migration Error]", err);
+    return c.json({ error: "Migration failed", details: err.message }, 500);
+  }
+});
+
+app.get('/debug/raw-db', async (c) => {
+  const db = c.env.DB;
+  
+  // SQL 레벨에서 문자열을 변형하여 미들웨어(Monkey patch)의 'aesgcm:' 검사를 우회합니다.
+  const { results: users } = await db.prepare("SELECT employee_id, 'RAW:' || phone as raw_phone FROM users LIMIT 5").all();
+  const { results: msgs } = await db.prepare("SELECT inc_id, 'RAW:' || message as raw_message FROM received_messages LIMIT 5").all();
+
+  // Test encryptAES to see if it's failing
+  const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
+  let testEncryption = "NOT RUN";
+  let testError = null;
+  try {
+    testEncryption = await encryptAES("010-1234-5678", secretKey);
+  } catch(e) {
+    testError = e.message;
+  }
+
+  let testDecryption = "NOT RUN";
+  let testDecryptionError = null;
+  try {
+    // 18121020 user's raw phone
+    testDecryption = await decryptAES("aesgcm:4Ll6zVYsHzhvKDMk:VE8AcC37ucfUlrzDXpbTKZqJyL8qb4psYN3CKxA=", secretKey);
+  } catch(e) {
+    testDecryptionError = e.message;
+  }
+
+  return c.json({ users, msgs, testEncryption, testError, testDecryption, testDecryptionError });
+});
 
 export default app

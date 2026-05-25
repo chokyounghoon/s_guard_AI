@@ -583,7 +583,7 @@ export default function AiReportPage() {
                   const statusCls = isComplete ? 'bg-slate-500/10 border-slate-500/20 text-slate-400 font-normal' :
                                     isProgress ? 'bg-[#ff8800]/15 border-[#ff8800]/40 text-[#ff8800] font-black animate-pulse shadow-[0_0_10px_rgba(255,136,0,0.2)]' :
                                     'bg-blue-500/10 border-blue-500/30 text-blue-400 font-bold';
-                  const statusName = isComplete ? '처리완료' : isProgress ? '분석중' : (inc.status || '대기');
+                  const statusName = isComplete ? '처리완료' : isProgress ? '분석중' : getStatusName(inc.status);
                   const assignee = inc.assignee_name || inc.assigned_to || '-';
 
                   return (

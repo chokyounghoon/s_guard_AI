@@ -8,6 +8,7 @@ import {
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { toast } from 'react-hot-toast';
+import { maskName } from '../utils/maskingUtils';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -134,7 +135,7 @@ export default function DeputyManagementPage() {
         body: JSON.stringify({ user_id: myProfile.employee_id, deputy_id: user.employee_id, priority: nextPriority })
       });
       if (res.ok) {
-        toast.success(`${user.name}님이 ${nextPriority}순위 대직자로 추가되었습니다.`);
+        toast.success(`${maskName(user.name)}님이 ${nextPriority}순위 대직자로 추가되었습니다.`);
         closeModal();
         fetchSubstitutes(myProfile.employee_id);
       }
@@ -293,7 +294,7 @@ export default function DeputyManagementPage() {
                   <UserCircle className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-black text-blue-200">{selectedUser.name}</div>
+                  <div className="text-xs font-black text-blue-200">{maskName(selectedUser.name)}</div>
                   <div className="text-[9px] text-blue-400/70">{selectedUser.employee_id}</div>
                 </div>
                 <button
@@ -393,7 +394,7 @@ export default function DeputyManagementPage() {
                 {/* 정보 */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-sm font-black text-white">{item.deputy_name}</span>
+                    <span className="text-sm font-black text-white">{maskName(item.deputy_name)}</span>
                     <span className="text-[9px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded-md font-mono">{item.deputy_id}</span>
                   </div>
                   <div className="flex items-center gap-1 mt-1 text-[9px] text-slate-500">
@@ -504,7 +505,7 @@ export default function DeputyManagementPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-black text-white leading-tight">
-                            {user.name}
+                            {maskName(user.name)}
                             <span className="ml-1.5 text-[10px] text-slate-500 font-mono font-normal">({user.employee_id})</span>
                           </div>
                           {/* 전체 조직 경로: company > honbu > team > part > subpart */}
@@ -560,7 +561,7 @@ export default function DeputyManagementPage() {
                         <UserCircle className="w-5 h-5 text-white" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-black text-blue-200 truncate">{selectedUser.name}</div>
+                        <div className="text-xs font-black text-blue-200 truncate">{maskName(selectedUser.name)}</div>
                         <div className="text-[9px] text-blue-400/70">조직도에서 위치 확인 중</div>
                       </div>
                     </div>

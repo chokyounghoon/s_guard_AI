@@ -19,6 +19,7 @@ const SEV = {
 const STS = {
   Open:         { label: '접수중', color: '#3b82f6' },
   'In Progress':{ label: '대응중', color: '#eab308' },
+  Active:       { label: '대응중', color: '#eab308' },
   Completed:    { label: '완료',   color: '#475569' },
   INC_001:      { label: '접수중', color: '#3b82f6' },
   INC_002:      { label: '진행중', color: '#10b981' },
@@ -304,7 +305,7 @@ export default function WarRoomManagementPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3.5">
-            {filtered.map(room => {
+            {filtered.map((room, index) => {
               const sev = SEV[normSeverity(room)] || SEV.NORMAL;
               const isComp = isCompleted(room);
               const isOp = isOpen(room);
@@ -312,7 +313,7 @@ export default function WarRoomManagementPage() {
               const isJoining = joining === room.code;
               
               return (
-                <div key={room.code} 
+                <div key={`${room.code}-${index}`} 
                   className={`rounded-[1.25rem] p-4 relative overflow-hidden backdrop-blur-md transition-all duration-300 ${isJoining ? 'opacity-50 scale-[0.98]' : 'hover:scale-[1.01]'}`}
                   style={{
                     background: `linear-gradient(135deg, ${sev.color}15 0%, rgba(255,255,255,0.02) 100%)`,

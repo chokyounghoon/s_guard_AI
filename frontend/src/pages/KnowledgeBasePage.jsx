@@ -81,9 +81,6 @@ export default function KnowledgeBasePage() {
     setIsSubmitting(true);
     
     try {
-      // DIFY GOVERNANCE KEY
-      const DIFY_API_KEY = "app-QHxJQTBSKJlTw2gVeGgTk915";
-      const DIFY_API_BASE = "https://api.dify.ai/v1";
       const savedUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
       const userId = savedUser.employee_id || 'sguard-system';
 
@@ -96,11 +93,9 @@ export default function KnowledgeBasePage() {
         formDataUpload.append('file', formData.file);
         formDataUpload.append('user', userId);
         
-        const uploadRes = await fetch(`${DIFY_API_BASE}/files/upload`, {
+        const uploadRes = await fetch(`${API_BASE}/ai/dify/knowledge/upload`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${DIFY_API_KEY}`
-          },
+          headers: getAuthHeaders({}),
           body: formDataUpload
         });
         
@@ -135,12 +130,9 @@ ${formData.content}`;
         user: userId
       };
 
-      const workflowRes = await fetch(`${DIFY_API_BASE}/workflows/run`, {
+      const workflowRes = await fetch(`${API_BASE}/ai/dify/knowledge/workflow`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${DIFY_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
 

@@ -9,6 +9,8 @@ import ServerStatusChart from '../components/chat/ServerStatusChart';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useCodebook } from '../context/CodebookContext';
+import DOMPurify from 'dompurify';
+import { maskName, maskPhone } from '../utils/maskingUtils';
 
 const agentColors = {
   Security: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', icon: Shield },
@@ -246,7 +248,7 @@ const ChatMessageRow = React.memo(({
               <Bot className="w-4 h-4 text-[#00e5ff]" />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-black text-white text-sm tracking-wide">{msg.sender_name || msg.name || msg.sender || 'AI Assistant'}</span>
+              <span className="font-black text-white text-sm tracking-wide">{maskName(msg.sender_name || msg.name || msg.sender) || 'AI Assistant'}</span>
               <span className="px-2 py-0.5 rounded-md bg-[#00ff88]/10 border border-[#00ff88]/40 text-[#00ff88] text-[10px] font-mono font-bold tracking-wider uppercase shadow-[0_0_8px_rgba(0,255,136,0.2)]">
                 [S-GUARD AI System]
               </span>
@@ -486,7 +488,7 @@ const ChatMessageRow = React.memo(({
       {msg.type === 'system' && (
         <div className="flex justify-center my-3">
           <div className="bg-[#1a1a1a] rounded-full px-4 py-1.5 max-w-[280px]">
-            <div className="text-[12px] text-center whitespace-pre-wrap" style={{color:'#777777'}} dangerouslySetInnerHTML={{ __html: msg.text }} />
+            <div className="text-[12px] text-center whitespace-pre-wrap" style={{color:'#777777'}} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.text) }} />
           </div>
         </div>
       )}
@@ -1897,7 +1899,7 @@ export default function ChatPage() {
                                     {person.name[0]}
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-sm text-white">{person.name}</span>
+                                    <span className="text-sm text-white">{maskName(person.name)}</span>
                                     <span className="text-[10px] text-slate-500">{person.role}</span>
                                 </div>
                             </div>
@@ -2245,7 +2247,7 @@ export default function ChatPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className={`text-[14px] font-bold truncate ${isOnl ? 'text-white' : 'text-slate-300'}`}>{person.name}</p>
+                  <p className={`text-[14px] font-bold truncate ${isOnl ? 'text-white' : 'text-slate-300'}`}>{maskName(person.name)}</p>
                   {person.isGuest && <span className="text-[9px] bg-slate-700/80 text-slate-400 px-1.5 py-0.5 rounded-md font-bold">Guest</span>}
                 </div>
                 <p className="text-[11px] text-slate-500 truncate mt-0.5">{orgLabel}</p>
@@ -2603,7 +2605,7 @@ export default function ChatPage() {
                         {/* Info */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: 14, color: '#fff', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {user.name}
+                            {maskName(user.name)}
                           </div>
                           <div style={{ fontSize: 11, color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {[user.team_name, user.part_name || user.position].filter(Boolean).join(' · ')}
@@ -2676,7 +2678,7 @@ export default function ChatPage() {
                   {dmTargetUser.name[0]}
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">{dmTargetUser.name}님과의 쪽지</h3>
+                  <h3 className="font-bold text-white text-base">{maskName(dmTargetUser.name)}님과의 쪽지</h3>
                   <p className="text-[10px] text-slate-500 uppercase tracking-widest">{dmTargetUser.role} • PRIVATE CHANNEL</p>
                 </div>
               </div>

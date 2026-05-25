@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Copy, Share2, Sparkles, CheckCircle, ThumbsUp, ThumbsDown, MessageSquare, AlertCircle, X, ChevronRight } from 'lucide-react';
 import { getAccessToken } from '../lib/authStore';
+import DOMPurify from 'dompurify';
 
 export default function AIChatBubble({ message, query, incidentId, onCopy, onShare }) {
   const [feedback, setFeedback] = useState(null); // 'UP', 'DOWN'
@@ -190,14 +191,14 @@ export default function AIChatBubble({ message, query, incidentId, onCopy, onSha
         elements.push(
           <div key={idx} className="flex items-start space-x-2 my-1.5 text-[13px] text-slate-200">
             <span className="text-purple-400 mt-0.5 shrink-0 text-xs">•</span>
-            <span className="leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: contentHtml }} />
+            <span className="leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contentHtml) }} />
           </div>
         );
       } else {
         let processed = trimmed;
         processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-white">$1</strong>').replace(/\*\*/g, '');
         elements.push(
-          <div key={idx} className="my-1.5 leading-relaxed text-[13px] text-slate-200 break-words font-normal" dangerouslySetInnerHTML={{ __html: processed }} />
+          <div key={idx} className="my-1.5 leading-relaxed text-[13px] text-slate-200 break-words font-normal" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(processed) }} />
         );
       }
     });
