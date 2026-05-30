@@ -177,7 +177,7 @@ export default function MobileAlertMonitor() {
   };
 
   const totalCount = incidents.length;
-  const unresolved = incidents.filter(m => m.incident_status !== '처리완료').length;
+  const unresolved = incidents.filter(m => m.incident_status !== 'INC_003').length;
   const errorRate = totalCount > 0 ? Math.round((unresolved / totalCount) * 100) : 0;
 
   const classify = (inc) => {

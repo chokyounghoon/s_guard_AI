@@ -155,7 +155,7 @@ export const getAllowedPaths = () => {
 
 export const isPathAllowed = (path) => {
   if (!path) return true;
-  if (path === '/' || path === '/dashboard' || path.startsWith('/dashboard/') || path === '/realtime-pipeline') return true;
+  if (path === '/' || path === '/dashboard' || path.startsWith('/dashboard/') || path === '/realtime-pipeline' || path === '/security-features' || path === '/processing-flow' || path === '/inbox') return true;
 
   const u = getUserProfile();
   if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) {
@@ -177,7 +177,10 @@ export const isPathAllowed = (path) => {
     '/my-assignments': '/assignments',
     '/mobile-report-search': '/search',
     '/workflow': '/incident-list',
-    '/report': '/incident-list'
+    '/report': '/incident-list',
+    // 백엔드 DB(권한 테이블)에 누락된 메뉴 우회 맵핑
+    '/admin/incident-cleanup': '/overall-status',
+    '/s-callert': '/overall-status'
   };
 
   for (const [childPath, parentPath] of Object.entries(aliasMap)) {

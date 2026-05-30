@@ -3,7 +3,7 @@
  * Faster loads, offline support, and native app experience.
  */
 
-const CACHE_NAME = 'sguard-v35.1'; // Robust deep-linking and SPA navigation
+const CACHE_NAME = 'sguard-v35.2'; // Robust deep-linking and SPA navigation
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -57,6 +57,14 @@ self.addEventListener('fetch', (event) => {
     if (url.pathname.includes('/src/') || url.search.includes('t=')) {
       return; 
     }
+  }
+
+  // 📱 MOBILE REDIRECT: Handle mobile redirection directly in SW to avoid 'redirected response' fetch errors
+  const isMobile = /Mobile|Android|iPhone|iPod/i.test(navigator.userAgent) && !/iPad/i.test(navigator.userAgent);
+  if (isMobile && url.hostname === 'sguard-frontend.pages.dev' && event.request.mode === 'navigate') {
+    const target = 'https://sguard-mobile.pages.dev' + url.pathname + url.search;
+    event.respondWith(Response.redirect(target, 302));
+    return;
   }
 
   // Skip API requests to ensure fresh data

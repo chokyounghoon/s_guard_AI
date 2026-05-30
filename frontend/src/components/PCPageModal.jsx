@@ -68,22 +68,14 @@ export default function PCPageModal({ children }) {
         {/* Modal Top Bar - 특정 페이지들은 자체 헤더를 사용하므로 숨김 */}
         {!isModalPage && (
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#080c18] shrink-0">
-            <button
-              onClick={handleClose}
-              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold group"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-              <span>대시보드</span>
-            </button>
-
-            {/* 현재 경로 표시 */}
+            {/* 현재 경로 표시 (왼쪽 정렬로 변경) */}
             <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">
               {location.pathname}
             </span>
 
             <button
               onClick={handleClose}
-              className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all ml-auto"
             >
               <X className="w-4 h-4" />
             </button>

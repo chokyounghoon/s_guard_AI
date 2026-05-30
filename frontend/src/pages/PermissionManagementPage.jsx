@@ -5,13 +5,55 @@ import {
   ShieldCheck, ArrowLeft, Save, Plus, Check, X,
   AlertCircle, ChevronDown, Layout, Database,
   UserCog, History, Inbox, Activity, FileText,
-  Users, Shield, Code, Eye, EyeOff, Star
+  Users, Shield, Code, Eye, EyeOff, Star, RefreshCw
 } from 'lucide-react';
 import { getAuthHeaders, setAllowedPaths, getUserProfile } from '../lib/authStore';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { toast } from 'react-hot-toast';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
+
+// 프론트엔드에 하드코딩된 전체 메뉴 목록 (백엔드 DB에 누락된 메뉴 보완용)
+const ALL_KNOWN_MENUS = [
+  { menu_id: 'menu_realtime_pipeline', menu_name: 'Realtime Pipeline', path: '/realtime-pipeline', icon: 'Layers', sort_order: 10 },
+  { menu_id: 'menu_orbital_command', menu_name: 'Orbital Command', path: '/orbital-command', icon: 'Cpu', sort_order: 20 },
+  { menu_id: 'menu_user_keyword', menu_name: 'Personal KW', path: '/user-keyword', icon: 'Keyboard', sort_order: 30 },
+  { menu_id: 'menu_report_line', menu_name: 'Report Line', path: '/report-line-management', icon: 'Users', sort_order: 40 },
+  { menu_id: 'menu_user_mgmt', menu_name: 'Accounts', path: '/user-management', icon: 'User', sort_order: 50 },
+  { menu_id: 'menu_security_logs', menu_name: 'Security Logs', path: '/security-logs', icon: 'Shield', sort_order: 60 },
+  { menu_id: 'menu_org_mgmt', menu_name: 'Organization', path: '/organization-management', icon: 'Network', sort_order: 70 },
+  { menu_id: 'menu_knowledge_base', menu_name: 'Knowledge Base', path: '/knowledge-base', icon: 'FileText', sort_order: 80 },
+  { menu_id: 'menu_overall_status', menu_name: 'Global Stats', path: '/overall-status', icon: 'Activity', sort_order: 90 },
+  { menu_id: 'menu_warroom', menu_name: 'War-Room Hub', path: '/warroom-management', icon: 'Shield', sort_order: 100 },
+  { menu_id: 'menu_codebook', menu_name: 'Codebook', path: '/codebook-management', icon: 'BookOpen', sort_order: 110 },
+  { menu_id: 'menu_processing_flow', menu_name: 'Data Flow', path: '/processing-flow', icon: 'Layers', sort_order: 120 },
+  { menu_id: 'menu_push_diagnostic', menu_name: 'Push Diagnostic', path: '/push-diagnostic', icon: 'Bell', sort_order: 130 },
+  { menu_id: 'menu_ai_report', menu_name: 'AI Report', path: '/ai-report', icon: 'FileText', sort_order: 140 },
+  { menu_id: 'menu_mobile_report_search', menu_name: 'Report Search', path: '/mobile-report-search', icon: 'Search', sort_order: 150 },
+  { menu_id: 'menu_scallert', menu_name: 'S-Callert', path: '/s-callert', icon: 'Phone', sort_order: 160 },
+  { menu_id: 'menu_data_cleanup', menu_name: 'Data Cleanup', path: '/admin/incident-cleanup', icon: 'Trash2', sort_order: 170 },
+  { menu_id: 'menu_permissions', menu_name: 'Permissions (RBAC)', path: '/admin/permissions', icon: 'Key', sort_order: 180 },
+];
+
+const mergeMissingMenus = (apiPerms) => {
+  const merged = [...apiPerms];
+  const existingPaths = new Set(apiPerms.map(p => p.path || p.menu_path));
+  
+  ALL_KNOWN_MENUS.forEach(known => {
+    if (!existingPaths.has(known.path)) {
+      merged.push({
+        ...known,
+        can_read: 0,
+        can_write: 0,
+        can_delete: 0
+      });
+    }
+  });
+  
+  // sort_order 기준으로 정렬 (있는 경우)
+  merged.sort((a, b) => (a.sort_order || 999) - (b.sort_order || 999));
+  return merged;
+};
 
 const ICON_MAP = {
   LayoutDashboard: Layout, Activity, Inbox, FileText,
@@ -56,7 +98,8 @@ export default function PermissionManagementPage() {
       const res = await fetch(`${API_BASE}/rbac/permissions/${roleCode}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        const normalized = (data.permissions || []).map(p => ({
+        const augmentedData = mergeMissingMenus(data.permissions || []);
+        const normalized = augmentedData.map(p => ({
           ...p,
           can_read:   p.can_read   ? 1 : 0,
           can_write:  p.can_write  ? 1 : 0,
@@ -73,7 +116,8 @@ export default function PermissionManagementPage() {
       const res = await fetch(`${API_BASE}/rbac/permissions/${roleCode}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        const normalized = (data.permissions || []).map(p => ({
+        const augmentedData = mergeMissingMenus(data.permissions || []);
+        const normalized = augmentedData.map(p => ({
           ...p,
           can_read:   p.can_read   ? 1 : 0,
           can_write:  p.can_write  ? 1 : 0,
@@ -166,10 +210,17 @@ export default function PermissionManagementPage() {
               <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">RBAC · Screen Access</p>
             </div>
           </div>
-          <button onClick={() => setShowRoleModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-black">
-            <Plus className="w-3.5 h-3.5" /> 역할 추가
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => selectedRole && fetchPermissions(selectedRole.role_code)}
+              disabled={loading || !selectedRole}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-300">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={() => setShowRoleModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-black">
+              <Plus className="w-3.5 h-3.5" /> 역할 추가
+            </button>
+          </div>
         </div>
       </header>
 

@@ -125,7 +125,7 @@ function ThresholdBlock({ tier, title, subtitle, icon: Icon, color, bg, border, 
 }
 
 /* ── 메인 ── */
-export default function AlertMonitorPage() {
+export default function AlertMonitorPage({ embedded = false }) {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
@@ -180,12 +180,20 @@ export default function AlertMonitorPage() {
     return () => clearInterval(iv);
   }, []);
 
-  const saveSetting = (key, value) => {
+  const saveSetting = (key, value, tier) => {
     fetch(`${API_BASE}/sms/settings`, {
       method: 'POST',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: String(value) })
-    }).catch(e => console.error('[AlertMonitor] Setting save failed:', e));
+    })
+    .then(res => {
+      if (res.ok) {
+        toast.success(`${tier.toUpperCase()} 임계치가 정상적으로 수정되었습니다.`, {
+          style: { background: '#0f172a', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
+        });
+      }
+    })
+    .catch(e => console.error('[AlertMonitor] Setting save failed:', e));
   };
 
   const fetchIncidents = async () => {
@@ -206,25 +214,27 @@ export default function AlertMonitorPage() {
       critical: { errorCount: 'alert_critical_error_count', errorRate: 'alert_critical_error_rate' },
       major:    { errorCount: 'alert_major_error_count',    errorRate: 'alert_major_error_rate' },
     };
-    saveSetting(dbKeyMap[tier][key], val);
+    saveSetting(dbKeyMap[tier][key], val, tier);
   };
 
   /* 지표 계산 */
   const totalCount = incidents.length;
-  const unresolved = incidents.filter(m => m.incident_status !== '처리완료').length;
+  const unresolved = incidents.filter(m => m.incident_status !== 'INC_003').length;
   const errorRate = totalCount > 0 ? Math.round((unresolved / totalCount) * 100) : 0;
 
   /* 3단계 판정 — 각 영역 OR 조건
-     CRITICAL : 오류건수 >= CRITICAL 설정치  OR  오류율 >= CRITICAL 설정치
-     MAJOR    : 오류건수 >= MAJOR 설정치     OR  오류율 >= MAJOR 설정치  (단, CRITICAL 미해당)
+     CRITICAL : 미처리 오류건수 >= CRITICAL 설정치  OR  오류율 >= CRITICAL 설정치
+     MAJOR    : 미처리 오류건수 >= MAJOR 설정치     OR  오류율 >= MAJOR 설정치  (단, CRITICAL 미해당)
      NORMAL   : CRITICAL·MAJOR 조건 모두 미해당 (기본값)              */
   const classify = (inc) => {
-    const vol = Number(inc.received_count) || 1;
+    // 개별 인시던트의 중복 수신 횟수도 참조할 수 있지만, 사용자는 '전체 미처리 오류 건수' 기준으로 동작하길 원함.
+    // 따라서 전체 unresolved 값을 기준으로 임계치를 평가합니다.
+    const currentUnresolved = unresolved;
 
     // 1순위: CRITICAL — 어느 한 조건만 충족해도 해당
-    if (vol >= thresholds.critical.errorCount || errorRate >= thresholds.critical.errorRate) return 'CRITICAL';
+    if (currentUnresolved >= thresholds.critical.errorCount || errorRate >= thresholds.critical.errorRate) return 'CRITICAL';
     // 2순위: MAJOR   — 어느 한 조건만 충족해도 해당 (CRITICAL 미해당 전제)
-    if (vol >= thresholds.major.errorCount    || errorRate >= thresholds.major.errorRate)    return 'MAJOR';
+    if (currentUnresolved >= thresholds.major.errorCount    || errorRate >= thresholds.major.errorRate)    return 'MAJOR';
     // 3순위: NORMAL  — 위 두 조건 모두 미해당 시 기본값
     return 'NORMAL';
   };
@@ -240,17 +250,21 @@ export default function AlertMonitorPage() {
     majorList.length > 0 ? 'MAJOR' : 'NORMAL';
 
   const SLIDERS = [
-    { id: 'errorCount', label: '오류 건수', icon: BarChart3,  min: 1, max: 100, step: 1, unit: '건', isSim: false, desc: '동일 건 수신 횟수 기준' },
+    { id: 'errorCount', label: '오류 건수', icon: BarChart3,  min: 1, max: 100, step: 1, unit: '건', isSim: false, desc: '전체 미처리 장애 건수 기준' },
     { id: 'errorRate',  label: '오류율',    icon: TrendingUp, min: 0, max: 100, step: 5, unit: '%',  isSim: false, desc: '전체 대비 미처리 비율 기준' },
   ];
 
   return (
-    <div style={{ height: '100%', background: 'linear-gradient(160deg,#020917 0%,#070d1f 50%,#020917 100%)', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-      className="text-slate-300">
+    <div style={
+      embedded
+        ? { width: '100%', minHeight: '300px', display: 'flex', flexDirection: 'column', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden' }
+        : { height: '100%', background: 'linear-gradient(160deg,#020917 0%,#070d1f 50%,#020917 100%)', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden', display: 'flex', flexDirection: 'column' }
+    } className="text-slate-300">
 
       {/* HEADER */}
-      <header style={{ background: 'rgba(2,9,23,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(6,182,212,0.08)' }}
-        className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 flex-shrink-0">
+      {!embedded && (
+        <header style={{ background: 'rgba(2,9,23,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(6,182,212,0.08)' }}
+          className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 flex-shrink-0">
         <button onClick={() => goBack()}
           style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ArrowLeft style={{ width: 16, height: 16, color: '#64748b' }} />
@@ -268,6 +282,7 @@ export default function AlertMonitorPage() {
           <Compass style={{ width: 16, height: 16, color: '#06b6d4', animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
         </button>
       </header>
+      )}
 
       {/* ── 2-COLUMN GRID BODY ── */}
       <div style={{ flex: 1, overflow: 'hidden', padding: '12px', display: 'grid', gridTemplateColumns: '45% 55%', gap: 12 }}>

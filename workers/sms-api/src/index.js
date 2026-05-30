@@ -653,6 +653,13 @@ app.get('/debug/push-subscriptions', async (c) => {
   return c.json({ count: results.length, subscriptions: results });
 });
 
+app.get('/debug/find-target-incidents', async (c) => {
+  const db = c.env.DB;
+  const { results } = await db.prepare("SELECT inc_id, reg_dt, title FROM warroom_list WHERE reg_dt LIKE '%16:14:45%' OR reg_dt LIKE '%15:56:18%' OR reg_dt LIKE '%15:49:14%'").all();
+  const { results: incs } = await db.prepare("SELECT inc_id, timestamp as reg_dt, message as title FROM received_messages WHERE timestamp LIKE '%16:14:45%' OR timestamp LIKE '%15:56:18%' OR timestamp LIKE '%15:49:14%'").all();
+  return c.json({ warroom: results, incidents: incs });
+});
+
 // 🚀 Database One-time Migration Endpoint (Phase 4: Governance & Bypass)
 app.get('/debug/db-init', async (c) => {
   const pass = c.req.query('pass');
@@ -3483,9 +3490,40 @@ app.post('/sms/receive', async (c) => {
     "SELECT inc_id, received_count FROM received_messages WHERE (sender = ? OR REPLACE(REPLACE(sender, '-', ''), ' ', '') = ?) AND message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
   ).bind(sender, normSender, message, tenMinsAgo).first()
 
+  const parsedCount = extractOccurrence(occurrence_count);
+  const currentCount = existing ? (existing.received_count || 1) + 1 : (parsedCount > 0 ? parsedCount : 1);
+
+  // --- Calculate Severity dynamically based on Alert Monitor Settings ---
+  let alertSeverity = 'NORMAL';
+  try {
+    const configRes = await db.prepare(
+      "SELECT config_key, config_value FROM system_config WHERE config_key IN ('alert_critical_error_count','alert_critical_error_rate','alert_major_error_count','alert_major_error_rate')"
+    ).all();
+    const config = (configRes.results || []).reduce((acc, c) => ({ ...acc, [c.config_key]: parseFloat(c.config_value) }), {});
+    
+    const critCount = config['alert_critical_error_count'] || 10;
+    const critRate  = config['alert_critical_error_rate'] || 50;
+    const majorCount = config['alert_major_error_count'] || 3;
+    const majorRate  = config['alert_major_error_rate'] || 25;
+
+    const totalCountRes = await db.prepare("SELECT COUNT(*) as c FROM incidents").first();
+    const totalCount = totalCountRes?.c || 0;
+    const unresolvedRes = await db.prepare("SELECT COUNT(*) as c FROM incidents WHERE status != 'INC_003'").first();
+    const unresolvedCount = unresolvedRes?.c || 0;
+    const errorRate = totalCount > 0 ? Math.round((unresolvedCount / totalCount) * 100) : 0;
+
+    if (currentCount >= critCount || errorRate >= critRate) {
+      alertSeverity = 'CRITICAL';
+    } else if (currentCount >= majorCount || errorRate >= majorRate) {
+      alertSeverity = 'MAJOR';
+    }
+  } catch (e) {
+    console.error('[Severity Calc Error]', e);
+  }
+
   if (existing) {
-    const newCount = (existing.received_count || 1) + 1
-    const count = extractOccurrence(occurrence_count);
+    const newCount = currentCount
+    const count = parsedCount;
     await db.prepare(`
       UPDATE received_messages SET 
         received_count = ?, timestamp = ?, mod_dt = ?, employee_id = ?,
@@ -3608,13 +3646,18 @@ app.post('/sms/receive', async (c) => {
       } catch (e) { console.error('[Push-Broadcast-Dup] Error:', e.message); }
     })());
 
+    try {
+      await db.prepare("UPDATE incidents SET severity = ?, updated_at = ? WHERE inc_id = ?").bind(alertSeverity, timestamp, existing.inc_id).run();
+    } catch(e) {
+      console.error("[Sync-Incidents-Severity] Error:", e.message);
+    }
+
     return c.json({ status: 'duplicate_incremented', inc_id: existing.inc_id, received_count: newCount })
   }
 
 
   const newIncId = generateIncId()
-  const parsedCount = extractOccurrence(occurrence_count);
-  const initialCount = parsedCount > 0 ? parsedCount : 1
+  const initialCount = currentCount
 
   // \u2500\u2500\u2500 PII \ub9c8\uc2a4\ud0b9: \uc218\uc2e0\uc790 \uc774\ub984 \uae30\ubc18 \ud30c\ud2b8 \ud560\ub2f9 \uc644\ub8cc \ud6c4, DB INSERT \uc9c1\uc804 \uc801\uc6a9 \u2500\u2500\u2500
   // \ud560\ub2f9 \ub85c\uc9c1\uc740 \uc6d0\ubcf8 message/sender/receiver \ub370\uc774\ud130\ub97c \uc0ac\uc6a9\ud588\uc73c\uba74\uc73c\ub85c,
@@ -3672,8 +3715,8 @@ app.post('/sms/receive', async (c) => {
       INSERT OR IGNORE INTO incidents (
         inc_id, title, description, severity, status, incident_type,
         reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at
-      ) VALUES (?, ?, ?, 'NORMAL', 'INC_001', 'AI', 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
-    `).bind(newIncId, incTitle, maskedMessage, timestamp, timestamp, timestamp, timestamp).run();
+      ) VALUES (?, ?, ?, ?, 'INC_001', 'AI', 'SYSTEM', ?, 'SYSTEM', ?, ?, ?)
+    `).bind(newIncId, incTitle, maskedMessage, alertSeverity, timestamp, timestamp, timestamp, timestamp).run();
   } catch (e) {
     console.error("[Sync-Incidents] Error:", e.message);
   }
@@ -3857,6 +3900,8 @@ app.post('/sms/settings', async (c) => {
 app.get('/sms/recent', async (c) => {
   const limit = c.req.query('limit') || 10
   const excludeCompleted = c.req.query('excludeCompleted') === 'true'
+  const startDate = c.req.query('startDate')
+  const endDate = c.req.query('endDate')
   const db = c.env.DB
 
   let baseQuery = `
@@ -3871,6 +3916,7 @@ app.get('/sms/recent', async (c) => {
              wl.reg_dt as warroom_dt,
              i.updated_at as closed_dt,
              (SELECT COUNT(1) FROM autopilot_insight ai2 WHERE ai2.inc_id = r.inc_id) as is_analyzed,
+             (SELECT i2.severity FROM incidents i2 WHERE i2.inc_id = r.inc_id LIMIT 1) as severity,
              COALESCE(
                (SELECT 'INC_003' FROM warroom_list wl2 WHERE wl2.inc_id = r.inc_id AND (wl2.status = 'CLOSED' OR wl2.status = '최종완료' OR wl2.status = 'Completed' OR wl2.status = '처리완료') LIMIT 1),
                (SELECT CASE 
@@ -3904,6 +3950,14 @@ app.get('/sms/recent', async (c) => {
   const params = []
   if (excludeCompleted) {
     baseQuery += ` AND incident_status != 'INC_003' `
+  }
+  if (startDate) {
+    baseQuery += ` AND timestamp >= ? `
+    params.push(startDate + ' 00:00:00')
+  }
+  if (endDate) {
+    baseQuery += ` AND timestamp <= ? `
+    params.push(endDate + ' 23:59:59')
   }
   baseQuery += ` ORDER BY timestamp DESC LIMIT ? `
   params.push(limit)
@@ -4178,7 +4232,12 @@ app.get('/ai/governance/stats', async (c) => {
     const totalInc = totalIncRes?.c || 0;
 
     // 🚀 MTTR stats
-    const resolvedIncRes = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE response_message IS NOT NULL OR status = 'INC_003'").first();
+    const resolvedIncRes = await db.prepare(`
+      SELECT COUNT(DISTINCT r.inc_id) as c 
+      FROM received_messages r
+      LEFT JOIN incidents i ON r.inc_id = i.inc_id
+      WHERE r.response_message IS NOT NULL OR i.status = 'INC_003' OR i.status = '처리완료'
+    `).first();
     const resolvedInc = resolvedIncRes?.c || 0;
 
     // 전체 KB 수 (표시용)
@@ -4190,7 +4249,7 @@ app.get('/ai/governance/stats', async (c) => {
     const kbDistinctIncRes = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM knowledge_base WHERE inc_id IS NOT NULL AND inc_id != ''").first();
     const kbDistinctInc = kbDistinctIncRes?.c || 0;
 
-    const activeWarRoomsRes = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM received_messages WHERE received_count > 0").first();
+    const activeWarRoomsRes = await db.prepare("SELECT COUNT(DISTINCT inc_id) as c FROM warroom_list WHERE status != 'CLOSED' AND status != '최종완료' AND status != 'Completed'").first();
     const activeWarRooms = activeWarRoomsRes?.c || 0;
 
     // Governance Rate: 고유 인시던트 기준, 최대 100%
@@ -4202,19 +4261,40 @@ app.get('/ai/governance/stats', async (c) => {
     const topContributorsRes = await db.prepare(`
       SELECT * FROM (
         SELECT 
-          u.name, u.role, u.team,
+          u.name, u.role, 
+          COALESCE(oh.name, u.honbu) || ' ' || COALESCE(ot.name, u.team) || ' ' || COALESCE(op.name, u.part) as full_org,
+          COALESCE(op.name, u.team) as team,
           (SELECT COUNT(DISTINCT inc_id) FROM incident_assignments WHERE user_id = u.employee_id) as assigned_count,
+          (SELECT COUNT(DISTINCT inc_id) FROM warroom_list WHERE creator_id = u.employee_id) as warroom_count,
+          (SELECT COUNT(DISTINCT wl.inc_id) 
+           FROM warroom_list wl
+           JOIN received_messages r ON wl.inc_id = r.inc_id
+           WHERE wl.creator_id = u.employee_id
+           AND (
+             ( CAST(strftime('%H', r.timestamp) AS INTEGER) >= 9 
+               AND CAST(strftime('%H', r.timestamp) AS INTEGER) < 18 
+               AND (CAST(strftime('%s', wl.reg_dt) AS INTEGER) - CAST(strftime('%s', r.timestamp) AS INTEGER)) <= 60 )
+             OR
+             ( (CAST(strftime('%H', r.timestamp) AS INTEGER) < 9 OR CAST(strftime('%H', r.timestamp) AS INTEGER) >= 18)
+               AND (CAST(strftime('%s', wl.reg_dt) AS INTEGER) - CAST(strftime('%s', r.timestamp) AS INTEGER)) <= 300 )
+           )
+          ) as mtta_fast_count,
           (SELECT COUNT(DISTINCT id) FROM knowledge_base WHERE reg_id = u.employee_id) as kb_count,
+          (SELECT COUNT(DISTINCT inc_id) FROM warroom_chats WHERE sender = u.employee_id) as chat_count,
           (
-            (SELECT COUNT(DISTINCT id) FROM knowledge_base WHERE reg_id = u.employee_id) * 10 + 
-            (SELECT COUNT(*) FROM activity_logs WHERE user_id = u.employee_id) * 2
+            (SELECT COUNT(DISTINCT inc_id) FROM warroom_list WHERE creator_id = u.employee_id) * 50 + 
+            (SELECT COUNT(DISTINCT id) FROM knowledge_base WHERE reg_id = u.employee_id) * 30 + 
+            (SELECT COUNT(DISTINCT inc_id) FROM warroom_chats WHERE sender = u.employee_id) * 20
           ) as synergy_score
         FROM users u
+        LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+        LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+        LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+        LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
         WHERE u.is_active = 1
       ) t
-      WHERE t.synergy_score > 0
-      ORDER BY t.synergy_score DESC
-      LIMIT 5
+      WHERE t.synergy_score > 0 OR t.kb_count > 0 OR t.mtta_fast_count > 0 OR t.chat_count > 0
+      ORDER BY t.synergy_score DESC, t.kb_count DESC
     `).all();
 
     const topContributors = topContributorsRes.results || [];
@@ -11855,14 +11935,39 @@ app.delete('/admin/incident-cleanup/:id', async (c) => {
   const normId = String(inc_id);
   
   try {
+    // Delete child tables first to avoid Foreign Key constraint violations
     const tablesWithIncId = [
-      'received_messages', 'incident_assignments', 'incidents', 
-      'warroom_list', 'sms_history', 'aichat_history', 'autopilot_insight',
-      'incident_history', 'chat_summaries', 'postmortems'
+      'knowledge_base', 
+      'postmortems', 
+      'reports',
+      'warroom_chats', 
+      'warroom_attachments',
+      'user_warrooms', 
+      'incident_assignments', 
+      'sms_history', 
+      'aichat_history',
+      'autopilot_insight', 
+      'incident_history', 
+      'warroom_list', 
+      'incidents',
+      'received_messages'
     ];
     
+    let lastError = null;
     for (const table of tablesWithIncId) {
-      try { await db.prepare(`DELETE FROM ${table} WHERE inc_id = ?`).bind(normId).run(); } catch(e) {}
+      try { 
+        // ignore errors for tables that might not exist or if child has no rows
+        await db.prepare(`DELETE FROM ${table} WHERE inc_id = ?`).bind(normId).run(); 
+      } catch(e) {
+        if (table === 'received_messages' || table === 'incidents') {
+          lastError = e.message;
+          console.error(`[Cleanup Error] Failed to delete from ${table}:`, e.message);
+        }
+      }
+    }
+
+    if (lastError) {
+      return c.json({ error: `Cleanup partially failed: ${lastError}` }, 500);
     }
     
     // Some tables might use incident_id instead

@@ -11,11 +11,12 @@ import {
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ComposedChart
+  Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ComposedChart, BarChart, Bar
 } from 'recharts';
 import ReactECharts from 'echarts-for-react';
 import { getAccessToken, getAuthHeaders, getUserProfile } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
+import { useResizable, useResizableVertical } from '../hooks/useResizable';
 
 // 🇰🇷 KST 안전 날짜 파서 (브라우저간 타임존 파싱 편차 제거)
 const parseDate = (val) => {
@@ -255,6 +256,9 @@ export default function RealtimePipelinePage() {
   const [warRooms, setWarRooms] = useState([]);
   const [isOpeningWarRoom, setIsOpeningWarRoom] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { widths, startDrag, isDragging } = useResizable([40, 30, 30], 'realtime-pipeline-widths');
+  const { heights: leftHeights, startVDrag: startLeftVDrag } = useResizableVertical([35, 65], 'realtime-pipeline-left-heights');
+  const { heights: rightHeights, startVDrag: startRightVDrag } = useResizableVertical([35, 65], 'realtime-pipeline-right-heights');
 
   // --- Executive Mode Stable Mock Data ---
   // ROI Trend (Generate 24h smooth trend)
@@ -712,7 +716,11 @@ export default function RealtimePipelinePage() {
     });
   };
 
-  const displayedCards = getFilteredCards();
+  const displayedCards = getFilteredCards().sort((a, b) => {
+    const timeA = parseDate(a.reg_dt)?.getTime() || 0;
+    const timeB = parseDate(b.reg_dt)?.getTime() || 0;
+    return timeB - timeA;
+  });
   const searchedCards = displayedCards.filter(c => {
     const matchesSearch = c.inc_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.bizSystem.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1357,14 +1365,13 @@ export default function RealtimePipelinePage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col xl:flex-row gap-6 p-4 sm:p-6 overflow-y-auto xl:overflow-hidden relative z-0">
+        <div className={`flex-1 flex flex-col xl:flex-row p-4 sm:p-6 overflow-y-auto xl:overflow-hidden relative z-0 ${isDragging ? 'select-none' : ''}`}>
           
 
-
           {/* MIDDLE PANEL (Now Left Panel in flex row) */}
-          <div className="w-full xl:min-w-[500px] xl:w-auto xl:flex-1 flex flex-col gap-4 min-h-0">
+          <div style={{ flex: `${widths[0]} 1 0%`, minWidth: 0 }} className="w-full xl:w-auto xl:flex flex-col gap-4 min-h-0 xl:pr-3 mb-6 xl:mb-0">
             {/* Top Row: Charts */}
-            <div className="flex flex-col sm:flex-row gap-3 shrink-0 h-auto sm:h-[180px]">
+            <div style={{ height: `${leftHeights[0]}%`, minHeight: 120 }} className="flex flex-col sm:flex-row gap-3 shrink-0 overflow-hidden">
               
               {/* Chart 1 - System Occupancy */}
               <div className="flex-1 min-w-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
@@ -1467,8 +1474,19 @@ export default function RealtimePipelinePage() {
 
             </div>
 
+            {/* Vertical Splitter between charts and org grid */}
+            <div
+              onMouseDown={() => startLeftVDrag(0)}
+              className="flex items-center justify-center h-2 cursor-row-resize group shrink-0 -my-1 z-50 hover:bg-white/5 transition-colors rounded relative"
+            >
+              <div className="h-[1px] w-16 bg-white/20 group-hover:bg-[#00e5ff] transition-colors" />
+              <div className="absolute w-4 h-4 rounded-full bg-[#00e5ff]/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="w-[1px] h-2 bg-[#00e5ff]" />
+              </div>
+            </div>
+
             {/* Bottom Row: Organizational Grid */}
-            <div className="flex-1 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
+            <div style={{ height: `${leftHeights[1]}%`, minHeight: 100 }} className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg overflow-hidden">
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <Network className="w-4 h-4 text-blue-400" />
@@ -1709,8 +1727,18 @@ export default function RealtimePipelinePage() {
             </div>
           </div>
 
+          {/* Splitter 1 */}
+          <div
+            onMouseDown={() => startDrag(0)}
+            className="hidden xl:flex w-3 cursor-col-resize group flex-col items-center justify-center z-50 shrink-0 -mx-1 transition-colors hover:bg-white/5 rounded"
+          >
+            <div className="w-[1px] h-12 bg-white/20 group-hover:bg-[#00e5ff] transition-colors rounded-full" />
+            <div className="w-1 h-1 rounded-full bg-white/20 group-hover:bg-[#00e5ff] transition-colors my-0.5" />
+            <div className="w-[1px] h-12 bg-white/20 group-hover:bg-[#00e5ff] transition-colors rounded-full" />
+          </div>
+
           {/* MIDDLE PANEL: INCIDENT LIST PICKER */}
-          <div className="w-full xl:w-[420px] shrink-0 flex flex-col min-h-[400px] xl:min-h-0">
+          <div style={{ flex: `${widths[1]} 1 0%`, minWidth: 0 }} className="w-full xl:w-auto shrink-0 flex flex-col min-h-[400px] xl:min-h-0 xl:px-3 mb-6 xl:mb-0">
             <div className="flex-1 bg-zinc-900/40 backdrop-blur-sm border border-white/5 rounded-3xl p-4 flex flex-col min-h-0 overflow-hidden shadow-lg">
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-amber-400" /><h4 className="text-sm font-black text-white">인시던트 탐색기</h4></div>
@@ -1859,11 +1887,22 @@ export default function RealtimePipelinePage() {
             </div>
           </div>
 
+          {/* Splitter 2 */}
+          {/* Splitter 2 */}
+          <div
+            onMouseDown={() => startDrag(1)}
+            className="hidden xl:flex w-3 cursor-col-resize group flex-col items-center justify-center z-50 shrink-0 -mx-1 transition-colors hover:bg-white/5 rounded"
+          >
+            <div className="w-[1px] h-12 bg-white/20 group-hover:bg-[#00e5ff] transition-colors rounded-full" />
+            <div className="w-1 h-1 rounded-full bg-white/20 group-hover:bg-[#00e5ff] transition-colors my-0.5" />
+            <div className="w-[1px] h-12 bg-white/20 group-hover:bg-[#00e5ff] transition-colors rounded-full" />
+          </div>
+
           {/* RIGHT PANEL: Timeline & SMS */}
-          <div className="w-full xl:w-[460px] shrink-0 flex flex-col min-h-[500px] xl:min-h-0">
+          <div style={{ flex: `${widths[2]} 1 0%`, minWidth: 0 }} className="w-full xl:w-auto shrink-0 flex flex-col min-h-[500px] xl:min-h-0 xl:pl-3">
             
             {/* 상단: 실시간 SMS 수신내역 */}
-            <div className="h-[250px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg mb-4">
+            <div style={{ height: `${rightHeights[0]}%`, minHeight: 150 }} className="shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg overflow-hidden">
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <div className="flex items-center gap-1.5">
                   <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
@@ -1910,8 +1949,19 @@ export default function RealtimePipelinePage() {
               </div>
             </div>
 
+            {/* Vertical Splitter */}
+            <div
+              onMouseDown={() => startRightVDrag(0)}
+              className="flex items-center justify-center h-2 cursor-row-resize group shrink-0 my-1 z-50 hover:bg-white/5 transition-colors rounded relative"
+            >
+              <div className="h-[1px] w-16 bg-white/20 group-hover:bg-[#00e5ff] transition-colors" />
+              <div className="absolute w-4 h-4 rounded-full bg-[#00e5ff]/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="w-[1px] h-2 bg-[#00e5ff]" />
+              </div>
+            </div>
+
             {/* 하단: 장애 처리현황 */}
-            <div className="flex-1 bg-[#0b0e17] rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
+            <div style={{ height: `${rightHeights[1]}%`, minHeight: 200 }} className="bg-[#0b0e17] rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg overflow-hidden">
               <div className="flex items-center gap-1.5 mb-2 shrink-0">
                 <div className="w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center">
                   <Activity className="w-3.5 h-3.5 text-indigo-400" />

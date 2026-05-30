@@ -41,6 +41,7 @@ import UserKeywordPage from './pages/UserKeywordPage';
 import PermissionManagementPage from './pages/PermissionManagementPage';
 import DeputyManagementPage from './pages/DeputyManagementPage';
 import SCallertPage from './pages/SCallertPage';
+import AdminIncidentCleanupPage from './pages/AdminIncidentCleanupPage';
 import ConsentModal from './components/ConsentModal';
 import PCPageModal from './components/PCPageModal';
 
@@ -405,6 +406,9 @@ function AppContent() {
       {!isAuthPage && <SMSNotification />}
       
       <Routes>
+        <Route path="/incident-cleanup" element={<AdminIncidentCleanupPage />} />
+        <Route path="/admin-cleanup" element={<AdminIncidentCleanupPage />} />
+        <Route path="/admin/incident-cleanup" element={<AdminIncidentCleanupPage />} />
         <Route path="/" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
 
@@ -442,11 +446,12 @@ function AppContent() {
         <Route path="/codebook-management"     element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><CodebookManagementPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/workflow/:inc_id"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><WorkflowPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/report/:incId"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ReportViewPage /></PCPageModal></ProtectedRoute>} />
-        <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OrbitalCommandPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/orbital-command"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OrbitalCommandPage /></ProtectedRoute>} />
         <Route path="/alert-monitor"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AlertMonitorPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SCallertPage /></ProtectedRoute>} />
         <Route path="/realtime-pipeline"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><RealtimePipelinePage /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
       {/* ⚖️ Governance & Mandatory Consent Guard */}
@@ -520,20 +525,27 @@ function AppContent() {
               ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' && r.status !== '완료' && r.status !== 'INC_003' : true).map((room, index) => {
                 const roomId = room.inc_id || room.id;
                 const isCurrent = roomId === currentIncidentId;
+                const cleanTitle = (room.msg || room.title || roomId).replace(/^INC-[\d-]+\s*\|\s*/, '');
+                const severity = (room.severity || 'WARNING').toUpperCase();
+                let sevStyles = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                if (severity === 'CRITICAL') sevStyles = 'bg-red-500/10 text-red-400 border-red-500/20';
+                if (severity === 'MAJOR') sevStyles = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+                if (severity === 'WARNING') sevStyles = 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+
                 return (
                   <div
                     key={`${roomId}-${index}`}
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
-                    className={`p-5 rounded-[2rem] border transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${
+                    className={`p-5 rounded-[1.5rem] border transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${
                       isCurrent 
-                        ? 'bg-blue-600/10 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.1)]' 
-                        : 'bg-[#1a1f2e]/40 border-white/5 hover:border-blue-500/30 hover:bg-[#1a1f2e]/60'
+                        ? 'bg-blue-900/20 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.1)]' 
+                        : 'bg-white/[0.02] border-white/5 hover:border-blue-500/30 hover:bg-white/[0.04]'
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-black px-2 py-0.5 rounded border bg-red-500/20 text-red-500 border-red-500/30 tracking-tighter">CRITICAL</span>
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${sevStyles} tracking-tighter`}>{severity}</span>
                           {isCurrent && <span className="text-[10px] text-blue-400 font-black tracking-tight flex items-center gap-1">
                             <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
                             NOW
@@ -541,13 +553,16 @@ function AppContent() {
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono font-bold">{room.reg_dt ? new Date(room.reg_dt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                       </div>
-                      <p className="text-[15px] font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-2 pr-4 mb-3">{room.msg || room.title || roomId}</p>
+                      <p className="text-[14px] font-bold text-slate-200 group-hover:text-blue-400 transition-colors line-clamp-2 pr-2 mb-3 leading-snug">{cleanTitle}</p>
                     </div>
-                    <div className="flex items-center gap-2 mt-2 opacity-60">
-                      <div className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center">
-                        <User className="w-2.5 h-2.5 text-slate-500" />
+                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/5 opacity-80">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                          <MessageSquare className="w-3 h-3 text-blue-400" />
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono font-bold tracking-tight line-clamp-1 max-w-[120px]">{roomId}</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{roomId}</span>
+                      <span className="text-[10px] font-black text-slate-500 tracking-wider">ENTER</span>
                     </div>
                   </div>
                 );

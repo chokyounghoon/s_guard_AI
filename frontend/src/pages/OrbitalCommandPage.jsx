@@ -4,6 +4,8 @@ import { toast, Toaster } from 'react-hot-toast';
 import { getAuthHeaders } from '../lib/authStore';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useResizable } from '../hooks/useResizable';
+import AlertMonitorPage from './AlertMonitorPage';
 
 export default function OrbitalCommandPage() {
   const navigate = useNavigate();
@@ -17,6 +19,7 @@ export default function OrbitalCommandPage() {
   const [sandboxResults, setSandboxResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
+  const { widths, startDrag, isDragging } = useResizable([40, 60], 'orbital-command-widths');
 
   const fetchStats = async () => {
     try {
@@ -190,17 +193,12 @@ export default function OrbitalCommandPage() {
         </div>
       </header>
 
-      {/* ── 스크롤 가능한 본문 ── */}
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto', 
-        WebkitOverflowScrolling: 'touch',
-        padding: '12px 16px',
-        paddingBottom: 'calc(120px + env(safe-area-inset-bottom))',
-        gap: 12,
-        display: 'flex',
-        flexDirection: 'column'
-      }} className="hide-scrollbar">
+      {/* ── 스크롤 가능한 본문 (모바일) / 고정된 풀스크린 (PC) ── */}
+      <div className={`flex-1 flex flex-col lg:flex-row p-3 lg:p-4 overflow-y-auto lg:overflow-hidden hide-scrollbar ${isDragging ? 'select-none' : ''}`}
+        style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom))', WebkitOverflowScrolling: 'touch' }}
+      >
+        {/* ── 1열: 상태 게이지 + Threshold + Sandbox ── */}
+        <div style={{ flex: `0 0 ${widths[0]}%`, minWidth: '300px' }} className="flex flex-col gap-3 lg:h-full lg:pr-3 lg:overflow-y-auto hide-scrollbar">
 
         {/* ── 섹션 1: 상태 게이지 + SYNC 버튼 ── */}
         <div style={{
@@ -522,6 +520,57 @@ export default function OrbitalCommandPage() {
               })}
             </div>
           </div>
+        </div>
+        </div>
+
+        {/* ── Drag Handle (PC Only) ── */}
+        <div 
+          className="hidden lg:flex w-2 cursor-col-resize hover:bg-[#06b6d4]/20 items-center justify-center transition-colors group relative z-10 shrink-0"
+          onMouseDown={(e) => { e.preventDefault(); startDrag(0); }}
+        >
+          <div className="w-0.5 h-12 bg-slate-700 group-hover:bg-[#06b6d4] transition-colors rounded-full" />
+        </div>
+        
+        {/* ── 2열: Alert Monitor Engine ── */}
+        <div style={{ flex: `1 1 0%`, minWidth: 0 }} className="flex flex-col gap-3 lg:h-full lg:pl-3 lg:overflow-y-auto hide-scrollbar mt-3 lg:mt-0">
+        <div style={{
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 20,
+          overflow: 'hidden',
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          minHeight: '500px'
+        }}>
+          {/* 헤더 */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '13px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+            background: 'rgba(0,0,0,0.2)',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: 10,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Activity size={14} color="#818cf8" />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.05em' }}>3-TIER SEVERITY ENGINE</div>
+                <div style={{ fontSize: 9, color: '#475569', fontFamily: 'monospace' }}>Global Alert Thresholds</div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Embedded AlertMonitorPage */}
+          <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0 }}>
+            <AlertMonitorPage embedded={true} />
+          </div>
+        </div>
         </div>
       </div>
 

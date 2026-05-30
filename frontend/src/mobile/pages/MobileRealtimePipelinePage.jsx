@@ -6,9 +6,8 @@ import {
   Calendar, Clock, Server, Network
 } from 'lucide-react';
 import { 
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ComposedChart, Line, Legend
 } from 'recharts';
-import ReactECharts from 'echarts-for-react';
 import { getAccessToken, getAuthHeaders, getUserProfile } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
 
@@ -487,61 +486,56 @@ export default function MobileRealtimePipelinePage() {
   };
 
   const renderTimeline = (card) => {
-    if (!card) return <div className="text-slate-500 text-xs text-center py-10">인시던트가 없습니다.</div>;
+    if (!card) return <div className="text-slate-500 text-xs text-center py-20 flex flex-col items-center"><Layers className="w-8 h-8 mb-3 opacity-20" />인시던트가 없습니다.</div>;
     const { stage, reg_dt } = card;
     const t1 = parseDate(reg_dt) || new Date();
     const t2 = stage >= 2 ? (parseDate(card.ai_dt) || new Date(t1.getTime() + 10000)) : null;
     const t3 = stage >= 3 ? (parseDate(card.warroom_dt) || new Date((t2 || t1).getTime() + 120000)) : null;
     const t4 = stage >= 4 ? (parseDate(card.closed_dt) || new Date((t3 || t2 || t1).getTime() + 60000)) : null;
 
-    const diffObj = (a, b) => { 
-      if (!a) return null; 
-      const ms = Math.max(0, (b ? new Date(b) : currentTime) - new Date(a)); 
-      const m = Math.floor(ms / 60000), s2 = Math.floor((ms % 60000) / 1000); 
-      return { text: m > 0 ? `${m}m ${s2}s` : `${s2}s`, min: m }; 
-    };
-
     const durationMs = (t4 ? new Date(t4) : currentTime) - new Date(t1);
     const isClosed = stage >= 4;
 
     const FLOW_STEPS = [
-      { id: 'SMS', label: 'SMS 수신 및 인지', icon: <Bell className="w-3.5 h-3.5" />, color: '#3b82f6' },
-      { id: 'RAG_AGENT', label: 'RAG/AI 분석 완료', icon: <Brain className="w-3.5 h-3.5" />, color: '#8b5cf6' },
-      { id: 'WARROOM', label: '워룸 생성 (처리중)', icon: <Users className="w-3.5 h-3.5" />, color: '#00e5ff' },
-      { id: 'KNOWLEDGE', label: '최종 조치 완료', icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: '#10b981' }
+      { id: 'SMS', label: '장애 이벤트 인지', icon: <Bell className="w-4 h-4" />, color: '#00e5ff', shadow: 'rgba(0,229,255,0.4)' },
+      { id: 'RAG_AGENT', label: 'AI 컨텍스트 분석', icon: <Brain className="w-4 h-4" />, color: '#a855f7', shadow: 'rgba(168,85,247,0.4)' },
+      { id: 'WARROOM', label: '합동 워룸 대응', icon: <Users className="w-4 h-4" />, color: '#ef4444', shadow: 'rgba(239,68,68,0.4)' },
+      { id: 'KNOWLEDGE', label: '최종 복구 확인', icon: <CheckCircle2 className="w-4 h-4" />, color: '#10b981', shadow: 'rgba(16,185,129,0.4)' }
     ];
 
     return (
-      <div className="flex flex-col gap-3 pb-8">
+      <div className="flex flex-col gap-4 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Mobile Compact Activity Ring */}
-        <div className="flex items-center gap-4 bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
-          <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+        <div className="flex items-center gap-5 bg-gradient-to-r from-white/[0.05] to-transparent border border-white/10 p-4 rounded-3xl shadow-xl backdrop-blur-md relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#00e5ff]/5 rounded-full blur-3xl -z-10" />
+          <div className="relative w-20 h-20 shrink-0 flex items-center justify-center drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" stroke="#1e293b" strokeWidth="8" fill="none" />
-              <circle cx="50" cy="50" r="40" stroke={isClosed ? '#10b981' : '#00e5ff'} strokeWidth="8" fill="none" strokeDasharray={2 * Math.PI * 40} strokeDashoffset={(2 * Math.PI * 40) * (1 - (stage/4))} strokeLinecap="round" className="transition-all duration-1000" />
+              <circle cx="50" cy="50" r="42" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="none" />
+              <circle cx="50" cy="50" r="42" stroke={isClosed ? '#10b981' : '#00e5ff'} strokeWidth="8" fill="none" strokeDasharray={2 * Math.PI * 42} strokeDashoffset={(2 * Math.PI * 42) * (1 - (stage/4))} strokeLinecap="round" className="transition-all duration-1000 ease-out" style={{ filter: `drop-shadow(0 0 6px ${isClosed ? '#10b981' : '#00e5ff'})` }} />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[10px] font-black text-white" style={{ textShadow: `0 0 8px ${isClosed ? '#10b981' : '#00e5ff'}` }}>
+              <span className="text-[12px] font-black text-white" style={{ textShadow: `0 0 10px ${isClosed ? 'rgba(16,185,129,0.8)' : 'rgba(0,229,255,0.8)'}` }}>
                 {Math.floor(durationMs / 60000)}m
               </span>
             </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-black text-white truncate mr-2">{card.inc_id}</span>
-              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black shrink-0 ${card.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[13px] font-black text-white truncate mr-2 tracking-wide drop-shadow-md">{card.inc_id}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black shrink-0 border ${card.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border-red-500/40 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'}`}>
                 {card.severity}
               </span>
             </div>
-            <div className="text-[10px] text-slate-400 leading-tight">
-              {card.bizSystem} <br/> {card.bumun} &gt; {card.team}
+            <div className="text-[11px] font-bold text-slate-300 leading-tight">
+              <span className="text-[#00e5ff]">{card.bizSystem}</span> <br/> 
+              <span className="text-slate-500 mt-1 inline-block">{card.bumun} &gt; {card.team}</span>
             </div>
           </div>
         </div>
 
         {/* Vertical Timeline */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-4 relative">
-          <div className="absolute left-7 top-6 bottom-6 w-[2px] bg-white/5 rounded-full z-0" />
+        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 space-y-5 relative shadow-lg backdrop-blur-sm mt-2">
+          <div className="absolute left-9 top-8 bottom-8 w-0.5 bg-gradient-to-b from-white/10 via-white/5 to-transparent rounded-full z-0" />
           
           {FLOW_STEPS.map((step, sIdx) => {
             const stepStageNum = sIdx + 1;
@@ -550,26 +544,32 @@ export default function MobileRealtimePipelinePage() {
             const ts = stepStageNum === 1 ? t1 : stepStageNum === 2 ? t2 : stepStageNum === 3 ? t3 : t4;
             
             return (
-              <div key={step.id} className={`relative flex items-start gap-3 z-10 ${!isCompleted && !isActive ? 'opacity-30' : ''}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#0a0e17] transition-all`}
-                     style={{ borderColor: isCompleted ? step.color : '#1e293b', color: isCompleted ? step.color : '#475569' }}>
+              <div key={step.id} className={`relative flex items-start gap-4 z-10 transition-opacity duration-300 ${!isCompleted && !isActive ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border-2 transition-all duration-500 ${isActive ? 'scale-110' : ''}`}
+                     style={{ 
+                       backgroundColor: isCompleted ? `${step.color}15` : '#0a0e17',
+                       borderColor: isCompleted ? step.color : '#1e293b', 
+                       color: isCompleted ? step.color : '#475569',
+                       boxShadow: isActive || isCompleted ? `0 0 15px ${step.shadow}` : 'none'
+                     }}>
                   {step.icon}
                 </div>
-                <div className="flex-1 min-w-0 pt-1">
+                <div className="flex-1 min-w-0 pt-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[11px] font-black ${isCompleted ? 'text-white' : 'text-slate-400'}`}>{step.label}</span>
-                    {ts && <span className="text-[9px] font-mono text-slate-500">{`${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}`}</span>}
+                    <span className={`text-[12px] font-black ${isCompleted ? 'text-white drop-shadow-md' : 'text-slate-500'}`}>{step.label}</span>
+                    {ts && <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-1.5 py-0.5 rounded">{`${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}`}</span>}
                   </div>
-                  {isActive && <div className="text-[9px] text-cyan-400 mt-1 animate-pulse font-bold">진행 중...</div>}
+                  {isActive && <div className="text-[10px] text-[#00e5ff] mt-1.5 animate-pulse font-bold tracking-wide">분석/처리 진행중...</div>}
                   {step.id === 'WARROOM' && (isCompleted || isActive) && (() => {
                       const roomExists = warRooms.some(r => String(r.id) === String(card.inc_id) || String(r.inc_id) === String(card.inc_id));
                       return roomExists ? (
-                        <button onClick={() => navigate(`/chat/${card.inc_id}`)} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 active:scale-95 transition-all">
-                          <Zap className="w-3 h-3 text-[#00e5ff]" /><span>워룸 이동</span><ArrowRight className="w-3 h-3" />
+                        <button onClick={() => navigate(`/chat/${card.inc_id}`)} className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95 transition-all">
+                          <Zap className="w-3.5 h-3.5" /><span>워룸 즉시 이동</span><ArrowRight className="w-3.5 h-3.5 ml-1" />
                         </button>
                       ) : (
-                        <button onClick={() => handleOpenWarRoom(card)} disabled={isOpeningWarRoom} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 active:scale-95 transition-all">
-                          <Users className="w-3 h-3" /><span>워룸 개설하기</span>
+                        <button onClick={() => handleOpenWarRoom(card)} disabled={isOpeningWarRoom} className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] active:scale-95 transition-all disabled:opacity-50">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{isOpeningWarRoom ? '개설 준비 중...' : '합동 대응 워룸 개설'}</span>
                         </button>
                       );
                   })()}
@@ -580,9 +580,14 @@ export default function MobileRealtimePipelinePage() {
         </div>
 
         {/* Message Detail Card */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-3">
-          <div className="text-[10px] font-black text-slate-400 mb-2 border-b border-white/5 pb-2">SMS 원문</div>
-          {renderFormattedSMS(card.message, card.severity)}
+        <div className="bg-[#0a0e17] border border-white/5 rounded-3xl p-4 shadow-xl relative overflow-hidden mt-2 group">
+          <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-purple-500 opacity-50" />
+          <div className="text-[11px] font-black text-slate-400 mb-3 flex items-center gap-2">
+            <Server className="w-3.5 h-3.5" /> RAW Payload Data
+          </div>
+          <div className="pl-2">
+            {renderFormattedSMS(card.message, card.severity)}
+          </div>
         </div>
       </div>
     );
@@ -591,21 +596,41 @@ export default function MobileRealtimePipelinePage() {
   const renderAnalytics = () => {
     // Analytics Charts preparation
     const trafficMap = {};
-    for (let i = 0; i < 24; i++) trafficMap[i.toString().padStart(2, '0') + ':00'] = 0;
+    const mttaMap = {};
+    const mttrMap = {};
+    for (let i = 0; i < 24; i++) {
+      const hStr = i.toString().padStart(2, '0') + ':00';
+      trafficMap[hStr] = 0;
+      mttaMap[hStr] = { sum: 0, count: 0 };
+      mttrMap[hStr] = { sum: 0, count: 0 };
+    }
     const bizSystemMap = {};
     const orgStatsMap = {};
 
     displayedCards.forEach(c => {
       const date = parseDate(c.reg_dt) || new Date();
       const hourStr = date.getHours().toString().padStart(2, '0') + ':00';
-      trafficMap[hourStr] = (trafficMap[hourStr] || 0) + 1;
+      trafficMap[hourStr] += 1;
       bizSystemMap[c.bizSystem] = (bizSystemMap[c.bizSystem] || 0) + 1;
+      
+      if (c.warroom_dt && c.reg_dt) {
+        const diffMs = parseDate(c.warroom_dt).getTime() - parseDate(c.reg_dt).getTime();
+        if (diffMs >= 0) { mttaMap[hourStr].sum += diffMs / 60000; mttaMap[hourStr].count += 1; }
+      }
+      if (c.closed_dt && c.reg_dt) {
+        const diffMs = parseDate(c.closed_dt).getTime() - parseDate(c.reg_dt).getTime();
+        if (diffMs >= 0) { mttrMap[hourStr].sum += diffMs / 60000; mttrMap[hourStr].count += 1; }
+      }
     });
 
     const trafficData = Object.keys(trafficMap).sort().map(h => ({ hour: h, count: trafficMap[h] }));
-    const bizSystemPieData = Object.keys(bizSystemMap).map((n, i) => ({ name: n, value: bizSystemMap[n], color: ['#00e5ff', '#a855f7', '#f59e0b', '#3b82f6', '#10b981', '#ec4899'][i % 6] }));
+    const mttData = Object.keys(mttaMap).sort().map(h => ({
+      hour: h,
+      MTTA: mttaMap[h].count > 0 ? Math.round(mttaMap[h].sum / mttaMap[h].count) : 0,
+      MTTR: mttrMap[h].count > 0 ? Math.round(mttrMap[h].sum / mttrMap[h].count) : 0,
+    }));
     
-    const allBumuns = [...new Set(orgTree.flatMap(node => node.children || []).map(n => n.name))].filter(Boolean).sort();
+    const bizSystemPieData = Object.keys(bizSystemMap).map((n, i) => ({ name: n, value: bizSystemMap[n], color: ['#00e5ff', '#a855f7', '#f59e0b', '#3b82f6', '#10b981', '#ec4899'][i % 6] }));
     
     const orgFilteredCards = displayedCards.filter(c => {
       if (orgLevel === 'bumun') return selectedBumun === 'all' || (c.bumun || '') === selectedBumun;
@@ -623,55 +648,107 @@ export default function MobileRealtimePipelinePage() {
     const orgList = Object.values(orgStatsMap).sort((a, b) => b.수신 - a.수신);
 
     return (
-      <div className="flex flex-col gap-4 pb-8">
-        {/* System Occupancy */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3"><Layers className="w-4 h-4 text-cyan-400" /><h3 className="text-xs font-black text-white">시스템 점유비</h3></div>
-          {bizSystemPieData.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              <div className="w-full h-8 rounded-lg overflow-hidden flex bg-slate-800 shadow-inner">
-                {bizSystemPieData.map((item, i) => (
-                  <div key={i} style={{ width: `${(item.value / totalCount) * 100}%`, backgroundColor: item.color }} className="h-full border-r border-[#0b0e17]/50 flex items-center justify-center">
-                    {((item.value / totalCount) * 100) > 10 && <span className="text-[10px] font-black text-white/90">{Math.round((item.value / totalCount) * 100)}%</span>}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {bizSystemPieData.map((item, i) => (
-                  <div key={i} className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: item.color }} /><span className="text-[10px] text-slate-400 truncate">{item.name}</span><span className="text-[10px] font-bold text-slate-200 ml-auto">{item.value}건</span></div>
-                ))}
-              </div>
-            </div>
-          ) : <div className="text-center text-xs text-slate-500 py-4">데이터 없음</div>}
+      <div className="flex flex-col gap-6 pb-8 animate-in fade-in duration-500">
+        
+        {/* MTTA / MTTR Trend (New!) */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 mb-4">
+            <Clock className="w-4 h-4 text-purple-400 drop-shadow-[0_0_5px_rgba(168,85,247,0.8)]" />
+            <h3 className="text-[13px] font-black text-white tracking-wide">대응 시간 (MTTA/MTTR)</h3>
+          </div>
+          <div className="h-44 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={mttData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickMargin={8} />
+                <YAxis yAxisId="left" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'rgba(11,14,23,0.9)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}
+                  itemStyle={{ padding: '2px 0' }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                <Line yAxisId="left" type="monotone" dataKey="MTTA" name="MTTA (분)" stroke="#a855f7" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 5, strokeWidth: 0, fill: '#a855f7' }} style={{ filter: 'drop-shadow(0 0 5px rgba(168,85,247,0.5))' }} />
+                <Line yAxisId="left" type="monotone" dataKey="MTTR" name="MTTR (분)" stroke="#00e5ff" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 5, strokeWidth: 0, fill: '#00e5ff' }} style={{ filter: 'drop-shadow(0 0 5px rgba(0,229,255,0.5))' }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Hourly Traffic */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3"><TrendingUp className="w-4 h-4 text-cyan-400" /><h3 className="text-xs font-black text-white">실시간 장애 접수 추이</h3></div>
-          <div className="h-32 w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-              <AreaChart data={trafficData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
-                <defs><linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00e5ff" stopOpacity={0.4}/><stop offset="95%" stopColor="#00e5ff" stopOpacity={0}/></linearGradient></defs>
-                <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
-                <Area type="monotone" dataKey="count" stroke="#00e5ff" strokeWidth={1.5} fillOpacity={1} fill="url(#colorTraffic)" />
+        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 mb-4">
+            <TrendingUp className="w-4 h-4 text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.8)]" />
+            <h3 className="text-[13px] font-black text-white tracking-wide">실시간 장애 접수 추이</h3>
+          </div>
+          <div className="h-40 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trafficData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                <defs><linearGradient id="colorTrafficMob" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00e5ff" stopOpacity={0.5}/><stop offset="95%" stopColor="#00e5ff" stopOpacity={0}/></linearGradient></defs>
+                <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickMargin={8} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <Tooltip contentStyle={{ backgroundColor: 'rgba(11,14,23,0.9)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }} />
+                <Area type="monotone" dataKey="count" name="발생건수" stroke="#00e5ff" strokeWidth={2} fillOpacity={1} fill="url(#colorTrafficMob)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Org Stats (Simplified) */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3"><Network className="w-4 h-4 text-cyan-400" /><h3 className="text-xs font-black text-white">조직 기반 현황 (부문별)</h3></div>
+        {/* System Occupancy */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 mb-5">
+            <Layers className="w-4 h-4 text-emerald-400 drop-shadow-[0_0_5px_rgba(16,185,129,0.8)]" />
+            <h3 className="text-[13px] font-black text-white tracking-wide">주요 시스템 점유율</h3>
+          </div>
+          {bizSystemPieData.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              <div className="w-full h-10 rounded-xl overflow-hidden flex shadow-inner border border-white/5">
+                {bizSystemPieData.map((item, i) => (
+                  <div key={i} style={{ width: `${(item.value / totalCount) * 100}%`, backgroundColor: item.color }} className="h-full border-r border-[#0b0e17]/30 flex items-center justify-center transition-all">
+                    {((item.value / totalCount) * 100) > 12 && <span className="text-[11px] font-black text-black/70 drop-shadow-sm">{Math.round((item.value / totalCount) * 100)}%</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-1">
+                {bizSystemPieData.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between bg-white/[0.03] px-3 py-2 rounded-lg border border-white/5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-3 h-3 rounded-md shadow-sm shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-[11px] font-bold text-slate-300 truncate">{item.name}</span>
+                    </div>
+                    <span className="text-[12px] font-black text-white ml-2 shrink-0">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <div className="text-center text-xs text-slate-500 py-6 bg-white/5 rounded-xl">접수된 시스템 통계가 없습니다</div>}
+        </div>
+
+        {/* Org Stats Leaderboard */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 mb-5">
+            <Network className="w-4 h-4 text-red-400 drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]" />
+            <h3 className="text-[13px] font-black text-white tracking-wide">부문별 대응 리더보드</h3>
+          </div>
           <div className="space-y-3">
-            {orgList.map(org => (
-              <div key={org.name} className="flex flex-col gap-1 border-b border-white/5 pb-2 last:border-0 last:pb-0">
-                <div className="text-xs font-black text-white">{org.name}</div>
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-400">수신: <b className="text-blue-400">{org.수신}</b></span>
-                  <span className="text-slate-400">대기: <b className="text-amber-400">{org.처리대기중}</b></span>
-                  <span className="text-slate-400">처리중: <b className="text-red-400">{org.처리중}</b></span>
-                  <span className="text-slate-400">완료: <b className="text-emerald-400">{org.처리완료}</b></span>
+            {orgList.map((org, idx) => (
+              <div key={org.name} className="flex flex-col gap-2 bg-white/[0.03] border border-white/5 p-3 rounded-2xl relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-600 rounded-l-2xl" />
+                <div className="flex justify-between items-center pl-2">
+                  <div className="text-[12px] font-black text-white flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">#{idx+1}</span>
+                    {org.name}
+                  </div>
+                  <div className="text-[11px] font-black bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full shadow-[0_0_5px_rgba(59,130,246,0.2)]">
+                    TOTAL {org.수신}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[10px] pl-2 bg-black/20 rounded-xl p-2 mt-1">
+                  <span className="text-slate-400 font-bold flex flex-col items-center">대기 <b className="text-amber-400 text-[12px]">{org.처리대기중}</b></span>
+                  <div className="w-px h-6 bg-white/10" />
+                  <span className="text-slate-400 font-bold flex flex-col items-center">대응 <b className="text-red-400 text-[12px]">{org.처리중}</b></span>
+                  <div className="w-px h-6 bg-white/10" />
+                  <span className="text-slate-400 font-bold flex flex-col items-center">완료 <b className="text-emerald-400 text-[12px]">{org.처리완료}</b></span>
                 </div>
               </div>
             ))}
@@ -682,49 +759,84 @@ export default function MobileRealtimePipelinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b12] text-white font-sans flex flex-col">
+    <div className="min-h-screen bg-[#050810] text-slate-200 font-sans flex flex-col relative overflow-hidden">
+      {/* Background glow effects */}
+      <div className="fixed top-0 left-0 w-full h-96 bg-[#00e5ff]/5 rounded-full blur-[120px] -z-10 opacity-60 pointer-events-none" />
+      <div className="fixed bottom-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none" />
+
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0b0e17]/90 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-50 bg-[#070b14]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-3">
-          <button onClick={() => goBack()} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center active:scale-95 text-slate-300">
+          <button onClick={() => goBack()} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center active:scale-95 text-slate-300 transition-all shadow-sm">
             <ArrowLeft size={16} />
           </button>
-          <h1 className="text-sm font-black tracking-tight text-white flex items-center gap-2">
-            <Activity className="w-4 h-4 text-cyan-400" /> Realtime Pipeline
+          <h1 className="text-sm font-black tracking-tight text-white flex items-center gap-2" style={{ textShadow: '0 0 10px rgba(0,229,255,0.3)' }}>
+            <Activity className="w-4 h-4 text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" /> Pipeline
           </h1>
         </div>
-        <div className="flex gap-1 bg-black/40 p-1 rounded-lg">
-          <button onClick={() => setActiveTab('live')} className={`px-3 py-1 rounded-md text-[10px] font-black transition-all ${activeTab === 'live' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-500'}`}>LIVE</button>
-          <button onClick={() => setActiveTab('analytics')} className={`px-3 py-1 rounded-md text-[10px] font-black transition-all ${activeTab === 'analytics' ? 'bg-purple-500/20 text-purple-400' : 'text-slate-500'}`}>분석</button>
+        
+        {/* Segmented Control */}
+        <div className="relative flex items-center bg-black/40 p-1 rounded-xl shadow-inner border border-white/5">
+          <button 
+            onClick={() => setActiveTab('live')} 
+            className={`relative z-10 px-4 py-1.5 rounded-lg text-[11px] font-black transition-colors duration-300 ${activeTab === 'live' ? 'text-white' : 'text-slate-500'}`}
+          >
+            LIVE
+          </button>
+          <button 
+            onClick={() => setActiveTab('analytics')} 
+            className={`relative z-10 px-4 py-1.5 rounded-lg text-[11px] font-black transition-colors duration-300 ${activeTab === 'analytics' ? 'text-white' : 'text-slate-500'}`}
+          >
+            분석
+          </button>
+          {/* Active Slider */}
+          <div 
+            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-blue-600/80 to-purple-600/80 rounded-lg shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-transform duration-300 ease-out border border-white/10`} 
+            style={{ transform: activeTab === 'analytics' ? 'translateX(calc(100% + 8px))' : 'translateX(0)' }}
+          />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-10 custom-scrollbar z-10">
         {/* Funnel Dashboard Header (Always Visible) */}
-        <div className="bg-black/30 border border-white/5 rounded-2xl p-3 mb-4">
-          <div className="grid grid-cols-4 gap-2 mb-3">
+        <div className="bg-white/[0.02] backdrop-blur-md border border-white/10 rounded-3xl p-4 mb-5 shadow-2xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+          <div className="grid grid-cols-4 gap-2 mb-4 relative z-10">
             {[
-              { label: '수신/인지', count: countsByStage[1], color: 'text-blue-400', bg: 'bg-blue-500/10' },
-              { label: 'AI 분석', count: countsByStage[2], color: 'text-purple-400', bg: 'bg-purple-500/10' },
-              { label: '처리중', count: countsByStage[3], color: 'text-red-400', bg: 'bg-red-500/10' },
-              { label: '처리완료', count: countsByStage[4], color: 'text-emerald-400', bg: 'bg-emerald-500/10' }
+              { label: '수신/인지', count: countsByStage[1], color: 'text-[#00e5ff]', glow: 'shadow-[#00e5ff]/20', bg: 'bg-gradient-to-b from-[#00e5ff]/10 to-[#00e5ff]/5 border-[#00e5ff]/20' },
+              { label: 'AI 분석', count: countsByStage[2], color: 'text-purple-400', glow: 'shadow-purple-500/20', bg: 'bg-gradient-to-b from-purple-500/10 to-purple-500/5 border-purple-500/20' },
+              { label: '처리중', count: countsByStage[3], color: 'text-red-400', glow: 'shadow-red-500/20', bg: 'bg-gradient-to-b from-red-500/10 to-red-500/5 border-red-500/20' },
+              { label: '처리완료', count: countsByStage[4], color: 'text-emerald-400', glow: 'shadow-emerald-500/20', bg: 'bg-gradient-to-b from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' }
             ].map((st, i) => (
-              <div key={i} className={`${st.bg} flex flex-col items-center justify-center rounded-xl py-2 border border-white/5`} onClick={() => { setFilterStage(String(i+1)); setActiveTab('live'); }}>
-                <span className="text-[9px] font-bold text-slate-400 mb-1 tracking-tighter whitespace-nowrap">{st.label}</span>
-                <span className={`text-[12px] font-black font-mono ${st.color}`}>{st.count}</span>
+              <div 
+                key={i} 
+                className={`${st.bg} ${st.glow} flex flex-col items-center justify-center rounded-2xl py-3 border backdrop-blur-sm shadow-inner transition-transform active:scale-95`} 
+                onClick={() => { setFilterStage(String(i+1)); setActiveTab('live'); }}
+              >
+                <span className="text-[10px] font-black text-slate-300 mb-1 tracking-tighter whitespace-nowrap drop-shadow-md">{st.label}</span>
+                <span className={`text-[15px] font-black font-mono ${st.color} drop-shadow-[0_0_8px_currentColor]`}>{st.count}</span>
               </div>
             ))}
           </div>
+          
           {/* Ticker */}
-          <div className="bg-[#121622] rounded-lg border border-white/5 h-8 flex items-center overflow-hidden pl-2 pr-1 relative">
-            <div className="flex items-center gap-1 text-red-400 text-[8px] font-black shrink-0 mr-2 z-10 bg-[#121622] pr-2">
-              <AlertCircle className="w-2.5 h-2.5 animate-pulse" /> Breaking
+          <div className="bg-black/60 rounded-xl border border-white/5 h-10 flex items-center overflow-hidden pl-3 pr-2 relative shadow-inner">
+            <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-black shrink-0 mr-2 z-20 bg-black/60 pr-2 h-full">
+              <span className="relative flex h-2.5 w-2.5 mr-1">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+              BREAKING
             </div>
+            {/* Fade masks */}
+            <div className="absolute left-20 top-0 bottom-0 w-8 bg-gradient-to-r from-black/60 to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-black/60 to-transparent z-10 pointer-events-none" />
+            
             <div className="flex-1 overflow-hidden relative h-full flex items-center">
-              <div className="whitespace-nowrap animate-marquee flex items-center gap-8 absolute left-0" style={{ animationPlayState: isSimulationActive ? 'running' : 'paused' }}>
+              <div className="whitespace-nowrap animate-marquee flex items-center gap-10 absolute left-0" style={{ animationPlayState: isSimulationActive ? 'running' : 'paused' }}>
                 {displayedCards.slice(0, 5).map((c, i) => (
-                  <span key={i} className="text-[9px] text-slate-300 font-bold" onClick={() => { setSelectedCardId(c.inc_id); setActiveTab('live'); }}>
-                    <span className="text-cyan-400 mr-1">[{c.bizSystem}]</span>{c.inc_id} 유입
+                  <span key={i} className="text-[11px] text-slate-300 font-bold tracking-wide" onClick={() => { setSelectedCardId(c.inc_id); setActiveTab('live'); }}>
+                    <span className="text-[#00e5ff] mr-1.5">[{c.bizSystem}]</span>{c.inc_id} 유입
                   </span>
                 ))}
               </div>
@@ -739,19 +851,37 @@ export default function MobileRealtimePipelinePage() {
             {renderTimeline(activeDagCard)}
             
             {/* Horizontal scrollable incident cards */}
-            <div className="mt-4 mb-8">
-              <div className="text-[10px] font-black text-slate-400 mb-2 px-1">실시간 대기열 ({displayedCards.length}건)</div>
-              <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">
-                {displayedCards.map(c => (
-                  <div key={c.inc_id} onClick={() => setSelectedCardId(c.inc_id)} className={`snap-center shrink-0 w-[200px] bg-white/[0.02] border rounded-xl p-3 flex flex-col gap-2 transition-all cursor-pointer ${selectedCardId === c.inc_id ? 'border-cyan-500/50 shadow-[0_0_15px_rgba(0,229,255,0.15)]' : 'border-white/5 opacity-70'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-white">{c.inc_id}</span>
-                      <span className={`w-2 h-2 rounded-full ${c.stage === 4 ? 'bg-emerald-400' : c.stage === 3 ? 'bg-red-400 animate-pulse' : 'bg-blue-400'}`} />
+            <div className="mt-5 mb-8">
+              <div className="text-[11px] font-black text-slate-400 mb-3 px-1 tracking-wide uppercase">실시간 대기열 ({displayedCards.length}건)</div>
+              <div className="flex gap-4 overflow-x-auto pb-6 pt-2 px-1 custom-scrollbar snap-x">
+                {displayedCards.map(c => {
+                  const isSelected = selectedCardId === c.inc_id;
+                  return (
+                  <div 
+                    key={c.inc_id} 
+                    onClick={() => setSelectedCardId(c.inc_id)} 
+                    className={`snap-center shrink-0 w-[220px] rounded-2xl p-4 flex flex-col gap-2.5 transition-all duration-300 cursor-pointer ${
+                      isSelected 
+                      ? 'bg-gradient-to-br from-[#00e5ff]/20 to-blue-600/20 border-2 border-[#00e5ff]/50 shadow-[0_0_25px_rgba(0,229,255,0.2)] scale-100 z-10' 
+                      : 'bg-white/[0.03] border border-white/5 opacity-60 scale-95 hover:opacity-100 hover:scale-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[12px] font-black ${isSelected ? 'text-white' : 'text-slate-300'}`}>{c.inc_id}</span>
+                      <span className={`relative flex h-2.5 w-2.5`}>
+                        {c.stage === 3 && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>}
+                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${c.stage === 4 ? 'bg-emerald-400' : c.stage === 3 ? 'bg-red-500' : 'bg-purple-400'}`}></span>
+                      </span>
                     </div>
-                    <div className="text-[9px] text-slate-400 truncate">{c.bizSystem}</div>
-                    <div className="text-[9px] text-slate-500 font-mono mt-auto">{c.reg_dt.slice(11, 16)}</div>
+                    <div className="text-[11px] font-bold text-slate-300 truncate">{c.bizSystem}</div>
+                    <div className="flex justify-between items-center mt-auto">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${c.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {c.severity}
+                      </span>
+                      <div className="text-[10px] text-slate-500 font-mono font-bold bg-black/40 px-2 py-0.5 rounded-full">{c.reg_dt.slice(11, 16)}</div>
+                    </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           </>

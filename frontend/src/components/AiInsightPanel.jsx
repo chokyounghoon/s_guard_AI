@@ -519,6 +519,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
     runAnalysis(true);
   };
 
+  const lastAnalyzedIncId = useRef(null);
+
   useEffect(() => {
     if (!selectedSms) {
       setIsAnalyzingSms(false);
@@ -528,8 +530,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       delayShownRef.current = false;
       setInsightTimestamp(null);
       setInsightData(prev => ({ ...prev, similarity_score: null, similarity_reason: null }));
+      lastAnalyzedIncId.current = null;
       return;
     }
+    if (lastAnalyzedIncId.current === selectedSms.inc_id) return;
+    
+    lastAnalyzedIncId.current = selectedSms.inc_id;
     if (onAnalysisComplete) onAnalysisComplete(false, '');
     runAnalysis(false);
   }, [selectedSms, runAnalysis, onAnalysisComplete]);
@@ -998,13 +1004,17 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     return linkIncidentIds(finalResult);
                   })()}
                 />
-              ) : (
+              ) : selectedSms ? (
                 <span className="text-slate-500 font-bold tracking-tight animate-pulse flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
                   AI 모델이 관련 데이터를 검색하고 해결 방안을 실시간으로 분석하고 있습니다...
                 </span>
+              ) : (
+                <span className="text-slate-600 font-bold tracking-tight">
+                  분석할 장애 내역이 없습니다. (수신 대기 중)
+                </span>
               )}
-              <span className={`animate-pulse inline-block w-1.5 h-4 align-middle ml-1 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
+              {selectedSms && <span className={`animate-pulse inline-block w-1.5 h-4 align-middle ml-1 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>}
             </div>
           </div>
         </div>

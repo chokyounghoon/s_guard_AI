@@ -12,6 +12,7 @@ import {
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
 import { SMS_WORKER_URL } from '../config/api';
 import { maskName, maskPhone } from '../utils/maskingUtils';
+import { useResizable, useResizableVertical } from '../hooks/useResizable';
 
 const API_BASE = SMS_WORKER_URL || 'https://sguardai.khcho0421.workers.dev';
 
@@ -83,6 +84,12 @@ export default function SCallertPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const userProfile = getUserProfile();
+
+  // ── 리사이즈 훅 초기화 ────────────────────────
+  const { widths, startDrag, isDragging } = useResizable([32, 36, 32], 'scallert-widths');
+  const { heights: h1, startVDrag: vDrag1, isDragging: vDrag1ing } = useResizableVertical([45, 55], 'scallert-v-col1');
+  const { heights: h2, startVDrag: vDrag2, isDragging: vDrag2ing } = useResizableVertical([40, 60], 'scallert-v-col2');
+  const { heights: h3, startVDrag: vDrag3, isDragging: vDrag3ing } = useResizableVertical([40, 60], 'scallert-v-col3');
 
   // ── 전략 마스터 ─────────────────────────────────
   const [strategies, setStrategies] = useState([]);
@@ -1132,10 +1139,11 @@ export default function SCallertPage() {
         </div>
       </header>
       <main className="w-full px-4 lg:px-6 py-6">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start h-[calc(100vh-140px)]">
+        <div className={`flex flex-col xl:flex-row gap-6 items-start h-[calc(100vh-140px)] ${isDragging ? 'select-none' : ''}`}>
+          
           {/* Column 1: Strategy List + Rule Setting */}
-          <div className="flex flex-col gap-6 h-[calc(100vh-140px)] custom-scrollbar pr-2 pb-6">
-            <section className="flex flex-col bg-[#0c1020]/60 border border-white/5 rounded-[2rem] overflow-hidden backdrop-blur-xl shrink-0 max-h-[35%]">
+          <div style={{ flex: `0 0 ${widths[0]}%`, minWidth: '300px' }} className="flex flex-col gap-6 h-full custom-scrollbar pr-2 pb-6 relative shrink-0">
+            <section style={{ height: `${h1[0]}%` }} className="flex flex-col bg-[#0c1020]/60 border border-white/5 rounded-[2rem] overflow-hidden backdrop-blur-xl shrink-0 relative">
               <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-orange-400" />

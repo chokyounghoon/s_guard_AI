@@ -263,14 +263,24 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
   // 실제 권한 체크 헬퍼 (로컴 state 기반)
   const checkAllowed = (path) => {
-    if (!path || path === '/dashboard' || path === '/realtime-pipeline') return true;
+    // 1. 공통 정보성 페이지는 기본 허용
+    if (!path || path === '/dashboard' || path === '/realtime-pipeline' || path === '/security-features' || path === '/processing-flow') return true;
+    
     const u = getUserProfile();
+    // 2. 관리자는 무조건 전체 허용
     if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
+    
     // liveAllowedPaths가 null = 로딩 중 또는 전체허용
     if (liveAllowedPaths === null || liveAllowedPaths === undefined) return true;
     if (!Array.isArray(liveAllowedPaths)) return true;
     if (liveAllowedPaths.length === 0) return false;
-    return liveAllowedPaths.some(p => path === p || path.startsWith(p + '/'));
+
+    // 3. 백엔드 DB(권한 테이블)에 누락된 특수 메뉴들을 다른 권한에 맵핑하여 우회 처리
+    let effectivePath = path;
+    if (path === '/admin/incident-cleanup') effectivePath = '/overall-status'; // 전체 현황 권한이 있으면 Data Cleanup도 허용
+    if (path === '/s-callert') effectivePath = '/overall-status'; // s-callert가 DB에 없다면 전체 현황 권한으로 대체
+
+    return liveAllowedPaths.some(p => effectivePath === p || effectivePath.startsWith(p + '/'));
   };
 
   const location = useLocation();
@@ -315,6 +325,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [isSmsSpinning, setIsSmsSpinning] = useState(false);
   const [isFlowSpinning, setIsFlowSpinning] = useState(false);
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [smsRefreshCounter, setSmsRefreshCounter] = useState(0);
 
   // MTTR 타이머 실시간 동기화
   useEffect(() => {
@@ -651,36 +662,34 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     }
   }, []);
 
-  // Fetch detailed workflow when an incident is selected
+  // Fetch detailed workflow when an incident is selected or a new SMS triggers refresh
+  const fetchWorkflow = useCallback(async (isInitial = false) => {
+    if (!selectedIncidentIdFlow) return;
+    if (isInitial) setIsFlowSpinning(true);
+    try {
+      const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      setIncidentWorkflowSteps(data.steps || []);
+    } catch (e) {
+      console.error('Workflow fetch failed:', e);
+    } finally {
+      if (isInitial) setIsFlowSpinning(false);
+    }
+  }, [selectedIncidentIdFlow, apiBase]);
+
   useEffect(() => {
     if (!selectedIncidentIdFlow) {
       setIncidentWorkflowSteps([]);
       return;
     }
-
-    const fetchWorkflow = async (isInitial = false) => {
-      if (isInitial) setIsFlowSpinning(true);
-      try {
-        const res = await fetch(`${apiBase}/ai/incident/workflow-details?inc_id=${selectedIncidentIdFlow}`, {
-          headers: getAuthHeaders()
-        });
-        const data = await res.json();
-        setIncidentWorkflowSteps(data.steps || []);
-      } catch (e) {
-        console.error('Workflow fetch failed:', e);
-      } finally {
-        if (isInitial) setIsFlowSpinning(false);
-      }
-    };
-
     fetchWorkflow(true);
+  }, [selectedIncidentIdFlow, fetchWorkflow]);
 
-    const interval = setInterval(() => {
-      fetchWorkflow(false);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [selectedIncidentIdFlow, apiBase]);
+  useEffect(() => {
+    if (smsRefreshCounter > 0) fetchWorkflow(false);
+  }, [smsRefreshCounter, fetchWorkflow]);
 
   // 상단 S-Autopilot Insight 패널은 항상 최신 SMS만 분석하도록 고정
   // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
@@ -729,6 +738,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         console.log('[Dashboard SSE] sms_received:', event.data);
         sseRetry = 0;
         fetchSMSMessages();
+        setSmsRefreshCounter(c => c + 1);
       });
 
       newSse.addEventListener('connected', () => { sseRetry = 0; });
@@ -1236,6 +1246,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 
     // console.log('[parseTranscript] result:', result.map(r => `${r.role}(${r.text.length}chars)`));
+    
+    // Fallback: 파싱된 에이전트 결과가 하나도 없다면 원문 전체를 Leader 발언으로 표시하여 빈 화면(대기 중) 상태 방지
+    if (result.length === 0 && text && text.trim().length > 5) {
+      result.push({ role: 'Leader', text: text.trim(), delay: 0 });
+    }
+
     return result;
   };
 
@@ -1617,11 +1633,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               }`}>Casual Match Strictness</span>
             </button>
 
-            {/* S-callert 바로가기 - 관리자 전용 */}
-            {(userProfile?.is_admin === 1 || userProfile?.role === 'admin') && (
+            {/* S-callert 바로가기 - 권한 기반 (PC버전 전용) */}
+            {checkAllowed('/s-callert') && (
               <button
                 onClick={() => navigate('/s-callert')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 group"
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 group"
                 style={{
                   background: 'rgba(251,146,60,0.06)',
                   border: '1px solid rgba(251,146,60,0.25)',
@@ -1681,7 +1697,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {[
             { label: 'Realtime Pipeline', icon: Layers,    path: '/realtime-pipeline',      color: '#00e5ff' },
             { label: 'Orbital Command', icon: Cpu,         path: '/orbital-command',        color: '#06b6d4' },
-            { label: 'Alert Monitor',   icon: BellDot,     path: '/alert-monitor',          color: '#ef4444' },
             { label: 'Personal KW',     icon: Keyboard,    path: '/user-keyword',           color: '#06b6d4' },
             { label: 'Report Line',     icon: Users,       path: '/report-line-management', color: '#a855f7' },
             { label: 'Accounts',        icon: User,        path: '/user-management',        color: '#3b82f6' },
@@ -2107,7 +2122,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 </div>
                               );
                             })()}
-                            <div className="flex justify-end border-t border-white/5 pt-1 mt-0.5">
+                            <div className="flex justify-between items-center border-t border-white/5 pt-1 mt-0.5">
+                              <span className="text-[9px] text-slate-600 font-bold font-mono tracking-tight cursor-pointer hover:text-white transition-colors" title="클릭하여 복사" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(msg.inc_id); alert('ID가 복사되었습니다: ' + msg.inc_id); }}>ID: {msg.inc_id}</span>
                               <span className="text-[9px] text-slate-500 font-bold font-mono">{formatYYMMDD(msg.timestamp)}</span>
                             </div>
                           </div>

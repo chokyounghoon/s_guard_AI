@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, ShieldCheck, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, Lock } from 'lucide-react';
+import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, ShieldCheck, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, Lock, Trash2 } from 'lucide-react';
 import { getUserProfile, getAllowedPaths, addAuthListener } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
 
@@ -19,13 +19,23 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
   }, []);
 
   const checkAllowed = (path) => {
-    if (!path || path === '/dashboard' || path === '/realtime-pipeline') return true;
+    // 1. 공통 정보성 페이지는 기본 허용
+    if (!path || path === '/dashboard' || path === '/realtime-pipeline' || path === '/security-features' || path === '/processing-flow') return true;
+    
     const u = getUserProfile();
+    // 2. 관리자는 무조건 전체 허용
     if (u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN' || u.role === 'super_admin' || u.role === 'admin' || u.is_admin === 1)) return true;
+    
     if (liveAllowedPaths === null || liveAllowedPaths === undefined) return true;
     if (!Array.isArray(liveAllowedPaths)) return true;
     if (liveAllowedPaths.length === 0) return false;
-    return liveAllowedPaths.some(p => path === p || path.startsWith(p + '/'));
+
+    // 3. 백엔드 DB(권한 테이블)에 누락된 특수 메뉴들을 다른 권한에 맵핑하여 우회 처리
+    let effectivePath = path;
+    if (path === '/admin/incident-cleanup') effectivePath = '/overall-status'; // 전체 현황 권한이 있으면 Data Cleanup도 허용
+    if (path === '/s-callert') effectivePath = '/overall-status'; // s-callert가 DB에 없다면 전체 현황 권한으로 대체
+
+    return liveAllowedPaths.some(p => effectivePath === p || effectivePath.startsWith(p + '/'));
   };
 
   useEffect(() => {
@@ -147,7 +157,8 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
                 { label: '권한 관리', sub: 'RBAC SETTING', icon: Shield, path: '/admin/permissions', color: '#6366f1', adminOnly: true },
                 { label: '사용자 관리', sub: 'USER MGMT', icon: Users, path: '/user-management', color: '#3b82f6', adminOnly: true },
-              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'super_admin').map((item) => {
+                { label: '데이터 삭제', sub: 'DATA CLEANUP', icon: Trash2, path: '/admin/incident-cleanup', color: '#ef4444', adminOnly: true },
+              ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'super_admin' || checkAllowed(m.path)).map((item) => {
                 const Icon = item.icon;
                 const allowed = checkAllowed(item.path);
                 return (

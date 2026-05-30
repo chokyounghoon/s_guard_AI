@@ -43,6 +43,7 @@ import MobileSecurityFeaturesPage from './pages/MobileSecurityFeaturesPage';
 import PermissionManagementPage from '../pages/PermissionManagementPage';
 import DeputyManagementPage from '../pages/DeputyManagementPage';
 import MobileDeputyManagementPage from './pages/MobileDeputyManagementPage';
+import AdminIncidentCleanupPage from '../pages/AdminIncidentCleanupPage';
 
 
 // ── 모바일 전용 페이지 (카드 기반, 네이티브 UX) ────────────────────────────────
@@ -409,6 +410,8 @@ function AppContent() {
         <Route path="/realtime-pipeline"        element={<PR><MobileRealtimePipelinePage /></PR>} />
         <Route path="/admin/permissions" element={<PR><PermissionManagementPage /></PR>} />
         <Route path="/admin/deputy" element={<PR><MobileDeputyManagementPage /></PR>} />
+        <Route path="/admin/incident-cleanup" element={<PR><AdminIncidentCleanupPage /></PR>} />
+        <Route path="/admin-cleanup" element={<PR><AdminIncidentCleanupPage /></PR>} />
       </Routes>
 
       {/* Consent Modal */}

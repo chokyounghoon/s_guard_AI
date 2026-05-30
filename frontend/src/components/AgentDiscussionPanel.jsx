@@ -110,6 +110,66 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
     ? "w-full h-full bg-[#0a0c12] flex flex-col overflow-hidden animate-in fade-in duration-500"
     : "fixed right-4 bottom-4 w-96 max-h-[600px] bg-[#0a0c12]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col z-40 animate-in slide-in-from-right duration-500";
 
+  // 동적 상태 계산
+  const getIncidentStatus = () => {
+    let v = 0;
+    
+    // 1. Check if incident object has a count
+    if (incident) {
+      v = Number(incident.received_count) || Number(incident.unresolved) || 0;
+    }
+
+    // 2. Parse from AI messages (leader summary) if available and higher
+    if (messages && messages.length > 0) {
+      const leaderMsg = [...messages].reverse().find(m => m.role && (m.role.toLowerCase().includes('leader') || m.role.toLowerCase().includes('리더')));
+      if (leaderMsg && leaderMsg.text) {
+        // Extract numbers like "장애 102건", "오류 102건"
+        const match = leaderMsg.text.match(/(?:장애|오류|미처리)\s*(\d+)건/);
+        if (match) {
+          const parsedV = parseInt(match[1], 10);
+          if (parsedV > v) v = parsedV; // Take the highest count found
+        }
+      }
+    }
+    
+    // If v is still 0 and there's no incident, it's SAFE
+    if (v === 0 && !incident) {
+      return { level: 'SAFE', color: 'text-[#00ff88]', bg: 'bg-[#00ff88]/10', border: 'border-[#00ff88]/30', borderWrapper: 'border-[#00ff88]/40', shadow: 'shadow-[0_0_20px_rgba(0,255,136,0.15)]', innerShadow: 'shadow-[0_0_12px_rgba(0,255,136,0.3)]', dropShadow: 'drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]' };
+    }
+
+    
+    let critThreshold = 10;
+    let majThreshold = 3;
+    try {
+      const s = localStorage.getItem('sguard_alert_thresholds_v3');
+      if (s) {
+        const p = JSON.parse(s);
+        critThreshold = p.critical?.errorCount || 10;
+        majThreshold = p.major?.errorCount || 3;
+      }
+    } catch {}
+
+    if (v >= critThreshold) {
+      return { level: 'CRITICAL', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30', borderWrapper: 'border-red-500/40', shadow: 'shadow-[0_0_20px_rgba(239,68,68,0.15)]', innerShadow: 'shadow-[0_0_12px_rgba(239,68,68,0.3)]', dropShadow: 'drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' };
+    }
+    if (v >= majThreshold) {
+      return { level: 'MAJOR', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/30', borderWrapper: 'border-orange-500/40', shadow: 'shadow-[0_0_20px_rgba(249,115,22,0.15)]', innerShadow: 'shadow-[0_0_12px_rgba(249,115,22,0.3)]', dropShadow: 'drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' };
+    }
+    return { level: 'SAFE', color: 'text-[#00ff88]', bg: 'bg-[#00ff88]/10', border: 'border-[#00ff88]/30', borderWrapper: 'border-[#00ff88]/40', shadow: 'shadow-[0_0_20px_rgba(0,255,136,0.15)]', innerShadow: 'shadow-[0_0_12px_rgba(0,255,136,0.3)]', dropShadow: 'drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]' };
+  };
+
+  const status = getIncidentStatus();
+
+  const getSummaryText = () => {
+    if (messages && messages.length > 0) {
+      const leaderMsg = [...messages].reverse().find(m => m.role.toLowerCase().includes('leader') || m.role.toLowerCase().includes('리더'));
+      if (leaderMsg) return leaderMsg.text;
+    }
+    if (status.level === 'CRITICAL') return `분석결과: 현재 장애 발생 건수가 임계치를 초과하여 심각(CRITICAL) 상황으로 판단됩니다. 즉각적인 조치가 필요합니다.`;
+    if (status.level === 'MAJOR') return `분석결과: 다수의 이벤트가 발생하여 주의(MAJOR) 상태입니다. 모니터링이 필요합니다.`;
+    return '요약: 분석 결과, 관리자 테스트 또는 단순 정보성 이벤트로 판단되며 특이사항 및 위험 요소가 없습니다.';
+  };
+
   return (
     <div className={containerClasses}>
       {/* Header - Only show if NO-EMBEDDED */}
@@ -141,38 +201,38 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
       <div className="p-4 bg-[#060a12] flex flex-col gap-3">
         {/* 아이콘 3개 상태 인디케이터 */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border border-[#00ff88]/40 shadow-[0_0_20px_rgba(0,255,136,0.15)] text-center">
-            <div className="w-10 h-10 rounded-full bg-[#00ff88]/15 border border-[#00ff88]/30 flex items-center justify-center mb-2 shadow-[0_0_12px_rgba(0,255,136,0.3)]">
-              <Shield className="w-5 h-5 text-[#00ff88] filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+          <div className={`skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border ${status.borderWrapper} ${status.shadow} text-center transition-all`}>
+            <div className={`w-10 h-10 rounded-full bg-white/5 border ${status.border} flex items-center justify-center mb-2 ${status.innerShadow} transition-all`}>
+              <Shield className={`w-5 h-5 ${status.color} filter ${status.dropShadow}`} />
             </div>
             <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider mb-1">SEC-OPS</span>
-            <span className="text-[9px] font-black text-[#00ff88] bg-[#00ff88]/10 px-2 py-0.5 rounded-full border border-[#00ff88]/30 shadow-[0_0_8px_rgba(0,255,136,0.2)]">SAFE</span>
+            <span className={`text-[9px] font-black ${status.color} ${status.bg} px-2 py-0.5 rounded-full border ${status.border}`}>{status.level}</span>
           </div>
 
-          <div className="skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border border-[#00ff88]/40 shadow-[0_0_20px_rgba(0,255,136,0.15)] text-center">
-            <div className="w-10 h-10 rounded-full bg-[#00ff88]/15 border border-[#00ff88]/30 flex items-center justify-center mb-2 shadow-[0_0_12px_rgba(0,255,136,0.3)]">
-              <Database className="w-5 h-5 text-[#00ff88] filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+          <div className={`skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border ${status.borderWrapper} ${status.shadow} text-center transition-all`}>
+            <div className={`w-10 h-10 rounded-full bg-white/5 border ${status.border} flex items-center justify-center mb-2 ${status.innerShadow} transition-all`}>
+              <Database className={`w-5 h-5 ${status.color} filter ${status.dropShadow}`} />
             </div>
             <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider mb-1">DB-SYS</span>
-            <span className="text-[9px] font-black text-[#00ff88] bg-[#00ff88]/10 px-2 py-0.5 rounded-full border border-[#00ff88]/30 shadow-[0_0_8px_rgba(0,255,136,0.2)]">SAFE</span>
+            <span className={`text-[9px] font-black ${status.color} ${status.bg} px-2 py-0.5 rounded-full border ${status.border}`}>{status.level}</span>
           </div>
 
-          <div className="skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border border-[#00ff88]/40 shadow-[0_0_20px_rgba(0,255,136,0.15)] text-center">
-            <div className="w-10 h-10 rounded-full bg-[#00ff88]/15 border border-[#00ff88]/30 flex items-center justify-center mb-2 shadow-[0_0_12px_rgba(0,255,136,0.3)]">
-              <Server className="w-5 h-5 text-[#00ff88] filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+          <div className={`skeuo-card flex flex-col items-center justify-center py-3 px-2 rounded-2xl bg-[#12151a] border ${status.borderWrapper} ${status.shadow} text-center transition-all`}>
+            <div className={`w-10 h-10 rounded-full bg-white/5 border ${status.border} flex items-center justify-center mb-2 ${status.innerShadow} transition-all`}>
+              <Server className={`w-5 h-5 ${status.color} filter ${status.dropShadow}`} />
             </div>
             <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider mb-1">DEV-OPS</span>
-            <span className="text-[9px] font-black text-[#00ff88] bg-[#00ff88]/10 px-2 py-0.5 rounded-full border border-[#00ff88]/30 shadow-[0_0_8px_rgba(0,255,136,0.2)]">SAFE</span>
+            <span className={`text-[9px] font-black ${status.color} ${status.bg} px-2 py-0.5 rounded-full border ${status.border}`}>{status.level}</span>
           </div>
         </div>
 
         {/* 한 줄 결론 요약 박스 */}
-        <div className="skeuo-card p-4 rounded-2xl bg-gradient-to-r from-[#00ff88]/15 to-[#00ff88]/5 border border-[#00ff88]/30 flex items-center gap-3.5 shadow-[0_0_20px_rgba(0,255,136,0.1)]">
-          <CheckCircle2 className="w-6 h-6 text-[#00ff88] shrink-0 filter drop-shadow-[0_0_8px_rgba(0,255,136,0.8)]" />
+        <div className={`skeuo-card p-4 rounded-2xl bg-gradient-to-r ${status.level === 'CRITICAL' ? 'from-red-500/15 to-red-500/5 border-red-500/30' : status.level === 'MAJOR' ? 'from-orange-500/15 to-orange-500/5 border-orange-500/30' : 'from-[#00ff88]/15 to-[#00ff88]/5 border-[#00ff88]/30'} border flex items-center gap-3.5 shadow-lg transition-all`}>
+          <CheckCircle2 className={`w-6 h-6 ${status.color} shrink-0 filter ${status.dropShadow}`} />
           <div className="flex flex-col min-w-0">
-            <span className="text-[10px] font-bold text-[#00ff88] tracking-widest uppercase mb-0.5">Consensus Conclusion</span>
-            <p className="text-sm font-black text-white tracking-tight leading-snug">
-              요약: 관리자 테스트로 인한 정상 데이터 유입 (위협 없음)
+            <span className={`text-[10px] font-bold ${status.color} tracking-widest uppercase mb-0.5`}>Consensus Conclusion</span>
+            <p className="text-[13px] font-black text-white tracking-tight leading-snug break-keep">
+              {getSummaryText()}
             </p>
           </div>
         </div>

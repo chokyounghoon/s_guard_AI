@@ -313,26 +313,36 @@ export default function AiReportPage() {
 
   const handleTouchEnd = (e) => {
     if (touchStartX.current === null || touchStartY.current === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
+    
+    // changedTouches가 없을 수도 있음 (touchcancel 등)
+    const touch = e.changedTouches ? e.changedTouches[0] : null;
+    if (!touch) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
+
+    const touchEndX = touch.clientX;
+    const touchEndY = touch.clientY;
 
     const dx = touchStartX.current - touchEndX;
     const dy = touchStartY.current - touchEndY;
 
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    // 더 관대한 스와이프 조건: X 이동이 40px 이상이고, Y 이동보다 크면 스와이프 인정
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
       const currentIndex = tabs.findIndex(t => t.id === activeTab);
       if (currentIndex === -1) return;
 
       if (dx > 0 && currentIndex < tabs.length - 1) {
         // 좌측으로 스와이프 (다음 탭)
-        if (navigator.vibrate) navigator.vibrate(30);
+        if (navigator.vibrate) navigator.vibrate(20);
         const nextId = tabs[currentIndex + 1].id;
         setActiveTab(nextId);
         const el = document.getElementById(`tab-${nextId}`);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       } else if (dx < 0 && currentIndex > 0) {
         // 우측으로 스와이프 (이전 탭)
-        if (navigator.vibrate) navigator.vibrate(30);
+        if (navigator.vibrate) navigator.vibrate(20);
         const prevId = tabs[currentIndex - 1].id;
         setActiveTab(prevId);
         const el = document.getElementById(`tab-${prevId}`);
@@ -1004,6 +1014,7 @@ export default function AiReportPage() {
       <main
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 pb-20 overflow-y-auto custom-scrollbar"
       >
         {loading && (
