@@ -427,7 +427,7 @@ function AppContent() {
         <Route path="/activity-detail"         element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ActivityDetailPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/assignments"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AssignmentsPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/my-assignments"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><AssignmentsPage /></PCPageModal></ProtectedRoute>} />
-        <Route path="/overall-status"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><OverallStatusPage /></PCPageModal></ProtectedRoute>} />
+        <Route path="/overall-status"          element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><OverallStatusPage /></ProtectedRoute>} />
         <Route path="/search"                  element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SearchPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/mobile-report-search"    element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><SearchPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/incident-list"           element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><IncidentListPage /></PCPageModal></ProtectedRoute>} />

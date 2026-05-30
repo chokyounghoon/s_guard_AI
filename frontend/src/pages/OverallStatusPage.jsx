@@ -4,7 +4,8 @@ import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   Shield, Zap, Database, MessageSquare, Users, CheckCircle2,
   BarChart3, Clock, Sparkles, Activity, FileSearch, Brain,
-  Target, Rocket, Heart, Medal, ChevronLeft, Loader2, RefreshCw
+  Target, Rocket, Heart, Medal, ChevronLeft, Loader2, RefreshCw,
+  Layers, ArrowRight
 } from 'lucide-react';
 
 import { getAuthHeaders } from '../lib/authStore';
@@ -20,17 +21,14 @@ const EMPTY_STATS = {
   recentFeed: [],
 };
 
-// 탭 목록
-const TABS = ['개요', 'MTTA 분석', '카테고리', '기여자', '피드'];
-
 export default function OverallStatusPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState(EMPTY_STATS);
-  const [tab, setTab] = useState(0);
   const [now, setNow] = useState(new Date());
+  
   const getDefaultDates = () => {
     const today = new Date();
     const end = today.toISOString().split('T')[0];
@@ -120,496 +118,308 @@ export default function OverallStatusPage() {
 
   const KPI = [
     {
-      label: '자산화 성공률',
-      sub: 'Fidelity Index',
+      label: '자산화 성공률', sub: 'Fidelity Index',
       value: `${stats.incidents.integrity}%`,
-      icon: Shield,
-      color: '#10b981',
+      icon: Shield, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', iconBg: 'bg-emerald-500/20', iconBorder: 'border-emerald-500/30',
       formula: 'KB_COUNT / TOTAL_INC × 100',
     },
     {
-      label: '평균 복구 소요시간',
-      sub: 'MTTR (인지→지식화)',
+      label: '평균 복구 소요시간', sub: 'MTTR (인지→지식화)',
       value: stats.incidents.mttr > 0 ? `${stats.incidents.mttr}m` : '-',
-      icon: Rocket,
-      color: '#60a5fa',
+      icon: Rocket, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', iconBg: 'bg-blue-500/20', iconBorder: 'border-blue-500/30',
       formula: 'AVG(KB_REG - SMS_RECV)',
     },
     {
-      label: '평균 인지 소요시간',
-      sub: `주간: ${stats.incidents.dayMtta || 0}m / 야간: ${stats.incidents.nightMtta || 0}m`,
+      label: '평균 인지 소요시간', sub: `주간: ${stats.incidents.dayMtta || 0}m / 야간: ${stats.incidents.nightMtta || 0}m`,
       value: stats.incidents.mtta > 0 ? `${stats.incidents.mtta}m` : '-',
-      icon: Clock,
-      color: '#a855f7',
+      icon: Clock, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', iconBg: 'bg-purple-500/20', iconBorder: 'border-purple-500/30',
       formula: 'AVG(WARROOM - SMS_RECV)',
     },
     {
-      label: '이번달 KB 증가',
-      sub: '전월 대비 지식 성장률',
+      label: '이번달 KB 증가', sub: '전월 대비 지식 성장률',
       value: stats.knowledge.growth || '-',
-      icon: Heart,
-      color: '#f87171',
+      icon: Heart, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', iconBg: 'bg-red-500/20', iconBorder: 'border-red-500/30',
       formula: 'THIS_MONTH / LAST_MONTH',
     },
     {
-      label: '전사 조치 지수',
-      sub: 'High Intelligence',
+      label: '전사 조치 지수', sub: 'High Intelligence',
       value: `${stats.incidents.rate}%`,
-      icon: Zap,
-      color: '#fb923c',
+      icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', iconBg: 'bg-amber-500/20', iconBorder: 'border-amber-500/30',
       formula: 'RESOLVED / TOTAL × 100',
     },
   ];
 
   const FLOW = [
-    { label: 'SMS 수신', value: stats.incidents.total, icon: MessageSquare, color: '#f87171' },
-    { label: '전문가 배정', value: stats.warrooms?.assignedUsers ?? stats.warrooms.active, icon: Users, color: '#60a5fa' },
-    { label: '대응 중', value: Math.max(0, stats.incidents.total - stats.incidents.resolved), icon: Activity, color: '#a78bfa' },
-    { label: '조치 완료', value: stats.incidents.resolved, icon: CheckCircle2, color: '#fb923c' },
-    { label: '지식 자산', value: stats.knowledge.total, icon: Database, color: '#a78bfa' },
+    { label: 'SMS 수신', value: stats.incidents.total, icon: MessageSquare, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+    { label: '전문가 배정', value: stats.warrooms?.assignedUsers ?? stats.warrooms.active, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
+    { label: '대응 중', value: Math.max(0, stats.incidents.total - stats.incidents.resolved), icon: Activity, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
+    { label: '조치 완료', value: stats.incidents.resolved, icon: CheckCircle2, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
+    { label: '지식 자산', value: stats.knowledge.total, icon: Database, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', glow: true },
   ];
 
   if (loading) {
     return (
-      <div style={{
-        height: '100dvh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(160deg, #04060f, #080c1c)',
-        gap: 16,
-      }}>
-        <Loader2 size={36} color="#818cf8" style={{ animation: 'spin 1s linear infinite' }} />
-        <div style={{ fontSize: 14, fontWeight: 800, color: '#475569', letterSpacing: '0.1em' }}>
+      <div className="h-screen flex flex-col items-center justify-center bg-zinc-950 gap-4">
+        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+        <div className="text-sm font-black text-slate-500 tracking-widest">
           SYNCING DREAM ANALYTICS...
         </div>
-        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
   return (
-    <div style={{
-      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      background: 'linear-gradient(160deg, #04060f 0%, #080c1c 60%, #04060f 100%)',
-      fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
-    }}>
-      <style>{`
-        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        @keyframes glow { 0%,100%{box-shadow:0 0 12px rgba(129,140,248,0.3)} 50%{box-shadow:0 0 28px rgba(129,140,248,0.6)} }
-        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-thumb{background:rgba(129,140,248,0.2);border-radius:99px}
-      `}</style>
+    <div className="h-screen w-screen overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col select-none pb-[120px] xl:pb-0 relative">
+      {/* Background Effects */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
+      <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
 
-      {/* ①  헤더 */}
-      <header style={{
-        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '13px 16px',
-        borderBottom: '1px solid rgba(129,140,248,0.12)',
-        background: 'rgba(4,6,15,0.96)', backdropFilter: 'blur(20px)',
-      }}>
-        <button onClick={() => goBack()} style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-        }}>
-          <ChevronLeft size={18} color="#64748b" />
-        </button>
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            fontSize: 16, fontWeight: 900, letterSpacing: '0.04em',
-            background: 'linear-gradient(90deg, #818cf8, #a78bfa, #f472b6)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>Global Stats</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 1 }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#818cf8', animation: 'pulse 2s ease infinite' }} />
-            <span style={{ fontSize: 10, color: '#6366f1', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.7 }}>DREAM MODE LIVE</span>
+      {/* Header */}
+      <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md z-10">
+        <div className="flex items-center gap-3">
+          <button onClick={() => goBack()} className="w-9 h-9 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center cursor-pointer active:scale-95">
+            <ChevronLeft size={18} className="text-slate-400" />
+          </button>
+          <div>
+            <h1 className="text-sm lg:text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 tracking-tight flex items-center gap-2">
+              <Layers className="w-4 h-4 text-indigo-400" /> Global Stats Dashboard
+            </h1>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-0.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+              DREAM MODE LIVE
+            </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            padding: '5px 10px', borderRadius: 10,
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-          }}>
-            <span style={{ fontSize: 12, color: '#475569', fontFamily: 'monospace', fontWeight: 700 }}>
-              {now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </span>
+        <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
+             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none cursor-pointer" />
+             <span className="text-slate-500 text-xs">~</span>
+             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none cursor-pointer" />
           </div>
-          <button onClick={() => fetchData(true)} style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}>
-            <RefreshCw size={15} color="#818cf8" style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+          <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono font-bold text-slate-400">
+            {now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </div>
+          <button onClick={() => fetchData(true, startDate, endDate)} className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 transition-all flex items-center justify-center cursor-pointer">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
 
-      {/* ②  탭 */}
-      <div style={{
-        flexShrink: 0, display: 'flex', padding: '10px 16px 0', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch',
-      }}>
-        {TABS.map((t, i) => (
-          <button key={i} onClick={() => setTab(i)} style={{
-            flexShrink: 0, padding: '10px 14px', borderRadius: 12,
-            fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
-            background: tab === i ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.03)',
-            border: tab === i ? '1px solid rgba(129,140,248,0.3)' : '1px solid rgba(255,255,255,0.06)',
-            color: tab === i ? '#818cf8' : '#475569',
-            cursor: 'pointer', transition: 'all 0.15s',
-          }}>{t}</button>
-        ))}
-      </div>
-
-      {/* ③  콘텐츠 영역 */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px 80px', WebkitOverflowScrolling: 'touch' }}>
-
-        {/* === 탭 0: 개요 === */}
-        {tab === 0 && (
-          <>
-            {/* KPI 2열 그리드 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              {KPI.map((k, i) => {
-                const Icon = k.icon;
-                return (
-                  <div key={i} style={{
-                    borderRadius: 14, padding: '10px 10px',
-                    background: `linear-gradient(135deg, ${k.color}0d 0%, rgba(255,255,255,0.02) 100%)`,
-                    border: `1px solid ${k.color}25`,
-                    position: 'relative', overflow: 'hidden',
-                  }}>
-                    {/* 배경 아이콘 */}
-                    <div style={{ position: 'absolute', right: 4, top: 4, opacity: 0.07 }}>
-                      <Icon size={32} color={k.color} />
-                    </div>
-                    <div style={{
-                      width: 24, height: 24, borderRadius: 6, marginBottom: 4,
-                      background: `${k.color}18`, border: `1px solid ${k.color}30`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Icon size={12} color={k.color} />
-                    </div>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', fontFamily: 'monospace', lineHeight: 1 }}>
-                      {k.value}
-                    </div>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', marginTop: 4, lineHeight: 1.2 }}>
-                      {k.label}
-                    </div>
-                    <div style={{ fontSize: 9, color: '#334155', marginTop: 2, fontWeight: 700 }}>{k.sub}</div>
-                    <div style={{
-                      marginTop: 4, fontSize: 8, fontFamily: 'monospace', color: k.color,
-                      background: `${k.color}10`, border: `1px solid ${k.color}20`,
-                      borderRadius: 4, padding: '2px 4px', display: 'inline-block', opacity: 0.8,
-                    }}>{k.formula}</div>
+      {/* Main Content Area */}
+      <div className="flex-1 min-h-0 flex flex-col p-4 gap-4 z-10 overflow-y-auto xl:overflow-hidden custom-scrollbar">
+        
+        {/* ROW 1: KPIs & Flow */}
+        <div className="flex flex-col xl:flex-row gap-4 shrink-0">
+          
+          {/* KPI Grid */}
+          <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3">
+            {KPI.map((k, i) => {
+              const Icon = k.icon;
+              return (
+                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col justify-center`}>
+                  <div className={`absolute -right-4 -top-4 w-24 h-24 ${k.bg} blur-[30px] rounded-full group-hover:scale-110 transition-transform opacity-50`}></div>
+                  <div className={`w-8 h-8 rounded-xl mb-3 flex items-center justify-center ${k.iconBg} border ${k.iconBorder}`}>
+                    <Icon className={`w-4 h-4 ${k.color}`} />
                   </div>
+                  <div className="text-3xl font-black text-slate-100 font-mono tracking-tighter mb-1">
+                    {k.value}
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-400 mb-1">{k.label}</div>
+                  <div className="text-[9px] font-bold text-slate-500">{k.sub}</div>
+                  <div className={`mt-3 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80`}>
+                    {k.formula}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Incident Lifecycle Flow */}
+          <div className="xl:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg">
+            <div className="flex items-center gap-2 mb-4 shrink-0">
+              <div className="p-1.5 bg-indigo-500/10 rounded-lg"><Activity className="w-4 h-4 text-indigo-400" /></div>
+              <span className="text-sm font-black text-slate-200">인시던트 생애주기</span>
+            </div>
+            <div className="flex-1 flex items-center justify-between gap-1">
+              {FLOW.map((f, i) => {
+                const Icon = f.icon;
+                return (
+                  <React.Fragment key={i}>
+                    <div className="flex flex-col items-center gap-2 flex-1">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${f.bg} border ${f.border} ${f.glow ? 'shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse' : ''}`}>
+                        <Icon className={`w-5 h-5 ${f.color}`} />
+                      </div>
+                      <span className={`text-base font-black font-mono ${f.color}`}>{f.value}</span>
+                      <span className="text-[9px] font-bold text-slate-400 text-center leading-tight break-keep">{f.label}</span>
+                    </div>
+                    {i < FLOW.length - 1 && (
+                      <div className="w-4 h-[1px] bg-white/10 shrink-0" />
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>
+          </div>
+          
+        </div>
 
-            {/* 인시던트 생애주기 플로우 */}
-            <div style={{
-              borderRadius: 14, padding: '10px',
-              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <Activity size={14} color="#818cf8" />
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#e2e8f0' }}>인시던트 생애주기</span>
+        {/* ROW 2: 4 Columns Data Grid */}
+        <div className="flex-1 min-h-[400px] grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pb-4">
+          
+          {/* Column 1: MTTA */}
+          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-purple-400" />
+                <h3 className="text-sm font-black text-slate-200">일자별 MTTA</h3>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                {FLOW.map((f, i) => {
-                  const Icon = f.icon;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: 10,
-                          background: `${f.color}15`, border: `1px solid ${f.color}30`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          ...(i === 4 ? { animation: 'glow 2s ease infinite' } : {}),
-                        }}>
-                          <Icon size={16} color={f.color} />
-                        </div>
-                        <span style={{ fontSize: 15, fontWeight: 900, color: f.color, fontFamily: 'monospace' }}>
-                          {f.value}
-                        </span>
-                        <span style={{ fontSize: 8, color: '#334155', fontWeight: 700, textAlign: 'center', lineHeight: 1.1, wordBreak: 'keep-all' }}>
-                          {f.label}
-                        </span>
+              <span className="text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full">Performance</span>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+              {stats.incidents.mttaList && stats.incidents.mttaList.length > 0 ? stats.incidents.mttaList.map((m, i) => (
+                <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-3 shrink-0 hover:bg-white/10 transition-colors">
+                  <div className="text-xs font-black text-slate-300 mb-2">{m.date}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-2">
+                      <div className="text-[10px] font-bold text-amber-400 mb-1">주간 (09~18)</div>
+                      <div className="flex items-end gap-1">
+                        <span className="text-lg font-black font-mono text-amber-200 leading-none">{m.dayMtta}</span>
+                        <span className="text-[9px] font-bold text-slate-500 mb-0.5">분</span>
                       </div>
-                      {i < FLOW.length - 1 && (
-                        <div style={{ width: 8, height: 1, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* === 탭 1: MTTA 분석 === */}
-        {tab === 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <Clock size={16} color="#a855f7" />
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0' }}>일자별 MTTA (주/야간)</span>
-              <span style={{
-                fontSize: 11, color: '#a855f7', fontWeight: 800,
-                background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)',
-                borderRadius: 6, padding: '1px 8px',
-              }}>Performance</span>
-            </div>
-            
-            {/* 기간 검색 필터 */}
-            <div style={{ 
-              display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8,
-              background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)'
-            }}>
-              <div style={{ display: 'flex', flex: 1, alignItems: 'center', gap: 6 }}>
-                <input 
-                  type="date" 
-                  value={startDate} 
-                  onChange={e => setStartDate(e.target.value)}
-                  style={{ 
-                    flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#e2e8f0', borderRadius: 8, padding: '6px 8px', fontSize: 12, outline: 'none'
-                  }}
-                />
-                <span style={{ color: '#64748b', fontSize: 12 }}>~</span>
-                <input 
-                  type="date" 
-                  value={endDate} 
-                  onChange={e => setEndDate(e.target.value)}
-                  style={{ 
-                    flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#e2e8f0', borderRadius: 8, padding: '6px 8px', fontSize: 12, outline: 'none'
-                  }}
-                />
-              </div>
-              <button 
-                onClick={() => fetchData(true, startDate, endDate)}
-                disabled={refreshing}
-                style={{
-                  background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc',
-                  padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: refreshing ? 'not-allowed' : 'pointer',
-                  opacity: refreshing ? 0.7 : 1
-                }}
-              >
-                {refreshing ? '처리중...' : '조회'}
-              </button>
-            </div>
-            {stats.incidents.mttaList && stats.incidents.mttaList.length > 0 ? stats.incidents.mttaList.map((m, i) => (
-              <div key={i} style={{
-                borderRadius: 16, padding: '14px 16px',
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-              }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0', marginBottom: 12 }}>
-                  {m.date}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div style={{
-                    background: 'rgba(250,204,21,0.05)', border: '1px solid rgba(250,204,21,0.1)',
-                    borderRadius: 10, padding: '10px',
-                  }}>
-                    <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 700, marginBottom: 4 }}>주간 (09~18시)</div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
-                      <span style={{ fontSize: 22, fontWeight: 900, color: '#fde68a', fontFamily: 'monospace', lineHeight: 1 }}>{m.dayMtta}</span>
-                      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700, marginBottom: 2 }}>분</span>
+                      <div className="text-[9px] text-slate-500 mt-1">{m.dayCount}건 처리</div>
                     </div>
-                    <div style={{ fontSize: 10, color: '#475569', marginTop: 4 }}>{m.dayCount}건 처리</div>
-                  </div>
-                  <div style={{
-                    background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.1)',
-                    borderRadius: 10, padding: '10px',
-                  }}>
-                    <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 700, marginBottom: 4 }}>야간 (18~09시)</div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
-                      <span style={{ fontSize: 22, fontWeight: 900, color: '#c7d2fe', fontFamily: 'monospace', lineHeight: 1 }}>{m.nightMtta}</span>
-                      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700, marginBottom: 2 }}>분</span>
+                    <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-2">
+                      <div className="text-[10px] font-bold text-indigo-400 mb-1">야간 (18~09)</div>
+                      <div className="flex items-end gap-1">
+                        <span className="text-lg font-black font-mono text-indigo-200 leading-none">{m.nightMtta}</span>
+                        <span className="text-[9px] font-bold text-slate-500 mb-0.5">분</span>
+                      </div>
+                      <div className="text-[9px] text-slate-500 mt-1">{m.nightCount}건 처리</div>
                     </div>
-                    <div style={{ fontSize: 10, color: '#475569', marginTop: 4 }}>{m.nightCount}건 처리</div>
                   </div>
                 </div>
-              </div>
-            )) : (
-              <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: '#334155' }}>MTTA 데이터 없음</div>
-            )}
+              )) : (
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">MTTA 데이터 없음</div>
+              )}
+            </div>
           </div>
-        )}
 
-        {/* === 탭 2: 카테고리 === */}
-        {tab === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <BarChart3 size={16} color="#34d399" />
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0' }}>인텔리전스 카테고리 밀도</span>
-              <span style={{
-                fontSize: 12, color: '#34d399', fontWeight: 700,
-                background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)',
-                borderRadius: 6, padding: '1px 8px',
-              }}>{stats.knowledge.total} Assets</span>
+          {/* Column 2: Categories */}
+          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-black text-slate-200">카테고리 밀도</h3>
+              </div>
+              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">{stats.knowledge.total} Assets</span>
             </div>
-            {stats.categories.length > 0 ? stats.categories.map((cat, i) => {
-              const pct = Math.min(100, (cat.c / (stats.knowledge.total || 1)) * 100);
-              const hue = (i * 47) % 360;
-              const clr = `hsl(${hue}, 70%, 60%)`;
-              return (
-                <div key={i} style={{
-                  borderRadius: 16, padding: '14px 16px',
-                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>
-                      {cat.category || '기타'}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+              {stats.categories.length > 0 ? stats.categories.map((cat, i) => {
+                const pct = Math.min(100, (cat.c / (stats.knowledge.total || 1)) * 100);
+                const hue = (i * 47) % 360;
+                const clr = `hsl(${hue}, 70%, 60%)`;
+                return (
+                  <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-3 shrink-0 hover:bg-white/10 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-black text-slate-300">{cat.category || '기타'}</span>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ color: clr, backgroundColor: `${clr}15`, border: `1px solid ${clr}30` }}>{cat.c}</span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${clr}80, ${clr})` }} />
+                    </div>
+                    <div className="mt-1.5 text-[9px] font-bold font-mono text-slate-500 text-right">{pct.toFixed(1)}% of total</div>
+                  </div>
+                );
+              }) : (
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">카테고리 데이터 없음</div>
+              )}
+            </div>
+          </div>
+
+          {/* Column 3: Contributors */}
+          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
+            <div className="flex items-center justify-between mb-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <Medal className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-black text-slate-200">전문가 기여도</h3>
+              </div>
+              <span className="text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">Honor Board</span>
+            </div>
+            <div className="flex flex-wrap gap-2 p-2 rounded-xl bg-white/5 border border-white/10 mb-3 shrink-0">
+              <span className="text-[8px] font-bold text-slate-500">SCORE =</span>
+              <span className="text-[8px] font-black text-pink-400">전파 × 50pt</span>
+              <span className="text-[8px] font-bold text-slate-500">+</span>
+              <span className="text-[8px] font-black text-emerald-400">KB × 30pt</span>
+              <span className="text-[8px] font-bold text-slate-500">+</span>
+              <span className="text-[8px] font-black text-blue-400">참여 × 20pt</span>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+              {stats.topContributors.length > 0 ? stats.topContributors.map((user, i) => {
+                const isTop = i === 0;
+                return (
+                  <div key={i} className={`flex items-center gap-3 rounded-2xl p-3 shrink-0 transition-all ${isTop ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 ${isTop ? 'bg-amber-500/20 border-2 border-amber-500/40 text-amber-400' : 'bg-white/5 border border-white/10 text-slate-400'}`}>
+                      {isTop ? '🥇' : `${i + 1}`}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-xs font-black truncate mb-0.5 ${isTop ? 'text-amber-200' : 'text-slate-200'}`}>@{user.name}</div>
+                      <div className="text-[9px] font-bold text-slate-500 truncate mb-1.5">{user.full_org}</div>
+                      <div className="flex gap-2">
+                        <span className="text-[9px] font-bold text-pink-400">전파:{user.warroom_count}</span>
+                        <span className="text-[9px] font-bold text-emerald-400">KB:{user.kb_count}</span>
+                        <span className="text-[9px] font-bold text-blue-400">참여:{user.chat_count}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className={`text-lg font-black font-mono leading-none ${isTop ? 'text-amber-400' : 'text-slate-400'}`}>{user.synergy_score}</div>
+                      <div className="text-[8px] font-bold text-slate-500 mt-1">SCORE</div>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">기여자 데이터 없음</div>
+              )}
+            </div>
+          </div>
+
+          {/* Column 4: Feed */}
+          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileSearch className="w-4 h-4 text-blue-400" />
+                <h3 className="text-sm font-black text-slate-200">인텔리전스 피드</h3>
+              </div>
+              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+              {stats.recentFeed.length > 0 ? stats.recentFeed.map((item, i) => (
+                <div key={i} className={`rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${i === 0 ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
+                  {i === 0 && (
+                    <div className="absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-indigo-500" />
+                  )}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md">
+                      {item.category || '기타'} · APPROVED
                     </span>
-                    <span style={{
-                      fontSize: 13, fontWeight: 800, color: clr,
-                      background: `${clr}18`, border: `1px solid ${clr}30`,
-                      borderRadius: 7, padding: '2px 10px',
-                    }}>{cat.c}</span>
+                    <span className="text-[9px] font-mono font-bold text-slate-500">{(item.reg_dt || '').substring(5, 16)}</span>
                   </div>
-                  <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${pct}%`,
-                      background: `linear-gradient(90deg, ${clr}90, ${clr})`,
-                      borderRadius: 99, transition: 'width 1s ease',
-                    }} />
+                  <div className="text-xs font-black text-slate-200 leading-snug mb-2 line-clamp-2">
+                    {item.title}
                   </div>
-                  <div style={{ marginTop: 6, fontSize: 11, color: '#334155', fontWeight: 700, fontFamily: 'monospace' }}>
-                    {pct.toFixed(1)}% of total
+                  <div className="flex items-center gap-1.5">
+                    <Brain className="w-3 h-3 text-slate-500" />
+                    <span className="text-[9px] font-bold text-slate-400">@{item.reg_name || 'SYSTEM'}</span>
+                    <span className="text-[9px] font-bold text-slate-600 ml-1">· RAG Synced ✦</span>
                   </div>
                 </div>
-              );
-            }) : (
-              <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: '#334155' }}>카테고리 데이터 없음</div>
-            )}
+              )) : (
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">피드 데이터 없음</div>
+              )}
+            </div>
           </div>
-        )}
 
-        {/* === 탭 3: 기여자 === */}
-        {tab === 3 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <Medal size={16} color="#eab308" />
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0' }}>전문가 시너지 기여도</span>
-              <span style={{
-                fontSize: 11, color: '#eab308', fontWeight: 800,
-                background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)',
-                borderRadius: 6, padding: '1px 8px',
-              }}>Honor Board</span>
-            </div>
-            {/* 계산식 */}
-            <div style={{
-              display: 'flex', gap: 6, flexWrap: 'wrap',
-              padding: '8px 12px', borderRadius: 10, marginBottom: 4,
-              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
-            }}>
-              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700 }}>SCORE =</span>
-              <span style={{ fontSize: 10, color: '#f472b6', fontWeight: 800 }}>전파 × 50pt</span>
-              <span style={{ fontSize: 10, color: '#475569' }}>+</span>
-              <span style={{ fontSize: 10, color: '#34d399', fontWeight: 800 }}>KB × 30pt</span>
-              <span style={{ fontSize: 10, color: '#475569' }}>+</span>
-              <span style={{ fontSize: 10, color: '#60a5fa', fontWeight: 800 }}>참여건 × 20pt</span>
-              <span style={{ fontSize: 10, color: '#334155', marginLeft: 4 }}>│ MTTA: 주간 1분·야간 5분 내 달성건</span>
-            </div>
-            {stats.topContributors.length > 0 ? stats.topContributors.map((user, i) => {
-              const isTop = i === 0;
-              return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  borderRadius: 18, padding: '14px 16px',
-                  background: isTop ? 'rgba(234,179,8,0.07)' : 'rgba(255,255,255,0.03)',
-                  border: isTop ? '1px solid rgba(234,179,8,0.25)' : '1px solid rgba(255,255,255,0.07)',
-                }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 14, flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: isTop ? 20 : 18, fontWeight: 900,
-                    background: isTop ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.05)',
-                    border: isTop ? '2px solid rgba(234,179,8,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                    color: isTop ? '#fbbf24' : '#475569',
-                  }}>
-                    {isTop ? '🥇' : `${i + 1}`}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: isTop ? '#fde68a' : '#e2e8f0', marginBottom: 3 }}>
-                      @{user.name}
-                    </div>
-                    <div style={{ fontSize: 12, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {user.full_org}
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: '#f472b6', fontWeight: 700 }}>전파: {user.warroom_count}</span>
-                      <span style={{ fontSize: 11, color: '#a855f7', fontWeight: 700 }}>MTTA: {user.mtta_fast_count}</span>
-                      <span style={{ fontSize: 11, color: '#34d399', fontWeight: 700 }}>KB: {user.kb_count}</span>
-                      <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 700 }}>참여건: {user.chat_count}</span>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{
-                      fontSize: 26, fontWeight: 900, fontFamily: 'monospace',
-                      color: isTop ? '#fbbf24' : '#94a3b8',
-                    }}>{user.synergy_score}</div>
-                    <div style={{ fontSize: 10, color: '#334155', fontWeight: 700 }}>SCORE</div>
-                  </div>
-                </div>
-              );
-            }) : (
-              <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: '#334155' }}>기여자 데이터 없음</div>
-            )}
-          </div>
-        )}
-
-        {/* === 탭 4: 피드 === */}
-        {tab === 4 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <FileSearch size={16} color="#60a5fa" />
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0' }}>실시간 인텔리전스 피드</span>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#60a5fa', animation: 'pulse 2s ease infinite' }} />
-            </div>
-            {stats.recentFeed.length > 0 ? stats.recentFeed.map((item, i) => (
-              <div key={i} style={{
-                borderRadius: 18, padding: '14px 16px',
-                background: i === 0 ? 'rgba(96,165,250,0.07)' : 'rgba(255,255,255,0.03)',
-                border: i === 0 ? '1px solid rgba(96,165,250,0.2)' : '1px solid rgba(255,255,255,0.07)',
-                position: 'relative', overflow: 'hidden',
-              }}>
-                {i === 0 && (
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
-                    background: 'linear-gradient(180deg, #60a5fa, #818cf8)',
-                    borderRadius: '18px 0 0 18px',
-                  }} />
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{
-                    fontSize: 11, fontWeight: 800, color: '#60a5fa',
-                    background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)',
-                    borderRadius: 6, padding: '2px 8px',
-                  }}>
-                    {item.category || '기타'} · APPROVED
-                  </span>
-                  <span style={{ fontSize: 11, color: '#334155', fontFamily: 'monospace', fontWeight: 700 }}>
-                    {(item.reg_dt || '').substring(5, 16)}
-                  </span>
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#f1f5f9', lineHeight: 1.4, marginBottom: 8 }}>
-                  {item.title}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Brain size={12} color="#475569" />
-                  <span style={{ fontSize: 12, color: '#475569', fontWeight: 700 }}>
-                    @{item.reg_name || 'SYSTEM'}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#1e293b', fontWeight: 700, marginLeft: 4 }}>· RAG Synced ✦</span>
-                </div>
-              </div>
-            )) : (
-              <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: '#334155' }}>피드 데이터 없음</div>
-            )}
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

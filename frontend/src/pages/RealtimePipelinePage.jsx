@@ -2186,6 +2186,13 @@ export default function RealtimePipelinePage() {
             <h1 className="text-sm lg:text-base font-black text-white tracking-tight flex items-center gap-2"><Layers className="w-4 h-4 text-[#00e5ff] animate-pulse" /> 통합 데시보드</h1>
             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-0.5">Realtime Pipeline & Executive Dashboard</p>
           </div>
+          <button 
+            onClick={() => navigate('/overall-status')} 
+            className="ml-6 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600/40 to-purple-600/40 hover:from-blue-500/60 hover:to-purple-500/60 border border-blue-400/50 hover:border-blue-300/80 text-white text-sm font-black shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all flex items-center gap-2.5 cursor-pointer"
+          >
+            <Activity className="w-5 h-5 text-blue-300 animate-pulse" /> 
+            OVERALL STATUS 이동
+          </button>
         </div>
 
         <div className="hidden md:flex items-center bg-[#0f1422] rounded-full p-1 border border-white/10">

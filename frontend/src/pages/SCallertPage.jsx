@@ -1109,7 +1109,7 @@ export default function SCallertPage() {
 
   return (
     <div
-      className="text-white font-sans flex flex-col min-h-screen"
+      className="text-white font-sans flex flex-col h-screen overflow-hidden"
       style={{ background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' }}
     >
       {/* 배경 그로우 */}
@@ -1138,11 +1138,11 @@ export default function SCallertPage() {
           </div>
         </div>
       </header>
-      <main className="w-full px-4 lg:px-6 py-6">
-        <div className={`flex flex-col xl:flex-row gap-6 items-start h-[calc(100vh-140px)] ${isDragging ? 'select-none' : ''}`}>
+      <main className="w-full px-4 lg:px-6 pt-4 pb-[120px] flex flex-1 overflow-hidden min-h-0">
+        <div className={`flex flex-col xl:flex-row gap-6 items-start w-full h-full ${isDragging ? 'select-none' : ''}`}>
           
           {/* Column 1: Strategy List + Rule Setting */}
-          <div style={{ flex: `0 0 ${widths[0]}%`, minWidth: '300px' }} className="flex flex-col gap-6 h-full custom-scrollbar pr-2 pb-6 relative shrink-0">
+          <div style={{ flex: `0 0 calc(${widths[0]}% - 16px)`, minWidth: '300px' }} className="flex flex-col gap-6 h-full custom-scrollbar pr-2 pb-2 relative shrink-0">
             <section style={{ height: `${h1[0]}%` }} className="flex flex-col bg-[#0c1020]/60 border border-white/5 rounded-[2rem] overflow-hidden backdrop-blur-xl shrink-0 relative">
               <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
@@ -1196,7 +1196,13 @@ export default function SCallertPage() {
                 )}
               </div>
             </section>
-            <section className={`relative group transition-all duration-500 rounded-[2rem] overflow-hidden border ${ruleEditing ? 'border-orange-500/40 bg-orange-500/5 shadow-[0_0_40px_rgba(251,146,60,0.1)]' : 'border-white/5 bg-[#0c1020]/60'} backdrop-blur-xl flex flex-col flex-1 min-h-0`}>
+            
+            {/* Column 1 Vertical Splitter */}
+            <div className="h-2 group cursor-row-resize flex justify-center items-center hover:bg-white/5 transition-colors -my-3 z-10 shrink-0" onMouseDown={(e) => vDrag1(0, e)}>
+              <div className="w-8 h-1 bg-white/20 rounded-full group-hover:bg-orange-400 transition-colors" />
+            </div>
+
+            <section style={{ height: `${h1[1]}%` }} className={`relative group transition-all duration-500 rounded-[2rem] overflow-hidden border ${ruleEditing ? 'border-orange-500/40 bg-orange-500/5 shadow-[0_0_40px_rgba(251,146,60,0.1)]' : 'border-white/5 bg-[#0c1020]/60'} backdrop-blur-xl flex flex-col min-h-0 shrink-0`}>
               <div className="absolute inset-0 bg-gradient-to-br from-orange-600/[0.03] to-transparent pointer-events-none" />
 
               <div className="p-6 relative z-10 flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar">
@@ -1467,9 +1473,14 @@ export default function SCallertPage() {
             </section>
           </div>
 
+          {/* Col 1 <-> Col 3 Horizontal Splitter */}
+          <div className="hidden xl:flex w-2 group cursor-col-resize justify-center items-center h-full hover:bg-white/5 transition-colors -mx-3 z-10 shrink-0" onMouseDown={(e) => startDrag(0, e)}>
+            <div className="w-1 h-8 bg-white/20 rounded-full group-hover:bg-cyan-400 transition-colors" />
+          </div>
+
           {/* Column 3: 수신자 시뮬레이션 + 실시간 이력 */}
-          <div className="flex flex-col gap-6 h-[calc(100vh-140px)] custom-scrollbar pr-2 pb-6">
-            <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden flex flex-col flex-1 min-h-0">
+          <div style={{ flex: `0 0 calc(${widths[1]}% - 16px)`, minWidth: '300px' }} className="flex flex-col gap-6 h-full custom-scrollbar pr-2 pb-2 shrink-0 relative">
+            <section style={{ height: `${h3[0]}%` }} className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden flex flex-col min-h-0 shrink-0">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
 
               <SectionHeader icon={Activity} title="수신자 최종 확인" sub="수신자 최종 확인및 적용" color="#10b981">
@@ -1594,7 +1605,13 @@ export default function SCallertPage() {
                 )}
               </div>
             </section>
-            <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
+
+            {/* Column 3 Vertical Splitter */}
+            <div className="h-2 group cursor-row-resize flex justify-center items-center hover:bg-white/5 transition-colors -my-3 z-10 shrink-0" onMouseDown={(e) => vDrag3(0, e)}>
+              <div className="w-8 h-1 bg-white/20 rounded-full group-hover:bg-emerald-400 transition-colors" />
+            </div>
+
+            <section style={{ height: `${h3[1]}%` }} className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden flex flex-col min-h-0 shrink-0">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/[0.02] to-transparent pointer-events-none" />
 
               {/* 헤더 */}
@@ -1817,10 +1834,16 @@ export default function SCallertPage() {
               )}
             </section>
           </div>
-            {/* Column 2: Global Call History + PDS API 설정 */}
-            <div className="flex flex-col gap-6 h-[calc(100vh-140px)] custom-scrollbar pr-2 pb-6">
-              <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden flex flex-col flex-1 min-h-0 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/[0.02] to-transparent pointer-events-none" />
+          
+          {/* Col 3 <-> Col 2 Horizontal Splitter */}
+          <div className="hidden xl:flex w-2 group cursor-col-resize justify-center items-center h-full hover:bg-white/5 transition-colors -mx-3 z-10 shrink-0" onMouseDown={(e) => startDrag(1, e)}>
+            <div className="w-1 h-8 bg-white/20 rounded-full group-hover:bg-cyan-400 transition-colors" />
+          </div>
+
+          {/* Column 2: Global Call History + PDS API 설정 */}
+          <div style={{ flex: `0 0 calc(${widths[2]}% - 16px)`, minWidth: '300px' }} className="flex flex-col gap-6 h-full custom-scrollbar pr-2 pb-2 shrink-0 relative">
+            <section style={{ height: selectedSid ? `${h2[0]}%` : '100%' }} className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden flex flex-col min-h-0 shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/[0.02] to-transparent pointer-events-none" />
 
 
                 <SectionHeader icon={Phone} title="발신 이력 현황" sub="Global Call History (Filter & List)" color="#0ea5e9" />
@@ -1943,9 +1966,16 @@ export default function SCallertPage() {
                 </div>
 
               </section>
+              
               {selectedSid && (
-                <section className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/[0.02] to-transparent pointer-events-none" />
+                <>
+                  {/* Column 2 Vertical Splitter */}
+                  <div className="h-2 group cursor-row-resize flex justify-center items-center hover:bg-white/5 transition-colors -my-3 z-10 shrink-0" onMouseDown={(e) => vDrag2(0, e)}>
+                    <div className="w-8 h-1 bg-white/20 rounded-full group-hover:bg-cyan-400 transition-colors" />
+                  </div>
+
+                  <section style={{ height: `${h2[1]}%` }} className="bg-[#0c1020]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden flex flex-col min-h-0 shrink-0">
+                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/[0.02] to-transparent pointer-events-none" />
 
                   {/* 헤더 */}
                   <div className={`flex items-center justify-between relative z-10 transition-all ${isPdsApiExpanded ? 'mb-6' : ''}`}>
@@ -2196,6 +2226,7 @@ export default function SCallertPage() {
                     </div>
                   )}
                 </section>
+                </>
               )}
             </div>
         </div>
