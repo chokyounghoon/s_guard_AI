@@ -7,6 +7,10 @@ import {
   Target, Rocket, Heart, Medal, ChevronLeft, Loader2, RefreshCw,
   Layers, ArrowRight
 } from 'lucide-react';
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, PieChart, Pie, Cell, BarChart, Bar
+} from 'recharts';
 
 import { getAuthHeaders } from '../lib/authStore';
 
@@ -20,6 +24,8 @@ const EMPTY_STATS = {
   topContributors: [],
   recentFeed: [],
 };
+
+const TABS = ['개요', 'MTTA 분석', '카테고리', '기여자', '피드'];
 
 export default function OverallStatusPage() {
   const navigate = useNavigate();
@@ -38,6 +44,9 @@ export default function OverallStatusPage() {
   const { start: defaultStart, end: defaultEnd } = getDefaultDates();
   const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(defaultEnd);
+  
+  // 모바일 호환을 위한 상태 복원
+  const [tab, setTab] = useState(0);
 
   const fetchData = async (isManual = false, sd = startDate, ed = endDate) => {
     if (isManual) setRefreshing(true);
@@ -206,11 +215,24 @@ export default function OverallStatusPage() {
         </div>
       </header>
 
+      {/* Mobile Tabs (Hidden on PC) */}
+      <div className="xl:hidden flex shrink-0 px-4 pt-4 pb-0 gap-2 overflow-x-auto custom-scrollbar z-10">
+        {TABS.map((t, i) => (
+          <button 
+            key={i} 
+            onClick={() => setTab(i)} 
+            className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-black transition-all ${tab === i ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'}`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
       {/* Main Content Area */}
       <div className="flex-1 min-h-0 flex flex-col p-4 gap-4 z-10 overflow-y-auto xl:overflow-hidden custom-scrollbar">
         
-        {/* ROW 1: KPIs & Flow */}
-        <div className="flex flex-col xl:flex-row gap-4 shrink-0">
+        {/* ROW 1: KPIs & Flow (Tab 0 on Mobile) */}
+        <div className={`${tab === 0 ? 'flex' : 'hidden'} xl:flex flex-col xl:flex-row gap-4 shrink-0`}>
           
           {/* KPI Grid */}
           <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -267,102 +289,118 @@ export default function OverallStatusPage() {
         {/* ROW 2: 4 Columns Data Grid */}
         <div className="flex-1 min-h-[400px] grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pb-4">
           
-          {/* Column 1: MTTA */}
-          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
-            <div className="flex items-center justify-between mb-4 shrink-0">
+          {/* Column 1: MTTA (Tab 1 on Mobile) */}
+          <div className={`${tab === 1 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
+            <div className="flex items-center justify-between mb-2 shrink-0 relative z-10">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-purple-400" />
-                <h3 className="text-sm font-black text-slate-200">일자별 MTTA</h3>
+                <h3 className="text-sm font-black text-slate-200">일자별 MTTA 추이</h3>
               </div>
-              <span className="text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full">Performance</span>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
-              {stats.incidents.mttaList && stats.incidents.mttaList.length > 0 ? stats.incidents.mttaList.map((m, i) => (
-                <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-3 shrink-0 hover:bg-white/10 transition-colors">
-                  <div className="text-xs font-black text-slate-300 mb-2">{m.date}</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-2">
-                      <div className="text-[10px] font-bold text-amber-400 mb-1">주간 (09~18)</div>
-                      <div className="flex items-end gap-1">
-                        <span className="text-lg font-black font-mono text-amber-200 leading-none">{m.dayMtta}</span>
-                        <span className="text-[9px] font-bold text-slate-500 mb-0.5">분</span>
-                      </div>
-                      <div className="text-[9px] text-slate-500 mt-1">{m.dayCount}건 처리</div>
-                    </div>
-                    <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-2">
-                      <div className="text-[10px] font-bold text-indigo-400 mb-1">야간 (18~09)</div>
-                      <div className="flex items-end gap-1">
-                        <span className="text-lg font-black font-mono text-indigo-200 leading-none">{m.nightMtta}</span>
-                        <span className="text-[9px] font-bold text-slate-500 mb-0.5">분</span>
-                      </div>
-                      <div className="text-[9px] text-slate-500 mt-1">{m.nightCount}건 처리</div>
-                    </div>
-                  </div>
-                </div>
-              )) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">MTTA 데이터 없음</div>
+            <div className="flex items-center gap-3 text-[9px] font-bold mb-3 shrink-0 relative z-10 px-1">
+               <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-400"></div>주간 평균(m)</div>
+               <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-400"></div>야간 평균(m)</div>
+            </div>
+            <div className="flex-1 min-h-[200px] xl:min-h-0 relative z-10">
+              {stats.incidents.mttaList && stats.incidents.mttaList.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                  <AreaChart data={[...stats.incidents.mttaList].reverse()} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorDay" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4}/><stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/></linearGradient>
+                      <linearGradient id="colorNight" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/><stop offset="95%" stopColor="#818cf8" stopOpacity={0}/></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.substring(5)} />
+                    <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
+                    <Area type="monotone" dataKey="dayMtta" name="주간(분)" stroke="#fbbf24" strokeWidth={2} fill="url(#colorDay)" />
+                    <Area type="monotone" dataKey="nightMtta" name="야간(분)" stroke="#818cf8" strokeWidth={2} fill="url(#colorNight)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">데이터 없음</div>
               )}
             </div>
           </div>
 
-          {/* Column 2: Categories */}
-          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
-            <div className="flex items-center justify-between mb-4 shrink-0">
+          {/* Column 2: Categories (Tab 2 on Mobile) */}
+          <div className={`${tab === 2 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>
+            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-black text-slate-200">카테고리 밀도</h3>
+                <h3 className="text-sm font-black text-slate-200">인텔리전스 카테고리</h3>
               </div>
-              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">{stats.knowledge.total} Assets</span>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
-              {stats.categories.length > 0 ? stats.categories.map((cat, i) => {
-                const pct = Math.min(100, (cat.c / (stats.knowledge.total || 1)) * 100);
-                const hue = (i * 47) % 360;
-                const clr = `hsl(${hue}, 70%, 60%)`;
-                return (
-                  <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-3 shrink-0 hover:bg-white/10 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-black text-slate-300">{cat.category || '기타'}</span>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ color: clr, backgroundColor: `${clr}15`, border: `1px solid ${clr}30` }}>{cat.c}</span>
-                    </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${clr}80, ${clr})` }} />
-                    </div>
-                    <div className="mt-1.5 text-[9px] font-bold font-mono text-slate-500 text-right">{pct.toFixed(1)}% of total</div>
+            <div className="flex-1 min-h-[200px] xl:min-h-0 relative flex items-center justify-center z-10">
+              {stats.categories && stats.categories.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <PieChart>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} 
+                        itemStyle={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }} 
+                        formatter={(val) => [`${val}건`, '문서 수']} 
+                      />
+                      <Pie
+                        data={stats.categories}
+                        dataKey="c"
+                        nameKey="category"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="65%"
+                        outerRadius="85%"
+                        paddingAngle={4}
+                        cornerRadius={4}
+                        stroke="none"
+                      >
+                        {stats.categories.map((entry, index) => {
+                           const hue = (index * 47) % 360;
+                           return <Cell key={`cell-${index}`} fill={`hsl(${hue}, 70%, 55%)`} />;
+                        })}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <Database className="w-5 h-5 text-emerald-400 opacity-60 mb-1" />
+                    <span className="text-2xl font-black text-white font-mono">{stats.knowledge.total}</span>
+                    <span className="text-[8px] font-bold text-slate-400">TOTAL ASSETS</span>
                   </div>
-                );
-              }) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">카테고리 데이터 없음</div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">데이터 없음</div>
               )}
             </div>
           </div>
 
-          {/* Column 3: Contributors */}
-          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
-            <div className="flex items-center justify-between mb-2 shrink-0">
+          {/* Column 3: Contributors (Tab 3 on Mobile) */}
+          <div className={`${tab === 3 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>
+            <div className="flex items-center justify-between mb-2 shrink-0 relative z-10">
               <div className="flex items-center gap-2">
                 <Medal className="w-4 h-4 text-amber-400" />
                 <h3 className="text-sm font-black text-slate-200">전문가 기여도</h3>
               </div>
-              <span className="text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">Honor Board</span>
+              <span className="text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">Honor Board</span>
             </div>
-            <div className="flex flex-wrap gap-2 p-2 rounded-xl bg-white/5 border border-white/10 mb-3 shrink-0">
-              <span className="text-[8px] font-bold text-slate-500">SCORE =</span>
-              <span className="text-[8px] font-black text-pink-400">전파 × 50pt</span>
-              <span className="text-[8px] font-bold text-slate-500">+</span>
-              <span className="text-[8px] font-black text-emerald-400">KB × 30pt</span>
-              <span className="text-[8px] font-bold text-slate-500">+</span>
-              <span className="text-[8px] font-black text-blue-400">참여 × 20pt</span>
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+            
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-2.5 relative z-10 mt-2">
               {stats.topContributors.length > 0 ? stats.topContributors.map((user, i) => {
                 const isTop = i === 0;
+                const maxScore = stats.topContributors[0].synergy_score || 1;
+                const pct = Math.max(8, (user.synergy_score / maxScore) * 100);
+
                 return (
-                  <div key={i} className={`flex items-center gap-3 rounded-2xl p-3 shrink-0 transition-all ${isTop ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 ${isTop ? 'bg-amber-500/20 border-2 border-amber-500/40 text-amber-400' : 'bg-white/5 border border-white/10 text-slate-400'}`}>
+                  <div key={i} className={`flex items-center gap-3 rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${isTop ? 'border border-amber-500/30' : 'border border-white/5 hover:border-white/10'}`}>
+                    
+                    {/* Background Progress Bar */}
+                    <div className="absolute top-0 bottom-0 left-0 z-0 transition-all duration-1000" style={{ width: `${pct}%`, background: isTop ? 'linear-gradient(90deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05))' : 'rgba(255,255,255,0.03)' }} />
+                    
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 relative z-10 ${isTop ? 'bg-amber-500/20 border-2 border-amber-500/40 text-amber-400' : 'bg-white/5 border border-white/10 text-slate-400'}`}>
                       {isTop ? '🥇' : `${i + 1}`}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 relative z-10">
                       <div className={`text-xs font-black truncate mb-0.5 ${isTop ? 'text-amber-200' : 'text-slate-200'}`}>@{user.name}</div>
                       <div className="text-[9px] font-bold text-slate-500 truncate mb-1.5">{user.full_org}</div>
                       <div className="flex gap-2">
@@ -371,7 +409,7 @@ export default function OverallStatusPage() {
                         <span className="text-[9px] font-bold text-blue-400">참여:{user.chat_count}</span>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 relative z-10">
                       <div className={`text-lg font-black font-mono leading-none ${isTop ? 'text-amber-400' : 'text-slate-400'}`}>{user.synergy_score}</div>
                       <div className="text-[8px] font-bold text-slate-500 mt-1">SCORE</div>
                     </div>
@@ -383,18 +421,19 @@ export default function OverallStatusPage() {
             </div>
           </div>
 
-          {/* Column 4: Feed */}
-          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg">
-            <div className="flex items-center justify-between mb-4 shrink-0">
+          {/* Column 4: Feed (Tab 4 on Mobile) */}
+          <div className={`${tab === 4 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>
+            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10">
               <div className="flex items-center gap-2">
                 <FileSearch className="w-4 h-4 text-blue-400" />
                 <h3 className="text-sm font-black text-slate-200">인텔리전스 피드</h3>
               </div>
               <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3 relative z-10">
               {stats.recentFeed.length > 0 ? stats.recentFeed.map((item, i) => (
-                <div key={i} className={`rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${i === 0 ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
+                <div key={i} className={`rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${i === 0 ? 'bg-blue-500/10 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
                   {i === 0 && (
                     <div className="absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-indigo-500" />
                   )}
