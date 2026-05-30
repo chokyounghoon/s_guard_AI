@@ -46,8 +46,9 @@ export default function MobileExpertAdvisor({ user }) {
     try {
       const res = await fetch(`${API_BASE}/warroom/list`, { headers: getAuthHeaders() });
       if (res.ok) {
-        const data = await res.json();
-        setWarRooms(data.warRooms || data.rooms || []);
+        const rooms = data.warRooms || data.rooms || [];
+        const uniqueRooms = Array.from(new Map(rooms.map(r => [r.inc_id || r.id, r])).values());
+        setWarRooms(uniqueRooms);
       }
     } catch (e) {}
   }, []);
@@ -57,16 +58,113 @@ export default function MobileExpertAdvisor({ user }) {
     fetchWarRooms();
   }, [fetchIncident, fetchWarRooms]);
 
+  const deduplicateMessages = (msgs) => {
+    const seen = new Set();
+    return msgs.filter(m => {
+      const key = `${m.role}:${(m.text || '').trim().substring(0, 30)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const parseTranscript = (text) => {
+    if (!text) return [];
+    const AGENT_ORDER = ['Security', 'DB', 'DevOps', 'Leader'];
+    const detectAgentName = (str) => {
+      const s = str.trim();
+      if (/security/i.test(s))             return 'Security';
+      if (/db|database/i.test(s))          return 'DB';
+      if (/devops|infra|analyst/i.test(s)) return 'DevOps';
+      if (/leader/i.test(s))              return 'Leader';
+      return null;
+    };
+    const sectionMarkers = ['[전문가별 심층 진단]', '전문가별 심층 진단', '## 전문가', '### 전문가'];
+    let startIndex = -1;
+    for (const marker of sectionMarkers) {
+      const idx = text.indexOf(marker);
+      if (idx !== -1) { startIndex = idx; break; }
+    }
+    if (startIndex === -1) startIndex = 0;
+
+    const lines = text.substring(startIndex).split('\n');
+    const msgsMap = new Map();
+    let currentAgent = null;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const bulletMatch = trimmed.match(/^[-•*·\d.]\s*\*{0,4}(Security|DB|DevOps|Leader)\s*Agent\*{0,4}\s*[:：]\s*(.+)/i);
+      if (bulletMatch) {
+        const agentName = detectAgentName(bulletMatch[1]);
+        const content = bulletMatch[2].trim();
+        if (agentName && content) {
+          const prev = msgsMap.get(agentName) || '';
+          msgsMap.set(agentName, prev + (prev ? '\n' : '') + content);
+          currentAgent = agentName;
+          continue;
+        }
+      }
+
+      const isHeaderLike = (/^#{1,4}\s/.test(trimmed) || /^\*{1,2}[^*]/.test(trimmed) || /^\[.{2,40}\]/.test(trimmed) || /^\d+[\.]\s/.test(trimmed) || (/[：:]\s*$/.test(trimmed) && trimmed.length < 60));
+      if (isHeaderLike && /security|db|database|devops|infra|leader/i.test(trimmed)) {
+        const agentName = detectAgentName(trimmed);
+        if (agentName) { currentAgent = agentName; continue; }
+      }
+
+      if (/\[?리더의 최종 조치 가이드\]?/.test(trimmed)) {
+        currentAgent = 'Leader';
+        const leaderPrev = msgsMap.get('Leader') || '';
+        msgsMap.set('Leader', leaderPrev + (leaderPrev ? '\n' : '') + trimmed);
+        continue;
+      }
+
+      if (currentAgent) {
+        const prev = msgsMap.get(currentAgent) || '';
+        msgsMap.set(currentAgent, prev + (prev ? '\n' : '') + trimmed);
+      }
+    }
+
+    const result = [];
+    for (const name of AGENT_ORDER) {
+      const raw = msgsMap.get(name);
+      if (!raw) continue;
+      let processed = raw;
+      const leadingPattern = new RegExp(`^[-•*·\\d.]\\s*\\*{0,4}${name}\\s*Agent\\*{0,4}\\s*[:：]\\s*`, 'i');
+      processed = processed.replace(leadingPattern, '');
+      const headerPattern = new RegExp(`^#{1,4}\\s+${name}\\s*Agent\\s*`, 'i');
+      processed = processed.replace(headerPattern, '');
+      processed = processed.replace(/^\[.*?\]\s*/, '');
+      result.push({ role: name, text: processed.trim(), delay: 0 });
+    }
+    return result;
+  };
+
   const handleAgentContent = useCallback((content, isDone) => {
     if (!content) return;
-    setAgentMessages(prev => {
-      const last = prev[prev.length - 1];
-      if (last && last.role === 'AI Expert') {
-        return [...prev.slice(0, -1), { ...last, text: content }];
-      }
-      return [...prev, { role: 'AI Expert', text: content }];
+    const currentMsgs = parseTranscript(content);
+    const filteredMsgs = currentMsgs.filter(m => {
+      const isError = m.text && (
+        m.text.includes('AI 엔진 서버 오류') || 
+        m.text.includes('Dify 측 서버 상태가 불안정') ||
+        m.text.includes('인증 오류') ||
+        m.text.includes('엔드포인트 오류')
+      );
+      return m.role !== 'AI분석' && !isError;
     });
-    if (isDone) setShowAgentPanel(true);
+
+    if (isDone) {
+      if (filteredMsgs.length > 0) {
+        setShowAgentPanel(true);
+        setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: true }))));
+      }
+    } else {
+      if (filteredMsgs.length >= 2) {
+        setShowAgentPanel(true);
+        setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: false }))));
+      }
+    }
   }, []);
 
   const tabs = [
@@ -160,40 +258,34 @@ export default function MobileExpertAdvisor({ user }) {
           </div>
         ) : (
           <>
-            {activeTab === 'ai' && (
-              <div className="flex-1 bg-[#0a0c12] rounded-3xl border border-white/5 overflow-hidden" style={{ minHeight: 400 }}>
-                <AgentDiscussionPanel
-                  messages={agentMessages}
-                  isVisible={true}
-                  embedded={true}
-                  incident={smsData}
-                  onClose={() => goBack()}
-                />
-              </div>
-            )}
+            <div className={`flex-1 bg-[#0a0c12] rounded-3xl border border-white/5 overflow-hidden ${activeTab === 'ai' ? 'flex flex-col' : 'hidden'}`} style={{ minHeight: 400 }}>
+              <AgentDiscussionPanel
+                messages={agentMessages}
+                isVisible={true}
+                embedded={true}
+                incident={smsData}
+                onClose={() => goBack()}
+              />
+            </div>
 
-            {activeTab === 'warroom' && (
-              <div className="flex-1 bg-[#0a0c12] rounded-3xl border border-white/5 overflow-hidden" style={{ minHeight: 400 }}>
-                <WarRoomChatPanel
-                  incidentId={smsData.inc_id}
-                  currentUser={user || {}}
-                  isVisible={true}
-                />
-              </div>
-            )}
+            <div className={`flex-1 bg-[#0a0c12] rounded-3xl border border-white/5 overflow-hidden ${activeTab === 'warroom' ? 'flex flex-col' : 'hidden'}`} style={{ minHeight: 400 }}>
+              <WarRoomChatPanel
+                incidentId={smsData.inc_id}
+                currentUser={user || {}}
+                isVisible={true}
+              />
+            </div>
 
-            {activeTab === 'insight' && (
-              <div className="pb-6">
-                <AiInsightPanel
-                  selectedSms={smsData}
-                  warRooms={warRooms}
-                  onLogReceived={() => {}}
-                  onShowDetail={() => {}}
-                  onOpenWarRoom={() => {}}
-                  onAgentContent={handleAgentContent}
-                />
-              </div>
-            )}
+            <div className={`pb-6 ${activeTab === 'insight' ? 'block' : 'hidden'}`}>
+              <AiInsightPanel
+                selectedSms={smsData}
+                warRooms={warRooms}
+                onLogReceived={() => {}}
+                onShowDetail={() => {}}
+                onOpenWarRoom={() => {}}
+                onAgentContent={handleAgentContent}
+              />
+            </div>
           </>
         )}
       </div>

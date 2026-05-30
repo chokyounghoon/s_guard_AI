@@ -72,11 +72,11 @@ export default function ProcessingFlowPage() {
   const [expanded, setExpanded] = useState(null);
 
   return (
-    <div style={{ height:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'linear-gradient(160deg,#04060f,#07090f)', fontFamily:"'Pretendard','Inter',sans-serif", color:'#cbd5e1' }}>
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', background:'linear-gradient(160deg,#04060f,#07090f)', fontFamily:"'Pretendard','Inter',sans-serif", color:'#cbd5e1', paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}>
       <style>{`::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(99,102,241,.2);border-radius:99px}`}</style>
 
       {/* 헤더 */}
-      <header style={{ flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', background:'rgba(4,6,15,.96)', backdropFilter:'blur(20px)' }}>
+      <header style={{ position: 'sticky', top: 0, zIndex: 50, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', background:'rgba(4,6,15,.96)', backdropFilter:'blur(20px)' }}>
         <button onClick={() => goBack()} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
           <ChevronLeft size={18} color="#64748b" />
         </button>
@@ -99,7 +99,7 @@ export default function ProcessingFlowPage() {
       </div>
 
       {/* 스텝 목록 */}
-      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'10px 16px 24px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ padding:'10px 16px 24px', display:'flex', flexDirection:'column', gap:8 }}>
         {STEPS.map((step, i) => {
           const Icon = step.icon;
           const isOpen = expanded === i;

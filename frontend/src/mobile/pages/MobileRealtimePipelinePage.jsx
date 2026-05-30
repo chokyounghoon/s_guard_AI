@@ -233,7 +233,9 @@ export default function MobileRealtimePipelinePage() {
       const res = await fetch(`${apiBase}/ai/warroom/my-rooms?user_id=${userProfile.employee_id}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setWarRooms(data.rooms || []);
+        const rooms = data.rooms || [];
+        const uniqueRooms = Array.from(new Map(rooms.map(r => [r.inc_id || r.id, r])).values());
+        setWarRooms(uniqueRooms);
       }
     } catch (err) {}
   };

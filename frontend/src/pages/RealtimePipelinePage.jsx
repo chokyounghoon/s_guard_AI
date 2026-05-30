@@ -329,7 +329,9 @@ export default function RealtimePipelinePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        const mapped = (data.rooms || []).map(room => ({
+        const rooms = data.rooms || [];
+        const uniqueRooms = Array.from(new Map(rooms.map(r => [r.inc_id || r.id, r])).values());
+        const mapped = uniqueRooms.map(room => ({
           ...room,
           id: room.inc_id,
           time: room.reg_dt ? room.reg_dt : new Date().toISOString(),
@@ -957,90 +959,75 @@ export default function RealtimePipelinePage() {
             <div className="flex flex-col gap-y-2 px-1 py-4 bg-black/20 rounded-xl border border-white/5 relative shrink-0">
               <div className="flex flex-col w-full">
               {/* Row 1: Circles & Long Arrow Lines */}
-              <div className="flex items-center justify-between w-full">
+              <div className="flex items-start justify-between w-full">
                 {steps.map((st, i) => {
                   const isDone = st.done;
                   const isActive = st.active;
                   const isBottleneck = st.dObj?.min > 60;
+                  
+                  const nextStep = i < steps.length - 1 ? steps[i + 1] : null;
+                  const durationObj = nextStep?.dObj;
+                  const isNextStepDone = nextStep?.done;
+                  const isNextStepActive = nextStep?.active;
+                  const isArrowBottleneck = durationObj?.min > 60;
+
                   return (
-                    <React.Fragment key={`r1-${st.id}`}>
-                      <div className="flex-1 max-w-[80px] flex justify-center">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_8px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-2 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_8px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                          {isDone ? <CheckCircle2 size={12} /> : i + 1}
-                        </div>
-                      </div>
-                      {i < steps.length - 1 && (() => {
-                        const nextStep = steps[i + 1];
-                        const durationObj = nextStep.dObj;
-                        const isNextStepDone = nextStep.done;
-                        const isNextStepActive = nextStep.active;
-                        const isArrowBottleneck = durationObj?.min > 60;
-                        return (
-                          <div className="flex-[0.5] flex items-center relative h-7 min-w-[20px] px-1">
-                            <div className={`h-[3px] w-full rounded transition-all ${isNextStepDone ? (isArrowBottleneck ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.4)]') : isNextStepActive ? 'bg-[#00e5ff]/40 animate-pulse' : 'bg-slate-800'}`} />
-                            <svg className={`w-3 h-3 absolute right-0 transition-all ${isNextStepDone ? (isArrowBottleneck ? 'text-orange-500' : 'text-[#00e5ff]') : isNextStepActive ? 'text-[#00e5ff] animate-pulse' : 'text-slate-800'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4.5" style={{ transform: 'translateX(2px)' }}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                            </svg>
+                    <div key={`step-${st.id}`} className={`flex flex-col ${i < steps.length - 1 ? 'flex-1' : 'w-[72px] shrink-0'}`}>
+                      <div className="w-full flex items-start">
+                        <div className="w-[72px] flex flex-col items-center shrink-0">
+                          <div className="h-7 flex items-center justify-center">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_8px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-2 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_8px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                              {isDone ? <CheckCircle2 size={12} /> : i + 1}
+                            </div>
                           </div>
-                        );
-                      })()}
-                    </React.Fragment>
-                  );
-                })}
-                </div>
+                          
+                          <div className="mt-1.5 text-center w-full px-0.5">
+                            <span className={`text-[9px] font-black tracking-tight leading-[1.2] whitespace-normal break-keep inline-block ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+                              {st.label}
+                            </span>
+                          </div>
 
-              {/* Row 2: Step Labels */}
-              <div className="flex items-center justify-between w-full">
-                {steps.map((st, i) => {
-                  const isDone = st.done;
-                  const isActive = st.active;
-                  const isBottleneck = st.dObj?.min > 60;
-                  return (
-                    <React.Fragment key={`r2-${st.id}`}>
-                      <div className="flex-1 max-w-[80px] text-center px-0.5">
-                        <span className={`text-[9px] font-black tracking-tight leading-[1.2] whitespace-normal break-keep inline-block ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
-                      </div>
-                      {i < steps.length - 1 && (
-                        <div className="flex-[0.5] min-w-[20px] px-1" />
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-
-              {/* Row 3: Elapsed Durations */}
-              <div className="flex items-center justify-between w-full mt-0.5">
-                {steps.map((st, i) => {
-                  return (
-                    <React.Fragment key={`r3-${st.id}`}>
-                      <div className="flex-1 max-w-[80px]" />
-                      {i < steps.length - 1 && (() => {
-                        const nextStep = steps[i + 1];
-                        const durationObj = nextStep.dObj;
-                        const isNextActive = nextStep.active;
-                        const isNextDone = nextStep.done;
-                        const isArrowBottleneck = isNextActive && durationObj?.min > 60;
-                        return (
-                          <div className="flex-[0.5] flex justify-center px-0.5 min-w-[20px]">
-                            {durationObj ? (
-                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap ${
-                                isArrowBottleneck 
-                                  ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' 
-                                  : isNextActive 
+                          <div className="mt-1 flex justify-center w-full h-[18px]">
+                            {i > 0 && st.dObj ? (
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap inline-flex items-center justify-center ${
+                                (st.dObj?.min > 60)
+                                  ? (isActive 
+                                      ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' 
+                                      : 'bg-orange-500/10 text-[#fb923c] border border-orange-500/30')
+                                  : isActive 
                                     ? 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/50 animate-pulse'
-                                    : isNextDone
+                                    : isDone
                                       ? 'bg-[#00e5ff]/5 text-[#00e5ff]/80 border border-[#00e5ff]/20'
                                       : 'bg-slate-900/40 text-slate-600 border border-slate-800'
                               }`}>
-                                {durationObj.text}
+                                {st.dObj.text}
                               </span>
-                            ) : (
-                              <span className="text-[8px] text-slate-600 font-mono">-</span>
-                            )}
+                            ) : (i > 0 && <span className="text-[8px] text-slate-600 font-mono">-</span>)}
                           </div>
-                        );
-                      })()}
-                    </React.Fragment>
+                        </div>
+
+                        {i < steps.length - 1 && (
+                          <div className="flex-1 flex items-center relative h-7 px-1">
+                            <div className={`h-[3px] w-full rounded transition-all ${
+                              isNextStepDone 
+                                ? (isArrowBottleneck ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.4)]') 
+                                : isNextStepActive 
+                                  ? 'bg-[#00e5ff]/40 animate-pulse' 
+                                  : 'bg-slate-800'
+                            }`} />
+                            <svg className={`w-3 h-3 absolute right-0 transition-all ${
+                              isNextStepDone 
+                                ? (isArrowBottleneck ? 'text-orange-500' : 'text-[#00e5ff]') 
+                                : isNextStepActive 
+                                  ? 'text-[#00e5ff] animate-pulse' 
+                                  : 'text-slate-800'
+                            }`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4.5" style={{ transform: 'translateX(2px)' }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -1132,8 +1119,13 @@ export default function RealtimePipelinePage() {
 
   const renderOperatorMode = () => {
     const trafficMap = {};
+    const mttaMap = {};
+    const mttrMap = {};
     for (let i = 0; i < 24; i++) {
-      trafficMap[i.toString().padStart(2, '0') + ':00'] = 0;
+      const hStr = i.toString().padStart(2, '0') + ':00';
+      trafficMap[hStr] = 0;
+      mttaMap[hStr] = { sum: 0, count: 0 };
+      mttrMap[hStr] = { sum: 0, count: 0 };
     }
     const bizSystemMap = {};
     const keywordMap = {};
@@ -1147,6 +1139,21 @@ export default function RealtimePipelinePage() {
       bizSystemMap[c.bizSystem] = (bizSystemMap[c.bizSystem] || 0) + 1;
       keywordMap[c.keyword] = (keywordMap[c.keyword] || 0) + 1;
       nodeMap[c.node] = (nodeMap[c.node] || 0) + 1;
+
+      if (c.warroom_dt && c.reg_dt) {
+        const diffMs = parseDate(c.warroom_dt).getTime() - parseDate(c.reg_dt).getTime();
+        if (diffMs >= 0) {
+          mttaMap[hourStr].sum += diffMs / 60000;
+          mttaMap[hourStr].count += 1;
+        }
+      }
+      if (c.closed_dt && c.reg_dt) {
+        const diffMs = parseDate(c.closed_dt).getTime() - parseDate(c.reg_dt).getTime();
+        if (diffMs >= 0) {
+          mttrMap[hourStr].sum += diffMs / 60000;
+          mttrMap[hourStr].count += 1;
+        }
+      }
     });
 
     // --- Cascading org filter logic (Synced with orgTree) ---
@@ -1235,6 +1242,11 @@ export default function RealtimePipelinePage() {
     });
 
     const trafficData = Object.keys(trafficMap).sort().map(h => ({ hour: h, count: trafficMap[h] }));
+    const mttData = Object.keys(mttaMap).sort().map(h => ({
+      hour: h,
+      MTTA: mttaMap[h].count > 0 ? Math.round(mttaMap[h].sum / mttaMap[h].count) : 0,
+      MTTR: mttrMap[h].count > 0 ? Math.round(mttrMap[h].sum / mttrMap[h].count) : 0,
+    }));
     const bizSystemPieData = Object.keys(bizSystemMap).map((n, i) => ({ name: n, value: bizSystemMap[n], color: ['#00e5ff', '#a855f7', '#f59e0b', '#3b82f6', '#10b981', '#ec4899'][i % 6] }));
     const keywordBarData = Object.keys(keywordMap).map(k => ({ keyword: k, count: keywordMap[k] })).sort((a,b) => b.count - a.count).slice(0, 5);
     const nodeRadarData = Object.keys(nodeMap).map(n => ({ node: n, count: nodeMap[n] }));
@@ -1396,6 +1408,34 @@ export default function RealtimePipelinePage() {
                       </>
                     );
                   })()}
+                </div>
+              </div>
+
+              {/* Chart 2 - MTTA / MTTR Trend */}
+              <div className="flex-1 min-w-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
+                <div className="flex items-center justify-between mb-1 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-purple-400" />
+                    <span className="text-[10px] font-black text-white">시간대별 평균 소요시간 추이</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, height: 120, width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <ComposedChart data={mttData} margin={{ top: 5, right: -5, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
+                      <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="left" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} orientation="left" />
+                      <YAxis yAxisId="right" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} orientation="right" />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)' }} 
+                        itemStyle={{ fontSize: 9 }}
+                        formatter={(value, name) => [`${value}분`, name]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 9, paddingTop: '5px' }} />
+                      <Line yAxisId="left" type="monotone" dataKey="MTTA" name="MTTA (워룸개설)" stroke="#a855f7" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="MTTR" name="MTTR (처리완료)" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 

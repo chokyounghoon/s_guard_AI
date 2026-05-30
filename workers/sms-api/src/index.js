@@ -6072,8 +6072,9 @@ app.post('/ai/generate-report', async (c) => {
 
   const userChats = (chatLogs || []).filter(m => m.type !== 'system')
   const systemChats = (chatLogs || []).filter(m => m.type === 'system')
-  const firstEvent = systemChats[0]?.timestamp || chatLogs[0]?.timestamp || createdAt
-  const lastEvent = chatLogs[chatLogs.length - 1]?.timestamp || createdAt
+  
+  const firstEvent = sms?.timestamp || createdAt
+  const lastEvent = (wr?.status === 'CLOSED' || wr?.status === '처리완료' || wr?.status === 'INC_003') ? (wr?.mod_dt || createdAt) : new Date().toISOString()
   const durationMin = firstEvent && lastEvent
     ? Math.max(0, Math.round((new Date(lastEvent) - new Date(firstEvent)) / 60000))
     : 0

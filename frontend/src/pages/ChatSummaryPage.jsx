@@ -981,12 +981,15 @@ export default function ChatSummaryPage() {
                 </div>
               </div>
 
-              {/* MTTR */}
+              {/* MTTR Vertical Timeline */}
               {workflowSteps.length > 0 && (() => {
-                const smsStep = workflowSteps.find(s => s.id === 'SMS');
-                const ragStep = workflowSteps.find(s => s.id === 'RAG') || workflowSteps.find(s => s.id === 'AGENT');
-                const warStep = workflowSteps.find(s => s.id === 'WARROOM');
-                const knwStep = workflowSteps.find(s => s.id === 'KNOWLEDGE');
+                const FLOW_STEPS = [
+                  { id: 'SMS', label: 'SMS 수신 및 장애 인지', defaultDetail: '시스템에 장애 메시지가 수신되었습니다.' },
+                  { id: 'RAG_AGENT', label: 'RAG 및 AI AGENT 분석 완료', defaultDetail: 'AI 에이전트 그룹이 수천 건의 과거 데이터와 내부 지식베이스를 결합하여 인시던트 근본 원인을 입체적으로 분석하고 대응 시나리오를 수립했습니다.' },
+                  { id: 'WARROOM', label: '워룸 생성 및 할당 완료(처리중)', defaultDetail: '담당자에 의해 실시간 대응 워룸이 가동되었습니다.' },
+                  { id: 'KNOWLEDGE', label: '지식화/장애/보고 처리완료', defaultDetail: '인시던트 대응 지식이 지식베이스(RAG)에 저장되고 최종 보고 및 장애 처리가 완료되었습니다.' }
+                ];
+                
                 const now = new Date();
                 const formatDHMS = (from, to) => {
                   if (!from) return '-';
@@ -999,24 +1002,65 @@ export default function ChatSummaryPage() {
                   if (m > 0) return `${m}m ${s}s`;
                   return `${s}s`;
                 };
+
                 return (
-                  <div className="p-3 bg-white/[0.02] rounded-xl border border-white/5">
-                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-2">장애처리현황 MTTR</div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[
-                        { label: '인지', from: smsStep, to: ragStep },
-                        { label: '분석', from: ragStep, to: warStep },
-                        { label: '워룸진행', from: warStep, to: knwStep },
-                        { label: '처리완료', from: smsStep, to: knwStep },
-                      ].map(({ label, from, to }) => {
-                        const isDone = !!to, isActive = !!from && !to;
+                  <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5">
+                    <div className="relative">
+                      <div className="absolute left-[9px] top-0 bottom-0 w-px bg-white/10" />
+                      {FLOW_STEPS.map((step, sIdx) => {
+                        let stepData = workflowSteps.find(s => s.id === step.id);
+                        if (step.id === 'RAG_AGENT') {
+                          const rag = workflowSteps.find(s => s.id === 'RAG');
+                          const agent = workflowSteps.find(s => s.id === 'AGENT');
+                          if (rag && agent) {
+                            stepData = { ...agent, timestamp: agent.timestamp > rag.timestamp ? agent.timestamp : rag.timestamp };
+                          } else if (rag || agent) {
+                            stepData = { ...(rag || agent) };
+                          }
+                        }
+                        
+                        const isCompleted = !!stepData;
+                        const isNextStep = !isCompleted && sIdx > 0 && !!workflowSteps.find(s => s.id === FLOW_STEPS[sIdx - 1].id);
+                        
+                        let intervalText = null;
+                        if (sIdx > 0) {
+                          let prevStep = FLOW_STEPS[sIdx - 1];
+                          let prevLog = workflowSteps.find(s => s.id === prevStep.id);
+                          if (!prevLog && prevStep.id === 'RAG_AGENT') {
+                            prevLog = workflowSteps.find(s => s.id === 'RAG') || workflowSteps.find(s => s.id === 'AGENT');
+                          }
+                          if (prevLog && prevLog.timestamp) {
+                            intervalText = `⏱ ${formatDHMS(prevLog, stepData)}`;
+                          }
+                        }
+
+                        // For the first step, intervalText could be 0s or something else if needed, but usually we just skip or set to 0s
+                        if (sIdx === 0 && isCompleted) intervalText = `⏱ 0s`;
+
                         return (
-                          <div key={label} className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border ${isDone ? 'bg-emerald-500/5 border-emerald-500/20' : isActive ? 'bg-blue-500/5 border-blue-500/20' : 'bg-white/[0.01] border-white/5'}`}>
-                            <div className="flex items-center gap-1">
-                              <div className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-400' : isActive ? 'bg-blue-400 animate-pulse' : 'bg-slate-600'}`} />
-                              <span className={`text-[8px] font-black leading-none ${isDone ? 'text-emerald-400' : isActive ? 'text-blue-400' : 'text-slate-600'}`}>{label}</span>
+                          <div key={step.id} className="relative pl-10 pb-8 last:pb-2 transition-all duration-300" style={{ opacity: !isCompleted && !isNextStep ? 0.4 : 1 }}>
+                            {sIdx < FLOW_STEPS.length - 1 && (
+                              <div className="absolute left-[9px] top-5 bottom-0 w-px" style={{ background: isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.1)' }} />
+                            )}
+                            <div className="absolute left-0 top-0 w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-md" style={{ background: isCompleted ? 'rgba(0,229,255,0.15)' : '#0a1c20', border: `1px solid ${isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.15)'}` }}>
+                              {isCompleted ? <CircleCheck size={10} style={{ color: '#00e5ff' }} /> : <span className="w-1 h-1 rounded-full bg-slate-600" />}
                             </div>
-                            <span className={`text-[10px] font-black font-mono leading-tight truncate ${isDone ? 'text-emerald-300' : isActive ? 'text-blue-300' : 'text-slate-600'}`}>{formatDHMS(from, to)}</span>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-[13px] font-bold" style={{ color: isCompleted ? '#fff' : '#64748b' }}>{step.label}</span>
+                                {isCompleted && <span className="text-[10px] font-mono text-slate-400">{stepData.timestamp ? new Date(stepData.timestamp).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }) : ''}</span>}
+                              </div>
+                              <p className="text-[11px] leading-relaxed font-normal mb-3" style={{ color: isCompleted ? '#94a3b8' : '#475569' }}>
+                                {isCompleted ? (step.id === 'WARROOM' && stepData?.detail ? stepData.detail : step.defaultDetail) : '대기 중...'}
+                              </p>
+                              {intervalText && (
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-1 rounded-lg font-mono text-slate-300 bg-white/10 border border-white/20">
+                                    {intervalText}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         );
                       })}

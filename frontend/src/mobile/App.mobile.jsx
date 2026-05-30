@@ -324,7 +324,9 @@ function AppContent() {
       });
       if (res.ok) {
         const data = await res.json();
-        setWarRooms(data.rooms || []);
+        const rooms = data.rooms || [];
+        const uniqueRooms = Array.from(new Map(rooms.map(r => [r.inc_id || r.id, r])).values());
+        setWarRooms(uniqueRooms);
       }
     } catch (_) {}
   };

@@ -283,6 +283,12 @@ export default function AiReportPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const genAbortRef = useRef(null);
   const [chatSummary, setChatSummary] = useState('');
+
+  const formatTimeline = (text) => {
+    if (!text) return '';
+    // [HH:MM:SS] 패턴을 마크다운 글머리 기호와 굵은 글씨로 변환하여 타임라인 형태로 표시
+    return text.replace(/(?:\s*)(\[\d{2}:\d{2}:\d{2}\])/g, '\n\n- **$1**').trim();
+  };
   const [checkedActionItems, setCheckedActionItems] = useState({});
   const toggleActionItem = useCallback((key) => {
     setCheckedActionItems(prev => ({ ...prev, [key]: !prev[key] }));
@@ -1080,7 +1086,7 @@ export default function AiReportPage() {
                       <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
                     </div>
                     <div className="p-5 overflow-visible">
-                      <MarkdownBlock text={chatSummary} report={report} checkedItems={checkedActionItems} onToggleCheck={toggleActionItem} />
+                      <MarkdownBlock text={formatTimeline(chatSummary)} report={report} checkedItems={checkedActionItems} onToggleCheck={toggleActionItem} />
                     </div>
                   </section>
                 )}
@@ -1124,7 +1130,7 @@ export default function AiReportPage() {
                   </div>
                   <div className="p-5 overflow-visible">
                     {chatSummary ? (
-                      <MarkdownBlock text={chatSummary} report={report} />
+                      <MarkdownBlock text={formatTimeline(chatSummary)} report={report} />
                     ) : (
                       <div className="text-center py-10 text-slate-500 text-sm">
                         요약된 타임라인 정보가 없습니다. [AI 분석 요약] 탭에서 분석이 진행되었는지 확인해주세요.

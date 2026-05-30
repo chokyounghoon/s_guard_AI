@@ -973,6 +973,8 @@ export default function LoginPage() {
               <SubmitBtn label="로그인" />
               
               <div style={{ display:'flex', gap:16, justifyContent:'center', marginTop: isShrink ? 0 : 8 }}>
+                <button type="button" onClick={() => navigate('/signup')} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.4)', fontSize:12, cursor:'pointer', fontWeight:600 }}>회원가입</button>
+                <div style={{ width:1, background:'rgba(255,255,255,0.1)' }} />
                 <button type="button" onClick={() => setState(S.RESET_A)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.4)', fontSize:12, cursor:'pointer', fontWeight:600 }}>비밀번호 찾기</button>
               </div>
               

@@ -1425,6 +1425,10 @@ export default function ChatPage() {
       }
 
       if (hasText) {
+        if (hasFiles) {
+          // DO WebSocket DB Insert race condition 방지 (MAX(seq) 중복 방지)
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
         let isAiQuery = false;
         let aiQueryText = inputText;
         let aiAgentName = 'AI Expert';

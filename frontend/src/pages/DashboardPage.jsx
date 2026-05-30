@@ -543,7 +543,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       severity: roomSeverity,
       unread: true
     };
-    setWarRooms(prev => [newRoom, ...prev]);
+    setWarRooms(prev => {
+      const exists = Array.isArray(prev) ? prev.some(r => r.inc_id === newRoom.inc_id) : false;
+      return exists ? prev : [newRoom, ...(Array.isArray(prev) ? prev : [])];
+    });
 
     // 2. Persist to DB
     try {
@@ -771,7 +774,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       });
       if (res.ok) {
         const data = await res.json();
-        const mapped = (data.rooms || []).map(room => ({
+        const rooms = data.rooms || [];
+        const uniqueRooms = Array.from(new Map(rooms.map(r => [r.inc_id || r.id, r])).values());
+        const mapped = uniqueRooms.map(room => ({
           ...room,
           id: room.inc_id,
           lastMsg: room.status === 'Completed' ? '종료된 체널' : '대화가 시작되지 않았습니다.',
@@ -2250,7 +2255,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         const ragStep = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
                         const warStep = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
                         const knwStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-                        const diffObj = (a, b) => { if (!a) return null; const ms = (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp); const m = Math.floor(ms/60000), s2 = Math.floor((ms%60000)/1000); return { text: m > 0 ? `${m}m ${s2}s` : `${s2}s`, min: m }; };
+                        const diffObj = (a, b) => { if (!a) return null; const ms = Math.max(0, (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp)); const totalS = Math.floor(ms / 1000); const h = Math.floor(totalS / 3600); const m = Math.floor((totalS % 3600) / 60); const s2 = totalS % 60; let text = ''; if (h > 0) text = `${h}h ${m}m ${s2}s`; else if (m > 0) text = `${m}m ${s2}s`; else text = `${s2}s`; return { text, min: Math.floor(totalS / 60) }; };
 
                         const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - new Date(smsStep?.timestamp || currentTime);
                         const isClosed = !!knwStep;
@@ -2276,28 +2281,56 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         return (
                           <div className="flex flex-col shrink-0">
                             {/* 가로 프로그레스 바 (Horizontal Stepper) */}
-                            <div className="flex flex-col gap-y-2 px-6 py-6 bg-black/20 border-b border-white/5 relative shrink-0">
-                              {/* Row 1: Circles & Long Arrow Lines */}
-                              <div className="flex items-center justify-between w-full">
+                            <div className="flex flex-col gap-y-2 px-4 py-6 bg-black/20 border-b border-white/5 relative shrink-0">
+                              <div className="flex items-start justify-between w-full">
                                 {steps.map((st, i) => {
                                   const isDone = st.done;
                                   const isActive = st.active;
                                   const isBottleneck = st.dObj?.min > 60;
+                                  
+                                  const nextStep = i < steps.length - 1 ? steps[i + 1] : null;
+                                  const durationObj = nextStep?.dObj;
+                                  const isNextStepDone = nextStep?.done;
+                                  const isNextStepActive = nextStep?.active;
+                                  const isArrowBottleneck = durationObj?.min > 60;
+
                                   return (
-                                    <React.Fragment key={`r1-${st.id}`}>
-                                      <div className="w-20 flex justify-center shrink-0">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                                          {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                                    <div key={`step-${st.id}`} className={`flex flex-col ${i < steps.length - 1 ? 'flex-1' : 'w-[84px] shrink-0'}`}>
+                                      <div className="w-full flex items-start">
+                                        <div className="w-[84px] flex flex-col items-center shrink-0">
+                                          <div className="h-8 flex items-center justify-center">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                                              {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="mt-2 text-center w-full">
+                                            <span className={`text-[10px] font-black tracking-tight whitespace-normal break-keep leading-[1.2] inline-block w-full ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+                                              {st.label}
+                                            </span>
+                                          </div>
+
+                                          <div className="mt-1.5 flex justify-center w-full h-[20px]">
+                                            {i > 0 && st.dObj ? (
+                                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap inline-flex items-center justify-center ${
+                                                (st.dObj?.min > 60)
+                                                  ? (isActive 
+                                                      ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' 
+                                                      : 'bg-orange-500/10 text-[#fb923c] border border-orange-500/30')
+                                                  : isActive 
+                                                    ? 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/50 animate-pulse'
+                                                    : isDone
+                                                      ? 'bg-[#00e5ff]/5 text-[#00e5ff]/80 border border-[#00e5ff]/20'
+                                                      : 'bg-slate-900/40 text-slate-600 border border-slate-800'
+                                              }`}>
+                                                {st.dObj.text}
+                                              </span>
+                                            ) : (i > 0 && <span className="text-[10px] text-slate-600 font-mono">-</span>)}
+                                          </div>
                                         </div>
-                                      </div>
-                                      {i < steps.length - 1 && (() => {
-                                        const nextStep = steps[i + 1];
-                                        const durationObj = nextStep.dObj;
-                                        const isNextStepDone = nextStep.done;
-                                        const isNextStepActive = nextStep.active;
-                                        const isArrowBottleneck = durationObj?.min > 60;
-                                        return (
-                                          <div className="flex-1 flex items-center relative h-8 min-w-[60px] px-2">
+
+                                        {i < steps.length - 1 && (
+                                          <div className="flex-1 flex items-center relative h-8 px-1">
                                             <div className={`h-[3px] w-full rounded transition-all ${
                                               isNextStepDone 
                                                 ? (isArrowBottleneck ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.4)]') 
@@ -2315,67 +2348,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                                             </svg>
                                           </div>
-                                        );
-                                      })()}
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Row 2: Step Labels */}
-                              <div className="flex items-center justify-between w-full">
-                                {steps.map((st, i) => {
-                                  const isDone = st.done;
-                                  const isActive = st.active;
-                                  const isBottleneck = st.dObj?.min > 60;
-                                  return (
-                                    <React.Fragment key={`r2-${st.id}`}>
-                                      <div className="w-20 text-center shrink-0">
-                                        <span className={`text-[11px] font-black tracking-tight whitespace-nowrap ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>{st.label}</span>
+                                        )}
                                       </div>
-                                      {i < steps.length - 1 && (
-                                        <div className="flex-1 min-w-[60px] px-2" />
-                                      )}
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Row 3: Elapsed Durations */}
-                              <div className="flex items-center justify-between w-full mt-1">
-                                {steps.map((st, i) => {
-                                  return (
-                                    <React.Fragment key={`r3-${st.id}`}>
-                                      <div className="w-20 shrink-0" />
-                                      {i < steps.length - 1 && (() => {
-                                        const nextStep = steps[i + 1];
-                                        const durationObj = nextStep.dObj;
-                                        const isNextActive = nextStep.active;
-                                        const isNextDone = nextStep.done;
-                                        const isArrowBottleneck = durationObj?.min > 60;
-                                        return (
-                                          <div className="flex-1 flex justify-center px-2 min-w-[60px]">
-                                            {durationObj ? (
-                                              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap ${
-                                                isArrowBottleneck 
-                                                  ? (isNextActive 
-                                                      ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' 
-                                                      : 'bg-orange-500/10 text-[#fb923c] border border-orange-500/30')
-                                                  : isNextActive 
-                                                    ? 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/50 animate-pulse'
-                                                    : isNextDone
-                                                      ? 'bg-[#00e5ff]/5 text-[#00e5ff]/80 border border-[#00e5ff]/20'
-                                                      : 'bg-slate-900/40 text-slate-600 border border-slate-800'
-                                              }`}>
-                                                {durationObj.text}
-                                              </span>
-                                            ) : (
-                                              <span className="text-[10px] text-slate-600 font-mono">-</span>
-                                            )}
-                                          </div>
-                                        );
-                                      })()}
-                                    </React.Fragment>
+                                    </div>
                                   );
                                 })}
                               </div>
