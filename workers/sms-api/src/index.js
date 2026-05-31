@@ -3160,6 +3160,17 @@ app.post('/rbac/permissions', async (c) => {
   const modDt = getKst()
 
   try {
+    // 1. Ensure custom frontend menus exist in the `menus` table to satisfy foreign keys
+    const menuStmts = permissions.filter(p => p.menu_id < 0).map(p => 
+      db.prepare(`
+        INSERT OR IGNORE INTO menus (id, name, path, icon, is_active, sort_order)
+        VALUES (?, ?, ?, ?, 1, ?)
+      `).bind(p.menu_id, p.menu_name || '', p.menu_path || p.path || '', p.icon || 'Layout', Math.abs(p.menu_id))
+    );
+    if (menuStmts.length > 0) {
+      await db.batch(menuStmts);
+    }
+
     const stmts = permissions.map(p =>
       db.prepare(`
         INSERT INTO role_permissions
