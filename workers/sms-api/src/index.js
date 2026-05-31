@@ -7215,6 +7215,17 @@ app.post('/ai/warroom/open', async (c) => {
     }
   } catch (e) { console.error('[ActivityLog-WROpen]', e.message); }
 
+  } finally {
+    // Release Lock if exists (KV cleanup)
+    if (kv) {
+      try {
+        await kv.delete(`lock:warroom-open:${normId}`);
+      } catch (e) {
+        console.error("Lock release error:", e);
+      }
+    }
+  }
+
   return c.json({ status: 'opened', inc_id: normId })
 })
 
