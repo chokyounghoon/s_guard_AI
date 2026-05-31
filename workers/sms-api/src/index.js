@@ -11163,6 +11163,22 @@ async function executeSCallertStrategy(db, strategy, payload, inc_id, c) {
 async function executeSCallertFinal(env, strategy, payload, inc_id) {
   try {
     const db = env.DB;
+    
+    // 🚀 NEW: Re-verify if strategy is still active! User might have turned it off during the wait.
+    const currentStrategy = await db.prepare("SELECT USE_YN FROM TB_SCL_STRATEGY_MST WHERE STRATEGY_ID = ?").bind(strategy.STRATEGY_ID).first();
+    if (!currentStrategy || currentStrategy.USE_YN !== 'Y') {
+      console.log(`[scallert-trigger] 🛑 Strategy ${strategy.STRATEGY_ID} was disabled during the wait time. Aborting call.`);
+      return;
+    }
+
+    // 🚀 NEW: Re-verify if the incident/sms still exists! User might have deleted it during the wait.
+    const incidentExists = await db.prepare("SELECT inc_id FROM incidents WHERE inc_id = ?").bind(inc_id).first();
+    const smsExists = await db.prepare("SELECT inc_id FROM received_messages WHERE inc_id = ?").bind(inc_id).first();
+    if (!incidentExists && !smsExists) {
+       console.log(`[scallert-trigger] 🛑 Incident/SMS ${inc_id} was deleted during the wait time. Aborting call.`);
+       return;
+    }
+
     let targets = [];
     if (!payload.employee_id && !payload.emp_id) {
       console.warn(`[scallert-trigger] ⚠️ targetUserId is missing. Falling back to default '18121020'`);
