@@ -5398,11 +5398,13 @@ app.get('/warroom/rooms', async (c) => {
       (SELECT u_msg.name FROM warroom_chats wc2 LEFT JOIN users u_msg ON wc2.sender = u_msg.employee_id WHERE wc2.inc_id = all_inc.inc_id ORDER BY wc2.timestamp DESC LIMIT 1)   AS last_message_sender,
       (SELECT wc2.timestamp FROM warroom_chats wc2 WHERE wc2.inc_id = all_inc.inc_id ORDER BY wc2.timestamp DESC LIMIT 1) AS last_message_time
     FROM (
-      SELECT inc_id, created_at as reg_dt FROM incidents
-      UNION
-      SELECT inc_id, reg_dt FROM warroom_list
-      UNION
-      SELECT inc_id, timestamp as reg_dt FROM received_messages
+      SELECT inc_id, MAX(reg_dt) as reg_dt FROM (
+        SELECT inc_id, created_at as reg_dt FROM incidents
+        UNION ALL
+        SELECT inc_id, reg_dt FROM warroom_list
+        UNION ALL
+        SELECT inc_id, timestamp as reg_dt FROM received_messages
+      ) WHERE inc_id IS NOT NULL GROUP BY inc_id
     ) all_inc
     LEFT JOIN incidents i ON all_inc.inc_id = i.inc_id
     LEFT JOIN warroom_list w ON all_inc.inc_id = w.inc_id
@@ -7093,11 +7095,22 @@ app.post('/ai/warroom/open', async (c) => {
   const now = getKst()
 
   const normId = String(inc_id);
-  // 🛡️ Add 'INC-' to title as requested
   const safeTitle = String(title || normId);
   const cleanTitle = safeTitle.startsWith('INC-') ? safeTitle : `INC-${safeTitle}`;
 
-  // Prevent duplicate creation
+  const kv = c.env.SMS_STORAGE;
+  const lockKey = `lock:warroom-open:${normId}`;
+  
+  if (kv) {
+    const isLocked = await kv.get(lockKey);
+    if (isLocked) {
+      return c.json({ error: "War room is already being created. Please wait." }, 409);
+    }
+    await kv.put(lockKey, 'processing', { expirationTtl: 30 });
+  }
+
+  try {
+    // Prevent duplicate creation
   const existing = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ?").bind(normId).first()
   if (!existing) {
     await db.prepare(`
