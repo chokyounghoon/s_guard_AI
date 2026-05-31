@@ -7106,7 +7106,7 @@ app.post('/ai/warroom/open', async (c) => {
     if (isLocked) {
       return c.json({ error: "War room is already being created. Please wait." }, 409);
     }
-    await kv.put(lockKey, 'processing', { expirationTtl: 30 });
+    await kv.put(lockKey, 'processing', { expirationTtl: 60 });
   }
 
   try {
