@@ -15,24 +15,24 @@ const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 // 프론트엔드에 하드코딩된 전체 메뉴 목록 (백엔드 DB에 누락된 메뉴 보완용)
 const ALL_KNOWN_MENUS = [
-  { menu_id: 'menu_realtime_pipeline', menu_name: 'Realtime Pipeline', path: '/realtime-pipeline', icon: 'Layers', sort_order: 10 },
-  { menu_id: 'menu_orbital_command', menu_name: 'Orbital Command', path: '/orbital-command', icon: 'Cpu', sort_order: 20 },
-  { menu_id: 'menu_user_keyword', menu_name: 'Personal KW', path: '/user-keyword', icon: 'Keyboard', sort_order: 30 },
-  { menu_id: 'menu_report_line', menu_name: 'Report Line', path: '/report-line-management', icon: 'Users', sort_order: 40 },
-  { menu_id: 'menu_user_mgmt', menu_name: 'Accounts', path: '/user-management', icon: 'User', sort_order: 50 },
-  { menu_id: 'menu_security_logs', menu_name: 'Security Logs', path: '/security-logs', icon: 'Shield', sort_order: 60 },
-  { menu_id: 'menu_org_mgmt', menu_name: 'Organization', path: '/organization-management', icon: 'Network', sort_order: 70 },
-  { menu_id: 'menu_knowledge_base', menu_name: 'Knowledge Base', path: '/knowledge-base', icon: 'FileText', sort_order: 80 },
-  { menu_id: 'menu_overall_status', menu_name: 'Global Stats', path: '/overall-status', icon: 'Activity', sort_order: 90 },
-  { menu_id: 'menu_warroom', menu_name: 'War-Room Hub', path: '/warroom-management', icon: 'Shield', sort_order: 100 },
-  { menu_id: 'menu_codebook', menu_name: 'Codebook', path: '/codebook-management', icon: 'BookOpen', sort_order: 110 },
-  { menu_id: 'menu_processing_flow', menu_name: 'Data Flow', path: '/processing-flow', icon: 'Layers', sort_order: 120 },
-  { menu_id: 'menu_push_diagnostic', menu_name: 'Push Diagnostic', path: '/push-diagnostic', icon: 'Bell', sort_order: 130 },
-  { menu_id: 'menu_ai_report', menu_name: 'AI Report', path: '/ai-report', icon: 'FileText', sort_order: 140 },
-  { menu_id: 'menu_mobile_report_search', menu_name: 'Report Search', path: '/mobile-report-search', icon: 'Search', sort_order: 150 },
-  { menu_id: 'menu_scallert', menu_name: 'S-Callert', path: '/s-callert', icon: 'Phone', sort_order: 160 },
-  { menu_id: 'menu_data_cleanup', menu_name: 'Data Cleanup', path: '/admin/incident-cleanup', icon: 'Trash2', sort_order: 170 },
-  { menu_id: 'menu_permissions', menu_name: 'Permissions (RBAC)', path: '/admin/permissions', icon: 'Key', sort_order: 180 },
+  { menu_id: -10, menu_name: 'Realtime Pipeline', path: '/realtime-pipeline', icon: 'Layers', sort_order: 10 },
+  { menu_id: -20, menu_name: 'Orbital Command', path: '/orbital-command', icon: 'Cpu', sort_order: 20 },
+  { menu_id: -30, menu_name: 'Personal KW', path: '/user-keyword', icon: 'Keyboard', sort_order: 30 },
+  { menu_id: -40, menu_name: 'Report Line', path: '/report-line-management', icon: 'Users', sort_order: 40 },
+  { menu_id: -50, menu_name: 'Accounts', path: '/user-management', icon: 'User', sort_order: 50 },
+  { menu_id: -60, menu_name: 'Security Logs', path: '/security-logs', icon: 'Shield', sort_order: 60 },
+  { menu_id: -70, menu_name: 'Organization', path: '/organization-management', icon: 'Network', sort_order: 70 },
+  { menu_id: -80, menu_name: 'Knowledge Base', path: '/knowledge-base', icon: 'FileText', sort_order: 80 },
+  { menu_id: -90, menu_name: 'Global Stats', path: '/overall-status', icon: 'Activity', sort_order: 90 },
+  { menu_id: -100, menu_name: 'War-Room Hub', path: '/warroom-management', icon: 'Shield', sort_order: 100 },
+  { menu_id: -110, menu_name: 'Codebook', path: '/codebook-management', icon: 'BookOpen', sort_order: 110 },
+  { menu_id: -120, menu_name: 'Data Flow', path: '/processing-flow', icon: 'Layers', sort_order: 120 },
+  { menu_id: -130, menu_name: 'Push Diagnostic', path: '/push-diagnostic', icon: 'Bell', sort_order: 130 },
+  { menu_id: -140, menu_name: 'AI Report', path: '/ai-report', icon: 'FileText', sort_order: 140 },
+  { menu_id: -150, menu_name: 'Report Search', path: '/mobile-report-search', icon: 'Search', sort_order: 150 },
+  { menu_id: -160, menu_name: 'S-Callert', path: '/s-callert', icon: 'Phone', sort_order: 160 },
+  { menu_id: -170, menu_name: 'Data Cleanup', path: '/admin/incident-cleanup', icon: 'Trash2', sort_order: 170 },
+  { menu_id: -180, menu_name: 'Permissions (RBAC)', path: '/admin/permissions', icon: 'Key', sort_order: 180 },
 ];
 
 const mergeMissingMenus = (apiPerms) => {
@@ -314,7 +314,7 @@ export default function PermissionManagementPage() {
 
       {/* Role Select Bottom Sheet */}
       {showRoleSheet && createPortal(
-        <div className="fixed inset-0 z-[110] flex items-end">
+        <div className="fixed inset-0 z-[400] flex items-end">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setShowRoleSheet(false)} />
           <div className="relative w-full bg-[#0c1018] border-t border-white/10 rounded-t-[2rem] z-10 pb-[env(safe-area-inset-bottom,16px)]">
             <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mt-3 mb-4" />
@@ -351,7 +351,7 @@ export default function PermissionManagementPage() {
 
       {/* Add Role Modal */}
       {showRoleModal && createPortal(
-        <div className="fixed inset-0 z-[120] flex items-end">
+        <div className="fixed inset-0 z-[410] flex items-end">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowRoleModal(false)} />
           <div className="relative w-full bg-[#0e1118] border-t border-white/10 rounded-t-[2rem] z-10 pb-[env(safe-area-inset-bottom,16px)]">
             <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mt-3 mb-5" />

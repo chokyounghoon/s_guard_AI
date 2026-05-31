@@ -383,6 +383,7 @@ const authMiddleware = async (c, next) => {
     path === '/register-token' ||           // ⚡ Android FCM 토큰 등록 — JWT 없이 앱 시작 시 호출
     path === '/scallert/debug-trigger' ||
     path === '/scallert/debug-schema' ||
+    path === '/activity-logs' ||           // ⚡ Dashboard Feed (Public)
     (path.startsWith('/sms/') && !path.startsWith('/sms/user-keywords')); // ⚡ SMS 원문 조회 경로 (Public 허용, 단 개인 키워드 제외)
 
   console.log(`[Auth-Access] Path: ${path} | isPublic: ${isPublic}`);
@@ -1238,6 +1239,14 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
       }
       // PENDING/ANALYZING인데 캐시가 있으면 → 상태만 ANALYZED로 업데이트하고 종료
       await db.prepare("UPDATE received_messages SET status = 'ANALYZED' WHERE inc_id = ?").bind(String(sms_id)).run();
+      try {
+        const doId = env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+        const room = env.WARROOM_DO.get(doId);
+        await room.fetch(new Request("https://dummy/broadcast-sse", {
+          method: "POST",
+          body: JSON.stringify({ type: "sms_received", timestamp: new Date().toISOString(), data: { inc_id: String(sms_id), status: 'ANALYZED' } })
+        }));
+      } catch (sseErr) { console.error("[Background-AI] Broadcast error:", sseErr); }
       if (kv) await kv.delete(lockKey);
       return;
     }
@@ -1591,6 +1600,15 @@ ${detailedInfo}`;
 
     // 🔔 Push는 /sms/receive 라우트에서 이미 처리됨 — 여기서는 중복 발송 방지를 위해 스킵
 
+    try {
+      const doId = env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+      const room = env.WARROOM_DO.get(doId);
+      await room.fetch(new Request("https://dummy/broadcast-sse", {
+        method: "POST",
+        body: JSON.stringify({ type: "sms_received", timestamp: new Date().toISOString(), data: { inc_id: String(sms_id), status: 'ANALYZED' } })
+      }));
+    } catch (sseErr) { console.error("[Background-AI] Broadcast error:", sseErr); }
+
     if (kv) await kv.delete(lockKey);
   } catch (err) {
     console.error(`[Background] Error analyzing SMS ${sms_id}:`, err);
@@ -1610,6 +1628,15 @@ ${detailedInfo}`;
         VALUES (?, 'BG_PROCESS_FATAL', 'CRITICAL_FAILURE', 500, ?)
       `).bind(String(sms_id), err.message).run();
     } catch (le) { }
+
+    try {
+      const doId = env.WARROOM_DO.idFromName("GLOBAL_PIPELINE");
+      const room = env.WARROOM_DO.get(doId);
+      await room.fetch(new Request("https://dummy/broadcast-sse", {
+        method: "POST",
+        body: JSON.stringify({ type: "sms_received", timestamp: new Date().toISOString(), data: { inc_id: String(sms_id), status: 'ERROR' } })
+      }));
+    } catch (sseErr) { console.error("[Background-AI] Error Broadcast error:", sseErr); }
 
     if (env.SMS_STORAGE) await env.SMS_STORAGE.delete(`lock:analyze:${sms_id}`);
   }
@@ -2613,14 +2640,40 @@ app.delete('/users/:employee_id', async (c) => {
   if (!employee_id) return c.json({ detail: "사번이 지정되지 않았습니다." }, 400);
 
   try {
-    const res = await db.prepare("DELETE FROM users WHERE employee_id = ?").bind(employee_id).run()
-    if (res.meta.changes === 0) {
+    // 외래키 제약조건을 회피하기 위해 참조 테이블의 데이터 우선 삭제
+    // (일부 테이블이 아직 프로덕션에 생성되지 않았을 경우 db.batch가 통째로 실패하므로 순차 실행 및 예외 무시 처리)
+    const dependentQueries = [
+      { query: "DELETE FROM user_sessions WHERE user_id = ?", binds: [employee_id] },
+      { query: "DELETE FROM login_history WHERE user_id = ?", binds: [employee_id] },
+      { query: "DELETE FROM activity_logs WHERE user_id = ?", binds: [employee_id] },
+      { query: "DELETE FROM user_warrooms WHERE user_id = ?", binds: [employee_id] },
+      { query: "DELETE FROM direct_messages WHERE sender_id = ? OR receiver_id = ?", binds: [employee_id, employee_id] },
+      { query: "DELETE FROM inbox_items WHERE user_id = ? OR sender_id = ?", binds: [employee_id, employee_id] },
+      { query: "DELETE FROM incident_assignments WHERE user_id = ?", binds: [employee_id] },
+      { query: "DELETE FROM user_chat_sessions WHERE user_id = ?", binds: [employee_id] }
+    ];
+
+    for (const item of dependentQueries) {
+      try {
+        await db.prepare(item.query).bind(...item.binds).run();
+      } catch (err) {
+        // 존재하지 않는 테이블 에러(no such table)는 무시하고 계속 진행
+        if (!err.message.includes('no such table')) {
+          console.warn(`[User Delete Warning] Error executing ${item.query}:`, err.message);
+        }
+      }
+    }
+
+    // 연관 데이터 정리 후 실제 사용자 삭제
+    const userDeleteResult = await db.prepare("DELETE FROM users WHERE employee_id = ?").bind(employee_id).run();
+    
+    if (userDeleteResult.meta?.changes === 0) {
       return c.json({ detail: "삭제할 사용자를 찾을 수 없습니다." }, 404)
     }
-    return c.json({ ok: true, detail: "사용자가 성공적으로 삭제되었습니다." })
+    return c.json({ ok: true, detail: "사용자 및 연관 데이터가 성공적으로 삭제되었습니다." })
   } catch (err) {
     console.error('[User Delete Error]', err)
-    return c.json({ detail: "사용자 삭제 중 서버 오류가 발생했습니다." }, 500)
+    return c.json({ detail: `사용자 삭제 실패: ${err.message}` }, 500)
   }
 })
 
@@ -3087,9 +3140,17 @@ app.get('/rbac/permissions/:roleCode', async (c) => {
     FROM menus m
     LEFT JOIN role_permissions rp ON m.id = rp.menu_id AND rp.role_code = ?
     WHERE m.is_active = 1
-    ORDER BY m.sort_order ASC
+    
+    UNION
+    
+    SELECT 
+      rp.menu_id, rp.menu_name, rp.menu_path as path, '' as icon,
+      rp.can_read, rp.can_write, rp.can_delete
+    FROM role_permissions rp
+    WHERE rp.role_code = ? 
+      AND rp.menu_id NOT IN (SELECT id FROM menus)
   `
-  const { results } = await db.prepare(query).bind(roleCode).all()
+  const { results } = await db.prepare(query).bind(roleCode, roleCode).all()
   return c.json({ role_code: roleCode, permissions: results })
 })
 
