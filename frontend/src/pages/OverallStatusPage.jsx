@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 
 import { getAuthHeaders } from '../lib/authStore';
+import { useResizable, useResizableVertical } from '../hooks/useResizable';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -47,6 +48,19 @@ export default function OverallStatusPage() {
   
   // 모바일 호환을 위한 상태 복원
   const [tab, setTab] = useState(0);
+  const [isPC, setIsPC] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+
+  // Resize hooks for PC Layout
+  const { heights: vH, startVDrag: vDrag, isDragging: vDragIng } = useResizableVertical([45, 55], 'overall-v');
+  const { widths: wR1, startDrag: hDrag1, isDragging: hDragIng1 } = useResizable([65, 35], 'overall-r1');
+  const { widths: wR2, startDrag: hDrag2, isDragging: hDragIng2 } = useResizable([25, 25, 25, 25], 'overall-r2');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsPC(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchData = async (isManual = false, sd = startDate, ed = endDate) => {
     if (isManual) setRefreshing(true);
@@ -178,45 +192,49 @@ export default function OverallStatusPage() {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col select-none pb-[120px] xl:pb-0 relative">
+    <div className="h-[100dvh] w-screen overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col select-none relative">
       {/* Background Effects */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
       <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
 
       {/* Header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md z-10">
-        <div className="flex items-center gap-3">
-          <button onClick={() => goBack()} className="w-9 h-9 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center cursor-pointer active:scale-95">
-            <ChevronLeft size={18} className="text-slate-400" />
+      <header className="flex-shrink-0 flex items-center justify-between px-3 md:px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md z-10 gap-2">
+        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+          
+          <button onClick={() => goBack()} className="w-7 h-7 md:w-8 md:h-8 min-w-[28px] md:min-w-[32px] shrink-0 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center cursor-pointer active:scale-95">
+            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-slate-400" />
           </button>
-          <div>
-            <h1 className="text-sm lg:text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 tracking-tight flex items-center gap-2">
-              <Layers className="w-4 h-4 text-indigo-400" /> Global Stats Dashboard
+          
+          <div className="flex flex-col justify-center min-w-0">
+            <h1 className="text-[11px] sm:text-xs md:text-sm lg:text-base font-black tracking-tight flex items-center gap-1.5 text-indigo-400 md:text-transparent md:bg-clip-text md:bg-gradient-to-r md:from-indigo-400 md:via-purple-400 md:to-pink-400 truncate">
+              <Layers className="w-3.5 h-3.5 md:w-4 md:h-4 text-indigo-400 shrink-0" /> 
+              <span className="truncate">Global Stats Dashboard</span>
             </h1>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-0.5 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-              DREAM MODE LIVE
+            <p className="text-[8px] md:text-[9px] text-slate-500 font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] mt-0.5 flex items-center gap-1.5 truncate">
+              <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-indigo-500 animate-pulse"></span>
+              <span className="truncate">DREAM MODE LIVE</span>
             </p>
           </div>
+
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 shrink-0">
           <div className="hidden lg:flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none cursor-pointer" />
              <span className="text-slate-500 text-xs">~</span>
              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none cursor-pointer" />
           </div>
-          <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono font-bold text-slate-400">
+          <div className="px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] md:text-xs font-mono font-bold text-slate-400 whitespace-nowrap">
             {now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
-          <button onClick={() => fetchData(true, startDate, endDate)} className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 transition-all flex items-center justify-center cursor-pointer">
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <button onClick={() => fetchData(true, startDate, endDate)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 transition-all flex items-center justify-center cursor-pointer">
+            <RefreshCw className={`w-3.5 h-3.5 md:w-4 md:h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
 
       {/* Mobile Tabs (Hidden on PC) */}
-      <div className="xl:hidden flex shrink-0 px-4 pt-4 pb-0 gap-2 overflow-x-auto custom-scrollbar z-10">
+      <div className="lg:hidden flex shrink-0 px-4 pt-4 pb-0 gap-2 overflow-x-auto custom-scrollbar z-10">
         {TABS.map((t, i) => (
           <button 
             key={i} 
@@ -229,70 +247,91 @@ export default function OverallStatusPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0 flex flex-col p-4 gap-4 z-10 overflow-y-auto xl:overflow-hidden custom-scrollbar">
+      <div className="flex-1 min-h-0 flex flex-col p-4 pb-[140px] gap-4 z-10 overflow-y-auto custom-scrollbar">
         
         {/* ROW 1: KPIs & Flow (Tab 0 on Mobile) */}
-        <div className={`${tab === 0 ? 'flex' : 'hidden'} xl:flex flex-col xl:flex-row gap-4 shrink-0`}>
+        {(isPC || tab === 0) && (
+          <div 
+            className="flex flex-col lg:flex-row gap-4 lg:gap-0 shrink-0 lg:items-start"
+            style={isPC ? { height: `${vH[0]}%`, minHeight: '150px' } : {}}
+          >
           
           {/* KPI Grid */}
-          <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3 lg:h-full" style={isPC ? { width: `${wR1[0]}%`, flex: 'none' } : {}}>
             {KPI.map((k, i) => {
               const Icon = k.icon;
               return (
-                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col justify-center`}>
+                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col h-full ${i === 4 ? 'col-span-2 lg:col-span-1' : ''}`}>
                   <div className={`absolute -right-4 -top-4 w-24 h-24 ${k.bg} blur-[30px] rounded-full group-hover:scale-110 transition-transform opacity-50`}></div>
-                  <div className={`w-8 h-8 rounded-xl mb-3 flex items-center justify-center ${k.iconBg} border ${k.iconBorder}`}>
-                    <Icon className={`w-4 h-4 ${k.color}`} />
+                  
+                  <div className="flex-none">
+                    <div className={`w-8 h-8 rounded-xl mb-3 flex items-center justify-center ${k.iconBg} border ${k.iconBorder} shrink-0`}>
+                      <Icon className={`w-4 h-4 ${k.color}`} />
+                    </div>
+                    <div className="text-3xl font-black text-slate-100 font-mono tracking-tighter mb-1 leading-none">
+                      {k.value}
+                    </div>
                   </div>
-                  <div className="text-3xl font-black text-slate-100 font-mono tracking-tighter mb-1">
-                    {k.value}
-                  </div>
-                  <div className="text-[11px] font-bold text-slate-400 mb-1">{k.label}</div>
-                  <div className="text-[9px] font-bold text-slate-500">{k.sub}</div>
-                  <div className={`mt-3 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80`}>
-                    {k.formula}
+                  
+                  <div className="flex-1 flex flex-col justify-end mt-2">
+                    <div className="text-[11px] font-bold text-slate-400 mb-1 leading-tight">{k.label}</div>
+                    <div className="text-[9px] font-bold text-slate-500 leading-tight">{k.sub}</div>
+                    <div className={`mt-3 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80 shrink-0`}>
+                      {k.formula}
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
 
+          {isPC && <div onMouseDown={(e) => hDrag1(0, e)} className={`w-1.5 md:w-2 cursor-ew-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${hDragIng1 ? 'bg-blue-500/50' : ''}`} />}
+
           {/* Incident Lifecycle Flow */}
-          <div className="xl:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg">
+          <div className="lg:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg overflow-hidden lg:h-full" style={isPC ? { width: `${wR1[1]}%`, flex: 'none' } : {}}>
             <div className="flex items-center gap-2 mb-4 shrink-0">
               <div className="p-1.5 bg-indigo-500/10 rounded-lg"><Activity className="w-4 h-4 text-indigo-400" /></div>
               <span className="text-sm font-black text-slate-200">인시던트 생애주기</span>
             </div>
-            <div className="flex-1 flex items-center justify-between gap-1">
+            <div className="flex-1 flex items-center justify-between gap-1 mt-1 md:mt-0">
               {FLOW.map((f, i) => {
                 const Icon = f.icon;
                 return (
                   <React.Fragment key={i}>
-                    <div className="flex flex-col items-center gap-2 flex-1">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${f.bg} border ${f.border} ${f.glow ? 'shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse' : ''}`}>
-                        <Icon className={`w-5 h-5 ${f.color}`} />
+                    <div className="flex flex-col items-center gap-1 md:gap-2 flex-1 p-1 md:p-0 rounded-xl md:rounded-none bg-transparent border-none">
+                      <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center ${f.bg} border ${f.border} ${f.glow ? 'shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse' : ''}`}>
+                        <Icon className={`w-4 h-4 md:w-5 md:h-5 ${f.color}`} />
                       </div>
-                      <span className={`text-base font-black font-mono ${f.color}`}>{f.value}</span>
-                      <span className="text-[9px] font-bold text-slate-400 text-center leading-tight break-keep">{f.label}</span>
+                      <div className="text-center">
+                         <span className={`text-[11px] md:text-base font-black font-mono leading-tight block md:inline ${f.color}`}>{f.value}</span>
+                         <span className="text-[8px] md:text-[9px] font-bold text-slate-400 text-center leading-tight break-keep block md:inline md:ml-1 whitespace-nowrap md:whitespace-normal">{f.label}</span>
+                      </div>
                     </div>
                     {i < FLOW.length - 1 && (
-                      <div className="w-4 h-[1px] bg-white/10 shrink-0" />
+                      <div className="w-2 md:w-4 h-[1px] bg-white/10 shrink-0" />
                     )}
                   </React.Fragment>
                 );
               })}
             </div>
           </div>
-          
         </div>
+        )}
+
+        {isPC && <div onMouseDown={(e) => vDrag(0, e)} className={`h-1.5 md:h-2 cursor-ns-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${vDragIng ? 'bg-blue-500/50' : ''}`} />}
 
         {/* ROW 2: 4 Columns Data Grid */}
-        <div className="flex-1 min-h-[400px] grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pb-4">
+        {(isPC || tab !== 0) && (
+          <div 
+            className="flex-1 min-h-[250px] lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-0 pb-4 lg:pb-0"
+            style={isPC ? { height: `${vH[1]}%` } : {}}
+          >
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
-          <div className={`${tab === 1 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+          {(isPC || tab === 1) && (
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-2 shrink-0 relative z-10">
+            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-purple-400" />
                 <h3 className="text-sm font-black text-slate-200">일자별 MTTA 추이</h3>
@@ -302,66 +341,74 @@ export default function OverallStatusPage() {
                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-400"></div>주간 평균(m)</div>
                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-400"></div>야간 평균(m)</div>
             </div>
-            <div className="flex-1 min-h-[200px] xl:min-h-0 relative z-10">
+            <div className="flex-1 min-h-[200px] lg:min-h-0 relative z-10">
               {stats.incidents.mttaList && stats.incidents.mttaList.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                  <AreaChart data={[...stats.incidents.mttaList].reverse()} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorDay" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4}/><stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/></linearGradient>
-                      <linearGradient id="colorNight" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/><stop offset="95%" stopColor="#818cf8" stopOpacity={0}/></linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.substring(5)} />
-                    <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
-                    <Area type="monotone" dataKey="dayMtta" name="주간(분)" stroke="#fbbf24" strokeWidth={2} fill="url(#colorDay)" />
-                    <Area type="monotone" dataKey="nightMtta" name="야간(분)" stroke="#818cf8" strokeWidth={2} fill="url(#colorNight)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <div className="absolute inset-0">
+                  <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
+                    <AreaChart data={[...stats.incidents.mttaList].reverse()} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorDay" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4}/><stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/></linearGradient>
+                        <linearGradient id="colorNight" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/><stop offset="95%" stopColor="#818cf8" stopOpacity={0}/></linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.substring(5)} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
+                      <Area type="monotone" dataKey="dayMtta" name="주간(분)" stroke="#fbbf24" strokeWidth={2} fill="url(#colorDay)" />
+                      <Area type="monotone" dataKey="nightMtta" name="야간(분)" stroke="#818cf8" strokeWidth={2} fill="url(#colorNight)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">데이터 없음</div>
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500 absolute inset-0">데이터 없음</div>
               )}
             </div>
           </div>
+        )}
+
+          {isPC && <div onMouseDown={(e) => hDrag2(0, e)} className={`w-1.5 md:w-2 cursor-ew-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${hDragIng2 ? 'bg-blue-500/50' : ''}`} />}
 
           {/* Column 2: Categories (Tab 2 on Mobile) */}
-          <div className={`${tab === 2 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+          {(isPC || tab === 2) && (
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10">
+            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-emerald-400" />
                 <h3 className="text-sm font-black text-slate-200">인텔리전스 카테고리</h3>
               </div>
             </div>
-            <div className="flex-1 min-h-[200px] xl:min-h-0 relative flex items-center justify-center z-10">
+            <div className="flex-1 min-h-[200px] lg:min-h-0 relative flex items-center justify-center z-10">
               {stats.categories && stats.categories.length > 0 ? (
                 <>
-                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                    <PieChart>
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} 
-                        itemStyle={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }} 
-                        formatter={(val) => [`${val}건`, '문서 수']} 
-                      />
-                      <Pie
-                        data={stats.categories}
-                        dataKey="c"
-                        nameKey="category"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius="65%"
-                        outerRadius="85%"
-                        paddingAngle={4}
-                        cornerRadius={4}
-                        stroke="none"
-                      >
-                        {stats.categories.map((entry, index) => {
-                           const hue = (index * 47) % 360;
-                           return <Cell key={`cell-${index}`} fill={`hsl(${hue}, 70%, 55%)`} />;
-                        })}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="absolute inset-0">
+                    <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
+                      <PieChart>
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} 
+                          itemStyle={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }} 
+                          formatter={(val) => [`${val}건`, '문서 수']} 
+                        />
+                        <Pie
+                          data={stats.categories}
+                          dataKey="c"
+                          nameKey="category"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius="65%"
+                          outerRadius="85%"
+                          paddingAngle={4}
+                          cornerRadius={4}
+                          stroke="none"
+                        >
+                          {stats.categories.map((entry, index) => {
+                             const hue = (index * 47) % 360;
+                             return <Cell key={`cell-${index}`} fill={`hsl(${hue}, 70%, 55%)`} />;
+                          })}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <Database className="w-5 h-5 text-emerald-400 opacity-60 mb-1" />
                     <span className="text-2xl font-black text-white font-mono">{stats.knowledge.total}</span>
@@ -369,15 +416,19 @@ export default function OverallStatusPage() {
                   </div>
                 </>
               ) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">데이터 없음</div>
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500 absolute inset-0">데이터 없음</div>
               )}
             </div>
           </div>
+        )}
+
+          {isPC && <div onMouseDown={(e) => hDrag2(1, e)} className={`w-1.5 md:w-2 cursor-ew-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${hDragIng2 ? 'bg-blue-500/50' : ''}`} />}
 
           {/* Column 3: Contributors (Tab 3 on Mobile) */}
-          <div className={`${tab === 3 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+          {(isPC || tab === 3) && (
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-2 shrink-0 relative z-10">
+            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
                 <Medal className="w-4 h-4 text-amber-400" />
                 <h3 className="text-sm font-black text-slate-200">전문가 기여도</h3>
@@ -385,7 +436,7 @@ export default function OverallStatusPage() {
               <span className="text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">Honor Board</span>
             </div>
             
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-2.5 relative z-10 mt-2">
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-2.5 relative z-10">
               {stats.topContributors.length > 0 ? stats.topContributors.map((user, i) => {
                 const isTop = i === 0;
                 const maxScore = stats.topContributors[0].synergy_score || 1;
@@ -420,11 +471,15 @@ export default function OverallStatusPage() {
               )}
             </div>
           </div>
+        )}
+
+          {isPC && <div onMouseDown={(e) => hDrag2(2, e)} className={`w-1.5 md:w-2 cursor-ew-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${hDragIng2 ? 'bg-blue-500/50' : ''}`} />}
 
           {/* Column 4: Feed (Tab 4 on Mobile) */}
-          <div className={`${tab === 4 ? 'flex' : 'hidden'} xl:flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex-col min-h-[300px] xl:min-h-0 shadow-lg relative overflow-hidden`}>
+          {(isPC || tab === 4) && (
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10">
+            <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
                 <FileSearch className="w-4 h-4 text-blue-400" />
                 <h3 className="text-sm font-black text-slate-200">인텔리전스 피드</h3>
@@ -457,8 +512,9 @@ export default function OverallStatusPage() {
               )}
             </div>
           </div>
-
-        </div>
+        )}
+          </div>
+        )}
       </div>
     </div>
   );

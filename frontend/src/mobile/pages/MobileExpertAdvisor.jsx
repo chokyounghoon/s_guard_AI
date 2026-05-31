@@ -160,7 +160,7 @@ export default function MobileExpertAdvisor({ user }) {
         setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: true }))));
       }
     } else {
-      if (filteredMsgs.length >= 2) {
+      if (filteredMsgs.length >= 1) {
         setShowAgentPanel(true);
         setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: false }))));
       }

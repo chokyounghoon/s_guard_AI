@@ -137,7 +137,13 @@ export default function SMSNotification() {
       });
 
       es.onerror = (error) => {
-        console.error(`❌ [SSE] 연결 오류 (readyState: ${es.readyState})`, error);
+        if (es.readyState === EventSource.CONNECTING) {
+          // 브라우저가 기본적으로 재연결을 시도 중임
+          console.warn(`⏳ [SSE] 연결 재시도 중... (자동 복구 대기)`);
+          return;
+        }
+
+        console.warn(`❌ [SSE] 연결 종료 (readyState: ${es.readyState})`);
         setSseStatus('error');
         es.close();
         esRef.current = null;

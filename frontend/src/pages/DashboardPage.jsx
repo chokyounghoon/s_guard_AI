@@ -743,8 +743,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
       newSse.addEventListener('connected', () => { sseRetry = 0; });
 
-      newSse.onerror = () => {
-        console.warn('[Dashboard SSE] Connection failed, retrying...');
+      newSse.onerror = (e) => {
+        if (newSse.readyState === EventSource.CONNECTING) return; // 브라우저 자동 복구 중
         newSse.close();
         sseInstance = null;
         const delay = Math.min(1000 * Math.pow(2, sseRetry), 30000);
@@ -764,7 +764,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       clearTimeout(sseRetryTimer);
       if (sseInstance) { sseInstance.close(); sseInstance = null; }
     };
-  }, [userProfile, assignmentDateRange, hideCompletedSms, isAiAnalyzing]);
+  }, [userProfile, assignmentDateRange, hideCompletedSms]);
 
   // SMS 선택 시 에이전트 토론 자동 시작
    useEffect(() => {
@@ -1295,8 +1295,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: true }))));
       }
     } else {
-      // 스트리밍 중: 2개 이상 파싱됐을 때만 중간 업데이트 (깜빡임 방지)
-      if (filteredMsgs.length >= 2) {
+      // 스트리밍 중: 1개 이상 파싱됐을 때 바로 업데이트하여, 단일 결과(유사 장애 검색 보고서)일 때도 실시간 표시
+      if (filteredMsgs.length >= 1) {
         setShowAgentPanel(true);
         setAgentMessages(deduplicateMessages(filteredMsgs.map(m => ({ ...m, isCompleted: false }))));
       }
@@ -2010,6 +2010,37 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   <div className="p-3 space-y-2">
                     {visibleSms.map((msg) => {
                       const isSelected = selectedSms?.inc_id === msg.inc_id;
+
+                      let calculatedSeverity = msg.severity || 'NORMAL';
+                      let critT = 10;
+                      let majT = 3;
+                      try {
+                        const s = localStorage.getItem('sguard_alert_thresholds_v3');
+                        if (s) {
+                          const p = JSON.parse(s);
+                          critT = p.critical?.errorCount || 10;
+                          majT = p.major?.errorCount || 3;
+                        }
+                      } catch {}
+
+                      let v = Number(msg.received_count) || 1;
+                      if (msg.message) {
+                        const m = msg.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
+                        if (m) {
+                          const parsedV = parseInt(m[1], 10);
+                          if (parsedV > v) v = parsedV;
+                        }
+                      }
+
+                      if (v >= critT) calculatedSeverity = 'CRITICAL';
+                      else if (v >= majT) calculatedSeverity = 'MAJOR';
+                      else calculatedSeverity = 'NORMAL';
+
+                      const isCritical = calculatedSeverity === 'CRITICAL';
+                      const isMaj = calculatedSeverity === 'MAJOR';
+                      const accentColor = isCritical ? '#ef4444' : isMaj ? '#f97316' : '#00e5ff';
+                      const accentBgRGB = isCritical ? '239,68,68' : isMaj ? '249,115,22' : '0,229,255';
+
                       return (
                         <div
                           key={`sms-${msg.inc_id}`}
@@ -2036,22 +2067,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                             }
                           }}
                           style={{
-                            background: isSelected ? 'rgba(0,229,255,0.08)' : 'rgba(18,21,26,0.85)',
+                            background: isSelected ? `rgba(${accentBgRGB},0.15)` : isCritical ? `rgba(${accentBgRGB},0.08)` : isMaj ? `rgba(${accentBgRGB},0.05)` : 'rgba(18,21,26,0.85)',
                             borderTop: '1px solid rgba(255,255,255,0.05)',
                             borderRight: '1px solid rgba(255,255,255,0.05)',
                             borderBottom: '1px solid rgba(255,255,255,0.05)',
-                            borderLeft: isSelected ? '4px solid #00e5ff' : '4px solid #00e5ff',
-                            boxShadow: isSelected ? '0 0 15px rgba(0,229,255,0.25)' : '0 4px 15px rgba(0,0,0,0.4)'
+                            borderLeft: `4px solid ${accentColor}`,
+                            boxShadow: isSelected ? `0 0 20px rgba(${accentBgRGB},0.4)` : isCritical ? `0 0 20px rgba(${accentBgRGB},0.5)` : isMaj ? `0 0 15px rgba(${accentBgRGB},0.3)` : '0 4px 15px rgba(0,0,0,0.4)'
                           }}
-                          className="rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98]"
+                          className={`rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] ${isCritical ? 'sms-pulse-critical' : isMaj ? 'sms-pulse-major' : ''}`}
                         >
                           {/* 상단: 제목 + 배지 */}
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#00e5ff]/20' : 'bg-[#00e5ff]/10'}`}>
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0`} style={{ background: isSelected ? `rgba(${accentBgRGB},0.25)` : `rgba(${accentBgRGB},0.1)` }}>
                                 {msg.keyword_detected
-                                  ? <AlertCircle className="w-4 h-4 text-[#00e5ff]" />
-                                  : <Info className="w-4 h-4 text-[#00e5ff]" />
+                                  ? <AlertCircle className="w-4 h-4" style={{ color: accentColor }} />
+                                  : <Info className="w-4 h-4" style={{ color: accentColor }} />
                                 }
                               </div>
                               <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-[#00e5ff] text-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-white'}`}>
@@ -2115,10 +2146,50 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 matchBorder = 'rgba(251,146,60,0.3)';
                               }
                               return (
-                                <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider font-mono w-fit"
-                                  style={{ color: matchColor, background: matchBg, borderColor: matchBorder }}>
-                                  <Zap className="w-3 h-3 shrink-0" />
-                                  Match {(score * 100).toFixed(1)}%
+                                <div className="flex gap-2 items-center mt-1">
+                                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider font-mono w-fit"
+                                    style={{ color: matchColor, background: matchBg, borderColor: matchBorder }}>
+                                    <Zap className="w-3 h-3 shrink-0" />
+                                    Match {(score * 100).toFixed(1)}%
+                                  </div>
+                                  {(() => {
+                                    let calculatedSeverity = msg.severity || 'NORMAL';
+                                    let critT = 10;
+                                    let majT = 3;
+                                    try {
+                                      const s = localStorage.getItem('sguard_alert_thresholds_v3');
+                                      if (s) {
+                                        const p = JSON.parse(s);
+                                        critT = p.critical?.errorCount || 10;
+                                        majT = p.major?.errorCount || 3;
+                                      }
+                                    } catch {}
+
+                                    let v = Number(msg.received_count) || 1;
+                                    if (msg.message) {
+                                      const m = msg.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
+                                      if (m) {
+                                        const parsedV = parseInt(m[1], 10);
+                                        if (parsedV > v) v = parsedV;
+                                      }
+                                    }
+
+                                    if (v >= critT) calculatedSeverity = 'CRITICAL';
+                                    else if (v >= majT) calculatedSeverity = 'MAJOR';
+                                    else calculatedSeverity = 'NORMAL';
+
+                                    return (
+                                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider font-mono w-fit ${calculatedSeverity === 'CRITICAL' ? 'animate-pulse' : ''}`}
+                                        style={{ 
+                                          color: calculatedSeverity === 'CRITICAL' ? '#ef4444' : calculatedSeverity === 'MAJOR' ? '#f97316' : '#10b981',
+                                          background: calculatedSeverity === 'CRITICAL' ? 'rgba(239,68,68,0.1)' : calculatedSeverity === 'MAJOR' ? 'rgba(249,115,22,0.1)' : 'rgba(16,185,129,0.1)',
+                                          borderColor: calculatedSeverity === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : calculatedSeverity === 'MAJOR' ? 'rgba(249,115,22,0.2)' : 'rgba(16,185,129,0.2)'
+                                        }}>
+                                        {calculatedSeverity === 'CRITICAL' ? <AlertTriangle className="w-3 h-3 shrink-0" /> : calculatedSeverity === 'MAJOR' ? <AlertCircle className="w-3 h-3 shrink-0" /> : <CheckCircle2 className="w-3 h-3 shrink-0" />}
+                                        {calculatedSeverity}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               );
                             })()}
