@@ -7165,7 +7165,6 @@ app.post('/ai/warroom/open', async (c) => {
     .bind(now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
 
   // Release Lock if exists (KV cleanup)
-  const kv = c.env.SMS_STORAGE;
   if (kv) {
     try {
       await kv.delete(`lock:warroom:${normId}`);
