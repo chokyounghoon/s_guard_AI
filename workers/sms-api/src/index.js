@@ -7135,34 +7135,38 @@ app.post('/ai/warroom/open', async (c) => {
     console.error("Bulk join error:", e);
   }
 
-  if (creator_id) {
+  const actual_creator = creator_id || c.get('user')?.employee_id;
+
+  if (actual_creator) {
     await db.prepare("INSERT INTO user_warrooms (user_id, inc_id, joined_at) VALUES (?, ?, ?) ON CONFLICT(user_id, inc_id) DO NOTHING")
-      .bind(creator_id, normId, now).run()
+      .bind(actual_creator, normId, now).run()
   }
 
   // 🚀 NEW: Ensure incidents table has a record and set status to 'INC_002' (처리중)
   await db.prepare(`
     INSERT OR IGNORE INTO incidents (inc_id, title, status, severity, incident_type, reg_id, reg_dt, mod_id, mod_dt, created_at, updated_at)
     VALUES (?, ?, 'INC_002', ?, 'AI', ?, ?, ?, ?, ?, ?)
-  `).bind(normId, cleanTitle, severity || 'NORMAL', creator_id || c.get('user')?.employee_id || 'SYSTEM', now, creator_id || c.get('user')?.employee_id || 'SYSTEM', now, now, now).run()
+  `).bind(normId, cleanTitle, severity || 'NORMAL', actual_creator || 'SYSTEM', now, actual_creator || 'SYSTEM', now, now, now).run()
 
   await db.prepare("UPDATE incidents SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
+    .bind(now, now, actual_creator || 'SYSTEM', normId).run()
 
   // 🚀 NEW: Ensure creator is in incident_assignments with status 'INC_002'
-  await db.prepare(`
-    INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
-    VALUES (?, ?, 'INC_002', ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, inc_id) 
-    DO UPDATE SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ?
-  `).bind(
-    creator_id, normId, now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM', now, creator_id || c.get('user')?.employee_id || 'SYSTEM', now,
-    now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM'
-  ).run();
+  if (actual_creator) {
+    await db.prepare(`
+      INSERT INTO incident_assignments (user_id, inc_id, status, assigned_at, updated_at, reg_id, reg_dt, mod_id, mod_dt)
+      VALUES (?, ?, 'INC_002', ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, inc_id) 
+      DO UPDATE SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ?
+    `).bind(
+      actual_creator, normId, now, now, actual_creator, now, actual_creator, now,
+      now, now, actual_creator
+    ).run();
+  }
 
   // Update assignment status to 'INC_002' for all assignees of this incident
   await db.prepare("UPDATE incident_assignments SET status = 'INC_002', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?")
-    .bind(now, now, creator_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
+    .bind(now, now, actual_creator || 'SYSTEM', normId).run()
 
   // Release Lock if exists (KV cleanup)
   if (kv) {
