@@ -7,7 +7,7 @@ import {
   CheckCircle2, User, RefreshCw, AlertTriangle, ShieldAlert,
   Play, Volume2, ExternalLink, X, TrendingUp, BarChart3,
   Calendar, Network, Server, Zap, CheckCircle, Search, PieChart as PieChartIcon,
-  Bell, Users, Brain, AlertCircle, Info, MessageSquare
+  Bell, Users, Brain, AlertCircle, Info, MessageSquare, Rocket, Heart
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -233,9 +233,12 @@ export default function RealtimePipelinePage() {
   const user = getUserProfile();
 
   const [cards, setCards] = useState([]);
+  const [govStats, setGovStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('operator'); 
-  const [period, setPeriod] = useState('today');
+  const [period, setPeriod] = useState('7days');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [orgLevel, setOrgLevel] = useState('team');
   const [selectedBumun, setSelectedBumun] = useState('개발운영부문');
   const [selectedHonbu, setSelectedHonbu] = useState('금융본부');
@@ -260,17 +263,16 @@ export default function RealtimePipelinePage() {
   const { heights: leftHeights, startVDrag: startLeftVDrag } = useResizableVertical([35, 65], 'realtime-pipeline-left-heights');
   const { heights: rightHeights, startVDrag: startRightVDrag } = useResizableVertical([35, 65], 'realtime-pipeline-right-heights');
 
-  // --- Executive Mode Stable Mock Data ---
-  // ROI Trend (Generate 24h smooth trend)
-  const execRoiTrendData = useMemo(() => Array.from({length: 24}, (_, i) => {
-    const base = 50 + Math.sin(i * 0.5) * 30 + Math.random() * 10;
-    return {
-      time: `${i}시`,
-      hours: Math.round(base * 1.5),
-      rag: Math.round(base),
-      incidents: Math.round(base * 1.2)
-    };
-  }), []);
+  // Executive Mode layout hooks
+  const { heights: execRowHeights, startVDrag: startExecVDrag } = useResizableVertical([25, 45, 30], 'realtime-exec-rows');
+  const { widths: execChartWidths, startDrag: startExecChartDrag } = useResizable([60, 40], 'realtime-exec-charts');
+  const { heights: execLeftHeights, startVDrag: startExecLeftVDrag } = useResizableVertical([25, 75], 'realtime-exec-left-heights');
+
+  // Executive Org View States
+  const [execOrgLevel, setExecOrgLevel] = useState('부문'); // '부문', '본부', '팀', '파트'
+  const [execOrgBumun, setExecOrgBumun] = useState('all');
+  const [execOrgHonbu, setExecOrgHonbu] = useState('all');
+  const [execOrgTeam, setExecOrgTeam] = useState('all');
 
   // System Vulnerability
   const sysNames = ['JOBMIND Batch', 'Infra Core', 'WAS Web Server', 'DB Master', 'Network L4'];
@@ -291,6 +293,8 @@ export default function RealtimePipelinePage() {
       critical: isNight && Math.random() > 0.7 ? 1 : 0
     };
   }), []);
+
+
 
   const apiBase = 'https://sguardai.khcho0421.workers.dev';
 
@@ -561,6 +565,11 @@ export default function RealtimePipelinePage() {
       .then(tree => setOrgTree(Array.isArray(tree) ? tree : []))
       .catch(() => {});
 
+    // Fetch gov stats for C-Level Dashboard real data
+    fetch(`${apiBase}/ai/governance/stats`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setGovStats(data))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -625,6 +634,10 @@ export default function RealtimePipelinePage() {
       sse.addEventListener('connected', () => { sseRetry = 0; });
 
       sse.onerror = () => {
+        if (sse.readyState === EventSource.CONNECTING) {
+          // 브라우저가 자동 재연결 중이므로 무시
+          return;
+        }
         console.warn('[Pipeline SSE] Connection failed, retrying...');
         sse.close();
         eventSourceRef.current = null;
@@ -707,6 +720,18 @@ export default function RealtimePipelinePage() {
           sevenDaysAgo.setDate(now.getDate() - 7);
           if (regDate < sevenDaysAgo) return false;
         }
+        if (period === '1month') {
+          const oneMonthAgo = new Date();
+          oneMonthAgo.setDate(now.getDate() - 30);
+          if (regDate < oneMonthAgo) return false;
+        }
+        if (period === 'custom' && customStartDate && customEndDate) {
+          const start = new Date(customStartDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(customEndDate);
+          end.setHours(23, 59, 59, 999);
+          if (regDate < start || regDate > end) return false;
+        }
       }
       
       if (filterSeverity !== 'all' && c.severity !== filterSeverity) return false;
@@ -721,6 +746,230 @@ export default function RealtimePipelinePage() {
     const timeB = parseDate(b.reg_dt)?.getTime() || 0;
     return timeB - timeA;
   });
+
+  // Extract Org Lists from orgTree
+  const execOrgLists = useMemo(() => {
+    let bumuns = [];
+    let honbus = [];
+    let teams = [];
+
+    // Assuming orgTree root is 'Company' (Level 1)
+    orgTree.forEach(company => {
+      if (company.children) {
+        company.children.forEach(bumun => {
+          bumuns.push(bumun.name);
+          
+          if (execOrgBumun === 'all' || bumun.name === execOrgBumun) {
+            if (bumun.children) {
+              bumun.children.forEach(honbu => {
+                honbus.push(honbu.name);
+                
+                if (execOrgHonbu === 'all' || honbu.name === execOrgHonbu) {
+                  if (honbu.children) {
+                    honbu.children.forEach(team => {
+                      teams.push(team.name);
+                    });
+                  }
+                }
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // Deduplicate
+    return {
+      bumun: Array.from(new Set(bumuns)).filter(Boolean),
+      honbu: Array.from(new Set(honbus)).filter(Boolean),
+      team: Array.from(new Set(teams)).filter(Boolean)
+    };
+  }, [orgTree, execOrgBumun, execOrgHonbu]);
+
+  // Executive Org Grouped Data
+  const execOrgGroupedData = useMemo(() => {
+    let filtered = displayedCards;
+    if (execOrgBumun !== 'all') filtered = filtered.filter(c => c.bumun === execOrgBumun);
+    if (execOrgHonbu !== 'all') filtered = filtered.filter(c => c.honbu === execOrgHonbu);
+    if (execOrgTeam !== 'all') filtered = filtered.filter(c => c.team === execOrgTeam);
+    
+    const map = {};
+    let maxTotal = 0;
+    
+    // Pre-fill map based on orgTree so that organizations with 0 incidents still show up
+    let targetList = [];
+    if (execOrgLevel === '부문') targetList = execOrgLists.bumun;
+    else if (execOrgLevel === '본부') targetList = execOrgLists.honbu;
+    else if (execOrgLevel === '팀') targetList = execOrgLists.team;
+    
+    targetList.forEach(name => {
+      map[name] = { name, 수신: 0, 처리대기중: 0, 처리중: 0, 처리완료: 0, incidents: [] };
+    });
+    
+    filtered.forEach(c => {
+      let key = '미분류';
+      if (execOrgLevel === '부문') key = c.bumun || '미분류';
+      else if (execOrgLevel === '본부') key = c.honbu || '미분류';
+      else if (execOrgLevel === '팀') key = c.team || '미분류';
+      else if (execOrgLevel === '파트') key = c.part || '미분류';
+      
+      if (!map[key]) map[key] = { name: key, 수신: 0, 처리대기중: 0, 처리중: 0, 처리완료: 0, incidents: [] };
+      
+      map[key].수신++;
+      if (c.stage === 1) map[key].처리대기중++;
+      else if (c.stage === 2 || c.stage === 3) map[key].처리중++;
+      else if (c.stage === 4) map[key].처리완료++;
+      
+      map[key].incidents.push(c);
+      if (map[key].수신 > maxTotal) maxTotal = map[key].수신;
+    });
+    
+    // Convert to array. Filter out unclassified/fallback orgs. Sort by received desc.
+    const list = Object.values(map)
+      .filter(item => !item.name.includes('미분류') && !item.name.includes('미지정') && item.name !== '소속 없음')
+      .sort((a, b) => b.수신 - a.수신);
+    return { list, maxTotal };
+  }, [displayedCards, execOrgLevel, execOrgBumun, execOrgHonbu, execOrgTeam, execOrgLists]);
+
+  // Calculate dynamic ROI Trend Data based on displayedCards and period
+  const dynamicRoiTrendData = useMemo(() => {
+    const processBucket = (bucket, c) => {
+      const dReg = parseDate(c.reg_dt);
+      if (!dReg) return;
+      
+      bucket.received += 1;
+      if (c.stage >= 2) {
+        bucket.kb = (bucket.kb || 0) + 1;
+      }
+      
+      if (c.stage === 4) {
+        bucket.resolved += 1;
+      } else {
+        bucket.processing += 1;
+      }
+
+      if (c.warroom_dt) {
+        const dWar = parseDate(c.warroom_dt);
+        const diff = (dWar - dReg) / 60000;
+        if (diff >= 0 && diff < 100000) {
+          const h = dReg.getHours();
+          if (h >= 9 && h < 18) {
+            bucket._mttaDaySum += diff;
+            bucket._mttaDayCount += 1;
+          } else {
+            bucket._mttaNightSum += diff;
+            bucket._mttaNightCount += 1;
+          }
+        }
+      }
+
+      if (c.closed_dt) {
+        const dClosed = parseDate(c.closed_dt);
+        const diff = (dClosed - dReg) / 60000;
+        if (diff >= 0 && diff < 100000) {
+          bucket._mttrSum += diff;
+          bucket._mttrCount += 1;
+        }
+      }
+    };
+
+    const finalizeBuckets = (buckets) => {
+      return buckets.map(b => {
+        b.mttaDay = b._mttaDayCount > 0 ? Math.round(b._mttaDaySum / b._mttaDayCount) : null;
+        b.mttaNight = b._mttaNightCount > 0 ? Math.round(b._mttaNightSum / b._mttaNightCount) : null;
+        b.mtta = (b._mttaDayCount + b._mttaNightCount) > 0 ? Math.round((b._mttaDaySum + b._mttaNightSum) / (b._mttaDayCount + b._mttaNightCount)) : null;
+        b.mttr = b._mttrCount > 0 ? Math.round(b._mttrSum / b._mttrCount) : null;
+        b.kb = b.kb || 0;
+        b.fidelity = b.received > 0 ? Math.round((b.kb / b.received) * 100) : 0;
+        b.resolveRate = b.received > 0 ? Math.round((b.resolved / b.received) * 100) : 0;
+        return b;
+      });
+    };
+
+    if (period === 'today' || period === 'yesterday') {
+       // Group by hour
+       const hoursData = Array.from({length: 24}, (_, i) => ({
+          time: `${i}시`, received: 0, processing: 0, resolved: 0,
+          _mttaDaySum: 0, _mttaDayCount: 0, _mttaNightSum: 0, _mttaNightCount: 0, _mttrSum: 0, _mttrCount: 0
+       }));
+       displayedCards.forEach(c => {
+         const d = parseDate(c.reg_dt);
+         if (d) processBucket(hoursData[d.getHours()], c);
+       });
+       return finalizeBuckets(hoursData);
+    } else {
+       // Group by days
+       const daysData = {};
+       const today = new Date();
+       
+       if (period === 'custom' && customStartDate && customEndDate) {
+         const start = new Date(customStartDate);
+         const end = new Date(customEndDate);
+         start.setHours(0,0,0,0);
+         end.setHours(23,59,59,999);
+         if (start <= end) {
+           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+             const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+             daysData[dateStr] = { 
+               time: dateStr, received: 0, processing: 0, resolved: 0,
+               _mttaDaySum: 0, _mttaDayCount: 0, _mttaNightSum: 0, _mttaNightCount: 0, _mttrSum: 0, _mttrCount: 0
+             };
+           }
+         }
+       } else {
+         const days = period === '1month' ? 30 : 7;
+         for (let i = days - 1; i >= 0; i--) {
+           const d = new Date(today);
+           d.setDate(d.getDate() - i);
+           const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+           daysData[dateStr] = { 
+             time: dateStr, received: 0, processing: 0, resolved: 0,
+             _mttaDaySum: 0, _mttaDayCount: 0, _mttaNightSum: 0, _mttaNightCount: 0, _mttrSum: 0, _mttrCount: 0
+           };
+         }
+       }
+       
+       displayedCards.forEach(c => {
+         const d = parseDate(c.reg_dt);
+         if (d) {
+           const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+           if (daysData[dateStr]) {
+             processBucket(daysData[dateStr], c);
+           }
+         }
+       });
+       return finalizeBuckets(Object.values(daysData));
+    }
+  }, [displayedCards, period, customStartDate, customEndDate]);
+
+  // KPI Sparkline Data: ALWAYS 7 days retrospective using ALL raw cards (ignores current period filter)
+  const kpiSparklineData = useMemo(() => {
+    const days = 7;
+    const daysData = {};
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+      daysData[dateStr] = { time: dateStr, hours: 0, rag: 0, incidents: 0 };
+    }
+    
+    cards.forEach(c => {
+      const d = parseDate(c.reg_dt);
+      if (d) {
+        const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+        if (daysData[dateStr]) {
+          daysData[dateStr].incidents += 1;
+          if (c.stage >= 2) {
+            daysData[dateStr].rag += 1;
+            daysData[dateStr].hours += 2;
+          }
+        }
+      }
+    });
+    return Object.values(daysData);
+  }, [cards]);
+
   const searchedCards = displayedCards.filter(c => {
     const matchesSearch = c.inc_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.bizSystem.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1250,11 +1499,18 @@ export default function RealtimePipelinePage() {
     });
 
     const trafficData = Object.keys(trafficMap).sort().map(h => ({ hour: h, count: trafficMap[h] }));
-    const mttData = Object.keys(mttaMap).sort().map(h => ({
-      hour: h,
-      MTTA: mttaMap[h].count > 0 ? Math.round(mttaMap[h].sum / mttaMap[h].count) : 0,
-      MTTR: mttrMap[h].count > 0 ? Math.round(mttrMap[h].sum / mttrMap[h].count) : 0,
-    }));
+    const mttData = Object.keys(mttaMap).sort().map(h => {
+      const hInt = parseInt(h.split(':')[0], 10);
+      const isDay = hInt >= 9 && hInt < 18;
+      const mttaVal = mttaMap[h].count > 0 ? Math.round(mttaMap[h].sum / mttaMap[h].count) : null;
+      const mttrVal = mttrMap[h].count > 0 ? Math.round(mttrMap[h].sum / mttrMap[h].count) : null;
+      return {
+        hour: h,
+        MTTA_Day: isDay ? mttaVal : null,
+        MTTA_Night: !isDay ? mttaVal : null,
+        MTTR: mttrVal,
+      };
+    });
     const bizSystemPieData = Object.keys(bizSystemMap).map((n, i) => ({ name: n, value: bizSystemMap[n], color: ['#00e5ff', '#a855f7', '#f59e0b', '#3b82f6', '#10b981', '#ec4899'][i % 6] }));
     const keywordBarData = Object.keys(keywordMap).map(k => ({ keyword: k, count: keywordMap[k] })).sort((a,b) => b.count - a.count).slice(0, 5);
     const nodeRadarData = Object.keys(nodeMap).map(n => ({ node: n, count: nodeMap[n] }));
@@ -1439,8 +1695,9 @@ export default function RealtimePipelinePage() {
                         formatter={(value, name) => [`${value}분`, name]}
                       />
                       <Legend wrapperStyle={{ fontSize: 9, paddingTop: '5px' }} />
-                      <Line yAxisId="left" type="monotone" dataKey="MTTA" name="MTTA (워룸개설)" stroke="#a855f7" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                      <Line yAxisId="right" type="monotone" dataKey="MTTR" name="MTTR (처리완료)" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Line yAxisId="left" type="monotone" dataKey="MTTA_Day" name="MTTA (주간)" stroke="#facc15" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} connectNulls />
+                      <Line yAxisId="left" type="monotone" dataKey="MTTA_Night" name="MTTA (야간)" stroke="#c084fc" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} connectNulls />
+                      <Line yAxisId="right" type="monotone" dataKey="MTTR" name="MTTR (처리완료)" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} connectNulls />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -1983,26 +2240,110 @@ export default function RealtimePipelinePage() {
   };
 
   const renderExecutiveMode = () => {
-    // --- 1. Robust Realistic Mock Data Generation ---
-    // Instead of sparse live data, we aggregate live data and scale it up to represent a full 24H enterprise view.
-    const baseCount = Math.max(150, displayedCards.length * 5); 
-    const automationRate = 84.2; 
-    const mttrReduction = 23; 
+    // --- 1. Dynamic Metric Calculations ---
+    let currentTotal = displayedCards.length;
+    let currentKbCount = 0;
+    let currentResolved = 0;
     
-    // SLA Pie
-    const slaPieData = [
-      { name: 'SLA 준수', value: 98.5, color: '#10b981' },
-      { name: 'SLA 초과', value: 1.5, color: '#ef4444' }
-    ];
+    let totalMttr = 0; let countMttr = 0;
+    let totalMtta = 0; let countMtta = 0;
+    let dayMttaTotal = 0; let dayMttaCount = 0;
+    let nightMttaTotal = 0; let nightMttaCount = 0;
 
-    // ROI Trend (Generate 24h smooth trend)
-    const roiTrendData = execRoiTrendData;
+    displayedCards.forEach(c => {
+      if (c.stage >= 2) currentKbCount++;
+      if (c.stage === 4) currentResolved++;
+      
+      const dReg = parseDate(c.reg_dt);
+      if (dReg) {
+        if (c.closed_dt) {
+          const dClosed = parseDate(c.closed_dt);
+          const diff = (dClosed - dReg) / 60000;
+          if (diff >= 0 && diff < 100000) { totalMttr += diff; countMttr++; }
+        }
+        if (c.warroom_dt) {
+          const dWar = parseDate(c.warroom_dt);
+          const diff = (dWar - dReg) / 60000;
+          if (diff >= 0 && diff < 100000) {
+            totalMtta += diff; countMtta++;
+            const h = dReg.getHours();
+            if (h >= 9 && h < 18) { dayMttaTotal += diff; dayMttaCount++; }
+            else { nightMttaTotal += diff; nightMttaCount++; }
+          }
+        }
+      }
+    });
 
-    // System Vulnerability
-    const systemHealthList = execSystemHealthList;
+    const fidelityIndex = currentTotal > 0 ? Math.round((currentKbCount / currentTotal) * 100) : 0;
+    const avgMttr = countMttr > 0 ? Math.round(totalMttr / countMttr) : 0;
+    const avgMtta = countMtta > 0 ? Math.round(totalMtta / countMtta) : 0;
+    const avgDayMtta = dayMttaCount > 0 ? Math.round(dayMttaTotal / dayMttaCount) : 0;
+    const avgNightMtta = nightMttaCount > 0 ? Math.round(nightMttaTotal / nightMttaCount) : 0;
+    const resolveRate = currentTotal > 0 ? Math.round((currentResolved / currentTotal) * 100) : 0;
 
-    // 24H Zero-Blind Spot Map
-    const hourlyMap = execHourlyMap;
+    let growthTitle = 'KB 증가율';
+    let growthSub = '지식 성장률';
+    let growthBadge = 'CURRENT / PREVIOUS';
+    let prevKbCount = 0;
+
+    const now = new Date();
+    if (period === 'today') {
+      growthTitle = '오늘 KB 증가'; growthSub = '전일 대비 지식 성장률'; growthBadge = 'TODAY / YESTERDAY';
+      const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      const yesterdayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      cards.forEach(c => {
+        const d = parseDate(c.reg_dt);
+        if (d >= yesterdayStart && d < yesterdayEnd && c.stage >= 2) prevKbCount++;
+      });
+    } else if (period === 'yesterday') {
+      growthTitle = '어제 KB 증가'; growthSub = '그제 대비 지식 성장률'; growthBadge = 'YESTERDAY / PREV_DAY';
+      const prevStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+      const prevEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      cards.forEach(c => {
+        const d = parseDate(c.reg_dt);
+        if (d >= prevStart && d < prevEnd && c.stage >= 2) prevKbCount++;
+      });
+    } else if (period === '7days') {
+      growthTitle = '최근 7일 KB 증가'; growthSub = '이전 7일 대비 지식 성장률'; growthBadge = 'LAST_7D / PREV_7D';
+      const prevStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14);
+      const prevEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+      cards.forEach(c => {
+        const d = parseDate(c.reg_dt);
+        if (d >= prevStart && d < prevEnd && c.stage >= 2) prevKbCount++;
+      });
+    } else if (period === '1month') {
+      growthTitle = '이번달 KB 증가'; growthSub = '전월 대비 지식 성장률'; growthBadge = 'THIS_MONTH / LAST_MONTH';
+      const start = new Date(now); start.setDate(now.getDate() - 60);
+      const end = new Date(now); end.setDate(now.getDate() - 30);
+      cards.forEach(c => {
+        const d = parseDate(c.reg_dt);
+        if (d >= start && d < end && c.stage >= 2) prevKbCount++;
+      });
+    } else if (period === 'custom' && customStartDate && customEndDate) {
+      growthTitle = '선택기간 KB 증가'; growthSub = '직전 동일 기간 대비 지식 성장률'; growthBadge = 'CUSTOM / PREV_CUSTOM';
+      const start = new Date(customStartDate); start.setHours(0,0,0,0);
+      const end = new Date(customEndDate); end.setHours(23,59,59,999);
+      const diffMs = end - start;
+      const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+      const prevStart = new Date(prevEnd.getTime() - diffMs);
+      cards.forEach(c => {
+        const d = parseDate(c.reg_dt);
+        if (d >= prevStart && d < prevEnd && c.stage >= 2) prevKbCount++;
+      });
+    } else {
+      growthTitle = '전체 KB 누적'; growthSub = '누적 지식 자산 수'; growthBadge = 'ALL_TIME / ALL_TIME';
+      prevKbCount = currentKbCount; 
+    }
+
+    let growthRate = 0;
+    if (period !== 'all') {
+      if (prevKbCount > 0) {
+        growthRate = Math.round(((currentKbCount - prevKbCount) / prevKbCount) * 100);
+      } else if (currentKbCount > 0) {
+        growthRate = 100;
+      }
+    }
+    const growthPrefix = growthRate > 0 ? '+' : '';
 
     return (
       <div className="flex-1 p-4 bg-[#07090f] min-h-0 flex flex-col gap-4">
@@ -2017,161 +2358,386 @@ export default function RealtimePipelinePage() {
           </div>
         </div>
 
-        <div className="flex-1 grid grid-cols-4 grid-rows-3 gap-4 min-h-0">
-          
-          {/* ROW 1: 4 KPI CARDS */}
-          <div className="col-span-1 row-span-1 bg-gradient-to-br from-[#121622] to-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl relative overflow-hidden group hover:border-[#00e5ff]/30 transition-all flex flex-col justify-center">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-[#00e5ff]/10 blur-[30px] rounded-full group-hover:bg-[#00e5ff]/20 transition-all"></div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-[#00e5ff]/10 rounded-xl"><Layers className="w-4 h-4 text-[#00e5ff]" /></div>
-              <h3 className="text-[11px] font-bold text-slate-400">오늘의 통합 인시던트</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-black text-white tracking-tighter">{baseCount}</span>
-              <span className="text-sm font-bold text-[#00e5ff] mb-1">건</span>
-            </div>
-            <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-              <span className="text-emerald-400 flex items-center"><TrendingUp className="w-3 h-3 mr-0.5" /> +12%</span> 전일 대비 증가
-            </div>
-          </div>
-
-          <div className="col-span-1 row-span-1 bg-gradient-to-br from-[#121622] to-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-all flex flex-col justify-center">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-500/10 blur-[30px] rounded-full group-hover:bg-purple-500/20 transition-all"></div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-purple-500/10 rounded-xl"><Brain className="w-4 h-4 text-purple-400" /></div>
-              <h3 className="text-[11px] font-bold text-slate-400">AI 자동화 방어율</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-black text-white tracking-tighter">{automationRate}</span>
-              <span className="text-sm font-bold text-purple-400 mb-1">%</span>
-            </div>
-            <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-              <span className="text-emerald-400 flex items-center"><TrendingUp className="w-3 h-3 mr-0.5" /> +5.2%</span> AI 자산화 기여
-            </div>
-          </div>
-
-          <div className="col-span-1 row-span-1 bg-gradient-to-br from-[#121622] to-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl relative overflow-hidden group hover:border-emerald-500/30 transition-all flex flex-col justify-center">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/10 blur-[30px] rounded-full group-hover:bg-emerald-500/20 transition-all"></div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-emerald-500/10 rounded-xl"><Clock className="w-4 h-4 text-emerald-400" /></div>
-              <h3 className="text-[11px] font-bold text-slate-400">MTTR (평균 조치시간) 단축</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-black text-white tracking-tighter">{mttrReduction}</span>
-              <span className="text-sm font-bold text-emerald-400 mb-1">% ⬇</span>
-            </div>
-            <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-              <span className="text-emerald-400 flex items-center">평균 01:24:30 달성</span>
-            </div>
-          </div>
-
-          <div className="col-span-1 row-span-1 bg-gradient-to-br from-[#121622] to-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl relative overflow-hidden group flex flex-col min-h-0">
-             <div className="flex items-center gap-2 mb-2 shrink-0"><ShieldCheck className="w-4 h-4 text-emerald-400" /><h3 className="text-xs font-black text-white">SLA 골든타임 준수율</h3></div>
-             <div className="flex-1 min-h-0 relative flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                  <PieChart>
-                    <defs>
-                      <linearGradient id="slaGradient" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#34d399" />
-                        <stop offset="100%" stopColor="#059669" />
-                      </linearGradient>
-                    </defs>
-                    <Pie data={slaPieData} cx="50%" cy="50%" innerRadius="70%" outerRadius="90%" paddingAngle={2} dataKey="value" stroke="none" cornerRadius={4}>
-                      <Cell key="1" fill="url(#slaGradient)" />
-                      <Cell key="2" fill="#1e293b" />
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-black text-white tracking-tighter">{slaPieData[0].value}%</span>
-                  <span className="text-[8px] font-bold text-emerald-500">SAFE</span>
-                </div>
-             </div>
-          </div>
-
-          {/* ROW 2: TREND & RANKING */}
-          <div className="col-span-2 row-span-1 bg-[#0b0e17] rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col min-h-0 relative overflow-hidden">
-            <div className="absolute left-1/2 top-0 w-64 h-32 bg-purple-500/10 blur-[50px] rounded-full pointer-events-none -translate-x-1/2" />
-            <div className="flex items-center justify-between mb-3 shrink-0 relative z-10">
-              <div className="flex items-center gap-2"><Cpu className="w-4 h-4 text-purple-400" /><h2 className="text-sm font-black text-white">AI 자동화 ROI 및 장애 유입 트렌드</h2></div>
-              <div className="flex items-center gap-3 text-[9px] font-bold bg-white/5 px-3 py-1 rounded-full">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500" />총 유입</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-400" />인력 절감(h)</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-400" />AI 자산화</div>
-              </div>
-            </div>
-            <div className="flex-1 min-h-0 relative z-10">
-              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                <ComposedChart data={roiTrendData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
-                    <linearGradient id="colorRag" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/><stop offset="95%" stopColor="#a855f7" stopOpacity={0}/></linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
-                  <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
-                  <Area type="monotone" dataKey="hours" name="절감 시간 누적(h)" stroke="#10b981" strokeWidth={2} fill="url(#colorHours)" />
-                  <Area type="monotone" dataKey="rag" name="보고서 자산화(건)" stroke="#a855f7" strokeWidth={2} fill="url(#colorRag)" />
-                  <Line type="monotone" dataKey="incidents" name="총 장애 유입" stroke="#3b82f6" strokeWidth={2} dot={false} strokeDasharray="5 5" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="col-span-2 row-span-1 bg-zinc-900/40 backdrop-blur-sm rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col min-h-0 relative overflow-hidden">
-             <div className="flex items-center gap-2 mb-3 shrink-0"><Activity className="w-4 h-4 text-amber-400" /><h2 className="text-sm font-black text-white">시스템 취약성 및 AI 방어 성과 (Top 5)</h2></div>
-             <div className="flex-1 min-h-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                <BarChart layout="vertical" data={systemHealthList} margin={{ top: 0, right: 10, left: 30, bottom: 0 }} barGap={2}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" horizontal={false} />
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" tick={{ fill: '#cbd5e1', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} width={100} />
-                  <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
-                  <Bar dataKey="total" name="총 발생" fill="#1e293b" radius={[0, 4, 4, 0]} barSize={12} />
-                  <Bar dataKey="aiResolved" name="AI 조치 완료" fill="#00e5ff" radius={[0, 4, 4, 0]} barSize={12}>
-                    {systemHealthList.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#ef4444' : index === 1 ? '#f59e0b' : '#00e5ff'} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-             </div>
-          </div>
-
-          {/* ROW 3: 24H ZERO BLIND SPOT */}
-          <div className="col-span-4 row-span-1 bg-zinc-900/40 backdrop-blur-sm rounded-3xl border border-white/5 p-5 shadow-xl flex flex-col relative overflow-hidden min-h-0">
-            <div className="absolute right-0 bottom-0 w-[60%] h-full bg-gradient-to-l from-blue-900/10 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between mb-4 relative z-10 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/10 rounded-xl border border-blue-500/20"><ShieldCheck className="w-4 h-4 text-blue-400" /></div>
-                <div><h2 className="text-sm font-black text-white">야간 관제 24시간 사각지대 제로(0) 현황</h2><p className="text-[9px] text-slate-500 font-bold mt-0.5">22:00 ~ 06:00 Zero-Blind Spot Night Tracking</p></div>
-              </div>
-              <div className="px-4 py-1.5 rounded-xl border bg-blue-500/10 border-blue-500/30 flex items-center gap-2">
-                 <CheckCircle className="w-3.5 h-3.5 text-blue-400" />
-                 <span className="text-[10px] font-black text-blue-400">야간 사각지대 방어 100% 달성</span>
-              </div>
-            </div>
+        <div className="flex flex-1 min-h-0 gap-4 relative z-10 w-full shrink-0">
+          {/* Left Column (Cards + Trend) */}
+          <div style={{ width: `${execChartWidths[0]}%` }} className="flex flex-col min-w-0 h-full relative z-10 shrink-0">
             
-            <div className="flex-1 min-h-0 relative z-10">
-              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                <ComposedChart data={hourlyMap} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorNight" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
-                  <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
-                  <Area type="monotone" dataKey="count" name="발생 건수" stroke="#3b82f6" strokeWidth={2} fill="url(#colorNight)" />
-                  <Bar dataKey="critical" name="크리티컬 경보" barSize={4} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </ComposedChart>
-              </ResponsiveContainer>
+            {/* Top Indicator Cards (4-Grid Layout) */}
+            <div style={{ height: `${execLeftHeights[0]}%` }} className="grid grid-cols-4 gap-3 shrink-0 w-full relative z-10">
+
+              {/* Card 2 */}
+              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
+                  <Rocket className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 flex items-baseline gap-0.5 relative z-10">
+                  {avgMttr}<span className="text-sm font-bold text-blue-400">m</span>
+                </div>
+                
+                <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
+                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">평균 복구 소요시간</div>
+                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">MTTR (인지→지식화)</div>
+                </div>
+                
+                <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
+                  <div className="inline-flex px-2 py-1 bg-blue-500/5 border border-blue-500/20 rounded-md">
+                    <span className="text-[7px] xl:text-[8px] font-bold text-blue-500 tracking-widest leading-none truncate max-w-full">AVG(KB_REG - SMS_RECV)</span>
+                  </div>
+                </div>
+                {/* Full Line Chart */}
+                <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dynamicRoiTrendData}>
+                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} tickFormatter={(v) => `${v}m`} />
+                      <Line type="monotone" dataKey="mttr" name="MTTR" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Card 3 */}
+              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
+                  <Clock className="w-4 h-4 text-purple-500" />
+                </div>
+                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 flex items-baseline gap-0.5 relative z-10">
+                  {avgMtta}<span className="text-sm font-bold text-purple-400">m</span>
+                </div>
+                
+                <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
+                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">평균 인지 소요시간</div>
+                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">주간: {avgDayMtta}m / 야간: {avgNightMtta}m</div>
+                </div>
+                
+                <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
+                  <div className="inline-flex px-2 py-1 bg-purple-500/5 border border-purple-500/20 rounded-md">
+                    <span className="text-[7px] xl:text-[8px] font-bold text-purple-500 tracking-widest leading-none truncate max-w-full">AVG(WARROOM - SMS_RECV)</span>
+                  </div>
+                </div>
+                {/* Full Line Chart */}
+                <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dynamicRoiTrendData}>
+                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} tickFormatter={(v) => `${v}m`} />
+                      <Line type="monotone" dataKey="mtta" name="MTTA" stroke="#a855f7" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Card 4 */}
+              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-rose-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
+                  <Heart className="w-4 h-4 text-rose-500" />
+                </div>
+                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 relative z-10">
+                  {period === 'all' ? currentKbCount : `${growthPrefix}${growthRate}%`}
+                </div>
+                
+                <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
+                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">{growthTitle}</div>
+                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">{growthSub}</div>
+                </div>
+                
+                <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
+                  <div className="inline-flex px-2 py-1 bg-rose-500/5 border border-rose-500/20 rounded-md">
+                    <span className="text-[7px] xl:text-[8px] font-bold text-rose-500 tracking-widest leading-none truncate max-w-full">{growthBadge}</span>
+                  </div>
+                </div>
+                {/* Full Line Chart */}
+                <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dynamicRoiTrendData}>
+                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} />
+                      <Line type="monotone" dataKey="kb" name="KB 증가" stroke="#f43f5e" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Card 5 */}
+              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                </div>
+                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 relative z-10">{resolveRate}%</div>
+                
+                <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
+                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">전사 조치 지수</div>
+                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">High Intelligence</div>
+                </div>
+                
+                <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
+                  <div className="inline-flex px-2 py-1 bg-amber-500/5 border border-amber-500/20 rounded-md">
+                    <span className="text-[7px] xl:text-[8px] font-bold text-amber-500 tracking-widest leading-none truncate max-w-full">RESOLVED / TOTAL</span>
+                  </div>
+                </div>
+                {/* Full Line Chart */}
+                <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dynamicRoiTrendData}>
+                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} tickFormatter={(v) => `${v}%`} />
+                      <Line type="monotone" dataKey="resolveRate" name="조치 지수" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* V-Splitter (Top / Bottom Splitter) */}
+            <div onMouseDown={() => startExecLeftVDrag(0)} className="h-2 cursor-row-resize flex flex-row items-center justify-center shrink-0 my-1 z-[60] group hover:bg-white/5 rounded transition-colors relative">
+              <div className="w-16 h-[2px] bg-white/10 group-hover:bg-[#00e5ff] rounded-full transition-colors" />
+            </div>
+
+            {/* Chart 1: ROI Trend */}
+            <div style={{ height: `calc(${execLeftHeights[1]}% - 16px)` }} className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl flex flex-col relative overflow-hidden shrink-0">
+              <div className="absolute left-1/2 top-0 w-64 h-32 bg-purple-500/10 blur-[50px] rounded-full pointer-events-none -translate-x-1/2" />
+              <div className="flex items-center justify-between mb-3 shrink-0 relative z-10">
+                <div className="flex items-center gap-2"><Cpu className="w-4 h-4 text-purple-400" /><h2 className="text-sm font-black text-white">AI 자동화 ROI 및 장애 유입 트렌드</h2></div>
+                <div className="flex flex-wrap items-center justify-end gap-3 text-[9px] font-bold bg-white/5 px-3 py-1.5 rounded-full">
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-blue-500" />접수건수</div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-orange-400" />처리중</div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-emerald-400" />처리완료</div>
+                  <div className="w-px h-3 bg-white/20 mx-1"></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-[2px] bg-yellow-400" />MTTA(주간)</div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-[2px] bg-purple-400" />MTTA(야간)</div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-[2px] bg-cyan-400" />MTTR</div>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 relative z-10">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                  <ComposedChart data={dynamicRoiTrendData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }} barGap={2}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
+                    <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}m`} />
+                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
+                    <Bar yAxisId="left" dataKey="received" name="접수건수" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={8} />
+                    <Bar yAxisId="left" dataKey="processing" name="처리중" fill="#fb923c" radius={[2, 2, 0, 0]} barSize={8} />
+                    <Bar yAxisId="left" dataKey="resolved" name="처리완료" fill="#10b981" radius={[2, 2, 0, 0]} barSize={8} />
+                    <Line yAxisId="right" type="monotone" dataKey="mttaDay" name="MTTA(주간)" stroke="#facc15" strokeWidth={2} dot={{r: 2, fill: '#facc15', strokeWidth: 0}} connectNulls />
+                    <Line yAxisId="right" type="monotone" dataKey="mttaNight" name="MTTA(야간)" stroke="#c084fc" strokeWidth={2} dot={{r: 2, fill: '#c084fc', strokeWidth: 0}} connectNulls />
+                    <Line yAxisId="right" type="monotone" dataKey="mttr" name="MTTR" stroke="#22d3ee" strokeWidth={2} dot={{r: 2, fill: '#22d3ee', strokeWidth: 0}} connectNulls />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
+          {/* H-Splitter (Left / Right Column Splitter) */}
+          <div onMouseDown={() => startExecChartDrag(0)} className="w-1.5 cursor-col-resize flex flex-col items-center justify-center shrink-0 mx-[-2px] z-[60] group hover:bg-white/5 rounded transition-colors relative">
+            <div className="h-16 w-[2px] bg-white/10 group-hover:bg-[#00e5ff] rounded-full transition-colors" />
+          </div>
+
+          {/* Right Column (Organization Status matching Operator Mode) */}
+          <div style={{ width: `${execChartWidths[1]}%` }} className="bg-[#0b0e17] backdrop-blur-sm rounded-3xl p-4 xl:p-5 border border-white/5 flex flex-col h-full shadow-lg overflow-hidden shrink-0 z-10">
+            <div className="flex items-center justify-between mb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <Network className="w-4 h-4 text-blue-400" />
+                <h2 className="text-sm font-black text-white">조직 기반 실시간 처리 현황</h2>
+              </div>
+              
+              <div className="flex items-center gap-1.5 bg-[#121622] p-1 rounded-xl border border-white/5">
+                {['부문', '본부', '팀', '파트'].map(level => (
+                  <button 
+                    key={level}
+                    onClick={() => {
+                      setExecOrgLevel(level);
+                      if (level === '부문') { setExecOrgBumun('all'); setExecOrgHonbu('all'); setExecOrgTeam('all'); }
+                      if (level === '본부') { setExecOrgHonbu('all'); setExecOrgTeam('all'); }
+                      if (level === '팀') { setExecOrgTeam('all'); }
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${execOrgLevel === level ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cascading filter selectors */}
+            <div className="flex gap-2 mb-3 shrink-0">
+              <select
+                value={execOrgBumun}
+                onChange={(e) => { setExecOrgBumun(e.target.value); setExecOrgHonbu('all'); setExecOrgTeam('all'); }}
+                className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-blue-500/40"
+              >
+                <option value="all">전체 부문</option>
+                {execOrgLists.bumun.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+
+              {(execOrgLevel === '본부' || execOrgLevel === '팀' || execOrgLevel === '파트') && (
+                <select
+                  value={execOrgHonbu}
+                  disabled={execOrgBumun === 'all'}
+                  onChange={(e) => { setExecOrgHonbu(e.target.value); setExecOrgTeam('all'); }}
+                  className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-purple-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {execOrgBumun === 'all' ? (
+                    <option value="all">부문 선택 필수</option>
+                  ) : (
+                    <>
+                      <option value="all">전체 본부</option>
+                      {execOrgLists.honbu.map(h => <option key={h} value={h}>{h}</option>)}
+                    </>
+                  )}
+                </select>
+              )}
+
+              {(execOrgLevel === '팀' || execOrgLevel === '파트') && (
+                <select
+                  value={execOrgTeam}
+                  disabled={execOrgBumun === 'all' || execOrgHonbu === 'all'}
+                  onChange={(e) => setExecOrgTeam(e.target.value)}
+                  className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-cyan-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {execOrgBumun === 'all' || execOrgHonbu === 'all' ? (
+                    <option value="all">본부 선택 필수</option>
+                  ) : (
+                    <>
+                      <option value="all">전체 팀</option>
+                      {execOrgLists.team.map(t => <option key={t} value={t}>{t}</option>)}
+                    </>
+                  )}
+                </select>
+              )}
+            </div>
+
+            <div className="bg-[#121622] border border-white/5 rounded-xl p-3 mb-3 flex items-center justify-between shrink-0 shadow-inner">
+              <span className="text-xs font-black text-slate-300">
+                {execOrgLevel === '부문' ? '부문' : execOrgLevel === '본부' ? `${execOrgBumun !== 'all' ? execOrgBumun + ' > ' : ''}본부` : execOrgLevel === '팀' ? `${execOrgBumun !== 'all' ? execOrgBumun + ' > ' : ''}${execOrgHonbu !== 'all' ? execOrgHonbu + ' > ' : ''}팀` : '파트'} 기준 현황
+              </span>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"/><span className="text-[9px] font-bold text-slate-400">수신: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.수신, 0)}건</strong></span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"/><span className="text-[9px] font-bold text-slate-400">대기중: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.처리대기중, 0)}건</strong></span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"/><span className="text-[9px] font-bold text-slate-400">처리중: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.처리중, 0)}건</strong></span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"/><span className="text-[9px] font-bold text-slate-400">완료: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.처리완료, 0)}건</strong></span></div>
+              </div>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {execOrgGroupedData.list.map((org, idx) => {
+                    const chartData = [
+                      { name: '수신', count: org.수신, fill: '#3b82f6' },
+                      { name: '대기중', count: org.처리대기중, fill: '#f59e0b' },
+                      { name: '처리중', count: org.처리중, fill: '#ef4444' },
+                      { name: '완료', count: org.처리완료, fill: '#10b981' }
+                    ];
+                    const activeCritical = org.incidents.filter(c => c.stage === 3 && (c.severity === 'CRITICAL' || c.severity === 'MAJOR')).length;
+
+                    return (
+                      <div key={idx} className="bg-[#121622] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors flex flex-col">
+                        <div className="flex items-center justify-between mb-3 shrink-0">
+                          <div className="flex items-center gap-2"><User className="w-3.5 h-3.5 text-slate-400" /><h3 className="text-xs font-black text-white truncate max-w-[120px]">{org.name}</h3></div>
+                          {activeCritical > 0 && <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-[9px] font-bold text-red-400 flex items-center gap-1 animate-pulse border border-red-500/30"><AlertTriangle className="w-2.5 h-2.5" /> 긴급 {activeCritical}건</span>}
+                        </div>
+                        <div className="h-[90px] w-full shrink-0 min-w-0 min-h-0">
+                          <ReactECharts
+                            option={{
+                              grid: { top: 20, right: 5, bottom: 20, left: 5, containLabel: false },
+                              tooltip: {
+                                trigger: 'axis',
+                                axisPointer: { type: 'shadow' },
+                                backgroundColor: '#0f172a',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                textStyle: { color: '#fff', fontSize: 10, fontWeight: 'bold' }
+                              },
+                              xAxis: {
+                                type: 'category',
+                                data: chartData.map(d => d.name),
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                axisLabel: { color: '#64748b', fontSize: 8, fontWeight: 'bold', interval: 0 }
+                              },
+                              yAxis: {
+                                type: 'value',
+                                axisLabel: { show: false },
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                splitLine: { 
+                                  show: true,
+                                  lineStyle: { type: 'dashed', color: 'rgba(255,255,255,0.05)' } 
+                                }
+                              },
+                              series: [
+                                {
+                                  type: 'bar',
+                                  barWidth: '60%',
+                                  data: chartData.map(entry => {
+                                    let topColor = '#00E5FF';
+                                    let bottomColor = 'rgba(0,229,255,0.1)';
+                                    let shadowColor = 'rgba(0,229,255,0.6)';
+                          
+                                    if (entry.name === '대기중') {
+                                      topColor = '#FF9100';
+                                      bottomColor = 'rgba(255,145,0,0.1)';
+                                      shadowColor = 'rgba(255,145,0,0.6)';
+                                    } else if (entry.name === '처리중') {
+                                      topColor = '#FF1744';
+                                      bottomColor = 'rgba(255,23,68,0.1)';
+                                      shadowColor = 'rgba(255,23,68,0.6)';
+                                    } else if (entry.name === '완료') {
+                                      topColor = '#00E676';
+                                      bottomColor = 'rgba(0,230,118,0.1)';
+                                      shadowColor = 'rgba(0,230,118,0.6)';
+                                    }
+                          
+                                    return {
+                                      value: entry.count,
+                                      itemStyle: {
+                                        color: {
+                                          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                                          colorStops: [{ offset: 0, color: topColor }, { offset: 1, color: bottomColor }]
+                                        },
+                                        borderRadius: [4, 4, 0, 0],
+                                        shadowColor: entry.count > 0 ? shadowColor : 'transparent',
+                                        shadowBlur: entry.count > 0 ? 10 : 0
+                                      },
+                                      label: {
+                                        show: true,
+                                        position: 'top',
+                                        color: entry.count > 0 ? '#fff' : '#475569',
+                                        fontSize: 9,
+                                        fontWeight: 'bold',
+                                        formatter: (p) => p.value > 0 ? p.value : ''
+                                      }
+                                    };
+                                  })
+                                }
+                              ]
+                            }}
+                            style={{ height: '100%', width: '100%' }}
+                          />
+                        </div>
+                        
+                        <div className="flex mt-2 pt-2 border-t border-white/5 shrink-0 gap-1">
+                          {chartData.map((d, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center justify-center p-1 rounded-lg bg-black/20">
+                              <span className="text-[8px] text-slate-500 font-bold mb-0.5">{d.name}</span>
+                              <span className="text-[10px] font-black text-white">{d.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   };
+
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col pb-[60px] select-none">
@@ -2201,7 +2767,24 @@ export default function RealtimePipelinePage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center bg-[#0f1422] border border-white/5 rounded-xl px-2 py-1 gap-1.5"><Calendar className="w-3 h-3 text-blue-400" /><select value={period} onChange={(e) => setPeriod(e.target.value)} className="bg-transparent text-slate-300 font-bold text-[10px] border-none outline-none cursor-pointer pr-1"><option value="all">전체</option><option value="today">오늘</option><option value="yesterday">어제</option><option value="7days">최근 7일</option></select></div>
+          <div className="flex items-center bg-[#0f1422] border border-white/5 rounded-xl px-2 py-1 gap-1.5">
+            <Calendar className="w-3 h-3 text-blue-400" />
+            <select value={period} onChange={(e) => setPeriod(e.target.value)} className="bg-transparent text-slate-300 font-bold text-[10px] border-none outline-none cursor-pointer pr-1">
+              <option value="all">전체</option>
+              <option value="today">일별 (오늘)</option>
+              <option value="yesterday">일별 (어제)</option>
+              <option value="7days">주별 (최근 7일)</option>
+              <option value="1month">월별 (최근 1개월)</option>
+              <option value="custom">기간별 (직접 설정)</option>
+            </select>
+            {period === 'custom' && (
+               <div className="flex items-center gap-1 ml-1 border-l border-white/10 pl-2">
+                 <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="bg-transparent text-slate-300 text-[10px] border border-white/10 rounded px-1 outline-none" />
+                 <span className="text-slate-500 text-[10px]">-</span>
+                 <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="bg-transparent text-slate-300 text-[10px] border border-white/10 rounded px-1 outline-none" />
+               </div>
+            )}
+          </div>
           <button onClick={() => setSoundEnabled(!soundEnabled)} className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${soundEnabled ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-white/5 border-white/10 text-slate-500'}`}><Volume2 className="w-3.5 h-3.5" /></button>
           <button onClick={() => setIsSimulationActive(!isSimulationActive)} className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${isSimulationActive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}><Play className="w-3.5 h-3.5" /></button>
           <button onClick={fetchLiveMessages} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/20 text-slate-400 hover:text-white transition-all flex items-center justify-center cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /></button>

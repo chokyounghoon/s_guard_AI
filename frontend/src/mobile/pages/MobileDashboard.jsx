@@ -1868,24 +1868,52 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           >
             {visibleSms.length > 0 ? visibleSms.map((msg) => {
               const isSel = selectedSms?.inc_id === msg.inc_id;
-              const isCrit = msg.severity === 'CRITICAL';
-              const isMaj = msg.severity === 'MAJOR';
-              const accentColor = isSel ? '#00e5ff' : isCrit ? '#00e5ff' : isMaj ? '#00e5ff' : '#00e5ff';
+
+              let calculatedSeverity = msg.severity || 'NORMAL';
+              let critT = 10;
+              let majT = 3;
+              try {
+                const s = localStorage.getItem('sguard_alert_thresholds_v3');
+                if (s) {
+                  const p = JSON.parse(s);
+                  critT = p.critical?.errorCount || 10;
+                  majT = p.major?.errorCount || 3;
+                }
+              } catch {}
+
+              let v = Number(msg.received_count) || 1;
+              if (msg.message) {
+                const m = msg.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
+                if (m) {
+                  const parsedV = parseInt(m[1], 10);
+                  if (parsedV > v) v = parsedV;
+                }
+              }
+
+              if (v >= critT) calculatedSeverity = 'CRITICAL';
+              else if (v >= majT) calculatedSeverity = 'MAJOR';
+              else calculatedSeverity = 'NORMAL';
+
+              const isCritical = calculatedSeverity === 'CRITICAL';
+              const isMaj = calculatedSeverity === 'MAJOR';
+              const accentColor = isCritical ? '#ef4444' : isMaj ? '#f97316' : '#00e5ff';
+              const accentBgRGB = isCritical ? '239,68,68' : isMaj ? '249,115,22' : '0,229,255';
+
               return (
                 <div key={`sms-${msg.inc_id}`}
                   onClick={() => {
                     if (selectedSms?.inc_id === msg.inc_id) { setSelectedSms(null); selectedSmsRef.current = null; setShowAgentPanel(false); setAgentMessages([]); }
                     else { setSelectedSms(msg); selectedSmsRef.current = msg; setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
                   }}
-                  className="rounded-2xl p-4.5 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-3 relative overflow-hidden"
+                  className={`rounded-2xl p-4.5 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-3 relative overflow-hidden ${isCritical ? 'sms-pulse-critical' : isMaj ? 'sms-pulse-major' : ''}`}
                   style={{
-                    background: isSel ? 'rgba(0,229,255,0.08)' : 'rgba(18,21,26,0.85)',
+                    background: isSel ? `rgba(${accentBgRGB},0.15)` : isCritical ? `rgba(${accentBgRGB},0.08)` : isMaj ? `rgba(${accentBgRGB},0.05)` : 'rgba(18,21,26,0.85)',
                     borderTop: '1px solid rgba(255,255,255,0.05)',
                     borderRight: '1px solid rgba(255,255,255,0.05)',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     borderLeft: `4px solid ${accentColor}`,
                     borderRadius: 16,
-                    boxShadow: isSel ? `0 0 15px ${accentColor}40` : '0 4px 15px rgba(0,0,0,0.4)'
+                    boxShadow: isSel ? `0 0 20px rgba(${accentBgRGB},0.4)` : isCritical ? `0 0 20px rgba(${accentBgRGB},0.5)` : isMaj ? `0 0 15px rgba(${accentBgRGB},0.3)` : '0 4px 15px rgba(0,0,0,0.4)'
                   }}>
                   {/* Header: Notification Type & Severity */}
                   <div className="flex items-center justify-between">
@@ -1922,30 +1950,67 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
 
                   {/* Footer / Right Action Bar */}
-                  <div className="flex items-center justify-between mt-1 pt-3.5 border-t border-white/5">
-                    {msg.similarity_score != null ? (() => {
-                      const score = msg.similarity_score;
-                      let matchColor = '#00e5ff';
-                      let matchBg = 'rgba(0,229,255,0.1)';
-                      let matchBorder = 'rgba(0,229,255,0.2)';
-                      if (score >= 0.8) {
-                        matchColor = '#f87171'; // Coral Red
-                        matchBg = 'rgba(248,113,113,0.15)';
-                        matchBorder = 'rgba(248,113,113,0.3)';
-                      } else if (score >= 0.5) {
-                        matchColor = '#fb923c'; // Amber/Orange
-                        matchBg = 'rgba(251,146,60,0.15)';
-                        matchBorder = 'rgba(251,146,60,0.3)';
-                      }
-                      return (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg border uppercase tracking-wider flex items-center gap-1 shrink-0 font-mono"
-                          style={{ color: matchColor, background: matchBg, borderColor: matchBorder }}>
-                          ⚡ Match {(score * 100).toFixed(1)}%
-                        </span>
-                      );
-                    })() : <span />}
+                  <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 mt-1 pt-3.5 border-t border-white/5">
+                    <div className="flex gap-2 items-center flex-wrap">
+                      {msg.similarity_score != null && (() => {
+                        const score = msg.similarity_score;
+                        let matchColor = '#00e5ff';
+                        let matchBg = 'rgba(0,229,255,0.1)';
+                        let matchBorder = 'rgba(0,229,255,0.2)';
+                        if (score >= 0.8) {
+                          matchColor = '#f87171'; // Coral Red
+                          matchBg = 'rgba(248,113,113,0.15)';
+                          matchBorder = 'rgba(248,113,113,0.3)';
+                        } else if (score >= 0.5) {
+                          matchColor = '#fb923c'; // Amber/Orange
+                          matchBg = 'rgba(251,146,60,0.15)';
+                          matchBorder = 'rgba(251,146,60,0.3)';
+                        }
 
-                    <div className="flex items-center gap-2 ml-auto">
+                        let calculatedSeverity = msg.severity || 'NORMAL';
+                        let critT = 10;
+                        let majT = 3;
+                        try {
+                          const s = localStorage.getItem('sguard_alert_thresholds_v3');
+                          if (s) {
+                            const p = JSON.parse(s);
+                            critT = p.critical?.errorCount || 10;
+                            majT = p.major?.errorCount || 3;
+                          }
+                        } catch {}
+
+                        let v = Number(msg.received_count) || 1;
+                        if (msg.message) {
+                          const m = msg.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
+                          if (m) {
+                            const parsedV = parseInt(m[1], 10);
+                            if (parsedV > v) v = parsedV;
+                          }
+                        }
+
+                        if (v >= critT) calculatedSeverity = 'CRITICAL';
+                        else if (v >= majT) calculatedSeverity = 'MAJOR';
+                        else calculatedSeverity = 'NORMAL';
+
+                        return (
+                          <>
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg border uppercase tracking-wider flex items-center gap-1 shrink-0 font-mono"
+                              style={{ color: matchColor, background: matchBg, borderColor: matchBorder }}>
+                              ⚡ Match {(score * 100).toFixed(1)}%
+                            </span>
+                            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider font-mono shrink-0 ${calculatedSeverity === 'CRITICAL' ? 'animate-pulse' : ''}`}
+                              style={{ 
+                                color: calculatedSeverity === 'CRITICAL' ? '#ef4444' : calculatedSeverity === 'MAJOR' ? '#f97316' : '#10b981',
+                                background: calculatedSeverity === 'CRITICAL' ? 'rgba(239,68,68,0.1)' : calculatedSeverity === 'MAJOR' ? 'rgba(249,115,22,0.1)' : 'rgba(16,185,129,0.1)',
+                                borderColor: calculatedSeverity === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : calculatedSeverity === 'MAJOR' ? 'rgba(249,115,22,0.2)' : 'rgba(16,185,129,0.2)'
+                              }}>
+                              {calculatedSeverity === 'CRITICAL' ? <AlertTriangle className="w-3 h-3 shrink-0" /> : calculatedSeverity === 'MAJOR' ? <AlertCircle className="w-3 h-3 shrink-0" /> : <CheckCircle2 className="w-3 h-3 shrink-0" />}
+                              {calculatedSeverity}
+                            </div>
+                          </>
+                        );
+                      })()}
+
                       {(() => {
                         const isDone = msg.incident_status === '처리완료' || Number(msg.is_analyzed) >= 1;
                         return (
@@ -1954,6 +2019,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           </span>
                         );
                       })()}
+                    </div>
+
+                    <div className="flex items-center flex-wrap gap-2 ml-auto">
 
                       <button onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
                         className="text-[10px] font-bold px-3 py-1 rounded-lg active:scale-95 transition-all hover:bg-[#00e5ff]/20 shrink-0 shadow-sm"

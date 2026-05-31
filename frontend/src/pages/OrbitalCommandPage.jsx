@@ -355,7 +355,9 @@ export default function OrbitalCommandPage() {
           border: '1px solid rgba(6,182,212,0.12)',
           borderRadius: 20,
           overflow: 'hidden',
-          flexShrink: 0,
+          flex: 1, // Changed from flexShrink: 0
+          display: 'flex',
+          flexDirection: 'column',
         }}>
           {/* 샌드박스 헤더 */}
           <div style={{
@@ -385,7 +387,7 @@ export default function OrbitalCommandPage() {
           </div>
 
           {/* 항상 펼쳐진 본문 */}
-          <div style={{ display: 'flex', flexDirection: 'column', padding: '0 16px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', padding: '0 16px 16px', flex: 1, minHeight: 0 }}>
             {/* 입력 영역 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -440,13 +442,13 @@ export default function OrbitalCommandPage() {
             </div>
 
             {/* 결과 목록 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflowY: 'auto' }} className="custom-scrollbar">
               {sandboxResults.length === 0 && !isSearching ? (
                 <div style={{
-                  minHeight: 120, display: 'flex', flexDirection: 'column',
+                  flex: 1, display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center', gap: 10,
                   border: '1px dashed rgba(255,255,255,0.06)', borderRadius: 16,
-                  background: 'rgba(255,255,255,0.01)',
+                  background: 'rgba(255,255,255,0.01)', minHeight: 120,
                 }}>
                   <ShieldAlert size={28} color="#334155" />
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#475569', letterSpacing: '0.15em', fontWeight: 700 }}>AWAITING QUERY INJECTION</span>
