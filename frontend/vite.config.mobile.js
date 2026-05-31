@@ -54,6 +54,10 @@ export default defineConfig({
     },
   },
 
+  esbuild: {
+    pure: ['console.log', 'console.debug', 'console.info'],
+  },
+
   server: {
     host: '0.0.0.0',
     port: 5174,

@@ -14,9 +14,11 @@ export default defineConfig({
           charts: ['recharts'],
           ui: ['framer-motion', 'lucide-react', 'react-hot-toast'],
           markdown: ['react-markdown', 'remark-gfm', 'html2pdf.js']
-        }
       }
     }
+  },
+  esbuild: {
+    pure: ['console.log', 'console.debug', 'console.info'],
   },
   server: {
     host: '0.0.0.0',
