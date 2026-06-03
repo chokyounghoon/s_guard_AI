@@ -3559,8 +3559,8 @@ app.post('/sms/receive', async (c) => {
   // Duplicate check: Merge identical messages if they arrive within a 10-minute window
   const tenMinsAgo = new Date(kstNow.getTime() - 10 * 60 * 1000).toISOString().replace('T', ' ').substring(0, 19)
   const existing = await db.prepare(
-    "SELECT inc_id, received_count FROM received_messages WHERE (sender = ? OR REPLACE(REPLACE(sender, '-', ''), ' ', '') = ?) AND message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
-  ).bind(sender, normSender, message, tenMinsAgo).first()
+    "SELECT inc_id, received_count FROM received_messages WHERE message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
+  ).bind(message, tenMinsAgo).first()
 
   const parsedCount = extractOccurrence(occurrence_count);
   const currentCount = existing ? (existing.received_count || 1) + 1 : (parsedCount > 0 ? parsedCount : 1);
@@ -6852,6 +6852,10 @@ ${timelineCtx.join('\n')}
         // Auto-save summary to DB (only if it's a valid summary, not a raw transcript leak)
         if (fullContent && !isRaw(fullContent)) {
           const nowKst = getKst()
+          
+          // 🛡️ Fix FOREIGN KEY constraint error: Ensure warroom_list entry exists before inserting into chat_summaries
+          await db.prepare("INSERT OR IGNORE INTO warroom_list (inc_id, title, status, reg_dt) VALUES (?, 'AI Auto-Analysis', 'CLOSED', ?)").bind(cleanId, nowKst).run();
+
           await db.prepare(`
           INSERT INTO chat_summaries (inc_id, summary, model, mod_dt) 
           VALUES (?, ?, 'dify-workflow', ?)
