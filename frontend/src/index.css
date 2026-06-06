@@ -448,15 +448,72 @@
 
 /* SMS Card — 장애 감지 맥동 */
 @keyframes cardPulseRed {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0), inset 0 0 0 0 rgba(248,113,113,0); }
-  50%       { box-shadow: 0 0 40px 4px rgba(248,113,113,0.12), inset 0 0 60px 0 rgba(248,113,113,0.04); }
+  0%, 100% { 
+    box-shadow: 0 0 10px rgba(239,68,68,0.2), inset 0 0 20px rgba(239,68,68,0.05);
+    background-color: rgba(18,21,26,0.85);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-left: 4px solid #ef4444;
+  }
+  50% { 
+    box-shadow: 0 0 35px rgba(239,68,68,0.7), inset 0 0 50px rgba(239,68,68,0.2);
+    background-color: rgba(239,68,68,0.18);
+    border-top: 1px solid rgba(239,68,68,0.6);
+    border-right: 1px solid rgba(239,68,68,0.6);
+    border-bottom: 1px solid rgba(239,68,68,0.6);
+    border-left: 6px solid #ef4444;
+  }
 }
+
+@keyframes dangerStripeMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 0; }
+}
+
+.sms-pulse-critical { 
+  animation: cardPulseRed 1.2s ease-in-out infinite !important;
+  z-index: 1;
+}
+
+.sms-pulse-critical::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(239, 68, 68, 0.1),
+    rgba(239, 68, 68, 0.1) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+  background-size: 56px 56px;
+  animation: dangerStripeMove 1s linear infinite;
+  opacity: 0.8;
+}
+
 @keyframes cardPulseOrange {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(251,146,60,0), inset 0 0 0 0 rgba(251,146,60,0); }
-  50%       { box-shadow: 0 0 40px 4px rgba(251,146,60,0.12), inset 0 0 60px 0 rgba(251,146,60,0.04); }
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(249,115,22,0.1), inset 0 0 10px rgba(249,115,22,0.02);
+    background-color: rgba(18,21,26,0.85);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-left: 4px solid #f97316;
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(249,115,22,0.4), inset 0 0 30px rgba(249,115,22,0.1);
+    background-color: rgba(249,115,22,0.08);
+    border-top: 1px solid rgba(249,115,22,0.3);
+    border-right: 1px solid rgba(249,115,22,0.3);
+    border-bottom: 1px solid rgba(249,115,22,0.3);
+    border-left: 4px solid #f97316;
+  }
 }
-.sms-pulse-critical { animation: cardPulseRed 2.5s ease-in-out infinite; }
-.sms-pulse-major    { animation: cardPulseOrange 3s ease-in-out infinite; }
+.sms-pulse-major { animation: cardPulseOrange 2s ease-in-out infinite !important; }
 
 /* AI Insight — 회전 데이터 링 */
 @keyframes ringRotate {

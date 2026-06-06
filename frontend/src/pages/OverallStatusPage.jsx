@@ -261,10 +261,10 @@ export default function OverallStatusPage() {
             {KPI.map((k, i) => {
               const Icon = k.icon;
               return (
-                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col h-full ${i === 4 ? 'col-span-2 lg:col-span-1' : ''}`}>
+                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col justify-start h-full ${i === 4 ? 'col-span-2 lg:col-span-1' : ''}`}>
                   <div className={`absolute -right-4 -top-4 w-24 h-24 ${k.bg} blur-[30px] rounded-full group-hover:scale-110 transition-transform opacity-50`}></div>
                   
-                  <div className="flex-none">
+                  <div>
                     <div className={`w-8 h-8 rounded-xl mb-3 flex items-center justify-center ${k.iconBg} border ${k.iconBorder} shrink-0`}>
                       <Icon className={`w-4 h-4 ${k.color}`} />
                     </div>
@@ -273,7 +273,7 @@ export default function OverallStatusPage() {
                     </div>
                   </div>
                   
-                  <div className="flex-1 flex flex-col justify-end mt-2">
+                  <div className="flex flex-col justify-end mt-auto pt-2">
                     <div className="text-[11px] font-bold text-slate-400 mb-1 leading-tight">{k.label}</div>
                     <div className="text-[9px] font-bold text-slate-500 leading-tight">{k.sub}</div>
                     <div className={`mt-3 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80 shrink-0`}>
@@ -329,7 +329,7 @@ export default function OverallStatusPage() {
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
           {(isPC || tab === 1) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export default function OverallStatusPage() {
 
           {/* Column 2: Categories (Tab 2 on Mobile) */}
           {(isPC || tab === 2) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -426,7 +426,7 @@ export default function OverallStatusPage() {
 
           {/* Column 3: Contributors (Tab 3 on Mobile) */}
           {(isPC || tab === 3) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -477,7 +477,7 @@ export default function OverallStatusPage() {
 
           {/* Column 4: Feed (Tab 4 on Mobile) */}
           {(isPC || tab === 4) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">

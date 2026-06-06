@@ -105,6 +105,7 @@ const IncidentPushPage = () => {
 
         recognition.onstart = () => {
             setIsListening(true);
+            recognition.baseText = messageRef.current;
             setLogs(prev => [{
                 time: new Date().toLocaleTimeString(),
                 type: 'ai',
@@ -113,20 +114,22 @@ const IncidentPushPage = () => {
         };
 
         recognition.onresult = (event) => {
-            let interimTranscript = '';
             let finalTranscript = '';
+            let interimTranscript = '';
 
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            for (let i = 0; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
+                    finalTranscript += event.results[i][0].transcript + ' ';
                 } else {
                     interimTranscript += event.results[i][0].transcript;
                 }
             }
 
-            if (finalTranscript) {
-                setMessageWithRef(prev => prev ? `${prev} ${finalTranscript}` : finalTranscript);
-            }
+            const updatedMessage = recognition.baseText 
+                ? `${recognition.baseText}\n${finalTranscript}${interimTranscript}`.trim()
+                : `${finalTranscript}${interimTranscript}`.trim();
+                
+            setMessageWithRef(updatedMessage);
         };
 
         recognition.onerror = (event) => {

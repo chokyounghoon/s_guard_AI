@@ -11183,6 +11183,13 @@ async function executeSCallertFinal(env, strategy, payload, inc_id) {
        return;
     }
 
+    // 🚀 NEW: Re-verify if a War-Room is already opened! User might have opened it during the wait.
+    const activeWarroom = await db.prepare("SELECT inc_id FROM warroom_list WHERE inc_id = ? AND status != 'CLOSED'").bind(inc_id).first();
+    if (activeWarroom) {
+       console.log(`[scallert-trigger] 🛑 War-Room for incident ${inc_id} was already opened during the wait time. Aborting call.`);
+       return;
+    }
+
     let targets = [];
     if (!payload.employee_id && !payload.emp_id) {
       console.warn(`[scallert-trigger] ⚠️ targetUserId is missing. Falling back to default '18121020'`);
