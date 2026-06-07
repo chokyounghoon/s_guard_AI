@@ -2127,26 +2127,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           key={`sms-${msg.inc_id}`}
                           onClick={() => {
                             const isSelected = selectedSmsRef.current?.inc_id === msg.inc_id;
-                            // 패널이 닫혀있다면 강제로 열어야 하므로 (!isSelected || !showAgentPanel) 조건을 씁니다.
-                            if (!isSelected || !showAgentPanel) {
-                              // SMS 선택: selectedSms + insightSms 동시 설정 → AiInsightPanel 분석 트리거
-                              userManuallyClearedRef.current = false; // 명시적 선택 → 자동선택 차단 해제
-                              setSelectedSms(msg);
-                              selectedSmsRef.current = msg;
-                              setInsightSms(msg);
-                              setAgentMessages([]);
-                              setShowAgentPanel(true);
-                              setActiveLogTab('ai');
-                              setSelectedIncidentIdFlow(msg.inc_id);
-                            } else {
-                              // 선택 해제
-                              userManuallyClearedRef.current = true; // 명시적 해제 → 이후 자동선택 차단
-                              setSelectedSms(null);
-                              selectedSmsRef.current = null;
-                              setInsightSms(null);
-                              setShowAgentPanel(false);
-                              setAgentMessages([]);
-                            }
+                            // 이미 선택된 항목 클릭 시 패널 그대로 유지 (no-op)
+                            if (isSelected && showAgentPanel) return;
+
+                            // SMS 선택: selectedSms + insightSms 동시 설정 → AiInsightPanel 분석 트리거
+                            userManuallyClearedRef.current = false; // 명시적 선택 → 자동선택 차단 해제
+                            setSelectedSms(msg);
+                            selectedSmsRef.current = msg;
+                            setInsightSms(msg);
+                            setAgentMessages([]);
+                            setShowAgentPanel(true);
+                            setActiveLogTab('ai');
+                            setSelectedIncidentIdFlow(msg.inc_id);
                           }}
                           style={isCritical ? {
                             background: isSelected
