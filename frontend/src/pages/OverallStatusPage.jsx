@@ -5,7 +5,7 @@ import {
   Shield, Zap, Database, MessageSquare, Users, CheckCircle2,
   BarChart3, Clock, Sparkles, Activity, FileSearch, Brain,
   Target, Rocket, Heart, Medal, ChevronLeft, Loader2, RefreshCw,
-  Layers, ArrowRight
+  Layers, ArrowRight, FileText
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -257,7 +257,7 @@ export default function OverallStatusPage() {
           >
           
           {/* KPI Grid */}
-          <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3 lg:h-full" style={isPC ? { width: `${wR1[0]}%`, flex: 'none' } : {}>
+          <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3 lg:h-full" style={isPC ? { width: `${wR1[0]}%`, flex: 'none' } : {}}>
             {KPI.map((k, i) => {
               const Icon = k.icon;
               return (
@@ -288,7 +288,7 @@ export default function OverallStatusPage() {
           {isPC && <div onMouseDown={(e) => hDrag1(0, e)} className={`w-1.5 md:w-2 cursor-ew-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${hDragIng1 ? 'bg-blue-500/50' : ''}`} />}
 
           {/* Incident Lifecycle Flow */}
-          <div className="lg:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg overflow-hidden lg:h-full" style={isPC ? { width: `${wR1[1]}%`, flex: 'none' } : {}>
+          <div className="lg:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg overflow-hidden lg:h-full" style={isPC ? { width: `${wR1[1]}%`, flex: 'none' } : {}}>
             <div className="flex items-center gap-2 mb-4 shrink-0">
               <div className="p-1.5 bg-indigo-500/10 rounded-lg"><Activity className="w-4 h-4 text-indigo-400" /></div>
               <span className="text-sm font-black text-slate-200">인시던트 생애주기</span>
@@ -329,7 +329,7 @@ export default function OverallStatusPage() {
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
           {(isPC || tab === 1) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export default function OverallStatusPage() {
 
           {/* Column 2: Categories (Tab 2 on Mobile) */}
           {(isPC || tab === 2) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -426,7 +426,7 @@ export default function OverallStatusPage() {
 
           {/* Column 3: Contributors (Tab 3 on Mobile) */}
           {(isPC || tab === 3) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -477,7 +477,7 @@ export default function OverallStatusPage() {
 
           {/* Column 4: Feed (Tab 4 on Mobile) */}
           {(isPC || tab === 4) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -501,10 +501,35 @@ export default function OverallStatusPage() {
                   <div className="text-xs font-black text-slate-200 leading-snug mb-2 line-clamp-2">
                     {item.title}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Brain className="w-3 h-3 text-slate-500" />
-                    <span className="text-[9px] font-bold text-slate-400">@{item.reg_name || 'SYSTEM'}</span>
-                    <span className="text-[9px] font-bold text-slate-600 ml-1">· RAG Synced ✦</span>
+                  <div className="flex items-center justify-between gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center gap-1.5">
+                      <Brain className="w-3 h-3 text-slate-500" />
+                      <span className="text-[9px] font-bold text-slate-400">@{item.reg_name || 'SYSTEM'}</span>
+                      <span className="text-[9px] font-bold text-slate-600 ml-1">· RAG Synced ✦</span>
+                    </div>
+                    {(() => {
+                      // Extract inc_id from title: "[S-GUARD AI 보고서] {inc_id}: ..."
+                      const match = (item.title || '').match(/\]\s*([\d]+)[:：]/);
+                      const incId = match ? match[1] : (item.inc_id || null);
+                      return incId ? (
+                        <button
+                          onClick={() => navigate(`/ai-report/${incId}`)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black transition-all active:scale-95 shrink-0"
+                          style={{
+                            background: 'rgba(59,130,246,0.12)',
+                            border: '1px solid rgba(59,130,246,0.3)',
+                            color: '#60a5fa',
+                            boxShadow: '0 0 8px rgba(59,130,246,0.15)'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 14px rgba(59,130,246,0.35)'}
+                          onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 8px rgba(59,130,246,0.15)'}
+                        >
+                          <FileText className="w-2.5 h-2.5" />
+                          <span>AI 레포트</span>
+                          <ArrowRight className="w-2.5 h-2.5" />
+                        </button>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               )) : (
