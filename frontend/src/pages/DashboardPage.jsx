@@ -1601,9 +1601,28 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const activeTheme = useMemo(() => {
     let sev = (selectedSms?.severity || 'NORMAL').toUpperCase();
     if (selectedSms && selectedSms.incident_status !== '처리완료' && selectedSms.incident_status !== 'Completed' && selectedSms.status !== '처리완료' && selectedSms.status !== 'Completed') {
-      const cT = userProfile?.alert_critical_error_count || 10;
-      const majT = userProfile?.alert_major_error_count || 5;
-      const v = Number(selectedSms.received_count) || Number(selectedSms.occurrence_count) || 1;
+      let cT = userProfile?.alert_critical_error_count || 10;
+      let majT = userProfile?.alert_major_error_count || 5;
+
+      try {
+        const s = localStorage.getItem('sguard_alert_thresholds_v3');
+        if (s) {
+          const p = JSON.parse(s);
+          cT = p.critical?.errorCount || cT;
+          majT = p.major?.errorCount || majT;
+        }
+      } catch {}
+
+      let v = Number(selectedSms.received_count) || Number(selectedSms.occurrence_count) || 1;
+      
+      if (selectedSms.message) {
+        const m = selectedSms.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
+        if (m) {
+          const parsedV = parseInt(m[1], 10);
+          if (parsedV > v) v = parsedV;
+        }
+      }
+
       if (v >= cT) sev = 'CRITICAL';
       else if (v >= majT) sev = 'MAJOR';
     }
@@ -1641,7 +1660,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       shadowDim: 'shadow-[0_0_15px_rgba(0,229,255,0.15)]',
       accentColor: 'text-[#00e5ff]',
     };
-  }, [selectedSms?.severity]);
+  }, [selectedSms, userProfile]);
 
   return (
     <>
@@ -2299,7 +2318,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
           {/* ── 2/4: S-Autopilot Insight Panel ── */}
           <div className="flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-hidden flex flex-col p-px">
+            <div className="flex-1 overflow-hidden flex flex-col">
               <AiInsightPanel 
                  onLogReceived={handleLogReceived} 
                  onShowDetail={handleShowInsight} 
