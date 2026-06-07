@@ -2153,13 +2153,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           }}
                           style={isCritical ? {
                             background: isSelected
-                              ? `repeating-linear-gradient(-45deg, rgba(239,68,68,0.18) 0px, rgba(239,68,68,0.18) 12px, rgba(60,10,10,0.6) 12px, rgba(60,10,10,0.6) 28px)`
-                              : `repeating-linear-gradient(-45deg, rgba(239,68,68,0.10) 0px, rgba(239,68,68,0.10) 12px, rgba(25,4,4,0.75) 12px, rgba(25,4,4,0.75) 28px)`,
-                            border: `2px solid rgba(239,68,68,${isSelected ? '0.95' : '0.65'})`,
+                              ? `repeating-linear-gradient(-45deg, rgba(239,68,68,0.10) 0px, rgba(239,68,68,0.10) 14px, rgba(30,8,8,0.55) 14px, rgba(30,8,8,0.55) 30px)`
+                              : `repeating-linear-gradient(-45deg, rgba(239,68,68,0.05) 0px, rgba(239,68,68,0.05) 14px, rgba(18,4,4,0.60) 14px, rgba(18,4,4,0.60) 30px)`,
+                            border: `1.5px solid rgba(239,68,68,${isSelected ? '0.70' : '0.40'})`,
                             borderRadius: 16,
                             boxShadow: isSelected
-                              ? '0 0 40px rgba(239,68,68,0.55), inset 0 0 20px rgba(239,68,68,0.1)'
-                              : '0 0 20px rgba(239,68,68,0.35)',
+                              ? '0 0 20px rgba(239,68,68,0.25), inset 0 0 10px rgba(239,68,68,0.05)'
+                              : '0 0 8px rgba(239,68,68,0.15)',
                           } : {
                             background: isSelected ? `rgba(${accentBgRGB},0.15)` : (isMaj ? '' : 'rgba(18,21,26,0.85)'),
                             borderTop: '1px solid rgba(255,255,255,0.05)',
@@ -2168,7 +2168,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                             borderLeft: `4px solid ${accentColor}`,
                             boxShadow: isSelected ? `0 0 30px rgba(${accentBgRGB},0.6)` : '0 4px 15px rgba(0,0,0,0.4)'
                           }}
-                          className={`rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden ${isCritical && !isSelected ? 'sms-pulse-critical' : isMaj && !isSelected ? 'sms-pulse-major' : ''}`}
+                          className={`rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden`}
                         >
                           {isSelected && (
                             <div className="absolute inset-0 pointer-events-none rounded-2xl" style={{ outline: `2px solid ${accentColor}`, outlineOffset: '-2px', boxShadow: `inset 0 0 20px rgba(${accentBgRGB},0.2)` }} />
@@ -2597,18 +2597,19 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               <div className="flex flex-row items-center justify-center gap-6 sm:gap-10">
                                 
                                 {/* MTTA Ring */}
-                              <div className="relative w-52 h-52 flex items-center justify-center">
-                                <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
+                              <div className="relative w-52 h-52 flex items-center justify-center overflow-hidden rounded-full">
+                                {/* Ping ring — rendered as a div layer behind SVG, contained by overflow-hidden */}
+                                {!isMttaClosed && (
+                                  <span className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'transparent', border: `4px solid ${mttaRingColor}`, boxSizing: 'border-box' }} />
+                                )}
+                                <svg className="w-full h-full -rotate-90 transform relative z-10" viewBox="0 0 180 180" style={{ overflow: 'visible' }}>
                                   <defs>
                                     <linearGradient id="mttaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                                       <stop offset="0%" stopColor={mttaRingColor} />
                                       <stop offset="100%" stopColor={mttaRingColor} />
                                     </linearGradient>
                                   </defs>
-                                  {!isMttaClosed && (
-                                    <circle cx="90" cy="90" r="70" stroke={mttaRingColor} strokeWidth="16" fill="none" className="animate-ping opacity-30" />
-                                  )}
-                                  <circle cx="90" cy="90" r="70" stroke="url(#mttaGradient)" strokeWidth={!isMttaClosed ? "14" : "12"} fill="none" strokeDasharray={circum} strokeDashoffset={isMttaClosed ? 0 : offset} strokeLinecap="round" className={`transition-all duration-1000`} filter={`drop-shadow(0 0 ${!isMttaClosed ? '20px' : '8px'} rgba(${mttaRingColorRGB}, ${!isMttaClosed ? '1' : '0.5'}))`} style={!isMttaClosed ? { animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : {}} />
+                                  <circle cx="90" cy="90" r="70" stroke="url(#mttaGradient)" strokeWidth={!isMttaClosed ? "14" : "12"} fill="none" strokeDasharray={circum} strokeDashoffset={isMttaClosed ? 0 : offset} strokeLinecap="round" className={`transition-all duration-1000`} filter={`drop-shadow(0 0 ${!isMttaClosed ? '12px' : '8px'} rgba(${mttaRingColorRGB}, ${!isMttaClosed ? '1' : '0.5'}))`} style={!isMttaClosed ? { animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : {}} />
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                                   <span className={`text-[9.5px] font-black uppercase tracking-widest mb-0.5 ${!isMttaClosed ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>MTTA TIMER</span>
