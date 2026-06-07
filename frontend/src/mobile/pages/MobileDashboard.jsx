@@ -2149,6 +2149,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               warRooms={warRooms}
               hideWarRoomButton={true}
               onAnalysisComplete={handleAnalysisComplete}
+              activeTheme={activeTheme}
             />
           </div>
         )}
@@ -2243,15 +2244,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           const isActive = !!selectedIncidentIdFlow;
           const isClosedFlow = incidentWorkflowSteps.some(s => s.id === 'KNOWLEDGE');
           return (
-        <div className="md:col-span-1 transition-all duration-300 flex flex-col shadow-2xl" style={{
-          background: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
-          border: `1px solid ${isActive ? (isClosedFlow ? '#10b981' : '#00e5ff') : 'rgba(255,255,255,0.15)'}`,
+        <div className="md:col-span-1 transition-all duration-700 flex flex-col shadow-2xl" style={{
+          background: activeTheme.bg,
           borderRadius: 24,
           overflow: 'hidden',
-          boxShadow: isActive
-            ? (isClosedFlow ? '0 0 20px rgba(16,185,129,0.2), inset 0 1px 0 rgba(255,255,255,0.1)' : '0 0 25px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.1)')
-            : '0 8px 24px -5px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
-          backdropFilter: 'blur(20px)'
+          backdropFilter: 'blur(20px)',
+          ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
