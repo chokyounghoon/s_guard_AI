@@ -42,13 +42,18 @@ export default function ExpertBoardPage() {
   const maxScore = contributors[0]?.synergy_score || 1;
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: '#09090b', color: '#cbd5e1', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Background */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full pointer-events-none" />
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: '#09090b', color: '#cbd5e1', overflow: 'hidden' }}>
+      {/* Background layer — separate from flex to avoid pushing header down */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full" />
+      </div>
 
-      {/* Header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md z-10 gap-3">
+      {/* Flex column layout — starts at top:0 */}
+      <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <header className="flex-shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md gap-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => goBack()}
@@ -184,6 +189,7 @@ export default function ExpertBoardPage() {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
