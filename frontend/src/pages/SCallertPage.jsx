@@ -1396,7 +1396,10 @@ export default function SCallertPage() {
                           { id: 'WEEKEND', label: '주말(토/일) 발신 허용' },
                           { id: 'NIGHT_18', label: '야간 발신 허용 (18시 이후)' },
                           { id: 'NIGHT_19', label: '야간 발신 허용 (19시 이후)' },
-                          { id: 'NIGHT_20', label: '야간 발신 허용 (20시 이후)' }
+                          { id: 'NIGHT_20', label: '야간 발신 허용 (20시 이후)' },
+                          { id: 'SEV_1', label: '1등급 (Critical) 발신 허용' },
+                          { id: 'SEV_2', label: '2등급 (Major) 발신 허용' },
+                          { id: 'SEV_3', label: '3등급 (Normal) 발신 허용' }
                         ].map(cond => {
                           const isChecked = Array.isArray(ruleForm.valid_conditions) && ruleForm.valid_conditions.includes(cond.id);
                           return (
@@ -2345,7 +2348,10 @@ export default function SCallertPage() {
                       { id: 'WEEKEND', label: '주말(토/일) 발신 허용' },
                       { id: 'NIGHT_18', label: '야간 발신 허용 (18시 이후)' },
                       { id: 'NIGHT_19', label: '야간 발신 허용 (19시 이후)' },
-                      { id: 'NIGHT_20', label: '야간 발신 허용 (20시 이후)' }
+                      { id: 'NIGHT_20', label: '야간 발신 허용 (20시 이후)' },
+                      { id: 'SEV_1', label: '1등급 (Critical) 발신 허용' },
+                      { id: 'SEV_2', label: '2등급 (Major) 발신 허용' },
+                      { id: 'SEV_3', label: '3등급 (Normal) 발신 허용' }
                     ].map(cond => {
                       const isChecked = Array.isArray(newStrategy.valid_conditions) && newStrategy.valid_conditions.includes(cond.id);
                       return (

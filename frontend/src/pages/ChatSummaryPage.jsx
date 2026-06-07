@@ -75,7 +75,22 @@ export default function ChatSummaryPage() {
   const [incidentMessage, setIncidentMessage] = useState('');     // 장애 SMS 문자 내용
   const [workflowSteps, setWorkflowSteps] = useState([]);          // 장애처리현황 단계
   const hasTriggeredRef = useRef(null); // 🚀 중복 호출 방지용 락
+  const abortTimeoutRef = useRef(null); // 🚀 StrictMode double-mount abort delay ref
   const [elapsedTime, setElapsedTime] = useState(0); // 🚀 분석 소요 시간 타이머
+
+  useEffect(() => {
+    let timerId;
+    if (isLoading) {
+      setElapsedTime(0);
+      const startTime = Date.now();
+      timerId = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    }
+    return () => {
+      if (timerId) clearInterval(timerId);
+    };
+  }, [isLoading]);
 
   const getApiUrl = (endpoint) => {
     // 🚀 AI 분석/요약 엔진은 로컬 백엔드 대신 배포된 Worker를 직접 사용한다 (안정성 확보 및 스트리밍 성능 최적화)
@@ -89,12 +104,90 @@ export default function ChatSummaryPage() {
     console.log(`[ChatSummary-State] isLoading: ${isLoading}, hasSummary: ${!!summary}, error: ${error}`);
   }, [isLoading, summary, error]);
 
+  const triggerAnalysis = () => {
+    setSummary(''); 
+    setError(null); 
+    setIsLoading(true); 
+    setIsStreaming(true);
+    setLoadingStatus('Dify AI 엔진에 분석을 요청하고 있습니다...');
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
+    (async () => {
+      try {
+        const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n⚠️ 중요 지침: 만약 전송된 텍스트나 이미지가 장애/에러와 무관한 단순 테스트(예: 사람 얼굴 사진, 일상적인 대화 등)일 경우, 절대로 과거 유사 사례를 가져와서 허위 보고서를 작성하지 마세요! 이 경우 각 항목에 "관련 데이터 없음"이라고 명시하고 주요 현상에 "[테스트 감지됨] 전달된 내용이 장애와 무관합니다"라고만 작성하세요.\n\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
+        const cleanIdForAi = String(incidentId || '').replace(/^INC-/i, '');
+        const response = await fetch(getApiUrl('/ai/summarize-chat'), {
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+          body: JSON.stringify({ 
+            incident_id: cleanIdForAi,
+            instructions: reportInstruction,
+            prompt: reportInstruction
+          }), 
+          signal: controller.signal
+        });
+        
+        if (!response.ok || !response.body) throw new Error('분석 요청 실패');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulatedAnswer = '';
+        let lastUpdateTime = Date.now();
+        
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+          
+          for (const evt of events) {
+            for (const line of evt.split('\n')) {
+              if (!line.trim().startsWith('data:')) continue;
+              const dataStr = line.replace(/^data:\s*/, '').trim();
+              if (dataStr === '[DONE]') continue;
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.status) setLoadingStatus(data.status);
+                if (data.answer) {
+                  accumulatedAnswer += data.answer;
+                  const now = Date.now();
+                  if (now - lastUpdateTime > 50) {
+                    setSummary(prev => { const t = prev + accumulatedAnswer; if (t.length > 5) setIsLoading(false); return t; });
+                    accumulatedAnswer = '';
+                    lastUpdateTime = now;
+                  }
+                }
+                if (data.error) setError(data.error);
+              } catch {}
+            }
+          }
+        }
+        if (accumulatedAnswer) {
+          setSummary(prev => { const t = prev + accumulatedAnswer; if (t.length > 5) setIsLoading(false); return t; });
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') setError('분석 중 오류가 발생했습니다.');
+      } finally { 
+        setIsLoading(false); 
+        setIsStreaming(false); 
+      }
+    })();
+  };
+
   useEffect(() => {
     // 🛡️ Strict Concurrency Lock: incidentId가 있을 때만 작동하며, 이미 트리거된 경우 중복 호출 방지
     if (!incidentId) return;
     
     if (hasTriggeredRef.current === incidentId) {
-      console.log(`[ChatSummary] Skipping redundant trigger for ${incidentId}`);
+      console.log(`[ChatSummary] Skipping redundant trigger and cancelling pending abort for ${incidentId}`);
+      if (abortTimeoutRef.current) {
+        clearTimeout(abortTimeoutRef.current);
+        abortTimeoutRef.current = null;
+      }
       return;
     }
     
@@ -103,195 +196,33 @@ export default function ChatSummaryPage() {
 
     retryCountRef.current = 0;
 
-    const fetchSummary = async (isRetry = false) => {
-      // 🛡️ Robust ID Normalization: Strip existing INC- and re-apply it consistently
-      const cleanIdForAi = String(incidentId || '').replace(/^INC-/i, '');
-      
-      console.log(`[ChatSummary] fetchSummary(isRetry=${isRetry}) started for ${cleanIdForAi}`);
-      setIsLoading(true);
-      setIsStreaming(true);
-      setError(null);
-      setLoadingStatus('AI 분석 준비 중...');
-      setElapsedTime(0);
-      if (!isRetry) setSummary('');
-
-      // 타이머 시작
-      const startTime = Date.now();
-      const timerId = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
-
-      let currentController;
+    const checkExistingSummary = async () => {
       try {
-        currentController = new AbortController();
-        abortControllerRef.current = currentController;
-
-        const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
-
-        // 🚀 Lock Acquisition (Concurrency Control)
-        if (!isRetry) {
-          console.log(`[ChatSummary] Attempting to acquire lock for ${incidentId}...`);
-          setLoadingStatus('중복 분석 여부를 확인하고 있습니다...');
-          const userStr = localStorage.getItem('sguard_user');
-          const user = JSON.parse(userStr || '{}');
-          
-          const cleanId = String(incidentId || '').replace(/^INC-/i, '');
-
-          try {
-            // 🛡️ Fail-safe: Manual timeout for better compatibility
-            const lockController = new AbortController();
-            const lockTimeout = setTimeout(() => lockController.abort(), 3500);
-
-            const lockRes = await fetch(getApiUrl(`/ai/summarize/lock/${cleanId}`), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-              body: JSON.stringify({ user_name: user.name || 'Unknown User' }),
-              signal: lockController.signal
-            });
-            clearTimeout(lockTimeout);
-
-            const lockData = await lockRes.json();
-            console.log(`[ChatSummary] Lock acquisition result:`, lockData);
-            if (!lockData.success) {
-              setLoadingStatus(`${lockData.owner} 매니저님이 처리중 입니다.`);
-              setIsStreaming(false);
-              return;
-            }
-          } catch (e) { 
-            console.warn("[ChatSummary] Lock acquisition failed/skipped:", e.name === 'AbortError' ? 'Timeout' : e.message); 
-          }
-        }
-
-        console.log(`[ChatSummary] >> Requesting /ai/summarize-chat for ${cleanIdForAi}...`);
-        setLoadingStatus('Dify AI 엔진에 분석 요청을 전송했습니다...');
-        if (isRetry) setLoadingStatus(`재시도 중... (${retryCountRef.current}/2)`);
-
-        // ⏱️ Add a fetch timeout for better feedback (90s to match Dify workflow processing time)
-        const timeoutController = new AbortController();
-        const timeoutId = setTimeout(() => timeoutController.abort(), 90000); 
-
-        const response = await fetch(getApiUrl('/ai/summarize-chat'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-          body: JSON.stringify({ 
-            incident_id: cleanIdForAi,
-            instructions: reportInstruction,
-            prompt: reportInstruction
-          }),
-          signal: timeoutController.signal
+        setIsLoading(true);
+        const cleanId = String(incidentId || '').replace(/^INC-/i, '');
+        console.log(`[ChatSummary] Checking existing summary for ${cleanId}`);
+        const res = await fetch(getApiUrl(`/db/summary/${cleanId}`), {
+          headers: getAuthHeader()
         });
-
-        clearTimeout(timeoutId);
-        console.log(`[ChatSummary] << Stream started (HTTP ${response.status} ${response.statusText}). Waiting for chunks...`);
-        setLoadingStatus('AI 엔진 연결 성공! 데이터를 분석하고 있습니다...');
-
-        if (!response.ok || !response.body) {
-          const errText = await response.text().catch(() => 'No error body');
-          throw new Error(`HTTP ${response.status}: ${errText}`);
-        }
-
-        // 성공하면 retry 카운터 리셋
-        retryCountRef.current = 0;
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let receivedAny = false;
-        let accumulatedAnswer = '';
-        let lastUpdateTime = Date.now();
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const events = buffer.split('\n\n');
-          buffer = events.pop() || '';
-
-          for (const evt of events) {
-            const lines = evt.split('\n');
-            for (const line of lines) {
-              if (!line.trim().startsWith('data:')) continue;
-              const dataStr = line.replace(/^data:\s*/, '').trim();
-              if (dataStr === '[DONE]') continue;
-              
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.status) {
-                  setLoadingStatus(data.status);
-                }
-                if (data.answer) {
-                  receivedAny = true;
-                  accumulatedAnswer += data.answer;
-                  const now = Date.now();
-                  if (now - lastUpdateTime > 50) {
-                    setSummary(prev => {
-                      const newText = prev + accumulatedAnswer;
-                      if (newText.length > 5) setIsLoading(false);
-                      return newText;
-                    });
-                    accumulatedAnswer = '';
-                    lastUpdateTime = now;
-                  }
-                }
-                if (data.error) {
-                  setError(data.error);
-                }
-              } catch (e) {
-                console.error('Error parsing SSE data', e, 'DataStr:', dataStr);
-              }
-            }
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.summary) {
+            setSummary(data.summary);
+            setIsLoading(false);
+            return;
           }
         }
-
-        if (accumulatedAnswer) {
-          setSummary(prev => {
-            const newText = prev + accumulatedAnswer;
-            if (newText.length > 5) setIsLoading(false);
-            return newText;
-          });
-        }
-
-        // 스트림은 끝났지만 아무 데이터도 없었으면 재시도
-        if (!receivedAny && retryCountRef.current < 2) {
-          throw new Error('Empty response from Dify');
-        }
-
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          if (abortControllerRef.current !== currentController) return;
-          console.error('[ChatSummary] Fetch Aborted (Timeout/Cancel)');
-          setError('AI 엔진 응답 대기 시간이 초과되었습니다.');
-        } else {
-          console.error('[ChatSummary] Summary fetch error:', err);
-          setError(`분석 오류: ${err.message}`);
-        }
-
-        // 🚫 자동 재시도 비활성화: 백엔드 heartbeat(5s) + 90s timeout으로 안정화됨
-        // 재시도가 두 번째 summarize-chat 호출의 원인이었음
-
-        // 🚑 로컬 비상 요약 엔진 (AI 장애 시 작동)
-        const localSummary = `# [🛠️ 로컬 비상 장애 요약]\n\n현재 AI 리포트 생성 엔진이 일시적으로 응답하지 않아 시스템 기본 정보로 요약되었습니다.\n\n### 🚨 장애 개요\n- **인시던트 ID:** INC-${incidentId}\n- **분석 상태:** AI 자동 요약 지연 (Dify API Time-out)\n\n### 📝 주요 내용\n해당 인시던트에 대한 상세 대화 내역 및 조치 사항은 워룸(War-Room) 채널에서 직접 확인이 필요합니다.\n\n### 💡 조치 권고\n1. 관련 파트 담당자 소집 확인\n2. 장애 전파 및 유관 부서 공지\n3. 시스템 로그 및 모니터링 대시보드 집중 관측\n\n*정상 복구 시 AI 심층 요약 리포트가 자동으로 생성됩니다.*`;
-        
-        setSummary(localSummary);
-        setLoadingStatus('비상 분석 완료');
-      } finally {
-        console.log(`[ChatSummary] fetchSummary finally block reached. controller: ${currentController === abortControllerRef.current ? 'current' : 'stale'}`);
-        if (timerId) clearInterval(timerId); // 타이머 종료
-        if (abortControllerRef.current === currentController) {
-          setIsLoading(false);
-          setIsStreaming(false);
-          // 🚀 Unlock (Cleanup)
-          const cleanIdForUnlock = String(incidentId || '').replace(/^INC-/i, '');
-          fetch(getApiUrl(`/ai/summarize/lock/${cleanIdForUnlock}`), { 
-            method: 'DELETE',
-            headers: getAuthHeader() 
-          }).catch(() => {});
-        }
+        // DB에 요약이 없으면 자동 분석을 실행
+        console.log(`[ChatSummary] No existing summary found. Auto-triggering analysis...`);
+        triggerAnalysis();
+      } catch (e) {
+        console.error("Failed to check existing summary:", e);
+        setIsLoading(false);
+        setIsStreaming(false);
       }
     };
 
-    fetchSummary();
+    checkExistingSummary();
 
     // Fetch Personalized Reporting Lines
     const fetchReportLines = async () => {
@@ -383,9 +314,13 @@ export default function ChatSummaryPage() {
 
     return () => {
       // cleanup: abort 진행중인 요청 취소 (StrictMode에서 ref는 유지 — 두 번째 mount에서 guard가 작동함)
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      // Delay the abort to see if we remount the same incident (StrictMode support)
+      abortTimeoutRef.current = setTimeout(() => {
+        if (abortControllerRef.current) {
+          console.log(`[ChatSummary] Cleaning up: Aborting summary request for ${incidentId}`);
+          abortControllerRef.current.abort();
+        }
+      }, 100);
     };
   }, [incidentId]);
 
@@ -602,8 +537,15 @@ export default function ChatSummaryPage() {
     }
   };
 
+  const isTestIncident = React.useMemo(() => {
+    const testKeywords = /테스트|test|TEST|샘플|sample|demo|데모/i;
+    return testKeywords.test(
+      [incidentId, incidentMessage, summary].filter(Boolean).join(' ')
+    );
+  }, [incidentId, incidentMessage, summary]);
+
   const generateFinalReportText = () => {
-    const raw = summary || '';
+    const raw = (summary || '').replace(/\*\*/g, '').replace(/__/g, '');
 
     // 불필요한 기호/마크다운 제거 (** 는 파싱 후에 제거)
     const stripLine = (s) => s
@@ -682,7 +624,7 @@ export default function ChatSummaryPage() {
     const recovery = getItem(['복구\\s*확인\\s*지표', '복구\\s*확인', '복구지표'], reportBlock) || '확인 지표 대기 중';
     const rawS5    = getItem(['추가\\s*작업\\s*진행\\s*여부', '사후\\s*관리', 'Action\\s*Items'], reportBlock) || '장애 원인 규명 후 수립 예정';
 
-    const finalS5 = additionalNotes ? additionalNotes.trim() : rawS5;
+    const finalS5 = additionalNotes ? `${rawS5}\n  - 그외 처리 사항: ${additionalNotes.trim()}` : rawS5;
 
     return `**1. 장애 내용**
 - 서비스 영향 범위: ${scope}
@@ -772,7 +714,7 @@ export default function ChatSummaryPage() {
         const cleanSmsText = incidentMessage || cleanAiText(summary || '').replace(/\n+/g, ' ').substring(0, 100);
         const pushBody = `해당 문자 오류는 최종 보고 및 완료 처리 되었습니다.\n\n[문자 내용]\n${cleanSmsText}`;
 
-        await fetch(getApiUrl('/push/notify'), {
+        fetch(getApiUrl('/push/notify'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
           body: JSON.stringify({
@@ -784,9 +726,9 @@ export default function ChatSummaryPage() {
             tag: `complete-${incidentId}`,
             priority: 50
           })
-        });
-      } catch (pushErr) {
-        console.warn('Push notification on complete failed:', pushErr);
+        }).catch(pushErr => console.warn('Push notification on complete failed:', pushErr));
+      } catch (e) {
+        console.warn('Failed to construct push notification:', e);
       }
       
       const supMsg = result.recipient_count > 0 
@@ -832,66 +774,7 @@ export default function ChatSummaryPage() {
           <div className="flex items-center gap-1.5 shrink-0">
             {/* 재분석 */}
             <button
-              onClick={() => {
-                setSummary(''); setError(null); setIsLoading(true); setIsStreaming(true);
-                setLoadingStatus('Dify AI 엔진에 재분석을 요청하고 있습니다...');
-                const controller = new AbortController();
-                abortControllerRef.current = controller;
-                (async () => {
-                  try {
-                    const reportInstruction = `최종보고서는 가독성있게 각 순번은 굵게 표시해 작성해주세요.\n1. 장애 내용\n   - 서비스 영향 범위: (예: 카드 승인 지연, 특정 채널 로그인 불가 등)\n   - 주요 현상: (이미지와 로그에서 추출된 구체적 오류 증상)\n\n2. 발생 원인\n   - (기술적 근거를 바탕으로 한 상세 원인 기술)\n\n3. 진행 경과\n   - (타임라인의 핵심 내용을 서술형으로 요약)\n\n4. 상황 종료\n   - 복구 확인 지표: (예: TPS 회복, 에러율 0% 진입 등)\n\n5. 사후 관리 (Action Items)\n   - 추가 작업 진행 여부: (예: 영구 조치 적용 계획, 모니터링 강화 등)`;
-                    const cleanIdForAi = String(incidentId || '').replace(/^INC-/i, '');
-                    const response = await fetch(getApiUrl('/ai/summarize-chat'), {
-                      method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-                      body: JSON.stringify({ 
-                        incident_id: cleanIdForAi,
-                        instructions: reportInstruction,
-                        prompt: reportInstruction
-                      }), 
-                      signal: controller.signal
-                    });
-                    if (!response.ok || !response.body) throw new Error('재분석 요청 실패');
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-                    let buffer = '';
-                    let accumulatedAnswer = '';
-                    let lastUpdateTime = Date.now();
-                    while (true) {
-                      const { value, done } = await reader.read();
-                      if (done) break;
-                      buffer += decoder.decode(value, { stream: true });
-                      const events = buffer.split('\n\n');
-                      buffer = events.pop() || '';
-                      for (const evt of events) {
-                        for (const line of evt.split('\n')) {
-                          if (!line.trim().startsWith('data:')) continue;
-                          const dataStr = line.replace(/^data:\s*/, '').trim();
-                          if (dataStr === '[DONE]') continue;
-                          try {
-                            const data = JSON.parse(dataStr);
-                            if (data.status) setLoadingStatus(data.status);
-                            if (data.answer) {
-                              accumulatedAnswer += data.answer;
-                              const now = Date.now();
-                              if (now - lastUpdateTime > 50) {
-                                setSummary(prev => { const t = prev + accumulatedAnswer; if (t.length > 5) setIsLoading(false); return t; });
-                                accumulatedAnswer = '';
-                                lastUpdateTime = now;
-                              }
-                            }
-                            if (data.error) setError(data.error);
-                          } catch {}
-                        }
-                      }
-                    }
-                    if (accumulatedAnswer) {
-                      setSummary(prev => { const t = prev + accumulatedAnswer; if (t.length > 5) setIsLoading(false); return t; });
-                    }
-                  } catch (err) {
-                    if (err.name !== 'AbortError') setError('재분석 중 오류가 발생했습니다.');
-                  } finally { setIsLoading(false); setIsStreaming(false); }
-                })();
-              }}
+              onClick={triggerAnalysis}
               disabled={isLoading || isStreaming || isGoverning || govSuccess}
               className="p-2 rounded-xl bg-white/5 hover:bg-indigo-500/20 border border-white/10 hover:border-indigo-500/30 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
               title="재분석"
@@ -934,16 +817,36 @@ export default function ChatSummaryPage() {
       <main className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 pb-32 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-4">
 
+          {isTestIncident && (
+            <div className="bg-gradient-to-r from-rose-900/40 to-amber-900/40 border border-rose-500/30 p-4 rounded-2xl flex items-center gap-3 shadow-lg">
+              <CircleAlert className="w-5 h-5 text-rose-400 animate-bounce" />
+              <div className="flex-1 text-left">
+                <h4 className="text-xs font-black text-rose-300 uppercase tracking-wider">시뮬레이션 / 테스트용 데이터</h4>
+                <p className="text-[11px] text-slate-400">본 리포트는 테스트 키워드(테스트, test, demo 등)를 포함하여 감지된 가상 사건의 결과물입니다.</p>
+              </div>
+              <span className="text-[9px] font-bold px-2 py-1 bg-rose-500/20 border border-rose-500/40 rounded-lg text-rose-300 uppercase font-mono">TEST RUN</span>
+            </div>
+          )}
+
           {/* 메타데이터 카드 */}
           <div className="bg-[#1a1f2e] border border-white/10 rounded-2xl overflow-hidden shadow-lg">
             <div className="h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
             <div className="p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3">
-                <div className="bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-mono">
-                  <Sparkles className="w-2.5 h-2.5 text-blue-400" />
-                  <span className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">AI-Generated Report</span>
-                </div>
-                <span className="text-xs font-black text-white uppercase ml-1">장애 대응 Collaborative Timeline</span>
+                {isTestIncident ? (
+                  <div className="bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-mono animate-pulse">
+                    <CircleAlert className="w-2.5 h-2.5 text-rose-400" />
+                    <span className="text-[9px] font-black text-rose-400 uppercase tracking-tighter">TEST / DEMO INCIDENT</span>
+                  </div>
+                ) : (
+                  <div className="bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-mono">
+                    <Sparkles className="w-2.5 h-2.5 text-blue-400" />
+                    <span className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">AI-Generated Report</span>
+                  </div>
+                )}
+                <span className="text-xs font-black text-white uppercase ml-1">
+                  {isTestIncident ? '⚠️ 테스트 모니터링 시뮬레이션' : '장애 대응 Collaborative Timeline'}
+                </span>
               </div>
               <div className="p-3 sm:p-4 bg-white/[0.02] rounded-xl border border-white/5 mb-3 space-y-4">
                 <div className="space-y-1">
@@ -1150,6 +1053,14 @@ export default function ChatSummaryPage() {
                       <RefreshCw className="w-3.5 h-3.5" /> 재분석
                     </button>
                   </div>
+                </div>
+              )}
+
+              {!error && !summary && !isLoading && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                  <FileText className="w-12 h-12 mb-4 opacity-50" />
+                  <p>AI 리포트가 아직 생성되지 않았습니다.</p>
+                  <p className="text-sm mt-2">상단의 '재분석' 버튼을 눌러 분석을 시작하세요.</p>
                 </div>
               )}
 

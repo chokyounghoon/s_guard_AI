@@ -58,6 +58,20 @@ const parseSMS = (message) => {
   return { title, items };
 };
 
+// 🇰🇷 KST 안전 날짜 파서
+const parseDate = (val) => {
+  if (!val) return null;
+  let s = String(val).trim();
+  if (!s.includes('T') && s.length >= 16) {
+    s = s.substring(0, 10) + 'T' + s.substring(11, 16) + (s.length >= 19 ? s.substring(16, 19) : ':00');
+  }
+  if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-') && s.includes('T')) {
+    s += 'Z';
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 const cleanValue = (val) => {
   if (!val) return '';
   let cleaned = val.trim();
@@ -2216,13 +2230,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             const knwStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
             const diffObj = (a, b) => { if (!a) return null; const ms = Math.max(0, (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp)); const totalS = Math.floor(ms / 1000); const h = Math.floor(totalS / 3600); const m = Math.floor((totalS % 3600) / 60); const s2 = totalS % 60; let text = ''; if (h > 0) text = `${h}h ${m}m ${s2}s`; else if (m > 0) text = `${m}m ${s2}s`; else text = `${s2}s`; return { text, min: Math.floor(totalS / 60) }; };
 
-            const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - new Date(smsStep?.timestamp || currentTime);
+            const activeIncident = smsMessages.find(m => m.inc_id === selectedIncidentIdFlow);
+            const finalRegDtStr = activeIncident?.occurrence_time || activeIncident?.reg_dt || smsStep?.timestamp;
+            const diffStart = finalRegDtStr ? parseDate(finalRegDtStr) : new Date(smsStep?.timestamp || currentTime);
+            const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - diffStart;
             const isClosed = !!knwStep;
 
             const steps = [
-              { id: 'SMS', label: '문자수신', done: !!smsStep || !!ragStep || !!warStep || !!knwStep, active: false, dObj: null },
+              { id: 'SMS', label: '장애수신/할당완료', done: !!smsStep || !!ragStep || !!warStep || !!knwStep, active: false, dObj: null },
               { id: 'RAG', label: 'RAG분석완료', done: !!ragStep || !!warStep || !!knwStep, active: !!smsStep && !ragStep, dObj: diffObj(smsStep, ragStep) },
-              { id: 'WARROOM', label: '담당자인지(워룸개설)', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, dObj: diffObj(ragStep, warStep) },
+              { id: 'WARROOM', label: '장애인지(워룸개설완료)', done: !!warStep || !!knwStep, active: !!ragStep && !warStep, dObj: diffObj(ragStep, warStep) },
               { id: 'KNOWLEDGE', label: '처리완료(보고/지식화)', done: !!knwStep, active: !!warStep && !knwStep, dObj: diffObj(warStep, knwStep) }
             ];
 
@@ -2231,8 +2248,49 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             const progressPct = knwStep ? 100 : warStep ? 75 : ragStep ? 50 : smsStep ? 25 : 0;
             const offset = circum - (progressPct / 100) * circum;
 
-            const ringColor = isClosed ? '#10b981' : '#00e5ff';
-            const ringShadow = isClosed ? 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.3))' : 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.5))';
+            const selectedSms = myAssignments.find(a => String(a.inc_id) === String(selectedIncidentIdFlow)) ||
+                                smsMessages.find(a => String(a.inc_id) === String(selectedIncidentIdFlow)) || {};
+
+            const isCritical = !isClosed && (selectedSms.severity === 'CRITICAL');
+            const isMajor = !isClosed && (selectedSms.severity === 'MAJOR');
+
+            const ringColor = isClosed ? '#10b981' : isCritical ? '#ef4444' : isMajor ? '#f97316' : '#00e5ff';
+            const ringColorRGB = isClosed ? '16, 185, 129' : isCritical ? '239, 68, 68' : isMajor ? '249, 115, 22' : '0, 229, 255';
+            const ringShadow = isClosed ? `drop-shadow(0 0 4px rgba(${ringColorRGB}, 0.3))` : `drop-shadow(0 0 10px rgba(${ringColorRGB}, 0.8))`;
+
+            // MTTA Timer Logic
+            const mttaDurationMs = (warStep ? new Date(warStep.timestamp) : currentTime) - diffStart;
+            const isMttaClosed = !!warStep;
+            
+            let mttaRingColor = '#ef4444';
+            let mttaRingColorRGB = '239, 68, 68';
+
+            if (!isMttaClosed) {
+              mttaRingColor = '#ff0000';
+              mttaRingColorRGB = '255, 0, 0';
+            } else {
+              const mttaMinutes = mttaDurationMs / 60000;
+              const incidentHour = diffStart.getHours();
+              const isDaytime = incidentHour >= 9 && incidentHour < 18;
+
+              if (isDaytime) {
+                if (mttaMinutes < 3) {
+                  mttaRingColor = '#10b981'; mttaRingColorRGB = '16, 185, 129';
+                } else if (mttaMinutes < 5) {
+                  mttaRingColor = '#f97316'; mttaRingColorRGB = '249, 115, 22';
+                } else {
+                  mttaRingColor = '#ef4444'; mttaRingColorRGB = '239, 68, 68';
+                }
+              } else {
+                if (mttaMinutes < 5) {
+                  mttaRingColor = '#10b981'; mttaRingColorRGB = '16, 185, 129';
+                } else if (mttaMinutes < 10) {
+                  mttaRingColor = '#f97316'; mttaRingColorRGB = '249, 115, 22';
+                } else {
+                  mttaRingColor = '#ef4444'; mttaRingColorRGB = '239, 68, 68';
+                }
+              }
+            }
 
             return (
               <div className="flex flex-col">
@@ -2313,27 +2371,69 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 </div>
 
                 {/* 애플워치 스타일 활동 링 (Activity Ring) */}
-                <div className="py-8 flex flex-col items-center justify-center bg-gradient-to-b from-black/40 to-transparent relative">
-                  <div className="relative w-52 h-52 flex items-center justify-center">
-                    <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
-                      <defs>
-                        <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor={ringColor} />
-                          <stop offset="100%" stopColor={isClosed ? '#059669' : '#00e5ff'} />
-                        </linearGradient>
-                      </defs>
-                      <circle cx="90" cy="90" r="70" stroke="#1e293b" strokeWidth="12" fill="none" />
-                      <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter={ringShadow} />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">MTTR TIMER</span>
-                      <span className="text-3xl font-black font-mono tracking-tighter tabular-nums" style={{ color: ringColor, textShadow: isClosed ? '0 0 10px rgba(16,185,129,0.3)' : '0 0 15px rgba(0,229,255,0.8)' }}>
-                        {formatDuration(durationMs)}
-                      </span>
-                      <span className={`text-[11px] font-bold mt-2 px-3 py-1 rounded-full border shadow-inner ${isClosed ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-300'}`}>
-                        {isClosed ? '조치 완료 (SAFE)' : '실시간 대응 중'}
-                      </span>
+                <div className="py-6 flex flex-col items-center justify-center bg-gradient-to-b from-black/40 to-transparent relative shrink-0">
+                  <div className="flex flex-row flex-wrap items-center justify-center gap-4 px-2">
+                    
+                    {/* MTTA Ring */}
+                    <div className="relative w-[145px] h-[145px] flex items-center justify-center">
+                      <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
+                        <defs>
+                          <linearGradient id="mttaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor={mttaRingColor} />
+                            <stop offset="100%" stopColor={mttaRingColor} />
+                          </linearGradient>
+                        </defs>
+                        {!isMttaClosed && (
+                          <circle cx="90" cy="90" r="70" stroke={mttaRingColor} strokeWidth="16" fill="none" className="animate-ping opacity-30" />
+                        )}
+                        <circle cx="90" cy="90" r="70" stroke="url(#mttaGradient)" strokeWidth={!isMttaClosed ? "14" : "12"} fill="none" strokeDasharray={circum} strokeDashoffset={isMttaClosed ? 0 : offset} strokeLinecap="round" className="transition-all duration-1000" filter={`drop-shadow(0 0 ${!isMttaClosed ? '15px' : '6px'} rgba(${mttaRingColorRGB}, ${!isMttaClosed ? '0.9' : '0.4'}))`} style={!isMttaClosed ? { animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : {}} />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1">
+                        <span className={`text-[8.5px] font-black uppercase tracking-wider mb-0.5 ${!isMttaClosed ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>MTTA TIMER</span>
+                        <span className="text-[20px] font-black font-mono tracking-tighter tabular-nums" style={{ color: mttaRingColor, textShadow: isMttaClosed ? `0 0 6px rgba(${mttaRingColorRGB},0.3)` : `0 0 15px rgba(${mttaRingColorRGB},1)` }}>
+                          {formatDuration(mttaDurationMs)}
+                        </span>
+                        <span className={`text-[8.5px] font-black mt-1 px-2 py-0.5 rounded-full border shadow-inner transition-all ${
+                          isMttaClosed 
+                            ? 'bg-white/10 border-white/20 text-slate-300' 
+                            : 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse shadow-[0_0_10px_rgba(255,0,0,0.5)]'
+                        }`}>
+                          {isMttaClosed ? '인지 완료' : '대기 중'}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* MTTR Ring */}
+                    <div className="relative w-[145px] h-[145px] flex items-center justify-center">
+                      <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
+                        <defs>
+                          <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor={ringColor} />
+                            <stop offset="100%" stopColor={isClosed ? '#059669' : ringColor} />
+                          </linearGradient>
+                        </defs>
+                        <circle cx="90" cy="90" r="70" stroke="#1e293b" strokeWidth="12" fill="none" />
+                        <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter={ringShadow} />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1">
+                        <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">MTTR TIMER</span>
+                        <span className="text-[20px] font-black font-mono tracking-tighter tabular-nums" style={{ color: ringColor, textShadow: isClosed ? `0 0 6px rgba(${ringColorRGB},0.3)` : `0 0 12px rgba(${ringColorRGB},0.8)` }}>
+                          {formatDuration(durationMs)}
+                        </span>
+                        <span className={`text-[8.5px] font-bold mt-1 px-2 py-0.5 rounded-full border shadow-inner ${isClosed ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-300'}`}>
+                          {isClosed ? '조치 완료' : '대응 중'}
+                        </span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* 하단 등급 기준 안내 */}
+                  <div className="mt-4 text-[9px] text-slate-500 tracking-tighter whitespace-nowrap px-3 border border-white/5 bg-black/20 rounded-lg py-1.5 shadow-inner w-fit mx-auto">
+                    <span className="font-bold text-slate-400 mr-1">MTTA 등급 기준</span> 
+                    <span className="text-emerald-400 ml-1">상:</span> 주간3분, 야간5분 <span className="mx-0.5 text-slate-600">|</span> 
+                    <span className="text-orange-400">중:</span> 주간3~5분, 야간5~10분 <span className="mx-0.5 text-slate-600">|</span> 
+                    <span className="text-red-400">하:</span> 주간5분 이상, 야간10분 이상
                   </div>
                 </div>
 

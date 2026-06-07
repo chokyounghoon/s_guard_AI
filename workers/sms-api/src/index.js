@@ -3562,7 +3562,10 @@ app.post('/sms/receive', async (c) => {
     "SELECT inc_id, received_count FROM received_messages WHERE message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
   ).bind(message, tenMinsAgo).first()
 
-  const parsedCount = extractOccurrence(occurrence_count);
+  let parsedCount = extractOccurrence(occurrence_count);
+  if (parsedCount === 0 && message) {
+    parsedCount = extractOccurrence(message);
+  }
   const currentCount = existing ? (existing.received_count || 1) + 1 : (parsedCount > 0 ? parsedCount : 1);
 
   // --- Calculate Severity dynamically based on Alert Monitor Settings ---
@@ -3848,7 +3851,7 @@ app.post('/sms/receive', async (c) => {
         ORDER BY PRIORITY ASC LIMIT 1
       `).bind(now, now).first();
 
-      if (strategy && checkValidConditions(strategy.VALID_CONDITIONS, now)) {
+      if (strategy && checkValidConditions(strategy.VALID_CONDITIONS, now, alertSeverity)) {
         console.log(`[S-callert] Triggering internal IGW event for strategy ${strategy.STRATEGY_ID}, inc_id: ${newIncId}`);
         const payload = {
           igw_txn_id: `INC_${newIncId}_${Date.now()}`,
@@ -3856,7 +3859,7 @@ app.post('/sms/receive', async (c) => {
           event_type: 'TRIGGER',
           inc_id: newIncId,
           message: message,
-          severity: 'CRITICAL',
+          severity: alertSeverity,
           occurred_at: now,
           employee_id: employee_id
         };
@@ -6202,7 +6205,7 @@ app.post('/ai/generate-report', async (c) => {
   // 1. 모든 테이블 JOIN 조회
   // ────────────────────────────────────────────────────
   const [wr, sms, insight] = await Promise.all([
-    db.prepare("SELECT * FROM warroom_list WHERE inc_id = ?").bind(rawId).first(),
+    db.prepare("SELECT w.*, u.name as creator_name FROM warroom_list w LEFT JOIN users u ON w.creator_id = u.employee_id WHERE w.inc_id = ?").bind(rawId).first(),
     db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(rawId).first(),
     db.prepare("SELECT content, severity, category FROM autopilot_insight WHERE inc_id = ?").bind(rawId).first(),
   ])
@@ -6219,7 +6222,9 @@ app.post('/ai/generate-report', async (c) => {
   const title = wr?.title || incident_id
   const severity = wr?.severity || 'NORMAL'
   const status = wr?.status || '-'
-  const creator = wr?.creator_id || '-'
+  const creatorId = wr?.creator_id || '-'
+  const creatorName = wr?.creator_name || ''
+  const creatorDisplay = creatorName ? `${creatorId} (${creatorName})` : creatorId
   const createdAt = wr?.reg_dt || '-'
   const smsMsg = sms ? `발신자: ${sms.sender}\n메시지: ${sms.message}` : '(SMS 정보 없음)'
   const insightTxt = insight?.content || ''
@@ -6232,6 +6237,15 @@ app.post('/ai/generate-report', async (c) => {
   const durationMin = firstEvent && lastEvent
     ? Math.max(0, Math.round((new Date(lastEvent) - new Date(firstEvent)) / 60000))
     : 0
+
+  let mttaText = '-';
+  if (sms?.timestamp && wr?.reg_dt) {
+    const diff = Math.round((new Date(wr.reg_dt) - new Date(sms.timestamp)) / 60000);
+    mttaText = `약 ${Math.max(0, diff)}분`;
+  } else if (wr?.reg_dt && firstEvent) {
+    const diff = Math.round((new Date(wr.reg_dt) - new Date(firstEvent)) / 60000);
+    mttaText = `약 ${Math.max(0, diff)}분`;
+  }
 
   // 에이전트별 분석
   const agentMap = {}
@@ -6279,8 +6293,9 @@ app.post('/ai/generate-report', async (c) => {
 |------|------|
 | **심각도** | ${severityEmoji} ${severity} |
 | **발생 일시** | ${createdAt} |
-| **담당자** | ${creator} |
+| **담당자** | ${creatorDisplay} |
 | **대상 시스템** | ${title.split('|').slice(-1)[0]?.trim() || title} |
+| **MTTA (워룸 개설)** | ${mttaText} |
 | **총 대응 시간** | 약 ${durationMin}분 |
 | **채팅 메시지** | ${userChats.length}건 |
 | **첨부파일** | ${(attachments || []).length}건 |
@@ -6531,6 +6546,16 @@ app.get('/ai/agent-discussion/:id', async (c) => {
 })
 
 // --- Chat Summary Database Endpoints ---
+app.get('/debug/dify-logs', async (c) => {
+  const db = c.env.DB
+  try {
+    const res = await db.prepare("SELECT * FROM dify_debug_logs ORDER BY id DESC LIMIT 20").all()
+    return c.json(res.results || [])
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
 app.get('/db/summary/:inc_id', async (c) => {
   const raw_id = c.req.param('inc_id')
   const inc_id = String(raw_id).trim()
@@ -6568,11 +6593,13 @@ app.post('/ai/summarize-chat', async (c) => {
   const kv = c.env.SMS_STORAGE
   const api_key = "app-owwPp3j2qAvVDZpW2UUiY8L3"
   const api_base = c.env.DIFY_API_BASE || 'https://api.dify.ai/v1'
+  const apiBaseUrl = new URL(c.req.url).origin;
 
   if (!incident_id) return c.json({ error: 'incident_id is required' }, 400)
 
   // ID Normalization: Use raw numeric ID (no INC- prefix) for database operations
   const cleanId = String(incident_id || '').replace(/^INC-/i, '');
+  const incIdWithPrefix = `INC-${cleanId}`;
   // Use cleanId directly as the primary identifier
 
   const { readable, writable } = new TransformStream()
@@ -6581,14 +6608,29 @@ app.post('/ai/summarize-chat', async (c) => {
 
     ; (async () => {
       try {
-        // 1. Parallel DB fetch - incident status + cache + timeline data
-        const [incident, cached, incDetail, wfLogsResult] = await Promise.all([
-          db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
+        // 1. Parallel DB fetch - incident status + cache + timeline data + source SMS
+        const [incident, cached, incDetail, wfLogsResult, smsSource, warroomInfo] = await Promise.all([
+          db.prepare("SELECT status FROM incidents WHERE inc_id = ?").bind(incIdWithPrefix).first(),
           db.prepare("SELECT summary FROM chat_summaries WHERE inc_id = ?").bind(cleanId).first(),
-          db.prepare("SELECT inc_id, reg_dt, created_at, title FROM incidents WHERE inc_id = ?").bind(cleanId).first(),
-          db.prepare("SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC").bind(cleanId).all().catch(() => ({ results: [] }))
+          db.prepare("SELECT inc_id, reg_dt, created_at, title, description, severity FROM incidents WHERE inc_id = ?").bind(incIdWithPrefix).first(),
+          db.prepare("SELECT step_id, completed_at FROM workflow_steps WHERE inc_id = ? ORDER BY completed_at ASC").bind(cleanId).all().catch(() => ({ results: [] })),
+          // Fetch original SMS content from received_messages
+          db.prepare("SELECT message, sender, timestamp FROM received_messages WHERE inc_id = ? OR inc_id = ? ORDER BY timestamp ASC LIMIT 5").bind(incIdWithPrefix, cleanId).all().catch(() => ({ results: [] })),
+          // Fetch warroom basic info
+          db.prepare("SELECT msg, severity, created_at FROM warroom_list WHERE inc_id = ? OR inc_id = ? LIMIT 1").bind(incIdWithPrefix, cleanId).first().catch(() => null)
         ]);
         const wfLogs = wfLogsResult?.results || [];
+        const smsMessages = smsSource?.results || [];
+
+        // Detect test incident
+        const allText = [incDetail?.title, incDetail?.description, incDetail?.message, warroomInfo?.msg, ...smsMessages.map(s => s.message)].join(' ');
+        const isTestIncident = /테스트|test|TEST|샘플|sample|demo|데모/i.test(allText);
+        const testLabel = isTestIncident ? '\n⚠️ [테스트 인시던트로 감지됨 - 실제 장애 데이터가 아닐 수 있습니다]\n' : '';
+
+        console.log(`[AI Summarize] incDetail:`, JSON.stringify(incDetail));
+        console.log(`[AI Summarize] smsMessages count: ${smsMessages.length}`, JSON.stringify(smsMessages));
+        console.log(`[AI Summarize] warroomInfo:`, JSON.stringify(warroomInfo));
+        console.log(`[AI Summarize] isTestIncident: ${isTestIncident}`);
 
         const finalStatuses = ['CLOSED', 'Completed', '처리완료', '완료', '최종완료', 'INC_003'];
         const isFinal = finalStatuses.includes(incident?.status || 'Open');
@@ -6670,8 +6712,8 @@ app.post('/ai/summarize-chat', async (c) => {
           await kv.put(lockKey, 'processing', { expirationTtl: 60 });
         }
 
-        // 3. Fetch ONLY user chat history - Using numeric ID
-        const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id = ? AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(cleanId).all()
+        // 3. Fetch ONLY user chat history - Using both prefixed and raw ID
+        const { results: wrResults } = await db.prepare("SELECT wc.*, u.name as sender_name, u.profile_picture FROM warroom_chats wc LEFT JOIN users u ON (wc.sender = u.employee_id OR wc.sender = u.name) WHERE wc.inc_id IN (?, ?) AND wc.type NOT IN ('system', 'ai_analysis') ORDER BY wc.timestamp ASC").bind(incIdWithPrefix, cleanId).all()
 
         // (incDetail and wfLogs already fetched above in parallel)
         const wfLogs_data = wfLogs;
@@ -6705,20 +6747,275 @@ app.post('/ai/summarize-chat', async (c) => {
 
         combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
 
+        const imageUrls = [];
         for (const msg of combined) {
           if (msg.text) {
-            const ts = toKST(msg.timestamp);
-            transcript.push(`[${ts || '--:--:--'}] [${msg.role}] ${msg.sender}: ${msg.text}`);
+            if (msg.text && (msg.text.startsWith('[첨부파일]') || msg.text.includes('첨부파일'))) {
+              const pipeContent = msg.text.replace('[첨부파일]', '').replace('[첨부파일] ', '').trim();
+              const parts = pipeContent.split('|');
+              if (parts.length >= 2) {
+                const mime = (parts[2] || '').trim();
+                if (!mime || mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|heic)$/i.test(parts[0])) {
+                  let url = parts[1].trim();
+                  if (url.startsWith('/')) url = `${apiBaseUrl}${url}`;
+                  if (!imageUrls.includes(url)) imageUrls.push(url);
+                }
+              } else {
+                const match = msg.text.match(/\(([^)]+\.(jpg|jpeg|png|gif|webp|bmp))\)/i);
+                if (match) {
+                  let url = match[1].trim();
+                  if (url.startsWith('/')) url = `${apiBaseUrl}${url}`;
+                  if (!imageUrls.includes(url)) imageUrls.push(url);
+                }
+              }
+            }
           }
         }
 
-        // Dify에 전달할 최종 컨텍스트: 인시던트 타임라인 + 채팅 로그
+        // Run visual analysis on each unique image using DIFY_API_KEY_DASHBOARD (which supports vision)
+        const imageDescriptions = {};
+        if (imageUrls.length > 0) {
+          console.log(`[AI Summarize] Starting pre-analysis for ${imageUrls.length} images...`);
+          await writer.write(encode(`data: ${JSON.stringify({ status: `📸 첨부 이미지(${imageUrls.length}개) 분석을 시작합니다...` })}\n\n`));
+          
+          const dashboardKey = c.env.DIFY_API_KEY_DASHBOARD || fallbackKey;
+          
+          const analysisPromises = imageUrls.map(async (url) => {
+            try {
+              let path = url;
+              if (path.startsWith('http://') || path.startsWith('https://')) {
+                try { path = new URL(path).pathname; } catch(e) {}
+              }
+              const key = decodeURIComponent(path.replace(/^\/warroom\/asset\//, ''));
+              console.log(`[AI Summarize] Fetching from R2 for pre-analysis: ${key}`);
+              const object = await c.env.WARROOM_ASSETS.get(key);
+              if (!object) {
+                console.warn(`[AI Summarize] Image not found in R2: ${key}`);
+                return;
+              }
+
+              const arrayBuffer = await new Response(object.body).arrayBuffer();
+              const fileName = key.split('/').pop() || 'image.png';
+              const fileType = object.httpMetadata?.contentType || 'image/png';
+              
+              // Upload file to Dify using Blob object (Cloudflare Workers compat)
+              const getFormData = () => {
+                const formData = new FormData();
+                const blob = new Blob([arrayBuffer], { type: fileType });
+                formData.append('file', blob, fileName);
+                formData.append('user', 'sguard-worker');
+                return formData;
+              };
+              
+              let useMultimodal = false;
+              let uploadData = null;
+              
+              // 1. Try uploading with dashboardKey
+              let uploadRes = await fetch(`${api_base}/files/upload`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${dashboardKey}`
+                },
+                body: getFormData()
+              });
+              
+              if (uploadRes.ok) {
+                uploadData = await uploadRes.json();
+              } else {
+                const errText = await uploadRes.text();
+                console.warn(`[AI Summarize] Pre-analysis upload with dashboardKey failed: ${errText}. Trying Multimodal...`);
+                try {
+                  await db.prepare(`
+                    INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
+                    VALUES (?, 'DIFY_VISION_UPLOAD_PRIMARY_FAIL', ?, ?, ?)
+                  `).bind(cleanId, fileName, uploadRes.status, errText).run();
+                } catch(le) {}
+                useMultimodal = true;
+              }
+
+              let analyzeRes = null;
+              if (!useMultimodal && uploadData && uploadData.id) {
+                // Try chat-messages with dashboardKey
+                analyzeRes = await fetch(`${api_base}/chat-messages`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${dashboardKey}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    inputs: {},
+                    query: "이 이미지에 나타난 에러 로그, 차트, 화면 캡쳐의 모든 텍스트와 의미를 상세히 분석하고 설명해줘. 특히 에러 메시지, 장애 현상, 또는 상태 값을 상세하게 텍스트로 추출해서 한국어로 설명해줘.",
+                    response_mode: "blocking",
+                    user: "sguard-worker",
+                    files: [
+                      {
+                        type: "image",
+                        transfer_method: "local_file",
+                        upload_file_id: uploadData.id
+                      }
+                    ]
+                  })
+                });
+                
+                if (analyzeRes.ok) {
+                  const analyzeData = await analyzeRes.json();
+                  const desc = analyzeData.answer || "";
+                  if (desc) {
+                    console.log(`[AI Summarize] Pre-analysis success (Primary) for ${fileName}: ${desc.substring(0, 100)}...`);
+                    imageDescriptions[url] = desc;
+                    await writer.write(encode(`data: ${JSON.stringify({ status: `📸 이미지 [${fileName}] 분석 완료` })}\n\n`));
+                  }
+                } else {
+                  const errText = await analyzeRes.text();
+                  console.warn(`[AI Summarize] Pre-analysis chat with dashboardKey failed: ${errText}. Falling back to Multimodal...`);
+                  try {
+                    await db.prepare(`
+                      INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
+                      VALUES (?, 'DIFY_VISION_ANALYZE_PRIMARY_FAIL', ?, ?, ?)
+                    `).bind(cleanId, uploadData.id, analyzeRes.status, errText).run();
+                  } catch(le) {}
+                  useMultimodal = true;
+                }
+              }
+
+              if (useMultimodal || !analyzeRes || !analyzeRes.ok) {
+                console.log(`[AI Summarize] Running pre-analysis using Multimodal OCR key...`);
+                // Upload with Multimodal key
+                const multiUploadRes = await fetch(`${api_base}/files/upload`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer app-NKmE6uOd6n7FteajnHh1xXuf`
+                  },
+                  body: getFormData()
+                });
+                
+                if (!multiUploadRes.ok) {
+                  const errText = await multiUploadRes.text();
+                  console.error(`[AI Summarize] Multimodal upload failed: ${errText}`);
+                  try {
+                    await db.prepare(`
+                      INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
+                      VALUES (?, 'DIFY_VISION_UPLOAD_FALLBACK_FAIL', ?, ?, ?)
+                    `).bind(cleanId, fileName, multiUploadRes.status, errText).run();
+                  } catch(le) {}
+                  return;
+                }
+                
+                const multiUploadData = await multiUploadRes.json();
+                if (multiUploadData && multiUploadData.id) {
+                  const multiAnalyzeRes = await fetch(`${api_base}/chat-messages`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer app-NKmE6uOd6n7FteajnHh1xXuf`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      inputs: {
+                        sms_image: {
+                          type: "image",
+                          transfer_method: "local_file",
+                          upload_file_id: multiUploadData.id
+                        }
+                      },
+                      query: "이 이미지에 나타난 에러 로그, 차트, 화면 캡쳐의 모든 텍스트와 의미를 상세히 분석하고 설명해줘. 특히 에러 메시지, 장애 현상, 또는 상태 값을 상세하게 텍스트로 추출해서 한국어로 설명해줘.",
+                      response_mode: "blocking",
+                      user: "sguard-worker"
+                    })
+                  });
+                  
+                  if (multiAnalyzeRes.ok) {
+                    const analyzeData = await multiAnalyzeRes.json();
+                    const desc = analyzeData.answer || "";
+                    if (desc) {
+                      console.log(`[AI Summarize] Pre-analysis success (Multimodal Fallback) for ${fileName}: ${desc.substring(0, 100)}...`);
+                      imageDescriptions[url] = desc;
+                      await writer.write(encode(`data: ${JSON.stringify({ status: `📸 이미지 [${fileName}] 분석 완료` })}\n\n`));
+                    }
+                  } else {
+                    const errText = await multiAnalyzeRes.text();
+                    console.error(`[AI Summarize] Multimodal analysis failed: ${errText}`);
+                    try {
+                      await db.prepare(`
+                        INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
+                        VALUES (?, 'DIFY_VISION_ANALYZE_FALLBACK_FAIL', ?, ?, ?)
+                      `).bind(cleanId, multiUploadData.id, multiAnalyzeRes.status, errText).run();
+                    } catch(le) {}
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(`[AI Summarize] Error during pre-analysis of image ${url}:`, err);
+            }
+          });
+
+          await Promise.all(analysisPromises);
+        }
+
+        // Now build transcript with enriched image descriptions
+        for (const msg of combined) {
+          if (msg.text) {
+            const ts = toKST(msg.timestamp);
+            let msgText = msg.text;
+
+            if (msg.text && (msg.text.startsWith('[첨부파일]') || msg.text.includes('첨부파일'))) {
+              const pipeContent = msg.text.replace('[첨부파일]', '').replace('[첨부파일] ', '').trim();
+              const parts = pipeContent.split('|');
+              if (parts.length >= 2) {
+                const mime = (parts[2] || '').trim();
+                if (!mime || mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|heic)$/i.test(parts[0])) {
+                  let url = parts[1].trim();
+                  if (url.startsWith('/')) url = `${apiBaseUrl}${url}`;
+                  const desc = imageDescriptions[url];
+                  if (desc) {
+                    msgText += `\n[첨부 이미지 분석 내용: ${desc}]`;
+                  } else {
+                    msgText += ` [이미지 URL: ${url}]`;
+                  }
+                }
+              } else {
+                const match = msg.text.match(/\(([^)]+\.(jpg|jpeg|png|gif|webp|bmp))\)/i);
+                if (match) {
+                  let url = match[1].trim();
+                  if (url.startsWith('/')) url = `${apiBaseUrl}${url}`;
+                  const desc = imageDescriptions[url];
+                  if (desc) {
+                    msgText += `\n[첨부 이미지 분석 내용: ${desc}]`;
+                  } else {
+                    msgText += ` [이미지 URL: ${url}]`;
+                  }
+                }
+              }
+            }
+
+            transcript.push(`[${ts || '--:--:--'}] [${msg.role}] ${msg.sender}: ${msgText}`);
+          }
+        }
+
+        // Dify에 전달할 최종 컨텍스트: 수신 내용 + 인시던트 타임라인 + 채팅 로그
         const chatLogForDify = [
-          timelineCtx.length > 0 ? `=== 인시던트 이벤트 타임라인 ===
-${timelineCtx.join('\n')}
-` : '',
+          testLabel,
+          `=== 장애/알람 수신 내용 ===`,
+          // SMS 원문 우선
+          ...(smsMessages.length > 0
+            ? smsMessages.map(s => `[SMS 원문] ${s.sender || 'Unknown'} (${s.timestamp || ''}):\n${s.message || ''}` )
+            : []),
+          // 인시던트 상세
+          incDetail?.description ? `[장애 설명] ${incDetail.description}` : '',
+          incDetail?.message ? `[장애 메시지] ${incDetail.message}` : '',
+          incDetail?.title ? `[장애 제목] ${incDetail.title}` : '',
+          warroomInfo?.msg ? `[워룸 원문] ${warroomInfo.msg}` : '',
+          (!incDetail?.description && !incDetail?.message && !incDetail?.title && !warroomInfo?.msg && smsMessages.length === 0)
+            ? `(수신된 알람 텍스트 없음 - incident_id: ${cleanId})` : '',
+          `\n=== 인시던트 심각도 ===`,
+          `심각도: ${incDetail?.severity || warroomInfo?.severity || '미분류'}`,
+          timelineCtx.length > 0 ? `\n=== 인시던트 이벤트 타임라인 ===\n${timelineCtx.join('\n')}\n` : '',
           `=== 워룸 채팅 내역 ===`,
-          ...transcript
+          ...(transcript.length > 0 ? transcript : [
+            '(현재 생성된 워룸 채팅 내역이 없습니다.)',
+            '반드시 최상단의 [장애/알람 수신 내용]을 핵심으로 보고서를 작성하세요.',
+            '⚠️ 중요 지침: 이전 유사 사례(Knowledge Base)를 검색하되, 현재 알람 내용에 없는 에러 로그나 조치 내역을 지어내거나 그대로 복사하지 마세요.',
+            '⚠️ 중요 지침: 만약 내용이나 이미지가 사람 얼굴 등 장애와 무관한 테스트 데이터라면, 허위로 원인을 지어내지 말고 "관련 데이터 없음"이라고 명시하세요.'
+          ])
         ].filter(Boolean).join('\n');
 
         await writer.write(encode(`data: ${JSON.stringify({ status: 'Dify AI 분석 엔진을 구동하고 있습니다...' })}\n\n`));
@@ -6736,7 +7033,7 @@ ${timelineCtx.join('\n')}
         const totalTimeoutController = new AbortController();
         const totalTimeoutId = setTimeout(() => {
           totalTimeoutController.abort();
-        }, 90000); // 90 seconds hard limit (Dify workflow can be slow)
+        }, 180000); // 180 seconds hard limit (Vision workflow can be very slow)
 
         let difyRes = null;
         const primaryKey = api_key;
@@ -6745,6 +7042,58 @@ ${timelineCtx.join('\n')}
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             const currentKey = (attempt === 2 && fallbackKey) ? fallbackKey : primaryKey;
+
+            // Upload images to Dify using the current key
+            const difyFileObjects = [];
+            for (const url of imageUrls) {
+              try {
+                let path = url;
+                if (path.startsWith('http://') || path.startsWith('https://')) {
+                  try { path = new URL(path).pathname; } catch(e) {}
+                }
+                const key = decodeURIComponent(path.replace(/^\/warroom\/asset\//, ''));
+                console.log(`[AI Summarize] [Attempt ${attempt}] Fetching from R2. Key: ${key}`);
+                const object = await c.env.WARROOM_ASSETS.get(key);
+                if (object) {
+                  const arrayBuffer = await new Response(object.body).arrayBuffer();
+                  const fileName = key.split('/').pop() || 'image.png';
+                  
+                  const uploadFormData = new FormData();
+                  const fileType = object.httpMetadata?.contentType || 'image/png';
+                  uploadFormData.append('file', new Blob([arrayBuffer], { type: fileType }), fileName);
+                  uploadFormData.append('user', 'sguard-worker');
+                  
+                  const uploadRes = await fetch(`${api_base}/files/upload`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${currentKey}`
+                    },
+                    body: uploadFormData
+                  });
+                  
+                  if (uploadRes.ok) {
+                    const uploadData = await uploadRes.json();
+                    if (uploadData && uploadData.id) {
+                      console.log(`[AI Summarize] [Attempt ${attempt}] Uploaded image. File ID: ${uploadData.id}`);
+                      difyFileObjects.push({
+                        type: "image",
+                        transfer_method: "local_file",
+                        upload_file_id: uploadData.id
+                      });
+                    }
+                  } else {
+                    const errText = await uploadRes.text();
+                    console.error(`[AI Summarize] [Attempt ${attempt}] Dify image upload failed. Status: ${uploadRes.status}, Error: ${errText}`);
+                  }
+                }
+              } catch (e) {
+                console.error(`[AI Summarize] [Attempt ${attempt}] Error uploading image ${url}:`, e.message);
+              }
+            }
+
+            // Debug: Log what we're sending to Dify
+            console.log(`[AI Summarize] Sending to Dify - chat_log length: ${chatLogForDify.length} chars, images: ${difyFileObjects.length}`, JSON.stringify(difyFileObjects));
+            console.log(`[AI Summarize] transcript lines: ${transcript.length}, incDetail:`, JSON.stringify(incDetail));
 
             difyRes = await fetch(`${api_base}/workflows/run`, {
               method: 'POST',
@@ -6755,13 +7104,58 @@ ${timelineCtx.join('\n')}
               },
               signal: totalTimeoutController.signal,
               body: JSON.stringify({
-                inputs: { chat_log: chatLogForDify, incident_images: [] },
+                inputs: { 
+                  chat_log: chatLogForDify, 
+                  incident_images: difyFileObjects 
+                },
+                files: difyFileObjects,
                 response_mode: 'streaming',
                 user: 'sguard-worker'
               })
             });
 
-            if (difyRes.ok) break;
+            if (!difyRes.ok) {
+              const errText = await difyRes.text().catch(() => 'No response body');
+              console.warn(`[AI Summarize] Dify workflow run with files failed (Status: ${difyRes.status}, Error: ${errText}). Retrying WITHOUT files parameter...`);
+              try {
+                await db.prepare(`
+                  INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
+                  VALUES (?, 'DIFY_WORKFLOW_RUN_WITH_FILES_FAIL', ?, ?, ?)
+                `).bind(cleanId, `Attempt ${attempt} | Key: ${currentKey ? currentKey.substring(0, 12) : 'none'}...`, difyRes.status, errText).run();
+              } catch(le) {}
+
+              // Fallback run: remove files parameters
+              difyRes = await fetch(`${api_base}/workflows/run`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${currentKey}`,
+                  'Content-Type': 'application/json',
+                  'Accept': 'text/event-stream'
+                },
+                signal: totalTimeoutController.signal,
+                body: JSON.stringify({
+                  inputs: { 
+                    chat_log: chatLogForDify, 
+                    incident_images: [] 
+                  },
+                  response_mode: 'streaming',
+                  user: 'sguard-worker'
+                })
+              });
+            }
+
+            if (difyRes.ok) {
+              break;
+            } else {
+              const errText = await difyRes.text().catch(() => 'No response body');
+              console.error(`[AI Summarize] Dify workflow run without files also failed. Status: ${difyRes.status}, Error: ${errText}`);
+              try {
+                await db.prepare(`
+                  INSERT INTO dify_debug_logs (inc_id, api_endpoint, request_payload, status_code, error_message)
+                  VALUES (?, 'DIFY_WORKFLOW_RUN_WITHOUT_FILES_FAIL', ?, ?, ?)
+                `).bind(cleanId, `Attempt ${attempt}`, difyRes.status, errText).run();
+              } catch(le) {}
+            }
 
             if (attempt < 2 && (difyRes.status >= 500 || difyRes.status === 429)) {
               const delay = difyRes.status === 429 ? 3000 : 2000;
@@ -6780,7 +7174,8 @@ ${timelineCtx.join('\n')}
         clearInterval(heartbeatId);
 
         if (!difyRes || !difyRes.ok) {
-          throw new Error(`Dify API error: ${difyRes?.status || 'Unknown'}`);
+          const errText = difyRes ? await difyRes.text().catch(() => 'No response body') : 'No response';
+          throw new Error(`Dify API error: ${difyRes?.status || 'Unknown'} - ${errText}`);
         }
 
 
@@ -6808,6 +7203,18 @@ ${timelineCtx.join('\n')}
             try {
               const data = JSON.parse(dataStr)
 
+              // 🚀 Log Dify internal status to frontend so user knows it's working
+              if (data.event === 'workflow_started') {
+                await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 워크플로우 시작...' })}\n\n`));
+              } else if (data.event === 'node_started') {
+                const nodeName = data.data?.node_type || '노드';
+                await writer.write(encode(`data: ${JSON.stringify({ status: `[${nodeName}] 분석 중...` })}\n\n`));
+              } else if (data.event === 'error') {
+                console.error('[Dify Stream Error]', data);
+                await writer.write(encode(`data: ${JSON.stringify({ error: `Dify 내부 오류: ${data.message || data.code}` })}\n\n`));
+                break;
+              }
+
               // 🚀 Support Both Chat Apps and Workflow Apps
               if (data.event === 'message' || data.event === 'agent_message') {
                 // Standard Chat App events
@@ -6817,7 +7224,7 @@ ${timelineCtx.join('\n')}
                 }
                 fullContent += (data.answer || "");
                 await writer.write(encode(`data: ${JSON.stringify({ answer: data.answer })}\n\n`))
-              } else if (data.event === 'text_chunk') {
+              } else if (data.event === 'text_chunk' || data.event === 'node_chunk') {
                 // Streaming LLM node in Workflow
                 if (firstChunk) {
                   await writer.write(encode(`data: ${JSON.stringify({ status: 'AI 분석 결과 수신 중...' })}\n\n`));
@@ -6832,7 +7239,8 @@ ${timelineCtx.join('\n')}
                 if (outputs) {
                   // Try to find the primary text output (result, text, output, etc.)
                   const workflowResult = outputs.text || outputs.result || outputs.output ||
-                    (Object.values(outputs).find(v => typeof v === 'string') || "");
+                    (Object.values(outputs).find(v => typeof v === 'string')) ||
+                    (typeof outputs === 'object' ? JSON.stringify(outputs) : String(outputs));
 
                   // If we haven't received anything through text_chunks, or if this is the final summary
                   if (workflowResult && (!fullContent || !fullContent.includes(workflowResult.substring(0, 10)))) {
@@ -6844,8 +7252,14 @@ ${timelineCtx.join('\n')}
                     await writer.write(encode(`data: ${JSON.stringify({ answer: workflowResult })}\n\n`))
                   }
                 }
+                await writer.write(encode(`data: ${JSON.stringify({ status: '분석 완료' })}\n\n`));
               }
-            } catch (e) { continue }
+            } catch (e) { 
+              // If writer.write fails, the client disconnected. We should stop processing.
+              console.log('[AI Summarize] Client disconnected, aborting Dify stream');
+              if (difyRes && difyRes.body) difyRes.body.cancel().catch(()=>{});
+              break; 
+            }
           }
         }
 
@@ -6863,7 +7277,6 @@ ${timelineCtx.join('\n')}
         `).bind(cleanId, fullContent, nowKst, nowKst).run();
         }
 
-        if (kv) await kv.delete(lockKey);
         await writer.write(encode('data: [DONE]\n\n'))
       } catch (e) {
         console.error('Summarize-Chat error:', e)
@@ -6873,6 +7286,14 @@ ${timelineCtx.join('\n')}
 
         await writer.write(encode(`data: ${JSON.stringify({ error: errorMsg, status: '분석 중단됨' })}\n\n`))
       } finally {
+        if (kv) {
+          try {
+            await kv.delete(lockKey);
+            console.log(`[AI Summarize] Released KV lock for ${cleanId}`);
+          } catch (lockErr) {
+            console.error(`[AI Summarize] Error releasing KV lock:`, lockErr);
+          }
+        }
         await writer.close()
       }
     })()
@@ -9010,7 +9431,7 @@ app.post('/warroom/chat', async (c) => {
     "INSERT INTO warroom_chats (inc_id, seq, sender, name, role, type, text, timestamp, reg_id, reg_dt, mod_id, mod_dt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).bind(incident_id, seq, senderId, name || sender_name || senderId, role || 'user', type || 'user', text, now, senderId, now, senderId, now).run()
 
-  return c.json({ status: 'saved' })
+  return c.json({ status: 'saved', seq: seq })
 })
 
 // Warroom chat delete (permanently wipe from DB)
@@ -9103,8 +9524,10 @@ app.post('/warroom/upload', async (c) => {
 })
 
 // Serve attachment file from R2
-app.get('/warroom/asset/:key', async (c) => {
-  const key = decodeURIComponent(c.req.param('key'))
+app.get('/warroom/asset/*', async (c) => {
+  // Extract everything after '/warroom/asset/' as the R2 key
+  const raw = c.req.path.replace(/^\/warroom\/asset\//, '');
+  const key = decodeURIComponent(raw);
   const object = await c.env.WARROOM_ASSETS.get(key)
   if (!object) return c.notFound()
 
@@ -9751,49 +10174,52 @@ app.post('/api/v1/reports/submit', async (c) => {
       UPDATE incident_assignments SET status = 'INC_003', updated_at = ?, mod_dt = ?, mod_id = ? WHERE inc_id = ?
     `).bind(now, now, sender_id || c.get('user')?.employee_id || 'SYSTEM', normId).run()
 
-    // 2. Generate embedding for Vector Search
-    const ai = c.env.AI;
-    let vector = null;
-    let vectorArray = null;
-    if (content) {
-      try {
-        const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [content.substring(0, 3000)] });
-        vector = embeddings.data[0];
-        vectorArray = vector ? new Float32Array(vector) : null;
-      } catch (e) {
-        console.error("Report Embedding error:", e);
-      }
-    }
-
-    // 3. Register Knowledge Base
+    // 2. Register Knowledge Base (PENDING)
     const kbResult = await db.prepare(`
       INSERT INTO knowledge_base (inc_id, title, content, category, reg_id, reg_dt, mod_id, mod_dt, vector, status)
-      VALUES (?, ?, ?, 'REPORT', ?, ?, ?, ?, ?, 'PENDING')
+      VALUES (?, ?, ?, 'REPORT', ?, ?, ?, ?, NULL, 'PENDING')
       ON CONFLICT(inc_id) DO UPDATE SET 
         content = excluded.content,
         mod_id = excluded.mod_id,
         mod_dt = excluded.mod_dt,
-        vector = excluded.vector,
         status = 'PENDING'
       RETURNING id
-    `).bind(incident_id, title, content, sender_id, now, sender_id, now, vectorArray).first()
+    `).bind(incident_id, title, content, sender_id, now, sender_id, now).first()
 
     const knowledgeId = kbResult?.id;
 
-    // 4. Sync to Vectorize Index
-    const vectorIndex = c.env.WARROOM_INDEX;
-    if (vector && vectorIndex && knowledgeId) {
-      await vectorIndex.upsert([{
-        id: `kn-${knowledgeId}`,
-        values: vector,
-        metadata: {
-          title: title,
-          incident_id: incident_id || '',
-          category: 'REPORT'
+    // 3. Background AI Embedding & Vectorize Upsert (Non-blocking!)
+    if (content) {
+      c.executionCtx.waitUntil((async () => {
+        try {
+          const ai = c.env.AI;
+          const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [content.substring(0, 3000)] });
+          const vector = embeddings.data[0];
+          if (!vector) return;
+          
+          const vectorArray = new Float32Array(vector);
+          
+          // Update KB with vector array
+          await db.prepare(`UPDATE knowledge_base SET vector = ?, status = 'SUCCESS' WHERE id = ?`)
+            .bind(vectorArray, knowledgeId).run();
+
+          // Sync to Vectorize Index
+          const vectorIndex = c.env.WARROOM_INDEX;
+          if (vectorIndex && knowledgeId) {
+            await vectorIndex.upsert([{
+              id: `kn-${knowledgeId}`,
+              values: vector,
+              metadata: {
+                title: title,
+                incident_id: incident_id || '',
+                category: 'REPORT'
+              }
+            }]);
+          }
+        } catch (e) {
+          console.error("[Background Vectorize Error]", e);
         }
-      }]);
-      // Update status to SUCCESS
-      await db.prepare("UPDATE knowledge_base SET status = 'SUCCESS' WHERE id = ?").bind(knowledgeId).run();
+      })());
     }
 
     // 2-1. Save to reports table (CREATE IF NOT EXISTS for safety)
@@ -10101,6 +10527,14 @@ export class WarRoom {
         const currentAlarm = await this.state.storage.getAlarm();
         if (!currentAlarm || alarmTime < currentAlarm) {
           await this.state.storage.setAlarm(alarmTime);
+        }
+
+        // 🚀 초정밀 타이머 하이브리드 적용: 60초 이내의 알람은 DO 내부 setTimeout으로 강제 정확도 보장 (오차 방지)
+        // Cloudflare Native Alarm은 부하에 따라 10초~1분 지연될 수 있으므로, 메모리가 살아있는 한 setTimeout이 칼같이 실행되게 합니다.
+        if (body.waitMs > 0 && body.waitMs <= 60000) {
+          setTimeout(() => {
+            this.alarm().catch(console.error);
+          }, body.waitMs);
         }
 
         return new Response("OK");
@@ -11065,7 +11499,7 @@ async function triggerAppPushCall(env, target_user_id, phone_number) {
   return { success, method, detail: resultDetail };
 }
 
-function checkValidConditions(conditionsJson, nowKstStr) {
+function checkValidConditions(conditionsJson, nowKstStr, severity) {
   if (!conditionsJson) return true;
   let conditions = [];
   try {
@@ -11076,7 +11510,6 @@ function checkValidConditions(conditionsJson, nowKstStr) {
   if (!Array.isArray(conditions) || conditions.length === 0) return true;
 
   // nowKstStr 포맷: "YYYY-MM-DD HH:MM:SS" 또는 "YYYY-MM-DDTHH:MM:SS"
-  // 표준 포맷으로 변환 후 Date 객체 생성
   const formattedStr = nowKstStr.includes('T') ? nowKstStr : nowKstStr.replace(' ', 'T');
   const dt = new Date(formattedStr + '+09:00'); // KST 시간으로 해석
   const day = dt.getDay(); // 0: 일요일, 6: 토요일
@@ -11091,25 +11524,37 @@ function checkValidConditions(conditionsJson, nowKstStr) {
   let hasNight19 = conditions.includes('NIGHT_19');
   let hasNight20 = conditions.includes('NIGHT_20');
 
-  let matched = false;
+  let hasSev1 = conditions.includes('SEV_1');
+  let hasSev2 = conditions.includes('SEV_2');
+  let hasSev3 = conditions.includes('SEV_3');
 
-  if (hasDaytime && isDaytime && !isWeekend) {
-    matched = true;
-  }
-  if (hasWeekend && isWeekend) {
-    matched = true;
-  }
-  if (hasNight18 && (hour >= 18 || hour < 9) && !isWeekend) {
-    matched = true;
-  }
-  if (hasNight19 && (hour >= 19 || hour < 9) && !isWeekend) {
-    matched = true;
-  }
-  if (hasNight20 && (hour >= 20 || hour < 9) && !isWeekend) {
-    matched = true;
+  let timeMatched = false;
+  let sevMatched = false;
+
+  // 1. Time matching logic
+  if (hasDaytime && isDaytime && !isWeekend) timeMatched = true;
+  if (hasWeekend && isWeekend) timeMatched = true;
+  if (hasNight18 && (hour >= 18 || hour < 9) && !isWeekend) timeMatched = true;
+  if (hasNight19 && (hour >= 19 || hour < 9) && !isWeekend) timeMatched = true;
+  if (hasNight20 && (hour >= 20 || hour < 9) && !isWeekend) timeMatched = true;
+
+  // If NO time condition is selected, default to true for time
+  if (!hasDaytime && !hasWeekend && !hasNight18 && !hasNight19 && !hasNight20) {
+    timeMatched = true;
   }
 
-  return matched;
+  // 2. Severity matching logic
+  if (!hasSev1 && !hasSev2 && !hasSev3) {
+    sevMatched = true; // No severity condition means all severities are allowed
+  } else {
+    const sevStr = String(severity || '').toUpperCase();
+    if (hasSev1 && (sevStr.includes('1') || sevStr.includes('CRITICAL'))) sevMatched = true;
+    if (hasSev2 && (sevStr.includes('2') || sevStr.includes('MAJOR'))) sevMatched = true;
+    if (hasSev3 && (sevStr.includes('3') || sevStr.includes('NORMAL'))) sevMatched = true;
+  }
+
+  // MUST match BOTH time AND severity to execute
+  return timeMatched && sevMatched;
 }
 
 async function executeSCallertStrategy(db, strategy, payload, inc_id, c) {
@@ -11125,7 +11570,11 @@ async function executeSCallertStrategy(db, strategy, payload, inc_id, c) {
         const formattedStr = payload.occurred_at.includes('T') ? payload.occurred_at : payload.occurred_at.replace(' ', 'T');
         const smsTime = new Date(formattedStr + '+09:00').getTime();
         const currentTime = Date.now();
-        const elapsedMs = currentTime - smsTime;
+        let elapsedMs = currentTime - smsTime;
+        if (elapsedMs < 0) {
+          console.warn(`[scallert-trigger] ⚠️ smsTime is in the future! Clock skew detected. Treating elapsedMs as 0.`);
+          elapsedMs = 0;
+        }
         waitMs = (delaySec * 1000) - elapsedMs;
         if (waitMs < 0) waitMs = 0;
 
@@ -11713,8 +12162,8 @@ app.post('/call/event', async (c) => {
           } catch (err) { }
         }
 
-        // 통화가 연결되어 단 1초라도 유지되었다면 통화 성공(SUCCESS)으로 간주 (사용자가 받자마자 끊은 경우 포함)
-        if (durationSec > 0) {
+        // 통화 유지 시간이 0초 초과 50초 이하일 경우만 통화 성공(SUCCESS)으로 간주 (소리샘 방지)
+        if (durationSec > 0 && durationSec <= 50) {
           await db.prepare(`
             UPDATE TB_SCL_CALL_HIST 
             SET PDS_RESULT_CD = 'SUCCESS', DURATION_SEC = ?, DISCONNECTED_DT = ?, SUCCESS_YN = 'Y'

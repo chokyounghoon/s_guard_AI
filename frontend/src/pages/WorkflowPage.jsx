@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar,
          ChevronRight, ChevronDown, User, Clock, Terminal, Printer,
          LayoutDashboard, UserX, MessageSquare, AlertTriangle, Users } from 'lucide-react';
-import { getAuthHeaders } from '../lib/authStore';
+import { getAuthHeaders, getUserProfile } from '../lib/authStore';
+import toast from 'react-hot-toast';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -68,6 +69,52 @@ export default function WorkflowPage() {
     if (ms < 0) return '00:00:00';
     const s = Math.floor(ms / 1000);
     return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  };
+
+  const [isOpeningWarRoom, setIsOpeningWarRoom] = useState(false);
+
+  const handleOpenWarRoom = async () => {
+    if (isOpeningWarRoom) return;
+    setIsOpeningWarRoom(true);
+    const userProfile = getUserProfile();
+    const incidentId = inc_id;
+    
+    try {
+      const lockRes = await fetch(`${API_BASE}/ai/warroom/lock/${incidentId}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ user_name: userProfile?.name || 'Unknown User' })
+      });
+      const lockData = await lockRes.json();
+      if (!lockData.success) {
+        toast.error(`이미 ${lockData.owner} 매니저님이 워룸 개설을 진행 중입니다.`);
+        setIsOpeningWarRoom(false);
+        return;
+      }
+    } catch (lockError) {}
+    
+    try {
+      const rawMsg = incidentData?.rawMessage || 'SMS 장애 감지';
+      const truncatedMsg = rawMsg.length > 50 ? rawMsg.substring(0, 50) + '...' : rawMsg;
+      
+      const res = await fetch(`${API_BASE}/ai/warroom/open`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          inc_id: incidentId,
+          title: `${incidentId} | ${truncatedMsg}`,
+          creator_id: userProfile?.employee_id || null,
+          severity: incidentData?.severity || 'NORMAL',
+          leader_summary: '실시간 관제 워룸 생성'
+        })
+      });
+      navigate(`/chat/${incidentId}`);
+    } catch (err) {
+      console.error("Failed to create War-Room:", err);
+      toast.error("워룸 개설 중 오류가 발생했습니다.");
+    } finally {
+      setIsOpeningWarRoom(false);
+    }
   };
 
   const fmt = (dateStr) => {
@@ -455,6 +502,27 @@ export default function WorkflowPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* 워룸 이동/개설 버튼 (STEP 3) */}
+                      {step.id === 'WARROOM' && (done || next) && (
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (done) {
+                                navigate(`/chat/${inc_id}`);
+                              } else {
+                                handleOpenWarRoom();
+                              }
+                            }}
+                            disabled={isOpeningWarRoom}
+                            className="px-4 py-2 rounded-xl text-[11px] font-black bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {isOpeningWarRoom ? '개설 중...' : done ? '합동 워룸 입장' : '워룸 즉시 개설'}
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
 
                       {/* 소요 시간 라벨 (소요시간 vs 경과시간 Live Dot 분리) */}
                       {intervalText && sIdx > 0 && (

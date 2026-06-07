@@ -32,13 +32,14 @@ const AgentAvatar = ({ role }) => {
   );
 };
 
-// ** 등 마크다운 마커 제거 함수
+// ** 등 마크다운 마커 제거 함수 및 일목요연한 리스트 포맷팅
 const cleanText = (text = '') =>
   text
     .replace(/\*\*(.*?)\*\*/g, '$1')   // **bold** → bold
     .replace(/\*(.*?)\*/g, '$1')        // *italic* → italic
     .replace(/^#+\s/gm, '')             // ## 헤딩 제거
     .replace(/`([^`]+)`/g, '$1')        // `code` → code
+    .replace(/(?:\s|^)(\d+\.)/g, '\n$1') // 1. 2. 앞에 줄바꿈 추가
     .trim();
 
 export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false, incident }) {
@@ -47,6 +48,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
   const [contextMenu, setContextMenu] = useState(null); // { text, x, y }
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isConclusionExpanded, setIsConclusionExpanded] = useState(true);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -163,7 +165,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
   const getSummaryText = () => {
     if (messages && messages.length > 0) {
       const leaderMsg = [...messages].reverse().find(m => m.role.toLowerCase().includes('leader') || m.role.toLowerCase().includes('리더'));
-      if (leaderMsg) return leaderMsg.text;
+      if (leaderMsg) return cleanText(leaderMsg.text);
     }
     if (status.level === 'CRITICAL') return `분석결과: 현재 장애 발생 건수가 임계치를 초과하여 심각(CRITICAL) 상황으로 판단됩니다. 즉각적인 조치가 필요합니다.`;
     if (status.level === 'MAJOR') return `분석결과: 다수의 이벤트가 발생하여 주의(MAJOR) 상태입니다. 모니터링이 필요합니다.`;
@@ -227,14 +229,26 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         </div>
 
         {/* 한 줄 결론 요약 박스 */}
-        <div className={`skeuo-card p-4 rounded-2xl bg-gradient-to-r ${status.level === 'CRITICAL' ? 'from-red-500/15 to-red-500/5 border-red-500/30' : status.level === 'MAJOR' ? 'from-orange-500/15 to-orange-500/5 border-orange-500/30' : 'from-[#00ff88]/15 to-[#00ff88]/5 border-[#00ff88]/30'} border flex items-center gap-3.5 shadow-lg transition-all`}>
-          <CheckCircle2 className={`w-6 h-6 ${status.color} shrink-0 filter ${status.dropShadow}`} />
-          <div className="flex flex-col min-w-0">
-            <span className={`text-[10px] font-bold ${status.color} tracking-widest uppercase mb-0.5`}>Consensus Conclusion</span>
-            <p className="text-[13px] font-black text-white tracking-tight leading-snug break-keep">
-              {getSummaryText()}
-            </p>
+        <div 
+          onClick={() => setIsConclusionExpanded(!isConclusionExpanded)}
+          className={`skeuo-card p-4 rounded-2xl bg-gradient-to-r ${status.level === 'CRITICAL' ? 'from-red-500/15 to-red-500/5 border-red-500/30' : status.level === 'MAJOR' ? 'from-orange-500/15 to-orange-500/5 border-orange-500/30' : 'from-[#00ff88]/15 to-[#00ff88]/5 border-[#00ff88]/30'} border flex flex-col gap-3.5 shadow-lg transition-all cursor-pointer hover:bg-white/[0.02]`}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-3.5">
+              <CheckCircle2 className={`w-6 h-6 ${status.color} shrink-0 filter ${status.dropShadow}`} />
+              <span className={`text-[10px] font-bold ${status.color} tracking-widest uppercase`}>Consensus Conclusion</span>
+            </div>
+            <div className="text-white/50 hover:text-white/80 transition-colors">
+              {isConclusionExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </div>
           </div>
+          {isConclusionExpanded && (
+            <div className="flex flex-col min-w-0 pl-9">
+              <p className="text-[13px] font-black text-white tracking-tight leading-snug break-keep whitespace-pre-wrap">
+                {getSummaryText()}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* 에이전트 로그 보기 버튼 */}

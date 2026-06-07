@@ -40,8 +40,8 @@
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "받은사건함",
-      "short_name": "인박스",
+      "name": "인시던트 레포트 (Incident Reports)",
+      "short_name": "레포트 (Reports)",
       "url": "/#/inbox",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }

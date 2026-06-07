@@ -5,12 +5,12 @@ import MarkdownViewer from './MarkdownViewer';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
 
-// 🔗 장애 ID (INC- 또는 inc-숫자) 를 마크다운 링크로 변환 (대소문자 무관)
+// 🔗 장애 ID (INC-숫자 또는 단순 20으로 시작하는 8~18자리 숫자) 를 마크다운 링크로 변환
 const linkIncidentIds = (text) => {
   if (!text) return text;
   // 표준 HashRouter 링크 형식인 /#/ai-report/{id} 로 변환
-  return text.replace(/(?<!\[)(?<!\/)([Ii][Nn][Cc]-)(\d{10,})/g, (_, _prefix, id) => {
-    return `[INC-${id}](/#/ai-report/${id})`;
+  return text.replace(/(?<!\[)(?<!\/)\b(?:[Ii][Nn][Cc]-)?(20\d{6,18})\b/g, (match, id) => {
+    return `[${match}](/#/ai-report/${id})`;
   });
 };
 
@@ -74,7 +74,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
   return 'report';
 };
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete, onClose }) {
   const navigate = useNavigate();
   
   const handleChipClick = (value, label) => {
@@ -196,25 +196,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       setDisplayedText('');
     }
     if (!text) return;
-    typingQueueRef.current += text;
-    if (typingTimerRef.current) return;
-
-    // 모바일(좁은 화면)에서는 ReactMarkdown 잦은 렌더링으로 인한 끊김 방지 (간격 늘리고 한 번에 많이)
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const charsPerTick = isMobile ? 12 : 2; 
-    const interval = isMobile ? 60 : 25;
-
-    typingTimerRef.current = setInterval(() => {
-      if (!typingQueueRef.current.length) {
-        clearInterval(typingTimerRef.current);
-        typingTimerRef.current = null;
-        if (onDone) onDone();
-        return;
-      }
-      const chunk = typingQueueRef.current.slice(0, charsPerTick);
-      typingQueueRef.current = typingQueueRef.current.slice(charsPerTick);
-      setDisplayedText(prev => prev + chunk);
-    }, interval);
+    setDisplayedText(prev => prev + text);
+    if (onDone) onDone();
   }, [stopTypewriter]);
 
   // 🚀 Core Analysis Function (Force-able)
@@ -459,6 +442,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       }
       clearTimeout(delayNoticeId);
       clearTimeout(hardAbortId);
+      setIsAnalyzingSms(false);
+      setAnalysisComplete(true);
     } catch (err) {
         if (err.name === 'AbortError') return;
         setIsCritical(false);
@@ -738,12 +723,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
         {/* 오른쪽: 분석 중 스피너 또는 War-Room 이동 버튼 */}
         <div className="flex items-center gap-2 shrink-0">
-          {isAnalyzingSms ? (
-            <div className="flex items-center gap-1.5 px-1.5">
-              <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            !hideWarRoomButton && analysisComplete && selectedSms && (() => {
+          {!hideWarRoomButton && selectedSms && (() => {
               const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
               const incidentStatus = selectedSms.status || selectedSms.inc_status || 'INC_001';
               const isProcessing = incidentStatus === 'INC_002';
@@ -778,8 +758,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   </span>
                 </button>
               );
-            })()
-          )}
+            })()}
         </div>
       </div>
 

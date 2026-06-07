@@ -15,6 +15,13 @@ const IncidentPushPage = () => {
         messageRef.current = newVal;
         setMessage(newVal);
     };
+    // KST 시간 가져오기
+    const getKstNow = () => {
+        const d = new Date();
+        const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+        return kst.toISOString().slice(0, 16).replace('T', ' ');
+    };
+
     const [advanced, setAdvanced] = useState({
         channel: 'MANUAL',
         if_id: '',
@@ -25,7 +32,7 @@ const IncidentPushPage = () => {
         occurrence_count: '',
         occurrence_node: '',
         error_message: '',
-        occurrence_time: new Date().toISOString().slice(0, 16) // Default to now
+        occurrence_time: getKstNow()
     });
     const [receivers, setReceivers] = useState(Array(20).fill(''));
     const [showAdvanced, setShowAdvanced] = useState(false);

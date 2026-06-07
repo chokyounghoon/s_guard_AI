@@ -1124,6 +1124,7 @@ export default function ChatPage() {
             case 'REACTION_UPDATE':
               setMainMessages(prev => prev.map(m => (m.seq === data.seq) ? { ...m, reactions: data.reactions } : m));
               break;
+            case 'DM_SEND':
               if (data.receiver_id === currentUser.employee_id) {
                 const fromName = data.sender_name || data.name || data.sender;
                 setNotifications(prev => [...prev, { id: Date.now(), type: 'DM', from: fromName, message: data.message }]);

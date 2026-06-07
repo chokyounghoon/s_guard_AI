@@ -472,11 +472,20 @@ export default function RealtimePipelinePage() {
     if (!token) return;
     setLoading(true);
     try {
-      const response = await fetch(`${apiBase}/sms/recent?limit=100`, { headers: getAuthHeaders() });
+      const response = await fetch(`${apiBase}/sms/recent?limit=500`, { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await response.json();
         const liveMsgs = data.messages || data || [];
         
+        let critThreshold = 10, majThreshold = 3;
+        try {
+          const p = JSON.parse(localStorage.getItem('sguard_autopilot_policy'));
+          if (p) {
+            critThreshold = p.critical?.errorCount || 10;
+            majThreshold = p.major?.errorCount || 3;
+          }
+        } catch(e) {}
+
         const mappedCards = liveMsgs.map((msg, idx) => {
           let stage = 1;
           const statusNorm = String(msg.incident_status || '').toUpperCase().trim();
@@ -521,12 +530,25 @@ export default function RealtimePipelinePage() {
             }
           }
 
+          let rCount = Number(msg.received_count) || 1;
+          if (msg.message) {
+            const mRegex = String(msg.message).match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
+            if (mRegex) {
+              const parsedV = parseInt(mRegex[1], 10);
+              if (parsedV > rCount) rCount = parsedV;
+            }
+          }
+
+          let calcSev = 'WARNING';
+          if (rCount >= critThreshold) calcSev = 'CRITICAL';
+          else if (rCount >= majThreshold) calcSev = 'MAJOR';
+
           return {
             inc_id: msg.inc_id || `INC-${msg.id || idx}`,
             message: msg.message || '',
             sender: msg.sender || 'UNKNOWN',
             sender_name: assigneeName,
-            severity: msg.severity || 'WARNING',
+            severity: msg.severity || calcSev,
             reg_dt: finalRegDt,
             ai_dt: msg.ai_dt || null,
             warroom_dt: msg.warroom_dt || null,
@@ -537,7 +559,7 @@ export default function RealtimePipelinePage() {
             timer,
             assignee: maskedAssignee,
             bizSystem: msg.biz_system || getFallbackBizSystem(msg.message),
-            keyword: msg.keyword_detected || getFallbackKeyword(msg.message),
+            keyword: msg.response_message || getFallbackKeyword(msg.message),
             node: msg.occurrence_node || getFallbackNode(msg.message, idx),
             bumun: msg.bumun || '미분류 부문',
             honbu: msg.honbu || '미분류 본부',
@@ -709,28 +731,30 @@ export default function RealtimePipelinePage() {
     return cards.filter(c => {
       if (c.reg_dt) {
         const regDate = parseDate(c.reg_dt);
-        if (period === 'today' && regDate.toDateString() !== now.toDateString()) return false;
-        if (period === 'yesterday') {
-          const yesterday = new Date();
-          yesterday.setDate(now.getDate() - 1);
-          if (regDate.toDateString() !== yesterday.toDateString()) return false;
-        }
-        if (period === '7days') {
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(now.getDate() - 7);
-          if (regDate < sevenDaysAgo) return false;
-        }
-        if (period === '1month') {
-          const oneMonthAgo = new Date();
-          oneMonthAgo.setDate(now.getDate() - 30);
-          if (regDate < oneMonthAgo) return false;
-        }
-        if (period === 'custom' && customStartDate && customEndDate) {
-          const start = new Date(customStartDate);
-          start.setHours(0, 0, 0, 0);
-          const end = new Date(customEndDate);
-          end.setHours(23, 59, 59, 999);
-          if (regDate < start || regDate > end) return false;
+        if (regDate) {
+          if (period === 'today' && regDate.toDateString() !== now.toDateString()) return false;
+          if (period === 'yesterday') {
+            const yesterday = new Date();
+            yesterday.setDate(now.getDate() - 1);
+            if (regDate.toDateString() !== yesterday.toDateString()) return false;
+          }
+          if (period === '7days') {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(now.getDate() - 7);
+            if (regDate < sevenDaysAgo) return false;
+          }
+          if (period === '1month') {
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setDate(now.getDate() - 30);
+            if (regDate < oneMonthAgo) return false;
+          }
+          if (period === 'custom' && customStartDate && customEndDate) {
+            const start = new Date(customStartDate);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(customEndDate);
+            end.setHours(23, 59, 59, 999);
+            if (regDate < start || regDate > end) return false;
+          }
         }
       }
       
@@ -1013,16 +1037,18 @@ export default function RealtimePipelinePage() {
     return cards.filter(c => {
       if (c.reg_dt) {
         const regDate = parseDate(c.reg_dt);
-        if (period === 'today' && regDate.toDateString() !== now.toDateString()) return false;
-        if (period === 'yesterday') {
-          const yesterday = new Date();
-          yesterday.setDate(now.getDate() - 1);
-          if (regDate.toDateString() !== yesterday.toDateString()) return false;
-        }
-        if (period === '7days') {
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(now.getDate() - 7);
-          if (regDate < sevenDaysAgo) return false;
+        if (regDate) {
+          if (period === 'today' && regDate.toDateString() !== now.toDateString()) return false;
+          if (period === 'yesterday') {
+            const yesterday = new Date();
+            yesterday.setDate(now.getDate() - 1);
+            if (regDate.toDateString() !== yesterday.toDateString()) return false;
+          }
+          if (period === '7days') {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(now.getDate() - 7);
+            if (regDate < sevenDaysAgo) return false;
+          }
         }
       }
       if (filterSeverity !== 'all' && c.severity !== filterSeverity) return false;
@@ -1102,8 +1128,46 @@ export default function RealtimePipelinePage() {
     const progressPct = stage === 4 ? 100 : stage === 3 ? 75 : stage === 2 ? 50 : 25;
     const offset = circum - (progressPct / 100) * circum;
 
-    const ringColor = isClosed ? '#10b981' : '#00e5ff';
-    const ringShadow = isClosed ? 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.3))' : 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.5))';
+    const isCritical = !isClosed && (card.severity === 'CRITICAL');
+    const isMajor = !isClosed && (card.severity === 'MAJOR');
+
+    const ringColor = isClosed ? '#10b981' : isCritical ? '#ef4444' : isMajor ? '#f97316' : '#00e5ff';
+    const ringColorRGB = isClosed ? '16, 185, 129' : isCritical ? '239, 68, 68' : isMajor ? '249, 115, 22' : '0, 229, 255';
+    const ringShadow = isClosed ? `drop-shadow(0 0 4px rgba(${ringColorRGB}, 0.3))` : `drop-shadow(0 0 15px rgba(${ringColorRGB}, 0.8))`;
+
+    // MTTA Timer Logic
+    const mttaDurationMs = (t3 ? new Date(t3) : currentTime) - new Date(t1);
+    const isMttaClosed = stage >= 3;
+    
+    let mttaRingColor = '#ef4444';
+    let mttaRingColorRGB = '239, 68, 68';
+
+    if (!isMttaClosed) {
+      mttaRingColor = '#ff0000';
+      mttaRingColorRGB = '255, 0, 0';
+    } else {
+      const mttaMinutes = mttaDurationMs / 60000;
+      const incidentHour = new Date(t1).getHours();
+      const isDaytime = incidentHour >= 9 && incidentHour < 18;
+
+      if (isDaytime) {
+        if (mttaMinutes < 3) {
+          mttaRingColor = '#10b981'; mttaRingColorRGB = '16, 185, 129';
+        } else if (mttaMinutes < 5) {
+          mttaRingColor = '#f97316'; mttaRingColorRGB = '249, 115, 22';
+        } else {
+          mttaRingColor = '#ef4444'; mttaRingColorRGB = '239, 68, 68';
+        }
+      } else {
+        if (mttaMinutes < 5) {
+          mttaRingColor = '#10b981'; mttaRingColorRGB = '16, 185, 129';
+        } else if (mttaMinutes < 10) {
+          mttaRingColor = '#f97316'; mttaRingColorRGB = '249, 115, 22';
+        } else {
+          mttaRingColor = '#ef4444'; mttaRingColorRGB = '239, 68, 68';
+        }
+      }
+    }
 
     const formatDuration = (ms) => {
       if (ms < 0) return '00:00:00';
@@ -1188,26 +1252,66 @@ export default function RealtimePipelinePage() {
         <div className="flex flex-col gap-3 mb-4 shrink-0 bg-black/20 p-3 rounded-xl border border-white/5">
           {/* Top: Activity Ring */}
           <div className="flex flex-col items-center justify-center relative bg-gradient-to-b from-black/40 to-transparent p-2 rounded-lg shrink-0">
-            <div className="relative w-28 h-28 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
-                <defs>
-                  <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor={ringColor} />
-                    <stop offset="100%" stopColor={isClosed ? '#059669' : '#00e5ff'} />
-                  </linearGradient>
-                </defs>
-                <circle cx="90" cy="90" r="70" stroke="#1e293b" strokeWidth="12" fill="none" />
-                <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter={ringShadow} />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">MTTR TIMER</span>
-                <span className="text-sm font-black font-mono tracking-tighter text-white" style={{ textShadow: isClosed ? '0 0 10px rgba(16,185,129,0.3)' : '0 0 15px rgba(0,229,255,0.8)' }}>
-                  {formatDuration(durationMs)}
-                </span>
-                <span className="text-[7.5px] font-mono text-slate-500 scale-90 mt-0.5">
-                  {isClosed ? `SAFE (${formatDtTimeOnly(t4)})` : 'LIVE'}
-                </span>
+            <div className="flex flex-row items-center justify-center gap-6">
+              {/* MTTA Ring */}
+              <div className="relative w-28 h-28 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
+                  <defs>
+                    <linearGradient id={`mttaGradient-${card.inc_id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor={mttaRingColor} />
+                      <stop offset="100%" stopColor={mttaRingColor} />
+                    </linearGradient>
+                  </defs>
+                  {!isMttaClosed && (
+                    <circle cx="90" cy="90" r="70" stroke={mttaRingColor} strokeWidth="14" fill="none" className="animate-ping opacity-30" />
+                  )}
+                  <circle cx="90" cy="90" r="70" stroke={`url(#mttaGradient-${card.inc_id})`} strokeWidth={!isMttaClosed ? "14" : "12"} fill="none" strokeDasharray={circum} strokeDashoffset={isMttaClosed ? 0 : offset} strokeLinecap="round" className="transition-all duration-1000" filter={`drop-shadow(0 0 ${!isMttaClosed ? '15px' : '6px'} rgba(${mttaRingColorRGB}, ${!isMttaClosed ? '1' : '0.5'}))`} style={!isMttaClosed ? { animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : {}} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className={`text-[7px] font-bold uppercase tracking-widest mb-0.5 ${!isMttaClosed ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>MTTA TIMER</span>
+                  <span className="text-sm font-black font-mono tracking-tighter tabular-nums" style={{ color: mttaRingColor, textShadow: isMttaClosed ? `0 0 10px rgba(${mttaRingColorRGB},0.3)` : `0 0 20px rgba(${mttaRingColorRGB},1)` }}>
+                    {formatDuration(mttaDurationMs)}
+                  </span>
+                  <span className={`text-[7px] font-mono mt-1 px-1.5 py-0.5 rounded-full border shadow-inner ${
+                    isMttaClosed 
+                      ? 'bg-white/10 border-white/20 text-slate-200' 
+                      : 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse shadow-[0_0_10px_rgba(255,0,0,0.5)]'
+                  }`}>
+                    {isMttaClosed ? '인지완료' : '대기중'}
+                  </span>
+                </div>
               </div>
+
+              {/* MTTR Ring */}
+              <div className="relative w-28 h-28 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
+                  <defs>
+                    <linearGradient id={`activityGradient-${card.inc_id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor={ringColor} />
+                      <stop offset="100%" stopColor={isClosed ? '#059669' : ringColor} />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="90" cy="90" r="70" stroke="#1e293b" strokeWidth="12" fill="none" />
+                  <circle cx="90" cy="90" r="70" stroke={`url(#activityGradient-${card.inc_id})`} strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className={`transition-all duration-1000 ${!isClosed ? 'animate-pulse' : ''}`} filter={ringShadow} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">MTTR TIMER</span>
+                  <span className="text-sm font-black font-mono tracking-tighter text-white" style={{ textShadow: isClosed ? `0 0 10px rgba(${ringColorRGB},0.3)` : `0 0 15px rgba(${ringColorRGB},0.8)` }}>
+                    {formatDuration(durationMs)}
+                  </span>
+                  <span className="text-[7.5px] font-mono text-slate-500 scale-90 mt-0.5">
+                    {isClosed ? `SAFE (${formatDtTimeOnly(t4)})` : 'LIVE'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 하단 등급 기준 안내 (한 줄) */}
+            <div className="mt-4 text-[7px] xl:text-[8px] text-slate-500 tracking-tighter whitespace-nowrap px-2 py-1 border border-white/5 bg-black/20 rounded-md shadow-inner w-fit mx-auto">
+              <span className="font-bold text-slate-400 mr-1">MTTA 기준</span> 
+              <span className="text-emerald-400 ml-0.5">상:</span> 주간3/야간5분 <span className="mx-0.5 text-slate-600">|</span> 
+              <span className="text-orange-400">중:</span> 주간3~5/야간5~10분 <span className="mx-0.5 text-slate-600">|</span> 
+              <span className="text-red-400">하:</span> 초과
             </div>
           </div>
 
@@ -2078,16 +2182,30 @@ export default function RealtimePipelinePage() {
               <div className="flex-1 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
                 {searchedCards.map((card) => {
                   const isSelected = card.inc_id === selectedCardId;
-                  const isCritical = card.severity === 'CRITICAL' || card.severity === 'MAJOR';
+                  const isCritical = card.severity === 'CRITICAL';
+                  const isMajor = card.severity === 'MAJOR';
+                  const isWarning = card.severity === 'WARNING';
+                  const isSafe = card.severity === 'SAFE';
+
                   let stageColor = 'bg-slate-700';
                   if (card.stage === 1) stageColor = 'bg-blue-500';
                   if (card.stage === 2) stageColor = 'bg-purple-500';
                   if (card.stage === 3) stageColor = card.timer === 0 ? 'bg-red-500 animate-pulse' : 'bg-amber-500 animate-pulse';
                   if (card.stage === 4) stageColor = 'bg-emerald-500';
 
+                  const badgeClass = isCritical ? 'bg-red-500/20 text-red-400' :
+                                     isMajor ? 'bg-orange-500/20 text-orange-400' :
+                                     'bg-blue-500/20 text-blue-400';
+
                   return (
-                    <div key={card.inc_id} onClick={() => { setSelectedCardId(card.inc_id); }} className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2.5 group ${
-                      isSelected ? 'bg-zinc-800 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)]' 
+                    <div key={card.inc_id} onClick={() => { setSelectedCardId(card.inc_id); }} className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2.5 group relative overflow-hidden ${
+                      card.stage !== 4 ? (
+                        card.severity === 'CRITICAL' ? 'sms-pulse-critical' :
+                        card.severity === 'MAJOR' ? 'sms-pulse-major' :
+                        'sms-pulse-safe'
+                      ) : ''
+                    } ${
+                      isSelected ? 'bg-zinc-800 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)] ring-1 ring-blue-500/50' 
                       : card.stage === 1 ? 'bg-zinc-800 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:border-red-500/70'
                       : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'
                     }`}>
@@ -2098,7 +2216,7 @@ export default function RealtimePipelinePage() {
                         </div>
                         <div className="flex items-center gap-1.5">
                           {/* Badges */}
-                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isCritical ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>{card.severity}</span>
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${badgeClass}`}>{card.severity}</span>
                           <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">{card.bizSystem}</span>
                         </div>
                       </div>

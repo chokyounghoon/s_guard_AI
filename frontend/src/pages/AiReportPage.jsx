@@ -284,6 +284,14 @@ export default function AiReportPage() {
   const genAbortRef = useRef(null);
   const [chatSummary, setChatSummary] = useState('');
 
+  const isTestIncident = useMemo(() => {
+    if (!report) return false;
+    const testKeywords = /테스트|test|TEST|샘플|sample|demo|데모/i;
+    return testKeywords.test(
+      [incidentId, report.title, report.message, chatSummary, aiGenText].filter(Boolean).join(' ')
+    );
+  }, [incidentId, report, chatSummary, aiGenText]);
+
   const formatTimeline = (text) => {
     if (!text) return '';
     // [HH:MM:SS] 패턴을 마크다운 글머리 기호와 굵은 글씨로 변환하여 타임라인 형태로 표시
@@ -868,6 +876,11 @@ export default function AiReportPage() {
                   <span className="text-[11px] text-slate-500 font-mono">
                     INC-{incidentId}
                   </span>
+                  {isTestIncident && (
+                    <span className="shrink-0 text-[9px] font-black px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/35 uppercase tracking-tighter animate-pulse">
+                      TEST
+                    </span>
+                  )}
                   {report.similarity_score != null && (
                     <span className="flex items-center gap-1 text-[10px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg">
                       <Zap className="w-2.5 h-2.5 fill-blue-400/30" />
@@ -1038,6 +1051,16 @@ export default function AiReportPage() {
         ) : null}
         {report && !loading && (
           <>
+            {isTestIncident && (
+              <div className="mb-4 bg-gradient-to-r from-rose-950/40 to-amber-950/40 border border-rose-500/30 p-4 rounded-2xl flex items-center gap-3 shadow-lg">
+                <AlertTriangle className="w-5 h-5 text-rose-400 animate-bounce" />
+                <div className="flex-1 text-left">
+                  <h4 className="text-xs font-black text-rose-300 uppercase tracking-wider">시뮬레이션 / 테스트용 데이터</h4>
+                  <p className="text-[11px] text-slate-400">본 리포트는 테스트 키워드(테스트, test, demo 등)를 포함하여 감지된 가상 사건의 결과물입니다.</p>
+                </div>
+                <span className="text-[9px] font-bold px-2 py-1 bg-rose-500/20 border border-rose-500/40 rounded-lg text-rose-300 uppercase font-mono">TEST RUN</span>
+              </div>
+            )}
             {/* ── AI 분석 요약 ── */}
             {activeTab === 'summary' && (
               <div className="space-y-3 animate-in fade-in duration-300">
