@@ -771,7 +771,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               );
             })()}
         </div>
-        </div>
       </div>
 
       {/* Similarity Score Indicator - 분석 완료 시 항상 표시 (null = 0%) */}
