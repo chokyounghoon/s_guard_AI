@@ -253,6 +253,8 @@ export default function RealtimePipelinePage() {
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [isSimulationActive, setIsSimulationActive] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const soundEnabledRef = useRef(soundEnabled);
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
   const [workflowPanelId, setWorkflowPanelId] = useState(null);
   const [orgTree, setOrgTree] = useState([]); // Full org chart from /org/tree
   const [showFullTimeline, setShowFullTimeline] = useState(false);
@@ -461,7 +463,7 @@ export default function RealtimePipelinePage() {
   };
 
   const playAlertSound = (type) => {
-    if (!soundEnabled) return;
+    if (!soundEnabledRef.current) return;
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = ctx.createOscillator();
@@ -660,6 +662,12 @@ export default function RealtimePipelinePage() {
             setCards(prev => [newCard, ...prev]);
             if (!selectedCardId) setSelectedCardId(newCard.inc_id);
             toast.success(`[신규 장애 수신] ${newCard.inc_id} 파이프라인 진입!`);
+            
+            // Auto-read CRITICAL alerts if sound is enabled
+            if (raw.severity?.toUpperCase() === 'CRITICAL' && soundEnabledRef.current) {
+              const text = `크리티컬 알림. ${newCard.bizSystem} 관련. ${newCard.message || newCard.keyword}`;
+              speakText(text);
+            }
           }
         } catch (err) {}
       });
