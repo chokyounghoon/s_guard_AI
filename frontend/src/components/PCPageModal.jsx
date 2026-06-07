@@ -45,10 +45,14 @@ export default function PCPageModal({ children }) {
     return <>{children}</>;
   }
 
+  // Full-screen modal pages (no padding, stretch to full viewport)
+  const fullscreenPaths = ['/expert-board'];
+  const isFullscreen = fullscreenPaths.some(p => location.pathname.startsWith(p));
+
   // PC: 모달 오버레이
   return (
     <div
-      className={`fixed inset-0 z-[300] flex items-center justify-center ${isPC ? 'p-6 lg:p-10' : 'p-3 sm:p-6'}`}
+      className={`fixed inset-0 z-[300] flex ${isFullscreen ? 'items-stretch' : 'items-center justify-center'} ${isFullscreen ? '' : isPC ? 'p-6 lg:p-10' : 'p-3 sm:p-6'}`}
       onClick={handleClose}
     >
       {/* Backdrop */}
@@ -57,12 +61,12 @@ export default function PCPageModal({ children }) {
       {/* Modal Panel */}
       <div
         className={`
-          relative z-10 w-full ${location.pathname.includes('/workflow') ? 'max-w-[92vw]' : 'max-w-5xl'} h-fit
-          bg-[#0f1421] border border-white/10 rounded-[2.5rem] shadow-2xl
+          relative z-10 w-full ${isFullscreen ? 'max-w-full h-full rounded-none' : location.pathname.includes('/workflow') ? 'max-w-[92vw] h-fit rounded-[2.5rem]' : 'max-w-5xl h-fit rounded-[2.5rem]'}
+          bg-[#0f1421] border ${isFullscreen ? 'border-0' : 'border-white/10'} shadow-2xl
           flex flex-col overflow-hidden
-          animate-in zoom-in-95 fade-in duration-300
+          animate-in ${isFullscreen ? 'fade-in' : 'zoom-in-95 fade-in'} duration-300
         `}
-        style={{ maxHeight: isPC ? 'calc(100vh - 4rem)' : 'calc(100vh - 2rem)' }}
+        style={isFullscreen ? { height: '100%' } : { maxHeight: isPC ? 'calc(100vh - 4rem)' : 'calc(100vh - 2rem)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Bar - 특정 페이지들은 자체 헤더를 사용하므로 숨김 */}
