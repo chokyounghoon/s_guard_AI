@@ -6078,17 +6078,35 @@ ${feedbackContext}
 
 응답은 [S-Autopilot Insight], [전문가별 심층 진단], [리더의 최종 조치 가이드] 섹션으로 구성하고, 전문가 의견은 간결하게 작성해 주세요.`
 
-          let effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
-          const fallbackKey = c.env.DIFY_API_KEY_SUMMARIZER || c.env.DIFY_API_KEY;
+          // 🔧 Load threshold configs (same as background analysis)
+          let liveAdminThreshold = 0.85, liveTechThreshold = 0.85, liveCasualThreshold = 0.95;
+          try {
+            const thCfg = await db.prepare(
+              "SELECT config_key, config_value FROM system_config WHERE config_key IN ('similarity_threshold_technical','similarity_threshold_casual','similarity_threshold_admin')"
+            ).all();
+            (thCfg.results || []).forEach(r => {
+              if (r.config_key === 'similarity_threshold_technical') liveTechThreshold = parseFloat(r.config_value);
+              if (r.config_key === 'similarity_threshold_casual') liveCasualThreshold = parseFloat(r.config_value);
+              if (r.config_key === 'similarity_threshold_admin') liveAdminThreshold = parseFloat(r.config_value);
+            });
+          } catch (_) {}
 
-          // Helper to perform Dify call
+          let effectiveKey = c.env.DIFY_API_KEY_DASHBOARD || api_key;
+          const fallbackKey = c.env.DIFY_API_KEY_SUMMARIZER || c.env.DIFY_API_KEY || effectiveKey;
+
+          // Helper to perform Dify call — includes threshold inputs matching background analysis
           const fetchDify = async (mode, key) => {
             const endpoint = mode === 'workflow' ? `${api_base}/workflows/run` : `${api_base}/chat-messages`;
+            const sharedInputs = {
+              admin_threshold_value: liveAdminThreshold,
+              technical_threshold: liveTechThreshold,
+              casual_threshold: liveCasualThreshold,
+            };
             const payload = mode === 'workflow'
-              ? { inputs: { query: prompt, chat_log: prompt }, response_mode: 'streaming', user: 'sguard-worker' }
-              : { inputs: {}, query: prompt, response_mode: 'streaming', user: 'sguard-worker' };
+              ? { inputs: { ...sharedInputs, query: prompt, chat_log: prompt }, response_mode: 'streaming', user: 'sguard-worker' }
+              : { inputs: sharedInputs, query: prompt, response_mode: 'streaming', user: 'sguard-worker' };
 
-            return await fetch(endpoint, {
+            const res = await fetch(endpoint, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${key}`,
@@ -6097,6 +6115,8 @@ ${feedbackContext}
               },
               body: JSON.stringify(payload)
             });
+            if (!res.ok) console.warn(`[AI Analyze] Dify ${mode} HTTP ${res.status} with key ${key.substring(0,12)}...`);
+            return res;
           };
 
           let difyRes = await fetchDify('chat', effectiveKey);
