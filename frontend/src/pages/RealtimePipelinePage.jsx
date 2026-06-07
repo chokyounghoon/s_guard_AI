@@ -449,10 +449,12 @@ export default function RealtimePipelinePage() {
   const handleReadTicker = () => {
     const nextState = !soundEnabled;
     setSoundEnabled(nextState);
-    if (nextState && latestIncidents.length > 0) {
-      const inc = latestIncidents[0];
-      const text = `${inc.severity} 알림. ${inc.bizSystem} 관련. ${inc.message || inc.keyword}`;
-      speakText(text);
+    if (nextState && cards.length > 0) {
+      const latest = [...cards].sort((a, b) => new Date(b.reg_dt || b.created_at) - new Date(a.reg_dt || a.created_at))[0];
+      if (latest) {
+        const text = `${latest.severity} 알림. ${latest.bizSystem} 관련. ${latest.message || latest.keyword}`;
+        speakText(text);
+      }
     } else if (!nextState) {
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     }
