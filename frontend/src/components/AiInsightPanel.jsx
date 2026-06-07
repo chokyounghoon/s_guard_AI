@@ -675,12 +675,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const showWarRoomButton = analysisComplete;
 
   return (
-    <div className={`rounded-3xl border relative h-full flex flex-col transition-all duration-700 backdrop-blur-2xl
+    <div className={`rounded-3xl relative h-full flex flex-col transition-all duration-700 backdrop-blur-2xl
       ${isAnalyzingSms
-        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-white/50 shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-pulse'
+        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-2 border-white/50 shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-pulse'
         : selectedSms && activeTheme
         ? `bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} ${activeTheme.borderColorActive} ${activeTheme.shadowActive}`
-        : 'bg-gradient-to-b from-[#102428]/80 to-[#081619]/80 border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.15)]'}`}>
+        : 'bg-gradient-to-b from-[#102428]/80 to-[#081619]/80 border border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.15)]'}`}>
       {/* 고정 헤더 영역 */}
       <div className="shrink-0 p-4 sm:p-5 border-b border-white/5 relative">
       <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
