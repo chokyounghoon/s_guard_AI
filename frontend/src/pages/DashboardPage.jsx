@@ -2081,18 +2081,19 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               setAgentMessages([]);
                             }
                           }}
-                          style={
-                            isCritical || isMaj ? {} : {
-                              background: isSelected ? `rgba(${accentBgRGB},0.15)` : 'rgba(18,21,26,0.85)',
-                              borderTop: '1px solid rgba(255,255,255,0.05)',
-                              borderRight: '1px solid rgba(255,255,255,0.05)',
-                              borderBottom: '1px solid rgba(255,255,255,0.05)',
-                              borderLeft: `4px solid ${accentColor}`,
-                              boxShadow: isSelected ? `0 0 20px rgba(${accentBgRGB},0.4)` : '0 4px 15px rgba(0,0,0,0.4)'
-                            }
-                          }
-                          className={`rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden ${isCritical ? 'sms-pulse-critical' : isMaj ? 'sms-pulse-major' : ''} ${isSelected && !isCritical && !isMaj ? 'ring-1 ring-[#00e5ff]/50' : ''}`}
+                          style={{
+                            background: isSelected ? `rgba(${accentBgRGB},0.15)` : (isCritical || isMaj ? '' : 'rgba(18,21,26,0.85)'),
+                            borderTop: '1px solid rgba(255,255,255,0.05)',
+                            borderRight: '1px solid rgba(255,255,255,0.05)',
+                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            borderLeft: `4px solid ${accentColor}`,
+                            boxShadow: isSelected ? `0 0 30px rgba(${accentBgRGB},0.6)` : '0 4px 15px rgba(0,0,0,0.4)'
+                          }}
+                          className={`rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden ${isCritical && !isSelected ? 'sms-pulse-critical' : isMaj && !isSelected ? 'sms-pulse-major' : ''}`}
                         >
+                          {isSelected && (
+                            <div className="absolute inset-0 pointer-events-none rounded-2xl" style={{ border: `2px solid ${accentColor}`, boxShadow: `inset 0 0 20px rgba(${accentBgRGB},0.2)` }} />
+                          )}
                           {/* 상단: 제목 + 배지 */}
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div className="flex items-center gap-2 min-w-0">
