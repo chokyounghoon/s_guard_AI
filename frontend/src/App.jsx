@@ -42,6 +42,7 @@ import PermissionManagementPage from './pages/PermissionManagementPage';
 import DeputyManagementPage from './pages/DeputyManagementPage';
 import SCallertPage from './pages/SCallertPage';
 import AdminIncidentCleanupPage from './pages/AdminIncidentCleanupPage';
+import ExpertBoardPage from './pages/ExpertBoardPage';
 import ConsentModal from './components/ConsentModal';
 import PCPageModal from './components/PCPageModal';
 
@@ -451,6 +452,7 @@ function AppContent() {
         <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SCallertPage /></ProtectedRoute>} />
         <Route path="/realtime-pipeline"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><RealtimePipelinePage /></ProtectedRoute>} />
+        <Route path="/expert-board"              element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ExpertBoardPage /></PCPageModal></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
