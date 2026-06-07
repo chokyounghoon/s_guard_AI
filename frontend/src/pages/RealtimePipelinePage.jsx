@@ -437,6 +437,27 @@ export default function RealtimePipelinePage() {
   }, []);
   const eventSourceRef = useRef(null);
 
+  const speakText = (text) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ko-KR';
+    utterance.rate = 1.1;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleReadTicker = () => {
+    const nextState = !soundEnabled;
+    setSoundEnabled(nextState);
+    if (nextState && latestIncidents.length > 0) {
+      const inc = latestIncidents[0];
+      const text = `${inc.severity} 알림. ${inc.bizSystem} 관련. ${inc.message || inc.keyword}`;
+      speakText(text);
+    } else if (!nextState) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+  };
+
   const playAlertSound = (type) => {
     if (!soundEnabled) return;
     try {
@@ -2911,7 +2932,7 @@ export default function RealtimePipelinePage() {
                </div>
             )}
           </div>
-          <button onClick={() => setSoundEnabled(!soundEnabled)} className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${soundEnabled ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-white/5 border-white/10 text-slate-500'}`}><Volume2 className="w-3.5 h-3.5" /></button>
+          <button onClick={handleReadTicker} className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${soundEnabled ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-white/5 border-white/10 text-slate-500'}`}><Volume2 className="w-3.5 h-3.5" /></button>
           <button onClick={() => setIsSimulationActive(!isSimulationActive)} className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${isSimulationActive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}><Play className="w-3.5 h-3.5" /></button>
           <button onClick={fetchLiveMessages} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/20 text-slate-400 hover:text-white transition-all flex items-center justify-center cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /></button>
         </div>
