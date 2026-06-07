@@ -2479,8 +2479,15 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         const ringShadow = isClosed ? `drop-shadow(0 0 4px rgba(${ringColorRGB}, 0.3))` : `drop-shadow(0 0 15px rgba(${ringColorRGB}, 0.8))`;
 
                         // MTTA Timer Logic
-                        const mttaDurationMs = (warStep ? new Date(warStep.timestamp) : currentTime) - diffStart;
-                        const isMttaClosed = !!warStep;
+                        // warRooms는 이미 로드됨 → RealtimePipeline과 동일하게 즉시 사용
+                        // warStep(workflow API)은 보조 소스로만 사용
+                        const incWarRoom = warRooms.find(r => String(r.inc_id) === String(selectedIncidentIdFlow));
+                        const warRoomDt = incWarRoom?.reg_dt
+                          ? parseDate(incWarRoom.reg_dt)
+                          : (warStep?.timestamp ? new Date(warStep.timestamp) : null);
+                        const mttaDurationMs = (warRoomDt || currentTime) - diffStart;
+                        const isMttaClosed = !!warRoomDt;
+
                         
                         let mttaRingColor = '#ef4444';
                         let mttaRingColorRGB = '239, 68, 68';
