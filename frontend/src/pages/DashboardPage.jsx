@@ -418,6 +418,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [insightSms, setInsightSms] = useState(null);
   const lastProcessedLogIncId = useRef(null);
   const selectedSmsRef = useRef(null);
+  const userManuallyClearedRef = useRef(false); // 사용자가 명시적으로 선택 해제 시 true → fetchSMSMessages 자동선택 차단
   const [lastAutoTriggeredKey, setLastAutoTriggeredKey] = useState(null);
   const lastAutoTriggeredKeyRef = useRef(null);
   const [saveStatus, setSaveStatus] = useState('');
@@ -981,7 +982,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           if (latestKey !== lastAutoTriggeredKeyRef.current) {
             lastAutoTriggeredKeyRef.current = latestKey;
             setLastAutoTriggeredKey(latestMsg.inc_id);
-            if (!selectedSmsRef.current || selectedSmsRef.current.inc_id !== latestMsg.inc_id) {
+            if (!userManuallyClearedRef.current && (!selectedSmsRef.current || selectedSmsRef.current.inc_id !== latestMsg.inc_id)) {
               setSelectedSms(latestMsg);
             }
             
@@ -2129,6 +2130,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                             // 패널이 닫혀있다면 강제로 열어야 하므로 (!isSelected || !showAgentPanel) 조건을 씁니다.
                             if (!isSelected || !showAgentPanel) {
                               // SMS 선택: selectedSms + insightSms 동시 설정 → AiInsightPanel 분석 트리거
+                              userManuallyClearedRef.current = false; // 명시적 선택 → 자동선택 차단 해제
                               setSelectedSms(msg);
                               selectedSmsRef.current = msg;
                               setInsightSms(msg);
@@ -2136,10 +2138,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               setShowAgentPanel(true);
                               setActiveLogTab('ai');
                               setSelectedIncidentIdFlow(msg.inc_id);
-                              
-                              // 🚀 Trigger "Lively" animation for Flow panel
                             } else {
                               // 선택 해제
+                              userManuallyClearedRef.current = true; // 명시적 해제 → 이후 자동선택 차단
                               setSelectedSms(null);
                               selectedSmsRef.current = null;
                               setInsightSms(null);
