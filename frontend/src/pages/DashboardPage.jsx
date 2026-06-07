@@ -1598,9 +1598,46 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     }
   };
 
+  const activeTheme = useMemo(() => {
+    const sev = (selectedSms?.severity || 'NORMAL').toUpperCase();
+    if (sev === 'CRITICAL') {
+      return {
+        bgStyle: { background: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,13,13,0.8) 0%, rgba(26,5,5,0.9) 40%, #050a15 100%)' },
+        gradientFrom: 'from-[#3f0d0d]/40',
+        gradientTo: 'to-[#1a0505]/40',
+        borderColorActive: 'border-red-500',
+        borderColorDim: 'border-red-500/40',
+        shadowActive: 'shadow-[0_0_35px_rgba(239,68,68,0.35)]',
+        shadowDim: 'shadow-[0_0_15px_rgba(239,68,68,0.15)]',
+        accentColor: 'text-red-400',
+      };
+    } else if (sev === 'MAJOR') {
+      return {
+        bgStyle: { background: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,29,13,0.8) 0%, rgba(26,10,5,0.9) 40%, #050a15 100%)' },
+        gradientFrom: 'from-[#3f1d0d]/40',
+        gradientTo: 'to-[#1a0a05]/40',
+        borderColorActive: 'border-orange-500',
+        borderColorDim: 'border-orange-500/40',
+        shadowActive: 'shadow-[0_0_35px_rgba(249,115,22,0.35)]',
+        shadowDim: 'shadow-[0_0_15px_rgba(249,115,22,0.15)]',
+        accentColor: 'text-orange-400',
+      };
+    }
+    return {
+      bgStyle: { background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d272b 0%, #081619 40%, #050a15 100%)' },
+      gradientFrom: 'from-[#102428]',
+      gradientTo: 'to-[#081619]',
+      borderColorActive: 'border-[#00e5ff]',
+      borderColorDim: 'border-[#00e5ff]/40',
+      shadowActive: 'shadow-[0_0_25px_rgba(0,229,255,0.25)]',
+      shadowDim: 'shadow-[0_0_15px_rgba(0,229,255,0.15)]',
+      accentColor: 'text-[#00e5ff]',
+    };
+  }, [selectedSms?.severity]);
+
   return (
     <>
-    <div className={`h-screen overflow-hidden text-white font-sans relative flex flex-col${isSmsSpinning || isAiAnalyzing || isFlowSpinning ? ' hud-fetching' : ''}`} style={{ background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d272b 0%, #081619 40%, #050a15 100%)' }}>
+    <div className={`h-screen overflow-hidden text-white font-sans relative flex flex-col${isSmsSpinning || isAiAnalyzing || isFlowSpinning ? ' hud-fetching' : ''} transition-colors duration-1000`} style={activeTheme.bgStyle}>
       {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
       {isNavCollapsed && (
         <div className="fixed top-3 left-4 z-50">
@@ -2275,7 +2312,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
           <div className="flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-hidden flex flex-col">
-              <div className={`bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-500 backdrop-blur-2xl ${selectedSms ? 'border-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.25)]' : 'border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.15)]'}`}>
+              <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl border overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-700 backdrop-blur-2xl ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`}`}>
                 {/* Header */}
                 <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
@@ -2327,7 +2364,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {/* ── 4/4: 처리 현황 ── */}
           <div className="flex flex-col h-full overflow-hidden">
             {/* Activity History Flow Area */}
-            <div className="bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border border-[#00e5ff]/40 shadow-[0_0_25px_rgba(0,229,255,0.2)] flex-1 overflow-hidden flex flex-col backdrop-blur-2xl">
+            <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl border ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`} flex-1 overflow-hidden flex flex-col backdrop-blur-2xl transition-all duration-700`}>
               {/* Header */}
               <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between gap-4 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
