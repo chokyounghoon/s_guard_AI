@@ -3722,7 +3722,9 @@ app.post('/sms/receive', async (c) => {
     })());
 
     try {
-      await db.prepare("UPDATE incidents SET severity = ?, updated_at = ? WHERE inc_id = ?").bind(alertSeverity, timestamp, existing.inc_id).run();
+      // 새로운 장애 문자가 들어왔으므로 상태를 다시 Open(미확인)으로 변경하여 미처리 건수로 집계되도록 합니다.
+      await db.prepare("UPDATE incidents SET severity = ?, status = 'Open', updated_at = ? WHERE inc_id = ?").bind(alertSeverity, timestamp, existing.inc_id).run();
+      await db.prepare("UPDATE incident_assignments SET status = '미확인', updated_at = ? WHERE inc_id = ?").bind(timestamp, existing.inc_id).run();
     } catch(e) {
       console.error("[Sync-Incidents-Severity] Error:", e.message);
     }
@@ -10532,9 +10534,18 @@ export class WarRoom {
         // 🚀 초정밀 타이머 하이브리드 적용: 60초 이내의 알람은 DO 내부 setTimeout으로 강제 정확도 보장 (오차 방지)
         // Cloudflare Native Alarm은 부하에 따라 10초~1분 지연될 수 있으므로, 메모리가 살아있는 한 setTimeout이 칼같이 실행되게 합니다.
         if (body.waitMs > 0 && body.waitMs <= 60000) {
-          setTimeout(() => {
-            this.alarm().catch(console.error);
-          }, body.waitMs);
+          const preciseTask = new Promise((resolve) => {
+            setTimeout(async () => {
+              try {
+                await this.alarm();
+              } catch (e) {
+                console.error(e);
+              }
+              resolve();
+            }, body.waitMs);
+          });
+          // waitUntil을 사용하여 setTimeout이 도는 동안 DO가 동면(Hibernation) 상태로 들어가지 않도록 강제 유지합니다.
+          this.state.waitUntil(preciseTask);
         }
 
         return new Response("OK");
@@ -10567,7 +10578,8 @@ export class WarRoom {
       const toExecute = [];
 
       for (const a of alarms) {
-        if (a.triggerAt <= now) {
+        // setTimeout이 1~2ms 일찍 실행될 수 있으므로, 2초의 여유(buffer)를 두고 실행 조건을 평가합니다.
+        if (a.triggerAt <= now + 2000) {
           toExecute.push(a);
         } else {
           pending.push(a);
@@ -11575,7 +11587,10 @@ async function executeSCallertStrategy(db, strategy, payload, inc_id, c) {
           console.warn(`[scallert-trigger] ⚠️ smsTime is in the future! Clock skew detected. Treating elapsedMs as 0.`);
           elapsedMs = 0;
         }
-        waitMs = (delaySec * 1000) - elapsedMs;
+        // 🚀 Telecom Latency Calibration: SENS 발신 후 실제 단말기에 신호가 가기까지 약 5초의 통신망 지연이 발생합니다.
+        // 대시보드의 MTTA 타이머(1분 0초)와 사용자의 체감 수신 시간을 정확히 일치시키기 위해 5000ms를 선제 차감합니다.
+        const TELECOM_LATENCY_OFFSET_MS = 5000;
+        waitMs = (delaySec * 1000) - elapsedMs - TELECOM_LATENCY_OFFSET_MS;
         if (waitMs < 0) waitMs = 0;
 
         console.log(`[scallert-trigger] ⏱️ SMS Received KST: ${payload.occurred_at} (${smsTime})`);

@@ -495,20 +495,8 @@ export default function RealtimePipelinePage() {
           else if (statusNorm === 'INC_002' || statusNorm === 'PROGRESS' || statusNorm === '진행중' || statusNorm === '처리중') stage = 3;
           else if (isAnalyzed) stage = 2;
 
-          // 실제 장애 발생 시각(occurrence_time)이 있으면 이를 최우선으로 매핑 (접수 시각의 지연 및 편차 보정)
+          // 접수 시각(reg_dt / timestamp)을 최우선으로 사용하여 타이머가 0초부터 시작하도록 수정 (occurrence_time 제외)
           let finalRegDt = msg.reg_dt || msg.timestamp || new Date().toISOString();
-          if (msg.occurrence_time) {
-            const ot = String(msg.occurrence_time).trim();
-            if (ot.length >= 19 && ot.match(/^\d{4}-\d{2}-\d{2}/)) {
-              finalRegDt = ot;
-            } else if (ot.match(/^\d{2}:\d{2}/)) {
-              const d = new Date();
-              const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              finalRegDt = `${todayStr} ${ot}`;
-            } else {
-              finalRegDt = ot;
-            }
-          }
 
           let timer = 180;
           if (stage === 3) {

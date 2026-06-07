@@ -223,19 +223,18 @@ export default function AlertMonitorPage({ embedded = false }) {
   const errorRate = totalCount > 0 ? Math.round((unresolved / totalCount) * 100) : 0;
 
   /* 3단계 판정 — 각 영역 OR 조건
-     CRITICAL : 미처리 오류건수 >= CRITICAL 설정치  OR  오류율 >= CRITICAL 설정치
-     MAJOR    : 미처리 오류건수 >= MAJOR 설정치     OR  오류율 >= MAJOR 설정치  (단, CRITICAL 미해당)
+     CRITICAL : 개별 오류건수 >= CRITICAL 설정치  OR  시스템 오류율 >= CRITICAL 설정치
+     MAJOR    : 개별 오류건수 >= MAJOR 설정치     OR  시스템 오류율 >= MAJOR 설정치
      NORMAL   : CRITICAL·MAJOR 조건 모두 미해당 (기본값)              */
   const classify = (inc) => {
-    // 개별 인시던트의 중복 수신 횟수도 참조할 수 있지만, 사용자는 '전체 미처리 오류 건수' 기준으로 동작하길 원함.
-    // 따라서 전체 unresolved 값을 기준으로 임계치를 평가합니다.
-    const currentUnresolved = unresolved;
+    // 개별 인시던트의 중복 수신 횟수(received_count)와 시스템 전체 오류율(errorRate)을 함께 평가합니다.
+    const currentCount = Number(inc.received_count) || Number(inc.occurrence_count) || 1;
 
-    // 1순위: CRITICAL — 어느 한 조건만 충족해도 해당
-    if (currentUnresolved >= thresholds.critical.errorCount || errorRate >= thresholds.critical.errorRate) return 'CRITICAL';
-    // 2순위: MAJOR   — 어느 한 조건만 충족해도 해당 (CRITICAL 미해당 전제)
-    if (currentUnresolved >= thresholds.major.errorCount    || errorRate >= thresholds.major.errorRate)    return 'MAJOR';
-    // 3순위: NORMAL  — 위 두 조건 모두 미해당 시 기본값
+    // 1순위: CRITICAL
+    if (currentCount >= thresholds.critical.errorCount || errorRate >= thresholds.critical.errorRate) return 'CRITICAL';
+    // 2순위: MAJOR
+    if (currentCount >= thresholds.major.errorCount    || errorRate >= thresholds.major.errorRate)    return 'MAJOR';
+    
     return 'NORMAL';
   };
 
@@ -250,8 +249,8 @@ export default function AlertMonitorPage({ embedded = false }) {
     majorList.length > 0 ? 'MAJOR' : 'NORMAL';
 
   const SLIDERS = [
-    { id: 'errorCount', label: '오류 건수', icon: BarChart3,  min: 1, max: 100, step: 1, unit: '건', isSim: false, desc: '전체 미처리 장애 건수 기준' },
-    { id: 'errorRate',  label: '오류율',    icon: TrendingUp, min: 0, max: 100, step: 5, unit: '%',  isSim: false, desc: '전체 대비 미처리 비율 기준' },
+    { id: 'errorCount', label: '오류 건수', icon: BarChart3,  min: 1, max: 100, step: 1, unit: '건', isSim: false, desc: '개별 장애 발생(중복) 건수 기준' },
+    { id: 'errorRate',  label: '오류율',    icon: TrendingUp, min: 0, max: 100, step: 5, unit: '%',  isSim: false, desc: '시스템 전체 미처리 장애 비율 기준' },
   ];
 
   return (

@@ -2367,7 +2367,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         const diffObj = (a, b) => { if (!a) return null; const ms = Math.max(0, (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp)); const totalS = Math.floor(ms / 1000); const h = Math.floor(totalS / 3600); const m = Math.floor((totalS % 3600) / 60); const s2 = totalS % 60; let text = ''; if (h > 0) text = `${h}h ${m}m ${s2}s`; else if (m > 0) text = `${m}m ${s2}s`; else text = `${s2}s`; return { text, min: Math.floor(totalS / 60) }; };
 
                         const activeIncident = smsMessages.find(m => m.inc_id === selectedIncidentIdFlow);
-                        const finalRegDtStr = activeIncident?.occurrence_time || activeIncident?.reg_dt || smsStep?.timestamp;
+                        const finalRegDtStr = activeIncident?.reg_dt || activeIncident?.timestamp || activeIncident?.occurrence_time || smsStep?.timestamp;
                         const diffStart = finalRegDtStr ? parseDate(finalRegDtStr) : new Date(smsStep?.timestamp || currentTime);
                         const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - diffStart;
                         const isClosed = !!knwStep;
