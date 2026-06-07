@@ -269,7 +269,7 @@ export default function OverallStatusPage() {
       </div>
 
       {/* Main Content Area */}
-      <div ref={scrollContainerRef} className="flex-1 min-h-0 p-4 pb-24 z-10 overflow-y-auto custom-scrollbar lg:flex lg:flex-col lg:gap-4">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 p-4 pb-24 lg:pb-4 z-10 overflow-y-auto lg:overflow-hidden custom-scrollbar lg:flex lg:flex-col lg:gap-4">
         
         {/* ROW 1: KPIs & Flow (Tab 0 on Mobile) */}
         {(isPC || tab === 0) && (
@@ -346,7 +346,7 @@ export default function OverallStatusPage() {
         {(isPC || tab !== 0) && (
           <div 
             className="lg:flex-1 lg:min-h-0 lg:flex lg:flex-row lg:gap-0 flex flex-col gap-4 pb-4 lg:pb-0"
-            style={isPC ? { height: `${vH[1]}%` } : {}}
+            style={isPC ? {} : {}}
           >
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
