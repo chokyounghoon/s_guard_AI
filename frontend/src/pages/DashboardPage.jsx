@@ -1984,9 +1984,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
 
           {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
-          <div className="flex flex-col h-full overflow-hidden">
+          <div className="flex flex-col h-full p-[2px]">
           {/* 실시간 SMS 수신 내역 패널 */}
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 flex flex-col min-h-0">
           <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`} h-full overflow-hidden flex flex-col relative backdrop-blur-2xl transition-all duration-700`}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-3.5">
@@ -2317,8 +2317,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col1 */}
 
           {/* ── 2/4: S-Autopilot Insight Panel ── */}
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex flex-col h-full p-[2px]">
+            <div className="flex-1 flex flex-col min-h-0">
               <AiInsightPanel 
                  onLogReceived={handleLogReceived} 
                  onShowDetail={handleShowInsight} 
@@ -2339,8 +2339,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col2 */}
 
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex flex-col h-full p-[2px]">
+            <div className="flex-1 flex flex-col min-h-0">
               <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-700 backdrop-blur-2xl ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`}`}>
                 {/* Header */}
                 <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
@@ -2391,7 +2391,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col3 */}
 
           {/* ── 4/4: 처리 현황 ── */}
-          <div className="flex flex-col h-full overflow-hidden">
+          <div className="flex flex-col h-full p-[2px]">
             <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`} flex-1 overflow-hidden flex flex-col backdrop-blur-2xl transition-all duration-700`}>
               {/* Header */}
               <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between gap-4 shrink-0">
