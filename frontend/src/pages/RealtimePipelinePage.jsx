@@ -461,11 +461,17 @@ export default function RealtimePipelinePage() {
   };
 
   // Auto-speak new incoming SSE incidents (skip if warroom already opened)
+  // Also skips if the same message was spoken within 15 seconds (dedup for burst duplicates)
+  const lastSpokenRef = useRef({ text: '', ts: 0 });
   const speakNewIncident = (card) => {
     if (!soundEnabled) return;
     // 워룸 이미 개설된 건(warroom_dt 있거나 stage>=3)이면 TTS 생략
     if (card.warroom_dt || card.stage >= 3) return;
     const text = `${card.severity} 신규 장애. ${card.bizSystem} 관련. ${card.message || card.keyword}`;
+    // 동일 메시지 15초 이내 재발화 방지 (중복 SMS 수신 시 TTS 중복 차단)
+    const now = Date.now();
+    if (lastSpokenRef.current.text === text && now - lastSpokenRef.current.ts < 15000) return;
+    lastSpokenRef.current = { text, ts: now };
     speakText(text);
   };
 

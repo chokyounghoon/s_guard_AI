@@ -3556,16 +3556,46 @@ app.post('/sms/receive', async (c) => {
   // Normalize sender phone number (remove dashes, spaces, etc.) for cross-device consistency
   const normSender = String(sender || '').replace(/[^0-9]/g, '');
 
-  // Duplicate check: Merge identical messages from same sender within a 10-minute window
-  // normSender is used so "+82" vs "010" format differences are handled
+  // ─── 중복 체크 ─────────────────────────────────────────────────────────────
+  // DB에는 message가 AES-256 암호화되어 저장되므로 평문 message로 WHERE 조회 불가.
+  // → message 내용의 해시(SHA-256 단축)를 msg_hash 컬럼에 별도 저장하고 그걸로 조회합니다.
+  // msg_hash 컬럼이 아직 없는 경우를 대비해 employee_id + normSender + 메시지 길이 + 10분 윈도우로 2차 보호.
+  const msgHashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message));
+  const msgHash = Array.from(new Uint8Array(msgHashBuf)).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+
   const tenMinsAgo = new Date(kstNow.getTime() - 10 * 60 * 1000).toISOString().replace('T', ' ').substring(0, 19)
-  const existing = await db.prepare(
-    `SELECT inc_id, received_count FROM received_messages
-     WHERE message = ?
-       AND REPLACE(REPLACE(sender,'-',''),' ','') = ?
-       AND timestamp >= ?
-     ORDER BY timestamp DESC LIMIT 1`
-  ).bind(message, normSender, tenMinsAgo).first()
+
+  // 먼저 msg_hash 컬럼이 있으면 해시로 조회 (가장 정확한 방법)
+  let existing = null;
+  try {
+    existing = await db.prepare(
+      `SELECT inc_id, received_count FROM received_messages
+       WHERE msg_hash = ?
+         AND REPLACE(REPLACE(sender,'-',''),' ','') = ?
+         AND timestamp >= ?
+       ORDER BY timestamp DESC LIMIT 1`
+    ).bind(msgHash, normSender, tenMinsAgo).first();
+  } catch (hashColMissing) {
+    // msg_hash 컬럼 없으면 폴백: employee_id + sender + message 길이 + 시간 윈도우
+    try {
+      existing = await db.prepare(
+        `SELECT inc_id, received_count FROM received_messages
+         WHERE employee_id = ?
+           AND REPLACE(REPLACE(sender,'-',''),' ','') = ?
+           AND length(message) = ?
+           AND timestamp >= ?
+         ORDER BY timestamp DESC LIMIT 1`
+      ).bind(employee_id, normSender, message.length, tenMinsAgo).first();
+    } catch (e2) {
+      existing = null;
+    }
+  }
+
+  // msg_hash 컬럼 생성 시도 (없으면 ALTER TABLE로 추가)
+  try {
+    await db.prepare(`ALTER TABLE received_messages ADD COLUMN msg_hash TEXT`).run();
+  } catch (_) { /* 이미 존재하는 경우 무시 */ }
+
 
   let parsedCount = extractOccurrence(occurrence_count);
   if (parsedCount === 0 && message) {
@@ -3763,7 +3793,7 @@ app.post('/sms/receive', async (c) => {
       receiver_6, receiver_7, receiver_8, receiver_9, receiver_10,
       receiver_11, receiver_12, receiver_13, receiver_14, receiver_15,
       receiver_16, receiver_17, receiver_18, receiver_19, receiver_20,
-      reg_id, reg_dt, mod_id, mod_dt, tags, category
+      reg_id, reg_dt, mod_id, mod_dt, tags, category, msg_hash
     ) VALUES (
       ?, ?, ?, ?, ?, ?, 
       ?, ?, 'PENDING',
@@ -3774,7 +3804,7 @@ app.post('/sms/receive', async (c) => {
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?
     )
   `).bind(
     newIncId, maskedSender || null, encryptedMessage || null, employee_id || null, timestamp, detectedCount,
@@ -3787,7 +3817,7 @@ app.post('/sms/receive', async (c) => {
     body.receiver_11 || null, body.receiver_12 || null, body.receiver_13 || null, body.receiver_14 || null, body.receiver_15 || null,
     body.receiver_16 || null, body.receiver_17 || null, body.receiver_18 || null, body.receiver_19 || null, body.receiver_20 || null,
     employee_id || 'SYSTEM', timestamp, employee_id || 'SYSTEM', timestamp,
-    tags, category
+    tags, category, msgHash
   ).run()
 
   // 🚀 NEW: Auto-sync to incidents table to prevent 404s on detail pages
