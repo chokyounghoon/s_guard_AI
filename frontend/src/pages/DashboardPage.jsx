@@ -705,14 +705,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     if (smsRefreshCounter > 0) fetchWorkflow(false);
   }, [smsRefreshCounter, fetchWorkflow]);
 
-  // 상단 S-Autopilot Insight 패널은 항상 최신 SMS만 분석하도록 고정
-  // 상단 S-Autopilot Insight 패널은 선택된 SMS를 우선 표시하고, 없을 경우 최신 SMS를 분석
+  // insightSms는 선택된 SMS를 따라가고, 선택 해제 시에는 null로 유지 (자동 첫 항목 선택 제거)
   useEffect(() => {
     if (visibleSms.length > 0) {
-      if (!selectedSms) {
-        setSelectedSms(visibleSms[0]);
-      }
-      setInsightSms(selectedSms || visibleSms[0]);
+      setInsightSms(selectedSms || null);
     } else {
       setInsightSms(null);
     }
