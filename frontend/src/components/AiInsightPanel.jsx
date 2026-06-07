@@ -736,12 +736,13 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           {!hideWarRoomButton && selectedSms && (() => {
               const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
               const incidentStatus = selectedSms.status || selectedSms.inc_status || 'INC_001';
-              const isProcessing = incidentStatus === 'INC_002';
               const isCompleted = incidentStatus === 'INC_003';
+              // warRoomExists: 실제 워룸이 개설된 경우에만 "이동" 표시 (incidentStatus INC_002는 처리중 의미이지 워룸 개설 여부와 무관)
+              const hasWarRoom = warRoomExists;
               
               const btnCls = isCompleted 
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                : isProcessing
+                : hasWarRoom
                 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
                 : sev === 'CRITICAL' ? 'bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)] hover:shadow-[0_0_25px_rgba(239,68,68,0.4)]'
                 : sev === 'MAJOR'    ? 'bg-orange-500/10 text-orange-400 border-orange-500/40 hover:bg-orange-500/20 shadow-[0_0_15px_rgba(249,115,22,0.2)] hover:shadow-[0_0_25px_rgba(249,115,22,0.4)]'
@@ -764,11 +765,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     <Users className="w-3.5 h-3.5" />
                   )}
                   <span>
-                    {isOpening ? '개설 중' : isCompleted ? '사후 분석' : isProcessing ? 'War-Room 이동' : 'War-Room 개설'}
+                    {isOpening ? '개설 중' : isCompleted ? '사후 분석' : hasWarRoom ? 'War-Room 이동' : 'War-Room 개설'}
                   </span>
                 </button>
               );
             })()}
+        </div>
         </div>
       </div>
 
