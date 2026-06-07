@@ -522,7 +522,7 @@ export default function OverallStatusPage() {
                       return incId ? (
                         <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => navigate(`/realtime-pipeline?inc_id=${incId}`)}
+                            onClick={() => navigate(`/chat/${incId}`)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black transition-all active:scale-95 shrink-0"
                             style={{
                               background: 'rgba(239,68,68,0.10)',
