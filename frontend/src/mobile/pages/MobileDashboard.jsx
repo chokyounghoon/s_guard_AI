@@ -417,6 +417,47 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       .filter(msg => !hideCompletedSms || msg.incident_status !== '처리완료');
   }, [smsMessages, hideCompletedSms, deletedSmsIds]);
 
+  // 🎨 Active Theme: 선택된 SMS의 심각도에 맞게 전체 대시보드 테마 계산
+  const activeTheme = useMemo(() => {
+    let sev = (selectedSms?.severity || 'NORMAL').toUpperCase();
+    if (selectedSms && selectedSms.incident_status !== '처리완료' && selectedSms.incident_status !== 'Completed' && selectedSms.status !== '처리완료' && selectedSms.status !== 'Completed') {
+      let cT = userProfile?.alert_critical_error_count || 10;
+      let majT = userProfile?.alert_major_error_count || 5;
+      try {
+        const s = localStorage.getItem('sguard_alert_thresholds_v3');
+        if (s) { const p = JSON.parse(s); cT = p.critical?.errorCount || cT; majT = p.major?.errorCount || majT; }
+      } catch {}
+      let v = Number(selectedSms.received_count) || Number(selectedSms.occurrence_count) || 1;
+      if (selectedSms.message) {
+        const m = selectedSms.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
+        if (m) { const pv = parseInt(m[1], 10); if (pv > v) v = pv; }
+      }
+      if (v >= cT) sev = 'CRITICAL';
+      else if (v >= majT) sev = 'MAJOR';
+    }
+    if (sev === 'CRITICAL') return {
+      bg: 'linear-gradient(180deg, #3f0d0d 0%, #1a0505 100%)',
+      outlineActive: { outline: '2px solid #ef4444', outlineOffset: '-2px', boxShadow: '0 0 35px rgba(239,68,68,0.4), inset 0 0 25px rgba(239,68,68,0.06)' },
+      outlineDim:   { outline: '1px solid rgba(239,68,68,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(239,68,68,0.15)' },
+      accentColor: '#ef4444', accentGlow: 'rgba(239,68,68,0.6)',
+      bodyBg: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,13,13,0.5) 0%, #050a15 100%)',
+    };
+    if (sev === 'MAJOR') return {
+      bg: 'linear-gradient(180deg, #3f1d0d 0%, #1a0a05 100%)',
+      outlineActive: { outline: '2px solid #f97316', outlineOffset: '-2px', boxShadow: '0 0 35px rgba(249,115,22,0.4), inset 0 0 25px rgba(249,115,22,0.06)' },
+      outlineDim:   { outline: '1px solid rgba(249,115,22,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(249,115,22,0.15)' },
+      accentColor: '#f97316', accentGlow: 'rgba(249,115,22,0.6)',
+      bodyBg: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,29,13,0.5) 0%, #050a15 100%)',
+    };
+    return {
+      bg: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
+      outlineActive: { outline: '2px solid #00e5ff', outlineOffset: '-2px', boxShadow: '0 0 25px rgba(0,229,255,0.3), inset 0 0 20px rgba(0,229,255,0.04)' },
+      outlineDim:   { outline: '1px solid rgba(0,229,255,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(0,229,255,0.15)' },
+      accentColor: '#00e5ff', accentGlow: 'rgba(0,229,255,0.5)',
+      bodyBg: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d272b 0%, #050a15 100%)',
+    };
+  }, [selectedSms, userProfile]);
+
   // 🚀 Auto-Reset: Clear other regions if no active incidents are visible
   useEffect(() => {
     if (visibleSms.length === 0) {
@@ -1529,7 +1570,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   };
 
   return (
-    <div className="fixed inset-0 text-slate-200 font-sans overflow-x-clip overflow-y-auto" style={{ background: '#121212' }}>
+    <div className="fixed inset-0 text-slate-200 font-sans overflow-x-clip overflow-y-auto" style={{ background: activeTheme.bodyBg, transition: 'background 0.7s ease' }}>
       {isInitialLoading && (
         <div className="absolute inset-0 z-[500] bg-[#121212]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-300">
           <div className="relative w-16 h-16">
@@ -1810,13 +1851,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           const borderGlow = isCrit ? 'rgba(0,229,255,0.6)' : 'rgba(0,229,255,0.5)';
           const borderColor = isCrit ? '#00e5ff' : '#00e5ff';
           return (
-        <div className="md:col-span-2 transition-all duration-300 shadow-2xl relative" style={{
-          background: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
-          border: `1px solid ${borderColor}`,
+        <div className="md:col-span-2 transition-all duration-700 shadow-2xl relative" style={{
+          background: activeTheme.bg,
           borderRadius: 24,
           overflow: 'hidden',
-          boxShadow: `0 0 25px ${borderGlow}, inset 0 1px 0 rgba(255,255,255,0.1)`,
-          backdropFilter: 'blur(20px)'
+          backdropFilter: 'blur(20px)',
+          ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
 
           {/* Panel header */}
@@ -2082,14 +2122,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
         {/* ── PANEL 2: AI Insight (Bento Wide) ── */}
         {(visibleSms.length > 0 || selectedSms) && (
-          <div className="md:col-span-2 transition-all duration-300 shadow-2xl" style={{
-            background: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
-            border: '1px solid #00e5ff',
-            borderRadius: 24,
-            overflow: 'hidden',
-            boxShadow: '0 0 25px rgba(0,229,255,0.25), inset 0 1px 0 rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(20px)'
-          }}>
+        <div className="md:col-span-2 transition-all duration-700 shadow-2xl" style={{
+          background: activeTheme.bg,
+          borderRadius: 24,
+          overflow: 'hidden',
+          backdropFilter: 'blur(20px)',
+          ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
+        }}>
             <AiInsightPanel
               onLogReceived={handleLogReceived}
               onShowDetail={handleShowInsight}
@@ -2106,13 +2145,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         )}
 
         {/* ── PANEL 3: Expert Advisor (Bento Card) ── */}
-        <div className="md:col-span-1 transition-all duration-300 flex flex-col shadow-2xl" style={{
-          background: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
-          border: '1px solid #00e5ff',
+        <div className="md:col-span-1 transition-all duration-700 flex flex-col shadow-2xl" style={{
+          background: activeTheme.bg,
           borderRadius: 24,
           overflow: 'hidden',
-          boxShadow: '0 0 25px rgba(0,229,255,0.25), inset 0 1px 0 rgba(255,255,255,0.1)',
-          backdropFilter: 'blur(20px)'
+          backdropFilter: 'blur(20px)',
+          ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
