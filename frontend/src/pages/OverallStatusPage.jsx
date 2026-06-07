@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
@@ -61,6 +61,14 @@ export default function OverallStatusPage() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // 탭 전환 시 스크롤 위치 초기화
+  const scrollContainerRef = useRef(null);
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [tab]);
 
   const fetchData = async (isManual = false, sd = startDate, ed = endDate) => {
     if (isManual) setRefreshing(true);
@@ -247,12 +255,12 @@ export default function OverallStatusPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0 flex flex-col p-4 pb-24 gap-4 z-10 overflow-y-auto custom-scrollbar">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 p-4 pb-24 z-10 overflow-y-auto custom-scrollbar lg:flex lg:flex-col lg:gap-4">
         
         {/* ROW 1: KPIs & Flow (Tab 0 on Mobile) */}
         {(isPC || tab === 0) && (
           <div 
-            className="flex flex-col lg:flex-row gap-4 lg:gap-0 shrink-0 lg:items-start"
+            className="flex flex-col lg:flex-row gap-4 lg:gap-0 shrink-0 lg:items-start mb-4 lg:mb-0"
             style={isPC ? { height: `${vH[0]}%`, minHeight: '150px' } : {}}
           >
           
@@ -323,7 +331,7 @@ export default function OverallStatusPage() {
         {/* ROW 2: 4 Columns Data Grid */}
         {(isPC || tab !== 0) && (
           <div 
-            className="lg:flex-1 lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-0 pb-4 lg:pb-0"
+            className="lg:flex-1 lg:min-h-0 lg:flex lg:flex-row lg:gap-0 flex flex-col gap-4 pb-4 lg:pb-0"
             style={isPC ? { height: `${vH[1]}%` } : {}}
           >
           
