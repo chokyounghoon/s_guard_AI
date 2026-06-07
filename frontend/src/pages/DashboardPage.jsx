@@ -335,6 +335,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [showFullTimeline, setShowFullTimeline] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
+  const workflowFinalizedRef = useRef(false); // warStep 확정 시 true → SSE 재조회 차단
   const [totalSmsVolume, setTotalSmsVolume] = useState(0);
   const [isSmsSpinning, setIsSmsSpinning] = useState(false);
   const [isFlowSpinning, setIsFlowSpinning] = useState(false);
@@ -697,13 +698,23 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   useEffect(() => {
     if (!selectedIncidentIdFlow) {
       setIncidentWorkflowSteps([]);
+      workflowFinalizedRef.current = false; // 인시던트 변경 시 확정 초기화
       return;
     }
+    workflowFinalizedRef.current = false; // 새 인시던트 선택 시 초기화
     fetchWorkflow(true);
   }, [selectedIncidentIdFlow, fetchWorkflow]);
 
+  // warStep 확정 시 재조회 차단 플래그 설정
   useEffect(() => {
-    if (smsRefreshCounter > 0) fetchWorkflow(false);
+    if (incidentWorkflowSteps.some(s => s.id === 'WARROOM')) {
+      workflowFinalizedRef.current = true;
+    }
+  }, [incidentWorkflowSteps]);
+
+  useEffect(() => {
+    // MTTA 확정(warStep 있음)이면 SSE 이벤트로 인한 재조회 생략
+    if (smsRefreshCounter > 0 && !workflowFinalizedRef.current) fetchWorkflow(false);
   }, [smsRefreshCounter, fetchWorkflow]);
 
   // insightSms는 선택된 SMS를 따라가고, 선택 해제 시에는 null로 유지 (자동 첫 항목 선택 제거)
