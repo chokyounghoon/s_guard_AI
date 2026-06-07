@@ -1599,7 +1599,15 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   };
 
   const activeTheme = useMemo(() => {
-    const sev = (selectedSms?.severity || 'NORMAL').toUpperCase();
+    let sev = (selectedSms?.severity || 'NORMAL').toUpperCase();
+    if (selectedSms && selectedSms.incident_status !== '처리완료' && selectedSms.incident_status !== 'Completed' && selectedSms.status !== '처리완료' && selectedSms.status !== 'Completed') {
+      const cT = userProfile?.alert_critical_error_count || 10;
+      const majT = userProfile?.alert_major_error_count || 5;
+      const v = Number(selectedSms.received_count) || Number(selectedSms.occurrence_count) || 1;
+      if (v >= cT) sev = 'CRITICAL';
+      else if (v >= majT) sev = 'MAJOR';
+    }
+
     if (sev === 'CRITICAL') {
       return {
         bgStyle: { background: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,13,13,0.8) 0%, rgba(26,5,5,0.9) 40%, #050a15 100%)' },
