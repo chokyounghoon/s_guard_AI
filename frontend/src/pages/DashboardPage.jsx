@@ -1968,8 +1968,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
           <div className="flex-1 overflow-hidden flex flex-col">
-          <div className={`bg-gradient-to-b from-[#102428] to-[#081619] rounded-3xl border border-[#00e5ff]/40 shadow-[0_0_25px_rgba(0,229,255,0.2)] h-full overflow-hidden flex flex-col relative backdrop-blur-2xl
-            ${(() => { const v = Number(selectedSms?.received_count); const t = (() => { try { const s = localStorage.getItem('sguard_alert_thresholds_v3'); if (s) { const p = JSON.parse(s); return p.critical?.errorCount || 10; } } catch{} return 10; })(); return v > t ? 'sms-pulse-critical' : v > 3 ? 'sms-pulse-major' : ''; })()}`}>
+          <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl border ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`} h-full overflow-hidden flex flex-col relative backdrop-blur-2xl transition-all duration-700`}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-3.5">
                     <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
@@ -2309,6 +2308,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                warRooms={warRooms}
                onAnalyzingChange={setIsAiAnalyzing}
                isOpening={isOpeningWarRoom}
+               activeTheme={activeTheme}
                onClose={() => {
                  setShowAgentPanel(false);
                  setSelectedSms(null);

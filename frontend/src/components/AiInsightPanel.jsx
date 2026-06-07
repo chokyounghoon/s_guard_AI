@@ -74,7 +74,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
   return 'report';
 };
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete, onClose }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete, onClose, activeTheme }) {
   const navigate = useNavigate();
   
   const handleChipClick = (value, label) => {
@@ -675,11 +675,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const showWarRoomButton = analysisComplete;
 
   return (
-    <div className={`rounded-3xl border shadow-2xl relative h-full flex flex-col transition-all duration-500 backdrop-blur-2xl
-      ${isAnalyzingSms && isCritical
-        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.3)]'
-        : selectedSms
-        ? 'bg-gradient-to-b from-[#102428] to-[#081619] border-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.25)]'
+    <div className={`rounded-3xl border relative h-full flex flex-col transition-all duration-700 backdrop-blur-2xl
+      ${isAnalyzingSms
+        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-white/50 shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-pulse'
+        : selectedSms && activeTheme
+        ? `bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} ${activeTheme.borderColorActive} ${activeTheme.shadowActive}`
         : 'bg-gradient-to-b from-[#102428]/80 to-[#081619]/80 border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.15)]'}`}>
       {/* 고정 헤더 영역 */}
       <div className="shrink-0 p-4 sm:p-5 border-b border-white/5 relative">
