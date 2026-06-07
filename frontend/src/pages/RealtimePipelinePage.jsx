@@ -7,7 +7,7 @@ import {
   CheckCircle2, User, RefreshCw, AlertTriangle, ShieldAlert,
   Play, Volume2, ExternalLink, X, TrendingUp, BarChart3,
   Calendar, Network, Server, Zap, CheckCircle, Search, PieChart as PieChartIcon,
-  Bell, Users, Brain, AlertCircle, Info, MessageSquare, Rocket, Heart
+  Bell, Users, Brain, AlertCircle, Info, MessageSquare, Rocket, Heart, FileText
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -1455,6 +1455,26 @@ export default function RealtimePipelinePage() {
                         </button>
                       );
                     })()}
+
+                    {/* AI 레포트 버튼 - Step4 쪽 완료 시 */}
+                    {step.id === 'KNOWLEDGE' && isCompleted && (
+                      <button
+                        onClick={() => navigate(`/ai-report/${card.inc_id}`)}
+                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all active:scale-95"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.1) 100%)',
+                          border: '1px solid rgba(16,185,129,0.4)',
+                          color: '#10b981',
+                          boxShadow: '0 0 12px rgba(16,185,129,0.2)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(16,185,129,0.4)'}
+                        onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 12px rgba(16,185,129,0.2)'}
+                      >
+                        <FileText className="w-3 h-3" />
+                        <span>AI 레포트 보기</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
