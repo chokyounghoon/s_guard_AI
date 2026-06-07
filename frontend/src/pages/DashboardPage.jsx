@@ -2299,22 +2299,24 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
           {/* ── 2/4: S-Autopilot Insight Panel ── */}
           <div className="flex flex-col h-full overflow-hidden">
-            <AiInsightPanel 
-               onLogReceived={handleLogReceived} 
-               onShowDetail={handleShowInsight} 
-               selectedSms={insightSms} 
-               onOpenWarRoom={handleOpenWarRoomFromInsight} 
-               onAgentContent={handleAgentContent}
-               warRooms={warRooms}
-               onAnalyzingChange={setIsAiAnalyzing}
-               isOpening={isOpeningWarRoom}
-               activeTheme={activeTheme}
-               onClose={() => {
-                 setShowAgentPanel(false);
-                 setSelectedSms(null);
-                 setInsightSms(null);
-               }}
-            />
+            <div className="flex-1 overflow-hidden flex flex-col p-px">
+              <AiInsightPanel 
+                 onLogReceived={handleLogReceived} 
+                 onShowDetail={handleShowInsight} 
+                 selectedSms={insightSms} 
+                 onOpenWarRoom={handleOpenWarRoomFromInsight} 
+                 onAgentContent={handleAgentContent}
+                 warRooms={warRooms}
+                 onAnalyzingChange={setIsAiAnalyzing}
+                 isOpening={isOpeningWarRoom}
+                 activeTheme={activeTheme}
+                 onClose={() => {
+                   setShowAgentPanel(false);
+                   setSelectedSms(null);
+                   setInsightSms(null);
+                 }}
+              />
+            </div>
           </div>{/* end col2 */}
 
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
