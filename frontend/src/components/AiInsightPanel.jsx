@@ -675,12 +675,22 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const showWarRoomButton = analysisComplete;
 
   return (
-    <div className={`rounded-3xl overflow-hidden relative h-full flex flex-col transition-all duration-700 backdrop-blur-2xl
-      ${isAnalyzingSms
-        ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] border-2 border-white/50 shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-pulse'
-        : activeTheme
-        ? `bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`}`
-        : `bg-gradient-to-b from-[#102428]/80 to-[#081619]/80 ${selectedSms ? 'border-2 border-[#00e5ff] shadow-[0_0_25px_rgba(0,229,255,0.25)]' : 'border border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.15)]'}`}`}>
+    <div
+      className={`rounded-3xl overflow-hidden relative h-full flex flex-col transition-all duration-700 backdrop-blur-2xl
+        ${isAnalyzingSms
+          ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] animate-pulse'
+          : activeTheme
+          ? `bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo}`
+          : 'bg-gradient-to-b from-[#102428]/80 to-[#081619]/80'}`}
+      style={isAnalyzingSms
+        ? { outline: '2px solid rgba(255,255,255,0.5)', outlineOffset: '-2px', boxShadow: '0 0 30px rgba(255,255,255,0.3)' }
+        : activeTheme?.outlineActive
+        ? (selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim)
+        : (selectedSms
+            ? { outline: '2px solid #00e5ff', outlineOffset: '-2px', boxShadow: '0 0 25px rgba(0,229,255,0.25)' }
+            : { outline: '1px solid rgba(0,229,255,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(0,229,255,0.15)' }
+          )
+      }>
       {/* 고정 헤더 영역 */}
       <div className="shrink-0 p-4 sm:p-5 border-b border-white/5 relative">
       <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />

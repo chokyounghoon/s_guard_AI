@@ -1632,10 +1632,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         bgStyle: { background: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,13,13,0.8) 0%, rgba(26,5,5,0.9) 40%, #050a15 100%)' },
         gradientFrom: 'from-[#3f0d0d]/40',
         gradientTo: 'to-[#1a0505]/40',
-        borderColorActive: 'border-2 border-red-500',
-        borderColorDim: 'border border-red-500/40',
-        shadowActive: 'shadow-[0_0_35px_rgba(239,68,68,0.35)]',
-        shadowDim: 'shadow-[0_0_15px_rgba(239,68,68,0.15)]',
+        borderColorActive: '',
+        borderColorDim: '',
+        shadowActive: '',
+        shadowDim: '',
+        outlineActive: { outline: '2px solid #ef4444', outlineOffset: '-2px', boxShadow: '0 0 35px rgba(239,68,68,0.4), inset 0 0 25px rgba(239,68,68,0.06)' },
+        outlineDim:   { outline: '1px solid rgba(239,68,68,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(239,68,68,0.15)' },
         accentColor: 'text-red-400',
       };
     } else if (sev === 'MAJOR') {
@@ -1643,10 +1645,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         bgStyle: { background: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,29,13,0.8) 0%, rgba(26,10,5,0.9) 40%, #050a15 100%)' },
         gradientFrom: 'from-[#3f1d0d]/40',
         gradientTo: 'to-[#1a0a05]/40',
-        borderColorActive: 'border-2 border-orange-500',
-        borderColorDim: 'border border-orange-500/40',
-        shadowActive: 'shadow-[0_0_35px_rgba(249,115,22,0.35)]',
-        shadowDim: 'shadow-[0_0_15px_rgba(249,115,22,0.15)]',
+        borderColorActive: '',
+        borderColorDim: '',
+        shadowActive: '',
+        shadowDim: '',
+        outlineActive: { outline: '2px solid #f97316', outlineOffset: '-2px', boxShadow: '0 0 35px rgba(249,115,22,0.4), inset 0 0 25px rgba(249,115,22,0.06)' },
+        outlineDim:   { outline: '1px solid rgba(249,115,22,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(249,115,22,0.15)' },
         accentColor: 'text-orange-400',
       };
     }
@@ -1654,10 +1658,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       bgStyle: { background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d272b 0%, #081619 40%, #050a15 100%)' },
       gradientFrom: 'from-[#102428]',
       gradientTo: 'to-[#081619]',
-      borderColorActive: 'border-2 border-[#00e5ff]',
-      borderColorDim: 'border border-[#00e5ff]/40',
-      shadowActive: 'shadow-[0_0_25px_rgba(0,229,255,0.25)]',
-      shadowDim: 'shadow-[0_0_15px_rgba(0,229,255,0.15)]',
+      borderColorActive: '',
+      borderColorDim: '',
+      shadowActive: '',
+      shadowDim: '',
+      outlineActive: { outline: '2px solid #00e5ff', outlineOffset: '-2px', boxShadow: '0 0 25px rgba(0,229,255,0.3), inset 0 0 20px rgba(0,229,255,0.04)' },
+      outlineDim:   { outline: '1px solid rgba(0,229,255,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(0,229,255,0.15)' },
       accentColor: 'text-[#00e5ff]',
     };
   }, [selectedSms, userProfile]);
@@ -1944,10 +1950,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden px-4 pt-4 pb-20 flex flex-col">
+      <div className="flex-1 min-h-0 overflow-hidden px-4 pt-4 pb-20 flex flex-col">
 
         {/* ── 3컬럼 메인 그리드 ── */}
-        <div className="relative flex-1 h-full">
+        <div className="relative flex-1 min-h-0">
 
           {/* ── 데이터 스트림 커넥터: 중앙 빛 흐름 (lg 이상에서만 표시, 처리완료 시 중지) ── */}
           {(() => {
@@ -1981,13 +1987,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             );
           })()}
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full min-h-0">
 
           {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
-          <div className="flex flex-col h-full p-[2px]">
+          <div className="flex flex-col h-full overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
-          <div className="flex-1 flex flex-col min-h-0">
-          <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`} h-full overflow-hidden flex flex-col relative backdrop-blur-2xl transition-all duration-700`}>
+          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl h-full overflow-hidden flex flex-col relative backdrop-blur-2xl transition-all duration-700`}
+            style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
               <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/5">
                   <div className="flex items-center gap-3.5">
                     <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
@@ -2317,8 +2324,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col1 */}
 
           {/* ── 2/4: S-Autopilot Insight Panel ── */}
-          <div className="flex flex-col h-full p-[2px]">
-            <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex-1 overflow-hidden flex flex-col">
               <AiInsightPanel 
                  onLogReceived={handleLogReceived} 
                  onShowDetail={handleShowInsight} 
@@ -2339,9 +2346,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col2 */}
 
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
-          <div className="flex flex-col h-full p-[2px]">
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-700 backdrop-blur-2xl ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`}`}>
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl overflow-hidden flex flex-col shadow-2xl h-full transition-all duration-700 backdrop-blur-2xl`}
+                style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
                 {/* Header */}
                 <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
@@ -2391,8 +2399,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col3 */}
 
           {/* ── 4/4: 처리 현황 ── */}
-          <div className="flex flex-col h-full p-[2px]">
-            <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl ${selectedSms ? `${activeTheme.borderColorActive} ${activeTheme.shadowActive}` : `${activeTheme.borderColorDim} ${activeTheme.shadowDim}`} flex-1 overflow-hidden flex flex-col backdrop-blur-2xl transition-all duration-700`}>
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className={`bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo} rounded-3xl flex-1 overflow-hidden flex flex-col backdrop-blur-2xl transition-all duration-700`}
+              style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
               {/* Header */}
               <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between gap-4 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
