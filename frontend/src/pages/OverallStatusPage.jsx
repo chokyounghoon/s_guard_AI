@@ -247,7 +247,7 @@ export default function OverallStatusPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0 flex flex-col p-4 pb-[140px] gap-4 z-10 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-h-0 flex flex-col p-4 pb-24 gap-4 z-10 overflow-y-auto custom-scrollbar">
         
         {/* ROW 1: KPIs & Flow (Tab 0 on Mobile) */}
         {(isPC || tab === 0) && (
@@ -257,7 +257,7 @@ export default function OverallStatusPage() {
           >
           
           {/* KPI Grid */}
-          <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3 lg:h-full" style={isPC ? { width: `${wR1[0]}%`, flex: 'none' } : {}}>
+          <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-3 lg:h-full" style={isPC ? { width: `${wR1[0]}%`, flex: 'none' } : {}>
             {KPI.map((k, i) => {
               const Icon = k.icon;
               return (
@@ -288,7 +288,7 @@ export default function OverallStatusPage() {
           {isPC && <div onMouseDown={(e) => hDrag1(0, e)} className={`w-1.5 md:w-2 cursor-ew-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${hDragIng1 ? 'bg-blue-500/50' : ''}`} />}
 
           {/* Incident Lifecycle Flow */}
-          <div className="lg:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg overflow-hidden lg:h-full" style={isPC ? { width: `${wR1[1]}%`, flex: 'none' } : {}}>
+          <div className="lg:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg overflow-hidden lg:h-full" style={isPC ? { width: `${wR1[1]}%`, flex: 'none' } : {}>
             <div className="flex items-center gap-2 mb-4 shrink-0">
               <div className="p-1.5 bg-indigo-500/10 rounded-lg"><Activity className="w-4 h-4 text-indigo-400" /></div>
               <span className="text-sm font-black text-slate-200">인시던트 생애주기</span>
@@ -329,7 +329,7 @@ export default function OverallStatusPage() {
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
           {(isPC || tab === 1) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export default function OverallStatusPage() {
 
           {/* Column 2: Categories (Tab 2 on Mobile) */}
           {(isPC || tab === 2) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -426,7 +426,7 @@ export default function OverallStatusPage() {
 
           {/* Column 3: Contributors (Tab 3 on Mobile) */}
           {(isPC || tab === 3) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -477,7 +477,7 @@ export default function OverallStatusPage() {
 
           {/* Column 4: Feed (Tab 4 on Mobile) */}
           {(isPC || tab === 4) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 min-h-[220px] lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
