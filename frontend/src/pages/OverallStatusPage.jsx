@@ -214,7 +214,7 @@ export default function OverallStatusPage() {
   }
 
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col select-none relative">
+    <div className="h-[100dvh] lg:h-full w-full overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col select-none relative">
       {/* Background Effects */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
       <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
