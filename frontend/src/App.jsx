@@ -452,7 +452,7 @@ function AppContent() {
         <Route path="/user-keyword"             element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><UserKeywordPage /></PCPageModal></ProtectedRoute>} />
         <Route path="/s-callert"                element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><SCallertPage /></ProtectedRoute>} />
         <Route path="/realtime-pipeline"        element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><RealtimePipelinePage /></ProtectedRoute>} />
-        <Route path="/expert-board"              element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><ExpertBoardPage /></ProtectedRoute>} />
+        <Route path="/expert-board"              element={<ProtectedRoute isRefreshing={isRefreshing} userProfile={userProfile}><PCPageModal><ExpertBoardPage /></PCPageModal></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 

@@ -42,7 +42,7 @@ export default function ExpertBoardPage() {
   const maxScore = contributors[0]?.synergy_score || 1;
 
   return (
-    <div className="fixed inset-0 z-50 w-full bg-zinc-950 text-slate-300 font-sans flex flex-col overflow-hidden">
+    <div className="h-full w-full bg-zinc-950 text-slate-300 font-sans flex flex-col overflow-hidden relative">
       {/* Background */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full pointer-events-none" />

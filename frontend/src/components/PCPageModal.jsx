@@ -37,7 +37,7 @@ export default function PCPageModal({ children }) {
   }, [isPC, handleClose]);
 
   // Mobile Popup Mode Routes
-  const modalPaths = ['/chat-summary/', '/inbox', '/report/', '/ai-report/', '/incident-push', '/workflow'];
+  const modalPaths = ['/chat-summary/', '/inbox', '/report/', '/ai-report/', '/incident-push', '/workflow', '/expert-board'];
   const isModalPage = modalPaths.some(path => location.pathname.includes(path));
 
   // 모바일: 기본적으로 full-page 렌더링하지만, 특정 페이지들은 팝업 형태로 유지
