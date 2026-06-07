@@ -2151,8 +2151,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               setAgentMessages([]);
                             }
                           }}
-                          style={{
-                            background: isSelected ? `rgba(${accentBgRGB},0.15)` : (isCritical || isMaj ? '' : 'rgba(18,21,26,0.85)'),
+                          style={isCritical ? {
+                            background: isSelected
+                              ? `repeating-linear-gradient(-45deg, rgba(239,68,68,0.18) 0px, rgba(239,68,68,0.18) 12px, rgba(60,10,10,0.6) 12px, rgba(60,10,10,0.6) 28px)`
+                              : `repeating-linear-gradient(-45deg, rgba(239,68,68,0.10) 0px, rgba(239,68,68,0.10) 12px, rgba(25,4,4,0.75) 12px, rgba(25,4,4,0.75) 28px)`,
+                            border: `2px solid rgba(239,68,68,${isSelected ? '0.95' : '0.65'})`,
+                            borderRadius: 16,
+                            boxShadow: isSelected
+                              ? '0 0 40px rgba(239,68,68,0.55), inset 0 0 20px rgba(239,68,68,0.1)'
+                              : '0 0 20px rgba(239,68,68,0.35)',
+                          } : {
+                            background: isSelected ? `rgba(${accentBgRGB},0.15)` : (isMaj ? '' : 'rgba(18,21,26,0.85)'),
                             borderTop: '1px solid rgba(255,255,255,0.05)',
                             borderRight: '1px solid rgba(255,255,255,0.05)',
                             borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -2162,7 +2171,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           className={`rounded-2xl py-3 px-4.5 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden ${isCritical && !isSelected ? 'sms-pulse-critical' : isMaj && !isSelected ? 'sms-pulse-major' : ''}`}
                         >
                           {isSelected && (
-                            <div className="absolute inset-0 pointer-events-none rounded-2xl" style={{ border: `2px solid ${accentColor}`, boxShadow: `inset 0 0 20px rgba(${accentBgRGB},0.2)` }} />
+                            <div className="absolute inset-0 pointer-events-none rounded-2xl" style={{ outline: `2px solid ${accentColor}`, outlineOffset: '-2px', boxShadow: `inset 0 0 20px rgba(${accentBgRGB},0.2)` }} />
                           )}
                           {/* 상단: 제목 + 배지 */}
                           <div className="flex items-center justify-between gap-2 mb-1">

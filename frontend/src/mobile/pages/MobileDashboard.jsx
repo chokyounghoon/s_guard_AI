@@ -1960,14 +1960,23 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     else { setSelectedSms(msg); selectedSmsRef.current = msg; setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
                   }}
                   className={`rounded-2xl p-4.5 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-3 relative overflow-hidden ${isCritical ? 'sms-pulse-critical' : isMaj ? 'sms-pulse-major' : ''}`}
-                  style={{
-                    background: isSel ? `rgba(${accentBgRGB},0.15)` : isCritical ? `rgba(${accentBgRGB},0.08)` : isMaj ? `rgba(${accentBgRGB},0.05)` : 'rgba(18,21,26,0.85)',
+                  style={isCritical ? {
+                    background: isSel
+                      ? `repeating-linear-gradient(-45deg, rgba(239,68,68,0.18) 0px, rgba(239,68,68,0.18) 12px, rgba(60,10,10,0.6) 12px, rgba(60,10,10,0.6) 28px)`
+                      : `repeating-linear-gradient(-45deg, rgba(239,68,68,0.10) 0px, rgba(239,68,68,0.10) 12px, rgba(25,4,4,0.75) 12px, rgba(25,4,4,0.75) 28px)`,
+                    border: `2px solid rgba(239,68,68,${isSel ? '0.95' : '0.65'})`,
+                    borderRadius: 16,
+                    boxShadow: isSel
+                      ? '0 0 40px rgba(239,68,68,0.55), inset 0 0 20px rgba(239,68,68,0.1)'
+                      : '0 0 20px rgba(239,68,68,0.35)',
+                  } : {
+                    background: isSel ? `rgba(${accentBgRGB},0.15)` : isMaj ? `rgba(${accentBgRGB},0.05)` : 'rgba(18,21,26,0.85)',
                     borderTop: '1px solid rgba(255,255,255,0.05)',
                     borderRight: '1px solid rgba(255,255,255,0.05)',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     borderLeft: `4px solid ${accentColor}`,
                     borderRadius: 16,
-                    boxShadow: isSel ? `0 0 20px rgba(${accentBgRGB},0.4)` : isCritical ? `0 0 20px rgba(${accentBgRGB},0.5)` : isMaj ? `0 0 15px rgba(${accentBgRGB},0.3)` : '0 4px 15px rgba(0,0,0,0.4)'
+                    boxShadow: isSel ? `0 0 20px rgba(${accentBgRGB},0.4)` : isMaj ? `0 0 15px rgba(${accentBgRGB},0.3)` : '0 4px 15px rgba(0,0,0,0.4)'
                   }}>
                   {/* Header: Notification Type & Severity */}
                   <div className="flex items-center justify-between">
