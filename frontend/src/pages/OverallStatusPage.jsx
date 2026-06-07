@@ -5,7 +5,7 @@ import {
   Shield, Zap, Database, MessageSquare, Users, CheckCircle2,
   BarChart3, Clock, Sparkles, Activity, FileSearch, Brain,
   Target, Rocket, Heart, Medal, ChevronLeft, Loader2, RefreshCw,
-  Layers, ArrowRight, FileText
+  Layers, ArrowRight, FileText, Swords
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -260,8 +260,8 @@ export default function OverallStatusPage() {
         {/* ROW 1: KPIs & Flow (Tab 0 on Mobile) */}
         {(isPC || tab === 0) && (
           <div 
-            className="flex flex-col lg:flex-row gap-4 lg:gap-0 shrink-0 lg:items-start mb-4 lg:mb-0"
-            style={isPC ? { height: `${vH[0]}%`, minHeight: '150px' } : {}}
+            className="flex flex-col lg:flex-row gap-4 lg:gap-0 shrink-0 lg:items-stretch mb-4 lg:mb-0"
+            style={isPC ? { minHeight: '200px', maxHeight: '220px' } : {}}
           >
           
           {/* KPI Grid */}
@@ -269,7 +269,7 @@ export default function OverallStatusPage() {
             {KPI.map((k, i) => {
               const Icon = k.icon;
               return (
-                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col justify-start h-full ${i === 4 ? 'col-span-2 lg:col-span-1' : ''}`}>
+                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col gap-3 ${i === 4 ? 'col-span-2 lg:col-span-1' : ''}`}>
                   <div className={`absolute -right-4 -top-4 w-24 h-24 ${k.bg} blur-[30px] rounded-full group-hover:scale-110 transition-transform opacity-50`}></div>
                   
                   <div>
@@ -281,10 +281,10 @@ export default function OverallStatusPage() {
                     </div>
                   </div>
                   
-                  <div className="flex flex-col justify-end mt-auto pt-2">
-                    <div className="text-[11px] font-bold text-slate-400 mb-1 leading-tight">{k.label}</div>
+                  <div className="flex flex-col gap-0.5 mt-auto pt-2 border-t border-white/5">
+                    <div className="text-[11px] font-bold text-slate-400 leading-tight">{k.label}</div>
                     <div className="text-[9px] font-bold text-slate-500 leading-tight">{k.sub}</div>
-                    <div className={`mt-3 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80 shrink-0`}>
+                    <div className={`mt-2 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80 shrink-0`}>
                       {k.formula}
                     </div>
                   </div>
@@ -332,7 +332,7 @@ export default function OverallStatusPage() {
         {(isPC || tab !== 0) && (
           <div 
             className="lg:flex-1 lg:min-h-0 lg:flex lg:flex-row lg:gap-0 flex flex-col gap-4 pb-4 lg:pb-0"
-            style={isPC ? { height: `${vH[1]}%` } : {}}
+            style={isPC ? {} : {}}
           >
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
@@ -520,22 +520,40 @@ export default function OverallStatusPage() {
                       const match = (item.title || '').match(/\]\s*([\d]+)[:：]/);
                       const incId = match ? match[1] : (item.inc_id || null);
                       return incId ? (
-                        <button
-                          onClick={() => navigate(`/ai-report/${incId}`)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black transition-all active:scale-95 shrink-0"
-                          style={{
-                            background: 'rgba(59,130,246,0.12)',
-                            border: '1px solid rgba(59,130,246,0.3)',
-                            color: '#60a5fa',
-                            boxShadow: '0 0 8px rgba(59,130,246,0.15)'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 14px rgba(59,130,246,0.35)'}
-                          onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 8px rgba(59,130,246,0.15)'}
-                        >
-                          <FileText className="w-2.5 h-2.5" />
-                          <span>AI 레포트</span>
-                          <ArrowRight className="w-2.5 h-2.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => navigate(`/realtime-pipeline?inc_id=${incId}`)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black transition-all active:scale-95 shrink-0"
+                            style={{
+                              background: 'rgba(239,68,68,0.10)',
+                              border: '1px solid rgba(239,68,68,0.3)',
+                              color: '#f87171',
+                              boxShadow: '0 0 8px rgba(239,68,68,0.15)'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 14px rgba(239,68,68,0.35)'}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 8px rgba(239,68,68,0.15)'}
+                          >
+                            <Swords className="w-2.5 h-2.5" />
+                            <span>워룸</span>
+                            <ArrowRight className="w-2.5 h-2.5" />
+                          </button>
+                          <button
+                            onClick={() => navigate(`/ai-report/${incId}`)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black transition-all active:scale-95 shrink-0"
+                            style={{
+                              background: 'rgba(59,130,246,0.12)',
+                              border: '1px solid rgba(59,130,246,0.3)',
+                              color: '#60a5fa',
+                              boxShadow: '0 0 8px rgba(59,130,246,0.15)'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 14px rgba(59,130,246,0.35)'}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 8px rgba(59,130,246,0.15)'}
+                          >
+                            <FileText className="w-2.5 h-2.5" />
+                            <span>AI 레포트</span>
+                            <ArrowRight className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
                       ) : null;
                     })()}
                   </div>
