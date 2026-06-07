@@ -2614,7 +2614,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                                   <span className={`text-[9.5px] font-black uppercase tracking-widest mb-0.5 ${!isMttaClosed ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>MTTA TIMER</span>
                                   <span className="text-[28px] font-black font-mono tracking-tighter tabular-nums" style={{ color: mttaRingColor, textShadow: isMttaClosed ? `0 0 10px rgba(${mttaRingColorRGB},0.3)` : `0 0 25px rgba(${mttaRingColorRGB},1)` }}>
-                                    {isFlowSpinning ? '---' : formatDuration(mttaDurationMs)}
+                                    {formatDuration(mttaDurationMs)}
                                   </span>
                                   <span className={`text-[10px] font-black mt-1.5 px-3 py-1 rounded-full border shadow-inner transition-all ${
                                     isMttaClosed 
