@@ -3556,11 +3556,16 @@ app.post('/sms/receive', async (c) => {
   // Normalize sender phone number (remove dashes, spaces, etc.) for cross-device consistency
   const normSender = String(sender || '').replace(/[^0-9]/g, '');
 
-  // Duplicate check: Merge identical messages if they arrive within a 10-minute window
+  // Duplicate check: Merge identical messages from same sender within a 10-minute window
+  // normSender is used so "+82" vs "010" format differences are handled
   const tenMinsAgo = new Date(kstNow.getTime() - 10 * 60 * 1000).toISOString().replace('T', ' ').substring(0, 19)
   const existing = await db.prepare(
-    "SELECT inc_id, received_count FROM received_messages WHERE message = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1"
-  ).bind(message, tenMinsAgo).first()
+    `SELECT inc_id, received_count FROM received_messages
+     WHERE message = ?
+       AND REPLACE(REPLACE(sender,'-',''),' ','') = ?
+       AND timestamp >= ?
+     ORDER BY timestamp DESC LIMIT 1`
+  ).bind(message, normSender, tenMinsAgo).first()
 
   let parsedCount = extractOccurrence(occurrence_count);
   if (parsedCount === 0 && message) {
