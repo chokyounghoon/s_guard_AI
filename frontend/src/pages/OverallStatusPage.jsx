@@ -51,7 +51,7 @@ export default function OverallStatusPage() {
   const [isPC, setIsPC] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
 
   // Resize hooks for PC Layout
-  const { heights: vH, startVDrag: vDrag, isDragging: vDragIng } = useResizableVertical([45, 55], 'overall-v');
+  const { heights: vH, startVDrag: vDrag, isDragging: vDragIng } = useResizableVertical([30, 70], 'overall-v');
   const { widths: wR1, startDrag: hDrag1, isDragging: hDragIng1 } = useResizable([65, 35], 'overall-r1');
   const { widths: wR2, startDrag: hDrag2, isDragging: hDragIng2 } = useResizable([25, 25, 25, 25], 'overall-r2');
 
@@ -69,6 +69,20 @@ export default function OverallStatusPage() {
       scrollContainerRef.current.scrollTop = 0;
     }
   }, [tab]);
+
+  // localStorage 저장 vH 비정상값 리셋 (Row1이 40% 초과 시 기본값으로)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('overall-v');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed) || parsed[0] > 40) {
+          localStorage.removeItem('overall-v');
+          window.location.reload();
+        }
+      }
+    } catch(e) { localStorage.removeItem('overall-v'); }
+  }, []);
 
   const fetchData = async (isManual = false, sd = startDate, ed = endDate) => {
     if (isManual) setRefreshing(true);
@@ -261,7 +275,7 @@ export default function OverallStatusPage() {
         {(isPC || tab === 0) && (
           <div 
             className="flex flex-col lg:flex-row gap-4 lg:gap-0 shrink-0 lg:items-stretch mb-4 lg:mb-0"
-            style={isPC ? { minHeight: '200px', maxHeight: '220px' } : {}}
+            style={isPC ? { height: `${vH[0]}%`, minHeight: '180px' } : {}}
           >
           
           {/* KPI Grid */}
@@ -281,7 +295,7 @@ export default function OverallStatusPage() {
                     </div>
                   </div>
                   
-                  <div className="flex flex-col gap-0.5 mt-auto pt-2 border-t border-white/5">
+                  <div className="flex flex-col gap-0.5 pt-2 border-t border-white/5">
                     <div className="text-[11px] font-bold text-slate-400 leading-tight">{k.label}</div>
                     <div className="text-[9px] font-bold text-slate-500 leading-tight">{k.sub}</div>
                     <div className={`mt-2 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80 shrink-0`}>
@@ -332,7 +346,7 @@ export default function OverallStatusPage() {
         {(isPC || tab !== 0) && (
           <div 
             className="lg:flex-1 lg:min-h-0 lg:flex lg:flex-row lg:gap-0 flex flex-col gap-4 pb-4 lg:pb-0"
-            style={isPC ? {} : {}}
+            style={isPC ? { height: `${vH[1]}%` } : {}}
           >
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
