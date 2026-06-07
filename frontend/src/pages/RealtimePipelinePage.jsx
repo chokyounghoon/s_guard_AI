@@ -252,7 +252,7 @@ export default function RealtimePipelinePage() {
   const [filterSystem, setFilterSystem] = useState('all');
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [isSimulationActive, setIsSimulationActive] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [workflowPanelId, setWorkflowPanelId] = useState(null);
   const [orgTree, setOrgTree] = useState([]); // Full org chart from /org/tree
   const [showFullTimeline, setShowFullTimeline] = useState(false);
@@ -460,6 +460,15 @@ export default function RealtimePipelinePage() {
     }
   };
 
+  // Auto-speak new incoming SSE incidents (skip if warroom already opened)
+  const speakNewIncident = (card) => {
+    if (!soundEnabled) return;
+    // 워룸 이미 개설된 건(warroom_dt 있거나 stage>=3)이면 TTS 생략
+    if (card.warroom_dt || card.stage >= 3) return;
+    const text = `${card.severity} 신규 장애. ${card.bizSystem} 관련. ${card.message || card.keyword}`;
+    speakText(text);
+  };
+
   const playAlertSound = (type) => {
     if (!soundEnabled) return;
     try {
@@ -660,6 +669,7 @@ export default function RealtimePipelinePage() {
             setCards(prev => [newCard, ...prev]);
             if (!selectedCardId) setSelectedCardId(newCard.inc_id);
             toast.success(`[신규 장애 수신] ${newCard.inc_id} 파이프라인 진입!`);
+            speakNewIncident(newCard);
           }
         } catch (err) {}
       });
