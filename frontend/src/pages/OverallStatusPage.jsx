@@ -323,13 +323,13 @@ export default function OverallStatusPage() {
         {/* ROW 2: 4 Columns Data Grid */}
         {(isPC || tab !== 0) && (
           <div 
-            className="flex-1 min-h-[250px] lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-0 pb-4 lg:pb-0"
+            className="lg:flex-1 lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-0 pb-4 lg:pb-0"
             style={isPC ? { height: `${vH[1]}%` } : {}}
           >
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
           {(isPC || tab === 1) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export default function OverallStatusPage() {
 
           {/* Column 2: Categories (Tab 2 on Mobile) */}
           {(isPC || tab === 2) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -426,7 +426,7 @@ export default function OverallStatusPage() {
 
           {/* Column 3: Contributors (Tab 3 on Mobile) */}
           {(isPC || tab === 3) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
@@ -477,7 +477,7 @@ export default function OverallStatusPage() {
 
           {/* Column 4: Feed (Tab 4 on Mobile) */}
           {(isPC || tab === 4) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
+            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
