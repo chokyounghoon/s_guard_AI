@@ -8314,12 +8314,20 @@ app.get('/ai/knowledge/search', async (c) => {
         const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { 
           messages: [
             { role: "system", content: "당신은 지능형 관제 시스템입니다. 주어진 쿼리와 이 과거 항목이 왜 연관성이 높은지 1개의 문장으로 짧고 명확하게 설명하세요." },
-            { role: "user", content: `[쿼리]: ${query}\n[항목]: ${top1.title}\n[내용]: ${top1.content?.substring(0, 100)}` }
+            { role: "user", content: `[쿼리]: ${query}\n[항목]: ${top1.title}\n[내용]: ${top1.content ? top1.content.substring(0, 100) : '없음'}` }
           ]
         });
-        top1.reason = (aiResponse.response || aiResponse).replace(/\n/g, ' ').trim();
+        
+        if (aiResponse && aiResponse.response) {
+          top1.reason = aiResponse.response.replace(/\n/g, ' ').trim();
+        } else if (typeof aiResponse === 'string') {
+          top1.reason = aiResponse.replace(/\n/g, ' ').trim();
+        } else {
+          top1.reason = "AI 응답 형식이 올바르지 않습니다: " + JSON.stringify(aiResponse);
+        }
       } catch (err) {
         console.warn("Reason generation failed:", err.message);
+        top1.reason = "AI 분석 오류 발생: " + err.message;
       }
     }
 

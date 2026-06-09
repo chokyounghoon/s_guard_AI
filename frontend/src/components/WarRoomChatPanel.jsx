@@ -608,7 +608,8 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
             {/* 이모티콘 픽커 팝업 */}
             {showEmojiPicker && (
               <div
-                className="absolute bottom-full left-0 mb-2 w-64 bg-[#1a2035] border border-white/10 rounded-2xl shadow-2xl z-[200] p-3 animate-in fade-in zoom-in-95 duration-200"
+                className="absolute bottom-full left-0 mb-2 bg-[#1a2035] border border-white/10 rounded-2xl shadow-2xl z-[200] p-3 animate-in fade-in zoom-in-95 duration-200"
+                style={{ width: '260px', minWidth: '260px' }}
                 onClick={e => e.stopPropagation()}
               >
                 {EMOJI_LIST.map(cat => (
