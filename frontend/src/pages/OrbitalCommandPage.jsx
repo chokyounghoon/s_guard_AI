@@ -4,7 +4,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { getAuthHeaders } from '../lib/authStore';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
-import { useResizable } from '../hooks/useResizable';
+import { useResizable, useResizableVertical } from '../hooks/useResizable';
 import AlertMonitorPage from './AlertMonitorPage';
 
 export default function OrbitalCommandPage() {
@@ -20,6 +20,7 @@ export default function OrbitalCommandPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
   const { widths, startDrag, isDragging } = useResizable([40, 60], 'orbital-command-widths');
+  const { heights: leftH, startVDrag: vDragLeft, isDragging: vDraggingLeft } = useResizableVertical([25, 20, 55], 'orbital-left-v');
 
   const fetchStats = async () => {
     try {
@@ -198,14 +199,16 @@ export default function OrbitalCommandPage() {
         style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom))', WebkitOverflowScrolling: 'touch' }}
       >
         {/* ── 1열: 상태 게이지 + Threshold + Sandbox ── */}
-        <div style={{ flex: `0 0 ${widths[0]}%`, minWidth: '300px' }} className="flex flex-col gap-3 lg:h-full lg:pr-3 lg:overflow-y-auto hide-scrollbar">
+        <div style={{ flex: `0 0 ${widths[0]}%`, minWidth: '300px' }} className="flex flex-col lg:h-full lg:pr-3 lg:overflow-y-auto hide-scrollbar">
 
         {/* ── 섹션 1: 상태 게이지 + SYNC 버튼 ── */}
         <div style={{
           background: 'rgba(79,70,229,0.06)',
           border: '1px solid rgba(79,70,229,0.15)',
           borderRadius: 20, padding: '16px',
-          flexShrink: 0,
+          flex: `0 0 ${leftH[0]}%`,
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {/* 원형 게이지 */}
@@ -254,33 +257,44 @@ export default function OrbitalCommandPage() {
 
           {/* 동기화 진행 바 */}
           {isSyncing && (
-            <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden', marginTop: 12 }}>
+            <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden', marginTop: 12, flexShrink: 0 }}>
               <div style={{ height: '100%', background: 'linear-gradient(90deg, #06b6d4, #818cf8)', animation: 'pulse 1s ease-in-out infinite' }} />
             </div>
           )}
 
           {/* SYNC 버튼 */}
-          <button
-            onClick={handleSync}
-            disabled={isSyncing || stats.pending === 0}
-            style={{
-              marginTop: 16, width: '100%', padding: '14px',
-              borderRadius: 12, fontWeight: 800, fontSize: 14,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              cursor: isSyncing || stats.pending === 0 ? 'not-allowed' : 'pointer',
-              background: isSyncing ? 'rgba(79,70,229,0.2)'
-                : stats.pending === 0 ? 'rgba(255,255,255,0.04)'
-                : 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-              border: stats.pending === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-              color: stats.pending === 0 && !isSyncing ? '#475569' : '#fff',
-              boxShadow: stats.pending > 0 && !isSyncing ? '0 0 20px rgba(79,70,229,0.3)' : 'none',
-              transition: 'all 0.2s',
-            }}
-          >
-            {isSyncing ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> PROCESSING VECTOR...</>
-              : stats.pending === 0 ? <><CheckCircle2 size={16} /> ALL KNOWLEDGE VECTORIZED</>
-              : <><Zap size={16} /> SYNC {stats.pending} ITEMS NOW</>}
-          </button>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="hide-scrollbar">
+            <button
+              onClick={handleSync}
+              disabled={isSyncing || stats.pending === 0}
+              style={{
+                marginTop: 16, width: '100%', padding: '14px',
+                borderRadius: 12, fontWeight: 800, fontSize: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                cursor: isSyncing || stats.pending === 0 ? 'not-allowed' : 'pointer',
+                background: isSyncing ? 'rgba(79,70,229,0.2)'
+                  : stats.pending === 0 ? 'rgba(255,255,255,0.04)'
+                  : 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
+                border: stats.pending === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                color: stats.pending === 0 && !isSyncing ? '#475569' : '#fff',
+                boxShadow: stats.pending > 0 && !isSyncing ? '0 0 20px rgba(79,70,229,0.3)' : 'none',
+                transition: 'all 0.2s',
+                flexShrink: 0
+              }}
+            >
+              {isSyncing ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> PROCESSING VECTOR...</>
+                : stats.pending === 0 ? <><CheckCircle2 size={16} /> ALL KNOWLEDGE VECTORIZED</>
+                : <><Zap size={16} /> SYNC {stats.pending} ITEMS NOW</>}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Drag Handle (V1) ── */}
+        <div 
+          className="hidden lg:flex h-3 cursor-row-resize hover:bg-[#06b6d4]/20 items-center justify-center transition-colors group relative shrink-0 my-1 rounded-full"
+          onMouseDown={(e) => { e.preventDefault(); vDragLeft(0); }}
+        >
+          <div className="h-0.5 w-12 bg-slate-700 group-hover:bg-[#06b6d4] transition-colors rounded-full" />
         </div>
 
         {/* ── 섹션 2: Threshold Controller ── */}
@@ -288,7 +302,8 @@ export default function OrbitalCommandPage() {
           background: 'rgba(255,255,255,0.03)',
           border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 20, padding: '16px',
-          flexShrink: 0,
+          flex: `0 0 ${leftH[1]}%`,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{
@@ -312,7 +327,7 @@ export default function OrbitalCommandPage() {
             </div>
           </div>
 
-          <div style={{ padding: '0 4px' }}>
+          <div style={{ padding: '0 4px', flex: 1, overflowY: 'auto' }} className="hide-scrollbar">
             <input
               type="range" min="0.00" max="1.00" step="0.01"
               value={threshold}
@@ -338,15 +353,23 @@ export default function OrbitalCommandPage() {
                 </span>
               ))}
             </div>
+            
+            <div style={{
+              marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              fontSize: 9, fontFamily: 'monospace', color: '#475569', fontWeight: 700,
+              background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)'
+            }}>
+              <Database size={10} /> PERSISTED TO EDGE KV IN REAL-TIME
+            </div>
           </div>
+        </div>
 
-          <div style={{
-            marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            fontSize: 9, fontFamily: 'monospace', color: '#475569', fontWeight: 700,
-            background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)'
-          }}>
-            <Database size={10} /> PERSISTED TO EDGE KV IN REAL-TIME
-          </div>
+        {/* ── Drag Handle (V2) ── */}
+        <div 
+          className="hidden lg:flex h-3 cursor-row-resize hover:bg-[#06b6d4]/20 items-center justify-center transition-colors group relative shrink-0 my-1 rounded-full"
+          onMouseDown={(e) => { e.preventDefault(); vDragLeft(1); }}
+        >
+          <div className="h-0.5 w-12 bg-slate-700 group-hover:bg-[#06b6d4] transition-colors rounded-full" />
         </div>
 
         {/* ── 섹션 3: Similarity Sandbox ── */}
@@ -355,9 +378,10 @@ export default function OrbitalCommandPage() {
           border: '1px solid rgba(6,182,212,0.12)',
           borderRadius: 20,
           overflow: 'hidden',
-          flex: 1, // Changed from flexShrink: 0
+          flex: `1 1 ${leftH[2]}%`,
           display: 'flex',
           flexDirection: 'column',
+          minHeight: 0
         }}>
           {/* 샌드박스 헤더 */}
           <div style={{

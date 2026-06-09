@@ -545,7 +545,13 @@ export default function ChatSummaryPage() {
   }, [incidentId, incidentMessage, summary]);
 
   const generateFinalReportText = () => {
-    const raw = (summary || '').replace(/\*\*/g, '').replace(/__/g, '');
+    let raw = summary || '';
+    if (!raw) return '';
+    // 예외 처리: 데이터베이스 없음 메시지나 매우 짧은 오류 메시지의 경우 그대로 반환
+    if (raw.includes('데이터베이스에 저장된') || raw.includes('오류') || (raw.length < 50 && !raw.includes('장애') && !raw.includes('보고서'))) {
+      return raw;
+    }
+    raw = raw.replace(/\*\*/g, '').replace(/__/g, '');
 
     // 불필요한 기호/마크다운 제거 (** 는 파싱 후에 제거)
     const stripLine = (s) => s

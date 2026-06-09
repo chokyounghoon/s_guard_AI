@@ -256,7 +256,7 @@ export default function AlertMonitorPage({ embedded = false }) {
   return (
     <div style={
       embedded
-        ? { width: '100%', minHeight: '300px', display: 'flex', flexDirection: 'column', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden' }
+        ? { width: '100%', height: '100%', minHeight: '300px', display: 'flex', flexDirection: 'column', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden' }
         : { height: '100%', background: 'linear-gradient(160deg,#020917 0%,#070d1f 50%,#020917 100%)', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden', display: 'flex', flexDirection: 'column' }
     } className="text-slate-300">
 
@@ -284,7 +284,7 @@ export default function AlertMonitorPage({ embedded = false }) {
       )}
 
       {/* ── 2-COLUMN GRID BODY ── */}
-      <div style={{ flex: 1, overflow: 'hidden', padding: '12px', display: 'grid', gridTemplateColumns: '45% 55%', gap: 12 }}>
+      <div style={{ flex: 1, overflow: 'hidden', padding: '12px', display: 'grid', gridTemplateColumns: '45% 55%', gridTemplateRows: '1fr', gap: 12, minHeight: 0 }}>
 
         {/* ── LEFT: 3-ORB STATUS HUD ── */}
         <div style={{
@@ -297,6 +297,7 @@ export default function AlertMonitorPage({ embedded = false }) {
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
+          minHeight: 0
         }}>
           {/* 스캔라인 */}
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${SC[overallSev].color}, transparent)`, animation: 'slideX 4s linear infinite', opacity: 0.4 }} />
@@ -350,7 +351,7 @@ export default function AlertMonitorPage({ embedded = false }) {
         </div>
 
         {/* ── RIGHT: 임계치 설정 + 판정 우선순위 ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', minHeight: 0 }} className="pb-10 custom-scrollbar">
 
           {/* ── CRITICAL 임계치 ── */}
           <ThresholdBlock

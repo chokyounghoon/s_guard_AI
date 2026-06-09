@@ -9,7 +9,8 @@ import { toast } from 'react-hot-toast';
 const linkIncidentIds = (text) => {
   if (!text) return text;
   // 표준 HashRouter 링크 형식인 /#/ai-report/{id} 로 변환
-  return text.replace(/(?<!\[)(?<!\/)\b(?:[Ii][Nn][Cc]-)?(20\d{6,18})\b/g, (match, id) => {
+  // 8자리(날짜형) 제외: 14자리 이상(YYYYMMDDHHMMSS+)인 경우만 inc_id 링크 처리
+  return text.replace(/(?<!\[)(?<!\/)\b(?:[Ii][Nn][Cc]-)?(20\d{12,16})\b/g, (match, id) => {
     return `[${match}](/#/ai-report/${id})`;
   });
 };

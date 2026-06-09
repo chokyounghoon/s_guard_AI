@@ -1209,22 +1209,7 @@ const performBackgroundAiAnalysis = async (sms_id, env) => {
     if (env.WARROOM_INDEX || env.AI) {
       cleanedMessage = cleanMessageForEmbedding(sms.message || '');
       messageVector = await generateEmbedding(cleanedMessage, env);
-
-      if (messageVector && messageVector.length === 768 && env.WARROOM_INDEX) {
-        await env.WARROOM_INDEX.upsert([{
-          id: `inc-${sms_id}`,
-          values: messageVector,
-          metadata: {
-            inc_id: String(sms_id),
-            title: `[과거 장애] ${cleanedMessage.substring(0, 30)}...`,
-            sender: sms.sender || 'Unknown',
-            timestamp: sms.timestamp,
-            text: cleanedMessage.substring(0, 500),
-            type: 'raw_sms'
-          }
-        }]);
-        console.log(`[Vectorize] Successfully indexed ${sms_id} (768-dim)`);
-      }
+      // ⚠️ upsert는 RAG 유사도 쿼리 완료 후 실행 (자기 자신이 검색 결과로 나오는 버그 방지)
     }
 
     // 2. Cache check — PENDING/ANALYZING 상태면 캐시 무시하고 강제 재분석
@@ -1297,10 +1282,15 @@ ${detailedInfo}`;
     // 4. Vectorize similarity check - Reuse the vector from above
     if (env.WARROOM_INDEX && messageVector) {
       try {
-        const simResults = await env.WARROOM_INDEX.query(messageVector, { topK: 1 });
-        if (simResults.matches && simResults.matches.length > 0) {
-          similarityScore = simResults.matches[0].score;
-          const matchId = simResults.matches[0].id;
+        // topK:3 으로 여러 결과를 가져와 자기 자신(inc-${sms_id}) 제외
+        const selfId = `inc-${sms_id}`;
+        const simResults = await env.WARROOM_INDEX.query(messageVector, { topK: 3, returnMetadata: true });
+        const validMatch = simResults.matches?.find(m => m.id !== selfId);
+
+        if (validMatch) {
+          similarityScore = validMatch.score;
+          const matchId = validMatch.id;
+          console.log(`[RAG] Best match after self-exclusion: id=${matchId} score=${similarityScore}`);
 
           if (similarityScore >= 0.7) {
             let kbMatch;
@@ -1323,9 +1313,32 @@ ${detailedInfo}`;
               similarityReason = `[${matchType}] 유사도 분석 완료\n- 출처 DB: ${sourceDB} (매칭 ID: ${matchId})\n- 매칭 기준 항목 제목: ${matchedTitle}\n- 분석에 사용된 입력값: "${inputSnippet}"`;
             }
           }
+        } else {
+          console.log(`[RAG] No valid match after self-exclusion for ${sms_id}`);
         }
       } catch (ve) {
         console.error('Vectorize background similarity error:', ve.message);
+      }
+    }
+
+    // ✅ RAG 쿼리 완료 후 자기 자신을 벡터 DB에 등록 (다음 SMS의 유사도 검색에 활용)
+    if (messageVector && messageVector.length === 768 && env.WARROOM_INDEX) {
+      try {
+        await env.WARROOM_INDEX.upsert([{
+          id: `inc-${sms_id}`,
+          values: messageVector,
+          metadata: {
+            inc_id: String(sms_id),
+            title: `[과거 장애] ${cleanedMessage.substring(0, 30)}...`,
+            sender: sms.sender || 'Unknown',
+            timestamp: sms.timestamp,
+            text: cleanedMessage.substring(0, 500),
+            type: 'raw_sms'
+          }
+        }]);
+        console.log(`[Vectorize] Successfully indexed ${sms_id} (768-dim) after RAG query`);
+      } catch (ue) {
+        console.error('[Vectorize] Upsert error:', ue.message);
       }
     }
 
@@ -5832,12 +5845,17 @@ app.post('/ai/analyze-sms', async (c) => {
 
   if (!api_key) return c.json({ error: "DIFY_API_KEY_AGENT가 설정되지 않았습니다." }, 500)
 
-  // Fetch full details if sms_id is provided
+  // Fetch full details + feedbackContext in parallel
   let detailedInfo = ""
-  if (sms_id) {
-    const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(sms_id).first()
-    if (sms) {
-      detailedInfo = `
+  let feedbackContext = ""
+
+  await Promise.all([
+    // ① SMS 상세 조회
+    (async () => {
+      if (!sms_id) return;
+      const sms = await db.prepare("SELECT * FROM received_messages WHERE inc_id = ?").bind(sms_id).first()
+      if (sms) {
+        detailedInfo = `
 [장애 상세 정보]
 - 유입채널: ${sms.channel || 'N/A'}
 - IF아이디: ${sms.if_id || 'N/A'}
@@ -5850,34 +5868,31 @@ app.post('/ai/analyze-sms', async (c) => {
 - 실제발생시각(문자 내 시간): ${sms.occurrence_time || 'N/A'}
 - 시스템 장애 접수 시각: ${sms.timestamp}
 `
-    }
-  }
-  // 🚀 [Phase 2.2] Few-shot Feedback Context Retrieval
-  let feedbackContext = "";
-  try {
-    const smsInfo = await db.prepare("SELECT error_code, service_name FROM received_messages WHERE inc_id = ?").bind(String(sms_id)).first();
-    let fbQuery = "SELECT query, user_correction FROM ai_feedback WHERE feedback_type = 'DOWN' AND user_correction IS NOT NULL ORDER BY created_at DESC LIMIT 3";
-    let fbParams = [];
+      }
+    })(),
+    // ② Few-shot 피드백 컨텍스트 조회 (병렬)
+    (async () => {
+      try {
+        const smsInfo = await db.prepare("SELECT error_code, service_name FROM received_messages WHERE inc_id = ?").bind(String(sms_id)).first();
+        let fbQuery = "SELECT query, user_correction FROM ai_feedback WHERE feedback_type = 'DOWN' AND user_correction IS NOT NULL ORDER BY created_at DESC LIMIT 3";
+        let fbParams = [];
+        if (smsInfo && (smsInfo.error_code || smsInfo.service_name)) {
+          fbQuery = `SELECT query, user_correction FROM ai_feedback WHERE feedback_type = 'DOWN' AND user_correction IS NOT NULL AND (query LIKE ? OR query LIKE ? OR answer LIKE ?) ORDER BY created_at DESC LIMIT 3`;
+          const kw = smsInfo.error_code || smsInfo.service_name || 'NEVER_MATCH';
+          fbParams = [`%${kw}%`, `%${smsInfo.service_name || kw}%`, `%${kw}%`];
+        }
+        const { results: pastFeedbacks } = await db.prepare(fbQuery).bind(...fbParams).all();
+        if (pastFeedbacks?.length > 0) {
+          feedbackContext = "\n\n[💡 과거 관제사 정정 사례 (Few-shot)]\n이번 분석 시 다음 정정 사례를 필수 참고하세요:\n";
+          pastFeedbacks.forEach((fb, i) => {
+            feedbackContext += `${i + 1}. 질문: ${fb.query}\n   교정: ${fb.user_correction}\n`;
+          });
+          feedbackContext += "--------------------------------------\n";
+        }
+      } catch (e) { console.error("[Few-shot] Error:", e.message); }
+    })()
+  ]);
 
-    if (smsInfo && (smsInfo.error_code || smsInfo.service_name)) {
-      fbQuery = `
-        SELECT query, user_correction FROM ai_feedback 
-        WHERE feedback_type = 'DOWN' AND user_correction IS NOT NULL 
-        AND (query LIKE ? OR query LIKE ? OR answer LIKE ?)
-        ORDER BY created_at DESC LIMIT 3
-      `;
-      const kw = smsInfo.error_code || smsInfo.service_name || 'NEVER_MATCH';
-      fbParams = [`%${kw}%`, `%${smsInfo.service_name || kw}%`, `%${kw}%`];
-    }
-    const { results: pastFeedbacks } = await db.prepare(fbQuery).bind(...fbParams).all();
-    if (pastFeedbacks?.length > 0) {
-      feedbackContext = "\n\n[💡 과거 관제사 정정 사례 (Few-shot)]\n이번 분석 시 다음 정정 사례를 필수 참고하세요:\n";
-      pastFeedbacks.forEach((fb, i) => {
-        feedbackContext += `${i + 1}. 질문: ${fb.query}\n   교정: ${fb.user_correction}\n`;
-      });
-      feedbackContext += "--------------------------------------\n";
-    }
-  } catch (e) { console.error("[Few-shot] Error:", e.message); }
 
   const prompt = `당신은 S-GUARD 시스템의 핵심 오케스트레이터이자 지능형 관제 엔진입니다. 사용자가 입력하는 SMS 장애 메시지를 분석하여 실시간 인사이트를 제공하고, 전문가 에이전트들과 협업하여 최적의 조치 가이드를 도출합니다.
 
@@ -5931,7 +5946,7 @@ ${feedbackContext}`
                 await writer.write(encode(`data: ${JSON.stringify({ similarity_score: cached.similarity_score, similarity_reason: cached.similarity_reason })}\n\n`));
               }
               const chars = Array.from(cached.content);
-              const chunkSize = 50;
+              const chunkSize = 200; // 빠른 캐시 전송을 위해 청크 사이즈 확대
               for (let i = 0; i < chars.length; i += chunkSize) {
                 const chunk = chars.slice(i, i + chunkSize).join('');
                 await writer.write(encode(`data: ${JSON.stringify({ answer: chunk })}\n\n`));
@@ -7162,9 +7177,8 @@ app.post('/ai/summarize-chat', async (c) => {
               body: JSON.stringify({
                 inputs: { 
                   chat_log: chatLogForDify, 
-                  incident_images: difyFileObjects 
+                  incident_images: [] 
                 },
-                files: difyFileObjects,
                 response_mode: 'streaming',
                 user: 'sguard-worker'
               })
@@ -8297,8 +8311,12 @@ app.get('/ai/knowledge/search', async (c) => {
     if (scoredResults.length > 0) {
       try {
         const top1 = scoredResults[0];
-        const reasoningPrompt = `당신은 지능형 관제 시스템입니다. 주어진 쿼리와 이 과거 항목이 왜 연관성이 높은지 1개의 문장으로 설명하세요.\n\n[쿼리]: ${query}\n[항목]: ${top1.title}\n[내용]: ${top1.content?.substring(0, 100)}`;
-        const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { prompt: reasoningPrompt });
+        const aiResponse = await ai.run('@cf/meta/llama-3-8b-instruct', { 
+          messages: [
+            { role: "system", content: "당신은 지능형 관제 시스템입니다. 주어진 쿼리와 이 과거 항목이 왜 연관성이 높은지 1개의 문장으로 짧고 명확하게 설명하세요." },
+            { role: "user", content: `[쿼리]: ${query}\n[항목]: ${top1.title}\n[내용]: ${top1.content?.substring(0, 100)}` }
+          ]
+        });
         top1.reason = (aiResponse.response || aiResponse).replace(/\n/g, ' ').trim();
       } catch (err) {
         console.warn("Reason generation failed:", err.message);

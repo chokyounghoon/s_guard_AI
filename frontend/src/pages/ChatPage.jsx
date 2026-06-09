@@ -527,6 +527,26 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const textareaRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+
+  const EMOJI_LIST = [
+    '😊','😂','🥰','😎','🤔','😅','🙏','👍','👏','🔥','💯','⚡',
+    '✅','❌','⚠️','📌','🚨','🛡️','💻','📊','📈','🔴','🟡','🟢',
+    '🔵','⭕','💬','📋','🔧','🔍','📡','🗂️','😭','😤','🤦','👀',
+    '💪','🎯','🚀','💡','📢','🔔','☑️','❗','❓','💥','🆘','🫡'
+  ];
+
+  // 외부 클릭 시 픽커 닫기
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClick = (e) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showEmojiPicker]);
 
   const handleSend = () => {
     if (!localText.trim() && selectedFiles.length === 0) return;
@@ -570,7 +590,7 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
         </div>
       )}
 
-      <div className="flex items-center bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all px-1 rounded-[18px] flex-1" style={{ minHeight: 36 }}>
+      <div className="flex items-center bg-[#2A2A2A] border border-white/10 focus-within:border-blue-500/50 transition-all px-1 rounded-[18px] flex-1 relative" style={{ minHeight: 36 }}>
         <textarea ref={textareaRef} id="main-chat-input" rows={1}
           disabled={roomStatus === 'CLOSED' || roomStatus === 'Completed' || roomStatus === '처리완료' || roomStatus === '완료' || roomStatus === '최종완료' || roomStatus === 'INC_003'}
           value={localText}
@@ -605,10 +625,42 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
           className="flex-1 bg-transparent py-[7px] pl-3 pr-1 text-[14px] text-white focus:outline-none placeholder:text-[#666666] resize-none overflow-y-auto leading-tight"
           style={{ minHeight: 32, maxHeight: 120 }}
         />
-        <button onClick={() => setShowEmojiPicker(p => !p)}
-          className={`flex items-center justify-center w-8 h-8 mx-0.5 rounded-full transition-all active:scale-90 text-2xl leading-none shrink-0 ${showEmojiPicker ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}>
-          😊
-        </button>
+        {/* 이모티콘 버튼 + 픽커 */}
+        <div className="relative shrink-0" ref={emojiPickerRef}>
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker(p => !p)}
+            className={`flex items-center justify-center w-8 h-8 mx-0.5 rounded-full transition-all active:scale-90 text-xl leading-none ${showEmojiPicker ? 'bg-white/10' : 'hover:bg-white/5'}`}
+            title="이모티콘"
+          >
+            😊
+          </button>
+          {/* 이모티콘 픽커 팝업 */}
+          {showEmojiPicker && (
+            <div
+              className="absolute bottom-full right-0 mb-2 w-64 bg-[#1a2035] border border-white/10 rounded-2xl shadow-2xl z-[200] p-3 animate-in fade-in zoom-in-95 duration-200"
+              onClick={e => e.stopPropagation()}
+            >
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">이모티콘 선택</p>
+              <div className="grid grid-cols-8 gap-1">
+                {EMOJI_LIST.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      setLocalText(prev => prev + emoji);
+                      textareaRef.current?.focus();
+                      setShowEmojiPicker(false);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center text-lg rounded-lg hover:bg-white/10 active:scale-90 transition-all"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <button onClick={handleSend}
@@ -627,6 +679,7 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
     </div>
   );
 });
+
 
 export default function ChatPage() {
   const navigate = useNavigate();

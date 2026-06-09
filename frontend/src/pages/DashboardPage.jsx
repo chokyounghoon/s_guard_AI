@@ -256,8 +256,9 @@ const parseDate = (val) => {
   if (!s.includes('T') && s.length >= 16) {
     s = s.substring(0, 10) + 'T' + s.substring(11, 16) + (s.length >= 19 ? s.substring(16, 19) : ':00');
   }
-  if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-') && s.includes('T')) {
-    s += 'Z';
+  // DB 값은 KST(세울 +09:00) 기준이므로 Z(UTC) 대신 +09:00 명시
+  if (!s.endsWith('Z') && !s.includes('+') && !/T.*-\d{2}:\d{2}$/.test(s) && s.includes('T')) {
+    s += '+09:00';
   }
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
@@ -2448,12 +2449,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         const ragStep = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
                         const warStep = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
                         const knwStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-                        const diffObj = (a, b) => { if (!a) return null; const ms = Math.max(0, (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp)); const totalS = Math.floor(ms / 1000); const h = Math.floor(totalS / 3600); const m = Math.floor((totalS % 3600) / 60); const s2 = totalS % 60; let text = ''; if (h > 0) text = `${h}h ${m}m ${s2}s`; else if (m > 0) text = `${m}m ${s2}s`; else text = `${s2}s`; return { text, min: Math.floor(totalS / 60) }; };
+                        const diffObj = (a, b) => { if (!a) return null; const ms = Math.max(0, (b ? (parseDate(b.timestamp) || currentTime) : currentTime) - (parseDate(a.timestamp) || currentTime)); const totalS = Math.floor(ms / 1000); const h = Math.floor(totalS / 3600); const m = Math.floor((totalS % 3600) / 60); const s2 = totalS % 60; let text = ''; if (h > 0) text = `${h}h ${m}m ${s2}s`; else if (m > 0) text = `${m}m ${s2}s`; else text = `${s2}s`; return { text, min: Math.floor(totalS / 60) }; };
 
                         const activeIncident = smsMessages.find(m => m.inc_id === selectedIncidentIdFlow);
                         const finalRegDtStr = activeIncident?.reg_dt || activeIncident?.timestamp || activeIncident?.occurrence_time || smsStep?.timestamp;
-                        const diffStart = finalRegDtStr ? parseDate(finalRegDtStr) : new Date(smsStep?.timestamp || currentTime);
-                        const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - diffStart;
+                        const diffStart = finalRegDtStr ? parseDate(finalRegDtStr) : (parseDate(smsStep?.timestamp) || currentTime);
+                        const durationMs = (knwStep ? (parseDate(knwStep.timestamp) || currentTime) : currentTime) - diffStart;
                         const isClosed = !!knwStep;
 
                         const steps = [
@@ -2538,17 +2539,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                   const isArrowBottleneck = durationObj?.min > 60;
 
                                   return (
-                                    <div key={`step-${st.id}`} className={`flex flex-col ${i < steps.length - 1 ? 'flex-1' : 'w-[84px] shrink-0'}`}>
+                                    <div key={`step-${st.id}`} className={`flex flex-col ${i < steps.length - 1 ? 'flex-1' : 'w-[60px] shrink-0'}`}>
                                       <div className="w-full flex items-start">
-                                        <div className="w-[84px] flex flex-col items-center shrink-0">
-                                          <div className="h-8 flex items-center justify-center">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                                        <div className="w-[60px] flex flex-col items-center shrink-0">
+                                          <div className="h-7 flex items-center justify-center">
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
                                               {isDone ? <CheckCircle2 size={16} /> : i + 1}
                                             </div>
                                           </div>
                                           
-                                          <div className="mt-2 text-center w-full">
-                                            <span className={`text-[10px] font-black tracking-tight whitespace-normal break-keep leading-[1.2] inline-block w-full ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+                                          <div className="mt-1.5 text-center w-full">
+                                            <span className={`text-[9px] font-black tracking-tight break-keep leading-[1.2] inline-block w-full whitespace-normal ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
                                               {st.label}
                                             </span>
                                           </div>
@@ -2601,10 +2602,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                             {/* 애플워치 스타일 활동 링 (Activity Ring) */}
                             <div className="py-5 flex flex-col items-center justify-center bg-gradient-to-b from-black/40 to-transparent relative shrink-0">
-                              <div className="flex flex-row items-center justify-center gap-6 sm:gap-10">
+                              <div className="flex flex-row items-center justify-center gap-1 sm:gap-2">
                                 
                                 {/* MTTA Ring */}
-                              <div className="relative w-52 h-52 flex items-center justify-center overflow-hidden rounded-full">
+                              <div className="relative w-[130px] h-[130px] xl:w-[155px] xl:h-[155px] flex items-center justify-center overflow-hidden rounded-full shrink-0">
                                 {/* Ping ring — rendered as a div layer behind SVG, contained by overflow-hidden */}
                                 {!isMttaClosed && (
                                   <span className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'transparent', border: `4px solid ${mttaRingColor}`, boxSizing: 'border-box' }} />
@@ -2619,22 +2620,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                   <circle cx="90" cy="90" r="70" stroke="url(#mttaGradient)" strokeWidth={!isMttaClosed ? "14" : "12"} fill="none" strokeDasharray={circum} strokeDashoffset={isMttaClosed ? 0 : offset} strokeLinecap="round" className={`transition-all duration-1000`} filter={`drop-shadow(0 0 ${!isMttaClosed ? '12px' : '8px'} rgba(${mttaRingColorRGB}, ${!isMttaClosed ? '1' : '0.5'}))`} style={!isMttaClosed ? { animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : {}} />
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                  <span className={`text-[9.5px] font-black uppercase tracking-widest mb-0.5 ${!isMttaClosed ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>MTTA TIMER</span>
-                                  <span className="text-[28px] font-black font-mono tracking-tighter tabular-nums" style={{ color: mttaRingColor, textShadow: isMttaClosed ? `0 0 10px rgba(${mttaRingColorRGB},0.3)` : `0 0 25px rgba(${mttaRingColorRGB},1)` }}>
+                                  <span className={`text-[8px] xl:text-[9.5px] font-black uppercase tracking-widest mb-0.5 ${!isMttaClosed ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>MTTA TIMER</span>
+                                  <span className="text-[20px] xl:text-[24px] 2xl:text-[28px] font-black font-mono tracking-tighter tabular-nums" style={{ color: mttaRingColor, textShadow: isMttaClosed ? `0 0 10px rgba(${mttaRingColorRGB},0.3)` : `0 0 25px rgba(${mttaRingColorRGB},1)` }}>
                                     {formatDuration(mttaDurationMs)}
                                   </span>
-                                  <span className={`text-[10px] font-black mt-1.5 px-3 py-1 rounded-full border shadow-inner transition-all ${
+                                  <span className={`text-[8px] xl:text-[10px] font-black mt-1 xl:mt-1.5 px-2 xl:px-3 py-0.5 xl:py-1 rounded-full border shadow-inner transition-all ${
                                     isMttaClosed 
                                       ? 'bg-white/10 border-white/20 text-slate-200' 
                                       : 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse shadow-[0_0_15px_rgba(255,0,0,0.6)]'
                                   }`}>
-                                    {isMttaClosed ? '인지 완료' : '긴급 인지 대기 중'}
+                                    {isMttaClosed ? '인지 완료' : '긴급 대기'}
                                   </span>
                                 </div>
                               </div>
 
                               {/* MTTR Ring */}
-                              <div className="relative w-52 h-52 flex items-center justify-center">
+                              <div className="relative w-[130px] h-[130px] xl:w-[155px] xl:h-[155px] flex items-center justify-center shrink-0">
                                 <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
                                   <defs>
                                     <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -2645,12 +2646,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                   <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className={`transition-all duration-1000 ${!isClosed ? 'animate-pulse' : ''}`} filter={ringShadow} />
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">MTTR TIMER</span>
-                                  <span className="text-[28px] font-black font-mono tracking-tighter tabular-nums" style={{ color: ringColor, textShadow: isClosed ? `0 0 10px rgba(${ringColorRGB},0.3)` : `0 0 15px rgba(${ringColorRGB},0.8)` }}>
+                                  <span className="text-[8px] xl:text-[9.5px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">MTTR TIMER</span>
+                                  <span className="text-[20px] xl:text-[24px] 2xl:text-[28px] font-black font-mono tracking-tighter tabular-nums" style={{ color: ringColor, textShadow: isClosed ? `0 0 10px rgba(${ringColorRGB},0.3)` : `0 0 15px rgba(${ringColorRGB},0.8)` }}>
                                     {formatDuration(durationMs)}
                                   </span>
-                                  <span className={`text-[10px] font-bold mt-1.5 px-2.5 py-0.5 rounded-full border shadow-inner ${isClosed ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-300'}`}>
-                                    {isClosed ? '조치 완료' : '실시간 대응 중'}
+                                  <span className={`text-[8px] xl:text-[10px] font-bold mt-1 xl:mt-1.5 px-2 xl:px-2.5 py-0.5 rounded-full border shadow-inner ${isClosed ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-300'}`}>
+                                    {isClosed ? '조치 완료' : '대응 중'}
                                   </span>
                                 </div>
                               </div>
@@ -2659,10 +2660,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                               {/* 하단 등급 기준 안내 (한 줄) */}
                               <div className="mt-6 text-[9px] sm:text-[10px] text-slate-500 tracking-tighter whitespace-nowrap px-2 sm:px-4 border border-white/5 bg-black/20 rounded-lg py-1.5 shadow-inner w-fit mx-auto">
-                                <span className="font-bold text-slate-400 mr-1">MTTA 등급 기준</span> 
-                                <span className="text-emerald-400 ml-1">상:</span> 주간3분, 야간5분 <span className="mx-0.5 text-slate-600">|</span> 
-                                <span className="text-orange-400">중:</span> 주간3~5분, 야간5~10분 <span className="mx-0.5 text-slate-600">|</span> 
-                                <span className="text-red-400">하:</span> 주간5분 이상, 야간10분 이상
+                                <span className="font-bold text-slate-400 mr-1">MTTA-</span> 
+                                <span className="text-emerald-400 ml-1">상:</span> 주3분/야5분 이내 <span className="mx-0.5 text-slate-600">|</span> 
+                                <span className="text-red-400">하:</span> 주5분/야10분 이상
                               </div>
                             </div>
                             {/* 워룸 이동/개설 액션 버튼 */}

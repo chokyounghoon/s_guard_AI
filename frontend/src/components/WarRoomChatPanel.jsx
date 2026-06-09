@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info, Bot, X } from 'lucide-react';
+import { MessageSquare, Send, User, Sparkles, Zap, Megaphone, Info, Bot, X, Smile } from 'lucide-react';
 import AICardMarkdown from './AICardMarkdown';
 import { getAccessToken } from '../lib/authStore';
 
@@ -44,6 +44,14 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
   const [longPressMsg, setLongPressMsg] = useState(null);
   const longPressTimer = useRef(null);
   const textareaRef = useRef(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef(null);
+
+  const EMOJI_LIST = [
+    { label: '자주 쓰는', emojis: ['👍','✅','🚨','⚠️','🔧','🔥','❌','💡','📋','📞','🕐','⏱️','🎯','🚀','💬'] },
+    { label: '표정', emojis: ['😊','😅','😂','🙏','😰','😱','🤔','😡','😭','🥲','🫡','🥳','😎','🤝','💪'] },
+    { label: '기호', emojis: ['✔️','❗','❓','⭕','🔴','🟠','🟡','🟢','🔵','⚡','🔔','📌','🗂️','🗃️','📊'] },
+  ];
 
   const AI_AGENTS = [
     { id: 'expert', name: 'AI Expert', label: 'S-Autopilot Expert' },
@@ -65,6 +73,18 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // 이모티콘 픽커 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClick = (e) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showEmojiPicker]);
 
   // Fetch initial history and participants
   useEffect(() => {
@@ -574,14 +594,57 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
             )}
           </div>
         )}
-        <div className="relative flex items-center gap-2">
-          <input 
+        <div className="relative flex items-end gap-2">
+          {/* 이모티콘 버튼 */}
+          <div className="relative" ref={emojiPickerRef}>
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(p => !p)}
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all active:scale-95 shrink-0"
+              title="이모티콘"
+            >
+              <Smile className="w-4 h-4 text-yellow-400" />
+            </button>
+            {/* 이모티콘 픽커 팝업 */}
+            {showEmojiPicker && (
+              <div
+                className="absolute bottom-full left-0 mb-2 w-64 bg-[#1a2035] border border-white/10 rounded-2xl shadow-2xl z-[200] p-3 animate-in fade-in zoom-in-95 duration-200"
+                onClick={e => e.stopPropagation()}
+              >
+                {EMOJI_LIST.map(cat => (
+                  <div key={cat.label} className="mb-2">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{cat.label}</p>
+                    <div className="grid grid-cols-5 gap-1">
+                      {cat.emojis.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            setInputValue(prev => prev + emoji);
+                            textareaRef.current?.focus();
+                            setShowEmojiPicker(false);
+                          }}
+                          className="w-10 h-10 flex items-center justify-center text-xl rounded-xl hover:bg-white/10 active:scale-90 transition-all"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <textarea
             ref={textareaRef}
-            type="text"
+            rows={1}
             value={inputValue}
             onChange={(e) => {
               const val = e.target.value;
               setInputValue(val);
+              // 자동 높이 조절
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
               const lastAtPos = val.lastIndexOf('@');
               if (lastAtPos !== -1) {
                 const textAfterAt = val.slice(lastAtPos + 1);
@@ -595,14 +658,20 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                 setShowMentionMenu(false);
               }
             }}
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="전문가들과 의견을 나누세요..."
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-all"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            placeholder="전문가들과 의견을 나누세요... (이모티콘 가능 😊)"
+            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-all resize-none overflow-hidden leading-relaxed"
+            style={{ minHeight: '40px', maxHeight: '120px' }}
           />
           <button 
             onClick={handleSendMessage}
             disabled={!inputValue.trim()}
-            className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:grayscale transition-all shadow-lg active:scale-95"
+            className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:grayscale transition-all shadow-lg active:scale-95 shrink-0"
           >
             <Send className="w-4 h-4 text-white" />
           </button>

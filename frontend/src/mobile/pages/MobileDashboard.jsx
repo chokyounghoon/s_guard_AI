@@ -65,8 +65,9 @@ const parseDate = (val) => {
   if (!s.includes('T') && s.length >= 16) {
     s = s.substring(0, 10) + 'T' + s.substring(11, 16) + (s.length >= 19 ? s.substring(16, 19) : ':00');
   }
-  if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-') && s.includes('T')) {
-    s += 'Z';
+  // DB 값은 KST(+09:00) 기준이므로 Z(UTC) 대신 +09:00 명시
+  if (!s.endsWith('Z') && !s.includes('+') && !/T.*-\d{2}:\d{2}$/.test(s) && s.includes('T')) {
+    s += '+09:00';
   }
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
@@ -738,7 +739,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     const pollIntervalMultiplier = isAnalyzingActive ? 4 : 1; // 4x slower during analysis
 
     const smsInterval = setInterval(fetchSMSMessages, 10000 * pollIntervalMultiplier);
-    const wrInterval = isAnalyzingActive ? null : setInterval(fetchWarRooms, 15000);
+    const wrInterval = setInterval(fetchWarRooms, 8000); // 워룸 상태는 항상 빠르게 동기화 (PC와 동일)
     const activityInterval = isAnalyzingActive ? null : setInterval(fetchActivityLogs, 20000);
     const assignmentInterval = isAnalyzingActive ? null : setInterval(fetchMyAssignments, 20000);
     const historyInterval = isAnalyzingActive ? null : setInterval(fetchUserActivityHistory, 30000);
@@ -763,6 +764,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         sseRetry = 0;
         fetchSMSMessages();
       });
+
+      // 워룸 개설/변경 즉시 반영 (PC에서 개설해도 모바일에 바로 반영)
+      newSse.addEventListener('warroom_opened', () => {
+        console.log('[MobileDashboard SSE] warroom_opened — refreshing warRooms');
+        fetchWarRooms();
+      });
+      newSse.addEventListener('warroom_updated', () => { fetchWarRooms(); });
 
       newSse.addEventListener('connected', () => { sseRetry = 0; });
 
@@ -1668,21 +1676,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
             </button>
 
-            {/* Alert Monitor */}
-            <button onClick={() => {
-              if (!checkAllowed('/alert-monitor')) {
-                toast.error('해당 화면의 권한이 없습니다.');
-                return;
-              }
-              navigate('/alert-monitor');
-            }}
-              disabled={!checkAllowed('/alert-monitor')}
-              onPointerDown={() => handleTooltipStart('Alert Monitor')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${!checkAllowed('/alert-monitor') ? 'opacity-30 cursor-not-allowed' : ''}`}
-              style={{ background: 'transparent' }}>
-              <BellDot size={16} style={{ color: '#00e5ff' }} />
-              {!checkAllowed('/alert-monitor') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
-            </button>
+
 
             {/* Threshold */}
             <button onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
@@ -2273,12 +2267,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             const ragStep = incidentWorkflowSteps.find(s => s.id === 'RAG') || incidentWorkflowSteps.find(s => s.id === 'AGENT');
             const warStep = incidentWorkflowSteps.find(s => s.id === 'WARROOM');
             const knwStep = incidentWorkflowSteps.find(s => s.id === 'KNOWLEDGE');
-            const diffObj = (a, b) => { if (!a) return null; const ms = Math.max(0, (b ? new Date(b.timestamp) : currentTime) - new Date(a.timestamp)); const totalS = Math.floor(ms / 1000); const h = Math.floor(totalS / 3600); const m = Math.floor((totalS % 3600) / 60); const s2 = totalS % 60; let text = ''; if (h > 0) text = `${h}h ${m}m ${s2}s`; else if (m > 0) text = `${m}m ${s2}s`; else text = `${s2}s`; return { text, min: Math.floor(totalS / 60) }; };
+            const diffObj = (a, b) => { if (!a) return null; const ms = Math.max(0, (b ? (parseDate(b.timestamp) || currentTime) : currentTime) - (parseDate(a.timestamp) || currentTime)); const totalS = Math.floor(ms / 1000); const h = Math.floor(totalS / 3600); const m = Math.floor((totalS % 3600) / 60); const s2 = totalS % 60; let text = ''; if (h > 0) text = `${h}h ${m}m ${s2}s`; else if (m > 0) text = `${m}m ${s2}s`; else text = `${s2}s`; return { text, min: Math.floor(totalS / 60) }; };
 
             const activeIncident = smsMessages.find(m => m.inc_id === selectedIncidentIdFlow);
             const finalRegDtStr = activeIncident?.occurrence_time || activeIncident?.reg_dt || smsStep?.timestamp;
-            const diffStart = finalRegDtStr ? parseDate(finalRegDtStr) : new Date(smsStep?.timestamp || currentTime);
-            const durationMs = (knwStep ? new Date(knwStep.timestamp) : currentTime) - diffStart;
+            const diffStart = finalRegDtStr ? parseDate(finalRegDtStr) : (parseDate(smsStep?.timestamp) || currentTime);
+            const durationMs = (knwStep ? (parseDate(knwStep.timestamp) || currentTime) : currentTime) - diffStart;
             const isClosed = !!knwStep;
 
             const steps = [
@@ -2303,9 +2297,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             const ringColorRGB = isClosed ? '16, 185, 129' : isCritical ? '239, 68, 68' : isMajor ? '249, 115, 22' : '0, 229, 255';
             const ringShadow = isClosed ? `drop-shadow(0 0 4px rgba(${ringColorRGB}, 0.3))` : `drop-shadow(0 0 10px rgba(${ringColorRGB}, 0.8))`;
 
-            // MTTA Timer Logic
-            const mttaDurationMs = (warStep ? new Date(warStep.timestamp) : currentTime) - diffStart;
-            const isMttaClosed = !!warStep;
+            // MTTA Timer Logic — PC 버전과 동일하게 warRooms 데이터 우선 사용
+            const incWarRoom = warRooms.find(r => String(r.inc_id) === String(selectedIncidentIdFlow));
+            const warRoomDt = incWarRoom?.reg_dt
+              ? parseDate(incWarRoom.reg_dt)
+              : (warStep?.timestamp ? new Date(warStep.timestamp) : null);
+            const mttaDurationMs = (warRoomDt || currentTime) - diffStart;
+            const isMttaClosed = !!warRoomDt;
             
             let mttaRingColor = '#ef4444';
             let mttaRingColorRGB = '239, 68, 68';
@@ -2417,7 +2415,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                 {/* 애플워치 스타일 활동 링 (Activity Ring) */}
                 <div className="py-6 flex flex-col items-center justify-center bg-gradient-to-b from-black/40 to-transparent relative shrink-0">
-                  <div className="flex flex-row flex-wrap items-center justify-center gap-4 px-2">
+                  <div className="flex flex-row items-center justify-center gap-1 px-2">
                     
                     {/* MTTA Ring */}
                     <div className="relative w-[145px] h-[145px] flex items-center justify-center">
@@ -2475,10 +2473,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                   {/* 하단 등급 기준 안내 */}
                   <div className="mt-4 text-[9px] text-slate-500 tracking-tighter whitespace-nowrap px-3 border border-white/5 bg-black/20 rounded-lg py-1.5 shadow-inner w-fit mx-auto">
-                    <span className="font-bold text-slate-400 mr-1">MTTA 등급 기준</span> 
-                    <span className="text-emerald-400 ml-1">상:</span> 주간3분, 야간5분 <span className="mx-0.5 text-slate-600">|</span> 
-                    <span className="text-orange-400">중:</span> 주간3~5분, 야간5~10분 <span className="mx-0.5 text-slate-600">|</span> 
-                    <span className="text-red-400">하:</span> 주간5분 이상, 야간10분 이상
+                    <span className="font-bold text-slate-400 mr-1">MTTA-</span> 
+                    <span className="text-emerald-400 ml-1">상:</span> 주3분/야5분 이내 <span className="mx-0.5 text-slate-600">|</span> 
+                    <span className="text-red-400">하:</span> 주5분/야10분 이상
                   </div>
                 </div>
 

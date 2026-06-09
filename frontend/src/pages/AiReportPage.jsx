@@ -1154,7 +1154,7 @@ export default function AiReportPage() {
               </div>
             )}
 
-            {/* ── War-Room 채팅 전체 기록 (필요시 상세 조회용) ── */}
+            {/* ── War-Room 채팅 전체 기록 ── */}
             {activeTab === 'chat' && (
               <div className="space-y-6 animate-in fade-in duration-300 overflow-visible">
                 <section className="bg-blue-600/5 rounded-2xl border border-blue-500/20 overflow-visible shadow-lg shadow-blue-500/5">
@@ -1163,9 +1163,80 @@ export default function AiReportPage() {
                     <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
                   </div>
                   <div className="p-5 overflow-visible">
-                    {chatSummary ? (
-                      <MarkdownBlock text={formatTimeline(chatSummary)} report={report} />
-                    ) : (
+                    {chatSummary ? (() => {
+                      // [HH:MM:SS] or [HH:MM] 등 패턴 (뒤에 '이후' 등의 글자도 허용)
+                      const raw = chatSummary;
+                      const regex = /\[(\d{2}:\d{2}(?::\d{2})?[^\]]*)\]\s*/g;
+                      const items = [];
+                      let lastIndex = 0;
+                      let match;
+                      const timestamps = [];
+                      while ((match = regex.exec(raw)) !== null) {
+                        timestamps.push({ time: match[1], index: match.index, end: regex.lastIndex });
+                      }
+                      timestamps.forEach((ts, i) => {
+                        const nextStart = timestamps[i + 1]?.index ?? raw.length;
+                        const text = raw.slice(ts.end, nextStart).trim();
+                        if (text) items.push({ time: ts.time, text });
+                      });
+                      // 타임스탬프 없으면 fallback
+                      if (items.length === 0) {
+                        return <MarkdownBlock text={formatTimeline(chatSummary)} report={report} />;
+                      }
+
+                      const icons = ['🚨','📡','🔍','🛠️','✅','📋','🔔','💡'];
+                      const colors = [
+                        { dot: 'bg-red-500', line: 'bg-red-500/30', badge: 'bg-red-500/15 border-red-500/30 text-red-400', card: 'border-red-500/20 bg-red-500/5' },
+                        { dot: 'bg-orange-400', line: 'bg-orange-400/30', badge: 'bg-orange-500/15 border-orange-500/30 text-orange-400', card: 'border-orange-500/20 bg-orange-500/5' },
+                        { dot: 'bg-yellow-400', line: 'bg-yellow-400/30', badge: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400', card: 'border-yellow-500/20 bg-yellow-500/5' },
+                        { dot: 'bg-blue-500', line: 'bg-blue-500/30', badge: 'bg-blue-500/15 border-blue-500/30 text-blue-400', card: 'border-blue-500/20 bg-blue-500/5' },
+                        { dot: 'bg-violet-500', line: 'bg-violet-500/30', badge: 'bg-violet-500/15 border-violet-500/30 text-violet-400', card: 'border-violet-500/20 bg-violet-500/5' },
+                        { dot: 'bg-emerald-500', line: 'bg-emerald-500/30', badge: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400', card: 'border-emerald-500/20 bg-emerald-500/5' },
+                        { dot: 'bg-cyan-500', line: 'bg-cyan-500/30', badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400', card: 'border-cyan-500/20 bg-cyan-500/5' },
+                        { dot: 'bg-pink-500', line: 'bg-pink-500/30', badge: 'bg-pink-500/15 border-pink-500/30 text-pink-400', card: 'border-pink-500/20 bg-pink-500/5' },
+                      ];
+
+                      return (
+                        <div className="relative">
+                          {items.map((item, idx) => {
+                            const c = colors[idx % colors.length];
+                            const icon = icons[idx % icons.length];
+                            const isLast = idx === items.length - 1;
+                            return (
+                              <div key={idx} className="flex gap-4 relative">
+                                {/* 수직 연결선 + 점 */}
+                                <div className="flex flex-col items-center shrink-0 w-8">
+                                  <div className={`w-8 h-8 rounded-full ${c.dot} bg-opacity-20 border-2 border-opacity-60 flex items-center justify-center text-base shrink-0 shadow-lg`}
+                                    style={{ borderColor: 'currentColor', boxShadow: `0 0 12px rgba(0,0,0,0.3)` }}>
+                                    <span style={{ fontSize: 14 }}>{icon}</span>
+                                  </div>
+                                  {!isLast && (
+                                    <div className={`w-0.5 flex-1 min-h-[24px] mt-1 ${c.line}`} />
+                                  )}
+                                </div>
+                                {/* 카드 */}
+                                <div className={`flex-1 mb-5 rounded-2xl border p-4 ${c.card} transition-all hover:brightness-110`}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className={`text-[11px] font-black font-mono px-2.5 py-1 rounded-lg border ${c.badge}`}>
+                                      {item.time}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      STEP {idx + 1} / {items.length}
+                                    </span>
+                                    {isLast && (
+                                      <span className="ml-auto text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest">
+                                        완료
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-slate-200 leading-relaxed">{item.text}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })() : (
                       <div className="text-center py-10 text-slate-500 text-sm">
                         요약된 타임라인 정보가 없습니다. [AI 분석 요약] 탭에서 분석이 진행되었는지 확인해주세요.
                       </div>
@@ -1174,6 +1245,7 @@ export default function AiReportPage() {
                 </section>
               </div>
             )}
+
 
             {/* ── 첨부파일 ── */}
             {activeTab === 'files' && (
