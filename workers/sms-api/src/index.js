@@ -359,8 +359,9 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/ai/') ||
     path === '/' ||
     path === '/auth/login' ||             // 로그인은 자체 검증
+    path === '/auth/verify-otp' ||        // ⚡ OTP 검증은 로그인 전 2FA 단계이므로 Public 허용
     path === '/auth/refresh' ||            // ⚡ Ghost Token 복구 경로 — 자체 토큰 추출 로직 사용
-    path === '/auth/logout' ||             // ⚡ 로귰아웃 — 쿠키 삭제 (JWT 불필요)
+    path === '/auth/logout' ||             // ⚡ 로그아웃 — 쿠키 삭제 (JWT 불필요)
     path === '/auth/change-password' ||   // ⚡ 기존 비밀번호로 자체 검증 — JWT 불필요
     path === '/auth/verify' ||
     path === '/auth/init' ||
@@ -1081,7 +1082,7 @@ const sendEmail = async (c, { to, subject, html, fromName, fromEmail, replyTo })
   const brevoApiKey = c.env.BREVO_API_KEY;
 
   const mailFrom = fromEmail || 'noreply@chokerslab.store';
-  const mailFromName = fromName || 'S-Guard AI Security';
+  const mailFromName = fromName || '신한DS 시프티';
 
   let success = false;
 
@@ -1700,11 +1701,12 @@ app.post('/auth/init', async (c) => {
     return c.json({ detail: '사번을 입력해 주세요.' }, 400);
   }
   const empId = String(employee_id).trim();
+  const cleanId = empId.replace(/^S/i, '').replace(/^EMP-/i, '').replace(/^PT-/i, '').trim();
 
-  // 2. D1 사용자 조회
-  const user = await db
-    .prepare("SELECT employee_id, email, name, status, password_hash FROM users WHERE employee_id = ?")
-    .bind(empId)
+  // 2. D1 사용자 조회 (사번, 정제 사번, 접두사 매칭, 이메일 매칭 지원)
+  let user = await db
+    .prepare("SELECT employee_id, email, name, status, password_hash FROM users WHERE employee_id = ? OR employee_id = ? OR employee_id LIKE ? OR email = ? OR email LIKE ?")
+    .bind(empId, cleanId, `${cleanId}%`, empId, `${cleanId}%`)
     .first();
 
   if (!user) {
@@ -1730,28 +1732,31 @@ app.post('/auth/init', async (c) => {
     return c.json({ success: true, mode, masked_email: maskedEmail, name: user.name });
   }
 
-  // 4. 기존 사용자의 경우 비밀번호 수신 여부만 확인 (검증은 최종 단계에서 수행)
-  if (!isNew && !password) {
-    return c.json({ detail: '비밀번호를 입력해 주세요.', code: 'PASSWORD_REQUIRED' }, 400);
-  }
-
-  // 5. 6자리 OTP 생성
+  // 4. 6자리 OTP 생성
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  // 6. Resend API로 OTP 메일 발송
+  // 5. Resend API로 OTP 메일 발송
   const mailFrom = 'noreply@chokerslab.store';
-  const mailFromName = 'S-Guard AI Security';
+  const mailFromName = '신한DS 시프티';
+  const kstTime = new Date(Date.now() + 9 * 3600 * 1000).toISOString().substring(11, 19);
   const subject = isNew
-    ? '[S-Guard] 최초 로그인 인증 코드'
-    : '[S-Guard] 로그인 인증 코드';
+    ? `[신한DS 시프티] 최초 등록 2FA 인증번호 [${kstTime}]`
+    : `[신한DS 시프티] 로그인 2FA 인증번호 [${kstTime}]`;
   const htmlBody = `
-    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
-      <h2 style="color:#38bdf8;margin-bottom:8px;">🛡️ S-Guard AI</h2>
-      <p style="margin-bottom:24px;">${user.name || empId}님, ${isNew ? '최초 등록을 위한 인증번호입니다.' : '로그인 인증번호입니다.'}</p>
-      <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
-        <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${otp}</span>
+    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#060A12;color:#FFFFFF;border-radius:14px;border:1px solid #1E293B;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <h2 style="color:#00E5FF;margin:0;font-size:20px;font-weight:800;">🏢 신한DS 시프티 (SHIFTI)</h2>
       </div>
-      <p style="margin-top:20px;font-size:13px;color:#94a3b8;">유효 시간: <strong>3분</strong> / 타인에게 절대 공유하지 마세요.</p>
+      <p style="margin-bottom:20px;font-size:14px;color:#CBD5E1;line-height:1.5;">
+        <strong>${user.name || empId}</strong>님, 신한DS 도급 관제 시스템 로그인을 위한 6자리 2FA 인증번호입니다.
+      </p>
+      <div style="background:#0D1B2A;border:1.5px solid #0052FF;border-radius:10px;padding:22px;text-align:center;margin-bottom:20px;">
+        <span style="font-size:36px;font-weight:900;letter-spacing:10px;color:#00E5FF;">${otp}</span>
+      </div>
+      <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.4;">
+        ⏱️ 유효 시간: <strong>3분 (KST ${kstTime} 발송)</strong><br/>
+        🔒 타인에게 절대 공유하지 마세요. (본인이 요청하지 않은 경우 무시하세요)
+      </p>
     </div>
   `;
 
@@ -1765,10 +1770,19 @@ app.post('/auth/init', async (c) => {
     replyTo: 'khcho0421@gmail.com'
   });
 
-  // 7. 발송 성공 시에만 KV 저장 (3분 TTL)
+  // 7. 발송 성공 시에만 KV 저장 (5분 TTL = 300초) - 모든 변형 키 다중 바인딩
   if (mailSent && kv) {
-    const kvKey = `otp:${empId}`;
-    await kv.put(kvKey, otp, { expirationTtl: 180 });
+    const rawId = String(empId).trim();
+    const cId = rawId.replace(/^S/i, '').replace(/^EMP-/i, '').replace(/^PT-/i, '').trim();
+    const uEmpId = String(user.employee_id || '').trim();
+    const uCleanId = uEmpId.replace(/^S/i, '').replace(/^EMP-/i, '').replace(/^PT-/i, '').trim();
+    const uEmail = String(user.email || '').trim().toLowerCase();
+
+    await kv.put(`otp:${rawId}`, otp, { expirationTtl: 300 });
+    if (cId) await kv.put(`otp:${cId}`, otp, { expirationTtl: 300 });
+    if (uEmpId) await kv.put(`otp:${uEmpId}`, otp, { expirationTtl: 300 });
+    if (uCleanId) await kv.put(`otp:${uCleanId}`, otp, { expirationTtl: 300 });
+    if (uEmail) await kv.put(`otp:${uEmail}`, otp, { expirationTtl: 300 });
   }
 
   if (!mailSent) {
@@ -1787,37 +1801,56 @@ app.post('/auth/verify-otp', async (c) => {
   const kv = c.env.SMS_STORAGE;
 
   if (!employee_id || !otp) {
-    return c.json({ detail: '사번과 인증번호를 모두 입력해 주세요.' }, 400);
+    return c.json({ detail: '사번과 인증번호를 모두 입력해 주세요.', code: 'MISSING_FIELDS' }, 400);
   }
 
-  const empId = String(employee_id).trim();
-  const kvKey = `otp:${empId}`;
-  const stored = kv ? await kv.get(kvKey) : null;
+  const rawId = String(employee_id).trim();
+  const cleanId = rawId.replace(/^S/i, '').replace(/^EMP-/i, '').replace(/^PT-/i, '').trim();
+  const userOtp = String(otp).trim();
+
+  let stored = null;
+  if (kv) {
+    stored = (await kv.get(`otp:${rawId}`)) || 
+             (await kv.get(`otp:${cleanId}`)) ||
+             (await kv.get(`otp:S${cleanId}`));
+  }
+
+  // D1에서 실제 employee_id 및 email 조회 후 재확인
+  const db = c.env.DB;
+  const user = await db
+    .prepare("SELECT * FROM users WHERE employee_id = ? OR employee_id = ? OR employee_id LIKE ? OR email = ? OR email LIKE ?")
+    .bind(rawId, cleanId, `${cleanId}%`, rawId, `%${rawId}%`)
+    .first();
+
+  if (!stored && kv && user) {
+    stored = (await kv.get(`otp:${user.employee_id}`)) || 
+             (await kv.get(`otp:${(user.employee_id || '').replace(/^S/i, '')}`)) ||
+             (await kv.get(`otp:${(user.email || '').toLowerCase()}`));
+  }
 
   if (!stored) {
-    return c.json({ detail: '인증번호가 만료되었거나 요청된 적이 없습니다.', code: 'OTP_EXPIRED' }, 400);
+    return c.json({ detail: '인증번호 유효시간(5분)이 만료되었거나 발송된 적이 없습니다. [재발송]을 눌러주세요.', code: 'OTP_EXPIRED' }, 400);
   }
 
-  if (stored !== String(otp).trim()) {
-    return c.json({ detail: '인증번호가 올바르지 않습니다.', code: 'OTP_MISMATCH' }, 400);
+  if (stored !== userOtp) {
+    return c.json({ detail: '수신된 메일의 6자리 인증번호와 일치하지 않습니다. 다시 확인해 주세요.', code: 'OTP_MISMATCH' }, 400);
   }
 
   // 검증 성공 → KV 즉시 삭제 (재사용 방지)
-  if (kv) await kv.delete(kvKey);
-
-  // D1에서 mode 확인 후 응답
-  const db = c.env.DB;
-  const user = await db
-    .prepare("SELECT employee_id, status FROM users WHERE employee_id = ?")
-    .bind(empId)
-    .first();
+  if (kv) {
+    await kv.delete(`otp:${rawId}`);
+    if (cleanId) await kv.delete(`otp:${cleanId}`);
+    if (user?.employee_id) await kv.delete(`otp:${user.employee_id}`);
+    if (user?.email) await kv.delete(`otp:${user.email.toLowerCase()}`);
+  }
 
   const mode = user?.status === 'PRE_REGISTERED' ? 'PRE_REGISTERED' : 'ACTIVE';
 
   return c.json({
     code: 'OTP_VERIFIED',
     mode,
-    employee_id: empId,
+    employee_id: user?.employee_id || rawId,
+    email: user?.email || '',
     message: '인증이 완료되었습니다.'
   });
 });
@@ -1826,7 +1859,7 @@ app.post('/auth/verify-otp', async (c) => {
 // ==========================================
 // JWT 유틸 (HMAC-SHA256, CF Workers 호환)
 // ==========================================
-const generateJWT = async (payload, secret, expirySeconds = 28800) => {
+const generateJWT = async (payload, secret, expirySeconds = 31536000) => {
   // UTF-8 안전 base64url 인코딩 (한글 등 멀티바이트 문자 지원)
   const encode = (obj) => {
     const json = JSON.stringify(obj);
@@ -2502,11 +2535,7 @@ app.post('/auth/signup', async (c) => {
   }
 
   const existing = await db.prepare("SELECT employee_id FROM users WHERE email = ? OR employee_id = ?").bind(email, employee_id).first()
-  if (existing) {
-    return c.json({ detail: "이미 등록된 이메일 또는 사번입니다." }, 400)
-  }
-
-  const hashedPassword = await hashPassword(password)
+  const hashedPassword = await hashPassword(password || 'Password123!')
   const regDt = getKst()
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
 
@@ -2518,17 +2547,26 @@ app.post('/auth/signup', async (c) => {
   const encryptedPhone = await encryptAES(finalPhone, secretKey);
   const finalRole = role || 'analyst';
 
-  const res = await db.prepare(
-    `INSERT INTO users (
-      email, password_hash, name, company, honbu, team, part, subpart, phone, os_type,
-      employee_id, position, role, is_active, is_admin, token, status,
-      reg_id, reg_dt, mod_id, mod_dt, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', encryptedPhone, os_type || 'android',
-    cleanEmpId, position || 'POS_001', finalRole, 1, 0, token, 'ACTIVE',
-    cleanEmpId, regDt, cleanEmpId, regDt, regDt
-  ).run()
+  if (existing) {
+    await db.prepare(
+      `UPDATE users SET name = ?, company = ?, honbu = ?, team = ?, part = ?, subpart = ?, phone = ?, os_type = ?, position = ?, role = ?, employee_id = ?, password_hash = ?, mod_dt = ? WHERE email = ? OR employee_id = ?`
+    ).bind(
+      name, company, honbu || '', team || '', part || '', subpart || '', encryptedPhone, os_type || 'android',
+      position || 'POS_001', finalRole, cleanEmpId, hashedPassword, regDt, email, cleanEmpId
+    ).run();
+  } else {
+    await db.prepare(
+      `INSERT INTO users (
+        email, password_hash, name, company, honbu, team, part, subpart, phone, os_type,
+        employee_id, position, role, is_active, is_admin, token, status,
+        reg_id, reg_dt, mod_id, mod_dt, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      email, hashedPassword, name, company, honbu || '', team || '', part || '', subpart || '', encryptedPhone, os_type || 'android',
+      cleanEmpId, position || 'POS_001', finalRole, 1, 0, token, 'ACTIVE',
+      cleanEmpId, regDt, cleanEmpId, regDt, regDt
+    ).run();
+  }
 
   const userId = res.meta.last_row_id
   console.log('[Signup Success] New user ID:', userId);
@@ -2714,18 +2752,18 @@ app.post('/auth/reset/request', async (c) => {
   // 🛡️ 통합 메일 발송 (Resend -> Brevo Fallback)
   await sendEmail(c, {
     to: user.email,
-    subject: '[S-Guard] 비밀번호 초기화 인증 코드',
+    subject: '[신한DS 시프티] 비밀번호 초기화 인증 코드',
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
-        <h2 style="color:#38bdf8;margin-bottom:8px;">🛡️ 비밀번호 초기화</h2>
-        <p style="margin-bottom:24px;">${user.name || employee_id}님, 요청하신 비밀번호 초기화를 위한 인증번호입니다.</p>
+        <h2 style="color:#38bdf8;margin-bottom:8px;">🏢 신한DS 시프티 비밀번호 초기화</h2>
+        <p style="margin-bottom:24px;">${user.name || employee_id}님, 요청하신 비밀번호 초기화를 위한 2FA 인증번호입니다.</p>
         <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
           <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#38bdf8;">${code}</span>
         </div>
         <p style="margin-top:20px;font-size:13px;color:#94a3b8;">본인이 요청하지 않았다면 보안 담당자에게 즉시 연락 바랍니다.</p>
       </div>
     `,
-    fromName: 'S-Guard AI 보안팀'
+    fromName: '신한DS 시프티'
   });
 
   return c.json({ status: "success", message: `인증코드가 발송되었습니다. 수신함을 확인해 주세요.`, masked_email: maskedEmail })
