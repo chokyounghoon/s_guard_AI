@@ -379,6 +379,8 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/organizations') ||   // ⚡ 도급 공정 수행 조직 마스터 API
     path.startsWith('/companies') ||       // ⚡ 협력사 및 소속 마스터 API (신한DS 및 협력사 관리)
     path.startsWith('/users') ||           // ⚡ 직원 및 사용자 마스터 API (직원 관리 실시간 연동)
+    path.startsWith('/notifications') ||   // ⚡ 실시간 알림 센터 API (D1 DB 연동)
+    path.startsWith('/messages') ||        // ⚡ 도급 소통 및 메시지/소명 API (D1 DB 연동)
     path === '/sms/shortcut/keywords' ||   // ⚡ iPhone 단축어 전용 (userId 기반 조회)
     path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
     path.startsWith('/codebook') ||
@@ -2767,6 +2769,136 @@ app.delete('/users/:employee_id', async (c) => {
     return c.json({ detail: `사용자 삭제 실패: ${err.message}` }, 500)
   }
 })
+
+// =========================================================================
+// 🔔 실시간 알림 센터 API (Cloudflare D1 연동)
+// =========================================================================
+app.get('/notifications', async (c) => {
+  const db = c.env.DB;
+  const role = c.req.query('role');
+  const part = c.req.query('part');
+
+  try {
+    let query = "SELECT * FROM app_notifications";
+    const conditions = [];
+    const params = [];
+
+    if (role) {
+      conditions.push("(target_role = ? OR target_role = 'ALL')");
+      params.push(role);
+    }
+    if (part) {
+      conditions.push("(part_name = ? OR part_name = 'ALL')");
+      params.push(part);
+    }
+
+    if (conditions.length > 0) {
+      query += " WHERE " + conditions.join(" AND ");
+    }
+    query += " ORDER BY created_at DESC";
+
+    const stmt = db.prepare(query);
+    const result = params.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
+    const list = result.results || [];
+    const unreadCount = list.filter(n => !n.is_read).length;
+
+    return c.json({ ok: true, count: list.length, unreadCount, data: list });
+  } catch (err) {
+    console.error('[Notifications GET Error]', err);
+    return c.json({ ok: false, detail: err.message }, 500);
+  }
+});
+
+app.put('/notifications/:id/read', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  try {
+    await db.prepare("UPDATE app_notifications SET is_read = 1 WHERE id = ?").bind(id).run();
+    return c.json({ ok: true, detail: "알림 읽음 처리 완료" });
+  } catch (err) {
+    return c.json({ ok: false, detail: err.message }, 500);
+  }
+});
+
+app.put('/notifications/read-all', async (c) => {
+  const db = c.env.DB;
+  try {
+    await db.prepare("UPDATE app_notifications SET is_read = 1").run();
+    return c.json({ ok: true, detail: "전체 알림 읽음 처리 완료" });
+  } catch (err) {
+    return c.json({ ok: false, detail: err.message }, 500);
+  }
+});
+
+// =========================================================================
+// 💬 도급 소통 및 소명 메시지함 API (Cloudflare D1 연동)
+// =========================================================================
+app.get('/messages', async (c) => {
+  const db = c.env.DB;
+  const part = c.req.query('part');
+
+  try {
+    let query = "SELECT * FROM app_messages";
+    const params = [];
+
+    if (part) {
+      query += " WHERE (part_name = ? OR part_name = 'ALL')";
+      params.push(part);
+    }
+    query += " ORDER BY created_at DESC";
+
+    const stmt = db.prepare(query);
+    const result = params.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
+    const list = result.results || [];
+    const unreadCount = list.filter(m => !m.is_read).length;
+
+    return c.json({ ok: true, count: list.length, unreadCount, data: list });
+  } catch (err) {
+    console.error('[Messages GET Error]', err);
+    return c.json({ ok: false, detail: err.message }, 500);
+  }
+});
+
+app.put('/messages/:id/read', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  try {
+    await db.prepare("UPDATE app_messages SET is_read = 1 WHERE id = ?").bind(id).run();
+    return c.json({ ok: true, detail: "메시지 읽음 처리 완료" });
+  } catch (err) {
+    return c.json({ ok: false, detail: err.message }, 500);
+  }
+});
+
+app.put('/messages/:id/reply', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  try {
+    const body = await c.req.json();
+    const replyContent = body.reply_content || body.replyContent;
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    await db.prepare(`
+      UPDATE app_messages 
+      SET reply_status = 'COMPLETED', reply_content = ?, replied_at = ?, is_read = 1 
+      WHERE id = ?
+    `).bind(replyContent, nowStr, id).run();
+
+    return c.json({ ok: true, detail: "회신 답변 등록 완료" });
+  } catch (err) {
+    return c.json({ ok: false, detail: err.message }, 500);
+  }
+});
+
+app.put('/messages/read-all', async (c) => {
+  const db = c.env.DB;
+  try {
+    await db.prepare("UPDATE app_messages SET is_read = 1").run();
+    return c.json({ ok: true, detail: "전체 메시지 읽음 처리 완료" });
+  } catch (err) {
+    return c.json({ ok: false, detail: err.message }, 500);
+  }
+});
 
 app.get('/users/:id', async (c) => {
   const db = c.env.DB
