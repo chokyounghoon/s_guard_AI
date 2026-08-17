@@ -44,6 +44,6 @@ index_name = "sguard-warroom-index"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "sguard-db"
-database_id = "cec6c7cc-5bce-4fdf-a500-e1976b1fb66f"
-preview_database_id = "cec6c7cc-5bce-4fdf-a500-e1976b1fb66f"
+database_name = "shifti-db"
+database_id = "8d165000-c599-473b-ab48-cff47cb58370"
+preview_database_id = "8d165000-c599-473b-ab48-cff47cb58370"
