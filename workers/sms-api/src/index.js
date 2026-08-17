@@ -13090,14 +13090,102 @@ app.delete('/admin/incident-cleanup/:id', async (c) => {
     
     // Some tables might use incident_id instead
     const tablesWithIncidentId = ['warroom_chats', 'warroom_attachments', 'ai_feedback'];
-    for (const table of tablesWithIncidentId) {
-      try { await db.prepare(`DELETE FROM ${table} WHERE incident_id = ?`).bind(normId).run(); } catch(e) {}
-    }
-
     return c.json({ status: 'success', message: `Incident ${normId} fully deleted` });
   } catch (e) {
     return c.json({ error: e.message }, 500);
   }
 });
 
+// ============================================================================
+// 🔔 S-GUARD 실시간 출근 / 도급 인력 투입 실적 (Commute Logs) REST API
+// ============================================================================
+app.post('/commute/punch', async (c) => {
+  const db = c.env.DB;
+  try {
+    const body = await c.req.json();
+    const employee_id = (body.employee_id || body.employeeId || 'S01832').toUpperCase().trim();
+    const user_id = body.user_id || body.userId || employee_id;
+    const work_date = body.work_date || body.workDate || new Date().toISOString().substring(0, 10);
+    const clock_in_time = body.clock_in_time || body.clockInTime || new Date().toTimeString().substring(0, 5);
+    const location_name = body.location_name || body.locationName || '파인에비뉴(카드)';
+    const distance_meters = Number(body.distance_meters || body.distanceMeters || 25);
+    const status = body.status || 'NORMAL';
+    const id = `commute-${employee_id}-${work_date}`;
+
+    await db.prepare(`
+      INSERT INTO commute_logs 
+      (id, user_id, employee_id, work_date, clock_in_time, location_name, clock_in_method, distance_meters, status, created_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, 'GPS', ?, ?, datetime('now', '+9 hours'), ?)
+      ON CONFLICT(employee_id, work_date) DO UPDATE SET
+        clock_in_time = excluded.clock_in_time,
+        location_name = excluded.location_name,
+        distance_meters = excluded.distance_meters,
+        status = excluded.status,
+        updated_at = datetime('now', '+9 hours')
+    `).bind(id, user_id, employee_id, work_date, clock_in_time, location_name, distance_meters, status, employee_id).run();
+
+    return c.json({
+      success: true,
+      message: '출근/도급 투입 실적이 D1 DB(commute_logs)에 영구 저장되었습니다.',
+      data: {
+        id,
+        employee_id,
+        work_date,
+        clock_in_time,
+        location_name,
+        distance_meters,
+        status
+      }
+    });
+  } catch (e) {
+    console.error('Failed to save commute punch to D1:', e);
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+app.get('/commute/logs', async (c) => {
+  const db = c.env.DB;
+  const empId = c.req.query('employee_id');
+  const date = c.req.query('work_date');
+
+  try {
+    let sql = 'SELECT * FROM commute_logs WHERE 1=1';
+    const params = [];
+
+    if (empId) {
+      sql += ' AND employee_id = ?';
+      params.push(empId.toUpperCase().trim());
+    }
+    if (date) {
+      sql += ' AND work_date = ?';
+      params.push(date);
+    }
+    sql += ' ORDER BY work_date DESC, created_at DESC LIMIT 50';
+
+    const { results } = await db.prepare(sql).bind(...params).all();
+    return c.json({ success: true, data: results || [] });
+  } catch (e) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+app.get('/commute/today', async (c) => {
+  const db = c.env.DB;
+  const today = new Date().toISOString().substring(0, 10);
+  try {
+    const { results } = await db.prepare(`
+      SELECT c.*, u.name as worker_name, u.company, u.team, u.part, u.position
+      FROM commute_logs c
+      LEFT JOIN users u ON c.employee_id = u.employee_id
+      WHERE c.work_date = ?
+      ORDER BY c.clock_in_time ASC
+    `).bind(today).all();
+
+    return c.json({ success: true, count: (results || []).length, data: results || [] });
+  } catch (e) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
 export default app
+
