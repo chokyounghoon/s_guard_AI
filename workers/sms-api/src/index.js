@@ -381,6 +381,7 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/users') ||           // ⚡ 직원 및 사용자 마스터 API (직원 관리 실시간 연동)
     path.startsWith('/notifications') ||   // ⚡ 실시간 알림 센터 API (D1 DB 연동)
     path.startsWith('/messages') ||        // ⚡ 도급 소통 및 메시지/소명 API (D1 DB 연동)
+    path.startsWith('/commute') ||         // ⚡ 실시간 출근 및 도급 투입 실적 (commute_logs D1 연동)
     path === '/sms/shortcut/keywords' ||   // ⚡ iPhone 단축어 전용 (userId 기반 조회)
     path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
     path.startsWith('/codebook') ||
