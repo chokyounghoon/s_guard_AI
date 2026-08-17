@@ -377,6 +377,8 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/debug/') ||
     path === '/org/tree' ||                // 조직도 공개 참조 데이터 (프로필 편집용)
     path.startsWith('/organizations') ||   // ⚡ 도급 공정 수행 조직 마스터 API
+    path.startsWith('/companies') ||       // ⚡ 협력사 및 소속 마스터 API (신한DS 및 협력사 관리)
+    path.startsWith('/users') ||           // ⚡ 직원 및 사용자 마스터 API (직원 관리 실시간 연동)
     path === '/sms/shortcut/keywords' ||   // ⚡ iPhone 단축어 전용 (userId 기반 조회)
     path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
     path.startsWith('/codebook') ||
@@ -2231,7 +2233,7 @@ app.post('/auth/login', async (c) => {
 
     // 🛡️ 로그인 식별자 정제 (email 또는 employee_id 둘 다 지원)
     const loginId = (email || rawEmpId || '').trim();
-    const cleanEmpId = String(rawEmpId || '').replace(/^S/i, '').replace(/^EMP-/i, '').replace(/^PT-/i, '').replace(/^SH-/i, '').trim();
+    const cleanEmpId = String(rawEmpId || '').trim();
 
     console.log(`[Auth-Login-Debug] Login attempt for: ${loginId} (Cleaned ID: ${cleanEmpId})`);
 
@@ -2271,21 +2273,8 @@ app.post('/auth/login', async (c) => {
       }, 403);
     }
 
-    // 🔐 비밀번호 검증 진행
-    let isPasswordValid = user.password_hash && (await verifyPassword(password, user.password_hash));
-
-    // 2FA 이메일 OTP 인증을 마친 세션인 경우 비밀번호 자동 동기화 및 갱신 인가
-    if (!isPasswordValid && is_2fa_verified && password && password.length >= 4) {
-      try {
-        const newHash = await hashPassword(password);
-        await db.prepare("UPDATE users SET password_hash = ?, failed_attempts = 0 WHERE employee_id = ?")
-          .bind(newHash, user.employee_id).run();
-        isPasswordValid = true;
-        console.log(`[Auth] Password hash auto-synced for 2FA verified user: ${user.employee_id}`);
-      } catch (e) {
-        console.warn('[Auth] Failed to auto-sync password hash:', e.message);
-      }
-    }
+    // 🔐 비밀번호 검증 (D1 SHA-256 salt hash 대조)
+    const isPasswordValid = user.password_hash && (await verifyPassword(password, user.password_hash));
 
     if (!isPasswordValid) {
       await db.prepare("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE employee_id = ?").bind(user.employee_id).run();
@@ -2783,11 +2772,15 @@ app.post('/auth/reset/request', async (c) => {
   const { employee_id } = await c.req.json()
   const db = c.env.DB
 
-  if (!employee_id) return c.json({ detail: "사번이 필요합니다." }, 400);
+  if (!employee_id) return c.json({ success: false, detail: "사번 또는 이메일이 필요합니다." }, 400);
 
-  const user = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(employee_id.trim()).first()
+  const rawEmpId = employee_id.trim();
+  const user = await db.prepare("SELECT employee_id, email, name FROM users WHERE UPPER(employee_id) = UPPER(?) OR LOWER(email) = LOWER(?)")
+    .bind(rawEmpId, rawEmpId)
+    .first()
+
   if (!user) {
-    return c.json({ detail: "가입 정보가 없거나 사번이 일치하지 않습니다.", code: 'NOT_FOUND' }, 404)
+    return c.json({ success: false, detail: "가입 정보가 없거나 사번이 일치하지 않습니다.", code: 'NOT_FOUND' }, 404)
   }
 
   const email = user.email;
@@ -2798,7 +2791,7 @@ app.post('/auth/reset/request', async (c) => {
 
   // 🛡️ 이메일 마스킹 처리 (프론트엔드 전달용)
   const [userPart, domainPart] = email.split('@');
-  const maskedEmail = userPart.slice(0, 2) + '*'.repeat(userPart.length - 2) + '@' + domainPart;
+  const maskedEmail = userPart.slice(0, 2) + '*'.repeat(Math.max(1, userPart.length - 2)) + '@' + domainPart;
 
   // 🛡️ 통합 메일 발송 (Resend -> Brevo Fallback)
   await sendEmail(c, {
@@ -2817,44 +2810,49 @@ app.post('/auth/reset/request', async (c) => {
     fromName: '신한DS 시프티'
   });
 
-  return c.json({ status: "success", message: `인증코드가 발송되었습니다. 수신함을 확인해 주세요.`, masked_email: maskedEmail })
+  return c.json({ success: true, status: "success", message: `인증코드가 발송되었습니다. 수신함을 확인해 주세요.`, masked_email: maskedEmail })
 })
 
 app.post('/auth/reset/verify', async (c) => {
   const { employee_id, code, password } = await c.req.json()
   const db = c.env.DB
 
-  if (!employee_id || !code) return c.json({ detail: "필수 정보가 누락되었습니다." }, 400);
+  if (!employee_id || !code) return c.json({ success: false, detail: "사번과 인증번호를 모두 입력해 주세요." }, 400);
 
+  const rawEmpId = employee_id.trim();
   // 1. 사번으로 이메일 조회
-  const userRecord = await db.prepare("SELECT email, name FROM users WHERE employee_id = ?").bind(employee_id.trim()).first()
-  if (!userRecord) return c.json({ detail: "사용자를 찾을 수 없습니다." }, 404);
+  const userRecord = await db.prepare("SELECT employee_id, email, name FROM users WHERE UPPER(employee_id) = UPPER(?) OR LOWER(email) = LOWER(?)")
+    .bind(rawEmpId, rawEmpId)
+    .first()
+
+  if (!userRecord) return c.json({ success: false, detail: "사용자를 찾을 수 없습니다." }, 404);
   const email = userRecord.email;
 
   const record = await db.prepare("SELECT * FROM reset_verifications WHERE email = ? AND code = ? AND is_verified = 0 ORDER BY inc_id DESC LIMIT 1")
-    .bind(email, code)
+    .bind(email, code.trim())
     .first()
 
   if (!record) {
-    return c.json({ detail: "인증 코드가 올바르지 않거나 만료되었습니다." }, 400)
+    return c.json({ success: false, detail: "인증 코드가 올바르지 않거나 만료되었습니다." }, 400)
   }
 
   await db.prepare("UPDATE reset_verifications SET is_verified = 1 WHERE inc_id = ?").bind(record.inc_id).run()
 
-  const modDt = getKst()
+  const nowKst = getKst()
 
-  // 패스워드 제공 시 해당 패스워드로 업데이트, 미제공 시 기존 로직(임시번호) 유지 가능하나 
-  // 여기서는 명시적으로 제공된 패스워드 처리를 우선함
   if (password) {
+    if (password.length < 8) {
+      return c.json({ success: false, detail: "새 비밀번호는 최소 8자리 이상이어야 합니다." }, 400);
+    }
     const hashedPw = await hashPassword(password)
-    await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ?, status = 'ACTIVE' WHERE employee_id = ?")
-      .bind(hashedPw, modDt, employee_id.trim(), employee_id.trim())
+    await db.prepare("UPDATE users SET password_hash = ?, updated_at = ?, updated_by = ?, status = 'ACTIVE' WHERE UPPER(employee_id) = UPPER(?)")
+      .bind(hashedPw, nowKst, userRecord.employee_id, userRecord.employee_id)
       .run()
 
     // 🛡️ 성공 안내 메일 발송
     await sendEmail(c, {
       to: email,
-      subject: '[S-Guard] 비밀번호 변경 완료 안내',
+      subject: '[신한DS 시프티] 비밀번호 변경 완료 안내',
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
           <h2 style="color:#22c55e;margin-bottom:8px;">✅ 비밀번호 변경 완료</h2>
@@ -2864,111 +2862,151 @@ app.post('/auth/reset/verify', async (c) => {
           </div>
         </div>
       `,
-      fromName: 'S-Guard AI 보안팀'
+      fromName: '신한DS 시프티'
     });
-    return c.json({ status: "success", message: "Password updated successfully" })
-  } else {
-    // 하위 호환성을 위해 임시 비번 로직 유지
-    const temp_password = "T" + Math.floor(100000 + Math.random() * 900000).toString() + "!"
-    const hashedTempPassword = await hashPassword(temp_password)
-
-    await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
-      .bind(hashedTempPassword, modDt, employee_id.trim(), employee_id.trim())
-      .run()
-
-    await sendEmail(c, {
-      to: email,
-      subject: '[S-Guard] 임시 비밀번호 발급 안내',
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px;">
-          <h2 style="color:#ef4444;margin-bottom:8px;">⚠️ 임시 비밀번호 발급</h2>
-          <p style="margin-bottom:24px;">${userRecord.name || '사용자'}님, 요청하신 임시 비밀번호가 발급되었습니다.</p>
-          <div style="background:#1e293b;border-radius:8px;padding:24px;text-align:center;">
-            <span style="font-size:24px;font-weight:700;color:#ef4444;letter-spacing:1px;">${temp_password}</span>
-          </div>
-          <p style="font-size:12px;color:#94a3b8;margin-top:16px;">로그인 후 즉시 비밀번호를 변경하세요.</p>
-        </div>
-      `,
-      fromName: 'S-Guard AI 보안팀'
-    });
-    return c.json({ status: "success", temp_sent: true })
   }
+
+  return c.json({ success: true, status: "success", message: "비밀번호가 성공적으로 변경되었습니다." })
 })
 
 app.get('/users', async (c) => {
-  const db = c.env.DB
-  const { company, honbu, team, part, subpart, orgCode } = c.req.query()
-
-  let query = `
-    SELECT 
-      u.employee_id as id, u.employee_id, u.email, u.name, u.role, u.phone,
-      u.company, 
-      COALESCE(oc.name, u.company) as company_name, 
-      u.honbu,
-      COALESCE(oh.name, u.honbu) as honbu_name, 
-      u.team,
-      COALESCE(ot.name, u.team) as team_name,
-      u.part,
-      COALESCE(op.name, u.part) as part_name,
-      u.subpart,
-      COALESCE(os.name, u.subpart) as subpart_name,
-      u.profile_picture,
-      u.status, u.is_active, u.is_admin , u.last_login_at, u.os_type
-    FROM users u
-    LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
-    LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
-    LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
-    LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
-    LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
-    WHERE 1=1
-  `
-  const params = []
-
-  if (orgCode) {
-    query += " AND (u.company = ? OR u.honbu = ? OR u.team = ? OR u.part = ? OR u.subpart = ?)";
-    params.push(orgCode, orgCode, orgCode, orgCode, orgCode);
-  } else if (c.req.query('q')) {
-    const q = `%${c.req.query('q')}%`;
-    query += " AND (u.name LIKE ? OR u.employee_id LIKE ? OR u.email LIKE ?)";
-    params.push(q, q, q);
-  } else {
-    if (company) { query += " AND u.company = ?"; params.push(company); }
-    if (honbu) { query += " AND u.honbu = ?"; params.push(honbu); }
-    if (team) { query += " AND u.team = ?"; params.push(team); }
-    if (part) { query += " AND u.part = ?"; params.push(part); }
-    if (subpart) { query += " AND u.subpart = ?"; params.push(subpart); }
+  const db = c.env.DB;
+  try {
+    const { q, role, part, company } = c.req.query();
+    let query = `
+      SELECT 
+        seq, employee_id as id, employee_id, name, email, phone,
+        company, team, part, position, role, is_partner_manager,
+        status, is_active, is_admin, device_type, created_at, created_by, updated_at, updated_by
+      FROM users
+      WHERE 1=1
+    `;
+    const params = [];
+    if (q) {
+      query += " AND (name LIKE ? OR employee_id LIKE ? OR email LIKE ? OR phone LIKE ?)";
+      const qParam = `%${q}%`;
+      params.push(qParam, qParam, qParam, qParam);
+    }
+    if (company) {
+      query += " AND company = ?";
+      params.push(company);
+    }
+    if (part) {
+      query += " AND part = ?";
+      params.push(part);
+    }
+    if (role) {
+      query += " AND role = ?";
+      params.push(role);
+    }
+    query += " ORDER BY seq ASC";
+    const { results } = await db.prepare(query).bind(...params).all();
+    return c.json({ success: true, data: results || [] });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
   }
+});
 
-  const users = await db.prepare(query).bind(...params).all()
-  return c.json(users.results)
-})
+app.post('/users', async (c) => {
+  const db = c.env.DB;
+  try {
+    const body = await c.req.json();
+    const rawEmpId = String(body.employeeId || body.employee_id || '').trim();
+    const name = String(body.name || '').trim();
+    const email = String(body.email || '').trim();
+    const phone = String(body.phone || '').trim();
+    const company = String(body.company || '신한DS').trim();
+    const team = String(body.team || '카드개발').trim();
+    const part = String(body.part || '').trim();
+    const position = String(body.position || '연구원').trim();
+    const role = String(body.role || 'PARTNER_WORKER').trim();
+    const isPartnerManager = body.isPartnerManager || body.is_partner_manager ? 1 : 0;
+    const deviceType = String(body.deviceType || body.device_type || 'Android').trim();
+    const nowKst = getKst();
+    const actor = body.actor || body.updatedBy || 'SYSTEM';
+
+    const avatarUrl = typeof body.avatarUrl !== 'undefined' ? String(body.avatarUrl || '') : undefined;
+
+    if (!rawEmpId || !name) {
+      return c.json({ success: false, error: '사번과 성명은 필수 항목입니다.' }, 400);
+    }
+
+    // avatarUrl이 전달된 경우에만 profile_picture 업데이트
+    if (avatarUrl !== undefined) {
+      await db.prepare(`
+        INSERT INTO users (
+          employee_id, name, email, phone, company, team, part, position, role, is_partner_manager, device_type, profile_picture, status, is_active, is_admin,
+          created_at, created_by, updated_at, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 1, ?, ?, ?, ?, ?)
+        ON CONFLICT(employee_id) DO UPDATE SET
+          name = excluded.name,
+          email = excluded.email,
+          phone = excluded.phone,
+          company = excluded.company,
+          team = excluded.team,
+          part = excluded.part,
+          position = excluded.position,
+          role = excluded.role,
+          is_partner_manager = excluded.is_partner_manager,
+          device_type = excluded.device_type,
+          profile_picture = excluded.profile_picture,
+          updated_at = excluded.updated_at,
+          updated_by = excluded.updated_by
+      `).bind(
+        rawEmpId, name, email, phone, company, team, part, position, role, isPartnerManager, deviceType, avatarUrl,
+        company === '신한DS' ? 1 : 0,
+        nowKst, actor, nowKst, actor
+      ).run();
+    } else {
+      await db.prepare(`
+        INSERT INTO users (
+          employee_id, name, email, phone, company, team, part, position, role, is_partner_manager, device_type, status, is_active, is_admin,
+          created_at, created_by, updated_at, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 1, ?, ?, ?, ?, ?)
+        ON CONFLICT(employee_id) DO UPDATE SET
+          name = excluded.name,
+          email = excluded.email,
+          phone = excluded.phone,
+          company = excluded.company,
+          team = excluded.team,
+          part = excluded.part,
+          position = excluded.position,
+          role = excluded.role,
+          is_partner_manager = excluded.is_partner_manager,
+          device_type = excluded.device_type,
+          updated_at = excluded.updated_at,
+          updated_by = excluded.updated_by
+      `).bind(
+        rawEmpId, name, email, phone, company, team, part, position, role, isPartnerManager, deviceType,
+        company === '신한DS' ? 1 : 0,
+        nowKst, actor, nowKst, actor
+      ).run();
+    }
+
+    return c.json({ success: true, employee_id: rawEmpId, device_type: deviceType, updated_at: nowKst });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
 
 app.get('/users/:id', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
-  const user = await db.prepare(`
-    SELECT 
-      u.employee_id, u.email, u.name, u.role, u.phone, u.os_type, u.is_active, u.is_admin, u.profile_picture,
-      u.company,
-      COALESCE(oc.name, u.company) as company_name, 
-      u.honbu,
-      COALESCE(oh.name, u.honbu) as honbu_name, 
-      u.team,
-      COALESCE(ot.name, u.team) as team_name,
-      u.part,
-      COALESCE(op.name, u.part) as part_name,
-      u.subpart,
-      COALESCE(os.name, u.subpart) as subpart_name
-    FROM users u
-    LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
-    LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
-    LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
-    LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
-    LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
-    WHERE u.employee_id = ?
-  `).bind(id).first()
-  if (!user) return c.json({ detail: "User not found" }, 404)
-  return c.json(user)
+  try {
+    const user = await db.prepare(`
+      SELECT 
+        seq, employee_id as id, employee_id, name, email, phone,
+        company, team, part, position, role, is_partner_manager,
+        status, is_active, is_admin, device_type, profile_picture,
+        created_at, created_by, updated_at, updated_by
+      FROM users
+      WHERE UPPER(employee_id) = UPPER(?) OR LOWER(email) = LOWER(?)
+    `).bind(id, id).first()
+    if (!user) return c.json({ success: false, detail: "User not found" }, 404)
+    return c.json({ success: true, data: user, ...user })
+  } catch (err) {
+    return c.json({ success: false, detail: err.message }, 500)
+  }
 })
 app.patch('/auth/profile', async (c) => {
   const body = await c.req.json()
@@ -3027,19 +3065,40 @@ app.patch('/auth/profile', async (c) => {
 
 app.post('/auth/change-password', async (c) => {
   const db = c.env.DB
-  const { user_id, old_password, new_password } = await c.req.json()
-  const user = await db.prepare("SELECT * FROM users WHERE employee_id = ?").bind(user_id).first()
+  try {
+    const body = await c.req.json()
+    const rawEmpId = String(body.user_id || body.employee_id || body.employeeId || '').trim()
+    const oldPassword = String(body.old_password || body.currentPassword || body.currentPw || '').trim()
+    const newPassword = String(body.new_password || body.newPassword || body.newPw || '').trim()
 
-  if (!user || !(await verifyPassword(old_password, user.password_hash))) {
-    return c.json({ detail: "현재 비밀번호가 올바르지 않습니다." }, 401)
+    if (!rawEmpId || !oldPassword || !newPassword) {
+      return c.json({ success: false, detail: "현재 비밀번호와 새 비밀번호를 모두 입력해 주세요." }, 400)
+    }
+
+    const user = await db.prepare("SELECT * FROM users WHERE UPPER(employee_id) = UPPER(?) OR LOWER(email) = LOWER(?)").bind(rawEmpId, rawEmpId).first()
+
+    if (!user) {
+      return c.json({ success: false, detail: "해당 사용자를 찾을 수 없습니다." }, 404)
+    }
+
+    const isOldValid = await verifyPassword(oldPassword, user.password_hash)
+    if (!isOldValid) {
+      return c.json({ success: false, detail: "현재 비밀번호가 올바르지 않습니다. 다시 확인 후 입력해 주세요." }, 401)
+    }
+
+    if (newPassword.length < 8) {
+      return c.json({ success: false, detail: "새 비밀번호는 최소 8자리 이상이어야 합니다." }, 400)
+    }
+
+    const hashedNewPassword = await hashPassword(newPassword)
+    const nowKst = getKst()
+    await db.prepare("UPDATE users SET password_hash = ?, updated_at = ?, updated_by = ? WHERE UPPER(employee_id) = UPPER(?)")
+      .bind(hashedNewPassword, nowKst, user.employee_id, user.employee_id)
+      .run()
+    return c.json({ success: true, status: "success", message: "비밀번호가 안전하게 변경되었습니다." })
+  } catch (err) {
+    return c.json({ success: false, detail: err.message }, 500)
   }
-
-  const hashedNewPassword = await hashPassword(new_password)
-  const modDt = getKst()
-  await db.prepare("UPDATE users SET password_hash = ?, mod_dt = ?, mod_id = ? WHERE employee_id = ?")
-    .bind(hashedNewPassword, modDt, user.employee_id || 'USER', user_id)
-    .run()
-  return c.json({ status: "success" })
 })
 
 app.post('/users/:id/reset-password', async (c) => {
@@ -3187,6 +3246,131 @@ app.delete('/organizations/:id', async (c) => {
   try {
     const id = c.req.param('id');
     await db.prepare("DELETE FROM organizations WHERE id = ?").bind(id).run();
+    return c.json({ success: true });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
+// ==========================================
+// 2.1 Shifti Unified Companies (협력사 마스터) API
+// ==========================================
+app.get('/companies', async (c) => {
+  const db = c.env.DB;
+  try {
+    // 1. 테이블 존재 여부 및 description 컬럼 마이그레이션 보장
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS companies (
+        id TEXT PRIMARY KEY,
+        company_code TEXT UNIQUE NOT NULL,
+        company_name TEXT NOT NULL,
+        biz_number TEXT,
+        company_type TEXT CHECK(company_type IN ('SHINHAN_DS', 'PARTNER', 'SUB_CONTRACTOR')) NOT NULL DEFAULT 'PARTNER',
+        contact_person TEXT,
+        contact_phone TEXT,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_by TEXT DEFAULT 'SYSTEM',
+        updated_at DATETIME,
+        updated_by TEXT DEFAULT 'SYSTEM'
+      )
+    `).run();
+
+    try {
+      await db.prepare("ALTER TABLE companies ADD COLUMN description TEXT").run();
+    } catch (e) {
+      // column already exists
+    }
+
+    let { results } = await db.prepare("SELECT * FROM companies ORDER BY CASE WHEN company_type = 'SHINHAN_DS' THEN 0 ELSE 1 END, created_at ASC").all();
+    
+    // 비어있다면 초기 시드 데이터 자동 주입
+    if (!results || results.length === 0) {
+      const nowKst = getKst();
+      await db.prepare(`
+        INSERT OR IGNORE INTO companies 
+        (id, company_code, company_name, biz_number, company_type, contact_person, contact_phone, created_at, created_by, updated_at, updated_by)
+        VALUES 
+        ('comp-001', 'SHINHAN_DS', '신한DS', '110-81-12345', 'SHINHAN_DS', '인사총무부', '02-3770-0000', ?, 'SYSTEM', ?, 'SYSTEM'),
+        ('comp-002', 'UBGOT', '유브갓', '220-88-67890', 'PARTNER', '최영호 대표', '010-8888-9999', ?, 'SYSTEM', ?, 'SYSTEM'),
+        ('comp-003', 'PARTNER_ITS', '(주)협력아이티에스', '101-86-54321', 'PARTNER', '정진우 부사장', '010-5555-1234', ?, 'SYSTEM', ?, 'SYSTEM')
+      `).bind(nowKst, nowKst, nowKst, nowKst, nowKst, nowKst).run();
+
+      const res = await db.prepare("SELECT * FROM companies ORDER BY CASE WHEN company_type = 'SHINHAN_DS' THEN 0 ELSE 1 END, created_at ASC").all();
+      results = res.results || [];
+    }
+
+    return c.json({ success: true, data: results || [] });
+  } catch (err) {
+    return c.json({ success: false, error: err.message, data: [] }, 500);
+  }
+});
+
+app.post('/companies', async (c) => {
+  const db = c.env.DB;
+  try {
+    try {
+      await db.prepare("ALTER TABLE companies ADD COLUMN description TEXT").run();
+    } catch (e) {
+      // column already exists
+    }
+
+    const body = await c.req.json();
+    const id = body.id || `comp-${Date.now()}`;
+    const company_name = String(body.company_name || body.companyName || '').trim();
+    if (!company_name) {
+      return c.json({ success: false, error: '회사명은 필수 입력 항목입니다.' }, 400);
+    }
+    
+    let company_code = String(body.company_code || body.companyCode || '').trim();
+    if (!company_code) {
+      company_code = 'COMP_' + Date.now().toString(36).toUpperCase();
+    }
+    
+    const biz_number = String(body.biz_number || body.bizNumber || '').trim();
+    const company_type = String(body.company_type || body.companyType || (company_name === '신한DS' ? 'SHINHAN_DS' : 'PARTNER')).trim();
+    const contact_person = String(body.contact_person || body.contactPerson || '').trim();
+    const contact_phone = String(body.contact_phone || body.contactPhone || '').trim();
+    const description = String(body.description || '').trim();
+
+    const nowKst = getKst();
+    const actor = body.userId || body.employeeId || body.actor || body.updatedBy || 'SYSTEM';
+
+    await db.prepare(`
+      INSERT INTO companies (
+        id, company_code, company_name, biz_number, company_type, contact_person, contact_phone, description,
+        created_at, created_by, updated_at, updated_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        company_name = excluded.company_name,
+        company_code = excluded.company_code,
+        biz_number = excluded.biz_number,
+        company_type = excluded.company_type,
+        contact_person = excluded.contact_person,
+        contact_phone = excluded.contact_phone,
+        description = excluded.description,
+        updated_at = excluded.updated_at,
+        updated_by = excluded.updated_by
+    `).bind(
+      id, company_code, company_name, biz_number, company_type, contact_person, contact_phone, description,
+      nowKst, actor, nowKst, actor
+    ).run();
+
+    return c.json({ success: true, id, company_name, updated_at: nowKst });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/companies/:id', async (c) => {
+  const db = c.env.DB;
+  try {
+    const id = c.req.param('id');
+    const comp = await db.prepare("SELECT * FROM companies WHERE id = ?").bind(id).first();
+    if (comp && comp.company_type === 'SHINHAN_DS') {
+      return c.json({ success: false, error: '신한DS 기본 원청사는 삭제할 수 없습니다.' }, 400);
+    }
+    await db.prepare("DELETE FROM companies WHERE id = ?").bind(id).run();
     return c.json({ success: true });
   } catch (err) {
     return c.json({ success: false, error: err.message }, 500);
