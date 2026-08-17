@@ -382,6 +382,7 @@ const authMiddleware = async (c, next) => {
     path.startsWith('/notifications') ||   // ⚡ 실시간 알림 센터 API (D1 DB 연동)
     path.startsWith('/messages') ||        // ⚡ 도급 소통 및 메시지/소명 API (D1 DB 연동)
     path.startsWith('/commute') ||         // ⚡ 실시간 출근 및 도급 투입 실적 (commute_logs D1 연동)
+    path.startsWith('/attendance') ||      // ⚡ 휴가 및 근태 신청/승인 (attendance_requests D1 연동)
     path === '/sms/shortcut/keywords' ||   // ⚡ iPhone 단축어 전용 (userId 기반 조회)
     path === '/auth/push-vapid-public' ||  // ⚡ VAPID 공개키 조회 — 서비스워커 사전 등록에 필요
     path.startsWith('/codebook') ||
@@ -13188,5 +13189,90 @@ app.get('/commute/today', async (c) => {
   }
 });
 
+// ============================================================================
+// 🌴 S-GUARD 소속사 휴가 및 근태 신청 (Attendance Requests) D1 REST API
+// ============================================================================
+app.post('/attendance/request', async (c) => {
+  const db = c.env.DB;
+  try {
+    const body = await c.req.json();
+    const employee_id = (body.employee_id || body.employeeId || 'S01832').toUpperCase().trim();
+    const user_id = body.user_id || body.userId || employee_id;
+    const request_type = body.request_type || body.requestType || 'VACATION';
+    const vacation_type = body.vacation_type || body.vacationType || '연차';
+    const target_date = body.target_date || body.targetDate || new Date().toISOString().substring(0, 10);
+    const start_date = body.start_date || body.startDate || target_date.split('~')[0].trim();
+    const end_date = body.end_date || body.endDate || (target_date.includes('~') ? target_date.split('~')[1].trim() : start_date);
+    const hours = Number(body.hours || (vacation_type.includes('반차') ? 4 : 8));
+    const reason = body.reason || '소속사 복무규정에 따른 휴가 신청';
+    const status = body.status || 'APPROVED';
+    const partner_company = body.partner_company || body.partnerCompany || '유브갓';
+    const approver_name = body.approver_name || body.approverName || (partner_company + ' 현장관리인');
+    const id = body.id || ('req-vac-' + Date.now());
+
+    await db.prepare(`
+      INSERT INTO attendance_requests 
+      (id, user_id, employee_id, request_type, vacation_type, target_date, start_date, end_date, hours, reason, status, partner_company, approver_name, created_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+9 hours'), ?)
+      ON CONFLICT(id) DO UPDATE SET
+        vacation_type = excluded.vacation_type,
+        target_date = excluded.target_date,
+        start_date = excluded.start_date,
+        end_date = excluded.end_date,
+        hours = excluded.hours,
+        reason = excluded.reason,
+        status = excluded.status
+    `).bind(
+      id, user_id, employee_id, request_type, vacation_type, target_date, start_date, end_date, hours, reason, status, partner_company, approver_name, employee_id
+    ).run();
+
+    return c.json({
+      success: true,
+      message: '소속사 휴가 신청이 Cloudflare D1 DB(attendance_requests)에 영구 저장되었습니다.',
+      data: {
+        id,
+        employee_id,
+        request_type,
+        vacation_type,
+        target_date,
+        hours,
+        reason,
+        status,
+        partner_company
+      }
+    });
+  } catch (e) {
+    console.error('Failed to save attendance request to D1:', e);
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+app.get('/attendance/requests', async (c) => {
+  const db = c.env.DB;
+  const empId = c.req.query('employee_id');
+  const type = c.req.query('request_type');
+
+  try {
+    let sql = 'SELECT * FROM attendance_requests WHERE 1=1';
+    const params = [];
+
+    if (empId) {
+      sql += ' AND employee_id = ?';
+      params.push(empId.toUpperCase().trim());
+    }
+    if (type) {
+      sql += ' AND request_type = ?';
+      params.push(type);
+    }
+    sql += ' ORDER BY created_at DESC LIMIT 50';
+
+    const { results } = await db.prepare(sql).bind(...params).all();
+    return c.json({ success: true, data: results || [] });
+  } catch (e) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
 export default app
+
 
