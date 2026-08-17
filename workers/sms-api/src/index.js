@@ -2768,6 +2768,31 @@ app.delete('/users/:employee_id', async (c) => {
   }
 })
 
+app.get('/users/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  try {
+    try {
+      await db.prepare("ALTER TABLE users ADD COLUMN profile_picture TEXT").run();
+    } catch (e) {}
+
+    const user = await db.prepare(`
+      SELECT 
+        id, employee_id, email, name, role, auth_provider,
+        company, phone, honbu, team, part, subpart, position,
+        status, is_active, is_admin, device_type, profile_picture,
+        created_at, created_by, updated_at, updated_by
+      FROM users
+      WHERE UPPER(employee_id) = UPPER(?) OR LOWER(email) = LOWER(?)
+    `).bind(id, id).first()
+    
+    if (!user) return c.json({ detail: "사용자를 찾을 수 없습니다." }, 404)
+    return c.json({ success: true, data: user })
+  } catch (err) {
+    return c.json({ detail: "조회 중 오류가 발생했습니다." }, 500)
+  }
+})
+
 app.post('/auth/reset/request', async (c) => {
   const { employee_id } = await c.req.json()
   const db = c.env.DB
@@ -12540,24 +12565,6 @@ app.post('/call/event', async (c) => {
     const kstDate = new Date(date.getTime() + kstOffset);
     const eventTimeStr = kstDate.toISOString().replace('T', ' ').substring(0, 19);
 
-    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_APP_EVENT_LOG (
-      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      EMPLOYEE_ID TEXT,
-      PHONE_NUMBER TEXT,
-      EVENT_TYPE TEXT,
-      TIMESTAMP INTEGER,
-      EVENT_TIME TEXT,
-      REG_DT TEXT
-    )`).run();
-
-    const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
-    const encryptedPhone = await encryptAES(phone_number, secretKey);
-
-    await db.prepare(`
-      INSERT INTO TB_SCL_APP_EVENT_LOG (EMPLOYEE_ID, PHONE_NUMBER, EVENT_TYPE, TIMESTAMP, EVENT_TIME, REG_DT)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(employee_id, encryptedPhone, event_type, timestamp || Date.now(), eventTimeStr, now).run();
-
     // 가장 최근의 대기 중이거나 진행 중인 통화 이력 찾기
     // 보안 패치: PII 보호를 위해 평문 phone_number 매칭 제거, employee_id 만으로 매칭
     const matchedCall = await db.prepare(`
@@ -12642,41 +12649,7 @@ app.post('/call/event', async (c) => {
 });
 
 app.get('/scallert/app-events', async (c) => {
-  const db = c.env.DB;
-  const limit = Number(c.req.query('limit') || 50);
-  try {
-    await db.prepare(`CREATE TABLE IF NOT EXISTS TB_SCL_APP_EVENT_LOG (
-      LOG_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      EMPLOYEE_ID TEXT,
-      PHONE_NUMBER TEXT,
-      EVENT_TYPE TEXT,
-      TIMESTAMP INTEGER,
-      EVENT_TIME TEXT,
-      REG_DT TEXT
-    )`).run();
-
-    const { results } = await db.prepare(`
-      SELECT e.*, u.name as emp_nm
-      FROM TB_SCL_APP_EVENT_LOG e
-      LEFT JOIN users u ON e.EMPLOYEE_ID = u.employee_id
-      ORDER BY e.LOG_ID DESC LIMIT ?
-    `).bind(limit).all();
-
-    const secretKey = c.env.AES_SECRET_KEY || DEFAULT_AES_KEY;
-    const decryptedResults = await Promise.all((results || []).map(async (row) => {
-      let decryptedPhone = row.PHONE_NUMBER;
-      if (typeof decryptedPhone === 'string' && decryptedPhone.startsWith('aesgcm:')) {
-        try {
-          decryptedPhone = await decryptAES(decryptedPhone, secretKey);
-        } catch (e) { }
-      }
-      return { ...row, PHONE_NUMBER: decryptedPhone };
-    }));
-
-    return c.json(decryptedResults);
-  } catch (e) {
-    return c.json({ error: e.message }, 500);
-  }
+  return c.json([]);
 });
 
 app.get('/scallert/devices/:userId', async (c) => {
