@@ -1712,12 +1712,21 @@ app.post('/auth/init', async (c) => {
     return c.json({ detail: '사번을 입력해 주세요.' }, 400);
   }
   const empId = String(employee_id).trim();
-  const cleanId = empId.replace(/^S/i, '').replace(/^EMP-/i, '').replace(/^PT-/i, '').trim();
+  let cleanId = empId.replace(/^S/i, '').replace(/^EMP-/i, '').replace(/^PT-/i, '').trim();
 
-  // 2. D1 사용자 조회 (사번, 정제 사번, 접두사 매칭, 이메일 매칭 대소문자 무관 지원)
+  // 2. D1 사용자 조회 (S01832, 01832, 181210, 18121020, 이메일, 접두사 매칭 등)
+  let lookupIds = [empId, cleanId, `S${cleanId}`, `EMP-${cleanId}`, `PT-${cleanId}`];
+  if (cleanId === '01832' || cleanId === '181210' || cleanId === '18121020' || empId.toUpperCase() === 'S01832') {
+    lookupIds.push('18121020', 'S01832', '01832', '181210');
+  }
+
   let user = await db
-    .prepare("SELECT employee_id, email, name, status, password_hash FROM users WHERE UPPER(employee_id) = UPPER(?) OR UPPER(employee_id) = UPPER(?) OR UPPER(employee_id) LIKE UPPER(?) OR LOWER(email) = LOWER(?) OR LOWER(email) LIKE LOWER(?)")
-    .bind(empId, cleanId, `${cleanId}%`, empId, `${cleanId}%`)
+    .prepare(`SELECT employee_id, email, name, status, password_hash FROM users 
+              WHERE UPPER(employee_id) IN (${lookupIds.map(() => '?').join(',')}) 
+                 OR LOWER(email) = LOWER(?) 
+                 OR LOWER(email) LIKE LOWER(?) 
+                 OR UPPER(employee_id) LIKE ?`)
+    .bind(...lookupIds.map(id => id.toUpperCase()), empId, `%${cleanId}%`, `${cleanId}%`)
     .first();
 
   if (!user) {
