@@ -486,13 +486,10 @@ export default function SCallertPage() {
     fetchPushDevices();
   }, [fetchAppEvents, fetchPushDevices]);
 
+  // 🚀 불필요한 5초 app-events 폴링 제거 (서버 빈 배열 반환으로 인한 리소스 낭비 방지)
   useEffect(() => {
-    if (!autoRefreshEvents) return;
-    const timer = setInterval(() => {
-      fetchAppEvents();
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [autoRefreshEvents, fetchAppEvents]);
+    // 수동 새로고침 또는 마운트 시에만 1회 로드
+  }, [autoRefreshEvents]);
 
   // ── 발신 이력 로드 ───────────────────────────────
   const fetchHists = useCallback(async (sid) => {
@@ -675,9 +672,13 @@ export default function SCallertPage() {
     fetchPdsConfig(selectedSid);
     fetchTestLogs(selectedSid);
 
-    // 30초 폴링 (발신 이력 실시간 갱신)
+    // 30초 폴링 (발신 이력 갱신 — 브라우저 탭 비활성화 시 D1 쿼리 차단)
     clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => fetchHists(selectedSid), 30000);
+    pollRef.current = setInterval(() => {
+      if (!document.hidden && selectedSid) {
+        fetchHists(selectedSid);
+      }
+    }, 30000);
     return () => clearInterval(pollRef.current);
   }, [selectedSid, strategies]);
 

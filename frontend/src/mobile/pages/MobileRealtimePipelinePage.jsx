@@ -388,7 +388,9 @@ export default function MobileRealtimePipelinePage() {
       .then(tree => setOrgTree(Array.isArray(tree) ? tree : []))
       .catch(() => {});
       
-    const interval = setInterval(fetchWarRooms, 8000);
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchWarRooms();
+    }, 10000);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => { clearInterval(interval); clearInterval(timer); };
   }, []);

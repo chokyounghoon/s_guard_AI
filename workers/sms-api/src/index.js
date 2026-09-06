@@ -5457,6 +5457,105 @@ app.get('/incidents/sms/:sms_id', async (c) => {
   return c.json(result)
 })
 
+// Worker Isolate 전역 캐시: 복수의 SSE 클라이언트가 접속해 있어도 3.5초 동안 D1 쿼리를 공유
+let sseSharedCache = {
+  lastChecked: 0,
+  smsKey: null,
+  smsPayload: null,
+  callKey: null,
+  callPayload: null
+};
+
+async function getLatestSseEvents(db) {
+  const now = Date.now();
+  if (now - sseSharedCache.lastChecked < 3500) {
+    return sseSharedCache;
+  }
+  sseSharedCache.lastChecked = now;
+
+  // 1. 초경량 SMS 변경 여부 확인 (5개 테이블 조인 없이 인덱스 컬럼만 조회)
+  try {
+    const quickSms = await db.prepare(
+      'SELECT inc_id, timestamp FROM received_messages ORDER BY timestamp DESC LIMIT 1'
+    ).first();
+    const quickKey = quickSms ? `${quickSms.inc_id}_${quickSms.timestamp}` : null;
+
+    if (quickKey && quickKey !== sseSharedCache.smsKey) {
+      // 실제로 새 SMS가 도착했을 때만 1회 풀 조인 쿼리 실행
+      const fullSms = await db.prepare(`
+        SELECT r.*, u.name as sender_name,
+               COALESCE(oh.name, u.honbu) as bumun,
+               COALESCE(ot.name, u.team) as honbu,
+               COALESCE(op.name, u.part) as team,
+               COALESCE(os.name, u.subpart) as part
+        FROM received_messages r
+        LEFT JOIN users u ON r.employee_id = u.employee_id
+        LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+        LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+        LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+        LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+        WHERE r.inc_id = ?
+        LIMIT 1
+      `).bind(quickSms.inc_id).first();
+
+      sseSharedCache.smsKey = quickKey;
+      sseSharedCache.smsPayload = fullSms ? {
+        inc_id: fullSms.inc_id,
+        sender: fullSms.sender,
+        sender_name: fullSms.sender_name || '',
+        message: fullSms.message,
+        timestamp: fullSms.timestamp,
+        keyword_detected: parseInt(String(fullSms.keyword_detected || '0')),
+        response_message: fullSms.response_message,
+        received_count: parseInt(String(fullSms.received_count || '1')),
+        bumun: fullSms.bumun || '',
+        honbu: fullSms.honbu || '',
+        team: fullSms.team || '',
+        part: fullSms.part || ''
+      } : null;
+    }
+  } catch (e) {
+    console.warn('[SSE Shared Cache] SMS poll error:', e.message);
+  }
+
+  // 2. 초경량 S-Callert 변경 여부 확인 (LOG_ID, CALL_DT 등 인덱스 기반 키만 조회)
+  try {
+    const quickCall = await db.prepare(
+      'SELECT LOG_ID, IGW_TXN_ID, CALL_DT FROM TB_SCL_CALL_HIST ORDER BY LOG_ID DESC LIMIT 1'
+    ).first();
+    const quickCallKey = quickCall ? `${quickCall.LOG_ID}_${quickCall.CALL_DT}` : null;
+
+    if (quickCallKey && quickCallKey !== sseSharedCache.callKey) {
+      // 실제로 새 발신 이력이 생겼을 때만 상세 데이터 1회 조회
+      const fullCall = await db.prepare(
+        'SELECT * FROM TB_SCL_CALL_HIST WHERE LOG_ID = ?'
+      ).bind(quickCall.LOG_ID).first();
+
+      if (fullCall) {
+        let dispatchDeviceId = fullCall.EMP_ID;
+        try {
+          const raw = JSON.parse(fullCall.RAW_PAYLOAD || '{}');
+          if (raw.employee_id) dispatchDeviceId = raw.employee_id;
+        } catch (_) { }
+
+        sseSharedCache.callKey = quickCallKey;
+        sseSharedCache.callPayload = {
+          strategy_id: fullCall.STRATEGY_ID,
+          inc_id: fullCall.INC_ID,
+          target_emp: fullCall.EMP_ID,
+          target_name: fullCall.EMP_NM || '담당자',
+          target_mobile: fullCall.MOBILE_NO,
+          dispatcher_device: dispatchDeviceId
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('[SSE Shared Cache] CALL poll error:', e.message);
+  }
+
+  return sseSharedCache;
+}
+
 app.get('/sms/notification-stream', async (c) => {
   const db = c.env.DB;
 
@@ -5464,25 +5563,9 @@ app.get('/sms/notification-stream', async (c) => {
     console.log('[SSE] Client connected to notification-stream');
 
     // ── 초기값 세팅: 현재 최신 레코드 기억 (이전 항목은 무시) ──
-    let lastSmsKey = null;
-    try {
-      const initSms = await db.prepare(
-        'SELECT inc_id, timestamp FROM received_messages ORDER BY timestamp DESC LIMIT 1'
-      ).first();
-      if (initSms) lastSmsKey = `${initSms.inc_id}_${initSms.timestamp}`;
-    } catch (e) {
-      console.warn('[SSE] Init SMS query failed:', e.message);
-    }
-
-    let lastCallKey = null;
-    try {
-      const initCall = await db.prepare(
-        'SELECT IGW_TXN_ID, CALL_DT FROM TB_SCL_CALL_HIST ORDER BY CALL_DT DESC LIMIT 1'
-      ).first();
-      if (initCall) lastCallKey = `${initCall.IGW_TXN_ID}_${initCall.CALL_DT}`;
-    } catch (e) {
-      console.warn('[SSE] Init CALL query failed:', e.message);
-    }
+    const initData = await getLatestSseEvents(db);
+    let lastSmsKey = initData.smsKey;
+    let lastCallKey = initData.callKey;
 
     // 연결 확인용 초기 이벤트 즉시 전송
     await writeEvent('connected', { ok: true, ts: Date.now() });
@@ -5496,73 +5579,22 @@ app.get('/sms/notification-stream', async (c) => {
         lastHeartbeat = Date.now();
       }
 
-      // ── 새 SMS 수신 확인 ──
-      try {
-        const latestSms = await db.prepare(`
-          SELECT r.*, u.name as sender_name,
-                 COALESCE(oh.name, u.honbu) as bumun,
-                 COALESCE(ot.name, u.team) as honbu,
-                 COALESCE(op.name, u.part) as team,
-                 COALESCE(os.name, u.subpart) as part
-          FROM received_messages r
-          LEFT JOIN users u ON r.employee_id = u.employee_id
-          LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
-          LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
-          LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
-          LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
-          ORDER BY r.timestamp DESC LIMIT 1
-        `).first();
-        const smsKey = latestSms ? `${latestSms.inc_id}_${latestSms.timestamp}` : null;
-        if (latestSms && smsKey !== lastSmsKey) {
-          lastSmsKey = smsKey;
-          await writeEvent('sms_received', {
-            inc_id: latestSms.inc_id,
-            sender: latestSms.sender,
-            sender_name: latestSms.sender_name || '',
-            message: latestSms.message,
-            timestamp: latestSms.timestamp,
-            keyword_detected: parseInt(String(latestSms.keyword_detected || '0')),
-            response_message: latestSms.response_message,
-            received_count: parseInt(String(latestSms.received_count || '1')),
-            bumun: latestSms.bumun || '',
-            honbu: latestSms.honbu || '',
-            team: latestSms.team || '',
-            part: latestSms.part || ''
-          });
-          console.log('[SSE] Sent sms_received for inc_id:', latestSms.inc_id);
-        }
-      } catch (smsErr) {
-        console.error('[SSE] SMS poll error:', smsErr.message);
+      // ── 공유 캐시 기반 최신 이벤트 확인 (D1 부하 최소화) ──
+      const currentData = await getLatestSseEvents(db);
+
+      if (currentData.smsKey && currentData.smsKey !== lastSmsKey && currentData.smsPayload) {
+        lastSmsKey = currentData.smsKey;
+        await writeEvent('sms_received', currentData.smsPayload);
+        console.log('[SSE] Sent sms_received for inc_id:', currentData.smsPayload.inc_id);
       }
 
-      // ── S-Callert 발신 완료 이벤트 확인 ──
-      try {
-        const latestCall = await db.prepare(
-          'SELECT * FROM TB_SCL_CALL_HIST ORDER BY CALL_DT DESC LIMIT 1'
-        ).first();
-        const callKey = latestCall ? `${latestCall.IGW_TXN_ID}_${latestCall.CALL_DT}` : null;
-        if (latestCall && callKey !== lastCallKey) {
-          lastCallKey = callKey;
-          let dispatchDeviceId = latestCall.EMP_ID;
-          try {
-            const raw = JSON.parse(latestCall.RAW_PAYLOAD || '{}');
-            if (raw.employee_id) dispatchDeviceId = raw.employee_id;
-          } catch (e) { }
-          await writeEvent('scallert_triggered', {
-            strategy_id: latestCall.STRATEGY_ID,
-            inc_id: latestCall.INC_ID,
-            target_emp: latestCall.EMP_ID,
-            target_name: latestCall.EMP_NM || '담당자',
-            target_mobile: latestCall.MOBILE_NO,
-            dispatcher_device: dispatchDeviceId
-          });
-          console.log('[SSE] Sent scallert_triggered for inc_id:', latestCall.INC_ID);
-        }
-      } catch (callErr) {
-        console.error('[SSE] CALL poll error:', callErr.message);
+      if (currentData.callKey && currentData.callKey !== lastCallKey && currentData.callPayload) {
+        lastCallKey = currentData.callKey;
+        await writeEvent('scallert_triggered', currentData.callPayload);
+        console.log('[SSE] Sent scallert_triggered for inc_id:', currentData.callPayload.inc_id);
       }
 
-      await sleep(2000);
+      await sleep(3500);
     }
   });
 });

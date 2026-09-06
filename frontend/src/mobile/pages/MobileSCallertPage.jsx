@@ -534,11 +534,9 @@ export default function MobileSCallertPage() {
     }
   }, [selectedSid, strategies]);
 
+  // 🚀 불필요한 5초 app-events 폴링 제거
   useEffect(() => {
-    if (!autoRefresh) return;
-    const timer = setInterval(fetchAppEvents, 5000);
-    return () => clearInterval(timer);
-  }, [autoRefresh, fetchAppEvents]);
+  }, [autoRefresh]);
 
   const [nowTime, setNowTime] = useState(new Date());
   useEffect(() => {

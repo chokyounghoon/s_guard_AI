@@ -737,11 +737,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     fetchSettings(); // 🚀 Load thresholds on start
     const pollIntervalMultiplier = isAiAnalyzing ? 4 : 1; // 4x slower during analysis
 
-    const smsInterval = setInterval(fetchSMSMessages, 5000 * pollIntervalMultiplier);
-    const wrInterval = isAiAnalyzing ? null : setInterval(fetchWarRooms, 8000);
-    const activityInterval = isAiAnalyzing ? null : setInterval(fetchActivityLogs, 10000);
-    const assignmentInterval = isAiAnalyzing ? null : setInterval(fetchMyAssignments, 10000);
-    const historyInterval = isAiAnalyzing ? null : setInterval(fetchUserActivityHistory, 15000);
+    const smsInterval = setInterval(() => {
+      if (!document.hidden) fetchSMSMessages();
+    }, 10000 * pollIntervalMultiplier);
+    const wrInterval = isAiAnalyzing ? null : setInterval(() => {
+      if (!document.hidden) fetchWarRooms();
+    }, 10000);
+    const activityInterval = isAiAnalyzing ? null : setInterval(() => {
+      if (!document.hidden) fetchActivityLogs();
+    }, 30000);
+    const assignmentInterval = isAiAnalyzing ? null : setInterval(() => {
+      if (!document.hidden) fetchMyAssignments();
+    }, 30000);
+    const historyInterval = isAiAnalyzing ? null : setInterval(() => {
+      if (!document.hidden) fetchUserActivityHistory();
+    }, 45000);
 
     // 🚀 Real-time SMS Stream (SSE) — 지수 백오프 자동 재연결
     let sseInstance = null;

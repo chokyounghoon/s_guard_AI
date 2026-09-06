@@ -428,7 +428,9 @@ export default function RealtimePipelinePage() {
 
   useEffect(() => {
     fetchWarRooms();
-    const interval = setInterval(fetchWarRooms, 8000);
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchWarRooms();
+    }, 10000);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => {
       clearInterval(interval);
