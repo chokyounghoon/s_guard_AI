@@ -70,8 +70,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     reg_id TEXT DEFAULT 'SYSTEM',
     reg_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
     mod_id TEXT DEFAULT 'SYSTEM',
-    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (inc_id, user_id, created_at)
+    mod_dt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS incidents (
@@ -499,3 +498,22 @@ CREATE INDEX IF NOT EXISTS idx_warroom_attachments_inc ON warroom_attachments(in
 -- 5. 인박스(Inbox) 메시지함 인덱스
 CREATE INDEX IF NOT EXISTS idx_inbox_items_user_folder ON inbox_items(user_id, folder, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inbox_items_unread ON inbox_items(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_inbox_items_inc_type ON inbox_items(inc_id, type);
+
+-- 6. 인시던트 및 워룸 연계 튜닝
+CREATE INDEX IF NOT EXISTS idx_incident_assignments_inc_status ON incident_assignments(inc_id, status);
+CREATE INDEX IF NOT EXISTS idx_user_warrooms_inc_id ON user_warrooms(inc_id);
+CREATE INDEX IF NOT EXISTS idx_warroom_list_status_regdt ON warroom_list(status, reg_dt DESC);
+CREATE INDEX IF NOT EXISTS idx_aichat_history_inc_id ON aichat_history(inc_id, id ASC);
+CREATE INDEX IF NOT EXISTS idx_incidents_source_sms ON incidents(source_sms_id);
+
+-- 7. 사용자 및 세션 튜닝
+CREATE INDEX IF NOT EXISTS idx_users_upper_emp_id ON users(UPPER(employee_id));
+CREATE INDEX IF NOT EXISTS idx_users_lower_email ON users(LOWER(email));
+CREATE INDEX IF NOT EXISTS idx_users_admin_active ON users(is_admin, is_active);
+CREATE INDEX IF NOT EXISTS idx_user_chat_sessions_user_time ON user_chat_sessions(user_id, updated_at DESC);
+
+-- 8. 쪽지 및 대리자 튜닝
+CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_recv ON direct_messages(sender_id, receiver_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_direct_messages_recv_sender ON direct_messages(receiver_id, sender_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_report_lines_owner_level ON report_lines(owner_id, hierarchy_level ASC);

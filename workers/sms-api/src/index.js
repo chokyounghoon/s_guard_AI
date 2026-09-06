@@ -369,6 +369,7 @@ const authMiddleware = async (c, next) => {
     path === '/auth/reset/request' ||
     path === '/auth/reset/verify' ||
     path === '/auth/agree-terms' ||
+    path === '/mail/send' ||
     path === '/sms/receive' ||
     path === '/retrieval' ||
     path === '/upsert' ||          // ⚡ Dify Knowledge Tool — 자체 DIFY_TOOL_KEY 인증 사용
@@ -936,8 +937,109 @@ app.get('/debug/db-init', async (c) => {
     results.push({ table: 'login_history', status: 'Error', error: e.message });
   }
 
+  // ⚡ High-Performance D1 Database Tuning Indexes
+  const tuningIndexes = [
+    "CREATE INDEX IF NOT EXISTS IDX_HIST_EMP_LOG ON TB_SCL_CALL_HIST (EMP_ID, LOG_ID DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_HIST_STRAT_DT ON TB_SCL_CALL_HIST (STRATEGY_ID, CALL_DT DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_HIST_IGW_STRAT ON TB_SCL_CALL_HIST (IGW_TXN_ID, STRATEGY_ID)",
+    "CREATE INDEX IF NOT EXISTS IDX_TARGET_STRAT_SORT ON TB_SCL_TARGET_INFO (STRATEGY_ID, SORT_ORD ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_TEST_LOG_STRAT_LOG ON TB_SCL_TEST_LOG (STRATEGY_ID, LOG_ID DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_PUSH_SUBS_USER ON push_subscriptions (user_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_RCV_MSG_HASH_TIME ON received_messages (msg_hash, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_RCV_EMP_TIME ON received_messages (employee_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_RCV_READ ON received_messages (read)",
+    "CREATE INDEX IF NOT EXISTS IDX_INC_ASSIGN_INC_STATUS ON incident_assignments (inc_id, status)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_WARROOMS_INC ON user_warrooms (inc_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_WARROOM_STATUS_REGDT ON warroom_list (status, reg_dt DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_AICHAT_INC_ID ON aichat_history (inc_id, id ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_INCIDENTS_SOURCE_SMS ON incidents (source_sms_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_USERS_UPPER_EMP ON users (UPPER(employee_id))",
+    "CREATE INDEX IF NOT EXISTS IDX_USERS_LOWER_EMAIL ON users (LOWER(email))",
+    "CREATE INDEX IF NOT EXISTS IDX_USERS_ADMIN_ACTIVE ON users (is_admin, is_active)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_SESSIONS_TOKEN ON user_sessions (refresh_token)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_SESSIONS_USER ON user_sessions (user_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_CHAT_USER_TIME ON user_chat_sessions (user_id, updated_at DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_ACTIVITY_INC_TYPE_STATUS ON activity_logs (inc_id, type, status)",
+    "CREATE INDEX IF NOT EXISTS IDX_INBOX_INC_TYPE ON inbox_items (inc_id, type)",
+    "CREATE INDEX IF NOT EXISTS IDX_SUBSTITUTES_USER_PRIORITY ON substitutes (user_id, priority ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_DM_SENDER_RECEIVER ON direct_messages (sender_id, receiver_id, created_at ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_DM_RECEIVER_SENDER ON direct_messages (receiver_id, sender_id, created_at ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_DATE_TIME ON commute_logs (work_date, clock_in_time ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_EMP_DATE ON commute_logs (employee_id, work_date DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_ATTENDANCE_EMP_TIME ON attendance_requests (employee_id, created_at DESC)"
+  ];
+
+  for (const sql of tuningIndexes) {
+    try {
+      await db.prepare(sql).run();
+      const idxName = sql.split('IDX_')[1]?.split(' ')[0] ? 'IDX_' + sql.split('IDX_')[1].split(' ')[0] : 'index';
+      results.push({ index: idxName, status: 'Active' });
+    } catch (e) {
+      // Table or column might not exist in current env yet
+    }
+  }
+
   return c.json({
-    message: 'Phase 18 Leadboard Infrastructure Ready',
+    message: 'Phase 18 Leadboard & D1 Performance Tuning Ready',
+    results,
+    timestamp: getKst()
+  });
+});
+
+// ⚡ D1 DB 튜닝 인덱스 즉시 일괄 적용 엔드포인트
+app.get('/debug/tune-indexes', async (c) => {
+  const pass = c.req.query('pass');
+  if (c.env.ENVIRONMENT === 'production' && pass !== 'verify') {
+    return c.json({ error: 'Unauthorized. Use ?pass=verify' }, 403);
+  }
+  const db = c.env.DB;
+  if (!db) return c.json({ error: 'DB binding missing' }, 500);
+
+  const tuningIndexes = [
+    "CREATE INDEX IF NOT EXISTS IDX_HIST_EMP_LOG ON TB_SCL_CALL_HIST (EMP_ID, LOG_ID DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_HIST_STRAT_DT ON TB_SCL_CALL_HIST (STRATEGY_ID, CALL_DT DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_HIST_IGW_STRAT ON TB_SCL_CALL_HIST (IGW_TXN_ID, STRATEGY_ID)",
+    "CREATE INDEX IF NOT EXISTS IDX_TARGET_STRAT_SORT ON TB_SCL_TARGET_INFO (STRATEGY_ID, SORT_ORD ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_TEST_LOG_STRAT_LOG ON TB_SCL_TEST_LOG (STRATEGY_ID, LOG_ID DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_PUSH_SUBS_USER ON push_subscriptions (user_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_RCV_MSG_HASH_TIME ON received_messages (msg_hash, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_RCV_EMP_TIME ON received_messages (employee_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_RCV_READ ON received_messages (read)",
+    "CREATE INDEX IF NOT EXISTS IDX_INC_ASSIGN_INC_STATUS ON incident_assignments (inc_id, status)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_WARROOMS_INC ON user_warrooms (inc_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_WARROOM_STATUS_REGDT ON warroom_list (status, reg_dt DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_AICHAT_INC_ID ON aichat_history (inc_id, id ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_INCIDENTS_SOURCE_SMS ON incidents (source_sms_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_USERS_UPPER_EMP ON users (UPPER(employee_id))",
+    "CREATE INDEX IF NOT EXISTS IDX_USERS_LOWER_EMAIL ON users (LOWER(email))",
+    "CREATE INDEX IF NOT EXISTS IDX_USERS_ADMIN_ACTIVE ON users (is_admin, is_active)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_SESSIONS_TOKEN ON user_sessions (refresh_token)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_SESSIONS_USER ON user_sessions (user_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_USER_CHAT_USER_TIME ON user_chat_sessions (user_id, updated_at DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_ACTIVITY_INC_TYPE_STATUS ON activity_logs (inc_id, type, status)",
+    "CREATE INDEX IF NOT EXISTS IDX_INBOX_INC_TYPE ON inbox_items (inc_id, type)",
+    "CREATE INDEX IF NOT EXISTS IDX_SUBSTITUTES_USER_PRIORITY ON substitutes (user_id, priority ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_DM_SENDER_RECEIVER ON direct_messages (sender_id, receiver_id, created_at ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_DM_RECEIVER_SENDER ON direct_messages (receiver_id, sender_id, created_at ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_DATE_TIME ON commute_logs (work_date, clock_in_time ASC)",
+    "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_EMP_DATE ON commute_logs (employee_id, work_date DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_ATTENDANCE_EMP_TIME ON attendance_requests (employee_id, created_at DESC)"
+  ];
+
+  const results = [];
+  for (const sql of tuningIndexes) {
+    try {
+      await db.prepare(sql).run();
+      const idx = sql.split('IDX_')[1]?.split(' ')[0] ? 'IDX_' + sql.split('IDX_')[1].split(' ')[0] : 'index';
+      results.push({ index: idx, status: 'SUCCESS' });
+    } catch (e) {
+      results.push({ sql: sql.substring(0, 60), error: e.message });
+    }
+  }
+
+  return c.json({
+    success: true,
+    total_indexes: tuningIndexes.length,
     results,
     timestamp: getKst()
   });
@@ -1155,8 +1257,20 @@ const sendEmail = async (c, { to, subject, html, fromName, fromEmail, replyTo })
   return success;
 };
 
+// 📧 공용 이메일 발송 엔드포인트
+app.post('/mail/send', async (c) => {
+  try {
+    const { to, subject, html, fromName } = await c.req.json();
+    if (!to || !subject || !html) {
+      return c.json({ success: false, detail: 'to, subject, html 필드가 필요합니다.' }, 400);
+    }
+    const mailSent = await sendEmail(c, { to, subject, html, fromName });
+    return c.json({ success: mailSent, message: mailSent ? '이메일이 발송되었습니다.' : '이메일 발송에 실패했습니다.' });
+  } catch (err) {
+    return c.json({ success: false, detail: err.message }, 500);
+  }
+});
 
-// ==========================================
 // AI Background Analysis (Eager Loading)
 // ==========================================
 const performBackgroundAiAnalysis = async (sms_id, env) => {
@@ -11669,6 +11783,11 @@ app.get('/scallert/strategies', async (c) => {
     } catch (e) { }
     try {
       await db.prepare(`ALTER TABLE TB_SCL_CALL_HIST ADD COLUMN DISPATCHER_EMP_ID TEXT`).run();
+    } catch (e) { }
+    try {
+      await db.prepare(`CREATE INDEX IF NOT EXISTS IDX_HIST_EMP_LOG ON TB_SCL_CALL_HIST(EMP_ID, LOG_ID DESC)`).run();
+      await db.prepare(`CREATE INDEX IF NOT EXISTS IDX_HIST_CALL_DT ON TB_SCL_CALL_HIST(CALL_DT DESC)`).run();
+      await db.prepare(`CREATE INDEX IF NOT EXISTS IDX_HIST_STRAT_DT ON TB_SCL_CALL_HIST(STRATEGY_ID, CALL_DT DESC)`).run();
     } catch (e) { }
 
     try {
