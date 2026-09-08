@@ -966,7 +966,12 @@ app.get('/debug/db-init', async (c) => {
     "CREATE INDEX IF NOT EXISTS IDX_DM_RECEIVER_SENDER ON direct_messages (receiver_id, sender_id, created_at ASC)",
     "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_DATE_TIME ON commute_logs (work_date, clock_in_time ASC)",
     "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_EMP_DATE ON commute_logs (employee_id, work_date DESC)",
-    "CREATE INDEX IF NOT EXISTS IDX_ATTENDANCE_EMP_TIME ON attendance_requests (employee_id, created_at DESC)"
+    "CREATE INDEX IF NOT EXISTS IDX_ATTENDANCE_EMP_TIME ON attendance_requests (employee_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_WARROOM_CHATS_INC_TIME ON warroom_chats (inc_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_WARROOM_ATTACH_INC ON warroom_attachments (inc_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_KB_INC_ID ON knowledge_base (inc_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_NOTIFICATIONS_ROLE_TIME ON app_notifications (target_role, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_MESSAGES_PART_TIME ON app_messages (part_name, created_at DESC)"
   ];
 
   for (const sql of tuningIndexes) {
@@ -1023,7 +1028,12 @@ app.get('/debug/tune-indexes', async (c) => {
     "CREATE INDEX IF NOT EXISTS IDX_DM_RECEIVER_SENDER ON direct_messages (receiver_id, sender_id, created_at ASC)",
     "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_DATE_TIME ON commute_logs (work_date, clock_in_time ASC)",
     "CREATE INDEX IF NOT EXISTS IDX_COMMUTE_EMP_DATE ON commute_logs (employee_id, work_date DESC)",
-    "CREATE INDEX IF NOT EXISTS IDX_ATTENDANCE_EMP_TIME ON attendance_requests (employee_id, created_at DESC)"
+    "CREATE INDEX IF NOT EXISTS IDX_ATTENDANCE_EMP_TIME ON attendance_requests (employee_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_WARROOM_CHATS_INC_TIME ON warroom_chats (inc_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_WARROOM_ATTACH_INC ON warroom_attachments (inc_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_KB_INC_ID ON knowledge_base (inc_id)",
+    "CREATE INDEX IF NOT EXISTS IDX_NOTIFICATIONS_ROLE_TIME ON app_notifications (target_role, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS IDX_MESSAGES_PART_TIME ON app_messages (part_name, created_at DESC)"
   ];
 
   const results = [];
@@ -2920,7 +2930,7 @@ app.get('/notifications', async (c) => {
     if (conditions.length > 0) {
       query += " WHERE " + conditions.join(" AND ");
     }
-    query += " ORDER BY created_at DESC";
+    query += " ORDER BY id DESC LIMIT 50";
 
     const stmt = db.prepare(query);
     const result = params.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
@@ -2970,7 +2980,7 @@ app.get('/messages', async (c) => {
       query += " WHERE (part_name = ? OR part_name = 'ALL')";
       params.push(part);
     }
-    query += " ORDER BY created_at DESC";
+    query += " ORDER BY id DESC LIMIT 50";
 
     const stmt = db.prepare(query);
     const result = params.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
@@ -3465,13 +3475,89 @@ function buildTree(nodes, parentId = null) {
 }
 
 // ==========================================
+// ⚡ Multi-Tier Cache (L1 In-Memory + L2 Cloudflare KV SMS_STORAGE)
+// ==========================================
+const masterDataCache = new Map();
+
+async function getCachedData(c, key, ttlMs = 120000) {
+  // 1. L1 In-Memory Cache (0ms)
+  const item = masterDataCache.get(key);
+  if (item && (Date.now() - item.time < ttlMs)) {
+    return item.data;
+  }
+  // 2. L2 Cloudflare KV Cache (~5ms, global edge persistence)
+  const kv = c?.env?.SMS_STORAGE;
+  if (kv) {
+    try {
+      const kvData = await kv.get(`cache:${key}`, 'json');
+      if (kvData !== null && kvData !== undefined) {
+        masterDataCache.set(key, { data: kvData, time: Date.now() });
+        return kvData;
+      }
+    } catch (e) {
+      console.warn(`[KV Cache Read Error] key=${key}:`, e.message);
+    }
+  }
+  return null;
+}
+
+async function setCachedData(c, key, data, kvTtlSeconds = 3600) {
+  masterDataCache.set(key, { data, time: Date.now() });
+  const kv = c?.env?.SMS_STORAGE;
+  if (kv && data !== undefined) {
+    try {
+      await kv.put(`cache:${key}`, JSON.stringify(data), { expirationTtl: Math.max(kvTtlSeconds, 60) });
+    } catch (e) {
+      console.warn(`[KV Cache Write Error] key=${key}:`, e.message);
+    }
+  }
+}
+
+async function invalidateCachedData(c, key) {
+  if (key) {
+    masterDataCache.delete(key);
+    const kv = c?.env?.SMS_STORAGE;
+    if (kv) {
+      try {
+        await kv.delete(`cache:${key}`);
+      } catch (e) {}
+    }
+  } else {
+    masterDataCache.clear();
+  }
+}
+
+// Backward-compatible synchronous wrappers for in-memory only
+function getCachedMasterData(key, ttlMs = 120000) {
+  const item = masterDataCache.get(key);
+  if (item && (Date.now() - item.time < ttlMs)) return item.data;
+  return null;
+}
+function setCachedMasterData(key, data) {
+  masterDataCache.set(key, { data, time: Date.now() });
+}
+function invalidateMasterData(key) {
+  if (key) masterDataCache.delete(key);
+  else masterDataCache.clear();
+}
+
+// ==========================================
 // 2.0 Shifti Unified Organizations API
 // ==========================================
 app.get('/organizations', async (c) => {
+  const cached = await getCachedData(c, 'organizations', 120000);
+  if (cached) {
+    c.header('X-Cache', 'HIT');
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json({ success: true, data: cached });
+  }
   const db = c.env.DB;
   try {
     const { results } = await db.prepare("SELECT * FROM organizations ORDER BY created_at ASC").all();
-    return c.json({ success: true, data: results || [] });
+    const data = results || [];
+    await setCachedData(c, 'organizations', data, 3600);
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json({ success: true, data });
   } catch (err) {
     return c.json({ success: false, error: err.message, data: [] }, 500);
   }
@@ -3517,6 +3603,8 @@ app.post('/organizations', async (c) => {
       nowKst, actor, nowKst, actor
     ).run();
 
+    await invalidateCachedData(c, 'organizations');
+    await invalidateCachedData(c, 'org_tree');
     return c.json({ success: true, id, hierarchy_path, updated_at: nowKst });
   } catch (err) {
     return c.json({ success: false, error: err.message }, 500);
@@ -3528,6 +3616,8 @@ app.delete('/organizations/:id', async (c) => {
   try {
     const id = c.req.param('id');
     await db.prepare("DELETE FROM organizations WHERE id = ?").bind(id).run();
+    await invalidateCachedData(c, 'organizations');
+    await invalidateCachedData(c, 'org_tree');
     return c.json({ success: true });
   } catch (err) {
     return c.json({ success: false, error: err.message }, 500);
@@ -3538,32 +3628,14 @@ app.delete('/organizations/:id', async (c) => {
 // 2.1 Shifti Unified Companies (협력사 마스터) API
 // ==========================================
 app.get('/companies', async (c) => {
+  const cached = await getCachedData(c, 'companies', 120000);
+  if (cached) {
+    c.header('X-Cache', 'HIT');
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json({ success: true, data: cached });
+  }
   const db = c.env.DB;
   try {
-    // 1. 테이블 존재 여부 및 description 컬럼 마이그레이션 보장
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS companies (
-        id TEXT PRIMARY KEY,
-        company_code TEXT UNIQUE NOT NULL,
-        company_name TEXT NOT NULL,
-        biz_number TEXT,
-        company_type TEXT CHECK(company_type IN ('SHINHAN_DS', 'PARTNER', 'SUB_CONTRACTOR')) NOT NULL DEFAULT 'PARTNER',
-        contact_person TEXT,
-        contact_phone TEXT,
-        description TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_by TEXT DEFAULT 'SYSTEM',
-        updated_at DATETIME,
-        updated_by TEXT DEFAULT 'SYSTEM'
-      )
-    `).run();
-
-    try {
-      await db.prepare("ALTER TABLE companies ADD COLUMN description TEXT").run();
-    } catch (e) {
-      // column already exists
-    }
-
     let { results } = await db.prepare("SELECT * FROM companies ORDER BY CASE WHEN company_type = 'SHINHAN_DS' THEN 0 ELSE 1 END, created_at ASC").all();
     
     // 비어있다면 초기 시드 데이터 자동 주입
@@ -3582,7 +3654,10 @@ app.get('/companies', async (c) => {
       results = res.results || [];
     }
 
-    return c.json({ success: true, data: results || [] });
+    const data = results || [];
+    await setCachedData(c, 'companies', data, 3600);
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json({ success: true, data });
   } catch (err) {
     return c.json({ success: false, error: err.message, data: [] }, 500);
   }
@@ -3591,12 +3666,6 @@ app.get('/companies', async (c) => {
 app.post('/companies', async (c) => {
   const db = c.env.DB;
   try {
-    try {
-      await db.prepare("ALTER TABLE companies ADD COLUMN description TEXT").run();
-    } catch (e) {
-      // column already exists
-    }
-
     const body = await c.req.json();
     const id = body.id || `comp-${Date.now()}`;
     const company_name = String(body.company_name || body.companyName || '').trim();
@@ -3638,6 +3707,7 @@ app.post('/companies', async (c) => {
       nowKst, actor, nowKst, actor
     ).run();
 
+    await invalidateCachedData(c, 'companies');
     return c.json({ success: true, id, company_name, updated_at: nowKst });
   } catch (err) {
     return c.json({ success: false, error: err.message }, 500);
@@ -3653,6 +3723,7 @@ app.delete('/companies/:id', async (c) => {
       return c.json({ success: false, error: '신한DS 기본 원청사는 삭제할 수 없습니다.' }, 400);
     }
     await db.prepare("DELETE FROM companies WHERE id = ?").bind(id).run();
+    await invalidateCachedData(c, 'companies');
     return c.json({ success: true });
   } catch (err) {
     return c.json({ success: false, error: err.message }, 500);
@@ -3660,9 +3731,18 @@ app.delete('/companies/:id', async (c) => {
 });
 
 app.get('/org/tree', async (c) => {
-  const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM organizations ORDER BY sort_order ASC").all()
-  return c.json(buildTree(results))
+  const cached = await getCachedData(c, 'org_tree', 120000);
+  if (cached) {
+    c.header('X-Cache', 'HIT');
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json(cached);
+  }
+  const db = c.env.DB;
+  const { results } = await db.prepare("SELECT * FROM organizations ORDER BY sort_order ASC").all();
+  const tree = buildTree(results || []);
+  await setCachedData(c, 'org_tree', tree, 3600);
+  c.header('Cache-Control', 'private, max-age=120');
+  return c.json(tree);
 })
 
 app.post('/org/nodes', async (c) => {
@@ -3724,27 +3804,45 @@ app.get('/security/logs', async (c) => {
 });
 
 app.get('/ai/codes/:category', async (c) => {
-  const category = c.req.param('category')
-  const db = c.env.DB
+  const category = c.req.param('category').toUpperCase();
+  const cacheKey = 'codebook_' + category;
+  const cached = getCachedMasterData(cacheKey);
+  if (cached) {
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json({ category, codes: cached });
+  }
+  const db = c.env.DB;
   const { results } = await db.prepare(
     "SELECT code, name, sort_order FROM code_book WHERE category = ? AND is_active = 1 ORDER BY sort_order ASC"
-  ).bind(category.toUpperCase()).all()
-  return c.json({ category, codes: results })
+  ).bind(category).all();
+  const data = results || [];
+  setCachedMasterData(cacheKey, data);
+  c.header('Cache-Control', 'private, max-age=120');
+  return c.json({ category, codes: data });
 })
 
 // ==========================================
 // 1.6 RBAC (Role-Based Access Control) APIs
 // ==========================================
 app.get('/rbac/roles', async (c) => {
-  const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM roles ORDER BY role_name ASC").all()
-  return c.json({ roles: results })
+  const cached = await getCachedData(c, 'rbac_roles', 120000);
+  if (cached) {
+    c.header('X-Cache', 'HIT');
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json({ roles: cached });
+  }
+  const db = c.env.DB;
+  const { results } = await db.prepare("SELECT * FROM roles ORDER BY role_name ASC").all();
+  const data = results || [];
+  await setCachedData(c, 'rbac_roles', data, 3600);
+  c.header('Cache-Control', 'private, max-age=120');
+  return c.json({ roles: data });
 })
 
 app.post('/rbac/roles', async (c) => {
-  const db = c.env.DB
-  const { role_code, role_name, description } = await c.req.json()
-  const modDt = getKst()
+  const db = c.env.DB;
+  const { role_code, role_name, description } = await c.req.json();
+  const modDt = getKst();
 
   await db.prepare(`
     INSERT INTO roles (role_code, role_name, description, reg_dt, mod_dt)
@@ -3753,22 +3851,38 @@ app.post('/rbac/roles', async (c) => {
       role_name = excluded.role_name,
       description = excluded.description,
       mod_dt = excluded.mod_dt
-  `).bind(role_code, role_name, description, modDt, modDt).run()
+  `).bind(role_code, role_name, description, modDt, modDt).run();
 
-  return c.json({ success: true })
+  await invalidateCachedData(c, 'rbac_roles');
+  return c.json({ success: true });
 })
 
 app.get('/rbac/menus', async (c) => {
-  const db = c.env.DB
-  const { results } = await db.prepare("SELECT * FROM menus ORDER BY sort_order ASC").all()
-  return c.json({ menus: results })
+  const cached = await getCachedData(c, 'rbac_menus', 120000);
+  if (cached) {
+    c.header('X-Cache', 'HIT');
+    c.header('Cache-Control', 'private, max-age=120');
+    return c.json({ menus: cached });
+  }
+  const db = c.env.DB;
+  const { results } = await db.prepare("SELECT * FROM menus ORDER BY sort_order ASC").all();
+  const data = results || [];
+  await setCachedData(c, 'rbac_menus', data, 3600);
+  c.header('Cache-Control', 'private, max-age=120');
+  return c.json({ menus: data });
 })
 
 app.get('/rbac/permissions/:roleCode', async (c) => {
-  const roleCode = c.req.param('roleCode')
-  const db = c.env.DB
+  const roleCode = c.req.param('roleCode');
+  const cacheKey = `rbac_perms_${roleCode}`;
+  const cached = await getCachedData(c, cacheKey, 300000);
+  if (cached) {
+    c.header('X-Cache', 'HIT-KV');
+    c.header('Cache-Control', 'private, max-age=300');
+    return c.json({ role_code: roleCode, permissions: cached });
+  }
 
-  // Get all menus joined with permissions for this role
+  const db = c.env.DB;
   const query = `
     SELECT 
       m.id as menu_id, m.name as menu_name, m.path, m.icon,
@@ -3787,9 +3901,12 @@ app.get('/rbac/permissions/:roleCode', async (c) => {
     FROM role_permissions rp
     WHERE rp.role_code = ? 
       AND rp.menu_id NOT IN (SELECT id FROM menus)
-  `
-  const { results } = await db.prepare(query).bind(roleCode, roleCode).all()
-  return c.json({ role_code: roleCode, permissions: results })
+  `;
+  const { results } = await db.prepare(query).bind(roleCode, roleCode).all();
+  const permissions = results || [];
+  await setCachedData(c, cacheKey, permissions, 1800);
+  c.header('Cache-Control', 'private, max-age=300');
+  return c.json({ role_code: roleCode, permissions });
 })
 
 app.post('/rbac/permissions', async (c) => {
@@ -4513,6 +4630,16 @@ app.post('/sms/receive', async (c) => {
 
   // Eager Loading: Trigger background AI immediately for new insert
   c.executionCtx.waitUntil(performBackgroundAiAnalysis(newIncId, c.env).catch(e => console.error(e)));
+  if (c.env.SMS_STORAGE) {
+    c.executionCtx.waitUntil((async () => {
+      try {
+        await invalidateCachedData(c, 'sms_recent_10');
+        await invalidateCachedData(c, 'sms_recent_20');
+        await invalidateCachedData(c, 'sms_recent_50');
+        await invalidateCachedData(c, 'sms_stats');
+      } catch (e) {}
+    })());
+  }
 
   // ── S-callert (자동 PDS 발신) 내부 트리거 연동 ──
   c.executionCtx.waitUntil((async () => {
@@ -4615,18 +4742,36 @@ app.post('/sms/receive', async (c) => {
 
 
 app.get('/sms/stats', async (c) => {
-  const db = c.env.DB
-  const total = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first('c')
-  const unread = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE read = 0").first('c')
-  return c.json({ total, unread })
+  const cached = await getCachedData(c, 'sms_stats', 30000);
+  if (cached) {
+    c.header('X-Cache', 'HIT-KV');
+    c.header('Cache-Control', 'private, max-age=30');
+    return c.json(cached);
+  }
+  const db = c.env.DB;
+  const total = await db.prepare("SELECT COUNT(*) as c FROM received_messages").first('c');
+  const unread = await db.prepare("SELECT COUNT(*) as c FROM received_messages WHERE read = 0").first('c');
+  const stats = { total: total || 0, unread: unread || 0 };
+  await setCachedData(c, 'sms_stats', stats, 30);
+  c.header('Cache-Control', 'private, max-age=30');
+  return c.json(stats);
 })
 
 // 🚀 [NEW] Dynamic Configuration Endpoints
 app.get('/sms/settings', async (c) => {
+  const cached = await getCachedData(c, 'sms_settings', 300000);
+  if (cached) {
+    c.header('X-Cache', 'HIT-KV');
+    c.header('Cache-Control', 'private, max-age=300');
+    return c.json({ success: true, settings: cached });
+  }
   const db = c.env.DB;
   try {
     const { results } = await db.prepare("SELECT config_key as key, config_value as value, description FROM system_config").all();
-    return c.json({ success: true, settings: results });
+    const settings = results || [];
+    await setCachedData(c, 'sms_settings', settings, 1800);
+    c.header('Cache-Control', 'private, max-age=300');
+    return c.json({ success: true, settings });
   } catch (e) {
     return c.json({ success: false, error: e.message }, 500);
   }
@@ -4641,6 +4786,7 @@ app.post('/sms/settings', async (c) => {
     const now = getKst();
     await db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value, updated_at) VALUES (?, ?, ?)")
       .bind(key, String(value), now).run();
+    await invalidateCachedData(c, 'sms_settings');
     return c.json({ success: true, message: `Setting ${key} updated to ${value}` });
   } catch (e) {
     return c.json({ success: false, error: e.message }, 500);
@@ -4653,6 +4799,17 @@ app.get('/sms/recent', async (c) => {
   const startDate = c.req.query('startDate')
   const endDate = c.req.query('endDate')
   const db = c.env.DB
+
+  const isDefaultDashboard = !startDate && !endDate && !excludeCompleted && (parseInt(limit) <= 50);
+  const cacheKey = `sms_recent_${limit}`;
+  if (isDefaultDashboard) {
+    const cached = await getCachedData(c, cacheKey, 20000);
+    if (cached) {
+      c.header('X-Cache', 'HIT-KV');
+      c.header('Cache-Control', 'private, max-age=20');
+      return c.json(cached);
+    }
+  }
 
   let baseQuery = `
     SELECT * FROM (
@@ -4714,8 +4871,9 @@ app.get('/sms/recent', async (c) => {
 
   const { results } = await db.prepare(baseQuery).bind(...params).all()
 
-  return c.json({
-    total: results.length, messages: results.map(r => ({
+  const responsePayload = {
+    total: results.length,
+    messages: results.map(r => ({
       inc_id: r.inc_id,
       id: r.inc_id,
       sender: r.sender,
@@ -4757,7 +4915,14 @@ app.get('/sms/recent', async (c) => {
         r.receiver_16, r.receiver_17, r.receiver_18, r.receiver_19, r.receiver_20
       ].filter(v => v !== null)
     }))
-  })
+  };
+
+  if (isDefaultDashboard) {
+    await setCachedData(c, cacheKey, responsePayload, 30);
+  }
+  c.header('X-Cache', 'MISS');
+  c.header('Cache-Control', 'private, max-age=20');
+  return c.json(responsePayload);
 })
 
 // 🚀 NEW: SMS Deletion (Supports both direct DELETE and Proxy POST)
@@ -4768,6 +4933,12 @@ app.delete('/sms/:id', async (c) => {
   try {
     await db.prepare("DELETE FROM received_messages WHERE inc_id = ?").bind(normId).run();
     await db.prepare("DELETE FROM incident_assignments WHERE inc_id = ?").bind(normId).run();
+    if (c.env.SMS_STORAGE) {
+      await invalidateCachedData(c, 'sms_recent_10');
+      await invalidateCachedData(c, 'sms_recent_20');
+      await invalidateCachedData(c, 'sms_recent_50');
+      await invalidateCachedData(c, 'sms_stats');
+    }
     return c.json({ status: 'deleted', inc_id: normId });
   } catch (e) {
     console.error("Delete SMS error:", e);
@@ -6152,7 +6323,9 @@ app.get('/warroom/rooms', async (c) => {
     params.push(`%${assignedTo}%`, `%${assignedTo}%`)
   }
 
-  sql += ` ORDER BY COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt) DESC LIMIT 500`
+  const rawLimit = parseInt(c.req.query('limit') || '50', 10);
+  const limit = Math.min(Math.max(isNaN(rawLimit) ? 50 : rawLimit, 1), 100);
+  sql += ` ORDER BY COALESCE(i.created_at, w.reg_dt, all_inc.reg_dt) DESC LIMIT ${limit}`;
 
   const stmt = db.prepare(sql)
   const { results } = await stmt.bind(...params).all()

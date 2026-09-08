@@ -42,7 +42,9 @@ const AiSmsStatusPanel = () => {
       }
     };
     fetchStats();
-    const interval = setInterval(fetchStats, 10000);
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchStats();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

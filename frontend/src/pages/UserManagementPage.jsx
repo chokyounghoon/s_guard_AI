@@ -94,7 +94,7 @@ export default function UserManagementPage() {
         if (!r.ok) throw new Error('데이터를 불러오지 못했습니다.');
         return r.json();
       })
-      .then(data => setUsers(Array.isArray(data) ? data : []))
+      .then(data => setUsers(Array.isArray(data) ? data : (data?.data || data?.users || [])))
       .catch(err => {
         console.error(err);
         setUsers([]);

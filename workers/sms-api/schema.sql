@@ -482,6 +482,8 @@ CREATE INDEX IF NOT EXISTS idx_login_history_user_time ON login_history(user_id,
 -- 2. 침해사고(Incidents) 및 활동 로그 인덱스
 CREATE INDEX IF NOT EXISTS idx_incidents_status_created ON incidents(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_incidents_assigned ON incidents(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_inc_code ON activity_logs(incident_code);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_inc_time ON activity_logs(inc_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_user_time ON activity_logs(user_id, created_at DESC);
 
@@ -489,6 +491,7 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_user_time ON activity_logs(user_id,
 CREATE INDEX IF NOT EXISTS idx_received_messages_time ON received_messages(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_received_messages_sender ON received_messages(sender);
 CREATE INDEX IF NOT EXISTS idx_received_messages_employee ON received_messages(employee_id);
+CREATE INDEX IF NOT EXISTS idx_received_messages_inc_id ON received_messages(inc_id);
 
 -- 4. 워룸(War-Room) 채팅 및 첨부파일 인덱스
 CREATE INDEX IF NOT EXISTS idx_warroom_chats_inc_seq ON warroom_chats(inc_id, seq);
@@ -501,8 +504,11 @@ CREATE INDEX IF NOT EXISTS idx_inbox_items_unread ON inbox_items(user_id, is_rea
 CREATE INDEX IF NOT EXISTS idx_inbox_items_inc_type ON inbox_items(inc_id, type);
 
 -- 6. 인시던트 및 워룸 연계 튜닝
+CREATE INDEX IF NOT EXISTS idx_incident_assignments_user_dt ON incident_assignments(user_id, assigned_at DESC);
 CREATE INDEX IF NOT EXISTS idx_incident_assignments_inc_status ON incident_assignments(inc_id, status);
+CREATE INDEX IF NOT EXISTS idx_user_warrooms_user ON user_warrooms(user_id, inc_id);
 CREATE INDEX IF NOT EXISTS idx_user_warrooms_inc_id ON user_warrooms(inc_id);
+CREATE INDEX IF NOT EXISTS idx_warroom_list_inc_id ON warroom_list(inc_id);
 CREATE INDEX IF NOT EXISTS idx_warroom_list_status_regdt ON warroom_list(status, reg_dt DESC);
 CREATE INDEX IF NOT EXISTS idx_aichat_history_inc_id ON aichat_history(inc_id, id ASC);
 CREATE INDEX IF NOT EXISTS idx_incidents_source_sms ON incidents(source_sms_id);
@@ -517,3 +523,4 @@ CREATE INDEX IF NOT EXISTS idx_user_chat_sessions_user_time ON user_chat_session
 CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_recv ON direct_messages(sender_id, receiver_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_direct_messages_recv_sender ON direct_messages(receiver_id, sender_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_report_lines_owner_level ON report_lines(owner_id, hierarchy_level ASC);
+CREATE INDEX IF NOT EXISTS idx_call_hist_call_dt ON TB_SCL_CALL_HIST(CALL_DT DESC);

@@ -740,19 +740,19 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
     const smsInterval = setInterval(() => {
       if (!document.hidden) fetchSMSMessages();
-    }, 10000 * pollIntervalMultiplier);
+    }, 30000 * pollIntervalMultiplier);
     const wrInterval = setInterval(() => {
       if (!document.hidden) fetchWarRooms();
-    }, 10000);
+    }, 30000);
     const activityInterval = isAnalyzingActive ? null : setInterval(() => {
       if (!document.hidden) fetchActivityLogs();
-    }, 30000);
+    }, 60000);
     const assignmentInterval = isAnalyzingActive ? null : setInterval(() => {
       if (!document.hidden) fetchMyAssignments();
-    }, 30000);
+    }, 60000);
     const historyInterval = isAnalyzingActive ? null : setInterval(() => {
       if (!document.hidden) fetchUserActivityHistory();
-    }, 45000);
+    }, 90000);
 
     // 🚀 Real-time SMS Stream (SSE) — 지수 백오프 자동 재연결
     let sseInstance = null;
@@ -773,6 +773,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         console.log('[MobileDashboard SSE] sms_received:', event.data);
         sseRetry = 0;
         fetchSMSMessages();
+        fetchWarRooms();
       });
 
       // 워룸 개설/변경 즉시 반영 (PC에서 개설해도 모바일에 바로 반영)

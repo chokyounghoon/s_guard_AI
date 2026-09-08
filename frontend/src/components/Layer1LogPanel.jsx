@@ -11,7 +11,9 @@ export default function Layer1LogPanel() {
 
   useEffect(() => {
     fetchLogs();
-    const interval = setInterval(fetchLogs, 10000); // 10s refresh
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchLogs();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
