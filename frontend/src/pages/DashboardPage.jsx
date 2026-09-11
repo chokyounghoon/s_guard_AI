@@ -464,7 +464,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   }, [visibleSms, selectedSms, insightSms, showAgentPanel, agentMessages.length, incidentWorkflowSteps.length]);
 
   const [warRooms, setWarRooms] = useState([]);
-  const [activityLogs, setActivityLogs] = useState([]);
   const [myAssignments, setMyAssignments] = useState([]);
   const [expandedAssignments, setExpandedAssignments] = useState(new Set());
   const pressTimerRef = React.useRef(null);
@@ -727,31 +726,37 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     }
   }, [selectedSms, visibleSms]);
 
-  // Fetch War-Rooms & SMS periodically
+  // Fetch War-Rooms & SMS periodically (Event-Driven via SSE + Conservative Polling)
   useEffect(() => {
     fetchSMSMessages();
     fetchWarRooms();
-    fetchActivityLogs();
     fetchMyAssignments();
     fetchUserActivityHistory();
     fetchSettings(); // 🚀 Load thresholds on start
     const pollIntervalMultiplier = isAiAnalyzing ? 4 : 1; // 4x slower during analysis
 
+    // 🚀 D1 쿼리 폭증 방지: SSE 실시간 수신이 기본이므로 백업 폴링은 120초 주기로 최적화
     const smsInterval = setInterval(() => {
       if (!document.hidden) fetchSMSMessages();
-    }, 30000 * pollIntervalMultiplier);
+    }, 120000 * pollIntervalMultiplier);
     const wrInterval = isAiAnalyzing ? null : setInterval(() => {
       if (!document.hidden) fetchWarRooms();
-    }, 30000);
-    const activityInterval = isAiAnalyzing ? null : setInterval(() => {
-      if (!document.hidden) fetchActivityLogs();
-    }, 60000);
+    }, 120000);
     const assignmentInterval = isAiAnalyzing ? null : setInterval(() => {
       if (!document.hidden) fetchMyAssignments();
-    }, 60000);
+    }, 180000);
     const historyInterval = isAiAnalyzing ? null : setInterval(() => {
       if (!document.hidden) fetchUserActivityHistory();
-    }, 90000);
+    }, 300000);
+
+    // 탭 복귀 시 즉시 최신화 (사용자가 보고 있을 때만 신선한 데이터 동기화)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchSMSMessages();
+        fetchWarRooms();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // 🚀 Real-time SMS Stream (SSE) — 지수 백오프 자동 재연결
     let sseInstance = null;
@@ -792,9 +797,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     return () => {
       if (smsInterval) clearInterval(smsInterval);
       if (wrInterval) clearInterval(wrInterval);
-      if (activityInterval) clearInterval(activityInterval);
       if (assignmentInterval) clearInterval(assignmentInterval);
       if (historyInterval) clearInterval(historyInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearTimeout(sseRetryTimer);
       if (sseInstance) { sseInstance.close(); sseInstance = null; }
     };
@@ -838,21 +843,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       }
     } catch (err) {
       console.error("Failed to fetch War-Rooms:", err);
-    }
-  };
-
-  const fetchActivityLogs = async () => {
-    if (!userProfile?.employee_id) return;
-    try {
-      const res = await fetch(`${apiBase}/activity-logs`, {
-        headers: getAuthHeaders()
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setActivityLogs(data.logs || []);
-      }
-    } catch (err) {
-      console.error("Failed to fetch activity logs:", err);
     }
   };
 
@@ -1591,7 +1581,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         fetchSMSMessages(),
         fetchWarRooms(),
         fetchMyAssignments(),
-        fetchActivityLogs(),
         // Trigger backend self-healing
         fetch(`${apiBase}/ai/knowledge/sync-status`, {
           headers: getAuthHeaders()

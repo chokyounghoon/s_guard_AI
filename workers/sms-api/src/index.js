@@ -3039,24 +3039,38 @@ app.get('/users/:id', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
   try {
-    try {
-      await db.prepare("ALTER TABLE users ADD COLUMN profile_picture TEXT").run();
-    } catch (e) {}
-
     const user = await db.prepare(`
       SELECT 
-        id, employee_id, email, name, role, auth_provider,
-        company, phone, honbu, team, part, subpart, position,
-        status, is_active, is_admin, device_type, profile_picture,
-        created_at, created_by, updated_at, updated_by
-      FROM users
-      WHERE UPPER(employee_id) = UPPER(?) OR LOWER(email) = LOWER(?)
+        u.employee_id as id, u.employee_id, u.email, u.name, u.role, u.phone,
+        u.auth_provider, u.status, u.is_active, u.is_admin, u.position, u.profile_picture,
+        COALESCE(u.os_type, u.device_type, 'Android') as os_type,
+        COALESCE(u.device_type, u.os_type, 'Android') as device_type,
+        COALESCE(oc.name, u.company) as company_name, 
+        COALESCE(oh.name, u.honbu) as honbu_name, 
+        COALESCE(ot.name, u.team) as team_name,
+        COALESCE(op.name, u.part) as part_name,
+        COALESCE(os.name, u.subpart) as subpart_name,
+        u.company as company_code,
+        u.honbu as honbu_code,
+        u.team as team_code,
+        u.part as part_code,
+        u.subpart as subpart_code,
+        u.company, u.honbu, u.team, u.part, u.subpart,
+        u.created_at, u.reg_dt, u.mod_dt
+      FROM users u
+      LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+      LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+      LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+      LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+      LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
+      WHERE UPPER(u.employee_id) = UPPER(?) OR LOWER(u.email) = LOWER(?)
     `).bind(id, id).first()
     
-    if (!user) return c.json({ detail: "사용자를 찾을 수 없습니다." }, 404)
-    return c.json({ success: true, data: user })
+    if (!user) return c.json({ success: false, detail: "사용자를 찾을 수 없습니다." }, 404)
+    return c.json({ success: true, data: user, ...user })
   } catch (err) {
-    return c.json({ detail: "조회 중 오류가 발생했습니다." }, 500)
+    console.error('[User-Get-Detail-Error]', err)
+    return c.json({ success: false, detail: "조회 중 오류가 발생했습니다: " + err.message }, 500)
   }
 })
 
@@ -3164,37 +3178,72 @@ app.post('/auth/reset/verify', async (c) => {
 app.get('/users', async (c) => {
   const db = c.env.DB;
   try {
-    const { q, role, part, company } = c.req.query();
+    const { q, role, part, company, honbu, team, subpart, orgCode } = c.req.query();
     let query = `
       SELECT 
-        seq, employee_id as id, employee_id, name, email, phone,
-        company, team, part, position, role, is_partner_manager,
-        status, is_active, is_admin, device_type, created_at, created_by, updated_at, updated_by
-      FROM users
+        u.employee_id as id, u.employee_id, u.email, u.name, u.role, u.phone,
+        u.status, u.is_active, u.is_admin, u.position, u.profile_picture,
+        COALESCE(u.os_type, u.device_type, 'Android') as os_type,
+        COALESCE(u.device_type, u.os_type, 'Android') as device_type,
+        COALESCE(oc.name, u.company) as company_name, 
+        COALESCE(oh.name, u.honbu) as honbu_name, 
+        COALESCE(ot.name, u.team) as team_name,
+        COALESCE(op.name, u.part) as part_name,
+        COALESCE(os.name, u.subpart) as subpart_name,
+        u.company as company_code,
+        u.honbu as honbu_code,
+        u.team as team_code,
+        u.part as part_code,
+        u.subpart as subpart_code,
+        u.company, u.honbu, u.team, u.part, u.subpart,
+        u.created_at, u.reg_dt
+      FROM users u
+      LEFT JOIN organizations oc ON u.company = oc.code AND oc.depth = 1
+      LEFT JOIN organizations oh ON u.honbu = oh.code AND oh.depth = 2
+      LEFT JOIN organizations ot ON u.team = ot.code AND ot.depth = 3
+      LEFT JOIN organizations op ON u.part = op.code AND op.depth = 4
+      LEFT JOIN organizations os ON u.subpart = os.code AND os.depth = 5
       WHERE 1=1
     `;
     const params = [];
+    if (orgCode) {
+      query += " AND (u.company = ? OR u.honbu = ? OR u.team = ? OR u.part = ? OR u.subpart = ?)";
+      params.push(orgCode, orgCode, orgCode, orgCode, orgCode);
+    }
     if (q) {
-      query += " AND (name LIKE ? OR employee_id LIKE ? OR email LIKE ? OR phone LIKE ?)";
+      query += " AND (u.name LIKE ? OR u.employee_id LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)";
       const qParam = `%${q}%`;
       params.push(qParam, qParam, qParam, qParam);
     }
     if (company) {
-      query += " AND company = ?";
-      params.push(company);
+      query += " AND (u.company = ? OR oc.name = ?)";
+      params.push(company, company);
+    }
+    if (honbu) {
+      query += " AND (u.honbu = ? OR oh.name = ?)";
+      params.push(honbu, honbu);
+    }
+    if (team) {
+      query += " AND (u.team = ? OR ot.name = ?)";
+      params.push(team, team);
     }
     if (part) {
-      query += " AND part = ?";
-      params.push(part);
+      query += " AND (u.part = ? OR op.name = ?)";
+      params.push(part, part);
+    }
+    if (subpart) {
+      query += " AND (u.subpart = ? OR os.name = ?)";
+      params.push(subpart, subpart);
     }
     if (role) {
-      query += " AND role = ?";
+      query += " AND u.role = ?";
       params.push(role);
     }
-    query += " ORDER BY seq ASC";
+    query += " ORDER BY u.created_at DESC";
     const { results } = await db.prepare(query).bind(...params).all();
-    return c.json({ success: true, data: results || [] });
+    return c.json(results || []);
   } catch (err) {
+    console.error('[Users-List-Error]', err);
     return c.json({ success: false, error: err.message }, 500);
   }
 });
@@ -3281,25 +3330,6 @@ app.post('/users', async (c) => {
   }
 });
 
-app.get('/users/:id', async (c) => {
-  const db = c.env.DB
-  const id = c.req.param('id')
-  try {
-    const user = await db.prepare(`
-      SELECT 
-        seq, employee_id as id, employee_id, name, email, phone,
-        company, team, part, position, role, is_partner_manager,
-        status, is_active, is_admin, device_type, profile_picture,
-        created_at, created_by, updated_at, updated_by
-      FROM users
-      WHERE UPPER(employee_id) = UPPER(?) OR LOWER(email) = LOWER(?)
-    `).bind(id, id).first()
-    if (!user) return c.json({ success: false, detail: "User not found" }, 404)
-    return c.json({ success: true, data: user, ...user })
-  } catch (err) {
-    return c.json({ success: false, detail: err.message }, 500)
-  }
-})
 app.patch('/auth/profile', async (c) => {
   const body = await c.req.json()
   const { user_id, employee_id, name, phone, company, honbu, team, part, subpart, os_type, profile_picture } = body
@@ -4358,25 +4388,30 @@ app.post('/sms/receive', async (c) => {
   }
   const currentCount = existing ? (existing.received_count || 1) + 1 : (parsedCount > 0 ? parsedCount : 1);
 
-  // --- Calculate Severity dynamically based on Alert Monitor Settings ---
+  // 🚀 Cloudflare D1 비용 절감: 5분 인메모리 캐시 및 단일 집계 쿼리로 결합 (불필요한 D1 풀스캔 방지)
   let alertSeverity = 'NORMAL';
   try {
-    const configRes = await db.prepare(
-      "SELECT config_key, config_value FROM system_config WHERE config_key IN ('alert_critical_error_count','alert_critical_error_rate','alert_major_error_count','alert_major_error_rate')"
-    ).all();
-    const config = (configRes.results || []).reduce((acc, c) => ({ ...acc, [c.config_key]: parseFloat(c.config_value) }), {});
-    
-    const critCount = config['alert_critical_error_count'] || 10;
-    const critRate  = config['alert_critical_error_rate'] || 50;
-    const majorCount = config['alert_major_error_count'] || 3;
-    const majorRate  = config['alert_major_error_rate'] || 25;
+    const nowMs = Date.now();
+    if (!globalThis.__alertConfigCache || (nowMs - globalThis.__alertConfigCache.timestamp > 300000)) {
+      const [configRes, statsRes] = await Promise.all([
+        db.prepare("SELECT config_key, config_value FROM system_config WHERE config_key IN ('alert_critical_error_count','alert_critical_error_rate','alert_major_error_count','alert_major_error_rate')").all(),
+        db.prepare("SELECT COUNT(*) as total, SUM(CASE WHEN status != 'INC_003' THEN 1 ELSE 0 END) as unresolved FROM incidents").first()
+      ]);
+      const config = (configRes.results || []).reduce((acc, c) => ({ ...acc, [c.config_key]: parseFloat(c.config_value) }), {});
+      const totalCount = statsRes?.total || 0;
+      const unresolvedCount = statsRes?.unresolved || 0;
+      const errorRate = totalCount > 0 ? Math.round((unresolvedCount / totalCount) * 100) : 0;
+      globalThis.__alertConfigCache = {
+        timestamp: nowMs,
+        critCount: config['alert_critical_error_count'] || 10,
+        critRate: config['alert_critical_error_rate'] || 50,
+        majorCount: config['alert_major_error_count'] || 3,
+        majorRate: config['alert_major_error_rate'] || 25,
+        errorRate
+      };
+    }
 
-    const totalCountRes = await db.prepare("SELECT COUNT(*) as c FROM incidents").first();
-    const totalCount = totalCountRes?.c || 0;
-    const unresolvedRes = await db.prepare("SELECT COUNT(*) as c FROM incidents WHERE status != 'INC_003'").first();
-    const unresolvedCount = unresolvedRes?.c || 0;
-    const errorRate = totalCount > 0 ? Math.round((unresolvedCount / totalCount) * 100) : 0;
-
+    const { critCount, critRate, majorCount, majorRate, errorRate } = globalThis.__alertConfigCache;
     if (currentCount >= critCount || errorRate >= critRate) {
       alertSeverity = 'CRITICAL';
     } else if (currentCount >= majorCount || errorRate >= majorRate) {
@@ -5804,6 +5839,12 @@ app.get('/activity-logs', async (c) => {
   const db = c.env.DB
   const inc_id = c.req.query('inc_id')
 
+  // 🚀 전역 조회 시 30초 인메모리 캐시 적용 (활동 로그 조회 시 D1 Row Read 방어)
+  const nowMs = Date.now();
+  if (!inc_id && globalThis.__activityLogsCache && (nowMs - globalThis.__activityLogsCache.timestamp < 30000)) {
+    return c.json({ logs: globalThis.__activityLogsCache.logs });
+  }
+
   let query = "SELECT * FROM activity_logs"
   let params = []
 
@@ -5815,7 +5856,11 @@ app.get('/activity-logs', async (c) => {
   query += " ORDER BY created_at DESC LIMIT 50"
 
   const { results } = await db.prepare(query).bind(...params).all()
-  return c.json({ logs: results })
+  const logs = results || [];
+  if (!inc_id) {
+    globalThis.__activityLogsCache = { timestamp: nowMs, logs };
+  }
+  return c.json({ logs })
 })
 
 app.post('/incidents', async (c) => {
