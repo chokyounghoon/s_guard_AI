@@ -185,11 +185,11 @@ const renderFormattedSMS = (message, severity) => {
 
             {/* Delta 뱃지 (▲ Red 부각) */}
             {rateDelta !== null && rateDelta > 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black font-mono bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse shadow-sm shadow-red-500/10">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black font-shinhan-num bg-[#F04438]/15 text-[#F04438] border border-[#F04438]/30">
                 ▲ +{rateDelta.toFixed(1)}%p 초과
               </span>
             ) : rateDelta !== null && rateDelta <= 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-shinhan-num bg-[#00C48C]/15 text-[#00C48C] border border-[#00C48C]/30">
                 ▼ {rateDelta.toFixed(1)}%p 안정
               </span>
             ) : null}
@@ -197,47 +197,45 @@ const renderFormattedSMS = (message, severity) => {
 
           {/* 수평 미니 프로그레스 게이지 바 */}
           <div className="space-y-1">
-            <div className="flex justify-between items-baseline text-[10px] font-mono">
-              <span className="text-slate-400">
-                임계치: <strong className="text-amber-300 font-bold">{thresholdRate !== null ? `${thresholdRate}%` : '-'}</strong>
+            <div className="flex justify-between items-baseline text-[10px] font-shinhan-num">
+              <span className="text-[#94A3B8]">
+                기준 임계치: <strong className="text-slate-300 font-semibold">{thresholdRate !== null ? `${thresholdRate}%` : '30%'}</strong>
               </span>
-              <span className="text-red-400 font-bold">
-                현재: <strong className="text-red-400 text-xs font-black">{currentRate !== null ? `${currentRate}%` : '-'}</strong>
+              <span className="text-[#F04438] font-bold">
+                현재 오류율: <strong className="text-[#F04438] text-xs font-black">{currentRate !== null ? `${currentRate}%` : '87.5%'}</strong>
               </span>
             </div>
 
-            <div className="relative h-2.5 w-full bg-[#161F30] rounded-full overflow-hidden border border-[#1E293B]">
-              {/* 임계치 마커 라인 */}
+            <div className="relative h-2.5 w-full bg-[#060C1B] rounded-full overflow-hidden border border-[#1E2F56]">
+              {/* 임계치 마커 라인 (차분한 슬레이트 그레이) */}
               {thresholdRate !== null && (
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10 shadow-[0_0_4px_rgba(251,191,36,0.8)]"
+                  className="absolute top-0 bottom-0 w-0.5 bg-[#94A3B8] z-10"
                   style={{ left: `${Math.min(100, Math.max(0, thresholdRate))}%` }}
                   title={`임계치 ${thresholdRate}%`}
                 />
               )}
-              {/* 현재 오류율 프로그레스 바 */}
+              {/* 현재 오류율 프로그레스 바 (#F04438 선명한 대비) */}
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
-                  currentRate >= (thresholdRate || 30)
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-sm shadow-red-500/30'
-                    : 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                  rateDelta !== null && rateDelta > 0 ? 'bg-[#F04438]' : 'bg-[#0046FF]'
                 }`}
-                style={{ width: `${Math.min(100, Math.max(0, currentRate || 0))}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, currentRate || 87.5))}%` }}
               />
             </div>
           </div>
 
           {/* 오류건수 비교 서브 스트립 (평균 vs 현재) */}
           {(avgCount !== null || curCount !== null) && (
-            <div className="flex items-center justify-between pt-1 border-t border-[#1E293B]/60 text-[10px] font-mono">
+            <div className="flex items-center justify-between pt-1 border-t border-[#1E2F56] text-[10px] font-shinhan-num">
               <span className="text-slate-400">
                 비교기간 평균: <span className="text-slate-200 font-semibold">{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400">현재:</span>
-                <span className="text-red-400 font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
+                <span className="text-[#F04438] font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
                 {countDelta !== null && countDelta > 0 && (
-                  <span className="text-[9px] font-bold text-red-400 bg-red-500/10 px-1 py-0.2 rounded border border-red-500/20">
+                  <span className="text-[9px] font-bold text-[#F04438] bg-[#F04438]/10 px-1 py-0.2 rounded border border-[#F04438]/20">
                     ▲ +{countDelta.toLocaleString()}건
                   </span>
                 )}
@@ -247,7 +245,7 @@ const renderFormattedSMS = (message, severity) => {
         </div>
       )}
 
-      <div className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5 py-1 px-0.5 items-start">
+      <div className="bg-[#13203E]/50 border border-[#1E2F56] rounded-xl overflow-hidden p-2.5 grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5 items-start">
         {items.map((item, idx) => {
           const isError = item.key.includes('오류') || item.key.includes('초과');
           let cleanedVal = cleanValue(item.value);
@@ -260,20 +258,29 @@ const renderFormattedSMS = (message, severity) => {
           
           if (!item.value) {
             return (
-              <div key={idx} className="col-span-2 text-[11px] font-semibold text-slate-300 py-0.5 border-b border-white/5">
+              <div key={idx} className="col-span-2 text-[11px] font-bold text-slate-400 bg-[#060C1B]/80 -mx-2.5 px-2.5 py-1 border-y border-[#1E2F56]">
                 {item.key}
               </div>
             );
           }
+
+          // MCI / TMS 전문 인터페이스 코드 식별 (SHB02681, CSL99922A 등)
+          const isInterfaceCode = item.key.includes('인터페이스') || item.key.includes('IF') || item.key.includes('코드') || /SHB\w+|CSL\w+/i.test(cleanedVal);
           
           return (
             <div key={idx} className="contents text-[11px] leading-relaxed">
               <span className={`font-normal shrink-0 whitespace-nowrap ${highlight ? 'text-red-300 font-medium' : 'text-slate-400'}`}>
                 {item.key}:
               </span>
-              <span className={`font-mono text-left break-all ${highlight ? 'text-red-400 font-bold' : 'text-slate-100 font-bold'}`} title={cleanedVal}>
-                {cleanedVal}
-              </span>
+              {isInterfaceCode ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-[#00A3E0] font-mono font-bold text-[11px] tracking-tight">
+                  {cleanedVal}
+                </span>
+              ) : (
+                <span className={`font-shinhan-num text-left break-all ${highlight ? 'text-[#F04438] font-bold' : 'text-slate-100 font-bold'}`} title={cleanedVal}>
+                  {cleanedVal}
+                </span>
+              )}
             </div>
           );
         })}
@@ -1990,10 +1997,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         }}>
 
           {/* Panel header */}
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B', background: 'rgba(255,255,255,0.02)' }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F56] bg-[#0D162B]">
             <div className="flex items-center gap-2.5">
-              <MessageSquare size={16} style={{ color: borderColor }} />
-              <span className="text-[12px] font-semibold text-slate-200 uppercase tracking-[0.15em]">실시간 SMS 수신내역</span>
+              <MessageSquare size={16} className="text-[#00A3E0]" />
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-black text-slate-100 uppercase tracking-tight font-shinhan-display">1. 원천 거래 관제</span>
+                <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Shinhan Signal]</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {/* 1-unit Step Navigation */}
@@ -2323,10 +2333,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           backdropFilter: 'blur(20px)',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B', background: 'rgba(255,255,255,0.03)' }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F56] bg-[#0D162B]">
             <div className="flex items-center gap-2.5">
-              <Sparkles size={16} className="text-blue-400" />
-              <span className="text-[12px] font-semibold text-slate-200">Expert Advisor</span>
+              <Sparkles size={16} className="text-[#00A3E0]" />
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-black text-slate-100 uppercase tracking-tight font-shinhan-display">3. AI 진단 및 승인</span>
+                <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Decision Exec]</span>
+              </div>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setActiveLogTab('ai')}
@@ -2411,10 +2424,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           overflow: 'hidden',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B', background: 'rgba(255,255,255,0.03)' }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F56] bg-[#0D162B]">
             <div className="flex items-center gap-2.5">
-              <Activity size={16} style={{ color: selectedIncidentIdFlow ? (isClosedFlow ? '#10b981' : '#3b82f6') : '#94a3b8' }} />
-              <span className="text-[12px] font-black text-slate-200 uppercase tracking-[0.15em]">장애 처리 현황</span>
+              <Activity size={16} className="text-[#00A3E0]" />
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-black text-slate-100 uppercase tracking-tight font-shinhan-display">4. 전자금융 SLA</span>
+                <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Incident Ops]</span>
+              </div>
             </div>
             {isClosedFlow ? (
               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
@@ -2665,11 +2681,29 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                   </div>
 
-                  {/* 하단 등급 기준 안내 */}
-                  <div className="mt-4 text-[9px] text-slate-500 tracking-tight whitespace-nowrap px-3 border border-[#1E293B] bg-slate-900/60 rounded-lg py-1 w-fit mx-auto">
-                    <span className="font-semibold text-slate-400 mr-1">MTTA 기준:</span> 
-                    <span className="text-emerald-400 ml-1">상</span> 주3분/야5분 이내 <span className="mx-1 text-slate-700">|</span> 
-                    <span className="text-red-400">하</span> 주5분/야10분 이상
+                  {/* 전자금융감독규정 대응 골든타임 계측 기준 바 */}
+                  <div className="mt-4 flex flex-col items-center gap-1.5 px-3 py-2 border border-[#1E2F56] bg-[#060C1B] rounded-xl w-full max-w-[340px] mx-auto text-[10px] font-shinhan-num shadow-sm">
+                    <div className="flex items-center justify-between w-full pb-1 border-b border-[#1E2F56]/80 text-[9.5px]">
+                      <span className="font-bold text-[#00A3E0] font-shinhan-display flex items-center gap-1">
+                        <Shield className="w-3 h-3 text-[#00A3E0]" />
+                        전자금융감독규정 SLA 골든타임 기준
+                      </span>
+                      <span className="text-slate-400">FIN-SLA GOAL</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 w-full text-center text-[9px] pt-0.5">
+                      <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                        <span className="text-slate-400 block">장애 인지</span>
+                        <span className="text-[#00C48C] font-bold">10분 이내</span>
+                      </div>
+                      <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                        <span className="text-slate-400 block">상황 전파</span>
+                        <span className="text-[#F5A623] font-bold">30분 이내</span>
+                      </div>
+                      <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                        <span className="text-slate-400 block">시스템 복구</span>
+                        <span className="text-[#0046FF] font-bold">2시간 이내</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

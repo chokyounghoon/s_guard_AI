@@ -9,8 +9,51 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
 @theme {
-  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'SF Pro Display', Inter, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --font-sans: 'One Shinhan', 'One Shinhan Sans', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'SF Pro Display', Inter, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --font-display: 'One Shinhan', 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+  /* 🏢 신한 디지털 금융 관제 표준 디자인 시스템 */
+  --color-shinhan-bg-navy: #060C1B;   /* Canvas: 심야 네이비 배경 */
+  --color-shinhan-surface: #0D162B;   /* Surface: 메인 카드 배경면 */
+  --color-shinhan-card-inner: #13203E;/* Sub-Surface: 내부 블록 배경 */
+  --color-shinhan-border: #1E2F56;    /* Border: 1px 정밀 매트 분할선 */
+  --color-shinhan-blue: #0046FF;      /* Primary: 신한 시그니처 블루 */
+  --color-shinhan-sky: #00A3E0;       /* Accent Sky: AI 브리핑, 하이라이트 */
+  --color-shinhan-danger: #F04438;    /* Alert Red: 임계치 초과, 긴급 */
+  --color-shinhan-gold: #F5A623;      /* Warning Gold: 신한 골드, 이력 매칭 */
+  --color-shinhan-mint: #00C48C;      /* Success Mint: 정상 상태(SAFE) */
+
+  /* 세만틱 컬러 */
+  --color-status-normal: #00C48C;
+  --color-status-warning: #F5A623;
+  --color-status-danger: #F04438;
+}
+
+:root {
+  /* Font Family */
+  --font-shinhan-display: 'One Shinhan', 'Pretendard', sans-serif;
+  --font-shinhan-body: 'One Shinhan Sans', 'Pretendard', -apple-system, sans-serif;
+  --font-shinhan-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+
+  /* Shinhan Dark Elevation Colors */
+  --sh-bg-canvas: #060c1b;       /* 캔버스 기본 배경 */
+  --sh-surface-card: #0d162b;    /* 메인 카드 배경 */
+  --sh-surface-sub: #13203e;     /* 내부 위젯/리포트 블록 배경 */
+  --sh-border-color: #1e2f56;    /* 1px 정밀 보더 */
+
+  /* Shinhan Brand & Semantic Accents */
+  --sh-blue-primary: #0046ff;    /* 신한 시그니처 블루 */
+  --sh-blue-hover: #0036c8;
+  --sh-sky-accent: #00a3e0;      /* 에이전트/인사이트 하이라이트 */
+  --sh-danger: #f04438;          /* 오류 임계치 초과 */
+  --sh-warning: #f5a623;         /* 신한 골드 / 원인 인디케이터 */
+  --sh-success: #00c48c;         /* 정상 상태 / 조치 완료 */
+
+  /* Typography Colors */
+  --sh-text-primary: #f8fafc;
+  --sh-text-secondary: #94a3b8;
+  --sh-text-muted: #64748b;
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -33,7 +76,7 @@
   }
 
   body {
-    @apply bg-slate-900 text-white;
+    @apply bg-[#060C1B] text-slate-100;
     font-family: var(--font-sans);
     font-size: 15px;
     line-height: 1.5;
