@@ -3,20 +3,82 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
 @theme {
-  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'SF Pro Display', Inter, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  --color-sguard-main: #0B0F19;
-  --color-sguard-card: #111827;
-  --color-sguard-deep: #0F172A;
-  --color-sguard-darker: #090D16;
-  --color-sguard-accent: #3b82f6;
-  --color-sguard-purple: #a855f7;
-  --color-sguard-teal: #2dd4bf;
-  --color-sguard-emerald: #10b981;
+  --font-sans: 'One Shinhan', 'One Shinhan Sans', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', Inter, sans-serif;
+  --font-display: 'One Shinhan', 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+  --font-mono: 'Roboto', 'JetBrains Mono', 'SF Mono', monospace;
+
+  /* 🏢 신한 디지털 금융 관제 표준 디자인 시스템 (Shinhan Enterprise Ops Design System) */
+  --color-shinhan-bg-navy: #060C1B;   /* Canvas: 심야 네이비 배경 */
+  --color-shinhan-surface: #0D162B;   /* Surface: 4개 메인 컬럼 카드 배경면 */
+  --color-shinhan-card-inner: #13203E;/* Sub-Surface: 카드 내부 블록 배경 */
+  --color-shinhan-border: #1E2F56;    /* Border: 1px 매트 분할선 (네온 발광 배제) */
+  --color-shinhan-blue: #0046FF;      /* Primary: 신한 시그니처 블루 */
+  --color-shinhan-sky: #00A3E0;       /* Accent Sky: AI 브리핑, 하이라이트 */
+  --color-shinhan-danger: #F04438;    /* Alert Red: 임계치 초과, 긴급 */
+  --color-shinhan-gold: #F5A623;      /* Warning Gold: 신한 골드, 이력 매칭 */
+  --color-shinhan-mint: #00C48C;      /* Success Mint: 정상 상태(SAFE) */
+
+  /* 기존 sguard 클래스 호환 매핑 */
+  --color-sguard-main: #060C1B;
+  --color-sguard-card: #0D162B;
+  --color-sguard-deep: #13203E;
+  --color-sguard-darker: #060C1B;
+  --color-sguard-accent: #0046FF;
+  --color-sguard-purple: #00A3E0;
+  --color-sguard-teal: #00C48C;
+  --color-sguard-emerald: #00C48C;
+
   /* ── 세만틱 컬러 시스템 (Semantic Status Colors) ── */
-  --color-status-normal: #10b981;   /* 정상 (Green / Emerald) */
-  --color-status-warning: #f59e0b;  /* 경고 (Amber / Orange) */
-  --color-status-danger: #ef4444;   /* 위험 (Red / Rose) */
+  --color-status-normal: #00C48C;   /* 정상 (Shinhan Mint) */
+  --color-status-warning: #F5A623;  /* 경고 (Shinhan Gold) */
+  --color-status-danger: #F04438;   /* 위험 (Shinhan Danger) */
+}
+
+:root {
+  /* Font Family */
+  --font-shinhan-display: 'One Shinhan', 'Pretendard', sans-serif;
+  --font-shinhan-body: 'One Shinhan Sans', 'Pretendard', -apple-system, sans-serif;
+  --font-shinhan-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+
+  /* Shinhan Dark Elevation Colors */
+  --sh-bg-canvas: #060c1b;       /* 캔버스 기본 배경 */
+  --sh-surface-card: #0d162b;    /* 4대 컬럼 메인 배경 */
+  --sh-surface-sub: #13203e;     /* 내부 위젯/리포트 블록 배경 */
+  --sh-border-color: #1e2f56;    /* 1px 정밀 보더 */
+
+  /* Shinhan Brand & Semantic Accents */
+  --sh-blue-primary: #0046ff;    /* 신한 시그니처 블루 */
+  --sh-blue-hover: #0036c8;
+  --sh-sky-accent: #00a3e0;      /* 에이전트/인사이트 하이라이트 */
+  --sh-danger: #f04438;          /* 오류 임계치 초과 */
+  --sh-warning: #f5a623;         /* 신한 골드 / 원인 인디케이터 */
+  --sh-success: #00c48c;         /* 정상 상태 / 조치 완료 */
+
+  /* Typography Colors */
+  --sh-text-primary: #f8fafc;
+  --sh-text-secondary: #94a3b8;
+  --sh-text-muted: #64748b;
+}
+
+/* 4단 그리드 뷰포트 고정 레이아웃 */
+.dashboard-grid-container {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr 1.35fr 1fr;
+  gap: 16px;
+  height: calc(100vh - 72px);
+  padding: 16px 20px;
+  background-color: var(--sh-bg-canvas);
+  overflow: hidden;
+}
+
+/* 카드 서피스 스타일 */
+.shinhan-column-card {
+  background-color: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-color);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {
@@ -29,7 +91,7 @@
         overflow: hidden;
     }
     body {
-        @apply bg-[#0B0F19] text-[#e2e8f0];
+        @apply bg-[#060C1B] text-[#e2e8f0];
         font-family: var(--font-sans);
         font-size: 15px;
         line-height: 1.5;
@@ -39,10 +101,14 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
-    .font-mono, [class*="font-mono"], code, pre, kbd, samp {
+    .font-mono, [class*="font-mono"], code, pre, kbd, samp, .font-shinhan-num {
         font-family: var(--font-mono);
         font-feature-settings: "tnum" 1, "zero" 1;
         letter-spacing: -0.01em;
+    }
+    .font-shinhan-display {
+        font-family: var(--font-display);
+        letter-spacing: -0.03em;
     }
     input, button, select, textarea {
         font-family: inherit;
@@ -86,13 +152,23 @@
     }
 
 
-    /* 💎 Premium Clean Card */
+    /* 🏢 Shinhan Surface & Cards */
     .glass-card {
-        @apply bg-[#111827] border border-[#1E293B] shadow-none;
+        @apply bg-[#0D162B] border border-[#1E2F56] shadow-none;
     }
     
     .glass-panel {
-        @apply bg-[#0f111a]/80 backdrop-blur-md border-t border-[#1E293B];
+        @apply bg-[#0D162B]/95 border-t border-[#1E2F56];
+    }
+
+    .shinhan-surface-card {
+        background-color: #0D162B;
+        border: 1px solid #1E2F56;
+    }
+
+    .shinhan-inner-card {
+        background-color: #13203E;
+        border: 1px solid #1E2F56;
     }
 
     /* ✨ High-end Gradients */

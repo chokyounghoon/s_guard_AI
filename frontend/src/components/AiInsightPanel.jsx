@@ -41,7 +41,7 @@ const extractSearchEntities = (selectedSms, parsedSimilarity) => {
     if (ifM) ifVal = ifM[1];
   }
   if (ifVal) {
-    entities.push({ key: 'IF', val: ifVal, rawVal: ifVal, color: 'text-sky-300 bg-sky-500/10 border-sky-500/30' });
+    entities.push({ key: 'IF', val: ifVal, rawVal: ifVal, color: 'text-[#00A3E0] bg-[#00A3E0]/10 border-[#00A3E0]/30 font-shinhan-num' });
   }
 
   // 2. 업무 / 시스템
@@ -51,7 +51,7 @@ const extractSearchEntities = (selectedSms, parsedSimilarity) => {
     if (bizM) bizVal = bizM[1];
   }
   if (bizVal) {
-    entities.push({ key: '업무', val: bizVal, rawVal: bizVal, color: 'text-purple-300 bg-purple-500/10 border-purple-500/30' });
+    entities.push({ key: '업무', val: bizVal, rawVal: bizVal, color: 'text-[#0046FF] bg-[#0046FF]/10 border-[#0046FF]/30' });
   }
 
   // 3. 오류율 & 초과폭 (Delta)
@@ -69,22 +69,22 @@ const extractSearchEntities = (selectedSms, parsedSimilarity) => {
       const sign = delta > 0 ? `+${delta.toFixed(1)}%p` : `${delta.toFixed(1)}%p`;
       rateText += ` (초과폭 ${sign})`;
     }
-    entities.push({ key: '오류율', val: rateText, rawVal: `${curRate}%`, color: 'text-rose-300 bg-rose-500/10 border-rose-500/30' });
+    entities.push({ key: '오류율', val: rateText, rawVal: `${curRate}%`, color: 'text-[#F04438] bg-[#F04438]/10 border-[#F04438]/30 font-shinhan-num' });
   } else if (selectedSms.error_code) {
-    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-amber-300 bg-amber-500/10 border-amber-500/30' });
+    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-[#F5A623] bg-[#F5A623]/10 border-[#F5A623]/30 font-shinhan-num' });
   }
 
   // 4. 에러코드 (오류율이 있었어도 에러코드가 있으면 추가)
   if (selectedSms.error_code && curRate !== null) {
-    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-amber-300 bg-amber-500/10 border-amber-500/30' });
+    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-[#F5A623] bg-[#F5A623]/10 border-[#F5A623]/30 font-shinhan-num' });
   }
 
   // Fallback
   if (entities.length === 0) {
     if (parsedSimilarity?.inputValue) {
-      entities.push({ key: '검색키', val: parsedSimilarity.inputValue.slice(0, 25), rawVal: parsedSimilarity.inputValue.slice(0, 25), color: 'text-blue-300 bg-blue-500/10 border-blue-500/30' });
+      entities.push({ key: '검색키', val: parsedSimilarity.inputValue.slice(0, 25), rawVal: parsedSimilarity.inputValue.slice(0, 25), color: 'text-[#0046FF] bg-[#0046FF]/10 border-[#0046FF]/30' });
     } else {
-      entities.push({ key: '검색키', val: '실시간 이상징후 패턴', color: 'text-slate-300 bg-slate-800 border-slate-700' });
+      entities.push({ key: '검색키', val: '실시간 이상징후 패턴', color: 'text-slate-300 bg-[#0D162B] border-[#1E2F56]' });
     }
   }
 
@@ -873,36 +873,37 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
   return (
     <div
-      className="rounded-2xl overflow-hidden relative h-full flex flex-col transition-all duration-300 bg-[#111827]"
+      className="rounded-2xl overflow-hidden relative h-full flex flex-col transition-all duration-300 bg-[#0D162B] border border-[#1E2F56]"
       style={selectedSms
-        ? { border: '1px solid #3B82F6', outline: 'none', boxShadow: '0 0 16px -2px rgba(59, 130, 246, 0.18)' }
-        : { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' }
+        ? { border: '1px solid #0046FF', outline: 'none', boxShadow: '0 0 16px -2px rgba(0, 70, 255, 0.22)' }
+        : { border: '1px solid #1E2F56', outline: 'none', boxShadow: 'none' }
       }>
       {/* 고정 헤더 영역 */}
-      <div className="shrink-0 p-4 sm:p-5 border-b border-[#1E293B] relative">
+      <div className="shrink-0 p-4 sm:p-5 border-b border-[#1E2F56] relative">
 
       {/* 헤더 - SMS 수신내역과 동일한 구조 */}
       <div className="flex items-center justify-between gap-3 relative z-10">
         {/* 왼쪽: 아이콘 + 타이틀 */}
         <div className="flex items-center gap-3 min-w-0">
           <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms ? 'data-ring-spinning' : ''} ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
-            <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-red-500/15 border-red-500/30' : 'bg-blue-500/10 border-[#1E293B]'}`}>
+            <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-[#F04438]/15 border-[#F04438]/30' : 'bg-[#0046FF]/10 border-[#1E2F56]'}`}>
               {isAnalyzingSms && isCritical
-                ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
+                ? <AlertTriangle className="w-5 h-5 text-[#F04438] animate-pulse" />
                 : isAnalyzingSms
-                ? <MessageSquare className="w-5 h-5 text-blue-400 animate-pulse" />
-                : <Brain className="w-5 h-5 text-blue-400" />
+                ? <MessageSquare className="w-5 h-5 text-[#00A3E0] animate-pulse" />
+                : <Brain className="w-5 h-5 text-[#00A3E0]" />
               }
             </div>
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-white text-sm sm:text-base tracking-tight whitespace-nowrap">
-                S-Autopilot Insight
+              <h2 className="font-semibold text-white text-sm sm:text-base tracking-tight whitespace-nowrap font-shinhan-display">
+                2. 지능형 지식 대조
               </h2>
+              <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Insight Archive]</span>
               {selectedSms && (
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[9px] font-mono font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30 text-[9px] font-mono font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0] animate-pulse" />
                   PIPELINE SYNC
                 </span>
               )}
@@ -1062,18 +1063,18 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           const formattedTicketId = ticketId ? (ticketId.toLowerCase().startsWith('inc-') ? ticketId : `inc-${ticketId}`) : null;
 
           return (
-            <div className="mb-4 rounded-xl bg-[#161F30] border border-[#1E293B] p-3.5 sm:p-4 animate-in fade-in duration-500 relative z-10 shadow-sm">
+            <div className="mb-4 rounded-xl bg-[#13203E] border border-[#1E2F56] p-3.5 sm:p-4 animate-in fade-in duration-500 relative z-10 shadow-sm">
               {/* 1. 상단 AI 매칭 KPI 위젯: 타이틀 + 티켓 ID 아웃라인 뱃지 + 게이지 수치 */}
               <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
-                    <Zap className="w-3.5 h-3.5 text-blue-400" />
+                  <div className="w-7 h-7 rounded-lg bg-[#0046FF]/15 border border-[#0046FF]/30 flex items-center justify-center">
+                    <Zap className="w-3.5 h-3.5 text-[#00A3E0]" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-semibold text-slate-200">S-Autopilot 지식베이스 매칭</span>
                       {parsed?.matchType && (
-                        <span className="text-[9px] font-semibold text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                        <span className="text-[9px] font-semibold text-[#00A3E0] bg-[#00A3E0]/10 px-1.5 py-0.5 rounded border border-[#00A3E0]/20">
                           {parsed.matchType}
                         </span>
                       )}
@@ -1082,21 +1083,21 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   </div>
                 </div>
 
-                {/* 연동된 과거 인시던트 티켓 ID(inc-20260812083346268) 클릭 가능한 아웃라인 뱃지 + 유사도 프로그레스 게이지 */}
+                {/* 연동된 과거 인시던트 티켓 ID 클릭 가능한 아웃라인 뱃지 + 유사도 프로그레스 게이지 */}
                 <div className="flex items-center gap-2">
                   {formattedTicketId && (
                     <button
                       onClick={() => navigate(`/ai-report/${ticketId.replace(/^inc-?/i, '')}`)}
-                      className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/40 hover:border-blue-400 text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+                      className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0046FF]/10 hover:bg-[#0046FF]/20 text-[#00A3E0] hover:text-white border border-[#0046FF]/40 hover:border-[#0046FF] text-xs font-shinhan-num font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
                       title="연동된 과거 인시던트 티켓 리포트 열기"
                     >
                       <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                       <span>{formattedTicketId}</span>
                     </button>
                   )}
-                  <div className="flex items-baseline gap-1 bg-[#0B0F19] px-2.5 py-1 rounded-lg border border-[#1E293B]">
+                  <div className="flex items-baseline gap-1 bg-[#060C1B] px-2.5 py-1 rounded-lg border border-[#1E2F56]">
                     <span className="text-[10px] text-slate-400 font-medium">유사도</span>
-                    <span className={`text-base font-bold font-mono tabular-nums ${textColor}`}>
+                    <span className={`text-base font-bold font-shinhan-num tabular-nums ${textColor}`}>
                       {pct.toFixed(1)}%
                     </span>
                   </div>
@@ -1104,15 +1105,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               </div>
 
               {/* 프로그레스 바 형태의 게이지 위젯 */}
-              <div className="h-2 bg-[#0B0F19] rounded-full overflow-hidden border border-[#1E293B]/70 relative mb-3">
+              <div className="h-2 bg-[#060C1B] rounded-full overflow-hidden border border-[#1E2F56] relative mb-3">
                 <div
                   className="h-full rounded-full transition-all duration-1000 ease-out"
-                  style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}99, ${barColor})` }}
+                  style={{ width: `${pct}%`, background: score > 0.8 ? '#00C48C' : score > 0.6 ? '#0046FF' : '#F5A623' }}
                 />
               </div>
 
               {/* 2. 분석 데이터의 Key-Value 테이블화 (출처 DB / 매칭 기준 + [추출 엔티티] 컴팩트 태그) */}
-              <div className="bg-[#0B0F19] border border-[#1E293B]/80 rounded-xl p-3 flex flex-col gap-2 text-xs">
+              <div className="bg-[#060C1B] border border-[#1E2F56] rounded-xl p-3 flex flex-col gap-2 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-bold text-slate-400 shrink-0 whitespace-nowrap text-[11px]">출처 DB:</span>
@@ -1173,28 +1174,28 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
           if (!selectedSms) {
             return (
-              <div className="mb-4 rounded-2xl border border-[#1E293B] bg-[#161F30] p-6 text-sm flex items-center justify-center min-h-[140px]">
-                <span className="text-slate-500 font-medium">분석할 장애 내역이 없습니다. (수신 대기 중)</span>
+              <div className="mb-4 rounded-2xl border border-[#1E2F56] bg-[#13203E] p-6 text-sm flex items-center justify-center min-h-[140px]">
+                <span className="text-slate-400 font-medium">분석할 장애 내역이 없습니다. (수신 대기 중)</span>
               </div>
             );
           }
 
           return (
-            <div className="mb-4 rounded-2xl border border-[#1E293B] bg-[#161F30] p-4 sm:p-5 space-y-3.5 animate-in fade-in duration-500 relative shadow-sm">
+            <div className="mb-4 rounded-2xl border border-[#1E2F56] bg-[#13203E] p-4 sm:p-5 space-y-3.5 animate-in fade-in duration-500 relative shadow-sm">
               {/* 헤더: 과거 티켓 이력 & 신뢰도 지표 */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#1E293B]/70">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#1E2F56]">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
-                    <History className="w-3.5 h-3.5 text-amber-400" />
+                  <div className="w-7 h-7 rounded-lg bg-[#F5A623]/15 border border-[#F5A623]/30 flex items-center justify-center">
+                    <History className="w-3.5 h-3.5 text-[#F5A623]" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-100">과거 유사 장애 솔루션 아카이브</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                      <span className="text-xs font-bold text-slate-100 font-shinhan-display">과거 유사 장애 솔루션 아카이브</span>
+                      <span className="text-[9px] font-shinhan-num px-1.5 py-0.2 rounded bg-[#F5A623]/10 text-[#F5A623] border border-[#F5A623]/30">
                         {isMatched ? 'MATCHED SOLUTION' : 'STANDARD'}
                       </span>
                     </div>
-                    <p className="text-[9px] text-slate-400 font-mono">Historical Incident Resolution Archive</p>
+                    <p className="text-[9px] text-slate-400 font-shinhan-num">Historical Incident Resolution Archive</p>
                   </div>
                 </div>
 
@@ -1203,46 +1204,46 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   {hist?.ticketId && (
                     <button
                       onClick={() => navigate(`/ai-report/${hist.ticketId.replace(/^inc-?/i, '')}`)}
-                      className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/40 text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer"
+                      className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0046FF]/10 hover:bg-[#0046FF]/20 text-[#00A3E0] hover:text-[#38bdf8] border border-[#0046FF]/40 text-xs font-shinhan-num font-bold transition-all active:scale-95 cursor-pointer"
                       title="과거 인시던트 티켓 리포트 바로가기"
                     >
                       <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                       <span>{hist.ticketId}</span>
                     </button>
                   )}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0B0F19] border border-[#1E293B]">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[10px] text-slate-300 font-mono font-semibold">신뢰도 {pct.toFixed(1)}%</span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#060C1B] border border-[#1E2F56]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#00C48C]" />
+                    <span className="text-[10px] text-slate-300 font-shinhan-num font-semibold">신뢰도 {pct.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
 
               {/* 과거 티켓 원인 및 해결 조치 (Resolution 카드 면적 확장) */}
               <div className="space-y-2.5">
-                {/* 1. 당시 적용 조치 (Resolution) - 즉시 한눈에 들어오도록 면적 확장 및 시각적 강조 */}
-                <div className="p-3.5 sm:p-4 rounded-xl bg-[#0c1a16] border border-emerald-500/35 border-l-4 border-l-emerald-400 space-y-1.5 shadow-sm">
+                {/* 1. 당시 적용 조치 (Resolution) - 신한 골드/앰버 좌측 액센트 라인 및 조치 내용 강조 */}
+                <div className="p-3.5 sm:p-4 rounded-xl bg-[#1E170A] border border-[#F5A623]/40 border-l-4 border-l-[#F5A623] space-y-1.5 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-emerald-400 flex items-center gap-1.5 tracking-wider uppercase">
-                      <Wrench className="w-4 h-4 text-emerald-400" />
+                    <span className="text-[11px] font-black text-[#F5A623] flex items-center gap-1.5 tracking-wider uppercase font-shinhan-display">
+                      <Wrench className="w-4 h-4 text-[#F5A623]" />
                       과거 동일 장애 해결 조치 (Resolution)
                     </span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                    <span className="text-[9px] font-shinhan-num px-1.5 py-0.5 rounded bg-[#F5A623]/15 text-[#F5A623] border border-[#F5A623]/30 font-bold">
                       PROVEN REMEDY
                     </span>
                   </div>
-                  <p className="text-[13px] font-bold text-emerald-100 leading-relaxed break-keep">
-                    {hist?.resolution || '서비스 프로세스 긴급 재기동 및 슬로우 쿼리 Kill 조치 완료'}
+                  <p className="text-[13px] font-bold text-amber-100 leading-relaxed break-keep">
+                    {hist?.resolution || 'MCI 인터페이스 프로세스 긴급 재기동 및 슬로우 쿼리 Kill 조치 완료'}
                   </p>
                 </div>
 
                 {/* 2. 과거 발생 원인 (Root Cause) */}
-                <div className="p-3.5 rounded-xl bg-[#171206]/90 border border-amber-500/30 border-l-3 border-l-amber-400 space-y-1 shadow-sm">
+                <div className="p-3.5 rounded-xl bg-[#1E170A] border border-[#F5A623]/35 border-l-3 border-l-[#F5A623] space-y-1 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10.5px] font-bold text-amber-400 flex items-center gap-1.5 tracking-wider uppercase">
-                      <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[10.5px] font-bold text-[#F5A623] flex items-center gap-1.5 tracking-wider uppercase font-shinhan-display">
+                      <ShieldAlert className="w-3.5 h-3.5 text-[#F5A623]" />
                       과거 발생 원인 (Root Cause)
                     </span>
-                    <span className="text-[9px] font-mono text-slate-500">PAST CAUSE</span>
+                    <span className="text-[9px] font-shinhan-num text-slate-500">PAST CAUSE</span>
                   </div>
                   <p className="text-[12px] font-medium text-slate-200 leading-relaxed break-keep">
                     {hist?.cause || 'WAS 인스턴스 커넥션 풀 고갈 및 DB 세션 경합 발생'}
@@ -1251,37 +1252,37 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               </div>
 
               {/* 과거 티켓 해결 타임라인 스트립 (Timeline Track) */}
-              <div className="p-3 rounded-xl bg-[#0B0F19] border border-[#1E293B] space-y-2">
+              <div className="p-3 rounded-xl bg-[#060C1B] border border-[#1E2F56] space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Clock className="w-3 h-3 text-blue-400" />
+                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider font-shinhan-display">
+                    <Clock className="w-3 h-3 text-[#00A3E0]" />
                     과거 티켓 복구 타임라인 (MTTR 이력)
                   </span>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.2 rounded border border-emerald-500/20 font-bold">
+                  <span className="text-[10px] font-shinhan-num text-[#00C48C] bg-[#00C48C]/10 px-2 py-0.2 rounded border border-[#00C48C]/20 font-bold">
                     총 12분 소요 복구 완료
                   </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 pt-1">
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#161F30]/60 border border-[#1E293B]">
-                    <div className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0D162B] border border-[#1E2F56]">
+                    <div className="w-2 h-2 rounded-full bg-[#0046FF] shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold text-slate-200 truncate">1. 발생 감지</p>
-                      <p className="text-[9px] text-slate-400 font-mono">임계치 초과 1분 내</p>
+                      <p className="text-[9px] text-slate-400 font-shinhan-num">임계치 초과 1분 내</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#161F30]/60 border border-[#1E293B]">
-                    <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0D162B] border border-[#1E2F56]">
+                    <div className="w-2 h-2 rounded-full bg-[#F5A623] shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold text-slate-200 truncate">2. 원인 특정</p>
-                      <p className="text-[9px] text-slate-400 font-mono">세션 락 분석 4분</p>
+                      <p className="text-[9px] text-slate-400 font-shinhan-num">세션 락 분석 4분</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#161F30]/60 border border-[#1E293B]">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0D162B] border border-[#1E2F56]">
+                    <div className="w-2 h-2 rounded-full bg-[#00C48C] shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold text-slate-200 truncate">3. 조치 완료</p>
-                      <p className="text-[9px] text-slate-400 font-mono">프로세스 재기동 7분</p>
+                      <p className="text-[9px] text-slate-400 font-shinhan-num">프로세스 재기동 7분</p>
                     </div>
                   </div>
                 </div>
@@ -1310,21 +1311,21 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
           return (
             <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-500">
-              {/* 메타데이터 태그 클라우드 컨테이너 (은은한 서브 서피스 #161F30) */}
-              <div className="rounded-xl bg-[#161F30] border border-[#1E293B] p-3.5">
+              {/* 메타데이터 태그 클라우드 컨테이너 (은은한 서브 서피스 #13203E) */}
+              <div className="rounded-xl bg-[#13203E] border border-[#1E2F56] p-3.5">
                 {/* 헤더 바: 가로 여백을 알차게 메우는 정렬/리셋 셀렉트 박스 및 발생일시 */}
-                <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-[#1E293B]/70">
+                <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-[#1E2F56]">
                   <div className="flex items-center gap-1.5">
-                    <Hash size={12} className="text-blue-400" />
-                    <span className="text-xs font-semibold text-slate-200">메타데이터 필터</span>
-                    <span className="text-[10px] font-mono text-slate-400 bg-[#0B0F19] px-1.5 py-0.5 rounded border border-[#1E293B]">
+                    <Hash size={12} className="text-[#00A3E0]" />
+                    <span className="text-xs font-semibold text-slate-200 font-shinhan-display">메타데이터 필터</span>
+                    <span className="text-[10px] font-shinhan-num text-slate-400 bg-[#060C1B] px-1.5 py-0.5 rounded border border-[#1E2F56]">
                       {sortedMetadata.length}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
                     {selectedSms.occurrence_time && (
-                      <span className="text-[10px] text-slate-400 font-mono hidden sm:inline-block">
+                      <span className="text-[10px] text-slate-400 font-shinhan-num hidden sm:inline-block">
                         발생: {formatYYMMDD(selectedSms.occurrence_time)}
                       </span>
                     )}
@@ -1333,7 +1334,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                       <select
                         value={metadataSort}
                         onChange={(e) => setMetadataSort(e.target.value)}
-                        className="bg-[#0B0F19] border border-[#1E293B] rounded-lg px-2 py-0.5 text-[10px] font-medium text-slate-300 focus:outline-none focus:border-blue-500/50 cursor-pointer"
+                        className="bg-[#060C1B] border border-[#1E2F56] rounded-lg px-2 py-0.5 text-[10px] font-medium text-slate-300 focus:outline-none focus:border-[#0046FF] cursor-pointer font-shinhan-num"
                         title="메타데이터 정렬 기준"
                       >
                         <option value="default">기본 순서</option>
@@ -1343,7 +1344,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                       {metadataSort !== 'default' && (
                         <button
                           onClick={() => setMetadataSort('default')}
-                          className="p-1 rounded-lg bg-[#0B0F19] border border-[#1E293B] text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all cursor-pointer"
+                          className="p-1 rounded-lg bg-[#060C1B] border border-[#1E2F56] text-slate-400 hover:text-slate-200 hover:border-[#0046FF]/50 transition-all cursor-pointer"
                           title="정렬 초기화"
                         >
                           <RotateCcw size={10} />
@@ -1359,14 +1360,14 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     <button
                       key={i}
                       onClick={() => handleChipClick(item.value, item.label)}
-                      className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0B0F19] hover:bg-blue-500/10 border border-[#1E293B] hover:border-blue-500/40 text-xs transition-all cursor-pointer active:scale-95 shadow-sm"
+                      className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#060C1B] hover:bg-[#0046FF]/15 border border-[#1E2F56] hover:border-[#0046FF]/50 text-xs transition-all cursor-pointer active:scale-95 shadow-sm"
                       title={`[${item.label}] '${item.value}' 필터링 검색`}
                     >
                       <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">#{item.label}</span>
-                      <span className="text-[11px] text-slate-100 font-mono font-semibold group-hover:text-blue-300 transition-colors truncate max-w-[150px] sm:max-w-[220px]">
+                      <span className="text-[11px] text-slate-100 font-shinhan-num font-semibold group-hover:text-[#00A3E0] transition-colors truncate max-w-[150px] sm:max-w-[220px]">
                         {item.value}
                       </span>
-                      <Search size={10} className="text-slate-500 group-hover:text-blue-400 transition-colors shrink-0" />
+                      <Search size={10} className="text-slate-500 group-hover:text-[#00A3E0] transition-colors shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -1374,11 +1375,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
               {/* 에러 메시지 (플랫 스트립) */}
               {selectedSms.error_message && (
-                <div className="mt-3 p-3 bg-[#161F30] border-l-4 border-l-red-500 border border-[#1E293B] rounded-r-xl flex items-start gap-2.5">
-                  <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                <div className="mt-3 p-3 bg-[#13203E] border-l-4 border-l-[#F04438] border border-[#1E2F56] rounded-r-xl flex items-start gap-2.5">
+                  <AlertCircle size={14} className="text-[#F04438] shrink-0 mt-0.5" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[9px] font-semibold text-red-300/80 uppercase tracking-wider mb-0.5">Error Message</span>
-                    <p className="text-[11px] font-mono text-red-200/90 leading-relaxed break-words break-all font-normal">
+                    <span className="text-[9px] font-semibold text-[#F04438]/90 uppercase tracking-wider mb-0.5 font-shinhan-display">Error Message</span>
+                    <p className="text-[11px] font-shinhan-num text-red-200/95 leading-relaxed break-words break-all font-normal">
                       {selectedSms.error_message}
                     </p>
                   </div>
@@ -1387,15 +1388,15 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
               {/* 수신자 목록: 인라인 태그 */}
               {selectedSms.receivers && selectedSms.receivers.length > 0 && (
-                <div className="mt-3 rounded-xl bg-[#161F30] border border-[#1E293B] p-3">
-                  <span className="text-[9px] font-semibold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider mb-2">
-                    <Users size={11} className="text-purple-400" />
+                <div className="mt-3 rounded-xl bg-[#13203E] border border-[#1E2F56] p-3">
+                  <span className="text-[9px] font-semibold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider mb-2 font-shinhan-display">
+                    <Users size={11} className="text-[#00A3E0]" />
                     전파 대상자 ({selectedSms.receivers.length})
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedSms.receivers.map((r, i) => (
-                      <span key={i} className="text-[10px] text-slate-300 bg-[#0B0F19] px-2 py-0.5 rounded-md font-mono border border-[#1E293B] flex items-center gap-1">
-                        <span className="w-1 h-1 rounded-full bg-blue-400" />
+                      <span key={i} className="text-[10px] text-slate-300 bg-[#060C1B] px-2 py-0.5 rounded-md font-shinhan-num border border-[#1E2F56] flex items-center gap-1">
+                        <span className="w-1 h-1 rounded-full bg-[#0046FF]" />
                         {maskName(r)}
                       </span>
                     ))}
@@ -1412,16 +1413,16 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         {/* Feedback Buttons (👍/👎) - 플랫 그리드 액션 바 */}
         {analysisComplete && displayedText && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <div className={`w-full rounded-2xl border border-[#1E293B] p-4 sm:p-5 transition-all duration-300 ${
+            <div className={`w-full rounded-2xl border border-[#1E2F56] p-4 sm:p-5 transition-all duration-300 ${
               feedback === 'UP'
-                ? 'bg-emerald-500/10'
+                ? 'bg-[#00C48C]/10'
                 : feedback === 'DOWN'
-                ? 'bg-red-500/10'
-                : 'bg-[#0B0F19]'
+                ? 'bg-[#F04438]/10'
+                : 'bg-[#13203E]'
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <p className={`text-xs font-semibold flex items-center gap-2 ${
-                  feedback === 'UP' ? 'text-emerald-400' : feedback === 'DOWN' ? 'text-red-400' : 'text-slate-300'
+                  feedback === 'UP' ? 'text-[#00C48C]' : feedback === 'DOWN' ? 'text-[#F04438]' : 'text-slate-300'
                 }`}>
                   {feedback === 'UP' ? '정확한 분석으로 평가하셨습니다' : feedback === 'DOWN' ? '피드백을 제출해 주셔서 감사합니다' : 'AI 진단 결과가 실무에 도움이 되었나요?'}
                 </p>
@@ -1431,8 +1432,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     disabled={feedback === 'UP'}
                     className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all active:scale-95 border ${
                       feedback === 'UP'
-                        ? 'bg-emerald-600 text-white border-emerald-500 font-semibold'
-                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-[#1E293B] hover:border-slate-700'
+                        ? 'bg-[#00C48C] text-white border-[#00C48C] font-semibold'
+                        : 'bg-[#0D162B] hover:bg-[#1E2F56] text-slate-300 border-[#1E2F56]'
                     }`}
                   >
                     <ThumbsUp className={`w-3.5 h-3.5 ${feedback === 'UP' ? 'fill-current text-white' : 'text-slate-400'}`} />
@@ -1443,8 +1444,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     disabled={feedback === 'DOWN' && !showFeedbackModal}
                     className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all active:scale-95 border ${
                       feedback === 'DOWN'
-                        ? 'bg-rose-600 text-white border-rose-500 font-semibold'
-                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-[#1E293B] hover:border-slate-700'
+                        ? 'bg-[#F04438] text-white border-[#F04438] font-semibold'
+                        : 'bg-[#0D162B] hover:bg-[#1E2F56] text-slate-300 border-[#1E2F56]'
                     }`}
                   >
                     <ThumbsDown className={`w-3.5 h-3.5 ${feedback === 'DOWN' ? 'fill-current text-white' : 'text-slate-400'}`} />
@@ -1461,13 +1462,13 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       {/* Detailed Feedback Modal (Popup) */}
       {showFeedbackModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#1a1f2e] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-slate-900/40">
+          <div className="bg-[#0D162B] border border-[#1E2F56] rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-[#1E2F56] flex items-center justify-between bg-[#13203E]">
               <div className="flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 text-red-400" />
-                <h3 className="text-sm font-bold text-white">무엇이 잘못되었나요?</h3>
+                <AlertCircle className="w-4 h-4 text-[#F04438]" />
+                <h3 className="text-sm font-bold text-white font-shinhan-display">무엇이 잘못되었나요?</h3>
               </div>
-              <button onClick={() => setShowFeedbackModal(false)} className="text-slate-500 hover:text-white">
+              <button onClick={() => setShowFeedbackModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1478,7 +1479,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   <button
                     key={reason}
                     onClick={() => setDownReason(reason)}
-                    className={`text-left px-3 py-2.5 rounded-xl text-xs transition-all border ${downReason === reason ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' : 'bg-white/5 border-transparent text-slate-400 hover:bg-white/10'}`}
+                    className={`text-left px-3 py-2.5 rounded-xl text-xs transition-all border ${downReason === reason ? 'bg-[#0046FF]/20 border-[#0046FF] text-[#00A3E0]' : 'bg-[#060C1B] border-[#1E2F56] text-slate-400 hover:bg-[#13203E]'}`}
                   >
                     {reason}
                   </button>
@@ -1486,19 +1487,19 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">교정 내용 (직접 수정)</label>
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-shinhan-display">교정 내용 (직접 수정)</label>
                 <textarea
                   value={correction}
                   onChange={(e) => setCorrection(e.target.value)}
                   placeholder="올바른 정답이나 수정 사항을 입력해 주세요..."
-                  className="w-full h-24 bg-black/20 border border-white/10 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-blue-500/50 transition-all resize-none"
+                  className="w-full h-24 bg-[#060C1B] border border-[#1E2F56] rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-[#0046FF] transition-all resize-none"
                 />
               </div>
 
               <button
                 onClick={() => handleFeedback('DOWN', { reason: downReason, correction })}
                 disabled={!downReason || isSubmitting}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-all border border-blue-500 flex items-center justify-center space-x-2"
+                className="w-full py-2.5 bg-[#0046FF] hover:bg-[#0038cc] disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-all border border-[#0046FF] flex items-center justify-center space-x-2 font-shinhan-display"
               >
                 {isSubmitting ? <span>제출 중...</span> : (
                   <>

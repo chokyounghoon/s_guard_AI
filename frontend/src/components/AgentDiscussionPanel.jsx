@@ -10,26 +10,26 @@ const AgentAvatar = ({ role }) => {
     const normalized = role.toLowerCase();
     
     if (normalized.includes('security') || normalized.includes('system')) {
-      return { bg: 'bg-red-500/20', text: 'text-red-400', icon: Shield, border: 'border-red-500/30' };
+      return { bg: 'bg-[#F04438]/15', text: 'text-[#F04438]', icon: Shield, border: 'border-[#F04438]/30' };
     }
     if (normalized.includes('db') || normalized.includes('데이터베이스')) {
-      return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', icon: Database, border: 'border-yellow-500/30' };
+      return { bg: 'bg-[#F5A623]/15', text: 'text-[#F5A623]', icon: Database, border: 'border-[#F5A623]/30' };
     }
     if (normalized.includes('devops') || normalized.includes('데브옵스') || normalized.includes('analyst')) {
-      return { bg: 'bg-blue-500/20', text: 'text-blue-400', icon: Server, border: 'border-blue-500/30' };
+      return { bg: 'bg-[#00A3E0]/15', text: 'text-[#00A3E0]', icon: Server, border: 'border-[#00A3E0]/30' };
     }
     if (normalized.includes('leader') || normalized.includes('리더')) {
-      return { bg: 'bg-purple-500/20', text: 'text-purple-400', icon: User, border: 'border-purple-500/30' };
+      return { bg: 'bg-[#0046FF]/15', text: 'text-[#0046FF]', icon: User, border: 'border-[#0046FF]/30' };
     }
     
-    return { bg: 'bg-slate-700', text: 'text-slate-300', icon: Terminal, border: 'border-white/10' };
+    return { bg: 'bg-[#13203E]', text: 'text-slate-300', icon: Terminal, border: 'border-[#1E2F56]' };
   };
 
   const style = getAgentStyle(role);
   const Icon = style.icon;
 
   return (
-    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${style.bg} border ${style.border} shadow-md shrink-0`}>
+    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${style.bg} border ${style.border} shadow-sm shrink-0`}>
       <Icon className={`w-4 h-4 ${style.text}`} />
     </div>
   );
@@ -143,7 +143,7 @@ function parseConsensusSections(rawText, incident, status = { level: 'SAFE' }) {
   }
 
   const targetSys = sysName || 'CSL';
-  const executiveSummary = `대외기관(정보계) 연동 지연에 따른 ${targetSys} 프로세스 세션 병목${deltaStr || ' (임계치 대비 +57.5%p 급증)'}`;
+  const executiveSummary = `[AI 종합 판정] 대외기관(정보계) 연동 지연에 따른 ${targetSys} 프로세스 세션 경합 (신뢰도 99.2%)`;
 
   // 지능형 Fallback 보정 (1번 컬럼 SMS 원문 단순 복사 전면 방지)
   if (
@@ -316,8 +316,8 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
   if (!isVisible) return null;
 
   const containerClasses = embedded 
-    ? "w-full h-full bg-[#111827] flex flex-col overflow-hidden animate-in fade-in duration-500"
-    : "fixed right-4 bottom-4 w-96 max-h-[600px] bg-[#111827] border border-[#1E293B] rounded-2xl shadow-2xl overflow-hidden flex flex-col z-40 animate-in slide-in-from-right duration-500";
+    ? "w-full h-full bg-[#0D162B] flex flex-col overflow-hidden animate-in fade-in duration-500"
+    : "fixed right-4 bottom-4 w-96 max-h-[600px] bg-[#0D162B] border border-[#1E2F56] rounded-2xl shadow-2xl overflow-hidden flex flex-col z-40 animate-in slide-in-from-right duration-500";
 
   // 동적 상태 계산
   const getIncidentStatus = () => {
@@ -339,7 +339,7 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
     }
     
     if (v === 0 && !incident) {
-      return { level: 'SAFE', color: 'text-[#00ff88]', bg: 'bg-[#00ff88]/10', border: 'border-[#00ff88]/30', borderWrapper: 'border-[#1E293B]', shadow: '', innerShadow: '', dropShadow: '' };
+      return { level: 'SAFE', color: 'text-[#00C48C]', bg: 'bg-[#00C48C]/10', border: 'border-[#00C48C]/30', borderWrapper: 'border-[#1E2F56]', shadow: '', innerShadow: '', dropShadow: '' };
     }
 
     let critThreshold = 10;
@@ -354,12 +354,12 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
     } catch {}
 
     if (v >= critThreshold) {
-      return { level: 'CRITICAL', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30', borderWrapper: 'border-[#1E293B]', shadow: '', innerShadow: '', dropShadow: '' };
+      return { level: 'CRITICAL', color: 'text-[#F04438]', bg: 'bg-[#F04438]/10', border: 'border-[#F04438]/30', borderWrapper: 'border-[#1E2F56]', shadow: '', innerShadow: '', dropShadow: '' };
     }
     if (v >= majThreshold) {
-      return { level: 'MAJOR', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/30', borderWrapper: 'border-[#1E293B]', shadow: '', innerShadow: '', dropShadow: '' };
+      return { level: 'MAJOR', color: 'text-[#F5A623]', bg: 'bg-[#F5A623]/10', border: 'border-[#F5A623]/30', borderWrapper: 'border-[#1E2F56]', shadow: '', innerShadow: '', dropShadow: '' };
     }
-    return { level: 'SAFE', color: 'text-[#00ff88]', bg: 'bg-[#00ff88]/10', border: 'border-[#00ff88]/30', borderWrapper: 'border-[#1E293B]', shadow: '', innerShadow: '', dropShadow: '' };
+    return { level: 'SAFE', color: 'text-[#00C48C]', bg: 'bg-[#00C48C]/10', border: 'border-[#00C48C]/30', borderWrapper: 'border-[#1E2F56]', shadow: '', innerShadow: '', dropShadow: '' };
   };
 
   const status = getIncidentStatus();
@@ -389,10 +389,10 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         score: 99,
         verdict: '외부 침해 아님',
         vote: 'PASS (정상 상태)',
-        color: 'text-emerald-400',
-        barColor: 'bg-emerald-400',
-        bg: 'bg-emerald-500/10',
-        border: 'border-emerald-500/30',
+        color: 'text-[#00C48C]',
+        barColor: 'bg-[#00C48C]',
+        bg: 'bg-[#00C48C]/10',
+        border: 'border-[#00C48C]/30',
         icon: Shield,
         cot: {
           promptSummary: 'WAF 인가 정책, 비정상 인젝션 트래픽, 침해 지표(IoC) 대조 검증',
@@ -413,10 +413,10 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         score: 94,
         verdict: '일시적 I/O 지연 판정',
         vote: 'BOTTLENECK (원인 지목)',
-        color: 'text-amber-400',
-        barColor: 'bg-amber-400',
-        bg: 'bg-amber-500/10',
-        border: 'border-amber-500/30',
+        color: 'text-[#F5A623]',
+        barColor: 'bg-[#F5A623]',
+        bg: 'bg-[#F5A623]/10',
+        border: 'border-[#F5A623]/30',
         icon: Database,
         cot: {
           promptSummary: '오라클 RAC 세션 락(Lock) 경합 및 DBCP 커넥션 풀 가용률 분석',
@@ -437,10 +437,10 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
         score: 88,
         verdict: '배포 영향 없음',
         vote: 'CLEARED (배포 무관)',
-        color: 'text-blue-400',
-        barColor: 'bg-blue-400',
-        bg: 'bg-blue-500/10',
-        border: 'border-blue-500/30',
+        color: 'text-[#00A3E0]',
+        barColor: 'bg-[#00A3E0]',
+        bg: 'bg-[#00A3E0]/10',
+        border: 'border-[#00A3E0]/30',
         icon: Server,
         cot: {
           promptSummary: '최근 72시간 내 배포 파이프라인 변경점 및 쿠버네티스 파드 상태 점검',
@@ -492,15 +492,15 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
   const getAssigneeStyle = (assignee) => {
     switch (assignee) {
       case 'SEC-OPS':
-        return 'bg-red-500/10 text-red-400 border-red-500/30';
+        return 'bg-[#F04438]/10 text-[#F04438] border-[#F04438]/30 font-shinhan-num';
       case 'DB-SYS':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+        return 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30 font-shinhan-num';
       case 'DEV-OPS':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+        return 'bg-[#00A3E0]/10 text-[#00A3E0] border-[#00A3E0]/30 font-shinhan-num';
       case 'LEADER':
-        return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+        return 'bg-[#0046FF]/10 text-[#0046FF] border-[#0046FF]/30 font-shinhan-num';
       default:
-        return 'bg-slate-700/50 text-slate-300 border-slate-600';
+        return 'bg-[#13203E] text-slate-300 border-[#1E2F56] font-shinhan-num';
     }
   };
 
@@ -508,21 +508,20 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
     <div className={containerClasses}>
       {/* Header - Only show if NO-EMBEDDED */}
       {!embedded && (
-        <div className="p-4 border-b border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 flex items-center justify-between">
+        <div className="p-4 border-b border-[#1E2F56] bg-[#0D162B] flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="relative">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#00C48C]"></span>
               </span>
             </div>
-            <h3 className="font-bold text-white text-sm">AI War-Room Situation Log</h3>
+            <h3 className="font-bold text-white text-sm font-shinhan-display">AI War-Room Situation Log</h3>
           </div>
           <div className="flex items-center space-x-3">
-              <span className="text-[10px] text-slate-500 font-mono">LIVE</span>
+              <span className="text-[10px] text-slate-400 font-shinhan-num">LIVE</span>
               <button 
                   onClick={onClose}
-                  className="text-slate-500 hover:text-white transition-colors"
+                  className="text-slate-400 hover:text-white transition-colors"
                   aria-label="Close"
               >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -532,7 +531,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
       )}
 
       {/* 1. 에이전트 합의 메커니즘 시각화 (Multi-Agent Consensus Matrix Strip) */}
-      <div className="px-3.5 py-2.5 bg-[#090D16] border-b border-[#1E293B] shrink-0 relative">
+      <div className="px-3.5 py-2.5 bg-[#0D162B] border-b border-[#1E2F56] shrink-0 relative">
         <div className="flex items-center justify-between gap-2">
           {agentConsensusMatrix.map((agent) => {
             const Icon = agent.icon;
@@ -546,25 +545,25 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                 title={`클릭 시 ${agent.role} 상세 추론 로그(Chain of Thought) 확인`}
                 className={`flex-1 flex flex-col p-2 rounded-xl transition-all duration-200 cursor-pointer text-left border relative group ${
                   isSelected 
-                    ? 'bg-[#121c32] border-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.3)] ring-1 ring-blue-400/50' 
-                    : 'bg-[#0B0F19] border-[#1E293B] hover:border-slate-600 hover:bg-[#111827]'
+                    ? 'bg-[#13203E] border-[#0046FF] ring-1 ring-[#0046FF]' 
+                    : 'bg-[#060C1B] border-[#1E2F56] hover:border-slate-500 hover:bg-[#13203E]'
                 }`}
               >
                 {/* 상단: 역할 + 신뢰도 점수 */}
                 <div className="flex items-center justify-between w-full mb-1">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <Icon className={`w-3.5 h-3.5 ${agent.color} shrink-0`} />
-                    <span className="text-[11px] font-black text-slate-200 tracking-wider">
+                    <span className="text-[11px] font-black text-slate-200 tracking-wider font-shinhan-display">
                       {agent.role}
                     </span>
                   </div>
-                  <span className={`text-[10.5px] font-mono font-black ${agent.color} tracking-tight`}>
+                  <span className={`text-[10.5px] font-shinhan-num font-black ${agent.color} tracking-tight`}>
                     {agent.score}%
                   </span>
                 </div>
 
                 {/* 중단: 인라인 미니 프로그레스 게이지 */}
-                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden mb-1.5">
+                <div className="w-full h-1 bg-[#13203E] rounded-full overflow-hidden mb-1.5 border border-[#1E2F56]/60">
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${agent.barColor}`} 
                     style={{ width: `${agent.score}%` }} 
@@ -576,7 +575,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                   <span className="text-[9.5px] font-medium text-slate-300 truncate leading-tight" title={agent.verdict}>
                     {agent.verdict}
                   </span>
-                  <span className="text-[8px] font-mono text-slate-500 shrink-0 group-hover:text-blue-400 transition-colors">
+                  <span className="text-[8px] font-shinhan-num text-slate-400 shrink-0 group-hover:text-[#00A3E0] transition-colors">
                     CoT ▸
                   </span>
                 </div>
@@ -589,29 +588,29 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
         {selectedAgentCot && (
           <>
             <div 
-              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" 
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]" 
               onClick={() => setSelectedAgentCot(null)} 
             />
-            <div className="absolute inset-x-3.5 top-[76px] z-50 rounded-2xl bg-[#0d1627]/98 border border-blue-500/50 shadow-2xl backdrop-blur-xl p-4 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute inset-x-3.5 top-[76px] z-50 rounded-2xl bg-[#0D162B] border border-[#1E2F56] shadow-2xl p-4 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
               {/* Modal Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+              <div className="flex items-center justify-between pb-3 border-b border-[#1E2F56]">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className={`p-2 rounded-xl ${selectedAgentCot.bg} border ${selectedAgentCot.border}`}>
                     <selectedAgentCot.icon className={`w-4 h-4 ${selectedAgentCot.color}`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-white tracking-wider">
+                      <span className="text-xs font-black text-white tracking-wider font-shinhan-display">
                         {selectedAgentCot.role}
                       </span>
                       <span className="text-[10px] text-slate-400 font-medium">
                         ({selectedAgentCot.name})
                       </span>
-                      <span className={`text-[10px] font-mono font-black px-1.5 py-0.2 rounded-md ${selectedAgentCot.bg} ${selectedAgentCot.color} border ${selectedAgentCot.border}`}>
+                      <span className={`text-[10px] font-shinhan-num font-black px-1.5 py-0.2 rounded-md ${selectedAgentCot.bg} ${selectedAgentCot.color} border ${selectedAgentCot.border}`}>
                         신뢰도 {selectedAgentCot.score}%
                       </span>
                     </div>
-                    <p className="text-[9.5px] font-mono text-slate-400 mt-0.5">
+                    <p className="text-[9.5px] font-shinhan-num text-slate-400 mt-0.5">
                       {selectedAgentCot.cot.model} • 추론 지연시간 {selectedAgentCot.cot.inferenceLatency}
                     </p>
                   </div>
@@ -620,7 +619,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                 <button
                   type="button"
                   onClick={() => setSelectedAgentCot(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#13203E] transition-colors"
                   title="닫기"
                 >
                   <X className="w-4 h-4" />
@@ -630,9 +629,9 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
               {/* Modal Content: Chain of Thought */}
               <div className="pt-3 space-y-3">
                 {/* 프롬프트 분석 목표 */}
-                <div className="p-2.5 rounded-xl bg-[#070b14] border border-[#1E293B]">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <Terminal className="w-3.5 h-3.5 text-blue-400" />
+                <div className="p-2.5 rounded-xl bg-[#060C1B] border border-[#1E2F56]">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1.5 font-shinhan-display">
+                    <Terminal className="w-3.5 h-3.5 text-[#00A3E0]" />
                     프롬프트 분석 목표 (Prompt Objective)
                   </div>
                   <p className="text-[12px] font-medium text-slate-200 leading-snug">
@@ -641,15 +640,15 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                 </div>
 
                 {/* 단계별 추론 로그 (Chain of Thought Steps) */}
-                <div className="p-2.5 rounded-xl bg-[#070b14] border border-[#1E293B] space-y-2">
-                  <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <div className="p-2.5 rounded-xl bg-[#060C1B] border border-[#1E2F56] space-y-2">
+                  <div className="text-[10px] font-bold text-[#00A3E0] uppercase tracking-wider mb-1.5 flex items-center gap-1.5 font-shinhan-display">
+                    <Sparkles className="w-3.5 h-3.5 text-[#00A3E0]" />
                     단계별 추론 과정 (Chain of Thought Telemetry)
                   </div>
-                  <div className="space-y-1.5 pl-0.5 font-mono text-[11px] leading-relaxed">
+                  <div className="space-y-1.5 pl-0.5 font-shinhan-num text-[11px] leading-relaxed">
                     {selectedAgentCot.cot.thoughtSteps.map((step, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-slate-300">
-                        <span className="text-emerald-400 font-bold shrink-0 mt-0.5">✓</span>
+                        <span className="text-[#00C48C] font-bold shrink-0 mt-0.5">✓</span>
                         <span className={idx === selectedAgentCot.cot.thoughtSteps.length - 1 ? 'font-bold text-slate-100' : ''}>
                           {step}
                         </span>
@@ -661,7 +660,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                 {/* 최종 보팅 판정 */}
                 <div className="flex items-center justify-between px-2 pt-1 text-[11px]">
                   <span className="text-slate-400 font-medium">최종 원인 판정(Vote):</span>
-                  <span className={`font-bold px-2 py-0.5 rounded-md ${selectedAgentCot.bg} ${selectedAgentCot.color} border ${selectedAgentCot.border}`}>
+                  <span className={`font-bold px-2 py-0.5 rounded-md ${selectedAgentCot.bg} ${selectedAgentCot.color} border ${selectedAgentCot.border} font-shinhan-num`}>
                     {selectedAgentCot.vote}
                   </span>
                 </div>
@@ -677,26 +676,25 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status.level === 'CRITICAL' ? 'bg-red-400' : status.level === 'MAJOR' ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${status.level === 'CRITICAL' ? 'bg-red-500' : status.level === 'MAJOR' ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${status.level === 'CRITICAL' ? 'bg-[#F04438]' : status.level === 'MAJOR' ? 'bg-[#F5A623]' : 'bg-[#00C48C]'}`}></span>
             </span>
-            <span className={`text-[11px] font-black tracking-widest uppercase ${status.color} flex items-center gap-1.5`}>
+            <span className={`text-[11px] font-black tracking-widest uppercase ${status.color} flex items-center gap-1.5 font-shinhan-display`}>
               Consensus Conclusion
             </span>
-            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${status.bg} ${status.color} border ${status.border}`}>
+            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${status.bg} ${status.color} border ${status.border} font-shinhan-num`}>
               AI 합의 완료
             </span>
           </div>
 
           <button
             onClick={handleCopyConsensus}
-            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-slate-400 hover:text-white rounded bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 transition-all"
+            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-slate-400 hover:text-white rounded bg-[#13203E] hover:bg-[#1E2F56] border border-[#1E2F56] transition-all cursor-pointer font-shinhan-display"
             title="합의 결론 전체 복사"
           >
             {copiedConsensus ? (
               <>
-                <Check className="w-3 h-3 text-emerald-400" />
-                <span className="text-emerald-400">복사됨</span>
+                <Check className="w-3 h-3 text-[#00C48C]" />
+                <span className="text-[#00C48C]">복사됨</span>
               </>
             ) : (
               <>
@@ -708,9 +706,9 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
         </div>
 
         {/* 💡 1줄 상황 브리핑 (Executive Summary) 인라인 브리핑 바 */}
-        <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/50 via-[#0d1628] to-indigo-950/40 border border-blue-500/30 shadow-sm flex items-start gap-2.5">
-          <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/40 text-[10px] font-black tracking-wider shrink-0 mt-0.5 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-blue-400" />
+        <div className="p-3 rounded-xl bg-[#13203E] border border-[#00A3E0]/40 shadow-sm flex items-start gap-2.5">
+          <span className="px-2 py-0.5 rounded-md bg-[#0046FF]/20 text-[#00A3E0] border border-[#0046FF]/40 text-[10px] font-black tracking-wider shrink-0 mt-0.5 flex items-center gap-1 font-shinhan-display">
+            <Sparkles className="w-3 h-3 text-[#00A3E0]" />
             장애 요약
           </span>
           <p className="text-[13px] font-bold text-slate-100 leading-snug tracking-tight break-keep">
@@ -718,79 +716,156 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
           </p>
         </div>
 
-        {/* 4대 독립 서브 카드 (Nested Cards) */}
+        {/* 4대 체계적 리포트 카드 (01~04 마크다운 파싱 및 시각화) */}
         <div className="space-y-2.5">
-          {/* 1. 장애 요약 (영향 범위/시스템) (Cyan) */}
-          <div className="p-3.5 rounded-xl bg-[#091122]/90 border border-[#1E293B] border-l-2 border-l-cyan-400 shadow-sm transition-all hover:bg-[#0c162d]/90">
-            <div className="flex items-center justify-between mb-1.5">
+          {/* 01 장애 내용: 영향 시스템 태그(MCI, 신한카드 TMS)와 오류 발생 건수(42건) 정돈된 표 형태 */}
+          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#00A3E0] shadow-sm transition-all hover:border-[#00A3E0]/50">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[11px] font-black tracking-wider flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 text-cyan-400" />
-                  01 장애 요약 (영향 범위/시스템)
+                <span className="px-2 py-0.5 rounded bg-[#00A3E0]/10 text-[#00A3E0] border border-[#00A3E0]/30 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
+                  <AlertCircle className="w-3.5 h-3.5 text-[#00A3E0]" />
+                  01 장애 내용
                 </span>
-                <span className="text-[9.5px] font-mono text-cyan-500/70 tracking-widest uppercase">SYMPTOM & SCOPE</span>
+                <span className="text-[9.5px] font-shinhan-num text-[#00A3E0]/70 tracking-widest uppercase">SYMPTOM & IMPACT</span>
               </div>
             </div>
-            <p className="text-[13px] font-normal text-slate-100 leading-relaxed break-keep whitespace-pre-wrap pl-0.5">
+            
+            {/* 영향 시스템 및 오류 건수 표 */}
+            <div className="grid grid-cols-2 gap-2 mb-2 p-2 rounded-lg bg-[#060C1B] border border-[#1E2F56] text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-bold text-[11px]">영향 시스템:</span>
+                <div className="flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-[#00A3E0] font-mono font-bold text-[10px]">MCI</span>
+                  <span className="px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-slate-200 font-mono font-bold text-[10px]">신한카드 TMS</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="text-slate-400 font-bold text-[11px]">오류 발생 건수:</span>
+                <span className="px-2 py-0.5 rounded bg-[#F04438]/15 border border-[#F04438]/30 text-[#F04438] font-shinhan-num font-black text-[11px]">
+                  {incident?.occurrence_count || '42'}건
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[12.5px] font-normal text-slate-200 leading-relaxed break-keep whitespace-pre-wrap pl-0.5">
               {consensusData.symptom}
             </p>
           </div>
 
-          {/* 2. 발생 원인 (Root Cause 상세) (Amber / Yellow) */}
-          <div className="p-3.5 rounded-xl bg-[#171105]/90 border border-[#1E293B] border-l-2 border-l-amber-400 shadow-sm transition-all hover:bg-[#1f1707]/90">
-            <div className="flex items-center justify-between mb-1.5">
+          {/* 02 발생 원인: WAS 커넥션 풀 고갈 원인을 원신한 산세리프 본문으로 가독성 높게 전달 */}
+          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#F5A623] shadow-sm transition-all hover:border-[#F5A623]/50">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[11px] font-black tracking-wider flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 text-amber-400" />
-                  02 발생 원인 (Root Cause 상세)
+                <span className="px-2 py-0.5 rounded bg-[#F5A623]/10 text-[#F5A623] border border-[#F5A623]/30 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
+                  <Flame className="w-3.5 h-3.5 text-[#F5A623]" />
+                  02 발생 원인
                 </span>
-                <span className="text-[9.5px] font-mono text-amber-500/70 tracking-widest uppercase">ROOT CAUSE</span>
+                <span className="text-[9.5px] font-shinhan-num text-[#F5A623]/70 tracking-widest uppercase">ROOT CAUSE</span>
               </div>
             </div>
-            <p className="text-[13px] font-normal text-slate-100 leading-relaxed break-keep whitespace-pre-wrap pl-0.5">
-              {consensusData.cause}
+            <p className="text-[12.5px] font-normal text-slate-100 leading-relaxed break-keep whitespace-pre-wrap pl-0.5 font-shinhan-sans">
+              WAS 인스턴스 내부 커넥션 풀(DB Connection Pool) 고갈 및 대외기관(정보계) 연동 지연에 따른 세션 타임아웃 락 경합 발생. {consensusData.cause}
             </p>
           </div>
 
-          {/* 3. 진행 경과 (타임라인 포함) (Purple) */}
-          <div className="p-3.5 rounded-xl bg-[#140b24]/90 border border-[#1E293B] border-l-2 border-l-purple-400 shadow-sm transition-all hover:bg-[#1a0f30]/90">
-            <div className="flex items-center justify-between mb-1.5">
+          {/* 03 진행 경과: 타임스탬프(08:33:45) 기반의 컴팩트 스텝퍼 적용 */}
+          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#0046FF] shadow-sm transition-all hover:border-[#0046FF]/50">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[11px] font-black tracking-wider flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-purple-400" />
-                  03 진행 경과 (타임라인 포함)
+                <span className="px-2 py-0.5 rounded bg-[#0046FF]/15 text-[#00A3E0] border border-[#0046FF]/40 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
+                  <Clock className="w-3.5 h-3.5 text-[#00A3E0]" />
+                  03 진행 경과
                 </span>
-                <span className="text-[9.5px] font-mono text-purple-500/70 tracking-widest uppercase">PROGRESS & TIMELINE</span>
+                <span className="text-[9.5px] font-shinhan-num text-[#00A3E0]/70 tracking-widest uppercase">STEPPER TIMELINE</span>
               </div>
             </div>
-            <p className="text-[13px] font-normal text-slate-100 leading-relaxed break-keep whitespace-pre-wrap pl-0.5">
+
+            {/* 타임스탬프 컴팩트 스텝퍼 */}
+            <div className="space-y-1.5 mb-2 font-shinhan-num text-[11px]">
+              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-[#060C1B] border border-[#1E2F56]">
+                <span className="text-[#00A3E0] font-bold">08:33:45</span>
+                <span className="text-slate-400">|</span>
+                <span className="text-slate-200">TMS 온라인 이상 거래 임계치 초과 최초 감지</span>
+                <span className="ml-auto text-[#00C48C] font-semibold text-[10px]">COMPLETE</span>
+              </div>
+              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-[#060C1B] border border-[#1E2F56]">
+                <span className="text-[#00A3E0] font-bold">08:34:10</span>
+                <span className="text-slate-400">|</span>
+                <span className="text-slate-200">S-Autopilot 지식베이스 99.9% 과거 이력 매칭</span>
+                <span className="ml-auto text-[#00C48C] font-semibold text-[10px]">SYNCED</span>
+              </div>
+            </div>
+
+            <p className="text-[12px] font-normal text-slate-300 leading-relaxed break-keep whitespace-pre-wrap pl-0.5 font-shinhan-sans">
               {consensusData.progress}
             </p>
           </div>
 
-          {/* 4. 조치 권고 (스크립트/가이드) (Blue) */}
-          <div className="p-3.5 rounded-xl bg-[#081329]/90 border border-[#1E293B] border-l-2 border-l-blue-500 shadow-sm transition-all hover:bg-[#0c1a38]/90">
-            <div className="flex items-center justify-between mb-1.5">
+          {/* 04 조치 권고: 실행 가이드 스크립트를 다크 코드 블록으로 제공 */}
+          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#00C48C] shadow-sm transition-all hover:border-[#00C48C]/50">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[11px] font-black tracking-wider flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                  04 조치 권고 (스크립트/가이드)
+                <span className="px-2 py-0.5 rounded bg-[#00C48C]/10 text-[#00C48C] border border-[#00C48C]/30 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#00C48C]" />
+                  04 조치 권고
                 </span>
-                <span className="text-[9.5px] font-mono text-blue-500/70 tracking-widest uppercase">REMEDIATION GUIDE</span>
+                <span className="text-[9.5px] font-shinhan-num text-[#00C48C]/70 tracking-widest uppercase">REMEDIATION SCRIPT</span>
               </div>
             </div>
-            <p className="text-[13px] font-normal text-slate-100 leading-relaxed break-keep whitespace-pre-wrap pl-0.5">
+
+            <p className="text-[12px] font-normal text-slate-200 leading-relaxed break-keep whitespace-pre-wrap mb-2 pl-0.5 font-shinhan-sans">
               {consensusData.recommendation}
             </p>
+
+            {/* 다크 코드 블록 스크립트 */}
+            <div className="rounded-lg bg-[#060C1B] border border-[#1E2F56] p-2.5 font-mono text-[11px] text-slate-300 space-y-1 overflow-x-auto custom-scrollbar">
+              <div className="flex items-center justify-between pb-1 border-b border-white/5 text-[9px] text-slate-500 uppercase">
+                <span>Remediation Script</span>
+                <span className="text-[#00A3E0]">Bash / CLI</span>
+              </div>
+              <div className="text-[#00C48C] select-all">$ /app/mci/bin/mci_proc_ctl --restart --target=CSL99922A</div>
+              <div className="text-slate-400 select-all">$ kill -9 $(pgrep -f "csl_worker_pool") && /app/bin/start_csl.sh</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 🏢 신한 금융통제 Quick Actions 바 (Human-in-the-Loop) */}
+        <div className="p-3 rounded-xl bg-[#0D162B] border border-[#1E2F56] shadow-sm space-y-2">
+          <div className="flex items-center justify-between pb-1 border-b border-[#1E2F56]">
+            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1 font-shinhan-display">
+              <Shield className="w-3.5 h-3.5 text-[#0046FF]" />
+              신한 금융통제 Quick Actions (Human-in-the-Loop)
+            </span>
+            <span className="text-[9px] font-mono text-[#00A3E0] font-bold">AUTHORITY REQUIRED</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => alert('MCI 임계치 일시 완화 조치가 금융통제 승인 큐에 등록되었습니다.')}
+              className="px-2.5 py-2 rounded-lg bg-[#0046FF] hover:bg-[#0036C8] text-white text-[11px] font-bold transition-all active:scale-95 shadow-sm text-center font-shinhan-display cursor-pointer"
+            >
+              MCI 임계치 일시 완화
+            </button>
+            <button
+              onClick={() => alert('유관부서(운영팀, 보안팀) 긴급 상황 전파가 발송되었습니다.')}
+              className="px-2.5 py-2 rounded-lg bg-transparent hover:bg-[#13203E] text-slate-200 border border-[#1E2F56] hover:border-slate-500 text-[11px] font-bold transition-all active:scale-95 text-center font-shinhan-display cursor-pointer"
+            >
+              유관부서 긴급 전파
+            </button>
+            <button
+              onClick={() => alert('ITSM 시스템에 장애 티켓이 성공적으로 자동 발행되었습니다.')}
+              className="px-2.5 py-2 rounded-lg bg-[#13203E] hover:bg-[#1E2F56] text-[#00A3E0] border border-[#0046FF]/30 hover:border-[#0046FF] text-[11px] font-bold transition-all active:scale-95 text-center font-shinhan-display cursor-pointer"
+            >
+              ITSM 장애 티켓 등록
+            </button>
           </div>
         </div>
 
         {/* 체크리스트 기반 액션 아이템 (Action Items UI) */}
-        <div className="p-3 rounded-xl bg-[#090D16] border border-[#1E293B] shadow-sm space-y-2.5">
-          <div className="flex items-center justify-between pb-1 border-b border-[#1E293B]/70">
+        <div className="p-3 rounded-xl bg-[#13203E] border border-[#1E2F56] shadow-sm space-y-2.5">
+          <div className="flex items-center justify-between pb-1 border-b border-[#1E2F56]">
             <div className="flex items-center gap-2">
-              <ListChecks className="w-4 h-4 text-indigo-400" />
-              <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider">
+              <ListChecks className="w-4 h-4 text-[#00A3E0]" />
+              <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider font-shinhan-display">
                 Action Items
               </span>
               <span className="text-[9px] text-slate-400 font-medium">
@@ -798,7 +873,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ${completedCount === totalCount ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>
+              <span className={`text-[10px] font-bold font-shinhan-num px-2 py-0.5 rounded-full ${completedCount === totalCount ? 'bg-[#00C48C]/20 text-[#00C48C] border border-[#00C48C]/30' : 'bg-[#060C1B] text-slate-300 border border-[#1E2F56]'}`}>
                 {completedCount}/{totalCount} 완료
               </span>
             </div>
@@ -814,15 +889,15 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                   onClick={() => toggleItem(item.id)}
                   className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer select-none ${
                     isChecked
-                      ? 'bg-[#0b151e]/60 border-emerald-500/30 hover:bg-[#0b151e]'
-                      : 'bg-[#111827]/80 border-[#1E293B] hover:bg-slate-800/60 hover:border-slate-700'
+                      ? 'bg-[#060C1B] border-[#00C48C]/30 hover:bg-[#081329]'
+                      : 'bg-[#0D162B] border-[#1E2F56] hover:bg-[#13203E] hover:border-slate-500'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-all ${
                       isChecked
-                        ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/30'
-                        : 'border-slate-600 bg-slate-800'
+                        ? 'bg-[#00C48C] border-[#00C48C] text-white'
+                        : 'border-[#1E2F56] bg-[#060C1B]'
                     }`}>
                       {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
@@ -834,10 +909,10 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${getAssigneeStyle(item.assignee)}`}>
+                    <span className={`text-[9px] font-shinhan-num font-bold px-1.5 py-0.5 rounded border ${getAssigneeStyle(item.assignee)}`}>
                       {item.assignee}
                     </span>
-                    <span className="text-[9px] font-mono text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/50">
+                    <span className="text-[9px] font-shinhan-num text-slate-400 bg-[#060C1B] px-1.5 py-0.5 rounded border border-[#1E2F56]">
                       ⏱️ {item.duration}
                     </span>
                   </div>
@@ -850,10 +925,10 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
         {/* 에이전트 로그 보기 버튼 */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full py-2.5 px-3 bg-[#090D16] hover:bg-slate-800 active:scale-[0.99] border border-[#1E293B] rounded-xl flex items-center justify-between text-slate-300 font-bold text-xs tracking-tight transition-all cursor-pointer"
+          className="w-full py-2.5 px-3 bg-[#060C1B] hover:bg-[#13203E] active:scale-[0.99] border border-[#1E2F56] rounded-xl flex items-center justify-between text-slate-300 font-bold text-xs tracking-tight transition-all cursor-pointer font-shinhan-display"
         >
           <span className="flex items-center gap-2 truncate mr-2">
-            <Terminal size={14} className="text-blue-400 shrink-0" />
+            <Terminal size={14} className="text-[#00A3E0] shrink-0" />
             <span className="truncate">에이전트 분석 로그 {isExpanded ? '접기' : '보기'} ({messages?.length || 0}건)</span>
           </span>
           {isExpanded ? <ChevronUp size={15} className="text-slate-400 shrink-0" /> : <ChevronDown size={15} className="text-slate-400 shrink-0" />}
@@ -864,26 +939,26 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
           <div className="space-y-3 pt-1 animate-slide-in-smooth">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center text-center text-slate-500 text-xs py-8 opacity-40 space-y-2">
-                <div className="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center border border-white/5">
-                  <Shield className="w-4 h-4 text-slate-600" />
+                <div className="w-9 h-9 bg-[#13203E] rounded-full flex items-center justify-center border border-[#1E2F56]">
+                  <Shield className="w-4 h-4 text-slate-500" />
                 </div>
-                <p className="font-medium">분석 대기 중...</p>
+                <p className="font-medium font-shinhan-sans">분석 대기 중...</p>
               </div>
             )}
             
             {messages.map((msg, idx) => {
               const isLeader = msg.role.toLowerCase().includes('leader') || msg.role.toLowerCase().includes('리더');
               const roleColor =
-                msg.role.toLowerCase().includes('security') || msg.role.toLowerCase().includes('system') ? 'text-red-400' :
-                msg.role.toLowerCase().includes('db') ? 'text-yellow-400' :
-                msg.role.toLowerCase().includes('devops') || msg.role.toLowerCase().includes('analyst') ? 'text-blue-400' :
-                isLeader ? 'text-purple-400' : 'text-slate-400';
+                msg.role.toLowerCase().includes('security') || msg.role.toLowerCase().includes('system') ? 'text-[#F04438]' :
+                msg.role.toLowerCase().includes('db') ? 'text-[#F5A623]' :
+                msg.role.toLowerCase().includes('devops') || msg.role.toLowerCase().includes('analyst') ? 'text-[#00A3E0]' :
+                isLeader ? 'text-[#0046FF]' : 'text-slate-400';
 
               const bubbleBg = isLeader
-                ? { background: 'rgba(59,130,246,0.15)', borderColor: '#1E293B' }
-                : { background: '#0B0F19', borderColor: '#1E293B' };
+                ? { background: '#13203E', borderColor: '#0046FF' }
+                : { background: '#060C1B', borderColor: '#1E2F56' };
 
-              const tailColor = isLeader ? 'rgba(59,130,246,0.2)' : '#0B0F19';
+              const tailColor = isLeader ? '#13203E' : '#060C1B';
 
               return (
                 <div
@@ -902,7 +977,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                     {/* Message Content */}
                     <div className={`flex flex-col gap-0.5 ${isLeader ? 'items-end' : 'items-start'}`}>
                       {/* Name */}
-                      <span className={`text-[10px] px-1 font-bold ${roleColor}`}>
+                      <span className={`text-[10px] px-1 font-bold ${roleColor} font-shinhan-display`}>
                         {msg.role.toLowerCase().includes('agent') ? msg.role : `${msg.role} Agent`}
                       </span>
 
@@ -918,7 +993,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                               width: 0,
                               height: 0,
                               borderTop: '7px solid transparent',
-                              borderLeft: `7px solid rgba(59,130,246,0.2)`,
+                              borderLeft: `7px solid ${tailColor}`,
                               borderBottom: '7px solid transparent',
                             }} />
                           ) : (
@@ -955,7 +1030,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                           </div>
                         </div>
                         {/* Time */}
-                        <span className="text-[9px] text-slate-600 shrink-0 mb-1 tabular-nums">
+                        <span className="text-[9px] text-slate-500 shrink-0 mb-1 font-shinhan-num">
                           {(() => {
                             const d = new Date();
                             const yyyy = d.getFullYear();
@@ -980,22 +1055,22 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
       {/* 롱 프레스 컨텍스트 메뉴 */}
       {contextMenu && (
         <div
-          className="fixed z-[9999] bg-[#1a1f2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+          className="fixed z-[9999] bg-[#0D162B] border border-[#1E2F56] rounded-2xl shadow-2xl overflow-hidden"
           style={{ left: contextMenu.x, top: contextMenu.y, minWidth: 160 }}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
           <button
             onClick={handleCopy}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-white/10 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#13203E] transition-all cursor-pointer font-shinhan-display"
           >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-blue-400" />}
+            {copied ? <Check className="w-4 h-4 text-[#00C48C]" /> : <Copy className="w-4 h-4 text-[#00A3E0]" />}
             {copied ? '복사됨!' : '텍스트 복사'}
           </button>
-          <div className="h-px bg-white/5" />
+          <div className="h-px bg-[#1E2F56]" />
           <button
             onClick={() => setContextMenu(null)}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-400 hover:bg-white/10 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-400 hover:bg-[#13203E] transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
             닫기
@@ -1004,7 +1079,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
       )}
 
       {/* Footer Status */}
-      <div className="p-3 bg-[#0d111a] border-t border-white/5 text-[10px] text-slate-500 text-center font-bold tracking-widest uppercase">
+      <div className="p-3 bg-[#060C1B] border-t border-[#1E2F56] text-[10px] text-slate-400 text-center font-bold tracking-widest uppercase font-shinhan-num">
         Multi-Agent System Active • 4 Agents Online
       </div>
     </div>

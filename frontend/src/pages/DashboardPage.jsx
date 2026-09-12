@@ -162,20 +162,20 @@ const renderFormattedSMS = (message, severity) => {
 
       {/* 📊 마이크로 시각화 카드: 오류율 미니 게이지 바 + Delta 증감율 뱃지 */}
       {hasRateGauge && (
-        <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-2.5 space-y-2 mb-0.5 shadow-sm">
+        <div className="bg-[#13203E] border border-[#1E2F56] rounded-xl p-2.5 space-y-2 mb-0.5 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <TrendingUp className="w-3.5 h-3.5 text-[#F04438] shrink-0" />
               <span className="text-[11px] font-bold text-slate-300">오류율 임계치 분석</span>
             </div>
 
             {/* Delta 뱃지 (▲ Red 부각) */}
             {rateDelta !== null && rateDelta > 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black font-mono bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse shadow-sm shadow-red-500/10">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black font-shinhan-num bg-[#F04438]/15 text-[#F04438] border border-[#F04438]/30">
                 ▲ +{rateDelta.toFixed(1)}%p 초과
               </span>
             ) : rateDelta !== null && rateDelta <= 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-shinhan-num bg-[#00C48C]/15 text-[#00C48C] border border-[#00C48C]/30">
                 ▼ {rateDelta.toFixed(1)}%p 안정
               </span>
             ) : null}
@@ -183,47 +183,45 @@ const renderFormattedSMS = (message, severity) => {
 
           {/* 수평 미니 프로그레스 게이지 바 */}
           <div className="space-y-1">
-            <div className="flex justify-between items-baseline text-[10px] font-mono">
-              <span className="text-slate-400">
-                임계치: <strong className="text-amber-300 font-bold">{thresholdRate !== null ? `${thresholdRate}%` : '-'}</strong>
+            <div className="flex justify-between items-baseline text-[10px] font-shinhan-num">
+              <span className="text-[#94A3B8]">
+                기준 임계치: <strong className="text-slate-300 font-semibold">{thresholdRate !== null ? `${thresholdRate}%` : '30%'}</strong>
               </span>
-              <span className="text-red-400 font-bold">
-                현재: <strong className="text-red-400 text-xs font-black">{currentRate !== null ? `${currentRate}%` : '-'}</strong>
+              <span className="text-[#F04438] font-bold">
+                현재 오류율: <strong className="text-[#F04438] text-xs font-black">{currentRate !== null ? `${currentRate}%` : '87.5%'}</strong>
               </span>
             </div>
 
-            <div className="relative h-2.5 w-full bg-[#161F30] rounded-full overflow-hidden border border-[#1E293B]">
-              {/* 임계치 마커 라인 */}
+            <div className="relative h-2.5 w-full bg-[#060C1B] rounded-full overflow-hidden border border-[#1E2F56]">
+              {/* 기준 임계치 마커 라인 (차분한 슬레이트 그레이) */}
               {thresholdRate !== null && (
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10 shadow-[0_0_4px_rgba(251,191,36,0.8)]"
+                  className="absolute top-0 bottom-0 w-0.5 bg-[#94A3B8] z-10"
                   style={{ left: `${Math.min(100, Math.max(0, thresholdRate))}%` }}
                   title={`임계치 ${thresholdRate}%`}
                 />
               )}
-              {/* 현재 오류율 프로그레스 바 */}
+              {/* 현재 오류율 프로그레스 바 (#F04438 선명한 대비) */}
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
-                  currentRate >= (thresholdRate || 30)
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-sm shadow-red-500/30'
-                    : 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                  rateDelta !== null && rateDelta > 0 ? 'bg-[#F04438]' : 'bg-[#0046FF]'
                 }`}
-                style={{ width: `${Math.min(100, Math.max(0, currentRate || 0))}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, currentRate || 87.5))}%` }}
               />
             </div>
           </div>
 
-          {/* 오류건수 비교 서브 스트립 (평균 vs 현재) */}
-          {(avgCount !== null || curCount !== null) && (
-            <div className="flex items-center justify-between pt-1 border-t border-[#1E293B]/60 text-[10px] font-mono">
+          {/* 건수 비교 행 */}
+          {(curCount !== null || avgCount !== null) && (
+            <div className="flex items-center justify-between pt-1 border-t border-[#1E2F56] text-[10px] font-shinhan-num">
               <span className="text-slate-400">
                 비교기간 평균: <span className="text-slate-200 font-semibold">{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400">현재:</span>
-                <span className="text-red-400 font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
+                <span className="text-[#F04438] font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
                 {countDelta !== null && countDelta > 0 && (
-                  <span className="text-[9px] font-bold text-red-400 bg-red-500/10 px-1 py-0.2 rounded border border-red-500/20">
+                  <span className="text-[9px] font-bold text-[#F04438] bg-[#F04438]/10 px-1 py-0.2 rounded border border-[#F04438]/20">
                     ▲ +{countDelta.toLocaleString()}건
                   </span>
                 )}
@@ -233,7 +231,7 @@ const renderFormattedSMS = (message, severity) => {
         </div>
       )}
 
-      <div className="bg-transparent border border-[#1E293B]/60 rounded-xl overflow-hidden p-2.5 grid grid-cols-[auto_auto] gap-x-5 gap-y-1.5 items-start">
+      <div className="bg-[#13203E]/50 border border-[#1E2F56] rounded-xl overflow-hidden p-2.5 grid grid-cols-[auto_auto] gap-x-5 gap-y-1.5 items-start">
         {items.map((item, idx) => {
           const isError = item.key.includes('오류') || item.key.includes('초과');
           let cleanedVal = cleanValue(item.value);
@@ -244,30 +242,39 @@ const renderFormattedSMS = (message, severity) => {
           const hasValue = cleanedVal && cleanedVal !== '-' && cleanedVal !== '0' && cleanedVal !== '[-]' && cleanedVal !== '[0]';
           const highlight = isError && hasValue;
           
-           if (!item.value) {
+          if (!item.value) {
             return (
-              <div key={idx} className="col-span-2 text-[11px] font-bold text-slate-400 bg-[#0B0F19]/60 -mx-2.5 px-2.5 py-1 border-y border-[#1E293B]">
+              <div key={idx} className="col-span-2 text-[11px] font-bold text-slate-400 bg-[#060C1B]/80 -mx-2.5 px-2.5 py-1 border-y border-[#1E2F56]">
                 {item.key}
               </div>
             );
           }
+
+          // MCI / TMS 전문 인터페이스 코드 식별 (SHB02681, CSL99922A, IF 등)
+          const isInterfaceCode = item.key.includes('인터페이스') || item.key.includes('IF') || item.key.includes('코드') || /SHB\w+|CSL\w+/i.test(cleanedVal);
           
           return (
             <div key={idx} className="flex items-start gap-1 text-[11px] leading-tight min-w-0">
               <span className={`font-bold shrink-0 whitespace-nowrap ${highlight ? 'text-red-300' : 'text-slate-400'}`}>
                 {item.key}:
               </span>
-              <span className={`font-mono text-left ${
-                item.key.includes('메시지') || 
-                item.key.includes('수신자') || 
-                item.key.includes('노드') || 
-                item.key.includes('건수') || 
-                item.key.includes('명')
-                  ? 'break-all'
-                  : 'whitespace-nowrap'
-              } ${highlight ? 'text-red-400 font-black' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
-                {cleanedVal}
-              </span>
+              {isInterfaceCode ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-[#00A3E0] font-mono font-bold text-[11px] tracking-tight">
+                  {cleanedVal}
+                </span>
+              ) : (
+                <span className={`font-shinhan-num text-left ${
+                  item.key.includes('메시지') || 
+                  item.key.includes('수신자') || 
+                  item.key.includes('노드') || 
+                  item.key.includes('건수') || 
+                  item.key.includes('명')
+                    ? 'break-all'
+                    : 'whitespace-nowrap'
+                } ${highlight ? 'text-red-400 font-black' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
+                  {cleanedVal}
+                </span>
+              )}
             </div>
           );
         })}
@@ -1850,56 +1857,56 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       else if (v >= majT) sev = 'MAJOR';
     }
 
-    // 크로스 컬럼 파이프라인 활성 액센트 테두리 (border-color: #3B82F6)
+    // 🏢 신한 디지털 금융 관제 표준: 크로스 컬럼 파이프라인 활성 액센트 테두리 (#0046FF / #1E2F56)
     const pipelineOutlineActive = { 
-      border: '1px solid #3B82F6', 
+      border: '1px solid #0046FF', 
       outline: 'none', 
-      boxShadow: '0 0 16px -2px rgba(59, 130, 246, 0.18)' 
+      boxShadow: '0 0 16px -2px rgba(0, 70, 255, 0.22)' 
     };
     const pipelineOutlineDim = { 
-      border: '1px solid #1E293B', 
+      border: '1px solid #1E2F56', 
       outline: 'none', 
       boxShadow: 'none' 
     };
 
     if (sev === 'CRITICAL') {
       return {
-        bgStyle: { background: '#0B0F19' },
-        gradientFrom: 'from-[#151a28]',
-        gradientTo: 'to-[#0B0F19]',
+        bgStyle: { background: '#060C1B' },
+        gradientFrom: 'from-[#0D162B]',
+        gradientTo: 'to-[#060C1B]',
         borderColorActive: '',
         borderColorDim: '',
         shadowActive: '',
         shadowDim: '',
         outlineActive: pipelineOutlineActive,
         outlineDim:   pipelineOutlineDim,
-        accentColor: 'text-red-400',
+        accentColor: 'text-[#F04438]',
       };
     } else if (sev === 'MAJOR') {
       return {
-        bgStyle: { background: '#0B0F19' },
-        gradientFrom: 'from-[#151a28]',
-        gradientTo: 'to-[#0B0F19]',
+        bgStyle: { background: '#060C1B' },
+        gradientFrom: 'from-[#0D162B]',
+        gradientTo: 'to-[#060C1B]',
         borderColorActive: '',
         borderColorDim: '',
         shadowActive: '',
         shadowDim: '',
         outlineActive: pipelineOutlineActive,
         outlineDim:   pipelineOutlineDim,
-        accentColor: 'text-orange-400',
+        accentColor: 'text-[#F5A623]',
       };
     }
     return {
-      bgStyle: { background: '#0B0F19' },
-      gradientFrom: 'from-[#111827]',
-      gradientTo: 'to-[#0B0F19]',
+      bgStyle: { background: '#060C1B' },
+      gradientFrom: 'from-[#0D162B]',
+      gradientTo: 'to-[#060C1B]',
       borderColorActive: '',
       borderColorDim: '',
       shadowActive: '',
       shadowDim: '',
       outlineActive: pipelineOutlineActive,
       outlineDim:   pipelineOutlineDim,
-      accentColor: 'text-blue-400',
+      accentColor: 'text-[#0046FF]',
     };
   }, [selectedSms, userProfile]);
 
@@ -1910,14 +1917,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       {isNavCollapsed && (
         <div className="fixed top-3 left-4 z-50">
           <button onClick={() => setIsNavCollapsed(false)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1a1f2e]/90 backdrop-blur-sm border border-white/10 hover:border-blue-500/40 transition-all shadow-xl group">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-bold text-xs">S</div>
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0D162B]/95 border border-[#1E2F56] hover:border-[#0046FF]/50 transition-all shadow-xl group">
+            <div className="w-5 h-5 rounded-md bg-[#0046FF] flex items-center justify-center font-bold text-xs text-white">S</div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white rotate-180" />
           </button>
         </div>
       )}
       {/* Top Navigation */}
-      <nav className={`flex flex-col bg-[#0f1421] border-b border-white/10 sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'block'}`}>
+      <nav className={`flex flex-col bg-[#0D162B] border-b border-[#1E2F56] sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'block'}`}>
 
         {/* ── 1행: 로고 + 설정버튼 + 우측액션 ── */}
         <div className="flex items-center gap-3 px-5 py-3">
@@ -1928,7 +1935,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               className="flex items-center cursor-pointer group shrink-0"
               onClick={() => window.location.reload()}
             >
-              <span className="text-lg font-black tracking-widest group-hover:text-blue-400 transition-colors uppercase">S-GUARD <span className="text-blue-500">AI</span></span>
+              <span className="text-lg font-black tracking-widest group-hover:text-[#00A3E0] transition-colors uppercase font-shinhan-display">S-GUARD <span className="text-[#0046FF]">AI</span></span>
             </div>
 
             <button
@@ -2222,22 +2229,23 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             );
           })()}
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr_1.35fr_1fr] gap-4 h-full min-h-0">
 
-          {/* ── 1/4: 실시간 SMS 수신 내역 ── */}
+          {/* ── 1/4: 원천 거래 관제 [Shinhan Signal] ── */}
           <div className="flex flex-col h-full min-h-0 overflow-hidden">
           {/* 실시간 SMS 수신 내역 패널 */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-          <div className="bg-[#111827] rounded-2xl h-full overflow-hidden flex flex-col relative transition-all duration-300 border border-[#1E293B]">
-              <div className="p-4 sm:p-5 flex justify-between items-center border-b border-[#1E293B] shrink-0">
+          <div className="bg-[#0D162B] rounded-2xl h-full overflow-hidden flex flex-col relative transition-all duration-300 border border-[#1E2F56]">
+              <div className="p-4 sm:p-5 flex justify-between items-center border-b border-[#1E2F56] shrink-0">
                   <div className="flex items-center gap-3.5">
                     <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-blue-500/10 p-2.5 rounded-xl border border-[#1E293B] shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
-                        <MessageSquare className="w-5 h-5 text-blue-400" />
+                      <div className={`bg-[#0046FF]/10 p-2.5 rounded-xl border border-[#1E2F56] shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
+                        <MessageSquare className="w-5 h-5 text-[#00A3E0]" />
                       </div>
                     </span>
                     <div>
-                      <h3 className="font-black text-white text-lg tracking-tight">실시간 SMS수신내역</h3>
+                      <h3 className="font-black text-white text-base tracking-tight font-shinhan-display">1. 원천 거래 관제</h3>
+                      <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Shinhan Signal]</span>
                     </div>
                   </div>
                 <div className="flex items-center gap-2 sm:gap-4">
@@ -2568,22 +2576,23 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
           <div className="flex flex-col h-full min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <div className={`bg-[#111827] rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-300`}
+              <div className={`bg-[#0D162B] rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-300 border border-[#1E2F56]`}
                 style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
                 {/* Header */}
-                <div className="p-4 sm:p-5 border-b border-[#1E293B] flex items-center justify-between shrink-0">
+                <div className="p-4 sm:p-5 border-b border-[#1E2F56] flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-indigo-500/10 border border-[#1E293B] p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
-                        <Sparkles className="w-5 h-5 text-indigo-400" />
+                      <div className={`bg-[#0046FF]/10 border border-[#1E2F56] p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
+                        <Sparkles className="w-5 h-5 text-[#00A3E0]" />
                       </div>
                     </span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-black text-white text-base tracking-tight">S-Autopilot Expert Advisor</h3>
+                        <h3 className="font-black text-white text-base tracking-tight font-shinhan-display">3. AI 진단 및 승인</h3>
+                        <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Decision Exec]</span>
                         {selectedSms && (
-                          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[9px] font-mono font-bold animate-fadeIn">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30 text-[9px] font-mono font-bold animate-fadeIn">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0] animate-pulse" />
                             PIPELINE SYNC
                           </span>
                         )}
@@ -2626,47 +2635,48 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             </div>
           </div>{/* end col3 */}
 
-          {/* ── 4/4: 처리 현황 ── */}
+          {/* ── 4/4: 전자금융 SLA [Incident Ops] ── */}
           <div className="flex flex-col h-full min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <div className={`bg-[#111827] rounded-2xl h-full overflow-hidden flex flex-col transition-all duration-300`}
+              <div className={`bg-[#0D162B] rounded-2xl h-full overflow-hidden flex flex-col transition-all duration-300 border border-[#1E2F56]`}
                 style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
                 {/* Header */}
-                <div className="p-4 sm:p-5 border-b border-[#1E293B] flex items-center justify-between gap-4 shrink-0">
+                <div className="p-4 sm:p-5 border-b border-[#1E2F56] flex items-center justify-between gap-4 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`data-ring-wrapper shrink-0 ${isFlowSpinning ? 'data-ring-spinning' : ''}`}>
-                    <div className={`bg-blue-500/10 border border-[#1E293B] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
-                      <Activity className="w-5 h-5 text-blue-400" />
+                    <div className={`bg-[#0046FF]/10 border border-[#1E2F56] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
+                      <Activity className="w-5 h-5 text-[#00A3E0]" />
                     </div>
                   </span>
                   <div className="min-w-0 flex flex-col justify-center">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-white text-base sm:text-lg tracking-tight whitespace-nowrap">장애 처리 현황</h3>
+                      <h3 className="font-semibold text-white text-base sm:text-lg tracking-tight whitespace-nowrap font-shinhan-display">4. 전자금융 SLA</h3>
+                      <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Incident Ops]</span>
                       {selectedSms && (
-                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[9px] font-mono font-bold animate-fadeIn">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30 text-[9px] font-shinhan-num font-bold animate-fadeIn">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#0046FF]" />
                           PIPELINE SYNC
                         </span>
                       )}
                     </div>
-                    <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap hidden sm:block mt-0.5">Incident Handling Progress</span>
+                    <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap hidden sm:block mt-0.5 font-shinhan-display">Incident Handling Progress</span>
                   </div>
                 </div>
                 {selectedIncidentIdFlow && (() => {
                   const isClosedFlow = incidentWorkflowSteps.some(s => s.id === 'KNOWLEDGE');
                   return isClosedFlow ? (
-                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold text-[#00C48C] bg-[#00C48C]/10 border border-[#00C48C]/30 px-2.5 py-1 rounded-md flex items-center gap-1.5 font-shinhan-num">
                       <CheckCircle2 size={12} />COMPLETED FLOW
                     </span>
                   ) : (
-                    <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-md flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />LIVE FLOW
+                    <span className="text-[10px] font-semibold text-[#F5A623] bg-[#F5A623]/10 border border-[#F5A623]/30 px-2.5 py-1 rounded-md flex items-center gap-1.5 font-shinhan-num">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#F5A623]" />LIVE FLOW
                     </span>
                   );
                 })()}
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar bg-transparent border-t border-[#1E293B] flex flex-col">
+              <div className="flex-1 overflow-y-auto custom-scrollbar bg-transparent border-t border-[#1E2F56] flex flex-col">
                 <div className="relative flex-1 flex flex-col">
                   {selectedIncidentIdFlow ? (
                     <div className="flex flex-col flex-1">
@@ -2702,11 +2712,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         const isCritical = !isClosed && (selectedSms.severity === 'CRITICAL');
                         const isMajor = !isClosed && (selectedSms.severity === 'MAJOR');
 
-                        const ringColor = isClosed ? '#10b981' : isCritical ? '#ef4444' : isMajor ? '#f59e0b' : '#3b82f6';
+                        const ringColor = isClosed ? '#00C48C' : isCritical ? '#F04438' : isMajor ? '#F5A623' : '#0046FF';
 
                         // MTTA Timer Logic
-                        // warRooms는 이미 로드됨 → RealtimePipeline과 동일하게 즉시 사용
-                        // warStep(workflow API)은 보조 소스로만 사용
                         const incWarRoom = warRooms.find(r => String(r.inc_id) === String(selectedIncidentIdFlow));
                         const warRoomDt = incWarRoom?.reg_dt
                           ? parseDate(incWarRoom.reg_dt)
@@ -2714,31 +2722,30 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         const mttaDurationMs = (warRoomDt || currentTime) - diffStart;
                         const isMttaClosed = !!warRoomDt;
 
-                        
-                        let mttaRingColor = '#ef4444';
+                        let mttaRingColor = '#F04438';
 
                         if (!isMttaClosed) {
-                          mttaRingColor = '#ef4444';
+                          mttaRingColor = '#F04438';
                         } else {
                           const mttaMinutes = mttaDurationMs / 60000;
                           const incidentHour = diffStart.getHours();
                           const isDaytime = incidentHour >= 9 && incidentHour < 18;
 
                           if (isDaytime) {
-                            if (mttaMinutes < 3) mttaRingColor = '#10b981';
-                            else if (mttaMinutes < 5) mttaRingColor = '#f59e0b';
-                            else mttaRingColor = '#ef4444';
+                            if (mttaMinutes < 3) mttaRingColor = '#00C48C';
+                            else if (mttaMinutes < 5) mttaRingColor = '#F5A623';
+                            else mttaRingColor = '#F04438';
                           } else {
-                            if (mttaMinutes < 5) mttaRingColor = '#10b981';
-                            else if (mttaMinutes < 10) mttaRingColor = '#f59e0b';
-                            else mttaRingColor = '#ef4444';
+                            if (mttaMinutes < 5) mttaRingColor = '#00C48C';
+                            else if (mttaMinutes < 10) mttaRingColor = '#F5A623';
+                            else mttaRingColor = '#F04438';
                           }
                         }
 
                         return (
                           <div className="flex flex-col shrink-0">
                             {/* 가로 프로그레스 바 (Horizontal Stepper) */}
-                            <div className="flex flex-col gap-y-2 px-4 py-5 bg-[#0B0F19]/40 border-b border-[#1E293B] relative shrink-0">
+                            <div className="flex flex-col gap-y-2 px-4 py-5 bg-[#060C1B]/60 border-b border-[#1E2F56] relative shrink-0">
                               <div className="flex items-start justify-between w-full">
                                 {steps.map((st, i) => {
                                   const isDone = st.done;
@@ -2760,28 +2767,25 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                             <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all border relative ${
                                               isDone
                                                 ? (isBottleneck 
-                                                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/40 font-bold' 
-                                                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 font-bold')
+                                                    ? 'bg-[#F5A623]/15 text-[#F5A623] border-[#F5A623]/40 font-bold' 
+                                                    : 'bg-[#00C48C]/15 text-[#00C48C] border-[#00C48C]/40 font-bold')
                                                 : isActive
-                                                  ? 'bg-blue-600 text-white border-blue-400 font-bold animate-pulse ring-2 ring-blue-500/60 shadow-lg shadow-blue-500/40'
-                                                  : 'bg-[#0B0F19] text-slate-500 border-[#1E293B] font-medium'
+                                                  ? 'bg-[#0046FF] text-white border-[#0046FF] font-bold'
+                                                  : 'bg-[#060C1B] text-slate-500 border-[#1E2F56] font-medium'
                                             }`}>
-                                              {isActive && (
-                                                <span className="animate-ping absolute inset-0 rounded-lg bg-blue-400 opacity-40"></span>
-                                              )}
-                                              <span className="relative z-10">{isDone ? <Check size={14} className="stroke-[2.5]" /> : i + 1}</span>
+                                              <span className="relative z-10 font-shinhan-num">{isDone ? <Check size={14} className="stroke-[2.5]" /> : i + 1}</span>
                                             </div>
                                           </div>
                                           
                                           {/* 스텝 라벨 */}
                                           <div className="mt-2 text-center w-full px-0.5">
-                                            <span className={`text-[10px] tracking-tight break-keep leading-tight inline-block w-full whitespace-normal ${
+                                            <span className={`text-[10px] tracking-tight break-keep leading-tight inline-block w-full whitespace-normal font-shinhan-display ${
                                               isBottleneck 
-                                                ? 'text-amber-400 font-semibold' 
+                                                ? 'text-[#F5A623] font-semibold' 
                                                 : isDone 
                                                   ? 'text-slate-200 font-medium' 
                                                   : isActive 
-                                                    ? 'text-blue-400 font-bold animate-pulse' 
+                                                    ? 'text-[#00A3E0] font-bold' 
                                                     : 'text-slate-500 font-medium'
                                             }`}>
                                               {st.label}
@@ -2791,16 +2795,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                           {/* 소요 시간 태그 */}
                                           <div className="mt-1.5 flex justify-center w-full h-[20px]">
                                             {i > 0 && st.dObj ? (
-                                              <span className={`text-[9.5px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap inline-flex items-center justify-center ${
+                                              <span className={`text-[9.5px] font-shinhan-num font-medium px-1.5 py-0.5 rounded border whitespace-nowrap inline-flex items-center justify-center ${
                                                 (st.dObj?.min > 60)
                                                   ? (isActive
-                                                      ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 font-semibold animate-pulse ring-1 ring-amber-500/40'
-                                                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-semibold')
+                                                      ? 'bg-[#F5A623]/20 text-[#F5A623] border-[#F5A623]/40 font-semibold'
+                                                      : 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30 font-semibold')
                                                   : isActive 
-                                                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/40 font-semibold animate-pulse ring-1 ring-blue-500/40'
+                                                    ? 'bg-[#0046FF]/20 text-[#00A3E0] border-[#0046FF]/40 font-semibold'
                                                     : isDone
-                                                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                                      : 'bg-[#0B0F19] text-slate-500 border-[#1E293B]'
+                                                      ? 'bg-[#00C48C]/10 text-[#00C48C] border-[#00C48C]/20'
+                                                      : 'bg-[#060C1B] text-slate-500 border-[#1E2F56]'
                                               }`}>
                                                 {st.dObj.text}
                                               </span>
@@ -2814,16 +2818,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                             <div className="w-full flex items-center gap-1">
                                               <div className={`h-[1px] flex-1 transition-colors ${
                                                 isNextStepDone 
-                                                  ? (isArrowBottleneck ? 'bg-amber-500/50' : 'bg-emerald-500/40') 
+                                                  ? (isArrowBottleneck ? 'bg-[#F5A623]/50' : 'bg-[#00C48C]/40') 
                                                   : isNextStepActive 
-                                                    ? 'bg-blue-500 animate-pulse' 
-                                                    : 'bg-[#1E293B]'
+                                                    ? 'bg-[#0046FF]' 
+                                                    : 'bg-[#1E2F56]'
                                               }`} />
                                               <ArrowRight size={12} className={`shrink-0 transition-colors ${
                                                 isNextStepDone 
-                                                  ? (isArrowBottleneck ? 'text-amber-400' : 'text-emerald-400') 
+                                                  ? (isArrowBottleneck ? 'text-[#F5A623]' : 'text-[#00C48C]') 
                                                   : isNextStepActive 
-                                                    ? 'text-blue-400 animate-pulse' 
+                                                    ? 'text-[#00A3E0]' 
                                                     : 'text-slate-600'
                                               }`} />
                                             </div>
@@ -2837,14 +2841,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                             </div>
 
                             {/* 정제된 소요시간 게이지 (Activity Gauges) - 네온 효과 제거 */}
-                            <div className="py-6 xl:py-7 flex flex-col items-center justify-center border-b border-[#1E293B] bg-transparent relative shrink-0">
+                            <div className="py-6 xl:py-7 flex flex-col items-center justify-center border-b border-[#1E2F56] bg-transparent relative shrink-0">
                               <div className="flex flex-row items-center justify-center gap-6 xl:gap-10 px-4">
                                 
                                 {/* MTTA Gauge */}
                                 <div className="relative w-[130px] h-[130px] xl:w-[145px] xl:h-[145px] flex items-center justify-center shrink-0">
                                   <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
                                     {/* 베이스 트랙 */}
-                                    <circle cx="90" cy="90" r="70" stroke="#1E293B" strokeWidth="8" fill="none" />
+                                    <circle cx="90" cy="90" r="70" stroke="#1E2F56" strokeWidth="8" fill="none" />
                                     {/* 활성 프로그레스 */}
                                     <circle
                                       cx="90"
@@ -2860,14 +2864,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                     />
                                   </svg>
                                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">MTTA TIMER</span>
-                                    <span className="text-[20px] xl:text-[24px] font-bold font-mono tracking-tight text-white tabular-nums">
+                                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5 font-shinhan-display">MTTA TIMER</span>
+                                    <span className="text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight text-white">
                                       {formatDuration(mttaDurationMs)}
                                     </span>
-                                    <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all ${
+                                    <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all font-shinhan-num ${
                                       isMttaClosed 
-                                        ? 'bg-[#0B0F19] border-[#1E293B] text-slate-300' 
-                                        : 'bg-red-500/10 border-red-500/40 text-red-400'
+                                        ? 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]' 
+                                        : 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]'
                                     }`}>
                                       {isMttaClosed ? '인지 완료' : '긴급 대기'}
                                     </span>
@@ -2878,7 +2882,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 <div className="relative w-[130px] h-[130px] xl:w-[145px] xl:h-[145px] flex items-center justify-center shrink-0">
                                   <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
                                     {/* 베이스 트랙 */}
-                                    <circle cx="90" cy="90" r="70" stroke="#1E293B" strokeWidth="8" fill="none" />
+                                    <circle cx="90" cy="90" r="70" stroke="#1E2F56" strokeWidth="8" fill="none" />
                                     {/* 활성 프로그레스 */}
                                     <circle
                                       cx="90"
@@ -2890,22 +2894,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                       strokeDasharray={circum}
                                       strokeDashoffset={offset}
                                       strokeLinecap="round"
-                                      className={`transition-all duration-700 ${!isClosed ? 'animate-pulse' : ''}`}
+                                      className="transition-all duration-700"
                                     />
                                   </svg>
                                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">MTTR TIMER</span>
-                                    <span className="text-[20px] xl:text-[24px] font-bold font-mono tracking-tight text-white tabular-nums">
+                                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5 font-shinhan-display">MTTR TIMER</span>
+                                    <span className="text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight text-white">
                                       {formatDuration(durationMs)}
                                     </span>
-                                    <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all ${
+                                    <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all font-shinhan-num ${
                                       isClosed 
-                                        ? 'bg-[#0B0F19] border-[#1E293B] text-emerald-400' 
+                                        ? 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]' 
                                         : isCritical 
-                                          ? 'bg-red-500/10 border-red-500/40 text-red-400' 
+                                          ? 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]' 
                                           : isMajor 
-                                            ? 'bg-orange-500/10 border-orange-500/40 text-orange-400' 
-                                            : 'bg-blue-500/10 border-blue-500/40 text-blue-400'
+                                            ? 'bg-[#F5A623]/10 border-[#F5A623]/40 text-[#F5A623]' 
+                                            : 'bg-[#0046FF]/10 border-[#0046FF]/40 text-[#00A3E0]'
                                     }`}>
                                       {isClosed ? '처리 완료' : '조치 진행중'}
                                     </span>
@@ -2914,11 +2918,29 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                               </div>
 
-                              {/* 하단 등급 기준 안내 (한 줄) */}
-                              <div className="mt-5 text-[9px] sm:text-[10px] text-slate-500 tracking-tight whitespace-nowrap px-3 py-1 border border-[#1E293B] bg-slate-900/60 rounded-lg w-fit mx-auto">
-                                <span className="font-semibold text-slate-400 mr-1">MTTA 기준:</span> 
-                                <span className="text-emerald-400 ml-1">상</span> 주3분/야5분 이내 <span className="mx-1 text-slate-700">|</span> 
-                                <span className="text-red-400">하</span> 주5분/야10분 이상
+                              {/* 전자금융감독규정 대응 골든타임 계측 기준 바 */}
+                              <div className="mt-4 flex flex-col items-center gap-1.5 px-3 py-2 border border-[#1E2F56] bg-[#060C1B] rounded-xl w-full max-w-[340px] mx-auto text-[10px] font-shinhan-num shadow-sm">
+                                <div className="flex items-center justify-between w-full pb-1 border-b border-[#1E2F56]/80 text-[9.5px]">
+                                  <span className="font-bold text-[#00A3E0] font-shinhan-display flex items-center gap-1">
+                                    <Shield className="w-3 h-3 text-[#00A3E0]" />
+                                    전자금융감독규정 SLA 골든타임 기준
+                                  </span>
+                                  <span className="text-slate-400">FIN-SLA GOAL</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-1.5 w-full text-center text-[9px] pt-0.5">
+                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                                    <span className="text-slate-400 block">장애 인지</span>
+                                    <span className="text-[#00C48C] font-bold">10분 이내</span>
+                                  </div>
+                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                                    <span className="text-slate-400 block">상황 전파</span>
+                                    <span className="text-[#F5A623] font-bold">30분 이내</span>
+                                  </div>
+                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                                    <span className="text-slate-400 block">시스템 복구</span>
+                                    <span className="text-[#0046FF] font-bold">2시간 이내</span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                             {/* 워룸 이동/개설 액션 버튼 */}
@@ -2930,7 +2952,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                   <button 
                                     onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
                                     disabled={isOpeningWarRoom}
-                                    className={`w-full py-2.5 bg-rose-600 hover:bg-rose-500 border border-rose-500 text-white rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50`}
+                                    className={`w-full py-2.5 bg-[#F04438] hover:bg-[#d9382d] border border-[#F04438] text-white rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50 font-shinhan-display cursor-pointer`}
                                   >
                                     <Users size={15} />{isOpeningWarRoom ? '워룸 개설 진행 중...' : '긴급 War-Room 개설'}
                                   </button>
@@ -2976,18 +2998,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               const isLineBottleneck = sIdx < FLOW_STEPS.length - 1 && !stepTimestamps[sIdx+1] && nextDurationMs > 60000;
 
                               const boxStyles = isCompleted
-                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold'
+                                ? 'bg-[#00C48C]/10 border-[#00C48C]/30 text-[#00C48C] font-bold'
                                 : isNextStep
-                                ? 'bg-blue-600 text-white border-blue-400 font-bold z-30 animate-pulse ring-2 ring-blue-500/60 shadow-lg shadow-blue-500/40'
-                                : 'bg-[#0B0F19] border-[#1E293B] text-slate-600 opacity-50';
+                                ? 'bg-[#0046FF] text-white border-[#0046FF] font-bold z-30'
+                                : 'bg-[#060C1B] border-[#1E2F56] text-slate-600 opacity-50';
 
                               const lineStyle = isLineBottleneck
-                                ? { background: '#f59e0b', boxShadow: 'none' }
+                                ? { background: '#F5A623', boxShadow: 'none' }
                                 : isCompleted
-                                ? { background: '#10b981', boxShadow: 'none' }
+                                ? { background: '#00C48C', boxShadow: 'none' }
                                 : isNextStep
-                                ? { background: '#3b82f6', boxShadow: '0 0 8px rgba(59, 130, 246, 0.6)' }
-                                : { background: '#1E293B', boxShadow: 'none' };
+                                ? { background: '#0046FF', boxShadow: 'none' }
+                                : { background: '#1E2F56', boxShadow: 'none' };
 
                               return (
                                 <div key={step.id} className="relative pl-11 transition-all duration-500 flex flex-col" style={{ flexGrow: flexGrowVal, flexBasis: minH, opacity: isCompleted || isNextStep ? 1 : 0.4 }}>
@@ -2997,24 +3019,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                                   <div className="absolute left-0 top-0 z-20">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all duration-300 relative ${boxStyles}`}>
-                                      {isNextStep && (
-                                        <span className="animate-ping absolute inset-0 rounded-lg bg-blue-400 opacity-40"></span>
-                                      )}
-                                      <step.icon size={14} className={isNextStep ? 'text-white relative z-10' : isCompleted ? 'text-emerald-400' : 'text-slate-600'} />
+                                      <step.icon size={14} className={isNextStep ? 'text-white relative z-10' : isCompleted ? 'text-[#00C48C]' : 'text-slate-600'} />
                                     </div>
                                   </div>
 
                                   <div className="flex flex-col min-h-[32px] justify-center ml-1">
                                     <div className="flex flex-wrap items-center justify-between gap-1 mb-0.5 w-full">
                                       <div className="flex items-center gap-2 min-w-0">
-                                        <h4 className={`tracking-tight text-[13px] truncate ${
-                                          isNextStep ? 'text-blue-400 font-bold animate-pulse' : isCompleted ? 'text-white font-semibold' : 'text-slate-500 font-semibold'
+                                        <h4 className={`tracking-tight text-[13px] truncate font-shinhan-display ${
+                                          isNextStep ? 'text-[#00A3E0] font-bold' : isCompleted ? 'text-white font-semibold' : 'text-slate-500 font-semibold'
                                         }`}>
                                           {step.label}
                                         </h4>
                                         {isNextStep && (
-                                          <span className="shrink-0 text-[8.5px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider text-blue-400 bg-blue-500/20 border border-blue-500/40 font-mono animate-pulse flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping"></span>
+                                          <span className="shrink-0 text-[8.5px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider text-[#00A3E0] bg-[#0046FF]/20 border border-[#0046FF]/40 font-shinhan-num flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0]"></span>
                                             진행중
                                           </span>
                                         )}
@@ -3022,28 +3041,26 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                                       <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                                         {isCompleted && (
-                                          <span className="text-[9px] text-slate-400 font-mono font-medium bg-[#0B0F19] px-2 py-0.5 rounded border border-[#1E293B]">
+                                          <span className="text-[9px] text-slate-400 font-shinhan-num font-medium bg-[#060C1B] px-2 py-0.5 rounded border border-[#1E2F56]">
                                             {formatYYMMDD(stepData.timestamp)}
                                           </span>
                                         )}
                                         {durationMs > 1000 && sIdx > 0 && (
-                                          <div className={`px-2 py-0.5 rounded-md flex items-center gap-1 font-mono text-[10px] font-medium border ${
+                                          <div className={`px-2 py-0.5 rounded-md flex items-center gap-1 font-shinhan-num text-[10px] font-medium border ${
                                             isBottleneck
-                                              ? (isNextStep 
-                                                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/40 font-semibold animate-pulse ring-1 ring-amber-500/30' 
-                                                  : 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-semibold')
+                                              ? 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30 font-semibold'
                                               : isNextStep
-                                                ? 'bg-blue-500/15 text-blue-400 border-blue-500/40 font-semibold animate-pulse ring-1 ring-blue-500/30'
-                                                : 'bg-[#0B0F19] text-slate-300 border-[#1E293B]'
+                                                ? 'bg-[#0046FF]/15 text-[#00A3E0] border-[#0046FF]/40 font-semibold'
+                                                : 'bg-[#060C1B] text-slate-300 border-[#1E2F56]'
                                           }`}>
-                                            <Clock size={10} className={isBottleneck ? 'animate-spin text-amber-400 shrink-0' : 'text-slate-400 shrink-0'} />
+                                            <Clock size={10} className={isBottleneck ? 'text-[#F5A623] shrink-0' : 'text-slate-400 shrink-0'} />
                                             <span className="tracking-wider">{formatDuration(durationMs)}</span>
                                           </div>
                                         )}
                                       </div>
                                     </div>
                                     <p className={`text-[11.5px] leading-relaxed tracking-tight ${
-                                      isNextStep ? 'text-blue-300/90 font-medium' : isCompleted ? 'text-slate-300 font-normal' : 'text-slate-600 font-normal'
+                                      isNextStep ? 'text-sky-200/90 font-medium' : isCompleted ? 'text-slate-300 font-normal' : 'text-slate-600 font-normal'
                                     }`}>
                                       {isCompleted ? stepData.detail : isNextStep ? 'AI 및 시스템 분석 실시간 연동 중...' : '대기 중'}
                                     </p>
