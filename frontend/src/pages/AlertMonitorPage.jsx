@@ -30,18 +30,12 @@ function SeverityOrb({ level, count, maxCount, label }) {
   return (
     <div className="flex flex-col items-center gap-2" style={{ flex: 1, minWidth: 0 }}>
       <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-        {/* 배경 글로우 */}
-        <div style={{
-          position: 'absolute', width: size * 0.9, height: size * 0.9, borderRadius: '50%',
-          background: `radial-gradient(circle, ${cfg.glow} 0%, transparent 70%)`,
-          transition: 'all 0.8s ease'
-        }} />
         <svg width={size} height={size} className="-rotate-90" style={{ position: 'absolute', transition: 'all 0.8s ease' }}>
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={5} />
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={cfg.color} strokeWidth={5}
             strokeDasharray={circ} strokeDashoffset={isNaN(offset) ? circ : offset}
             strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 1s ease-out', filter: `drop-shadow(0 0 8px ${cfg.color})` }} />
+            style={{ transition: 'stroke-dashoffset 1s ease-out' }} />
         </svg>
         <div className="absolute flex flex-col items-center justify-center">
           <span className="font-black text-white leading-none" style={{ fontSize: size > 90 ? 28 : size > 70 ? 20 : 14 }}>{count}</span>
@@ -50,7 +44,7 @@ function SeverityOrb({ level, count, maxCount, label }) {
       </div>
       {/* 등급 레이블 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.color, boxShadow: `0 0 6px ${cfg.color}`, display: 'inline-block', animation: level === 'CRITICAL' ? 'blink 1.5s infinite' : 'none' }} />
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.color, display: 'inline-block', animation: level === 'CRITICAL' ? 'blink 1.5s infinite' : 'none' }} />
         <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: cfg.color }}>{label}</span>
       </div>
     </div>
@@ -257,28 +251,28 @@ export default function AlertMonitorPage({ embedded = false }) {
     <div style={
       embedded
         ? { width: '100%', height: '100%', minHeight: '300px', display: 'flex', flexDirection: 'column', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden' }
-        : { height: '100%', background: 'linear-gradient(160deg,#020917 0%,#070d1f 50%,#020917 100%)', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden', display: 'flex', flexDirection: 'column' }
+        : { height: '100%', background: '#0B0F19', fontFamily: "'Pretendard','Inter',sans-serif", overflow: 'hidden', display: 'flex', flexDirection: 'column' }
     } className="text-slate-300">
 
       {/* HEADER */}
       {!embedded && (
-        <header style={{ background: 'rgba(2,9,23,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(6,182,212,0.08)' }}
+        <header style={{ background: '#0B0F19', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
           className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 flex-shrink-0">
         <button onClick={() => goBack()}
           style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ArrowLeft style={{ width: 16, height: 16, color: '#64748b' }} />
         </button>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.18em', textTransform: 'uppercase', background: 'linear-gradient(90deg,#06b6d4,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#e2e8f0' }}>
             Orbital Monitor
           </div>
-          <div style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.35em', textTransform: 'uppercase', color: 'rgba(6,182,212,0.45)', marginTop: 2 }}>
+          <div style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.35em', textTransform: 'uppercase', color: '#64748b', marginTop: 2 }}>
             3-Tier Severity Engine
           </div>
         </div>
         <button onClick={fetchIncidents}
-          style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Compass style={{ width: 16, height: 16, color: '#06b6d4', animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+          style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Compass style={{ width: 16, height: 16, color: '#60a5fa', animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
         </button>
       </header>
       )}
@@ -288,7 +282,7 @@ export default function AlertMonitorPage({ embedded = false }) {
 
         {/* ── LEFT: 3-ORB STATUS HUD ── */}
         <div style={{
-          background: `radial-gradient(ellipse at 50% -20%, ${SC[overallSev].glow} 0%, transparent 65%), rgba(255,255,255,0.02)`,
+          background: '#111827',
           border: `1px solid ${SC[overallSev].border}`,
           borderRadius: 24,
           padding: '16px 14px',
@@ -308,8 +302,8 @@ export default function AlertMonitorPage({ embedded = false }) {
 
           {/* 현재 등급 배지 */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 99, background: SC[overallSev].bg, border: `1px solid ${SC[overallSev].border}`, boxShadow: `0 0 20px ${SC[overallSev].glow}` }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: SC[overallSev].color, boxShadow: `0 0 10px ${SC[overallSev].color}`, animation: 'blink 1.5s infinite' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 99, background: SC[overallSev].bg, border: `1px solid ${SC[overallSev].border}`, boxShadow: 'none' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: SC[overallSev].color, animation: 'blink 1.5s infinite' }} />
               <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.22em', color: SC[overallSev].color }}>{overallSev}</span>
             </div>
           </div>
@@ -357,7 +351,7 @@ export default function AlertMonitorPage({ embedded = false }) {
           <ThresholdBlock
             tier="critical" title="CRITICAL 임계치" subtitle="이 값 이상이면 CRITICAL 판정"
             icon={AlertTriangle} color={SC.CRITICAL.color}
-            bg="rgba(248,113,113,0.03)" border="rgba(248,113,113,0.2)"
+            bg="#111827" border="rgba(248,113,113,0.2)"
             values={thresholds.critical} sliders={SLIDERS}
             onChange={(key, val) => setTierVal('critical', key, val)}
           />
@@ -366,13 +360,13 @@ export default function AlertMonitorPage({ embedded = false }) {
           <ThresholdBlock
             tier="major" title="MAJOR 임계치" subtitle="CRITICAL 미만, NORMAL 초과 구간"
             icon={Zap} color={SC.MAJOR.color}
-            bg="rgba(251,146,60,0.03)" border="rgba(251,146,60,0.18)"
+            bg="#111827" border="rgba(251,146,60,0.18)"
             values={thresholds.major} sliders={SLIDERS}
             onChange={(key, val) => setTierVal('major', key, val)}
           />
 
           {/* 판정 로직 안내 */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <Shield style={{ width: 14, height: 14, color: '#334155', flexShrink: 0, marginTop: 1 }} />
             <div>
               <p style={{ fontSize: 9, fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>판정 우선순위</p>

@@ -460,15 +460,15 @@ export default function WorkflowPage() {
 
                 return (
                   <motion.div key={step.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: sIdx * 0.1 }} className="relative pl-10 lg:pl-10">
-                    {/* 원형 타임라인 노드 */}
-                    <div className={`absolute left-[3px] lg:left-[3px] top-4 w-6 h-6 rounded-full z-20 flex items-center justify-center transition-all duration-500 border ${
-                      done ? 'bg-emerald-500 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]' : next ? 'bg-blue-600 border-blue-400 shadow-[0_0_12px_rgba(37,99,235,0.8)] animate-pulse' : 'bg-slate-800 border-slate-700'
+                    {/* 정제된 타임라인 노드 */}
+                    <div className={`absolute left-[3px] lg:left-[3px] top-4 w-6 h-6 rounded-lg z-20 flex items-center justify-center transition-all duration-300 border ${
+                      done ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : next ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-[#1E293B] text-slate-500'
                     }`}>
-                      <Icon className={`w-3.5 h-3.5 ${done || next ? 'text-white' : 'text-slate-500'}`} />
+                      <Icon className="w-3.5 h-3.5" />
                     </div>
 
                     {/* 콘텐츠 카드 */}
-                    <div className={`p-4 lg:p-5 rounded-2xl border transition-all duration-300 ${done ? 'bg-white/[0.03] border-white/10 shadow-lg' : next ? 'bg-blue-900/15 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.15)]' : 'bg-transparent border-transparent opacity-40'}`}>
+                    <div className={`p-4 lg:p-5 rounded-2xl border transition-all duration-300 ${done ? 'bg-white/[0.03] border-[#1E293B]' : next ? 'bg-blue-900/15 border-blue-500/30' : 'bg-transparent border-transparent opacity-40'}`}>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 border-b border-white/5 pb-2.5">
                         <h4 className={`text-sm font-black tracking-tight flex items-center gap-1.5 ${done ? 'text-white' : next ? 'text-blue-400 font-bold tracking-wide' : 'text-slate-500'}`}>
                           <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">STEP {sIdx + 1}</span>

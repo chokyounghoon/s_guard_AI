@@ -893,7 +893,8 @@ export default function LoginPage() {
           position: fixed;
           inset: 0;
           background: #05091a;
-          font-family: 'Inter','Noto Sans KR',sans-serif;
+          font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, 'Noto Sans KR', sans-serif;
+          letter-spacing: -0.02em;
           display: flex;
           flex-direction: column;
           overflow-y: auto;

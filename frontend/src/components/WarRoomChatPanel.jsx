@@ -342,18 +342,18 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
   if (!isVisible) return null;
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0c12] animate-in fade-in duration-500">
+    <div className="flex flex-col h-full bg-[#111827] animate-in fade-in duration-500">
       {/* Header Info */}
-      <div className="px-5 py-3 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+      <div className="px-5 py-3 border-b border-[#1E293B] bg-transparent flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex -space-x-2">
             {participants.slice(0, 3).map((p, i) => (
-              <div key={i} className="w-6 h-6 rounded-full bg-slate-800 border-2 border-[#0a0c12] flex items-center justify-center text-[10px] font-bold text-white">
+              <div key={i} className="w-6 h-6 rounded-full bg-slate-800 border-2 border-[#111827] flex items-center justify-center text-[10px] font-bold text-white">
                 {p.name?.[0] || 'U'}
               </div>
             ))}
             {participants.length > 3 && (
-              <div className="w-6 h-6 rounded-full bg-blue-600/20 border-2 border-[#0a0c12] flex items-center justify-center text-[8px] font-bold text-blue-400">
+              <div className="w-6 h-6 rounded-full bg-blue-600/20 border-2 border-[#111827] flex items-center justify-center text-[8px] font-bold text-blue-400">
                 +{participants.length - 3}
               </div>
             )}
@@ -404,27 +404,27 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
 
             if (isAiAgent) {
               return (
-                <div key={msg.id || idx} className="w-full my-4 bg-gradient-to-br from-[#051329] to-[#0a1b3a] border border-[#00e5ff]/30 rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,229,255,0.15)] animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+                <div key={msg.id || idx} className="w-full my-4 bg-[#0B0F19] border border-[#1E293B] rounded-2xl p-4 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between border-b border-[#1E293B] pb-3 mb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 border border-[#00e5ff]/50 flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.3)] shrink-0">
-                        <Bot className="w-4 h-4 text-[#00e5ff]" />
+                      <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center shrink-0">
+                        <Bot className="w-4 h-4 text-blue-400" />
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-black text-white text-sm tracking-wide">{msg.name || msg.sender_name || msg.sender || 'AI Assistant'}</span>
-                        <span className="px-2 py-0.5 rounded-md bg-[#00ff88]/10 border border-[#00ff88]/40 text-[#00ff88] text-[10px] font-mono font-bold tracking-wider uppercase shadow-[0_0_8px_rgba(0,255,136,0.2)]">
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold tracking-wider uppercase">
                           [S-GUARD AI System]
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-slate-400 text-[10px] font-mono shrink-0">
                       <div className="flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-[#00e5ff]" />
+                        <Sparkles className="w-3 h-3 text-blue-400" />
                         <span>{msg.time || msg.ts ? formatKst(msg.time || msg.ts) : ''}</span>
                       </div>
                       <button 
                         onClick={() => handleDeleteMessage(msg.id || msg.seq)}
-                        className="px-2.5 py-1 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 hover:text-red-300 active:scale-95 transition-all ml-1 flex items-center gap-1 shadow-[0_0_12px_rgba(239,68,68,0.25)] font-sans font-bold text-xs cursor-pointer z-10"
+                        className="px-2.5 py-1 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 hover:text-red-300 active:scale-95 transition-all ml-1 flex items-center gap-1 font-sans font-bold text-xs cursor-pointer z-10"
                         title="메시지 삭제"
                       >
                         <X className="w-3.5 h-3.5 text-red-400 stroke-[3]" />
@@ -474,10 +474,10 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                         onTouchEnd={() => clearTimeout(longPressTimer.current)}
                         onTouchMove={() => clearTimeout(longPressTimer.current)}
                         onContextMenu={(e) => { e.preventDefault(); setLongPressMsg(msg); }}
-                        className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.4] shadow-md break-words whitespace-pre-wrap select-none
+                        className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.4] break-words whitespace-pre-wrap select-none
                         ${msg.type === 'me' 
-                          ? 'bg-[#0038a8] text-white rounded-tr-none' 
-                          : 'bg-[#2a2f3a] text-slate-100 rounded-tl-none border border-white/5'
+                          ? 'bg-blue-600 text-white rounded-tr-none' 
+                          : 'bg-[#0B0F19] text-slate-100 rounded-tl-none border border-[#1E293B]'
                         }`}
                       >
                         {msg.text}
@@ -493,17 +493,17 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
             );
           })}
         {isAiTyping && (
-          <div className="w-full my-4 bg-gradient-to-br from-[#051329]/90 to-[#0a1b3a]/90 border border-[#00e5ff]/40 rounded-2xl p-4 shadow-[0_4px_25px_rgba(0,229,255,0.25)] animate-pulse flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 border border-[#00e5ff]/50 flex items-center justify-center shrink-0 animate-spin shadow-[0_0_12px_rgba(0,229,255,0.5)]">
-              <Bot className="w-4 h-4 text-[#00e5ff]" />
+          <div className="w-full my-4 bg-[#111827] border border-blue-500/30 rounded-2xl p-4 shadow-lg animate-pulse flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center shrink-0 animate-spin">
+              <Bot className="w-4 h-4 text-blue-400" />
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-black text-white text-sm tracking-wide">AI Assistant</span>
-                <span className="px-1.5 py-0.5 rounded-md bg-[#00e5ff]/15 border border-[#00e5ff]/30 text-[#00e5ff] text-[10px] font-mono font-bold animate-pulse tracking-wider">THINKING</span>
+                <span className="px-1.5 py-0.5 rounded-md bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-mono font-bold animate-pulse tracking-wider">THINKING</span>
               </div>
-              <span className="text-xs text-[#00ff88] font-mono mt-1 flex items-center gap-2 truncate">
-                <span className="inline-block w-2 h-2 rounded-full bg-[#00ff88] animate-ping shrink-0 shadow-[0_0_8px_#00ff88]" />
+              <span className="text-xs text-emerald-400 font-mono mt-1 flex items-center gap-2 truncate">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
                 <span className="truncate">AI가 S-Guard 내부 시스템 및 지식 기반을 연동하여 실시간 답변을 생성 중입니다...</span>
               </span>
             </div>
@@ -566,9 +566,9 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-[#0d111a] border-t border-white/5 relative">
+      <div className="p-4 bg-[#0B0F19] border-t border-[#1E293B] relative">
         {showMentionMenu && (
-          <div className="absolute bottom-full left-4 right-4 mb-2 bg-[#1a2035] border border-white/10 rounded-2xl p-1.5 shadow-2xl z-[100] max-h-48 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute bottom-full left-4 right-4 mb-2 bg-[#111827] border border-[#1E293B] rounded-2xl p-1.5 shadow-2xl z-[100] max-h-48 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
             {AI_PROMPT_SUGGESTIONS.filter(p => p.title.toLowerCase().includes(mentionFilter)).map(prompt => (
               <div 
                 key={prompt.id}
@@ -578,13 +578,13 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
                   setInputValue('');
                   handleSendMessage(promptText);
                 }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/10 active:bg-white/20 cursor-pointer transition-all border border-white/5 my-0.5 bg-black/20 hover:border-[#00e5ff]/30 group"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/10 active:bg-white/20 cursor-pointer transition-all border border-[#1E293B] my-0.5 bg-[#0B0F19] hover:border-blue-500/30 group"
               >
-                <div className="w-7 h-7 rounded-xl bg-[#00e5ff]/20 border border-[#00e5ff]/40 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Sparkles className="w-3.5 h-3.5 text-[#00e5ff]" />
+                <div className="w-7 h-7 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                 </div>
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-xs font-black text-white truncate group-hover:text-[#00e5ff] transition-colors">{prompt.title}</span>
+                  <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">{prompt.title}</span>
                   <span className="text-[10px] text-slate-400 truncate">{prompt.desc}</span>
                 </div>
               </div>
@@ -600,7 +600,7 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
             <button
               type="button"
               onClick={() => setShowEmojiPicker(p => !p)}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all active:scale-95 shrink-0"
+              className="p-2.5 rounded-xl bg-[#0B0F19] hover:bg-slate-800 border border-[#1E293B] transition-all active:scale-95 shrink-0"
               title="이모티콘"
             >
               <Smile className="w-4 h-4 text-yellow-400" />
@@ -608,7 +608,7 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
             {/* 이모티콘 픽커 팝업 */}
             {showEmojiPicker && (
               <div
-                className="absolute bottom-full left-0 mb-2 bg-[#1a2035] border border-white/10 rounded-2xl shadow-2xl z-[200] p-3 animate-in fade-in zoom-in-95 duration-200"
+                className="absolute bottom-full left-0 mb-2 bg-[#111827] border border-[#1E293B] rounded-2xl shadow-2xl z-[200] p-3 animate-in fade-in zoom-in-95 duration-200"
                 style={{ width: '260px', minWidth: '260px' }}
                 onClick={e => e.stopPropagation()}
               >
@@ -666,7 +666,7 @@ export default function WarRoomChatPanel({ incidentId, currentUser, isVisible })
               }
             }}
             placeholder="전문가들과 의견을 나누세요... (이모티콘 가능 😊)"
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-all resize-none overflow-hidden leading-relaxed"
+            className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/60 transition-all resize-none overflow-hidden leading-relaxed"
             style={{ minHeight: '40px', maxHeight: '120px' }}
           />
           <button 

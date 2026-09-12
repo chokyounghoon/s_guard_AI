@@ -343,10 +343,10 @@ export default function AssignmentsPage({ onAiClick }) {
                         navigate(`/chat/${cleanId}`);
                       }
                     }}
-                    className={`w-full p-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${
+                    className={`w-full py-2.5 px-3 rounded-lg border text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
                       isItemSelected
-                        ? 'bg-blue-600/20 border-blue-500/40 text-blue-300'
-                        : 'bg-blue-600/10 border-blue-500/20 text-blue-400'
+                        ? 'bg-blue-600 text-white border-blue-500'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-[#1E293B] hover:border-slate-700'
                     }`}
                   >
                     { (['처리완료', '조치완료', 'INC_003'].includes(item.status)) ? (

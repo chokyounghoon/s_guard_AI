@@ -169,16 +169,15 @@ export default function WarRoomManagementPage() {
   };
 
   return (
-    <div className="w-full h-full min-h-[100dvh] flex flex-col overflow-y-auto bg-gradient-to-br from-[#050810] via-[#090c1a] to-[#050810] font-['Pretendard','Inter',sans-serif] text-slate-300">
+    <div className="w-full h-full min-h-[100dvh] flex flex-col overflow-y-auto bg-[#0B0F19] font-['Pretendard','Inter',sans-serif] text-slate-300">
       <style>{`
-        input::placeholder { color: #1e293b; }
+        input::placeholder { color: #475569; }
         ::-webkit-scrollbar { width: 3px; } 
-        ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
       `}</style>
 
       {/* ① 헤더 */}
-      <header className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#050810]/95 backdrop-blur-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+      <header className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#0B0F19] relative overflow-hidden">
         <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors z-10">
           <ChevronLeft size={18} className="text-slate-400" />
         </button>
@@ -186,7 +185,7 @@ export default function WarRoomManagementPage() {
         <div className="text-center z-10">
           <div className="text-base font-black tracking-widest bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">WAR-ROOM 현황</div>
           <div className="flex items-center justify-center gap-1.5 mt-0.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
             <span className="text-[10px] text-red-500 font-extrabold tracking-widest opacity-80">INCIDENT CHANNELS</span>
           </div>
         </div>
@@ -259,7 +258,7 @@ export default function WarRoomManagementPage() {
               초기화
             </button>
             <button onClick={() => fetchRooms()}
-              className="py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] transition-all">
+              className="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold border border-rose-500 transition-all">
               필터 적용
             </button>
           </div>
@@ -276,7 +275,7 @@ export default function WarRoomManagementPage() {
             { key: 'completed', label: '완료' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)} 
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${activeTab === t.key ? 'bg-red-500/20 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'text-slate-500 hover:text-slate-300'}`}>
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === t.key ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
               {t.label}
             </button>
           ))}
@@ -314,9 +313,9 @@ export default function WarRoomManagementPage() {
               
               return (
                 <div key={`${room.code}-${index}`} 
-                  className={`rounded-[1.25rem] p-4 relative overflow-hidden backdrop-blur-md transition-all duration-300 ${isJoining ? 'opacity-50 scale-[0.98]' : 'hover:scale-[1.01]'}`}
+                  className={`rounded-[1.25rem] p-4 relative overflow-hidden transition-all duration-300 ${isJoining ? 'opacity-50 scale-[0.98]' : 'hover:scale-[1.01]'}`}
                   style={{
-                    background: `linear-gradient(135deg, ${sev.color}15 0%, rgba(255,255,255,0.02) 100%)`,
+                    background: '#111827',
                     border: `1px solid ${sev.border}`
                   }}>
                   {/* 좌측 심각도 바 */}
@@ -399,12 +398,12 @@ export default function WarRoomManagementPage() {
                     <button
                       onClick={() => isComp ? navigate(`/chat/${room.code}`) : (isOp ? handleOpenWarRoom(room) : handleJoin(room))}
                       disabled={isJoining}
-                      className="py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-95"
+                      className="py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
                       style={{
                         background: isComp ? 'rgba(71,85,105,0.2)' : (isOp ? 'rgba(59,130,246,0.15)' : sev.bg),
                         border: isComp ? '1px solid rgba(71,85,105,0.3)' : (isOp ? '1px solid rgba(59,130,246,0.3)' : `1px solid ${sev.border}`),
                         color: isComp ? '#94a3b8' : (isOp ? '#60a5fa' : sev.color),
-                        boxShadow: isComp ? 'none' : (isOp ? '0 0 15px rgba(59,130,246,0.2)' : `0 0 15px ${sev.color}40`)
+                        boxShadow: 'none'
                       }}>
                       {isJoining
                         ? <><Loader2 size={14} className="animate-spin" /> 처리 중</>

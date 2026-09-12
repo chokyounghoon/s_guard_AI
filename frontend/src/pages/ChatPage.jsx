@@ -1901,22 +1901,22 @@ export default function ChatPage() {
                   navigate(`/chat-summary/${incidentId}`);
                 }}
                 disabled={isResolved || !isAssignedToMe || !!summaryLockOwner}
-                className={`flex items-center px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-extrabold transition-all duration-300 shrink-0 whitespace-nowrap ${
+                className={`flex items-center px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap border ${
                   isResolved || !isAssignedToMe || summaryLockOwner
-                    ? 'bg-slate-800 text-slate-500 border border-[#242424] cursor-not-allowed opacity-60'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border border-blue-400/50 shadow-[0_0_12px_rgba(59,130,246,0.5)] hover:shadow-[0_0_20px_rgba(59,130,246,0.8)] hover:scale-105'
+                    ? 'bg-slate-800 text-slate-500 border-[#242424] cursor-not-allowed opacity-60'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500 active:scale-[0.98]'
                 }`}
               >
-                <Sparkles className={`w-3.5 h-3.5 mr-1 shrink-0 ${(isResolved || !isAssignedToMe || summaryLockOwner) ? 'text-slate-600' : 'animate-pulse'}`} />
+                <Sparkles className={`w-3.5 h-3.5 mr-1 shrink-0 ${(isResolved || !isAssignedToMe || summaryLockOwner) ? 'text-slate-600' : 'text-blue-200'}`} />
                 <span className="whitespace-nowrap shrink-0">
                   {summaryLockOwner ? `분석 중 (${summaryLockOwner})` : 'W/R 분석'}
                 </span>
               </button>
 
               {/* Moved Status Indicator */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl shrink-0 whitespace-nowrap">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                <span className="text-xs font-black tracking-tight text-emerald-400 uppercase">{getStatusName(roomStatus)}</span>
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-[#1E293B] rounded-lg shrink-0 whitespace-nowrap">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-semibold tracking-tight text-emerald-400 uppercase">{getStatusName(roomStatus)}</span>
               </div>
                 {/* 참여자 아이콘 및 숫자 (한 줄 유지 보장) */}
                 <button

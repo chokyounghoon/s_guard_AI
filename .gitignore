@@ -12,6 +12,11 @@ dist/
 .DS_Store
 __pycache__/
 backend/__pycache__/
-workers/sms-api/.wrangler/
+*.pyc
+.env
+*.env
+slides_output/
+slides_source/
+fix_dify_workflow*.js
 frontend/.wrangler/
 frontend/dist/

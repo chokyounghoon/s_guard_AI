@@ -3834,21 +3834,26 @@ app.get('/security/logs', async (c) => {
 });
 
 app.get('/ai/codes/:category', async (c) => {
-  const category = c.req.param('category').toUpperCase();
-  const cacheKey = 'codebook_' + category;
-  const cached = getCachedMasterData(cacheKey);
-  if (cached) {
+  try {
+    const category = c.req.param('category').toUpperCase();
+    const cacheKey = 'codebook_' + category;
+    const cached = getCachedMasterData(cacheKey);
+    if (cached) {
+      c.header('Cache-Control', 'private, max-age=120');
+      return c.json({ category, codes: cached });
+    }
+    const db = c.env.DB;
+    const { results } = await db.prepare(
+      "SELECT code, name, sort_order FROM code_book WHERE category = ? AND is_active = 1 ORDER BY sort_order ASC"
+    ).bind(category).all();
+    const data = results || [];
+    setCachedMasterData(cacheKey, data);
     c.header('Cache-Control', 'private, max-age=120');
-    return c.json({ category, codes: cached });
+    return c.json({ category, codes: data });
+  } catch (err) {
+    console.error('ai/codes fetch error:', err);
+    return c.json({ category: c.req.param('category'), codes: [], error: err.message });
   }
-  const db = c.env.DB;
-  const { results } = await db.prepare(
-    "SELECT code, name, sort_order FROM code_book WHERE category = ? AND is_active = 1 ORDER BY sort_order ASC"
-  ).bind(category).all();
-  const data = results || [];
-  setCachedMasterData(cacheKey, data);
-  c.header('Cache-Control', 'private, max-age=120');
-  return c.json({ category, codes: data });
 })
 
 // ==========================================
@@ -4165,12 +4170,18 @@ app.post('/sms/convert-multimodal', async (c) => {
 
 function extractOccurrence(occStr) {
   if (!occStr) return 0;
-  const str = String(occStr);
-  // Match "22건" or "22 건"
+  const str = String(occStr).trim();
+  // 1. "22건" 또는 "22 건" 매칭
   const match = str.match(/(\d+)\s*건/);
   if (match) return parseInt(match[1], 10);
-  // Fallback to stripping all non-digits if no "건" is found
-  return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+  // 2. "발생건수: 10" 또는 "[10]" 형태 매칭
+  const keyMatch = str.match(/(?:발생\s*건수|오류\s*건수|거래\s*건수|건수)\s*[:：]?\s*\[?(\d+)/);
+  if (keyMatch) return parseInt(keyMatch[1], 10);
+  // 3. 6자리 이하의 순수 숫자 문자열인 경우만 파싱 (전체 문자열 숫자 추출 방지)
+  if (str.length <= 6 && /^\d+$/.test(str)) {
+    return parseInt(str, 10) || 0;
+  }
+  return 0;
 }
 
 app.post('/sms/receive', async (c) => {
@@ -5483,19 +5494,24 @@ app.get('/sms/shortcut/keywords', async (c) => {
 // 🚀 NEW: Codebook (Common Code) APIs
 // ==========================================
 app.get('/sms/codebook', async (c) => {
-  const db = c.env.DB
-  const category = c.req.query('category')
-  let query = "SELECT * FROM code_book WHERE is_active = 1"
-  let params = []
+  try {
+    const db = c.env.DB
+    const category = c.req.query('category')
+    let query = "SELECT * FROM code_book WHERE is_active = 1"
+    let params = []
 
-  if (category) {
-    query += " AND category = ?"
-    params.push(category)
+    if (category) {
+      query += " AND category = ?"
+      params.push(category)
+    }
+    query += " ORDER BY category ASC, sort_order ASC"
+
+    const { results } = await db.prepare(query).bind(...params).all()
+    return c.json({ codes: results || [] })
+  } catch (err) {
+    console.error('Codebook fetch error:', err)
+    return c.json({ codes: [], error: err.message })
   }
-  query += " ORDER BY category ASC, sort_order ASC"
-
-  const { results } = await db.prepare(query).bind(...params).all()
-  return c.json({ codes: results })
 })
 
 app.post('/sms/codebook', async (c) => {

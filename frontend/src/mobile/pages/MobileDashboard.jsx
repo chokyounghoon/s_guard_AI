@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Check, Download, Apple, SmartphoneNfc } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Check, Download, Apple, SmartphoneNfc, ArrowRight, TrendingUp } from 'lucide-react';
 import AgentDiscussionPanel from '../../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../../components/EmergencyActionModal';
 import AiInsightPanel from '../../components/AiInsightPanel';
@@ -118,26 +118,136 @@ const renderFormattedSMS = (message, severity) => {
   const { title, items } = parsed;
   const sev = String(severity || '').toUpperCase();
   
-  let headerBg = 'bg-[#00e5ff]/10 border-[#00e5ff]/20 text-[#00e5ff]';
-  let bulletColor = 'bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]';
+  let headerBg = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+  let bulletColor = 'bg-emerald-500 shadow-none';
   
   if (sev === 'CRITICAL') {
     headerBg = 'bg-red-500/10 border-red-500/20 text-red-400';
-    bulletColor = 'bg-red-500 shadow-[0_0_8px_#ef4444]';
+    bulletColor = 'bg-red-500 shadow-none';
   } else if (sev === 'MAJOR' || sev === 'WARNING' || sev === 'HIGH') {
     headerBg = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
-    bulletColor = 'bg-amber-500 shadow-[0_0_8px_#f59e0b]';
+    bulletColor = 'bg-amber-500 shadow-none';
   }
+
+  // 📊 마이크로 데이터 시각화 (Micro Data Visualization) 메트릭 추출
+  let avgCount = null;
+  let curCount = null;
+  let thresholdRate = null;
+  let currentRate = null;
+
+  items.forEach(it => {
+    const k = it.key.replace(/\s+/g, '');
+    const rawV = cleanValue(it.value);
+
+    // 1. 비교기간평균오류건수
+    if (k.includes('비교기간평균오류건수') || k.includes('평균오류건수')) {
+      const m = rawV.match(/([0-9,.]+)/);
+      if (m) avgCount = parseFloat(m[1].replace(/,/g, ''));
+    }
+    // 2. 현재오류건수
+    if ((k.includes('현재오류건수') || k.includes('오류건수') || k.includes('발생건수')) && !k.includes('평균')) {
+      const m = rawV.match(/([0-9,.]+)/);
+      if (m && curCount === null) curCount = parseFloat(m[1].replace(/,/g, ''));
+    }
+    // 3. 오류율임계치
+    if (k.includes('오류율임계치') || k.includes('임계치') || k.includes('기준오류율')) {
+      const m = rawV.match(/([0-9,.]+)/);
+      if (m) thresholdRate = parseFloat(m[1].replace(/,/g, ''));
+    }
+    // 4. 현재오류율
+    if (k.includes('현재오류율') || (k.includes('오류율') && !k.includes('임계치'))) {
+      const m = rawV.match(/([0-9,.]+)/);
+      if (m) currentRate = parseFloat(m[1].replace(/,/g, ''));
+    }
+  });
+
+  const rateDelta = (currentRate !== null && thresholdRate !== null) ? (currentRate - thresholdRate) : null;
+  const countDelta = (curCount !== null && avgCount !== null) ? (curCount - avgCount) : null;
+  const hasRateGauge = currentRate !== null || thresholdRate !== null;
 
   return (
     <div className="flex flex-col gap-2 w-full text-slate-200">
       {title && (
-        <div className={`text-[13px] font-black border px-3 py-2 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
+        <div className={`text-[13px] font-semibold border px-3 py-2 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
           <span className={`w-2 h-2 rounded-full animate-pulse ${bulletColor}`} />
           <span>{title}</span>
         </div>
       )}
-      <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden p-2.5 grid grid-cols-[auto_auto] gap-x-5 gap-y-1.5 items-start">
+
+      {/* 📊 마이크로 시각화 카드: 오류율 미니 게이지 바 + Delta 증감율 뱃지 */}
+      {hasRateGauge && (
+        <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-2.5 space-y-2 mb-0.5 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span className="text-[11px] font-bold text-slate-300">오류율 임계치 분석</span>
+            </div>
+
+            {/* Delta 뱃지 (▲ Red 부각) */}
+            {rateDelta !== null && rateDelta > 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black font-mono bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse shadow-sm shadow-red-500/10">
+                ▲ +{rateDelta.toFixed(1)}%p 초과
+              </span>
+            ) : rateDelta !== null && rateDelta <= 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                ▼ {rateDelta.toFixed(1)}%p 안정
+              </span>
+            ) : null}
+          </div>
+
+          {/* 수평 미니 프로그레스 게이지 바 */}
+          <div className="space-y-1">
+            <div className="flex justify-between items-baseline text-[10px] font-mono">
+              <span className="text-slate-400">
+                임계치: <strong className="text-amber-300 font-bold">{thresholdRate !== null ? `${thresholdRate}%` : '-'}</strong>
+              </span>
+              <span className="text-red-400 font-bold">
+                현재: <strong className="text-red-400 text-xs font-black">{currentRate !== null ? `${currentRate}%` : '-'}</strong>
+              </span>
+            </div>
+
+            <div className="relative h-2.5 w-full bg-[#161F30] rounded-full overflow-hidden border border-[#1E293B]">
+              {/* 임계치 마커 라인 */}
+              {thresholdRate !== null && (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10 shadow-[0_0_4px_rgba(251,191,36,0.8)]"
+                  style={{ left: `${Math.min(100, Math.max(0, thresholdRate))}%` }}
+                  title={`임계치 ${thresholdRate}%`}
+                />
+              )}
+              {/* 현재 오류율 프로그레스 바 */}
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  currentRate >= (thresholdRate || 30)
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-sm shadow-red-500/30'
+                    : 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                }`}
+                style={{ width: `${Math.min(100, Math.max(0, currentRate || 0))}%` }}
+              />
+            </div>
+          </div>
+
+          {/* 오류건수 비교 서브 스트립 (평균 vs 현재) */}
+          {(avgCount !== null || curCount !== null) && (
+            <div className="flex items-center justify-between pt-1 border-t border-[#1E293B]/60 text-[10px] font-mono">
+              <span className="text-slate-400">
+                비교기간 평균: <span className="text-slate-200 font-semibold">{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">현재:</span>
+                <span className="text-red-400 font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
+                {countDelta !== null && countDelta > 0 && (
+                  <span className="text-[9px] font-bold text-red-400 bg-red-500/10 px-1 py-0.2 rounded border border-red-500/20">
+                    ▲ +{countDelta.toLocaleString()}건
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5 py-1 px-0.5 items-start">
         {items.map((item, idx) => {
           const isError = item.key.includes('오류') || item.key.includes('초과');
           let cleanedVal = cleanValue(item.value);
@@ -150,26 +260,18 @@ const renderFormattedSMS = (message, severity) => {
           
           if (!item.value) {
             return (
-              <div key={idx} className="col-span-2 text-[11px] font-bold text-slate-400 bg-white/5 -mx-2.5 px-2.5 py-1 border-y border-white/5">
+              <div key={idx} className="col-span-2 text-[11px] font-semibold text-slate-300 py-0.5 border-b border-white/5">
                 {item.key}
               </div>
             );
           }
           
           return (
-            <div key={idx} className="flex items-start gap-1 text-[11px] leading-tight min-w-0">
-              <span className={`font-bold shrink-0 whitespace-nowrap ${highlight ? 'text-red-300' : 'text-slate-400'}`}>
+            <div key={idx} className="contents text-[11px] leading-relaxed">
+              <span className={`font-normal shrink-0 whitespace-nowrap ${highlight ? 'text-red-300 font-medium' : 'text-slate-400'}`}>
                 {item.key}:
               </span>
-              <span className={`font-mono text-left ${
-                item.key.includes('메시지') || 
-                item.key.includes('수신자') || 
-                item.key.includes('노드') || 
-                item.key.includes('건수') || 
-                item.key.includes('명')
-                  ? 'break-all'
-                  : 'whitespace-nowrap'
-              } ${highlight ? 'text-red-400 font-black' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
+              <span className={`font-mono text-left break-all ${highlight ? 'text-red-400 font-bold' : 'text-slate-100 font-bold'}`} title={cleanedVal}>
                 {cleanedVal}
               </span>
             </div>
@@ -225,12 +327,12 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
     onChange(e.target.value);
   };
 
-  const inputClass = "w-full bg-[#0d272b] border border-[#00e5ff]/20 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all text-slate-200";
+  const inputClass = "w-full bg-[#111827] border border-slate-700 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-200";
 
   return (
     <div className={disabled ? 'opacity-50 pointer-events-none' : ''}>
       <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">
-        {label} {required && disabled !== true && <span className="text-[#00e5ff]">*</span>}
+        {label} {required && disabled !== true && <span className="text-red-400">*</span>}
       </label>
       <div className="relative">
         <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -437,25 +539,25 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       else if (v >= majT) sev = 'MAJOR';
     }
     if (sev === 'CRITICAL') return {
-      bg: 'linear-gradient(180deg, #3f0d0d 0%, #1a0505 100%)',
-      outlineActive: { outline: '2px solid #ef4444', outlineOffset: '-2px', boxShadow: '0 0 35px rgba(239,68,68,0.4), inset 0 0 25px rgba(239,68,68,0.06)' },
-      outlineDim:   { outline: '1px solid rgba(239,68,68,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(239,68,68,0.15)' },
-      accentColor: '#ef4444', accentGlow: 'rgba(239,68,68,0.6)',
-      bodyBg: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,13,13,0.5) 0%, #050a15 100%)',
+      bg: '#151a28',
+      outlineActive: { border: '1px solid #ef4444', outline: 'none', boxShadow: 'none' },
+      outlineDim:   { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
+      accentColor: '#ef4444',
+      bodyBg: '#0B0F19',
     };
     if (sev === 'MAJOR') return {
-      bg: 'linear-gradient(180deg, #3f1d0d 0%, #1a0a05 100%)',
-      outlineActive: { outline: '2px solid #f97316', outlineOffset: '-2px', boxShadow: '0 0 35px rgba(249,115,22,0.4), inset 0 0 25px rgba(249,115,22,0.06)' },
-      outlineDim:   { outline: '1px solid rgba(249,115,22,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(249,115,22,0.15)' },
-      accentColor: '#f97316', accentGlow: 'rgba(249,115,22,0.6)',
-      bodyBg: 'radial-gradient(ellipse 120% 100% at 50% 0%, rgba(63,29,13,0.5) 0%, #050a15 100%)',
+      bg: '#151a28',
+      outlineActive: { border: '1px solid #f97316', outline: 'none', boxShadow: 'none' },
+      outlineDim:   { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
+      accentColor: '#f97316',
+      bodyBg: '#0B0F19',
     };
     return {
-      bg: 'linear-gradient(180deg, #102428 0%, #081619 100%)',
-      outlineActive: { outline: '2px solid #00e5ff', outlineOffset: '-2px', boxShadow: '0 0 25px rgba(0,229,255,0.3), inset 0 0 20px rgba(0,229,255,0.04)' },
-      outlineDim:   { outline: '1px solid rgba(0,229,255,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(0,229,255,0.15)' },
-      accentColor: '#00e5ff', accentGlow: 'rgba(0,229,255,0.5)',
-      bodyBg: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d272b 0%, #050a15 100%)',
+      bg: '#111827',
+      outlineActive: { border: '1px solid #3b82f6', outline: 'none', boxShadow: 'none' },
+      outlineDim:   { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
+      accentColor: '#3b82f6',
+      bodyBg: '#0B0F19',
     };
   }, [selectedSms, userProfile]);
 
@@ -492,15 +594,42 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [isOpeningWarRoom, setIsOpeningWarRoom] = useState(false);
 
   const [showSmsScrollIndicator, setShowSmsScrollIndicator] = useState(false);
+  const [canScrollSmsUp, setCanScrollSmsUp] = useState(false);
+  const [canScrollSmsDown, setCanScrollSmsDown] = useState(false);
   const smsListContainerRef = React.useRef(null);
 
   const checkSmsScroll = React.useCallback(() => {
     if (!smsListContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = smsListContainerRef.current;
-    if (scrollHeight > clientHeight + 15 && scrollTop + clientHeight < scrollHeight - 35) {
-      setShowSmsScrollIndicator(true);
+    const canDown = scrollHeight > clientHeight + 5 && scrollTop + clientHeight < scrollHeight - 15;
+    setCanScrollSmsUp(scrollTop > 10);
+    setCanScrollSmsDown(canDown);
+    setShowSmsScrollIndicator(canDown);
+  }, []);
+
+  const scrollSmsByItem = React.useCallback((direction = 'down') => {
+    const container = smsListContainerRef.current;
+    if (!container) return;
+    const items = Array.from(container.querySelectorAll('[data-sms-card="true"]'));
+    if (items.length === 0) return;
+
+    const containerTop = container.scrollTop;
+
+    if (direction === 'down') {
+      const nextItem = items.find(item => item.offsetTop > containerTop + 10);
+      if (nextItem) {
+        container.scrollTo({ top: nextItem.offsetTop - 8, behavior: 'smooth' });
+      } else {
+        container.scrollBy({ top: 120, behavior: 'smooth' });
+      }
     } else {
-      setShowSmsScrollIndicator(false);
+      const prevItems = items.filter(item => item.offsetTop < containerTop - 10);
+      if (prevItems.length > 0) {
+        const prevItem = prevItems[prevItems.length - 1];
+        container.scrollTo({ top: prevItem.offsetTop - 8, behavior: 'smooth' });
+      } else {
+        container.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
   }, []);
 
@@ -1049,10 +1178,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
   // Dummy data for status cards
   const statusCards = [
-    { id: 'critical', label: 'Critical', val: 0, icon: AlertTriangle, color: 'bg-[#00e5ff]/20', text: 'text-[#00e5ff]', bar: 'bg-[#00e5ff]', borderColor: 'border-[#00e5ff]/30' },
-    { id: 'major', label: 'Major', val: 1, icon: Shield, color: 'bg-[#00e5ff]/20', text: 'text-[#00e5ff]', bar: 'bg-[#00e5ff]', borderColor: 'border-[#00e5ff]/30' },
-    { id: 'normal', label: 'Normal', val: 24, icon: CheckCircle, color: 'bg-[#00e5ff]/20', text: 'text-[#00e5ff]', bar: 'bg-[#00e5ff]', borderColor: 'border-[#00e5ff]/30' },
-    { id: 'info', label: 'Info', val: 156, icon: Info, color: 'bg-[#00e5ff]/20', text: 'text-[#00e5ff]', bar: 'bg-[#00e5ff]', borderColor: 'border-[#00e5ff]/30' },
+    { id: 'critical', label: 'Critical', val: 0, icon: AlertTriangle, color: 'bg-red-500/10', text: 'text-red-400', bar: 'bg-red-500', borderColor: 'border-red-500/20' },
+    { id: 'major', label: 'Major', val: 1, icon: Shield, color: 'bg-amber-500/10', text: 'text-amber-400', bar: 'bg-amber-500', borderColor: 'border-amber-500/20' },
+    { id: 'normal', label: 'Normal', val: 24, icon: CheckCircle, color: 'bg-emerald-500/10', text: 'text-emerald-400', bar: 'bg-emerald-500', borderColor: 'border-emerald-500/20' },
+    { id: 'info', label: 'Info', val: 156, icon: Info, color: 'bg-blue-500/10', text: 'text-blue-400', bar: 'bg-blue-500', borderColor: 'border-blue-500/20' },
   ];
 
 
@@ -1581,10 +1710,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       {isInitialLoading && (
         <div className="absolute inset-0 z-[500] bg-[#121212]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-300">
           <div className="relative w-16 h-16">
-            <div className="absolute inset-0 border-4 border-[#00e5ff]/20 rounded-full" />
-            <div className="absolute inset-0 border-4 border-[#00e5ff] border-t-transparent rounded-full animate-spin" />
+            <div className="absolute inset-0 border-4 border-blue-500/20 rounded-full" />
+            <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Zap className="w-6 h-6 text-[#00e5ff] animate-pulse" />
+              <Zap className="w-6 h-6 text-blue-400 animate-pulse" />
             </div>
           </div>
           <div className="text-center space-y-1">
@@ -1593,23 +1722,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
         </div>
       )}
-      <nav className="mobile-top-nav flex justify-between items-end px-2.5 sm:px-4 sticky top-0 z-[100] backdrop-blur-md"
+      <nav className="mobile-top-nav flex justify-between items-end px-2.5 sm:px-4 sticky top-0 z-[100]"
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingBottom: '12px',
           height: 'calc(62px + env(safe-area-inset-top, 0px))',
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(0, 229, 255, 0.15)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.9)'
+          background: '#0B0F19',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)'
         }}>
 
         {/* Left: logo + icon buttons */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button onClick={() => window.location.reload()}
             className="text-sm sm:text-lg font-black tracking-widest uppercase text-slate-200 whitespace-nowrap font-mono flex items-center"
-            style={{ textShadow: '0 0 15px rgba(255,255,255,0.4)' }}
+            style={{ textShadow: 'none' }}
           >
             S-GUARD
           </button>
@@ -1627,7 +1754,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   
                   const btnCls = (isCompleted || isProcessing)
                     ? 'bg-[#121820] text-slate-300 border-white/15 shadow-sm font-bold'
-                    : 'bg-[#081820] text-[#00e5ff] border-[#00e5ff]/50 shadow-[0_0_12px_rgba(0,229,255,0.25)] animate-pulse font-black';
+                    : sev === 'CRITICAL'
+                    ? 'bg-red-500/20 text-red-400 border-red-500/40 animate-pulse font-black'
+                    : sev === 'MAJOR' || sev === 'WARNING'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse font-black'
+                    : 'bg-blue-600/20 text-blue-400 border-blue-500/40 font-black';
 
                   return (
                     <button
@@ -1671,8 +1802,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
               className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ background: 'transparent' }}>
-              <Cpu size={16} style={{ color: '#00e5ff' }} />
-              {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-[#00e5ff] absolute -top-1 -right-1" />}
+              <Cpu size={16} style={{ color: '#60a5fa' }} />
+              {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-blue-400 absolute -top-1 -right-1" />}
             </button>
 
 
@@ -1682,7 +1813,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               onPointerDown={() => handleTooltipStart('Threshold')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
               className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${showThresholdSettings ? 'bg-white/10' : ''}`}
               style={{ background: 'transparent' }}>
-              <Settings size={16} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#00e5ff' : '#94a3b8', transition: 'transform 0.3s' }} />
+              <Settings size={16} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#60a5fa' : '#94a3b8', transition: 'transform 0.3s' }} />
             </button>
           </div>
 
@@ -1691,13 +1822,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             onPointerDown={() => handleTooltipStart('AI Assistant')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
             className="w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer"
             style={{ background: 'transparent' }}>
-            <Bot size={16} style={{ color: '#00e5ff' }} />
+            <Bot size={16} style={{ color: '#60a5fa' }} />
           </button>
 
           <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 active:opacity-60 shrink-0 ml-0.5">
             {userProfile && <span className="text-[11px] font-semibold text-slate-400 hidden sm:block">{userProfile.name}</span>}
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.2)] shrink-0"
-              style={{ border: '1px solid #00e5ff', background: '#102428' }}>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0"
+              style={{ border: '1px solid rgba(255,255,255,0.2)', background: '#1e293b' }}>
               {userProfile?.profile_picture
                 ? <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
                 : <User size={14} className="text-slate-400" />}
@@ -1723,7 +1854,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             <div
               key={msg.id}
               className={`flex items-center justify-between p-3 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300
-                ${msg.type === 'error' ? 'bg-[#00e5ff] text-slate-200' : 'bg-[#00e5ff] text-slate-200'}
+                ${msg.type === 'error' ? 'bg-red-950/90 border border-red-500/40 text-red-200' : 'bg-slate-900/95 border border-blue-500/40 text-blue-200'}
               `}
             >
               <p className="text-sm font-medium">{msg.text}</p>
@@ -1742,20 +1873,15 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       {showNotifications && (
         <div className="fixed inset-0 z-[110] flex justify-end animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowNotifications(false)} />
-          <div className="w-full max-w-sm bg-[#0a1c20] h-full shadow-[0_0_30px_rgba(0,0,0,0.8)] relative z-10 animate-in slide-in-from-right duration-500 flex flex-col border-l border-white/10">
-            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-[#00e5ff]/10 to-transparent">
+          <div className="w-full max-w-sm bg-[#111827] h-full shadow-2xl relative z-10 animate-in slide-in-from-right duration-500 flex flex-col border-l border-white/10">
+            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-transparent">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden shrink-0"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(0,229,255,0.15) 0%, rgba(0,229,255,0.05) 100%)',
-                    border: '1px solid #00e5ff',
-                    boxShadow: '0 0 15px rgba(0,229,255,0.3)'
-                  }}>
-                  <Bell className="w-5 h-5 text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative group overflow-hidden shrink-0 bg-blue-600/20 border border-blue-500/30">
+                  <Bell className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-200 text-lg">알림 센터</h3>
-                  <p className="text-[10px] text-[#00e5ff] font-mono uppercase">Notification Center</p>
+                  <p className="text-[10px] text-blue-400 font-mono uppercase">Notification Center</p>
                 </div>
               </div>
               <button
@@ -1779,7 +1905,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       // Blocked legacy assignment-detail link
                     }
                     }}
-                    className={`p-4 rounded-2xl border ${n.severity === 'CRITICAL' ? 'bg-[#00e5ff]/5 border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.15)]' : 'bg-[#102428] border-white/10 hover:border-[#00e5ff]/50 hover:shadow-[0_0_15px_rgba(0,229,255,0.2)]'} transition-all cursor-pointer group active:scale-[0.98] relative`}
+                    className={`p-4 rounded-2xl border ${
+                      n.severity === 'CRITICAL'
+                        ? 'bg-red-500/10 border-red-500/30'
+                        : n.severity === 'MAJOR' || n.severity === 'WARNING'
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : 'bg-[#151d30] border-slate-800 hover:border-slate-700'
+                    } transition-all cursor-pointer group active:scale-[0.98] relative`}
                   >
                     <button
                       onClick={(e) => {
@@ -1788,23 +1920,29 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       }}
                       className="absolute right-3 top-3 p-1 rounded-lg hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all z-10"
                     >
-                      <X className="w-3.5 h-3.5 text-slate-500 hover:text-[#00e5ff]" />
+                      <X className="w-3.5 h-3.5 text-slate-500 hover:text-white" />
                     </button>
 
                     <div className="flex justify-between items-start mb-2 pr-6">
                       <div className="flex items-center gap-2">
                         {n.type === 'AI' ? (
-                          <Brain className="w-3.5 h-3.5 text-[#00e5ff]" />
+                          <Brain className="w-3.5 h-3.5 text-blue-400" />
                         ) : (
-                          <MessageSquare className="w-3.5 h-3.5 text-[#00e5ff]" />
+                          <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
                         )}
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${n.severity === 'CRITICAL' ? 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30' : 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30'}`}>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          n.severity === 'CRITICAL'
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : n.severity === 'MAJOR' || n.severity === 'WARNING'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        }`}>
                           {n.type}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-500 font-mono">{n.time}</span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-200 mb-1 group-hover:text-[#00e5ff] transition-colors line-clamp-1">{n.title}</h4>
+                    <h4 className="text-xs font-bold text-slate-200 mb-1 group-hover:text-blue-400 transition-colors line-clamp-1">{n.title}</h4>
                     <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{n.content}</p>
                   </div>
                 ))
@@ -1840,41 +1978,73 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
         {/* ── PANEL 1: SMS FEED (Bento Wide) ── */}
         {(() => {
-          const isCrit = smsMessages.some(m => m.severity === 'CRITICAL' || m.severity === 'MAJOR');
-          const borderGlow = isCrit ? 'rgba(0,229,255,0.6)' : 'rgba(0,229,255,0.5)';
-          const borderColor = isCrit ? '#00e5ff' : '#00e5ff';
+          const hasCrit = smsMessages.some(m => m.severity === 'CRITICAL');
+          const hasMaj = smsMessages.some(m => m.severity === 'MAJOR');
+          const borderColor = hasCrit ? '#ef4444' : hasMaj ? '#f97316' : '#3b82f6';
           return (
         <div className="md:col-span-2 transition-all duration-700 shadow-2xl relative" style={{
           background: activeTheme.bg,
-          borderRadius: 24,
+          borderRadius: 16,
           overflow: 'hidden',
-          backdropFilter: 'blur(20px)',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
 
           {/* Panel header */}
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B', background: 'rgba(255,255,255,0.02)' }}>
             <div className="flex items-center gap-2.5">
-              <MessageSquare size={16} style={{ color: borderColor, filter: `drop-shadow(0 0 8px ${borderColor})` }} />
-              <span className="text-[12px] font-black text-slate-200 uppercase tracking-[0.15em]">실시간 SMS 수신내역</span>
+              <MessageSquare size={16} style={{ color: borderColor }} />
+              <span className="text-[12px] font-semibold text-slate-200 uppercase tracking-[0.15em]">실시간 SMS 수신내역</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {/* 1-unit Step Navigation */}
+              <div className="flex items-center gap-0.5 bg-slate-900/60 p-0.5 rounded-lg border border-slate-700/50">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); scrollSmsByItem('up'); }}
+                  disabled={!canScrollSmsUp}
+                  title="이전 문자 (1건 위로)"
+                  className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
+                >
+                  <ChevronUp size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); scrollSmsByItem('down'); }}
+                  disabled={!canScrollSmsDown}
+                  title="다음 문자 (1건 아래로)"
+                  className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
+                >
+                  <ChevronDown size={13} />
+                </button>
+              </div>
+
               {/* Hide Done toggle */}
-              <button onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
-                className="flex items-center gap-1.5 active:opacity-60">
-                <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: hideCompletedSms ? '#00e5ff' : '#475569' }}>Done 숨김</span>
-                <div className="w-7 h-3.5 rounded-full relative" style={{ background: hideCompletedSms ? '#00e5ff' : '#1e293b', border: '1px solid rgba(255,255,255,0.1)', boxShadow: hideCompletedSms ? '0 0 8px #00e5ff' : 'none' }}>
-                  <div className="absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white" style={{ left: hideCompletedSms ? '13px' : '1px', transition: 'left 0.2s' }} />
-                </div>
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[10px] font-medium transition-colors ${
+                  hideCompletedSms 
+                    ? 'bg-blue-600 text-white border-blue-500 font-semibold' 
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <span className="text-[9px] uppercase tracking-wider font-semibold">Done 숨김</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${hideCompletedSms ? 'bg-white' : 'bg-slate-500'}`} />
               </button>
+
               {/* LIVE dot */}
               {(() => {
                 const isLive = smsMessages.length > 0 && smsMessages.some(m => !m.is_analyzed || Number(m.is_analyzed) === 0);
                 return (
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg"
-                    style={{ border: `1px solid ${isLive ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, background: isLive ? 'rgba(0,229,255,0.1)' : 'transparent', boxShadow: isLive ? '0 0 10px rgba(0,229,255,0.3)' : 'none' }}>
-                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isLive ? '#00e5ff' : '#475569', boxShadow: isLive ? '0 0 8px #00e5ff' : 'none' }} />
-                    <span className="text-[9px] font-black tracking-widest" style={{ color: isLive ? '#00e5ff' : '#64748b' }}>{isLive ? 'LIVE' : 'DONE'}</span>
+                  <div 
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[9px] font-semibold tracking-wider font-mono ${
+                      isLive 
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' 
+                        : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                    <span>{isLive ? 'LIVE' : 'DONE'}</span>
                   </div>
                 );
               })()}
@@ -1882,27 +2052,27 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
 
           {/* Threshold panel */}
-          <div style={{ maxHeight: showThresholdSettings ? 200 : 0, overflow: 'hidden', transition: 'max-height 0.3s', borderBottom: showThresholdSettings ? '1px solid rgba(255,255,255,0.08)' : 'none', background: 'rgba(0,229,255,0.05)' }}>
+          <div style={{ maxHeight: showThresholdSettings ? 200 : 0, overflow: 'hidden', transition: 'max-height 0.3s', borderBottom: showThresholdSettings ? '1px solid rgba(255,255,255,0.08)' : 'none', background: 'rgba(255,255,255,0.02)' }}>
             <div className="px-5 py-4 space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Technical Threshold</span>
-                  <span className="text-[10px] font-black font-mono" style={{ color: '#00e5ff', textShadow: '0 0 8px rgba(0,229,255,0.5)' }}>{(thresholds.technical * 100).toFixed(0)}%</span>
+                  <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Technical Threshold</span>
+                  <span className="text-[10px] font-bold font-mono text-blue-400">{(thresholds.technical * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0.5" max="1.0" step="0.01" value={thresholds.technical}
                   onChange={(e) => setThresholds(prev => ({ ...prev, technical: parseFloat(e.target.value) }))}
                   onMouseUp={() => updateThreshold('similarity_threshold_technical', thresholds.technical)}
-                  className="w-full h-1 rounded appearance-none cursor-pointer accent-[#00e5ff]" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                  className="w-full h-1 rounded appearance-none cursor-pointer accent-blue-500" style={{ background: 'rgba(255,255,255,0.15)' }} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Casual Strictness</span>
-                  <span className="text-[10px] font-black font-mono" style={{ color: '#00e5ff', textShadow: '0 0 8px rgba(0,229,255,0.5)' }}>{(thresholds.casual * 100).toFixed(0)}%</span>
+                  <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Casual Strictness</span>
+                  <span className="text-[10px] font-bold font-mono text-purple-400">{(thresholds.casual * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0.7" max="1.0" step="0.01" value={thresholds.casual}
                   onChange={(e) => setThresholds(prev => ({ ...prev, casual: parseFloat(e.target.value) }))}
                   onMouseUp={() => updateThreshold('similarity_threshold_casual', thresholds.casual)}
-                  className="w-full h-1 rounded appearance-none cursor-pointer accent-[#00e5ff]" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                  className="w-full h-1 rounded appearance-none cursor-pointer accent-purple-500" style={{ background: 'rgba(255,255,255,0.15)' }} />
               </div>
             </div>
           </div>
@@ -1911,7 +2081,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           <div 
             ref={smsListContainerRef}
             onScroll={checkSmsScroll}
-            className="overflow-y-auto max-h-[420px] p-3 space-y-2 custom-scrollbar"
+            className="overflow-y-auto max-h-[420px] p-3.5 space-y-3 custom-scrollbar scroll-smooth snap-y snap-mandatory"
           >
             {visibleSms.length > 0 ? visibleSms.map((msg) => {
               const isSel = selectedSms?.inc_id === msg.inc_id;
@@ -1943,16 +2113,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
               const isCritical = calculatedSeverity === 'CRITICAL';
               const isMaj = calculatedSeverity === 'MAJOR';
-              const accentColor = isCritical ? '#ef4444' : isMaj ? '#f97316' : '#00e5ff';
-              const accentBgRGB = isCritical ? '239,68,68' : isMaj ? '249,115,22' : '0,229,255';
+              const accentColor = isCritical ? '#ef4444' : isMaj ? '#f59e0b' : '#10b981';
+              const accentBgRGB = isCritical ? '239,68,68' : isMaj ? '245,158,11' : '16,185,129';
 
               return (
                 <div key={`sms-${msg.inc_id}`}
+                  data-sms-card="true"
                   onClick={() => {
                     if (selectedSms?.inc_id === msg.inc_id) { setSelectedSms(null); selectedSmsRef.current = null; setShowAgentPanel(false); setAgentMessages([]); }
                     else { setSelectedSms(msg); selectedSmsRef.current = msg; setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
                   }}
-                  className={`rounded-2xl p-4.5 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-3 relative overflow-hidden ${isCritical ? 'sms-pulse-critical' : isMaj ? 'sms-pulse-major' : ''}`}
+                  className={`rounded-2xl p-4.5 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-3 relative overflow-hidden snap-start ${isCritical ? 'sms-pulse-critical' : isMaj ? 'sms-pulse-major' : ''}`}
                   style={isCritical ? {
                     background: isSel
                       ? `repeating-linear-gradient(-45deg, rgba(239,68,68,0.18) 0px, rgba(239,68,68,0.18) 12px, rgba(60,10,10,0.6) 12px, rgba(60,10,10,0.6) 28px)`
@@ -1960,26 +2131,26 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     border: `2px solid rgba(239,68,68,${isSel ? '0.95' : '0.65'})`,
                     borderRadius: 16,
                     boxShadow: isSel
-                      ? '0 0 40px rgba(239,68,68,0.55), inset 0 0 20px rgba(239,68,68,0.1)'
-                      : '0 0 20px rgba(239,68,68,0.35)',
+                      ? '0 4px 12px rgba(0,0,0,0.5)'
+                      : 'none',
                   } : {
-                    background: isSel ? `rgba(${accentBgRGB},0.15)` : isMaj ? `rgba(${accentBgRGB},0.05)` : 'rgba(18,21,26,0.85)',
+                    background: isSel ? `rgba(${accentBgRGB},0.12)` : isMaj ? `rgba(${accentBgRGB},0.05)` : 'rgba(18,21,26,0.85)',
                     borderTop: '1px solid rgba(255,255,255,0.05)',
                     borderRight: '1px solid rgba(255,255,255,0.05)',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     borderLeft: `4px solid ${accentColor}`,
                     borderRadius: 16,
-                    boxShadow: isSel ? `0 0 20px rgba(${accentBgRGB},0.4)` : isMaj ? `0 0 15px rgba(${accentBgRGB},0.3)` : '0 4px 15px rgba(0,0,0,0.4)'
+                    boxShadow: isSel ? '0 4px 12px rgba(0,0,0,0.5)' : 'none'
                   }}>
                   {/* Header: Notification Type & Severity */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {msg.keyword_detected ? <AlertCircle size={15} style={{ color: accentColor }} /> : <Info size={15} style={{ color: accentColor }} />}
-                      <span className="text-[12px] font-bold tracking-wide text-slate-300 uppercase">
+                      <span className="text-[12px] font-semibold tracking-wide text-slate-300 uppercase">
                         {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
                       </span>
                       {msg.severity && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider"
                           style={{ color: accentColor, border: `1px solid ${accentColor}`, background: `${accentColor}15` }}>
                           {msg.severity}
                         </span>
@@ -1992,12 +2163,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   {renderFormattedSMS(msg.message, msg.severity)}
 
                   {/* Sub Contents: Sender & Employee Chip */}
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                    <span>발신: <span className="font-mono text-slate-200 font-semibold">{msg.sender}</span></span>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 font-normal">
+                    <span>발신: <span className="font-mono text-slate-200 font-medium">{msg.sender}</span></span>
                     {msg.employee_id && (
                       <>
                         <span className="text-slate-600">|</span>
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg font-mono shrink-0 flex items-center gap-1 shadow-sm"
+                        <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-lg font-mono shrink-0 flex items-center gap-1 shadow-sm"
                           style={{ color: '#cbd5e1', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}>
                           👤 담당자: {msg.employee_id}{msg.sender_name && ` (${msg.sender_name})`}
                         </span>
@@ -2006,21 +2177,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
 
                   {/* Footer / Right Action Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 mt-1 pt-3.5 border-t border-white/5">
+                  <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 mt-1 pt-3.5 border-t border-[#1E293B]">
                     <div className="flex gap-2 items-center flex-wrap">
                       {msg.similarity_score != null && (() => {
                         const score = msg.similarity_score;
-                        let matchColor = '#00e5ff';
-                        let matchBg = 'rgba(0,229,255,0.1)';
-                        let matchBorder = 'rgba(0,229,255,0.2)';
+                        let matchColor = '#10b981';
+                        let matchBg = 'rgba(16,185,129,0.1)';
+                        let matchBorder = 'rgba(16,185,129,0.2)';
                         if (score >= 0.8) {
-                          matchColor = '#f87171'; // Coral Red
-                          matchBg = 'rgba(248,113,113,0.15)';
-                          matchBorder = 'rgba(248,113,113,0.3)';
+                          matchColor = '#ef4444'; // Coral Red
+                          matchBg = 'rgba(239,68,68,0.15)';
+                          matchBorder = 'rgba(239,68,68,0.3)';
                         } else if (score >= 0.5) {
-                          matchColor = '#fb923c'; // Amber/Orange
-                          matchBg = 'rgba(251,146,60,0.15)';
-                          matchBorder = 'rgba(251,146,60,0.3)';
+                          matchColor = '#f59e0b'; // Amber/Orange
+                          matchBg = 'rgba(245,158,11,0.15)';
+                          matchBorder = 'rgba(245,158,11,0.3)';
                         }
 
                         let calculatedSeverity = msg.severity || 'NORMAL';
@@ -2070,7 +2241,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       {(() => {
                         const isDone = msg.incident_status === '처리완료' || Number(msg.is_analyzed) >= 1;
                         return (
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg shrink-0 ${!isDone ? 'animate-pulse bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_8px_rgba(0,229,255,0.2)] font-black' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold'}`}>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg shrink-0 ${!isDone ? 'animate-pulse bg-amber-500/15 text-amber-400 border border-amber-500/30 font-black' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold'}`}>
                             {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANALYZED' : 'ANALYZING'}
                           </span>
                         );
@@ -2080,15 +2251,15 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     <div className="flex items-center flex-wrap gap-2 ml-auto">
 
                       <button onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                        className="text-[10px] font-bold px-3 py-1 rounded-lg active:scale-95 transition-all hover:bg-[#00e5ff]/20 shrink-0 shadow-sm"
-                        style={{ color: '#00e5ff', border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.1)' }}>
+                        className="text-[10px] font-bold px-3 py-1 rounded-lg active:scale-95 transition-all text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 shrink-0"
+                      >
                         현황
                       </button>
 
                       {(msg.incident_status === '처리완료' || msg.incident_status === 'Completed' || msg.status === '처리완료' || msg.status === 'Completed' || Number(msg.is_analyzed) >= 1) && (
                         <button onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${msg.inc_id}`); }}
-                          className="text-[10px] font-bold px-3 py-1 rounded-lg active:scale-95 transition-all text-[#ff4a4a] hover:bg-[#ff4a4a]/30 shrink-0 shadow-sm"
-                          style={{ border: '1px solid #ff4a4a', background: 'rgba(255,74,74,0.15)' }}>
+                          className="text-[10px] font-bold px-3 py-1 rounded-lg active:scale-95 transition-all text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 shrink-0"
+                        >
                           REPORT
                         </button>
                       )}
@@ -2097,9 +2268,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 </div>
               );
             }) : (
-              <div className="py-12 flex flex-col items-center gap-3 opacity-30">
-                <MessageSquare size={28} className="text-[#00e5ff]" />
-                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">수신된 SMS 없음</p>
+              <div className="py-12 flex flex-col items-center gap-3 opacity-40">
+                <MessageSquare size={28} className="text-slate-400" />
+                <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">수신된 SMS 없음</p>
               </div>
             )}
           </div>
@@ -2108,14 +2279,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {showSmsScrollIndicator && (
             <div 
               onClick={() => {
-                if (smsListContainerRef.current) {
-                  smsListContainerRef.current.scrollTo({ top: smsListContainerRef.current.scrollHeight, behavior: 'smooth' });
-                }
+                scrollSmsByItem('down');
               }}
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#081820] text-[#00e5ff] border border-[#00e5ff]/50 font-black text-xs shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all hover:scale-105 active:scale-95 select-none"
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 text-blue-400 border border-blue-500/40 font-black text-xs transition-all hover:scale-105 active:scale-95 select-none"
             >
               <span>아래 수신내역 더보기</span>
-              <ChevronDown className="w-4 h-4 text-[#00e5ff] shrink-0" />
+              <ChevronDown className="w-4 h-4 text-blue-400 shrink-0" />
             </div>
           )}
         </div>
@@ -2126,9 +2295,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         {(visibleSms.length > 0 || selectedSms) && (
         <div className="md:col-span-2 transition-all duration-700 shadow-2xl" style={{
           background: activeTheme.bg,
-          borderRadius: 24,
+          borderRadius: 16,
           overflow: 'hidden',
-          backdropFilter: 'blur(20px)',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
             <AiInsightPanel
@@ -2150,25 +2318,25 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         {/* ── PANEL 3: Expert Advisor (Bento Card) ── */}
         <div className="md:col-span-1 transition-all duration-700 flex flex-col shadow-2xl" style={{
           background: activeTheme.bg,
-          borderRadius: 24,
+          borderRadius: 16,
           overflow: 'hidden',
           backdropFilter: 'blur(20px)',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
-              <Sparkles size={16} style={{ color: '#00e5ff', filter: 'drop-shadow(0 0 8px #00e5ff)' }} />
-              <span className="text-[12px] font-black text-slate-200 uppercase tracking-[0.15em]">Expert Advisor</span>
+              <Sparkles size={16} className="text-blue-400" />
+              <span className="text-[12px] font-semibold text-slate-200">Expert Advisor</span>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setActiveLogTab('ai')}
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
-                style={{ background: activeLogTab === 'ai' ? 'rgba(0,229,255,0.2)' : 'transparent', color: activeLogTab === 'ai' ? '#00e5ff' : '#64748b', border: activeLogTab === 'ai' ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.15)', textShadow: activeLogTab === 'ai' ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>
+                style={{ background: activeLogTab === 'ai' ? 'rgba(59,130,246,0.15)' : 'transparent', color: activeLogTab === 'ai' ? '#60a5fa' : '#64748b', border: activeLogTab === 'ai' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', textShadow: 'none' }}>
                 AI
               </button>
               <button onClick={() => setActiveLogTab('human')}
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ml-0.5 transition-all"
-                style={{ background: activeLogTab === 'human' ? 'rgba(0,229,255,0.2)' : 'transparent', color: activeLogTab === 'human' ? '#00e5ff' : '#64748b', border: activeLogTab === 'human' ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.15)', textShadow: activeLogTab === 'human' ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>
+                style={{ background: activeLogTab === 'human' ? 'rgba(59,130,246,0.15)' : 'transparent', color: activeLogTab === 'human' ? '#60a5fa' : '#64748b', border: activeLogTab === 'human' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', textShadow: 'none' }}>
                 Chat
               </button>
               {(() => {
@@ -2176,9 +2344,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 const isLive = showAgentPanel && agentMessages.length > 0 && !isDone;
                 return (
                   <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg ml-1"
-                    style={{ border: `1px solid ${isLive ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, background: isLive ? 'rgba(0,229,255,0.1)' : 'transparent', boxShadow: isLive ? '0 0 8px rgba(0,229,255,0.3)' : 'none' }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: isDone ? '#64748b' : isLive ? '#00e5ff' : '#64748b', boxShadow: isLive ? '0 0 6px #00e5ff' : 'none' }} />
-                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#94a3b8' : isLive ? '#00e5ff' : '#94a3b8' }}>
+                    style={{ border: `1px solid ${isDone ? 'rgba(16,185,129,0.3)' : isLive ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.15)'}`, background: isDone ? 'rgba(16,185,129,0.1)' : isLive ? 'rgba(245,158,11,0.1)' : 'transparent', boxShadow: 'none' }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: isDone ? '#10b981' : isLive ? '#f59e0b' : '#64748b', boxShadow: 'none' }} />
+                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#10b981' : isLive ? '#f59e0b' : '#94a3b8' }}>
                       {isDone ? 'DONE' : isLive ? 'LIVE' : 'IDLE'}
                     </span>
                   </div>
@@ -2201,8 +2369,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   {/* 헤더 영역 (닫기 버튼 포함) */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 bg-[#0a0c12] z-10">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-[#00e5ff]/20 flex items-center justify-center border border-[#00e5ff]/30">
-                        <MessageSquare className="w-4 h-4 text-[#00e5ff]" />
+                      <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center border border-blue-500/30">
+                        <MessageSquare className="w-4 h-4 text-blue-400" />
                       </div>
                       <div>
                         <h2 className="text-sm font-black text-slate-200 uppercase tracking-wider">War-Room Chat</h2>
@@ -2224,9 +2392,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 document.body
               ) : null
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center opacity-30" style={{ minHeight: 240 }}>
-                <Brain size={32} className="text-[#00e5ff] mb-3 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]" />
-                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">SMS를 선택하면 분석이 시작됩니다</p>
+              <div className="flex-1 flex flex-col items-center justify-center opacity-40" style={{ minHeight: 240 }}>
+                <Brain size={32} className="text-slate-500 mb-3" />
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">SMS를 선택하면 분석이 시작됩니다</p>
               </div>
             )}
           </div>
@@ -2239,23 +2407,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           return (
         <div className="md:col-span-1 transition-all duration-700 flex flex-col shadow-2xl" style={{
           background: activeTheme.bg,
-          borderRadius: 24,
+          borderRadius: 16,
           overflow: 'hidden',
-          backdropFilter: 'blur(20px)',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B', background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex items-center gap-2.5">
-              <Activity size={16} style={{ color: selectedIncidentIdFlow ? (isClosedFlow ? '#10b981' : '#00e5ff') : '#94a3b8', filter: selectedIncidentIdFlow && !isClosedFlow ? 'drop-shadow(0 0 8px #00e5ff)' : 'none' }} />
+              <Activity size={16} style={{ color: selectedIncidentIdFlow ? (isClosedFlow ? '#10b981' : '#3b82f6') : '#94a3b8' }} />
               <span className="text-[12px] font-black text-slate-200 uppercase tracking-[0.15em]">장애 처리 현황</span>
             </div>
             {isClosedFlow ? (
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-inner">
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
                 <Check size={12} />COMPLETED FLOW
               </span>
             ) : (
-              <span className="text-[10px] font-bold text-[#00e5ff] bg-[#00e5ff]/10 border border-[#00e5ff]/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-pulse shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00e5ff] animate-ping" />LIVE FLOW
+              <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-pulse shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />LIVE FLOW
               </span>
             )}
           </div>
@@ -2292,9 +2459,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             const isCritical = !isClosed && (selectedSms.severity === 'CRITICAL');
             const isMajor = !isClosed && (selectedSms.severity === 'MAJOR');
 
-            const ringColor = isClosed ? '#10b981' : isCritical ? '#ef4444' : isMajor ? '#f97316' : '#00e5ff';
-            const ringColorRGB = isClosed ? '16, 185, 129' : isCritical ? '239, 68, 68' : isMajor ? '249, 115, 22' : '0, 229, 255';
-            const ringShadow = isClosed ? `drop-shadow(0 0 4px rgba(${ringColorRGB}, 0.3))` : `drop-shadow(0 0 10px rgba(${ringColorRGB}, 0.8))`;
+            const ringColor = isClosed ? '#10b981' : isCritical ? '#ef4444' : isMajor ? '#f59e0b' : '#3b82f6';
+            const ringColorRGB = isClosed ? '16, 185, 129' : isCritical ? '239, 68, 68' : isMajor ? '245, 158, 11' : '59, 130, 246';
+            const ringShadow = `drop-shadow(0 0 4px rgba(${ringColorRGB}, 0.3))`;
 
             // MTTA Timer Logic — PC 버전과 동일하게 warRooms 데이터 우선 사용
             const incWarRoom = warRooms.find(r => String(r.inc_id) === String(selectedIncidentIdFlow));
@@ -2337,7 +2504,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             return (
               <div className="flex flex-col">
                 {/* 가로 프로그레스 바 (Horizontal Stepper) */}
-                <div className="flex flex-col gap-y-2 px-6 py-6 bg-black/20 border-b border-white/5 relative shrink-0">
+                <div className="flex flex-col gap-y-2 px-4 py-5 bg-black/20 border-b border-[#1E293B] relative shrink-0">
                   <div className="flex items-start justify-between w-full">
                     {steps.map((st, i) => {
                       const isDone = st.done;
@@ -2351,33 +2518,44 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       const isArrowBottleneck = durationObj?.min > 60;
 
                       return (
-                        <div key={`step-${st.id}`} className={`flex flex-col ${i < steps.length - 1 ? 'flex-1' : 'w-[72px] shrink-0'}`}>
+                        <div key={`step-${st.id}`} className={`flex flex-col ${i < steps.length - 1 ? 'flex-1' : 'w-[68px] shrink-0'}`}>
                           <div className="w-full flex items-start">
-                            <div className="w-[72px] flex flex-col items-center shrink-0">
-                              <div className="h-8 flex items-center justify-center">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_12px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-4 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_12px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                                  {isDone ? <CheckCircle2 size={16} /> : i + 1}
+                            <div className="w-[68px] flex flex-col items-center shrink-0">
+                              {/* 정제된 인디케이터 (Refined Step Indicator) */}
+                              <div className="h-7 flex items-center justify-center">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all border ${
+                                  isDone 
+                                    ? (isBottleneck 
+                                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/40 font-bold' 
+                                        : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 font-bold') 
+                                    : isActive 
+                                      ? 'bg-blue-600 text-white border-blue-500 font-bold' 
+                                      : 'bg-slate-900 text-slate-500 border-[#1E293B] font-medium'
+                                }`}>
+                                  {isDone ? <Check size={14} className="stroke-[2.5]" /> : i + 1}
                                 </div>
                               </div>
                               
-                              <div className="mt-1.5 text-center w-full px-0.5">
-                                <span className={`text-[10px] font-black tracking-tight leading-[1.2] whitespace-normal break-keep inline-block ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+                              {/* 스텝 라벨 */}
+                              <div className="mt-2 text-center w-full px-0.5">
+                                <span className={`text-[10px] font-medium tracking-tight leading-tight whitespace-normal break-keep inline-block ${
+                                  isBottleneck ? 'text-amber-400 font-semibold' : isDone ? 'text-slate-200' : isActive ? 'text-blue-400 font-semibold' : 'text-slate-500'
+                                }`}>
                                   {st.label}
                                 </span>
                               </div>
 
+                              {/* 소요 시간 태그 */}
                               <div className="mt-1 flex justify-center w-full h-[18px]">
                                 {i > 0 && st.dObj ? (
-                                  <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded border shadow-sm font-mono whitespace-nowrap inline-flex items-center justify-center ${
+                                  <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap inline-flex items-center justify-center ${
                                     (st.dObj?.min > 60)
-                                      ? (isActive 
-                                          ? 'bg-orange-500/20 text-[#fb923c] border border-orange-500/40 animate-pulse' 
-                                          : 'bg-orange-500/10 text-[#fb923c] border border-orange-500/30')
+                                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-semibold'
                                       : isActive 
-                                        ? 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/50 animate-pulse'
+                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 font-semibold'
                                         : isDone
-                                          ? 'bg-[#00e5ff]/5 text-[#00e5ff]/80 border border-[#00e5ff]/20'
-                                          : 'bg-slate-900/40 text-slate-600 border border-slate-800'
+                                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                          : 'bg-slate-900/60 text-slate-500 border-[#1E293B]'
                                   }`}>
                                     {st.dObj.text}
                                   </span>
@@ -2385,24 +2563,25 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               </div>
                             </div>
 
+                            {/* 연결선 및 심플한 화살표 아이콘 */}
                             {i < steps.length - 1 && (
-                              <div className="flex-1 flex items-center relative h-8 px-1">
-                                <div className={`h-[3px] w-full rounded transition-all ${
-                                  isNextStepDone 
-                                    ? (isArrowBottleneck ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.4)]') 
-                                    : isNextStepActive 
-                                      ? 'bg-[#00e5ff]/40 animate-pulse' 
-                                      : 'bg-slate-800'
-                                }`} />
-                                <svg className={`w-3 h-3 absolute right-0 transition-all ${
-                                  isNextStepDone 
-                                    ? (isArrowBottleneck ? 'text-orange-500' : 'text-[#00e5ff]') 
-                                    : isNextStepActive 
-                                      ? 'text-[#00e5ff] animate-pulse' 
-                                      : 'text-slate-800'
-                                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4.5" style={{ transform: 'translateX(2px)' }}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
+                              <div className="flex-1 flex items-center justify-center px-1 self-start pt-3">
+                                <div className="w-full flex items-center gap-1">
+                                  <div className={`h-[1px] flex-1 transition-colors ${
+                                    isNextStepDone 
+                                      ? (isArrowBottleneck ? 'bg-amber-500/50' : 'bg-emerald-500/40') 
+                                      : isNextStepActive 
+                                        ? 'bg-blue-500/50' 
+                                        : 'bg-[#1E293B]'
+                                  }`} />
+                                  <ArrowRight size={12} className={`shrink-0 transition-colors ${
+                                    isNextStepDone 
+                                      ? (isArrowBottleneck ? 'text-amber-400' : 'text-emerald-400') 
+                                      : isNextStepActive 
+                                        ? 'text-blue-400' 
+                                        : 'text-slate-600'
+                                  }`} />
+                                </div>
                               </div>
                             )}
                           </div>
@@ -2412,57 +2591,73 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
                 </div>
 
-                {/* 애플워치 스타일 활동 링 (Activity Ring) */}
-                <div className="py-6 flex flex-col items-center justify-center bg-gradient-to-b from-black/40 to-transparent relative shrink-0">
-                  <div className="flex flex-row items-center justify-center gap-1 px-2">
+                {/* 정제된 소요시간 게이지 (Activity Gauges) - 네온 효과 제거 */}
+                <div className="py-6 flex flex-col items-center justify-center border-b border-[#1E293B] relative shrink-0">
+                  <div className="flex flex-row items-center justify-center gap-4 px-2">
                     
-                    {/* MTTA Ring */}
-                    <div className="relative w-[145px] h-[145px] flex items-center justify-center">
+                    {/* MTTA Gauge */}
+                    <div className="relative w-[130px] h-[130px] flex items-center justify-center">
                       <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
-                        <defs>
-                          <linearGradient id="mttaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor={mttaRingColor} />
-                            <stop offset="100%" stopColor={mttaRingColor} />
-                          </linearGradient>
-                        </defs>
-                        {!isMttaClosed && (
-                          <circle cx="90" cy="90" r="70" stroke={mttaRingColor} strokeWidth="16" fill="none" className="animate-ping opacity-30" />
-                        )}
-                        <circle cx="90" cy="90" r="70" stroke="url(#mttaGradient)" strokeWidth={!isMttaClosed ? "14" : "12"} fill="none" strokeDasharray={circum} strokeDashoffset={isMttaClosed ? 0 : offset} strokeLinecap="round" className="transition-all duration-1000" filter={`drop-shadow(0 0 ${!isMttaClosed ? '15px' : '6px'} rgba(${mttaRingColorRGB}, ${!isMttaClosed ? '0.9' : '0.4'}))`} style={!isMttaClosed ? { animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : {}} />
+                        {/* 베이스 트랙 */}
+                        <circle cx="90" cy="90" r="70" stroke="#1E293B" strokeWidth="8" fill="none" />
+                        {/* 활성 프로그레스 */}
+                        <circle
+                          cx="90"
+                          cy="90"
+                          r="70"
+                          stroke={mttaRingColor}
+                          strokeWidth="8"
+                          fill="none"
+                          strokeDasharray={circum}
+                          strokeDashoffset={isMttaClosed ? 0 : offset}
+                          strokeLinecap="round"
+                          className="transition-all duration-700"
+                        />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1">
-                        <span className={`text-[8.5px] font-black uppercase tracking-wider mb-0.5 ${!isMttaClosed ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>MTTA TIMER</span>
-                        <span className="text-[20px] font-black font-mono tracking-tighter tabular-nums" style={{ color: mttaRingColor, textShadow: isMttaClosed ? `0 0 6px rgba(${mttaRingColorRGB},0.3)` : `0 0 15px rgba(${mttaRingColorRGB},1)` }}>
+                        <span className="text-[8.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">MTTA TIMER</span>
+                        <span className="text-[20px] font-bold font-mono tracking-tight text-white tabular-nums">
                           {formatDuration(mttaDurationMs)}
                         </span>
-                        <span className={`text-[8.5px] font-black mt-1 px-2 py-0.5 rounded-full border shadow-inner transition-all ${
+                        <span className={`text-[8.5px] font-semibold mt-1 px-2 py-0.5 rounded-full border transition-all ${
                           isMttaClosed 
-                            ? 'bg-white/10 border-white/20 text-slate-300' 
-                            : 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse shadow-[0_0_10px_rgba(255,0,0,0.5)]'
+                            ? 'bg-slate-900 border-[#1E293B] text-slate-300' 
+                            : 'bg-red-500/10 border-red-500/40 text-red-400'
                         }`}>
                           {isMttaClosed ? '인지 완료' : '대기 중'}
                         </span>
                       </div>
                     </div>
 
-                    {/* MTTR Ring */}
-                    <div className="relative w-[145px] h-[145px] flex items-center justify-center">
+                    {/* MTTR Gauge */}
+                    <div className="relative w-[130px] h-[130px] flex items-center justify-center">
                       <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
-                        <defs>
-                          <linearGradient id="activityGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor={ringColor} />
-                            <stop offset="100%" stopColor={isClosed ? '#059669' : ringColor} />
-                          </linearGradient>
-                        </defs>
-                        <circle cx="90" cy="90" r="70" stroke="#1e293b" strokeWidth="12" fill="none" />
-                        <circle cx="90" cy="90" r="70" stroke="url(#activityGradient)" strokeWidth="12" fill="none" strokeDasharray={circum} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" filter={ringShadow} />
+                        {/* 베이스 트랙 */}
+                        <circle cx="90" cy="90" r="70" stroke="#1E293B" strokeWidth="8" fill="none" />
+                        {/* 활성 프로그레스 */}
+                        <circle
+                          cx="90"
+                          cy="90"
+                          r="70"
+                          stroke={ringColor}
+                          strokeWidth="8"
+                          fill="none"
+                          strokeDasharray={circum}
+                          strokeDashoffset={offset}
+                          strokeLinecap="round"
+                          className="transition-all duration-700"
+                        />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1">
-                        <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">MTTR TIMER</span>
-                        <span className="text-[20px] font-black font-mono tracking-tighter tabular-nums" style={{ color: ringColor, textShadow: isClosed ? `0 0 6px rgba(${ringColorRGB},0.3)` : `0 0 12px rgba(${ringColorRGB},0.8)` }}>
+                        <span className="text-[8.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">MTTR TIMER</span>
+                        <span className="text-[20px] font-bold font-mono tracking-tight text-white tabular-nums">
                           {formatDuration(durationMs)}
                         </span>
-                        <span className={`text-[8.5px] font-bold mt-1 px-2 py-0.5 rounded-full border shadow-inner ${isClosed ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-300'}`}>
+                        <span className={`text-[8.5px] font-semibold mt-1 px-2 py-0.5 rounded-full border transition-all ${
+                          isClosed 
+                            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
+                            : 'bg-slate-900 border-[#1E293B] text-slate-300'
+                        }`}>
                           {isClosed ? '조치 완료' : '대응 중'}
                         </span>
                       </div>
@@ -2471,10 +2666,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
 
                   {/* 하단 등급 기준 안내 */}
-                  <div className="mt-4 text-[9px] text-slate-500 tracking-tighter whitespace-nowrap px-3 border border-white/5 bg-black/20 rounded-lg py-1.5 shadow-inner w-fit mx-auto">
-                    <span className="font-bold text-slate-400 mr-1">MTTA-</span> 
-                    <span className="text-emerald-400 ml-1">상:</span> 주3분/야5분 이내 <span className="mx-0.5 text-slate-600">|</span> 
-                    <span className="text-red-400">하:</span> 주5분/야10분 이상
+                  <div className="mt-4 text-[9px] text-slate-500 tracking-tight whitespace-nowrap px-3 border border-[#1E293B] bg-slate-900/60 rounded-lg py-1 w-fit mx-auto">
+                    <span className="font-semibold text-slate-400 mr-1">MTTA 기준:</span> 
+                    <span className="text-emerald-400 ml-1">상</span> 주3분/야5분 이내 <span className="mx-1 text-slate-700">|</span> 
+                    <span className="text-red-400">하</span> 주5분/야10분 이상
                   </div>
                 </div>
 
@@ -2483,14 +2678,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   {warStep && !knwStep && (() => {
                     const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
                     return roomExists ? (
-                      <button onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)} className="skeuo-btn w-full py-3.5 bg-gradient-to-r from-[#00e5ff]/20 to-[#00e5ff]/10 border border-[#00e5ff]/50 rounded-xl font-bold text-sm text-[#00e5ff] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+                      <button onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)} className="skeuo-btn w-full py-3.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 rounded-xl font-bold text-sm text-blue-400 flex items-center justify-center gap-2 shadow-sm">
                         <Zap size={16} />해당 워룸으로 이동<ChevronRight size={16} />
                       </button>
                     ) : (
                       <button 
                         onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
                         disabled={isOpeningWarRoom}
-                        className={`skeuo-btn w-full py-3.5 bg-gradient-to-r from-[#00e5ff]/20 to-[#00e5ff]/10 border border-[#00e5ff]/50 rounded-xl font-bold text-sm text-[#00e5ff] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)] ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`skeuo-btn w-full py-3.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 rounded-xl font-bold text-sm text-red-400 flex items-center justify-center gap-2 shadow-sm ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <Users size={16} />{isOpeningWarRoom ? '워룸 개설 진행 중...' : '긴급 워룸 개설하기'}
                       </button>
@@ -2502,10 +2697,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     className="skeuo-btn w-full py-3.5 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl text-slate-300 font-bold text-xs flex items-center justify-between transition-all shadow-sm"
                   >
                     <span className="flex items-center gap-2">
-                      <Clock size={16} className="text-[#00e5ff]" />
+                      <Clock size={16} className="text-blue-400" />
                       전체 스텝 상세 히스토리 타임라인 {showFullTimeline ? '접기' : '보기'}
                     </span>
-                    {showFullTimeline ? <ChevronUp size={22} className="text-[#00e5ff] shrink-0 ml-auto" /> : <ChevronDown size={22} className="text-slate-300 shrink-0 ml-auto" />}
+                    {showFullTimeline ? <ChevronUp size={22} className="text-blue-400 shrink-0 ml-auto" /> : <ChevronDown size={22} className="text-slate-300 shrink-0 ml-auto" />}
                   </button>
                 </div>
               </div>
@@ -2590,34 +2785,33 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     const pb = sIdx === FLOW_STEPS.length - 1 ? 24 : Math.min(160, Math.max(24, Math.round(24 + transMins * 0.2)));
                     return (
                       <div key={step.id} className="relative pl-10 transition-all duration-300" style={{ paddingBottom: pb+'px', opacity: !isCompleted&&!isNextStep ? 0.3 : 1 }}>
-                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 transition-all" style={{ width: isLineBottleneck ? '2px' : '1px', background: isLineBottleneck ? '#fb923c' : isCompleted ? '#00e5ff' : 'rgba(255,255,255,0.1)', boxShadow: isLineBottleneck ? '0 0 8px rgba(251,146,60,0.5)' : 'none' }} />}
-                        <div className="absolute left-0 top-0 w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-md transition-all" style={{ background: isBottleneck ? 'rgba(251,146,60,0.2)' : isCompleted ? 'rgba(0,229,255,0.15)' : isNextStep ? 'rgba(0,229,255,0.2)' : '#0a1c20', border: `1px solid ${isBottleneck ? '#fb923c' : isCompleted ? '#00e5ff' : isNextStep ? '#00e5ff' : 'rgba(255,255,255,0.15)'}`, boxShadow: isBottleneck ? '0 0 10px rgba(251,146,60,0.4)' : isCompleted ? 'none' : isNextStep ? '0 0 10px rgba(0,229,255,0.4)' : 'none' }}>
-                          {isCompleted ? <CheckCircle2 size={10} style={{ color: isBottleneck ? '#fb923c' : '#00e5ff', opacity: isBottleneck ? 1 : 0.8 }} /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#00e5ff' }} /> : <span className="w-1 h-1 rounded-full" style={{ background: '#475569' }} />}
+                        {sIdx < FLOW_STEPS.length-1 && <div className="absolute left-[9px] top-5 bottom-0 transition-all" style={{ width: '1px', background: isLineBottleneck ? '#f59e0b' : isCompleted ? '#10b981' : '#1E293B' }} />}
+                        <div className={`absolute left-0 top-0 w-5 h-5 rounded-md flex items-center justify-center transition-all ${isNextStep ? 'animate-pulse ring-2 ring-blue-500/60 shadow-md shadow-blue-500/30' : ''}`} style={{ background: isBottleneck ? 'rgba(245,158,11,0.15)' : isCompleted ? 'rgba(16,185,129,0.15)' : isNextStep ? '#2563eb' : '#0f172a', border: `1px solid ${isBottleneck ? '#f59e0b' : isCompleted ? '#10b981' : isNextStep ? '#3b82f6' : '#1E293B'}` }}>
+                          {isCompleted ? <Check size={11} className="text-emerald-400 stroke-[2.5]" /> : isNextStep ? <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> : <span className="w-1 h-1 rounded-full bg-slate-600" />}
                         </div>
                         <div className="ml-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-bold" style={{ color: isBottleneck ? '#fb923c' : isCompleted ? '#fff' : isNextStep ? '#00e5ff' : '#64748b', textShadow: isNextStep ? '0 0 8px rgba(0,229,255,0.5)' : 'none' }}>{step.label}</span>
-                            {isNextStep && <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse" style={{ color: '#00e5ff', border: '1px solid #00e5ff', background: 'rgba(0,229,255,0.15)', boxShadow: '0 0 8px rgba(0,229,255,0.4)' }}>진행중</span>}
-                            {isCompleted && <span className="text-[10px] font-mono text-slate-400">{formatYYMMDD(stepData.timestamp)}</span>}
+                            <span className="text-[13px] font-semibold" style={{ color: isBottleneck ? '#f59e0b' : isCompleted ? '#fff' : isNextStep ? '#60a5fa' : '#64748b', textShadow: 'none' }}>{step.label}</span>
+                            {isNextStep && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse text-blue-400 border border-blue-500/40 bg-blue-500/15 font-mono">진행중</span>}
+                            {isCompleted && <span className="text-[10px] font-mono font-normal text-slate-400">{formatYYMMDD(stepData.timestamp)}</span>}
                           </div>
                           <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? '#94a3b8' : isNextStep ? '#cbd5e1' : '#475569' }}>
                             {isCompleted ? stepData.detail : isNextStep ? '처리 진행 중...' : '대기 중'}
                           </p>
                           {intervalText && sIdx > 0 && (
-                            <span className="inline-block mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm font-mono" style={{ color: isBottleneck ? '#fb923c' : '#ffffff', border: `1px solid ${isBottleneck ? '#fb923c' : 'rgba(255,255,255,0.3)'}`, background: isBottleneck ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.1)' }}>{intervalText}</span>
+                            <span className="inline-block mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm font-mono" style={{ color: isBottleneck ? '#f59e0b' : '#ffffff', border: `1px solid ${isBottleneck ? '#f59e0b' : 'rgba(255,255,255,0.2)'}`, background: isBottleneck ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.06)' }}>{intervalText}</span>
                           )}
                           {(isCompleted||isNextStep)&&step.id==='WARROOM'&&(()=>{
                             const roomExists=warRooms.some(r=>String(r.id)===String(selectedIncidentIdFlow)||String(r.inc_id)===String(selectedIncidentIdFlow));
                             return roomExists?(
-                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)]" style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }}>
+                              <button onClick={()=>navigate(`/chat/${selectedIncidentIdFlow}`)} className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-sm text-blue-400 border border-blue-500/40 bg-blue-500/15">
                                 <Zap size={12} />워룸 이동<ChevronRight size={12} />
                               </button>
                             ):(
                                <button 
                                  onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
                                  disabled={isOpeningWarRoom}
-                                 className={`mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-[0_0_15px_rgba(0,229,255,0.3)] ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                                 style={{ color: "#00e5ff", border: "1px solid #00e5ff", background: "rgba(0,229,255,0.15)" }} 
+                                 className={`mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl active:scale-95 transition-all text-[12px] font-bold shadow-sm text-red-400 border border-red-500/40 bg-red-500/15 ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`} 
                                > 
                                  <Users size={12} />
                                  {isOpeningWarRoom ? '개설 진행 중...' : '워룸 개설하기'} 
@@ -2631,9 +2825,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 })()}
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center py-16 opacity-30" style={{ minHeight: 240 }}>
-                <Activity size={32} className="text-[#00e5ff] mb-3 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]" />
-                <p className="text-[11px] font-bold text-[#00e5ff] uppercase tracking-wider">인시던트를 선택하면 활성화됩니다</p>
+              <div className="flex-1 flex flex-col items-center justify-center py-16 opacity-40" style={{ minHeight: 240 }}>
+                <Activity size={32} className="text-slate-500 mb-3" />
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">인시던트를 선택하면 활성화됩니다</p>
               </div>
             )}
             </div>
@@ -2651,7 +2845,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
       {/* 🚀 Dynamic Save Toast for Thresholds */}
       {saveStatus && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#0a1c20] border border-[#00e5ff] text-[#00e5ff] shadow-[0_0_20px_rgba(0,229,255,0.4)] text-xs font-black px-6 py-3.5 rounded-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-[#0b1713] border border-emerald-500/40 text-emerald-400 shadow-xl text-xs font-black px-6 py-3.5 rounded-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">
           <CheckCircle className="w-4 h-4 animate-bounce" />
           <span>{saveStatus}</span>
         </div>
@@ -2662,22 +2856,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 function MetricCard({ title, value, subValue, trend, trendUp, icon: Icon, color }) {
   const colorClasses = {
-    blue: "text-[#00e5ff] bg-[#00e5ff]/10 shadow-[0_0_10px_rgba(0,229,255,0.2)] border border-[#00e5ff]/30",
-    purple: "text-[#a855f7] bg-[#a855f7]/10 shadow-[0_0_10px_rgba(168,85,247,0.2)] border border-[#a855f7]/30",
-    green: "text-[#00e5ff] bg-[#00e5ff]/10 shadow-[0_0_10px_rgba(0,229,255,0.2)] border border-[#00e5ff]/30",
-    emerald: "text-[#00e5ff] bg-[#00e5ff]/10 shadow-[0_0_10px_rgba(0,229,255,0.2)] border border-[#00e5ff]/30",
-    red: "text-[#00e5ff] bg-[#00e5ff]/10 shadow-[0_0_10px_rgba(0,229,255,0.2)] border border-[#00e5ff]/30",
-    yellow: "text-[#00e5ff] bg-[#00e5ff]/10 shadow-[0_0_10px_rgba(0,229,255,0.2)] border border-[#00e5ff]/30",
+    blue: "text-blue-400 bg-blue-500/10 border border-blue-500/30",
+    purple: "text-purple-400 bg-purple-500/10 border border-purple-500/30",
+    green: "text-emerald-400 bg-emerald-500/10 border border-emerald-500/30",
+    emerald: "text-emerald-400 bg-emerald-500/10 border border-emerald-500/30",
+    red: "text-red-400 bg-red-500/10 border border-red-500/30",
+    yellow: "text-amber-400 bg-amber-500/10 border border-amber-500/30",
   };
 
   return (
-    <div className="bg-[#102428] p-5 rounded-2xl border border-white/10 hover:border-[#00e5ff]/50 transition-all hover:shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+    <div className="bg-[#111827] p-5 rounded-2xl border border-slate-800/80 hover:border-slate-700 transition-all">
       <div className="flex justify-between items-start mb-2">
         <div className={`p-2 rounded-lg ${colorClasses[color]} mb-2`}>
           <Icon className="w-5 h-5" />
         </div>
         {trend && (
-          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${trendUp ? 'text-[#00e5ff] bg-[#00e5ff]/10 border border-[#00e5ff]/30' : 'text-[#00e5ff] bg-[#00e5ff]/10 border border-[#00e5ff]/30'}`}>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${trendUp ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30' : 'text-slate-400 bg-slate-800/60 border border-slate-700'}`}>
             {trend}
           </span>
         )}
@@ -2695,23 +2889,23 @@ function MetricCard({ title, value, subValue, trend, trendUp, icon: Icon, color 
 
 function AlertItem({ title, time, severity, desc, isSelected }) {
   const sevColor = {
-    critical: "bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]",
-    warning: "bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]",
-    info: "bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]",
-    success: "bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]"
+    critical: "bg-red-500",
+    warning: "bg-amber-500",
+    info: "bg-blue-500",
+    success: "bg-emerald-500"
   };
 
   return (
     <div className={`flex items-start space-x-2 p-3 rounded-xl transition-all group cursor-pointer ${
       isSelected 
-        ? "bg-[#00e5ff]/10 border border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.3)]" 
-        : "bg-[#0a1c20] border border-white/10 hover:border-[#00e5ff]/50 hover:shadow-[0_0_10px_rgba(0,229,255,0.2)]"
+        ? "bg-[#1e293b] border border-slate-600" 
+        : "bg-[#111827] border border-slate-800/80 hover:border-slate-700"
     }`}>
       <div className={`w-1.5 h-1.5 mt-2 rounded-full shrink-0 ${sevColor[severity]} ${isSelected ? 'animate-pulse' : ''}`}></div>
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start mb-1 gap-2">
-          <h4 className={`font-bold text-sm transition-colors ${isSelected ? 'text-[#00e5ff]' : 'text-slate-200 group-hover:text-slate-200'}`}>{title}</h4>
-          <span className="text-[11px] font-black text-slate-200 whitespace-nowrap bg-white/10 px-2 py-0.5 rounded border border-white/20 shadow-md shrink-0">
+          <h4 className={`font-semibold text-sm transition-colors ${isSelected ? 'text-blue-400 font-semibold' : 'text-slate-200 group-hover:text-slate-200'}`}>{title}</h4>
+          <span className="text-[11px] font-normal text-slate-300 whitespace-nowrap bg-white/10 px-2 py-0.5 rounded border border-white/20 shadow-md shrink-0 font-mono">
             {time}
           </span>
         </div>
@@ -2962,13 +3156,13 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
         if (profile.dept && profile.team) onClose();
       }}></div>
 
-      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#102428] to-[#081619] border border-white/10 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.9)] flex flex-col max-h-[90dvh] overflow-hidden animate-scale-up">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#00e5ff] to-[#00e5ff] shrink-0"></div>
+      <div className="relative w-full max-w-lg bg-[#0B0F19] border border-slate-800 rounded-3xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden animate-scale-up">
+        <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 shrink-0"></div>
 
         <div className="p-6 sm:p-8 flex flex-col max-h-full overflow-hidden flex-1">
           <div className="flex justify-between items-center mb-6 shrink-0">
             <h2 className="text-xl font-bold text-slate-200 flex items-center space-x-2">
-              <User className="w-5 h-5 text-[#00e5ff]" />
+              <User className="w-5 h-5 text-blue-400" />
               <span>회원 정보 관리</span>
             </h2>
             <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
@@ -2976,9 +3170,9 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </button>
           </div>
 
-          <div className="flex items-center space-x-4 mb-6 bg-slate-900/40 p-4 rounded-2xl border border-white/5 relative shrink-0">
+          <div className="flex items-center space-x-4 mb-6 bg-[#111827] p-4 rounded-2xl border border-slate-800 relative shrink-0">
             <div 
-              className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-[#00e5ff] animate-pulse' : 'border-[#00e5ff]/50'} overflow-hidden shadow-[0_0_15px_rgba(0,229,255,0.2)] shrink-0 group cursor-pointer`}
+              className={`relative w-16 h-16 rounded-full bg-slate-800 border-2 ${isUploading ? 'border-blue-400 animate-pulse' : 'border-slate-700'} overflow-hidden shadow-md shrink-0 group cursor-pointer`}
               onClick={() => fileInputRef.current?.click()}
             >
               {profilePreview ? (
@@ -3007,8 +3201,8 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <p className="text-xs text-slate-400">{profile.email}</p>
               {(profile.employee_id || profile.id) && (
                 <div className="flex items-center gap-1.5 mt-1">
-                  <IdCard className="w-3 h-3 text-[#00e5ff]" />
-                  <span className="text-[11px] font-mono text-[#00e5ff]">사번 {profile.employee_id || profile.id}</span>
+                  <IdCard className="w-3 h-3 text-blue-400" />
+                  <span className="text-[11px] font-mono text-blue-400">사번 {profile.employee_id || profile.id}</span>
                 </div>
               )}
             </div>
@@ -3025,7 +3219,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                     readOnly
                     type="text"
                     value={profile.employee_id || profile.id}
-                    className="w-full bg-[#0a1c20] border border-white/5 rounded-xl py-3.5 pl-11 pr-4 text-sm text-slate-400 cursor-not-allowed appearance-none select-all font-mono"
+                    className="w-full bg-[#111827] border border-slate-800 rounded-xl py-3.5 pl-11 pr-4 text-sm text-slate-400 cursor-not-allowed appearance-none select-all font-mono"
                   />
                 </div>
                 <p className="text-[10px] text-slate-600 ml-1 mt-1">사번은 관리자만 변경할 수 있습니다.</p>
@@ -3037,7 +3231,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">이름 *</label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input required type="text" value={formData.name} onChange={handleChange('name')} placeholder="홍길동" className="w-full bg-[#0a1c20] border border-[#00e5ff]/30 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all text-slate-200 appearance-none" />
+                <input required type="text" value={formData.name} onChange={handleChange('name')} placeholder="홍길동" className="w-full bg-[#111827] border border-slate-700 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-200 appearance-none" />
               </div>
             </div>
 
@@ -3046,7 +3240,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
               <label className="text-xs font-semibold text-slate-400 ml-1 mb-1.5 block">핸드폰 번호</label>
               <div className="relative">
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type="tel" value={formData.phone || ''} onChange={handlePhoneChange} placeholder="010-0000-0000" maxLength={13} className="w-full bg-[#0a1c20] border border-[#00e5ff]/30 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all text-slate-200 appearance-none" />
+                <input type="tel" value={formData.phone || ''} onChange={handlePhoneChange} placeholder="010-0000-0000" maxLength={13} className="w-full bg-[#111827] border border-slate-700 rounded-xl py-3.5 pl-11 pr-4 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-200 appearance-none" />
               </div>
             </div>
             {/* 휴대폰 기종 */}
@@ -3058,10 +3252,10 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                     key={os}
                     type="button"
                     onClick={() => setFormData(prev => ({ ...prev, os_type: os }))}
-                    className={`flex-1 py-3.5 rounded-xl border text-xs font-black transition-all ${
+                    className={`flex-1 py-3.5 rounded-xl border text-xs font-bold transition-all ${
                       formData.os_type === os 
-                        ? 'bg-[#00e5ff] border-[#00e5ff] text-black shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black' 
-                        : 'bg-[#0a1c20] border-white/10 text-slate-500 hover:text-slate-300'
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-sm' 
+                        : 'bg-[#111827] border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     {os === 'android' ? 'Android' : 'iOS (iPhone)'}
@@ -3084,11 +3278,11 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                     handleChange('part')('');
                     handleChange('subpart')('');
                   }}
-                  className="w-full bg-[#0a1c20] border border-[#00e5ff]/30 rounded-xl py-3.5 pl-11 pr-10 text-sm focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all text-slate-200 appearance-none"
+                  className="w-full bg-[#111827] border border-slate-700 rounded-xl py-3.5 pl-11 pr-10 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-200 appearance-none"
                 >
                   <option value="">회사를 선택하세요</option>
                   {companyList.map(c => (
-                    <option key={c.code} value={c.code} className="bg-[#0a1c20] text-slate-200">{c.name}</option>
+                    <option key={c.code} value={c.code} className="bg-[#111827] text-slate-200">{c.name}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -3153,26 +3347,26 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             <div className="pt-4 mt-2 border-t border-white/5">
               <button 
                 onClick={() => setShowPasswordChange(!showPasswordChange)}
-                className="flex items-center space-x-2 text-xs font-bold text-[#00e5ff] hover:text-[#00e5ff]/80 transition-colors uppercase tracking-wider mb-3"
+                className="flex items-center space-x-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider mb-3"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>{showPasswordChange ? '비밀번호 변경 취소' : '비밀번호 변경하기'}</span>
               </button>
 
               {showPasswordChange && (
-                <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/5 animate-slide-down">
+                <div className="space-y-3 bg-[#111827] p-4 rounded-2xl border border-slate-800 animate-slide-down">
                   {/* 현재 비밀번호 */}
                     <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#00e5ff]" />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
                       <input 
                         type={showPw ? 'text' : 'password'} 
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
                         placeholder="현재 비밀번호" 
-                        className="w-full bg-[#0a1c20] border border-[#00e5ff]/50 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all appearance-none"
+                        className="w-full bg-[#0B0F19] border border-slate-700 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                       />
                     </div>
-                    <div className="border-t border-white/5 pt-3">
+                    <div className="border-t border-slate-800 pt-3">
                       {/* 새 비밀번호 */}
                       <div className="relative mb-3">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -3181,7 +3375,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="새 비밀번호 입력" 
-                          className="w-full bg-[#0a1c20] border border-[#00e5ff]/30 rounded-xl py-3 pl-11 pr-11 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all appearance-none"
+                          className="w-full bg-[#0B0F19] border border-slate-700 rounded-xl py-3 pl-11 pr-11 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                         />
                         <button
                           onClick={() => setShowPw(!showPw)}
@@ -3198,14 +3392,14 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="새 비밀번호 확인" 
-                          className="w-full bg-[#0a1c20] border border-[#00e5ff]/30 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all appearance-none"
+                          className="w-full bg-[#0B0F19] border border-slate-700 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                         />
                       </div>
                     </div>
                   <button
                     onClick={handlePasswordChange}
                     disabled={isChangingPassword}
-                    className="w-full bg-[#00e5ff]/10 hover:bg-[#00e5ff] text-[#00e5ff] hover:text-black font-black py-2.5 rounded-xl transition-all text-xs border border-[#00e5ff]/30 shadow-[0_0_10px_rgba(0,229,255,0.2)]"
+                    className="w-full bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white font-bold py-2.5 rounded-xl transition-all text-xs border border-blue-500/40"
                   >
                     {isChangingPassword ? '변경 중...' : '비밀번호 변경 적용'}
                   </button>
@@ -3214,18 +3408,18 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
 
 
-            <div className="pt-6 pb-2 flex flex-col space-y-3 shrink-0 border-t border-white/5">
+            <div className="pt-6 pb-2 flex flex-col space-y-3 shrink-0 border-t border-slate-800">
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowAndroidManual(true)}
-                  className="flex-1 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/40 hover:to-cyan-600/40 text-[#00e5ff] font-black py-3.5 px-3 rounded-2xl transition-all flex items-center justify-center gap-2 border border-[#00e5ff]/30 shadow-[0_4px_20px_rgba(0,229,255,0.2)] active:scale-[0.98]"
+                  className="flex-1 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 font-bold py-3.5 px-3 rounded-2xl transition-all flex items-center justify-center gap-2 border border-blue-500/30 active:scale-[0.98]"
                 >
                   <Download className="w-4 h-4 shrink-0" />
                   <span className="text-[11px] sm:text-xs tracking-wider whitespace-nowrap">Android S-bridge</span>
                 </button>
                 <button
                   onClick={() => setShowIosManual(true)}
-                  className="flex-1 bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/40 hover:to-pink-600/40 text-purple-300 hover:text-white font-black py-3.5 px-3 rounded-2xl transition-all flex items-center justify-center gap-2 border border-purple-500/30 shadow-[0_4px_20px_rgba(168,85,247,0.2)] active:scale-[0.98]"
+                  className="flex-1 bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 hover:text-purple-200 font-bold py-3.5 px-3 rounded-2xl transition-all flex items-center justify-center gap-2 border border-purple-500/30 active:scale-[0.98]"
                 >
                   <Apple className="w-4 h-4 shrink-0" />
                   <span className="text-[11px] sm:text-xs tracking-wider whitespace-nowrap">iOS S-bridge</span>
@@ -3234,13 +3428,13 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
               <button
                 onClick={handleSave}
-                className="w-full bg-[#00e5ff] hover:bg-[#00e5ff]/80 text-black font-black py-4 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all transform active:scale-[0.98]"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-md transition-all transform active:scale-[0.98]"
               >
                 저장하기 (Save)
               </button>
               <button
                 onClick={handleLogout}
-                className="w-full bg-white/5 hover:bg-[#00e5ff]/10 text-slate-400 hover:text-[#00e5ff] font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1"
+                className="w-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-1"
               >
                 <LogIn className="w-4 h-4 rotate-180" />
                 <span>Logout</span>
@@ -3248,7 +3442,7 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
             </div>
 
             {(!formData.company || !formData.honbu || !formData.team || !formData.part) && (
-              <p className="text-[10px] text-[#00e5ff]/80 text-center mt-4 italic shrink-0">
+              <p className="text-[10px] text-amber-400/90 text-center mt-4 italic shrink-0">
                 * 서비스 이용을 위해 필수 정보를 모두 입력해 주세요.
               </p>
             )}
@@ -3333,10 +3527,10 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
         {/* Android S-bridge 설치 매뉴얼 모달 */}
         {showAndroidManual && (
           <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-            <div className="relative w-full max-w-md bg-[#0b1322] border border-blue-500/40 rounded-[28px] p-6 sm:p-8 shadow-[0_0_50px_rgba(0,229,255,0.3)] flex flex-col max-h-[85vh]">
-              <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10 shrink-0">
+            <div className="relative w-full max-w-md bg-[#0B0F19] border border-slate-800 rounded-[28px] p-6 sm:p-8 shadow-2xl flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-800 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600/30 to-cyan-600/30 border border-blue-500/40 text-[#00e5ff] flex items-center justify-center shrink-0 shadow-inner shadow-blue-500/20">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 flex items-center justify-center shrink-0 shadow-sm">
                     <Download className="w-5 h-5 shrink-0" />
                   </div>
                   <h3 className="text-base sm:text-lg font-black text-white tracking-tight whitespace-nowrap">Android S-bridge 설치 매뉴얼</h3>
@@ -3351,8 +3545,8 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
 
               <div className="overflow-y-auto pr-2 space-y-6 flex-1 text-slate-300 text-xs sm:text-sm custom-scrollbar">
                 <div className="space-y-2">
-                  <h4 className="flex items-center gap-2 text-[#00e5ff] font-bold text-sm sm:text-base">
-                    <span className="w-5 h-5 rounded bg-[#00e5ff] text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">1</span>
+                  <h4 className="flex items-center gap-2 text-blue-400 font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">1</span>
                     Play 프로텍트 설정 진입
                   </h4>
                   <ul className="pl-7 leading-relaxed text-slate-400 list-disc space-y-1">
@@ -3363,8 +3557,8 @@ function ProfileModalContent({ apiBase, profile, onClose, onSave, navigate }) {
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="flex items-center gap-2 text-[#00e5ff] font-bold text-sm sm:text-base">
-                    <span className="w-5 h-5 rounded bg-[#00e5ff] text-[#0b1322] flex items-center justify-center font-black text-xs shrink-0">2</span>
+                  <h4 className="flex items-center gap-2 text-blue-400 font-bold text-sm sm:text-base">
+                    <span className="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">2</span>
                     실시간 검사 비활성화
                   </h4>
                   <ul className="pl-7 leading-relaxed text-slate-400 list-disc space-y-1">

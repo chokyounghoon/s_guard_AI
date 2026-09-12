@@ -8,10 +8,19 @@
 /* ── Pretendard 전역 폰트 ── */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
+@theme {
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'SF Pro Display', Inter, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
 /* ──────────────────────────────────────────────────────────────────
    BASE — 모바일 기본 설정
    ────────────────────────────────────────────────────────────────── */
 @layer base {
+  *, *::before, *::after {
+    font-feature-settings: "cv05", "cv02", "cv03", "cv04", "ss01", "ss02";
+    text-rendering: optimizeLegibility;
+  }
 
   html,
   body {
@@ -25,13 +34,24 @@
 
   body {
     @apply bg-slate-900 text-white;
-    font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR', 'Malgun Gothic',
-      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
     font-size: 15px;
     line-height: 1.5;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.022em;
+    word-break: keep-all;
+    overflow-wrap: break-word;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  .font-mono, [class*="font-mono"], code, pre, kbd, samp {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1, "zero" 1;
+    letter-spacing: -0.01em;
+  }
+
+  input, button, select, textarea {
+    font-family: inherit;
   }
 }
 
@@ -99,13 +119,13 @@
     animation: fade-in 0.3s ease-out forwards;
   }
 
-  /* 💎 Glassmorphism */
+  /* 💎 Clean Card */
   .glass-card {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+    @apply bg-[#111827] border border-[#1E293B] shadow-none;
   }
 
   .glass-panel {
-    @apply bg-[#0f111a]/80 backdrop-blur-md border-t border-white/5;
+    @apply bg-[#0f111a]/80 backdrop-blur-md border-t border-[#1E293B];
   }
 
   /* ✨ Gradients */
@@ -144,81 +164,82 @@
     pointer-events: none;
   }
 
-  /* 🌟 Sophisticated Dark Mode & Neon Accents */
+  /* 🌟 Sophisticated Dark Mode & Neutral Bases */
   .bg-soc-dark {
-    background-color: #121212 !important;
+    background-color: #0B0F19 !important;
   }
 
   .bg-soc-card {
-    background: linear-gradient(180deg, #1c2027 0%, #12151a 100%) !important;
+    background: #111827 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
 
   .neon-border-green {
-    border: 1px solid #00ff88 !important;
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.25), inset 0 0 8px rgba(0, 255, 136, 0.1) !important;
+    border: 1px solid rgba(0, 255, 136, 0.4) !important;
+    box-shadow: none !important;
   }
 
   .neon-border-yellow {
-    border: 1px solid #ffb700 !important;
-    box-shadow: 0 0 15px rgba(255, 183, 0, 0.25), inset 0 0 8px rgba(255, 183, 0, 0.1) !important;
+    border: 1px solid rgba(255, 183, 0, 0.4) !important;
+    box-shadow: none !important;
   }
 
   .neon-border-red {
-    border: 1px solid #ff2a2a !important;
-    box-shadow: 0 0 15px rgba(255, 42, 42, 0.3), inset 0 0 8px rgba(255, 42, 42, 0.15) !important;
+    border: 1px solid rgba(255, 42, 42, 0.4) !important;
+    box-shadow: none !important;
   }
 
   .neon-border-blue {
-    border: 1px solid #00e5ff !important;
-    box-shadow: 0 0 15px rgba(0, 229, 255, 0.25), inset 0 0 8px rgba(0, 229, 255, 0.1) !important;
+    border: 1px solid rgba(0, 229, 255, 0.4) !important;
+    box-shadow: none !important;
   }
 
   .neon-text-green {
     color: #00ff88 !important;
-    text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+    text-shadow: none !important;
   }
 
   .neon-text-yellow {
     color: #ffb700 !important;
-    text-shadow: 0 0 10px rgba(255, 183, 0, 0.6);
+    text-shadow: none !important;
   }
 
   .neon-text-red {
     color: #ff2a2a !important;
-    text-shadow: 0 0 10px rgba(255, 42, 42, 0.6);
+    text-shadow: none !important;
   }
 
   .neon-text-blue {
     color: #00e5ff !important;
-    text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+    text-shadow: none !important;
   }
 
   .neon-badge-green {
     background: rgba(0, 255, 136, 0.12) !important;
-    border: 1px solid #00ff88 !important;
+    border: 1px solid rgba(0, 255, 136, 0.3) !important;
     color: #00ff88 !important;
-    box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+    box-shadow: none !important;
   }
 
   .neon-badge-yellow {
     background: rgba(255, 183, 0, 0.12) !important;
-    border: 1px solid #ffb700 !important;
+    border: 1px solid rgba(255, 183, 0, 0.3) !important;
     color: #ffb700 !important;
-    box-shadow: 0 0 8px rgba(255, 183, 0, 0.4);
+    box-shadow: none !important;
   }
 
   .neon-badge-red {
     background: rgba(255, 42, 42, 0.12) !important;
-    border: 1px solid #ff2a2a !important;
+    border: 1px solid rgba(255, 42, 42, 0.3) !important;
     color: #ff2a2a !important;
-    box-shadow: 0 0 8px rgba(255, 42, 42, 0.4);
+    box-shadow: none !important;
   }
 
   .neon-badge-blue {
     background: rgba(0, 229, 255, 0.12) !important;
-    border: 1px solid #00e5ff !important;
+    border: 1px solid rgba(0, 229, 255, 0.3) !important;
     color: #00e5ff !important;
-    box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+    box-shadow: none !important;
   }
 }
 

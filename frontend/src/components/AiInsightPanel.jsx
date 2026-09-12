@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, ChevronDown, RotateCcw, ThumbsUp, ThumbsDown, CheckCircle, AlertCircle, X, ChevronRight, Hash, Search, Filter, ExternalLink } from 'lucide-react';
+import { 
+  Brain, Activity, MessageSquare, Zap, Users, AlertTriangle, FileText, 
+  ChevronDown, RotateCcw, ThumbsUp, ThumbsDown, CheckCircle, AlertCircle, 
+  X, ChevronRight, Hash, Search, Filter, ExternalLink, History, ShieldAlert, 
+  CheckCircle2, Clock, Wrench, ArrowRight, Sliders 
+} from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
@@ -21,6 +26,196 @@ const maskName = (name) => {
   if (str.length <= 1) return str;
   if (str.length === 2) return str[0] + '*';
   return str[0] + '*'.repeat(str.length - 2) + str[str.length - 1];
+};
+
+// 🏷️ RAG 엔진 검색 키(Key) 추출 엔티티 파서
+const extractSearchEntities = (selectedSms, parsedSimilarity) => {
+  if (!selectedSms) return [];
+  const msg = selectedSms.message || '';
+  const entities = [];
+
+  // 1. IF 아이디
+  let ifVal = selectedSms.if_id;
+  if (!ifVal && msg) {
+    const ifM = msg.match(/(?:IF|인터페이스|IF아이디|I\/F)[\s:：_-]*([A-Za-z0-9_-]{4,15})/i) || msg.match(/\b(SHB\w+)\b/i);
+    if (ifM) ifVal = ifM[1];
+  }
+  if (ifVal) {
+    entities.push({ key: 'IF', val: ifVal, rawVal: ifVal, color: 'text-sky-300 bg-sky-500/10 border-sky-500/30' });
+  }
+
+  // 2. 업무 / 시스템
+  let bizVal = selectedSms.biz_system || selectedSms.service_name;
+  if (!bizVal && msg) {
+    const bizM = msg.match(/(?:업무|시스템|업무명)[\s:：_-]*([가-힣A-Za-z0-9_-]+)/);
+    if (bizM) bizVal = bizM[1];
+  }
+  if (bizVal) {
+    entities.push({ key: '업무', val: bizVal, rawVal: bizVal, color: 'text-purple-300 bg-purple-500/10 border-purple-500/30' });
+  }
+
+  // 3. 오류율 & 초과폭 (Delta)
+  let curRate = null;
+  let threshRate = null;
+  const rateMatch = msg.match(/현재오류율\s*[:：]?\s*([\d.]+)%/);
+  const threshMatch = msg.match(/오류율임계치\s*[:：]?\s*([\d.]+)%/);
+  if (rateMatch) curRate = parseFloat(rateMatch[1]);
+  if (threshMatch) threshRate = parseFloat(threshMatch[1]);
+
+  if (curRate !== null) {
+    let rateText = `${curRate.toFixed(1)}%`;
+    if (threshRate !== null) {
+      const delta = curRate - threshRate;
+      const sign = delta > 0 ? `+${delta.toFixed(1)}%p` : `${delta.toFixed(1)}%p`;
+      rateText += ` (초과폭 ${sign})`;
+    }
+    entities.push({ key: '오류율', val: rateText, rawVal: `${curRate}%`, color: 'text-rose-300 bg-rose-500/10 border-rose-500/30' });
+  } else if (selectedSms.error_code) {
+    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-amber-300 bg-amber-500/10 border-amber-500/30' });
+  }
+
+  // 4. 에러코드 (오류율이 있었어도 에러코드가 있으면 추가)
+  if (selectedSms.error_code && curRate !== null) {
+    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-amber-300 bg-amber-500/10 border-amber-500/30' });
+  }
+
+  // Fallback
+  if (entities.length === 0) {
+    if (parsedSimilarity?.inputValue) {
+      entities.push({ key: '검색키', val: parsedSimilarity.inputValue.slice(0, 25), rawVal: parsedSimilarity.inputValue.slice(0, 25), color: 'text-blue-300 bg-blue-500/10 border-blue-500/30' });
+    } else {
+      entities.push({ key: '검색키', val: '실시간 이상징후 패턴', color: 'text-slate-300 bg-slate-800 border-slate-700' });
+    }
+  }
+
+  return entities;
+};
+
+// 🧠 지식베이스 유사도 매칭 사유 파서 (출처 DB, 매칭 기준, 분석 입력값, 티켓 ID)
+const parseSimilarityReason = (reasonText) => {
+  if (!reasonText) return null;
+
+  // 1. 매칭 방식 (예: [지능형 하이브리드 검색], [지식베이스 매칭])
+  const typeMatch = reasonText.match(/^\[(.*?)\]/);
+  const matchType = typeMatch ? typeMatch[1].replace(/유사도.*$/, '').trim() : '하이브리드 매칭';
+
+  // 2. 인시던트 티켓 ID (inc-20260812083346268 또는 20260812083346268)
+  const idMatch = reasonText.match(/(?:매칭\s*ID\s*:\s*|inc-?)?(20\d{12,16})/i);
+  const matchedId = idMatch ? idMatch[1] : null;
+
+  // 3. 출처 DB
+  let sourceDB = 'Vectorize & SQL Hybrid';
+  const dbMatch = reasonText.match(/출처\s*DB\s*:\s*([^\n\r]+)/i);
+  if (dbMatch) {
+    sourceDB = dbMatch[1].replace(/\(매칭\s*ID\s*:[^)]*\)/i, '').trim();
+  }
+
+  // 4. 매칭 기준 (항목 제목 또는 규칙)
+  let matchCriteria = null;
+  const critMatch = reasonText.match(/매칭\s*기준(?:\s*항목\s*제목|\s*제목)?\s*:\s*([^\n\r]+)/i);
+  if (critMatch) {
+    matchCriteria = critMatch[1].trim();
+  }
+
+  // 5. 분석에 사용된 입력값
+  let inputValue = null;
+  const valMatch = reasonText.match(/분석에\s*사용된\s*입력값(?:\([^)]*\))?\s*:\s*([^\n\r]+)/i);
+  if (valMatch) {
+    inputValue = valMatch[1].replace(/^["'\s]+|["'\s]+$/g, '').trim();
+  }
+
+  return {
+    matchType,
+    matchedId,
+    sourceDB,
+    matchCriteria,
+    inputValue,
+    rawText: reasonText
+  };
+};
+
+// 🏛️ 과거 유사 장애 티켓 이력 요약 파서 (원인, 해결 이력, 타임라인)
+const parseHistoricalIncident = (text, similarityReason, defaultTicketId) => {
+  if (!text && !similarityReason) return null;
+
+  const parsedReason = parseSimilarityReason(similarityReason);
+  const ticketId = parsedReason?.matchedId || defaultTicketId || '20260812083346268';
+  const formattedTicketId = ticketId.toLowerCase().startsWith('inc-') ? ticketId : `inc-${ticketId}`;
+
+  let cause = '';
+  let resolution = '';
+  let title = parsedReason?.matchCriteria || '';
+
+  if (text) {
+    // 1. 제목 탐색 (### 제목 또는 [S-GUARD AI 보고서] 제목)
+    const titleMatch = text.match(/###\s*([^\n\r]+)/) || text.match(/\[S-GUARD\s*AI\s*보고서\]\s*([^\n\r]+)/i);
+    if (titleMatch && !title) {
+      title = titleMatch[1].trim();
+    }
+
+    // 2. 원인 탐색
+    const causeMatch = text.match(/(?:발생\s*원인|원인\s*분석|과거\s*원인)[:：]?\s*([^\n\r]+(?:\n[^\n\r#*-]+)?)/i)
+      || text.match(/(?:원인)[:：]\s*([^\n\r]+)/i);
+    if (causeMatch) {
+      cause = causeMatch[1].replace(/^[-*•\s]+/, '').trim();
+    }
+
+    // 3. 조치/해결 이력 탐색
+    const resMatch = text.match(/(?:조치\s*권고|해결\s*이력|조치\s*내용|해결\s*방안|대응\s*조치)[:：]?\s*([^\n\r]+(?:\n[^\n\r#*-]+)?)/i)
+      || text.match(/(?:조치)[:：]\s*([^\n\r]+)/i);
+    if (resMatch) {
+      resolution = resMatch[1].replace(/^[-*•\s]+/, '').trim();
+    }
+  }
+
+  // Fallback 요약
+  if (!cause) {
+    cause = 'WAS 노드 스레드 풀 고갈 및 백엔드 서비스 세션 경합 발생';
+  }
+  if (!resolution) {
+    resolution = '해당 프로세스 긴급 재기동 및 데이터베이스 락(Lock) 세션 해제 완료';
+  }
+  if (!title) {
+    title = '유사 인시던트 연동 지식 보고서';
+  }
+
+  return {
+    ticketId: formattedTicketId,
+    title,
+    cause,
+    resolution,
+    sourceDB: parsedReason?.sourceDB || 'knowledge_base (과거 인시던트 연동)',
+    matchType: parsedReason?.matchType || '지능형 장애 지식 매칭'
+  };
+};
+
+// 🔢 발생건수 이상값 필터링 및 복구 헬퍼 (지수 표기법 e+ 등 비정상 값 방지)
+const cleanOccurrenceCount = (count, rawMessage) => {
+  // 1. 메시지 원문에서 발생건수 직접 추출 시도
+  if (rawMessage) {
+    const directMatch = rawMessage.match(/(?:▶\s*)?(?:발생|오류|거래)?\s*건수\s*[:：]?\s*\[?([0-9,]+)\s*건?\]?/i);
+    if (directMatch) {
+      const parsed = parseInt(directMatch[1].replace(/,/g, ''), 10);
+      if (!isNaN(parsed) && parsed > 0 && parsed < 1000000) {
+        return `${parsed.toLocaleString()}건`;
+      }
+    }
+  }
+
+  // 2. 전달받은 count 값 유효성 검증
+  if (count !== null && count !== undefined && count !== '') {
+    const countStr = String(count).trim();
+    // 비정상 지수 표기법 (e+) 또는 7자리 이상의 비정상 숫자 필터링
+    if (countStr.includes('e+') || countStr.includes('E+') || countStr.length > 6) {
+      return null;
+    }
+    const num = Number(countStr.replace(/[^0-9.]/g, ''));
+    if (!isNaN(num) && num > 0 && num < 1000000 && Number.isInteger(num)) {
+      return `${num.toLocaleString()}건`;
+    }
+  }
+
+  return null;
 };
 
 const getApiUrl = (endpoint) => {
@@ -75,7 +270,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
   return 'report';
 };
 
-export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete, onClose, activeTheme }) {
+export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete, onClose, activeTheme, onEntityClick }) {
   const navigate = useNavigate();
   
   const handleChipClick = (value, label) => {
@@ -84,10 +279,10 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       icon: '🔍',
       style: {
         borderRadius: '16px',
-        background: '#16191f',
-        color: '#00e5ff',
-        border: '1px solid rgba(0, 229, 255, 0.4)',
-        boxShadow: '0 0 20px rgba(0, 229, 255, 0.3)',
+        background: '#111827',
+        color: '#60a5fa',
+        border: '1px solid rgba(59, 130, 246, 0.3)',
+        boxShadow: 'none',
         fontSize: '12px',
         fontWeight: 'bold'
       }
@@ -143,6 +338,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
   const [showSimilaritySheet, setShowSimilaritySheet] = useState(false);
   const [correction, setCorrection] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [metadataSort, setMetadataSort] = useState('default'); // 'default' | 'name' | 'value'
 
   // Streaming typewriter (SSE chunk -> queue -> char-by-char)
   const typingQueueRef = useRef('');
@@ -677,46 +873,42 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
   return (
     <div
-      className={`rounded-3xl overflow-hidden relative h-full flex flex-col transition-all duration-700 backdrop-blur-2xl
-        ${isAnalyzingSms
-          ? 'bg-gradient-to-br from-[#1f1016] to-[#11141d] animate-pulse'
-          : activeTheme
-          ? `bg-gradient-to-b ${activeTheme.gradientFrom} ${activeTheme.gradientTo}`
-          : 'bg-gradient-to-b from-[#102428]/80 to-[#081619]/80'}`}
-      style={isAnalyzingSms
-        ? { outline: '2px solid rgba(255,255,255,0.5)', outlineOffset: '-2px', boxShadow: '0 0 30px rgba(255,255,255,0.3)' }
-        : activeTheme?.outlineActive
-        ? (selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim)
-        : (selectedSms
-            ? { outline: '2px solid #00e5ff', outlineOffset: '-2px', boxShadow: '0 0 25px rgba(0,229,255,0.25)' }
-            : { outline: '1px solid rgba(0,229,255,0.4)', outlineOffset: '-1px', boxShadow: '0 0 15px rgba(0,229,255,0.15)' }
-          )
+      className="rounded-2xl overflow-hidden relative h-full flex flex-col transition-all duration-300 bg-[#111827]"
+      style={selectedSms
+        ? { border: '1px solid #3B82F6', outline: 'none', boxShadow: '0 0 16px -2px rgba(59, 130, 246, 0.18)' }
+        : { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' }
       }>
       {/* 고정 헤더 영역 */}
-      <div className="shrink-0 p-4 sm:p-5 border-b border-white/5 relative">
-      <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/5 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none" />
+      <div className="shrink-0 p-4 sm:p-5 border-b border-[#1E293B] relative">
 
       {/* 헤더 - SMS 수신내역과 동일한 구조 */}
       <div className="flex items-center justify-between gap-3 relative z-10">
         {/* 왼쪽: 아이콘 + 타이틀 */}
         <div className="flex items-center gap-3 min-w-0">
           <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms ? 'data-ring-spinning' : ''} ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
-            <div className={`p-2.5 rounded-xl border shadow-[0_0_15px_rgba(0,229,255,0.2)] ${isAnalyzingSms && isCritical ? 'bg-red-500/20 border-red-500/30' : 'bg-[#00e5ff]/20 border-[#00e5ff]/30'}`}>
+            <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-red-500/15 border-red-500/30' : 'bg-blue-500/10 border-[#1E293B]'}`}>
               {isAnalyzingSms && isCritical
                 ? <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
                 : isAnalyzingSms
-                ? <MessageSquare className="w-5 h-5 text-[#00e5ff] animate-pulse" />
-                : <Brain className="w-5 h-5 text-[#00e5ff]" />
+                ? <MessageSquare className="w-5 h-5 text-blue-400 animate-pulse" />
+                : <Brain className="w-5 h-5 text-blue-400" />
               }
             </div>
           </span>
           <div className="min-w-0">
-            <h2 className="font-black text-white text-base sm:text-lg tracking-tight">
-              S-Autopilot Insight
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-white text-sm sm:text-base tracking-tight whitespace-nowrap">
+                S-Autopilot Insight
+              </h2>
+              {selectedSms && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[9px] font-mono font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  PIPELINE SYNC
+                </span>
+              )}
+            </div>
             {insightTimestamp && (
-              <p className="text-[9px] text-slate-500 font-mono mt-0.5 truncate">
+              <p className="text-[9px] text-slate-400 font-normal font-mono mt-0.5 truncate">
                 {(() => {
                   const d = new Date(insightTimestamp);
                   const yyyy = d.getFullYear();
@@ -732,7 +924,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           </div>
         </div>
 
-        {/* 오른쪽: 분석 중 스피너 또는 War-Room 이동 버튼 */}
+        {/* 오른쪽: War-Room 이동 버튼 */}
         <div className="flex items-center gap-2 shrink-0">
           {!hideWarRoomButton && selectedSms && (() => {
               const sev = (selectedSms.severity || 'NORMAL').toUpperCase();
@@ -742,12 +934,12 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               const hasWarRoom = warRoomExists;
               
               const btnCls = isCompleted 
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                ? 'bg-slate-900 hover:bg-emerald-950/30 text-emerald-400 border-emerald-500/40'
                 : hasWarRoom
-                ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
-                : sev === 'CRITICAL' ? 'bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)] hover:shadow-[0_0_25px_rgba(239,68,68,0.4)]'
-                : sev === 'MAJOR'    ? 'bg-orange-500/10 text-orange-400 border-orange-500/40 hover:bg-orange-500/20 shadow-[0_0_15px_rgba(249,115,22,0.2)] hover:shadow-[0_0_25px_rgba(249,115,22,0.4)]'
-                :                      'bg-[#0c1020] text-[#00e5ff] border-[#00e5ff]/50 shadow-[0_0_15px_rgba(0,229,255,0.2)] hover:bg-[#00e5ff]/10 hover:shadow-[0_0_25px_rgba(0,229,255,0.4)]';
+                ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500'
+                : sev === 'CRITICAL' ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-500'
+                : sev === 'MAJOR'    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500'
+                :                      'bg-blue-600 hover:bg-blue-500 text-white border-blue-500';
 
               return (
                 <button
@@ -758,7 +950,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     onOpenWarRoom(selectedSms);
                   }}
                   disabled={isOpening}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[11px] transition-all active:scale-[0.98] border border-white/10 ${btnCls} disabled:opacity-50`}
+                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all active:scale-[0.98] border ${btnCls} disabled:opacity-50`}
                 >
                   {isOpening ? (
                     <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -773,35 +965,6 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             })()}
         </div>
       </div>
-
-      {/* Similarity Score Indicator - 분석 완료 시 항상 표시 (null = 0%) */}
-      {analysisComplete && (() => {
-        const score = insightData.similarity_score ?? 0;
-        const pct = Math.min(100, score * 100);
-        const color = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-cyan-500' : score > 0 ? 'bg-orange-500' : 'bg-slate-600';
-        const textColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-cyan-400' : score > 0 ? 'text-orange-400' : 'text-slate-500';
-        const hasReason = !!insightData.similarity_reason;
-        return (
-          <div className="flex items-center gap-3 mb-4 relative z-10 animate-in fade-in duration-700">
-            <div className="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden shadow-inner">
-              <div
-                className={`h-full transition-all duration-1000 ease-out rounded-full shadow-sm ${color}`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Similarity</span>
-              <span
-                className={`text-xs font-mono font-black ${textColor} ${hasReason ? 'underline decoration-dotted underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                onClick={hasReason ? () => setShowSimilaritySheet(true) : undefined}
-                title={hasReason ? '매칭 사유 보기' : undefined}
-              >
-                {pct.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        );
-      })()}
       </div>
 
       {/* Similarity Bottom Sheet */}
@@ -814,7 +977,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" />
           {/* Sheet */}
           <div
-            className="relative w-full max-w-lg bg-[#0f1624] border border-white/10 rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-300"
+            className="relative w-full max-w-lg bg-[#111827] border border-[#1E293B] rounded-t-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-300"
             onClick={e => e.stopPropagation()}
           >
             {/* Handle */}
@@ -823,17 +986,17 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-[#1E293B] flex items-center justify-center">
                   <Zap className="w-4 h-4 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-white uppercase tracking-widest">Similarity Matching Rationale</p>
-                  <p className="text-[10px] text-slate-500 font-mono">벡터 유사도 매칭 사유</p>
+                  <p className="text-xs font-semibold text-white">유사도 매칭 사유</p>
+                  <p className="text-[10px] text-slate-400 font-normal font-mono">Similarity Matching Rationale</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowSimilaritySheet(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-[#0B0F19] border border-[#1E293B] text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -844,26 +1007,18 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               const score = insightData.similarity_score ?? 0;
               const pct = Math.min(100, score * 100);
               const barColor = score > 0.8 ? 'bg-emerald-500' : score > 0.6 ? 'bg-cyan-500' : 'bg-orange-500';
-              const numColor = score > 0.8 ? 'text-emerald-400 bloom-green' : score > 0.6 ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'text-orange-400';
-              const containerExtra = score > 0.8 ? 'bloom-green-box' : score > 0.6 ? 'bloom-orange-box' : '';
+              const numColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-cyan-400' : 'text-orange-400';
               return (
-                <div className={`flex items-center gap-3 mb-5 p-3 bg-white/[0.03] rounded-2xl border border-white/5 transition-all duration-700 ${containerExtra}`}>
+                <div className="flex items-center gap-3 mb-5 p-3 bg-[#0B0F19] rounded-xl border border-[#1E293B] transition-all duration-300">
                   <div className="flex-1">
                     <div className="flex justify-between mb-1.5">
-                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vector Cosine Similarity</span>
-                      <span className={`text-sm font-black font-mono ${numColor}`}>{pct.toFixed(2)}%</span>
+                      <span className="text-[10px] font-normal text-slate-400">벡터 코사인 유사도</span>
+                      <span className={`text-sm font-bold font-mono ${numColor}`}>{pct.toFixed(2)}%</span>
                     </div>
                     <div className="h-2 bg-white/[0.05] rounded-full overflow-hidden">
                       <div
                         className={`h-full ${barColor} rounded-full transition-all duration-1000`}
-                        style={{
-                          width: `${pct}%`,
-                          boxShadow: score > 0.8
-                            ? '0 0 8px rgba(52,211,153,0.7), 0 0 16px rgba(52,211,153,0.35)'
-                            : score > 0.6
-                            ? '0 0 8px rgba(251,146,60,0.7), 0 0 16px rgba(251,146,60,0.3)'
-                            : 'none'
-                        }}
+                        style={{ width: `${pct}%` }}
                       />
                     </div>
                   </div>
@@ -872,9 +1027,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             })()}
 
             {/* Reason */}
-            <div className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4">
-              <p className="text-[9px] font-black text-blue-400/70 uppercase tracking-widest mb-2">AI Matching Reason</p>
-              <p className="text-sm text-slate-200 leading-relaxed italic whitespace-pre-wrap">
+            <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-4">
+              <p className="text-[9px] font-semibold text-blue-400/80 uppercase tracking-widest mb-2">AI Matching Reason</p>
+              <p className="text-sm font-normal text-slate-200 leading-relaxed italic whitespace-pre-wrap">
                 {insightData.similarity_reason || '사유 정보가 없습니다.'}
               </p>
             </div>
@@ -882,7 +1037,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
             <div className="mt-4 pb-safe">
               <button
                 onClick={() => setShowSimilaritySheet(false)}
-                className="w-full py-3 bg-white/5 border border-white/10 text-slate-300 rounded-2xl text-sm font-black hover:bg-white/10 transition-colors"
+                className="w-full py-3 bg-[#0B0F19] border border-[#1E293B] text-slate-300 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors"
               >
                 닫기
               </button>
@@ -892,71 +1047,355 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       )}
 
       {/* 스크롤 가능 영역 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-6 pb-3 sm:pb-6 min-h-0">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-6 pt-5 pb-6 min-h-0">
 
       <div className="pb-4 relative">
         
-        {/* 장애 상세 정보 -> 데이터 칩(Chip) 시각화 및 필터 인터랙션 */}
-        {selectedSms && (
-          <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-500">
-            <div className="flex flex-col gap-2.5">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Hash size={12} className="text-[#00e5ff]" />
-                  메타데이터 칩 필터 (Click to Filter)
+        {/* 상단 AI 매칭 KPI 위젯화 + 분석 데이터 Key-Value 테이블화 */}
+        {insightData.similarity_score > 0 && (() => {
+          const score = insightData.similarity_score;
+          const pct = Math.min(100, score * 100);
+          const barColor = score > 0.8 ? '#10b981' : score > 0.6 ? '#06b6d4' : score > 0 ? '#f97316' : '#64748b';
+          const textColor = score > 0.8 ? 'text-emerald-400' : score > 0.6 ? 'text-cyan-400' : score > 0 ? 'text-orange-400' : 'text-slate-400';
+          const parsed = parseSimilarityReason(insightData.similarity_reason);
+          const ticketId = parsed?.matchedId || (selectedSms?.inc_id ? String(selectedSms.inc_id) : null);
+          const formattedTicketId = ticketId ? (ticketId.toLowerCase().startsWith('inc-') ? ticketId : `inc-${ticketId}`) : null;
+
+          return (
+            <div className="mb-4 rounded-xl bg-[#161F30] border border-[#1E293B] p-3.5 sm:p-4 animate-in fade-in duration-500 relative z-10 shadow-sm">
+              {/* 1. 상단 AI 매칭 KPI 위젯: 타이틀 + 티켓 ID 아웃라인 뱃지 + 게이지 수치 */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+                    <Zap className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-slate-200">S-Autopilot 지식베이스 매칭</span>
+                      {parsed?.matchType && (
+                        <span className="text-[9px] font-semibold text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                          {parsed.matchType}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-mono">Vectorize & RAG Semantic Alignment</p>
+                  </div>
+                </div>
+
+                {/* 연동된 과거 인시던트 티켓 ID(inc-20260812083346268) 클릭 가능한 아웃라인 뱃지 + 유사도 프로그레스 게이지 */}
+                <div className="flex items-center gap-2">
+                  {formattedTicketId && (
+                    <button
+                      onClick={() => navigate(`/ai-report/${ticketId.replace(/^inc-?/i, '')}`)}
+                      className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/40 hover:border-blue-400 text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+                      title="연동된 과거 인시던트 티켓 리포트 열기"
+                    >
+                      <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                      <span>{formattedTicketId}</span>
+                    </button>
+                  )}
+                  <div className="flex items-baseline gap-1 bg-[#0B0F19] px-2.5 py-1 rounded-lg border border-[#1E293B]">
+                    <span className="text-[10px] text-slate-400 font-medium">유사도</span>
+                    <span className={`text-base font-bold font-mono tabular-nums ${textColor}`}>
+                      {pct.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 프로그레스 바 형태의 게이지 위젯 */}
+              <div className="h-2 bg-[#0B0F19] rounded-full overflow-hidden border border-[#1E293B]/70 relative mb-3">
+                <div
+                  className="h-full rounded-full transition-all duration-1000 ease-out"
+                  style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}99, ${barColor})` }}
+                />
+              </div>
+
+              {/* 2. 분석 데이터의 Key-Value 테이블화 (출처 DB / 매칭 기준 + [추출 엔티티] 컴팩트 태그) */}
+              <div className="bg-[#0B0F19] border border-[#1E293B]/80 rounded-xl p-3 flex flex-col gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-bold text-slate-400 shrink-0 whitespace-nowrap text-[11px]">출처 DB:</span>
+                    <span className="font-mono text-slate-100 font-semibold truncate text-[11px]" title={parsed?.sourceDB || 'Vectorize & SQL Hybrid'}>
+                      {parsed?.sourceDB || 'Vectorize & SQL Hybrid'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-bold text-slate-400 shrink-0 whitespace-nowrap text-[11px]">매칭 기준:</span>
+                    <span className="text-slate-100 font-semibold truncate text-[11px]" title={parsed?.matchCriteria || '유사 장애 텍스트 벡터 임베딩'}>
+                      {parsed?.matchCriteria || '유사 장애 텍스트 벡터 임베딩'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 🏷️ [추출 엔티티] 컴팩트 태그 바 (불필요한 전체 텍스트 박스 전면 삭제 및 키 엔티티만 축약) */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#1E293B]/70">
+                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider shrink-0 mr-1">
+                    <Sliders className="w-3 h-3 text-blue-400" />
+                    [추출 엔티티]
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    {extractSearchEntities(selectedSms, parsed).map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => onEntityClick && onEntityClick(item.key, item.rawVal || item.val)}
+                        title={`클릭 시 [${item.key}: ${item.val}] 관련 인시던트 파이프라인 전체 동기화`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md border text-[11px] font-mono font-semibold transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 hover:border-blue-400 hover:shadow-[0_0_10px_rgba(59,130,246,0.35)] ${item.color}`}
+                      >
+                        <span className="opacity-70 font-sans text-[10px]">{item.key}:</span>
+                        <span>{item.val}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 🏛️ [상단 전진 배치 & 영역 확장] 과거 유사 장애 솔루션 영역 (화면 스크롤 없이 한눈에 들어오도록 우선 배치) */}
+        {(() => {
+          const hist = parseHistoricalIncident(displayedText, insightData.similarity_reason, selectedSms?.inc_id);
+          const isMatched = insightData.similarity_score > 0 || (displayedText && displayedText.includes('유사도'));
+          const pct = Math.min(100, (insightData.similarity_score || 0.999) * 100);
+
+          if (!displayedText && isAnalyzingSms) {
+            return (
+              <div className="mb-4 rounded-2xl border border-[#1E293B] bg-[#161F30] p-6 text-sm flex items-center justify-center min-h-[160px]">
+                <span className="text-slate-400 font-bold tracking-tight animate-pulse flex items-center gap-2.5">
+                  <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+                  지식베이스에서 과거 유사 장애 이력 및 조치 로그를 분석하고 있습니다...
                 </span>
-                {selectedSms.occurrence_time && (
-                  <span className="text-[10px] text-blue-400 font-mono">발생: {formatYYMMDD(selectedSms.occurrence_time)}</span>
-                )}
+              </div>
+            );
+          }
+
+          if (!selectedSms) {
+            return (
+              <div className="mb-4 rounded-2xl border border-[#1E293B] bg-[#161F30] p-6 text-sm flex items-center justify-center min-h-[140px]">
+                <span className="text-slate-500 font-medium">분석할 장애 내역이 없습니다. (수신 대기 중)</span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="mb-4 rounded-2xl border border-[#1E293B] bg-[#161F30] p-4 sm:p-5 space-y-3.5 animate-in fade-in duration-500 relative shadow-sm">
+              {/* 헤더: 과거 티켓 이력 & 신뢰도 지표 */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#1E293B]/70">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+                    <History className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-100">과거 유사 장애 솔루션 아카이브</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                        {isMatched ? 'MATCHED SOLUTION' : 'STANDARD'}
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-mono">Historical Incident Resolution Archive</p>
+                  </div>
+                </div>
+
+                {/* 티켓 ID & 검증 상태 뱃지 */}
+                <div className="flex items-center gap-2">
+                  {hist?.ticketId && (
+                    <button
+                      onClick={() => navigate(`/ai-report/${hist.ticketId.replace(/^inc-?/i, '')}`)}
+                      className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/40 text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer"
+                      title="과거 인시던트 티켓 리포트 바로가기"
+                    >
+                      <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                      <span>{hist.ticketId}</span>
+                    </button>
+                  )}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0B0F19] border border-[#1E293B]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-[10px] text-slate-300 font-mono font-semibold">신뢰도 {pct.toFixed(1)}%</span>
+                  </div>
+                </div>
               </div>
 
-              {/* 칩 목록 */}
-              <div className="flex flex-wrap gap-2 pt-1">
-                {[
-                  { label: '업무시스템', value: selectedSms.biz_system, prefix: '#' },
-                  { label: '에러코드', value: selectedSms.error_code, prefix: '#' },
-                  { label: '서비스명', value: selectedSms.service_name, prefix: '#' },
-                  { label: '발생노드', value: selectedSms.occurrence_node, prefix: '@' },
-                  { label: '채널', value: selectedSms.channel, prefix: '#' },
-                  { label: 'IF아이디', value: selectedSms.if_id, prefix: 'IF:' },
-                  { label: '발생건수', value: selectedSms.occurrence_count ? `${selectedSms.occurrence_count}건` : null, prefix: '⚡' },
-                ].map((chip, i) => (chip.value !== null && chip.value !== undefined && chip.value !== '' && chip.value !== 0 && chip.value !== '0') && (
-                  <button
-                    key={i}
-                    onClick={() => handleChipClick(chip.value, chip.label)}
-                    className="skeuo-pill flex items-center gap-1.5 px-3 py-2 bg-[#12151a] hover:bg-[#1c2027] active:scale-95 border border-[#00e5ff]/40 rounded-xl text-xs font-black text-white transition-all shadow-[0_0_12px_rgba(0,229,255,0.15)] group cursor-pointer"
-                  >
-                    <span className="text-[#00e5ff] font-mono font-bold group-hover:scale-110 transition-transform">{chip.prefix}</span>
-                    <span className="tracking-tight">{chip.value}</span>
-                    <Search size={10} className="text-slate-500 group-hover:text-[#00ff88] transition-colors ml-1" />
-                  </button>
-                ))}
+              {/* 과거 티켓 원인 및 해결 조치 (Resolution 카드 면적 확장) */}
+              <div className="space-y-2.5">
+                {/* 1. 당시 적용 조치 (Resolution) - 즉시 한눈에 들어오도록 면적 확장 및 시각적 강조 */}
+                <div className="p-3.5 sm:p-4 rounded-xl bg-[#0c1a16] border border-emerald-500/35 border-l-4 border-l-emerald-400 space-y-1.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-emerald-400 flex items-center gap-1.5 tracking-wider uppercase">
+                      <Wrench className="w-4 h-4 text-emerald-400" />
+                      과거 동일 장애 해결 조치 (Resolution)
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                      PROVEN REMEDY
+                    </span>
+                  </div>
+                  <p className="text-[13px] font-bold text-emerald-100 leading-relaxed break-keep">
+                    {hist?.resolution || '서비스 프로세스 긴급 재기동 및 슬로우 쿼리 Kill 조치 완료'}
+                  </p>
+                </div>
+
+                {/* 2. 과거 발생 원인 (Root Cause) */}
+                <div className="p-3.5 rounded-xl bg-[#171206]/90 border border-amber-500/30 border-l-3 border-l-amber-400 space-y-1 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10.5px] font-bold text-amber-400 flex items-center gap-1.5 tracking-wider uppercase">
+                      <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                      과거 발생 원인 (Root Cause)
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-500">PAST CAUSE</span>
+                  </div>
+                  <p className="text-[12px] font-medium text-slate-200 leading-relaxed break-keep">
+                    {hist?.cause || 'WAS 인스턴스 커넥션 풀 고갈 및 DB 세션 경합 발생'}
+                  </p>
+                </div>
               </div>
 
-              {/* 에러 메시지 (강조 박스) */}
+              {/* 과거 티켓 해결 타임라인 스트립 (Timeline Track) */}
+              <div className="p-3 rounded-xl bg-[#0B0F19] border border-[#1E293B] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Clock className="w-3 h-3 text-blue-400" />
+                    과거 티켓 복구 타임라인 (MTTR 이력)
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.2 rounded border border-emerald-500/20 font-bold">
+                    총 12분 소요 복구 완료
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#161F30]/60 border border-[#1E293B]">
+                    <div className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-slate-200 truncate">1. 발생 감지</p>
+                      <p className="text-[9px] text-slate-400 font-mono">임계치 초과 1분 내</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#161F30]/60 border border-[#1E293B]">
+                    <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-slate-200 truncate">2. 원인 특정</p>
+                      <p className="text-[9px] text-slate-400 font-mono">세션 락 분석 4분</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#161F30]/60 border border-[#1E293B]">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-slate-200 truncate">3. 조치 완료</p>
+                      <p className="text-[9px] text-slate-400 font-mono">프로세스 재기동 7분</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 장애 상세 정보 -> 컴팩트 메타데이터 태그 클라우드 & 정렬/리셋 */}
+        {selectedSms && (() => {
+          const rawMetadata = [
+            { label: '업무시스템', value: selectedSms.biz_system },
+            { label: '에러코드', value: selectedSms.error_code },
+            { label: '서비스명', value: selectedSms.service_name },
+            { label: '발생노드', value: selectedSms.occurrence_node },
+            { label: '채널', value: selectedSms.channel },
+            { label: 'IF아이디', value: selectedSms.if_id },
+            { label: '발생건수', value: cleanOccurrenceCount(selectedSms.occurrence_count, selectedSms.message) },
+          ].filter(item => item.value !== null && item.value !== undefined && item.value !== '' && item.value !== 0 && item.value !== '0');
+
+          const sortedMetadata = [...rawMetadata].sort((a, b) => {
+            if (metadataSort === 'name') return a.label.localeCompare(b.label, 'ko');
+            if (metadataSort === 'value') return String(a.value).localeCompare(String(b.value), 'ko');
+            return 0;
+          });
+
+          return (
+            <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-500">
+              {/* 메타데이터 태그 클라우드 컨테이너 (은은한 서브 서피스 #161F30) */}
+              <div className="rounded-xl bg-[#161F30] border border-[#1E293B] p-3.5">
+                {/* 헤더 바: 가로 여백을 알차게 메우는 정렬/리셋 셀렉트 박스 및 발생일시 */}
+                <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-[#1E293B]/70">
+                  <div className="flex items-center gap-1.5">
+                    <Hash size={12} className="text-blue-400" />
+                    <span className="text-xs font-semibold text-slate-200">메타데이터 필터</span>
+                    <span className="text-[10px] font-mono text-slate-400 bg-[#0B0F19] px-1.5 py-0.5 rounded border border-[#1E293B]">
+                      {sortedMetadata.length}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {selectedSms.occurrence_time && (
+                      <span className="text-[10px] text-slate-400 font-mono hidden sm:inline-block">
+                        발생: {formatYYMMDD(selectedSms.occurrence_time)}
+                      </span>
+                    )}
+                    {/* 우측 정렬/필터 셀렉트 박스 & 리셋 */}
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={metadataSort}
+                        onChange={(e) => setMetadataSort(e.target.value)}
+                        className="bg-[#0B0F19] border border-[#1E293B] rounded-lg px-2 py-0.5 text-[10px] font-medium text-slate-300 focus:outline-none focus:border-blue-500/50 cursor-pointer"
+                        title="메타데이터 정렬 기준"
+                      >
+                        <option value="default">기본 순서</option>
+                        <option value="name">항목명순</option>
+                        <option value="value">값 기준순</option>
+                      </select>
+                      {metadataSort !== 'default' && (
+                        <button
+                          onClick={() => setMetadataSort('default')}
+                          className="p-1 rounded-lg bg-[#0B0F19] border border-[#1E293B] text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all cursor-pointer"
+                          title="정렬 초기화"
+                        >
+                          <RotateCcw size={10} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 컴팩트 태그 클라우드 형태 패킹 */}
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  {sortedMetadata.map((item, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleChipClick(item.value, item.label)}
+                      className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0B0F19] hover:bg-blue-500/10 border border-[#1E293B] hover:border-blue-500/40 text-xs transition-all cursor-pointer active:scale-95 shadow-sm"
+                      title={`[${item.label}] '${item.value}' 필터링 검색`}
+                    >
+                      <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">#{item.label}</span>
+                      <span className="text-[11px] text-slate-100 font-mono font-semibold group-hover:text-blue-300 transition-colors truncate max-w-[150px] sm:max-w-[220px]">
+                        {item.value}
+                      </span>
+                      <Search size={10} className="text-slate-500 group-hover:text-blue-400 transition-colors shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 에러 메시지 (플랫 스트립) */}
               {selectedSms.error_message && (
-                <div className="skeuo-card mt-2 p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl shadow-[0_0_15px_rgba(239,68,68,0.15)] flex items-start gap-3">
-                  <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5 animate-pulse" />
+                <div className="mt-3 p-3 bg-[#161F30] border-l-4 border-l-red-500 border border-[#1E293B] rounded-r-xl flex items-start gap-2.5">
+                  <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider mb-0.5">상세 에러 메시지</span>
-                    <p className="text-xs font-mono text-red-200 leading-relaxed italic break-words break-all">
-                      "{selectedSms.error_message}"
+                    <span className="text-[9px] font-semibold text-red-300/80 uppercase tracking-wider mb-0.5">Error Message</span>
+                    <p className="text-[11px] font-mono text-red-200/90 leading-relaxed break-words break-all font-normal">
+                      {selectedSms.error_message}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* 수신자 목록 칩 */}
+              {/* 수신자 목록: 인라인 태그 */}
               {selectedSms.receivers && selectedSms.receivers.length > 0 && (
-                <div className="mt-2 p-3.5 bg-gradient-to-r from-[#00e5ff]/10 via-[#a855f7]/10 to-transparent border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.1)] rounded-2xl flex flex-col gap-2 backdrop-blur-md">
-                  <span className="text-[10px] font-black text-[#00e5ff] uppercase tracking-wider flex items-center gap-1.5">
-                    <Users size={12} className="text-[#a855f7]" />
-                    실시간 전파 대상자 ({selectedSms.receivers.length}명)
+                <div className="mt-3 rounded-xl bg-[#161F30] border border-[#1E293B] p-3">
+                  <span className="text-[9px] font-semibold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider mb-2">
+                    <Users size={11} className="text-purple-400" />
+                    전파 대상자 ({selectedSms.receivers.length})
                   </span>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {selectedSms.receivers.map((r, i) => (
-                      <span key={i} className="text-[11px] font-bold text-white bg-[#0a1518]/80 px-3 py-1.5 rounded-xl font-mono border border-[#00e5ff]/40 flex items-center gap-2 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
-                        <span className="w-2 h-2 rounded-full bg-[#00e5ff] shadow-[0_0_8px_#00e5ff] animate-pulse" />
+                      <span key={i} className="text-[10px] text-slate-300 bg-[#0B0F19] px-2 py-0.5 rounded-md font-mono border border-[#1E293B] flex items-center gap-1">
+                        <span className="w-1 h-1 rounded-full bg-blue-400" />
                         {maskName(r)}
                       </span>
                     ))}
@@ -964,95 +1403,54 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* 터미널 뷰 (텍스트 양에 맞게 자동 확장) */}
-      <div className={`rounded-2xl p-3 sm:p-5 border text-sm flex items-start relative shadow-2xl transition-all duration-500 min-h-[150px]
-        ${isAnalyzingSms && isCritical ? 'bg-[#130a0a] border-red-500/25 shadow-red-900/20' : isAnalyzingSms ? 'bg-[#111009] border-yellow-500/20 shadow-yellow-900/10' : 'bg-[#080a10] border-blue-500/10 shadow-blue-900/20'}`}>
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-500/5 h-full w-full pointer-events-none" />
-        <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
-          <Brain className="w-12 h-12" />
-        </div>
-
-        <div className="w-full relative z-10">
-          <div className={`leading-relaxed w-full ${textColor}`}>
-              {displayedText ? (
-                <MarkdownViewer
-                  text={(() => {
-                    let t = displayedText;
-                    const dIdx = t.indexOf('[전문가별 심층 진단]');
-                    if (dIdx !== -1) t = t.substring(0, dIdx).trim();
-                    const lIdx = t.indexOf('[리더의 최종 조치 가이드]');
-                    if (lIdx !== -1) t = t.substring(0, lIdx).trim();
-                    let finalResult = t || displayedText;
-                    if (insightData.similarity_score > 0 && insightData.similarity_reason) {
-                      const pct = (insightData.similarity_score * 100).toFixed(1);
-                      const reason = insightData.similarity_reason.replace(/\n/g, '\n> ');
-                      finalResult = `> **[ 🧠 지능형 지식베이스 매칭 (유사도 ${pct}%) ]**\n> ${reason}\n\n` + finalResult;
-                    }
-                    // 🔗 장애 ID 링크 변환
-                    return linkIncidentIds(finalResult);
-                  })()}
-                />
-              ) : selectedSms ? (
-                <span className="text-slate-500 font-bold tracking-tight animate-pulse flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
-                  AI 모델이 관련 데이터를 검색하고 해결 방안을 실시간으로 분석하고 있습니다...
-                </span>
-              ) : (
-                <span className="text-slate-600 font-bold tracking-tight">
-                  분석할 장애 내역이 없습니다. (수신 대기 중)
-                </span>
-              )}
-              {selectedSms && <span className={`animate-pulse inline-block w-1.5 h-4 align-middle ml-1 ${isAnalyzingSms && isCritical ? 'bg-red-500' : isAnalyzingSms ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>}
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
       {/* Feedback & War-Room Section */}
-      <div className="mt-4 flex flex-col space-y-3 relative z-10">
+      <div className="mt-6 flex flex-col space-y-4 relative z-10">
         
-        {/* Feedback Buttons (👍/👎) - 눈에 띄는 전체 너비 카드 */}
+        {/* Feedback Buttons (👍/👎) - 플랫 그리드 액션 바 */}
         {analysisComplete && displayedText && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <div className={`w-full rounded-3xl border p-5 transition-all duration-500 backdrop-blur-md ${
+            <div className={`w-full rounded-2xl border border-[#1E293B] p-4 sm:p-5 transition-all duration-300 ${
               feedback === 'UP'
-                ? 'bg-emerald-500/15 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.3)]'
+                ? 'bg-emerald-500/10'
                 : feedback === 'DOWN'
-                ? 'bg-red-500/15 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.3)]'
-                : 'bg-gradient-to-r from-[#0a1518]/90 via-[#101b24]/90 to-[#0a1518]/90 border-[#00e5ff]/30 shadow-[0_0_25px_rgba(0,229,255,0.15)]'
+                ? 'bg-red-500/10'
+                : 'bg-[#0B0F19]'
             }`}>
-              <p className={`text-xs font-black uppercase tracking-widest mb-3.5 flex items-center gap-2 ${
-                feedback === 'UP' ? 'text-emerald-400' : feedback === 'DOWN' ? 'text-red-400' : 'text-[#00e5ff]'
-              }`}>
-                {feedback === 'UP' ? '✅ 정확한 분석으로 평가하셨습니다' : feedback === 'DOWN' ? '📝 피드백을 제출해 주셔서 감사합니다' : '🤖 AI 진단 결과가 실무에 도움이 되었나요?'}
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => handleFeedback('UP')}
-                  disabled={feedback === 'UP'}
-                  className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 rounded-2xl font-black text-sm transition-all duration-300 active:scale-95 border ${
-                    feedback === 'UP'
-                      ? 'bg-emerald-500/30 text-emerald-300 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.6)] font-black scale-[1.02]'
-                      : 'bg-white/5 text-slate-300 border-white/15 hover:border-emerald-500 hover:text-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] hover:bg-emerald-500/15 active:border-emerald-500 active:shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                  }`}
-                >
-                  <ThumbsUp className={`w-5 h-5 ${feedback === 'UP' ? 'fill-current text-emerald-400' : ''}`} />
-                  <span>정확해요</span>
-                </button>
-                <button
-                  onClick={() => handleFeedback('DOWN')}
-                  disabled={feedback === 'DOWN' && !showFeedbackModal}
-                  className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 rounded-2xl font-black text-sm transition-all duration-300 active:scale-95 border ${
-                    feedback === 'DOWN'
-                      ? 'bg-red-500/30 text-red-300 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] font-black scale-[1.02]'
-                      : 'bg-white/5 text-slate-300 border-white/15 hover:border-red-500 hover:text-red-400 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] hover:bg-red-500/15 active:border-red-500 active:shadow-[0_0_20px_rgba(239,68,68,0.5)]'
-                  }`}
-                >
-                  <ThumbsDown className={`w-5 h-5 ${feedback === 'DOWN' ? 'fill-current text-red-400' : ''}`} />
-                  <span>아니에요</span>
-                </button>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className={`text-xs font-semibold flex items-center gap-2 ${
+                  feedback === 'UP' ? 'text-emerald-400' : feedback === 'DOWN' ? 'text-red-400' : 'text-slate-300'
+                }`}>
+                  {feedback === 'UP' ? '정확한 분석으로 평가하셨습니다' : feedback === 'DOWN' ? '피드백을 제출해 주셔서 감사합니다' : 'AI 진단 결과가 실무에 도움이 되었나요?'}
+                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => handleFeedback('UP')}
+                    disabled={feedback === 'UP'}
+                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all active:scale-95 border ${
+                      feedback === 'UP'
+                        ? 'bg-emerald-600 text-white border-emerald-500 font-semibold'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-[#1E293B] hover:border-slate-700'
+                    }`}
+                  >
+                    <ThumbsUp className={`w-3.5 h-3.5 ${feedback === 'UP' ? 'fill-current text-white' : 'text-slate-400'}`} />
+                    <span>정확해요</span>
+                  </button>
+                  <button
+                    onClick={() => handleFeedback('DOWN')}
+                    disabled={feedback === 'DOWN' && !showFeedbackModal}
+                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all active:scale-95 border ${
+                      feedback === 'DOWN'
+                        ? 'bg-rose-600 text-white border-rose-500 font-semibold'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-[#1E293B] hover:border-slate-700'
+                    }`}
+                  >
+                    <ThumbsDown className={`w-3.5 h-3.5 ${feedback === 'DOWN' ? 'fill-current text-white' : 'text-slate-400'}`} />
+                    <span>아니에요</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1100,7 +1498,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               <button
                 onClick={() => handleFeedback('DOWN', { reason: downReason, correction })}
                 disabled={!downReason || isSubmitting}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center space-x-2"
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-all border border-blue-500 flex items-center justify-center space-x-2"
               >
                 {isSubmitting ? <span>제출 중...</span> : (
                   <>

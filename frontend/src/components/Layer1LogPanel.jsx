@@ -33,12 +33,12 @@ export default function Layer1LogPanel() {
   };
 
   if (loading && logs.length === 0) {
-    return <div className="h-48 bg-[#1a1f2e] rounded-3xl animate-pulse border border-white/5"></div>;
+    return <div className="h-48 bg-[#111827] rounded-3xl animate-pulse border border-slate-800"></div>;
   }
 
   return (
-    <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 shadow-xl overflow-hidden transition-all duration-300 mb-6">
-      <div className="p-6 border-b border-white/5 flex justify-between items-center">
+    <div className="bg-[#111827] rounded-3xl border border-slate-800 shadow-xl overflow-hidden transition-all duration-300 mb-6">
+      <div className="p-6 border-b border-slate-800 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="bg-emerald-600/20 p-2 rounded-xl">
             <Activity className="w-5 h-5 text-emerald-400" />
@@ -61,7 +61,7 @@ export default function Layer1LogPanel() {
           logs.map((log) => (
             <div 
               key={log.id}
-              className="bg-[#11141d] border border-white/5 rounded-2xl p-4 hover:border-emerald-500/30 transition-all cursor-pointer group"
+              className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-4 hover:border-slate-700 transition-all cursor-pointer group"
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2">
