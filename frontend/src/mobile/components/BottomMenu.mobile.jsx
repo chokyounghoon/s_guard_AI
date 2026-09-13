@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Keyboard, Bell, Phone, UserCircle, ShieldCheck, Lock, Trash2 } from 'lucide-react';
 import { getUserProfile, getAllowedPaths, addAuthListener } from '../../lib/authStore';
+import { useTheme } from '../../context/ThemeContext';
 import { toast } from 'react-hot-toast';
 
 export default function BottomMenu({ currentPath, activePopup, onClosePopups, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu, allowedPaths: _ignored }) {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -54,7 +56,11 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
   return (
     <>
       {/* Skeuomorphic Bottom Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-[250] bg-[#121212]/95 backdrop-blur-md border-t border-white/20 shadow-[0_-8px_30px_rgba(0,0,0,0.8)] flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden">
+      <nav className={`fixed bottom-0 left-0 right-0 z-[250] ${
+        isLight 
+          ? 'bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]' 
+          : 'bg-[#121212]/95 backdrop-blur-md border-t border-white/20 shadow-[0_-8px_30px_rgba(0,0,0,0.8)]'
+      } flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden`}>
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
           { id: 'chat', label: 'WAR-ROOM', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
@@ -83,19 +89,23 @@ export default function BottomMenu({ currentPath, activePopup, onClosePopups, on
                 }
               }}
               className={`flex flex-col items-center gap-1.5 px-2.5 py-1.5 rounded-2xl transition-all duration-300 relative min-w-[56px] active:scale-95 active:translate-y-0.5 ${
-                isActive ? 'skeuo-pill bg-[#00e5ff]/15 scale-105 shadow-[0_4px_20px_rgba(0,229,255,0.25)] border border-[#00e5ff]/40' : 'hover:bg-white/5 opacity-70 hover:opacity-100 border border-transparent'
+                isActive 
+                  ? (isLight 
+                      ? 'skeuo-pill bg-blue-50 scale-105 shadow-[0_2px_12px_rgba(0,70,255,0.15)] border border-blue-200' 
+                      : 'skeuo-pill bg-[#00e5ff]/15 scale-105 shadow-[0_4px_20px_rgba(0,229,255,0.25)] border border-[#00e5ff]/40') 
+                  : (isLight ? 'hover:bg-slate-100 opacity-70 hover:opacity-100 border border-transparent' : 'hover:bg-white/5 opacity-70 hover:opacity-100 border border-transparent')
               }`}
             >
               {isActive && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#00e5ff] rounded-full shadow-[0_0_12px_rgba(0,229,255,1)]" />
+                <span className={`absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full ${isLight ? 'bg-[#0046FF] shadow-[0_0_8px_rgba(0,70,255,0.8)]' : 'bg-[#00e5ff] shadow-[0_0_12px_rgba(0,229,255,1)]'}`} />
               )}
               <div className="relative">
-                <Icon className={`w-5 h-5 transition-all duration-300 ${isActive ? 'text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]' : 'text-slate-400'}`} />
+                <Icon className={`w-5 h-5 transition-all duration-300 ${isActive ? (isLight ? 'text-[#0046FF]' : 'text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]') : (isLight ? 'text-slate-400' : 'text-slate-400')}`} />
                 {item.isAi && showAiPulse && (
                   <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-[#ff2a2a] rounded-full border-2 border-[#121212] animate-pulse shadow-[0_0_8px_rgba(255,42,42,0.8)]" />
                 )}
               </div>
-              <span className={`text-[9px] font-black tracking-widest leading-none uppercase whitespace-nowrap ${isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+              <span className={`text-[9px] font-black tracking-widest leading-none uppercase whitespace-nowrap ${isActive ? (isLight ? 'text-[#0046FF]' : 'text-[#00e5ff]') : (isLight ? 'text-slate-500' : 'text-slate-500')}`}>
                 {item.label}
               </span>
             </button>

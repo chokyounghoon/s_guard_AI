@@ -2405,7 +2405,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               <div className={`p-4 sm:p-5 flex justify-between items-center ${isLight ? 'border-b border-[#E2E8F0] bg-white' : 'border-b border-[#1E2F56] bg-transparent'} shrink-0`}>
                   <div className="flex items-center gap-3.5">
                     <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
-                      <div className={`${isLight ? 'bg-blue-50 border border-blue-100' : 'bg-[#0046FF]/10 border border-[#1E2F56]'} p-2.5 rounded-xl shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
+                      <div className={`p-2.5 rounded-xl shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''} bg-[#0046FF]/15 border border-[#1E2F56]`}>
                         <MessageSquare className="w-5 h-5 text-[#0046FF]" />
                       </div>
                     </span>
@@ -2437,16 +2437,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     return (
                       <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all duration-500 ${
                         hasUnanalyzed 
-                          ? (isLight ? 'bg-blue-50 border-blue-200' : 'bg-blue-500/10 border-blue-500/30') 
-                          : (isLight ? 'bg-slate-100 border-slate-200 opacity-60' : 'bg-white/[0.03] border-[#1E293B] opacity-40')
+                          ? 'bg-blue-500/15 border-blue-500/30' 
+                          : 'bg-white/[0.04] border-[#1E293B] opacity-40'
                       }`}>
                         <span className="relative flex h-2 w-2">
                           {hasUnanalyzed && (
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
                           )}
-                          <span className={`relative inline-flex rounded-full h-2 w-2 ${hasUnanalyzed ? 'bg-blue-500' : (isLight ? 'bg-slate-400' : 'bg-slate-600')}`}></span>
+                          <span className={`relative inline-flex rounded-full h-2 w-2 ${hasUnanalyzed ? 'bg-blue-500' : 'bg-slate-500'}`}></span>
                         </span>
-                        <span className={`text-[10px] font-mono tracking-wider font-black ${hasUnanalyzed ? (isLight ? 'text-blue-700' : 'text-blue-400') : (isLight ? 'text-slate-500' : 'text-slate-500')}`}>
+                        <span className={`text-[10px] font-mono tracking-wider font-black ${hasUnanalyzed ? 'text-blue-400' : 'text-slate-400'}`}>
                           {hasUnanalyzed ? 'LIVE' : 'DONE'}
                         </span>
                       </div>
@@ -2783,12 +2783,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
                       <div className={`p-2.5 rounded-xl shrink-0 ${
                         isAiAnalyzing ? 'animate-pulse' : ''
-                      } ${
-                        isLight 
-                          ? 'bg-[#EFF6FF] border border-[#BFDBFE]' 
-                          : 'bg-[#0046FF]/10 border border-[#1E2F56]'
-                      }`}>
-                        <Sparkles className={`w-5 h-5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
+                      } bg-[#0046FF]/15 border border-[#1E2F56]`}>
+                        <Sparkles className="w-5 h-5 text-[#00A3E0]" />
                       </div>
                     </span>
                     <div className="min-w-0">
@@ -2796,14 +2792,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         <h3 className={`font-black text-base tracking-tight font-shinhan-display ${
                           isLight ? 'text-[#0F172A]' : 'text-white'
                         }`}>3. AI 진단 및 승인</h3>
-                        <span className={`text-[10px] font-bold font-mono ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>[Decision Exec]</span>
+                        <span className="text-[10px] font-bold font-mono text-[#00A3E0]">[Decision Exec]</span>
                         {selectedSms && (
-                          <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold animate-fadeIn ${
-                            isLight 
-                              ? 'bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]' 
-                              : 'bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-[#00A3E0]'} animate-pulse`} />
+                          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold animate-fadeIn bg-[#0046FF]/15 text-[#00A3E0] border border-[#0046FF]/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0] animate-pulse" />
                             PIPELINE SYNC
                           </span>
                         )}
@@ -2863,12 +2855,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   <span className={`data-ring-wrapper shrink-0 ${isFlowSpinning ? 'data-ring-spinning' : ''}`}>
                     <div className={`p-2.5 rounded-xl shrink-0 ${
                       isFlowSpinning ? 'animate-pulse' : ''
-                    } ${
-                      isLight 
-                        ? 'bg-[#EFF6FF] border border-[#BFDBFE]' 
-                        : 'bg-[#0046FF]/10 border border-[#1E2F56]'
-                    }`}>
-                      <Activity className={`w-5 h-5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
+                    } bg-[#0046FF]/15 border border-[#1E2F56]`}>
+                      <Activity className="w-5 h-5 text-[#00A3E0]" />
                     </div>
                   </span>
                   <div className="min-w-0 flex flex-col justify-center">
@@ -2876,14 +2864,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       <h3 className={`font-semibold text-lg sm:text-base tracking-tight whitespace-nowrap font-shinhan-display ${
                         isLight ? 'text-[#0F172A]' : 'text-white'
                       }`}>4. 전자금융 SLA</h3>
-                      <span className={`text-[10px] font-bold font-mono ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>[Incident Ops]</span>
+                      <span className="text-[10px] font-bold font-mono text-[#00A3E0]">[Incident Ops]</span>
                       {selectedSms && (
-                        <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-shinhan-num font-bold animate-fadeIn ${
-                          isLight 
-                            ? 'bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]' 
-                            : 'bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-[#0046FF]'}`} />
+                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-shinhan-num font-bold animate-fadeIn bg-[#0046FF]/15 text-[#00A3E0] border border-[#0046FF]/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0] animate-pulse" />
                           PIPELINE SYNC
                         </span>
                       )}
@@ -3087,23 +3071,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               </div>
                             </div>
 
-                            {/* 정제된 소요시간 게이지 (Activity Gauges) */}
-                            <div className={`py-6 xl:py-7 flex flex-col items-center justify-center border-b relative shrink-0 ${
-                              isLight ? 'border-[#E2E8F0] bg-white' : 'border-[#1E2F56] bg-transparent'
-                            }`}>
+                            {/* 정제된 소요시간 게이지 (Activity Gauges) - 라이트모드에서도 다크 콘솔 스타일 유지 */}
+                            <div className="py-6 xl:py-7 flex flex-col items-center justify-center border-b border-[#1E2F56] bg-[#060C1B] relative shrink-0">
                               <div className="flex flex-row items-center justify-center gap-6 xl:gap-10 px-4">
                                 
                                 {/* MTTA Gauge */}
                                 <div className="relative w-[130px] h-[130px] xl:w-[145px] xl:h-[145px] flex items-center justify-center shrink-0">
                                   <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
-                                    {/* 베이스 트랙: 라이트 모드 시 #E2E8F0 */}
-                                    <circle cx="90" cy="90" r="70" stroke={isLight ? "#E2E8F0" : "#1E2F56"} strokeWidth="8" fill="none" />
+                                    {/* 베이스 트랙: 다크 트랙 */}
+                                    <circle cx="90" cy="90" r="70" stroke="#1E2F56" strokeWidth="8" fill="none" />
                                     {/* 활성 프로그레스 */}
                                     <circle
                                       cx="90"
                                       cy="90"
                                       r="70"
-                                      stroke={isLight ? (isMttaClosed ? '#16A34A' : '#DC2626') : mttaRingColor}
+                                      stroke={mttaRingColor}
                                       strokeWidth="8"
                                       fill="none"
                                       strokeDasharray={circum}
@@ -3113,18 +3095,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                     />
                                   </svg>
                                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className={`text-[9px] font-semibold uppercase tracking-wider mb-0.5 font-shinhan-display ${
-                                      isLight ? 'text-slate-500' : 'text-slate-400'
-                                    }`}>MTTA TIMER</span>
-                                    <span className={`text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight ${
-                                      isLight ? 'text-[#0F172A]' : 'text-white'
-                                    }`}>
+                                    <span className="text-[9px] font-semibold uppercase tracking-wider mb-0.5 font-shinhan-display text-slate-400">MTTA TIMER</span>
+                                    <span className="text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight text-white">
                                       {formatDuration(mttaDurationMs)}
                                     </span>
                                     <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all font-shinhan-num ${
                                       isMttaClosed 
-                                        ? (isLight ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]') 
-                                        : (isLight ? 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]' : 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]')
+                                        ? 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]' 
+                                        : 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]'
                                     }`}>
                                       {isMttaClosed ? '인지 완료' : '긴급 대기'}
                                     </span>
@@ -3135,13 +3113,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 <div className="relative w-[130px] h-[130px] xl:w-[145px] xl:h-[145px] flex items-center justify-center shrink-0">
                                   <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
                                     {/* 베이스 트랙 */}
-                                    <circle cx="90" cy="90" r="70" stroke={isLight ? "#E2E8F0" : "#1E2F56"} strokeWidth="8" fill="none" />
+                                    <circle cx="90" cy="90" r="70" stroke="#1E2F56" strokeWidth="8" fill="none" />
                                     {/* 활성 프로그레스 */}
                                     <circle
                                       cx="90"
                                       cy="90"
                                       r="70"
-                                      stroke={isLight ? (isClosed ? '#16A34A' : isCritical ? '#DC2626' : isMajor ? '#D97706' : '#0046FF') : ringColor}
+                                      stroke={ringColor}
                                       strokeWidth="8"
                                       fill="none"
                                       strokeDasharray={circum}
@@ -3151,22 +3129,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                     />
                                   </svg>
                                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className={`text-[9px] font-semibold uppercase tracking-wider mb-0.5 font-shinhan-display ${
-                                      isLight ? 'text-slate-500' : 'text-slate-400'
-                                    }`}>MTTR TIMER</span>
-                                    <span className={`text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight ${
-                                      isLight ? 'text-[#0F172A]' : 'text-white'
-                                    }`}>
+                                    <span className="text-[9px] font-semibold uppercase tracking-wider mb-0.5 font-shinhan-display text-slate-400">MTTR TIMER</span>
+                                    <span className="text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight text-white">
                                       {formatDuration(durationMs)}
                                     </span>
                                     <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all font-shinhan-num ${
                                       isClosed 
-                                        ? (isLight ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]') 
+                                        ? 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]' 
                                         : isCritical 
-                                          ? (isLight ? 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]' : 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]') 
+                                          ? 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]' 
                                           : isMajor 
-                                            ? (isLight ? 'bg-[#FFFBEB] border-[#FDE68A] text-[#B45309]' : 'bg-[#F5A623]/10 border-[#F5A623]/40 text-[#F5A623]') 
-                                            : (isLight ? 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]' : 'bg-[#0046FF]/10 border-[#0046FF]/40 text-[#00A3E0]')
+                                            ? 'bg-[#F5A623]/10 border-[#F5A623]/40 text-[#F5A623]' 
+                                            : 'bg-[#0046FF]/10 border-[#0046FF]/40 text-[#00A3E0]'
                                     }`}>
                                       {isClosed ? '처리 완료' : '조치 진행중'}
                                     </span>
@@ -3176,40 +3150,26 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               </div>
 
                               {/* 전자금융감독규정 대응 골든타임 계측 기준 바 */}
-                              <div className={`mt-4 flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl w-full max-w-[340px] mx-auto text-[10px] font-shinhan-num shadow-sm ${
-                                isLight 
-                                  ? 'bg-[#F8FAFC] border border-[#E2E8F0]' 
-                                  : 'bg-[#060C1B] border border-[#1E2F56]'
-                              }`}>
-                                <div className={`flex items-center justify-between w-full pb-1 border-b text-[9.5px] ${
-                                  isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]/80'
-                                }`}>
-                                  <span className={`font-bold font-shinhan-display flex items-center gap-1 ${
-                                    isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'
-                                  }`}>
-                                    <Shield className={`w-3 h-3 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
+                              <div className="mt-4 flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl w-full max-w-[340px] mx-auto text-[10px] font-shinhan-num shadow-sm bg-[#060C1B] border border-[#1E2F56]">
+                                <div className="flex items-center justify-between w-full pb-1 border-b border-[#1E2F56]/80 text-[9.5px]">
+                                  <span className="font-bold font-shinhan-display flex items-center gap-1 text-[#00A3E0]">
+                                    <Shield className="w-3 h-3 text-[#00A3E0]" />
                                     전자금융감독규정 SLA 골든타임 기준
                                   </span>
-                                  <span className={isLight ? 'text-slate-400 font-semibold' : 'text-slate-400'}>FIN-SLA GOAL</span>
+                                  <span className="text-slate-400 font-semibold">FIN-SLA GOAL</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-1.5 w-full text-center text-[9px] pt-0.5">
-                                  <div className={`p-1 rounded ${
-                                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#13203E] border border-[#1E2F56]'
-                                  }`}>
-                                    <span className={isLight ? 'text-slate-500 block' : 'text-slate-400 block'}>장애 인지</span>
-                                    <span className={`${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'} font-bold`}>10분 이내</span>
+                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                                    <span className="text-slate-400 block">장애 인지</span>
+                                    <span className="text-[#00C48C] font-bold">10분 이내</span>
                                   </div>
-                                  <div className={`p-1 rounded ${
-                                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#13203E] border border-[#1E2F56]'
-                                  }`}>
-                                    <span className={isLight ? 'text-slate-500 block' : 'text-slate-400 block'}>상황 전파</span>
-                                    <span className={`${isLight ? 'text-[#B45309]' : 'text-[#F5A623]'} font-bold`}>30분 이내</span>
+                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                                    <span className="text-slate-400 block">상황 전파</span>
+                                    <span className="text-[#F5A623] font-bold">30분 이내</span>
                                   </div>
-                                  <div className={`p-1 rounded ${
-                                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#13203E] border border-[#1E2F56]'
-                                  }`}>
-                                    <span className={isLight ? 'text-slate-500 block' : 'text-slate-400 block'}>시스템 복구</span>
-                                    <span className={`${isLight ? 'text-[#0046FF]' : 'text-[#0046FF]'} font-bold`}>2시간 이내</span>
+                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
+                                    <span className="text-slate-400 block">시스템 복구</span>
+                                    <span className="text-[#00A3E0] font-bold">2시간 이내</span>
                                   </div>
                                 </div>
                               </div>

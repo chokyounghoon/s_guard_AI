@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.mobile.css'; // 📱 모바일 전용 CSS (PC/태블릿 index.css와 완전 독립)
 import MobileApp from './App.mobile.jsx';
+import { ThemeProvider } from '../context/ThemeContext';
 import { getAccessToken, setAccessToken, clearSession, getGhostToken, setGhostToken } from '../lib/authStore';
 
 console.log('🚀 [Mobile] S-Guard AI v1.2.0 - Performance Optimized & Cache Bypass Active');
@@ -117,7 +118,9 @@ window.fetch = async (...args) => {
 };
 
 ReactDOM.createRoot(document.getElementById('mobile-root')).render(
-  <MobileApp />
+  <ThemeProvider>
+    <MobileApp />
+  </ThemeProvider>
 );
 
 // 🕹️ S-Guard AI Mobile PWA Service Worker Registration

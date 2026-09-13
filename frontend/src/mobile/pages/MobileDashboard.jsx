@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Check, Download, Apple, SmartphoneNfc, ArrowRight, TrendingUp } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, BellDot, Cpu, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Check, Download, Apple, SmartphoneNfc, ArrowRight, TrendingUp, Sun, Moon } from 'lucide-react';
 import AgentDiscussionPanel from '../../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../../components/EmergencyActionModal';
 import AiInsightPanel from '../../components/AiInsightPanel';
@@ -10,6 +10,7 @@ import WarRoomChatPanel from '../../components/WarRoomChatPanel';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import AIInsightModal from '../../components/AIInsightModal';
 import { useCodebook } from '../../context/CodebookContext';
+import { useTheme } from '../../context/ThemeContext';
 import { getAccessToken, clearSession, getAuthHeaders, getUserProfile, getAllowedPaths, addAuthListener } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
 import { maskName, maskPhone, extractCleanErrorCount, formatOccurrenceCount } from '../../utils/maskingUtils';
@@ -442,6 +443,7 @@ function SelectWithOther({ label, icon: Icon, options, value, onChange, required
 
 // ── 메인 대시보드 컴포넌트 ───────────────────────
 export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
+  const { theme, toggleTheme, isLight } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -598,7 +600,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       .filter(msg => !hideCompletedSms || msg.incident_status !== '처리완료');
   }, [smsMessages, hideCompletedSms, deletedSmsIds]);
 
-  // 🎨 Active Theme: 선택된 SMS의 심각도에 맞게 전체 대시보드 테마 계산
+  // 🎨 Active Theme: 선택된 SMS의 심각도 및 라이트/다크 모드에 맞게 전체 대시보드 테마 계산
   const activeTheme = useMemo(() => {
     let sev = (selectedSms?.severity || 'NORMAL').toUpperCase();
     if (selectedSms && selectedSms.incident_status !== '처리완료' && selectedSms.incident_status !== 'Completed' && selectedSms.status !== '처리완료' && selectedSms.status !== 'Completed') {
@@ -613,27 +615,27 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       else if (v >= majT) sev = 'MAJOR';
     }
     if (sev === 'CRITICAL') return {
-      bg: '#151a28',
-      outlineActive: { border: '1px solid #ef4444', outline: 'none', boxShadow: 'none' },
-      outlineDim:   { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
+      bg: isLight ? '#FFFFFF' : '#151a28',
+      outlineActive: { border: '1px solid #ef4444', outline: 'none', boxShadow: isLight ? '0 4px 14px -2px rgba(239, 68, 68, 0.2)' : 'none' },
+      outlineDim:   { border: isLight ? '1px solid #E2E8F0' : '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
       accentColor: '#ef4444',
-      bodyBg: '#0B0F19',
+      bodyBg: isLight ? '#F1F5F9' : '#0B0F19',
     };
     if (sev === 'MAJOR') return {
-      bg: '#151a28',
-      outlineActive: { border: '1px solid #f97316', outline: 'none', boxShadow: 'none' },
-      outlineDim:   { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
+      bg: isLight ? '#FFFFFF' : '#151a28',
+      outlineActive: { border: '1px solid #f97316', outline: 'none', boxShadow: isLight ? '0 4px 14px -2px rgba(249, 115, 22, 0.2)' : 'none' },
+      outlineDim:   { border: isLight ? '1px solid #E2E8F0' : '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
       accentColor: '#f97316',
-      bodyBg: '#0B0F19',
+      bodyBg: isLight ? '#F1F5F9' : '#0B0F19',
     };
     return {
-      bg: '#111827',
-      outlineActive: { border: '1px solid #3b82f6', outline: 'none', boxShadow: 'none' },
-      outlineDim:   { border: '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
+      bg: isLight ? '#FFFFFF' : '#111827',
+      outlineActive: { border: '1px solid #3b82f6', outline: 'none', boxShadow: isLight ? '0 4px 14px -2px rgba(59, 130, 246, 0.2)' : 'none' },
+      outlineDim:   { border: isLight ? '1px solid #E2E8F0' : '1px solid #1E293B', outline: 'none', boxShadow: 'none' },
       accentColor: '#3b82f6',
-      bodyBg: '#0B0F19',
+      bodyBg: isLight ? '#F1F5F9' : '#0B0F19',
     };
-  }, [selectedSms, userProfile]);
+  }, [selectedSms, userProfile, isLight]);
 
   // 🚀 Auto-Reset: Clear other regions if no active incidents are visible
   useEffect(() => {
@@ -1796,20 +1798,20 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>
         </div>
       )}
-      <nav className="mobile-top-nav flex justify-between items-end px-2.5 sm:px-4 sticky top-0 z-[100]"
+      <nav className="mobile-top-nav flex justify-between items-end px-2.5 sm:px-4 sticky top-0 z-[100] transition-colors duration-300"
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingBottom: '12px',
           height: 'calc(62px + env(safe-area-inset-top, 0px))',
-          background: '#0B0F19',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)'
+          background: isLight ? '#FFFFFF' : '#0B0F19',
+          borderBottom: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: isLight ? '0 2px 10px rgba(0, 0, 0, 0.05)' : '0 4px 16px rgba(0, 0, 0, 0.5)'
         }}>
 
         {/* Left: logo + icon buttons */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button onClick={() => window.location.reload()}
-            className="text-sm sm:text-lg font-black tracking-widest uppercase text-slate-200 whitespace-nowrap font-mono flex items-center"
+            className={`text-sm sm:text-lg font-black tracking-widest uppercase whitespace-nowrap font-mono flex items-center ${isLight ? 'text-slate-900' : 'text-slate-200'}`}
             style={{ textShadow: 'none' }}
           >
             S-GUARD
@@ -1827,12 +1829,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   const isCompleted = incidentStatus === 'INC_003';
                   
                   const btnCls = (isCompleted || isProcessing)
-                    ? 'bg-[#121820] text-slate-300 border-white/15 shadow-sm font-bold'
+                    ? (isLight ? 'bg-slate-100 text-slate-700 border-slate-300 shadow-sm font-bold' : 'bg-[#121820] text-slate-300 border-white/15 shadow-sm font-bold')
                     : sev === 'CRITICAL'
-                    ? 'bg-red-500/20 text-red-400 border-red-500/40 animate-pulse font-black'
+                    ? 'bg-red-500/20 text-red-500 border-red-500/40 animate-pulse font-black'
                     : sev === 'MAJOR' || sev === 'WARNING'
-                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse font-black'
-                    : 'bg-blue-600/20 text-blue-400 border-blue-500/40 font-black';
+                    ? 'bg-amber-500/20 text-amber-500 border-amber-500/40 animate-pulse font-black'
+                    : 'bg-blue-600/20 text-blue-500 border-blue-500/40 font-black';
 
                   return (
                     <button
@@ -1846,7 +1848,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       className={`w-full flex items-center justify-center gap-1 py-1 sm:py-1.5 px-1.5 sm:px-2.5 rounded-lg font-black text-[9.5px] sm:text-[10px] tracking-tight transition-all border ${btnCls} disabled:opacity-50 whitespace-nowrap overflow-hidden shadow-md`}
                     >
                       {isOpeningWarRoom ? (
-                        <div className="w-2.5 h-2.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0" />
+                        <div className="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
                       ) : (
                         <Users size={11} className="shrink-0" />
                       )}
@@ -1874,38 +1876,50 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             }}
               disabled={!checkAllowed('/orbital-command')}
               onPointerDown={() => handleTooltipStart('Orbital Command')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative ${isLight ? 'hover:bg-slate-100 active:bg-slate-200' : 'hover:bg-white/10 active:bg-white/20'} transition-all cursor-pointer ${!checkAllowed('/orbital-command') ? 'opacity-30 cursor-not-allowed' : ''}`}
               style={{ background: 'transparent' }}>
-              <Cpu size={16} style={{ color: '#60a5fa' }} />
+              <Cpu size={16} style={{ color: isLight ? '#2563eb' : '#60a5fa' }} />
               {!checkAllowed('/orbital-command') && <Lock className="w-2.5 h-2.5 text-blue-400 absolute -top-1 -right-1" />}
             </button>
-
-
 
             {/* Threshold */}
             <button onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(!showThresholdSettings); }}
               onPointerDown={() => handleTooltipStart('Threshold')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer ${showThresholdSettings ? 'bg-white/10' : ''}`}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative ${isLight ? 'hover:bg-slate-100 active:bg-slate-200' : 'hover:bg-white/10 active:bg-white/20'} transition-all cursor-pointer ${showThresholdSettings ? (isLight ? 'bg-slate-200' : 'bg-white/10') : ''}`}
               style={{ background: 'transparent' }}>
-              <Settings size={16} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? '#60a5fa' : '#94a3b8', transition: 'transform 0.3s' }} />
+              <Settings size={16} className={showThresholdSettings ? 'rotate-45' : ''} style={{ color: showThresholdSettings ? (isLight ? '#2563eb' : '#60a5fa') : (isLight ? '#64748b' : '#94a3b8'), transition: 'transform 0.3s' }} />
+            </button>
+
+            {/* ☀️/🌙 Theme Toggle */}
+            <button 
+              onClick={toggleTheme}
+              onPointerDown={() => handleTooltipStart(isLight ? '다크 모드로 전환' : '라이트 모드로 전환')} 
+              onPointerUp={handleTooltipEnd} 
+              onPointerLeave={handleTooltipEnd}
+              aria-label="Toggle Theme"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer ${
+                isLight ? 'hover:bg-slate-100 active:bg-slate-200 text-amber-600' : 'hover:bg-white/10 active:bg-white/20 text-yellow-400'
+              }`}
+              style={{ background: 'transparent' }}>
+              {isLight ? <Moon size={16} className="text-slate-700" /> : <Sun size={16} className="text-amber-400" />}
             </button>
           </div>
 
           {/* AI Assistant */}
           <button onClick={onAiClick}
             onPointerDown={() => handleTooltipStart('AI Assistant')} onPointerUp={handleTooltipEnd} onPointerLeave={handleTooltipEnd}
-            className="w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative hover:bg-white/10 active:bg-white/20 transition-all cursor-pointer"
+            className={`w-8 h-8 rounded-xl flex items-center justify-center active:opacity-60 relative ${isLight ? 'hover:bg-slate-100 active:bg-slate-200' : 'hover:bg-white/10 active:bg-white/20'} transition-all cursor-pointer`}
             style={{ background: 'transparent' }}>
-            <Bot size={16} style={{ color: '#60a5fa' }} />
+            <Bot size={16} style={{ color: isLight ? '#2563eb' : '#60a5fa' }} />
           </button>
 
           <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 active:opacity-60 shrink-0 ml-0.5">
-            {userProfile && <span className="text-[11px] font-semibold text-slate-400 hidden sm:block">{userProfile.name}</span>}
+            {userProfile && <span className={`text-[11px] font-semibold hidden sm:block ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{userProfile.name}</span>}
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0"
-              style={{ border: '1px solid rgba(255,255,255,0.2)', background: '#1e293b' }}>
+              style={{ border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255,255,255,0.2)', background: isLight ? '#E2E8F0' : '#1e293b' }}>
               {userProfile?.profile_picture
                 ? <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
-                : <User size={14} className="text-slate-400" />}
+                : <User size={14} className={isLight ? 'text-slate-600' : 'text-slate-400'} />}
             </div>
           </button>
         </div>
@@ -2064,22 +2078,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         }}>
 
           {/* Panel header — 2-row mobile-optimised layout */}
-          <div className="flex flex-col border-b border-[#1E2F56] bg-[#0D162B]">
+          <div className={`flex flex-col border-b ${isLight ? 'border-[#E2E8F0] bg-white' : 'border-[#1E2F56] bg-[#0D162B]'}`}>
             {/* Row 1: Icon + Title + Live badge */}
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
               <div className="flex items-center gap-2 min-w-0">
-                <MessageSquare size={14} className="text-[#00A3E0] shrink-0" />
-                <span className="text-[13px] font-black text-slate-100 tracking-tight font-shinhan-display whitespace-nowrap">1. 원천 거래 관제</span>
-                <span className="text-[9px] font-bold text-[#00A3E0] font-mono bg-[#00A3E0]/10 border border-[#00A3E0]/30 px-1.5 py-0.5 rounded whitespace-nowrap">Signal Ingestion</span>
+                <MessageSquare size={14} className={isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'} />
+                <span className={`text-[13px] font-black tracking-tight font-shinhan-display whitespace-nowrap ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>1. 원천 거래 관제</span>
+                <span className={`text-[9px] font-bold font-mono px-1.5 py-0.5 rounded whitespace-nowrap ${isLight ? 'text-[#0046FF] bg-blue-50 border border-blue-200' : 'text-[#00A3E0] bg-[#00A3E0]/10 border border-[#00A3E0]/30'}`}>Signal Ingestion</span>
               </div>
-              {/* LIVE / DONE status */}
+              {/* LIVE / DONE status - 깜박이는 영역은 다크 글로우 스타일 유지 */}
               {(() => {
                 const isLive = smsMessages.length > 0 && smsMessages.some(m => !m.is_analyzed || Number(m.is_analyzed) === 0);
                 return (
                   <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold tracking-widest font-mono shrink-0 ${
                     isLive
-                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
-                      : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                      : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isLive ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
                     <span>{isLive ? 'LIVE' : 'ALL DONE'}</span>
@@ -2091,7 +2105,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             {/* Row 2: 건수 표시 + Done hide toggle */}
             <div className="flex items-center justify-between px-4 pb-2.5 gap-2">
               {/* SMS count badge */}
-              <span className="text-[10px] font-mono text-slate-500">
+              <span className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {visibleSms.length}건 수신
               </span>
 
@@ -2102,7 +2116,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-semibold transition-all active:scale-95 shrink-0 ${
                   hideCompletedSms
                     ? 'bg-[#0046FF] text-white border-[#0046FF]'
-                    : 'bg-[#060C1B] text-slate-400 border-[#1E2F56]'
+                    : (isLight ? 'bg-slate-100 text-slate-600 border-[#CBD5E1]' : 'bg-[#060C1B] text-slate-400 border-[#1E2F56]')
                 }`}
               >
                 <Eye size={10} />
@@ -2191,9 +2205,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     else { setSelectedSms(msg); selectedSmsRef.current = msg; setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
                   }}
                   className={`rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-2.5 relative overflow-hidden sms-snap-item shadow-sm border ${
-                    isSel 
-                      ? 'bg-[#13203E] border-[#0046FF] ring-1 ring-[#0046FF]' 
-                      : 'bg-[#0D162B] border-[#1E2F56] hover:border-slate-500'
+                    isLight
+                      ? (isSel 
+                          ? 'bg-blue-50/90 border-[#0046FF] ring-1 ring-[#0046FF]' 
+                          : 'bg-[#F8FAFC] border-[#E2E8F0] hover:border-slate-300')
+                      : (isSel 
+                          ? 'bg-[#13203E] border-[#0046FF] ring-1 ring-[#0046FF]' 
+                          : 'bg-[#0D162B] border-[#1E2F56] hover:border-slate-500')
                   }`}
                   style={{
                     borderLeftWidth: '4px',
@@ -2203,10 +2221,10 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     scrollMarginTop: '10px',
                   }}>
                   {/* Header: Notification Type & Severity */}
-                  <div className="flex items-center justify-between pb-2 border-b border-[#1E2F56]">
+                  <div className={`flex items-center justify-between pb-2 border-b ${isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]'}`}>
                     <div className="flex items-center gap-1.5 min-w-0">
                       {msg.keyword_detected ? <AlertCircle size={13} style={{ color: accentColor }} className="shrink-0" /> : <Info size={13} style={{ color: accentColor }} className="shrink-0" />}
-                      <span className="text-[11px] font-bold tracking-wide text-slate-200 uppercase font-shinhan-display truncate">
+                      <span className={`text-[11px] font-bold tracking-wide uppercase font-shinhan-display truncate ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                         {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'MANUAL' : 'SMS'}
                       </span>
                       {msg.severity && (
@@ -2217,7 +2235,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       )}
                     </div>
                     {/* 시간만 표시 (날짜 제거로 공간 절약) */}
-                    <span className="text-[10px] font-mono text-slate-500 shrink-0 ml-2">
+                    <span className={`text-[10px] font-mono shrink-0 ml-2 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                       {msg.timestamp ? String(formatYYMMDD(msg.timestamp)).slice(11, 19) : ''}
                     </span>
                   </div>
@@ -2226,13 +2244,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   {renderFormattedSMS(msg.message, msg.severity)}
 
                   {/* Sub Contents: Sender & Employee Chip */}
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 font-normal">
-                    <span>발신: <span className="font-mono text-slate-200 font-medium">{msg.sender}</span></span>
+                  <div className={`flex flex-wrap items-center gap-2 text-[11px] font-normal ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <span>발신: <span className={`font-mono font-medium ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{msg.sender}</span></span>
                     {msg.employee_id && (
                       <>
-                        <span className="text-slate-600">|</span>
+                        <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>|</span>
                         <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-lg font-mono shrink-0 flex items-center gap-1 shadow-sm"
-                          style={{ color: '#cbd5e1', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                          style={{ 
+                            color: isLight ? '#334155' : '#cbd5e1', 
+                            background: isLight ? '#EDF2F7' : 'rgba(255,255,255,0.08)', 
+                            border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255,255,255,0.15)' 
+                          }}>
                           👤 담당자: {msg.employee_id}{msg.sender_name && ` (${msg.sender_name})`}
                         </span>
                       </>
@@ -2240,7 +2262,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
 
                   {/* Footer / Right Action Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 mt-1 pt-3.5 border-t border-[#1E293B]">
+                  <div className={`flex flex-wrap items-center justify-between gap-y-3 gap-x-2 mt-1 pt-3.5 border-t ${isLight ? 'border-[#E2E8F0]' : 'border-[#1E293B]'}`}>
                     <div className="flex gap-2 items-center flex-wrap">
                       {msg.similarity_score != null && (() => {
                         const score = msg.similarity_score;
@@ -2382,23 +2404,33 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           backdropFilter: 'blur(20px)',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F56] bg-[#0D162B]">
+          <div className={`flex items-center justify-between px-5 py-4 border-b ${isLight ? 'border-[#E2E8F0] bg-white' : 'border-[#1E2F56] bg-[#0D162B]'}`}>
             <div className="flex items-center gap-2.5">
-              <Sparkles size={16} className="text-[#00A3E0]" />
+              <Sparkles size={16} className={isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'} />
               <div className="flex items-center gap-2">
-                <span className="text-[13px] font-black text-slate-100 uppercase tracking-tight font-shinhan-display">3. AI 진단 및 승인</span>
-                <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Decision Exec]</span>
+                <span className={`text-[13px] font-black uppercase tracking-tight font-shinhan-display ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>3. AI 진단 및 승인</span>
+                <span className={`text-[10px] font-bold font-mono ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>[Decision Exec]</span>
               </div>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setActiveLogTab('ai')}
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
-                style={{ background: activeLogTab === 'ai' ? 'rgba(59,130,246,0.15)' : 'transparent', color: activeLogTab === 'ai' ? '#60a5fa' : '#64748b', border: activeLogTab === 'ai' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', textShadow: 'none' }}>
+                style={{ 
+                  background: activeLogTab === 'ai' ? (isLight ? '#EFF6FF' : 'rgba(59,130,246,0.15)') : 'transparent', 
+                  color: activeLogTab === 'ai' ? (isLight ? '#1D4ED8' : '#60a5fa') : (isLight ? '#64748B' : '#64748b'), 
+                  border: activeLogTab === 'ai' ? (isLight ? '1px solid #93C5FD' : '1px solid #3b82f6') : (isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.15)'), 
+                  textShadow: 'none' 
+                }}>
                 AI
               </button>
               <button onClick={() => setActiveLogTab('human')}
                 className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ml-0.5 transition-all"
-                style={{ background: activeLogTab === 'human' ? 'rgba(59,130,246,0.15)' : 'transparent', color: activeLogTab === 'human' ? '#60a5fa' : '#64748b', border: activeLogTab === 'human' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', textShadow: 'none' }}>
+                style={{ 
+                  background: activeLogTab === 'human' ? (isLight ? '#EFF6FF' : 'rgba(59,130,246,0.15)') : 'transparent', 
+                  color: activeLogTab === 'human' ? (isLight ? '#1D4ED8' : '#60a5fa') : (isLight ? '#64748B' : '#64748b'), 
+                  border: activeLogTab === 'human' ? (isLight ? '1px solid #93C5FD' : '1px solid #3b82f6') : (isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.15)'), 
+                  textShadow: 'none' 
+                }}>
                 Chat
               </button>
               {(() => {
@@ -2406,9 +2438,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 const isLive = showAgentPanel && agentMessages.length > 0 && !isDone;
                 return (
                   <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg ml-1"
-                    style={{ border: `1px solid ${isDone ? 'rgba(16,185,129,0.3)' : isLive ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.15)'}`, background: isDone ? 'rgba(16,185,129,0.1)' : isLive ? 'rgba(245,158,11,0.1)' : 'transparent', boxShadow: 'none' }}>
+                    style={{ border: `1px solid ${isDone ? 'rgba(16,185,129,0.3)' : isLive ? 'rgba(245,158,11,0.4)' : isLight ? '#E2E8F0' : 'rgba(255,255,255,0.15)'}`, background: isDone ? 'rgba(16,185,129,0.1)' : isLive ? 'rgba(245,158,11,0.1)' : 'transparent', boxShadow: 'none' }}>
                     <span className="w-1.5 h-1.5 rounded-full" style={{ background: isDone ? '#10b981' : isLive ? '#f59e0b' : '#64748b', boxShadow: 'none' }} />
-                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#10b981' : isLive ? '#f59e0b' : '#94a3b8' }}>
+                    <span className="text-[9px] font-black tracking-widest" style={{ color: isDone ? '#10b981' : isLive ? '#f59e0b' : (isLight ? '#64748B' : '#94a3b8') }}>
                       {isDone ? 'DONE' : isLive ? 'LIVE' : 'IDLE'}
                     </span>
                   </div>
@@ -2475,12 +2507,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           overflow: 'hidden',
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F56] bg-[#0D162B]">
+          <div className={`flex items-center justify-between px-5 py-4 border-b ${isLight ? 'border-[#E2E8F0] bg-white' : 'border-[#1E2F56] bg-[#0D162B]'}`}>
             <div className="flex items-center gap-2.5">
-              <Activity size={16} className="text-[#00A3E0]" />
+              <Activity size={16} className={isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'} />
               <div className="flex items-center gap-2">
-                <span className="text-[13px] font-black text-slate-100 uppercase tracking-tight font-shinhan-display">4. 전자금융 SLA</span>
-                <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Incident Ops]</span>
+                <span className={`text-[13px] font-black uppercase tracking-tight font-shinhan-display ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>4. 전자금융 SLA</span>
+                <span className={`text-[10px] font-bold font-mono ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>[Incident Ops]</span>
               </div>
             </div>
             {isClosedFlow ? (
@@ -2571,7 +2603,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             return (
               <div className="flex flex-col">
                 {/* 가로 프로그레스 바 (Horizontal Stepper) */}
-                <div className="flex flex-col gap-y-2 px-4 py-5 bg-black/20 border-b border-[#1E293B] relative shrink-0">
+                <div className={`flex flex-col gap-y-2 px-4 py-5 ${isLight ? 'bg-slate-50/80 border-b border-[#E2E8F0]' : 'bg-black/20 border-b border-[#1E293B]'} relative shrink-0`}>
                   <div className="flex items-start justify-between w-full">
                     {steps.map((st, i) => {
                       const isDone = st.done;
@@ -2597,7 +2629,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                         : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 font-bold') 
                                     : isActive 
                                       ? 'bg-blue-600 text-white border-blue-500 font-bold' 
-                                      : 'bg-slate-900 text-slate-500 border-[#1E293B] font-medium'
+                                      : (isLight ? 'bg-white text-slate-400 border-slate-300 font-medium' : 'bg-slate-900 text-slate-500 border-[#1E293B] font-medium')
                                 }`}>
                                   {isDone ? <Check size={14} className="stroke-[2.5]" /> : i + 1}
                                 </div>
@@ -2606,7 +2638,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               {/* 스텝 라벨 */}
                               <div className="mt-2 text-center w-full px-0.5">
                                 <span className={`text-[10px] font-medium tracking-tight leading-tight whitespace-normal break-keep inline-block ${
-                                  isBottleneck ? 'text-amber-400 font-semibold' : isDone ? 'text-slate-200' : isActive ? 'text-blue-400 font-semibold' : 'text-slate-500'
+                                  isBottleneck ? 'text-amber-400 font-semibold' : isDone ? (isLight ? 'text-slate-800 font-semibold' : 'text-slate-200') : isActive ? (isLight ? 'text-[#0046FF] font-semibold' : 'text-blue-400 font-semibold') : (isLight ? 'text-slate-400' : 'text-slate-500')
                                 }`}>
                                   {st.label}
                                 </span>
