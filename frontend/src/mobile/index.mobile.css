@@ -267,11 +267,16 @@
 
 /* 3. Sub-surfaces & Nested Cards */
 [data-theme="light"] .sub-panel-card,
+[data-theme="light"] .bg-\[\#11141d\],
+[data-theme="light"] .bg-\[\#12151a\],
 [data-theme="light"] .bg-\[\#13203e\],
 [data-theme="light"] .bg-\[\#13203E\],
-[data-theme="light"] .bg-\[\#0f1422\] {
+[data-theme="light"] .bg-\[\#0f1422\],
+[data-theme="light"] .bg-white\/5,
+[data-theme="light"] .bg-white\/10 {
   background-color: var(--sh-surface-sub) !important;
   border-color: var(--sh-border-color) !important;
+  color: var(--sh-text-primary) !important;
 }
 
 /* 4. Sticky Headers */
@@ -293,20 +298,45 @@
   color: #0f172a !important;
 }
 
-/* 5. Typography — On light surfaces, turn text into high-contrast dark */
-[data-theme="light"] .bg-white,
-[data-theme="light"] .bg-slate-50,
-[data-theme="light"] .bg-slate-100,
-[data-theme="light"] .bg-slate-200 {
-  color: #0f172a;
+/* 5. Typography — High-Contrast Enterprise Light Theme */
+[data-theme="light"] .text-white:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+[data-theme="light"] .text-slate-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+[data-theme="light"] .text-slate-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+[data-theme="light"] .text-slate-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+[data-theme="light"] .text-zinc-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-zinc-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-zinc-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-gray-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-gray-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-gray-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-neutral-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-neutral-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+[data-theme="light"] .text-neutral-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]) {
+  color: #0f172a !important;
 }
 
-[data-theme="light"] .bg-white .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
-[data-theme="light"] .bg-slate-50 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
-[data-theme="light"] .bg-slate-100 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
-[data-theme="light"] .bg-slate-200 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
-[data-theme="light"] .skeuo-card .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]) {
-  color: #0f172a !important;
+[data-theme="light"] .text-slate-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary),
+[data-theme="light"] .text-zinc-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary),
+[data-theme="light"] .text-gray-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary),
+[data-theme="light"] .text-neutral-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary) {
+  color: #475569 !important;
+}
+
+/* 어두운 버튼이나 배지 내부의 텍스트는 흰색 보장 */
+[data-theme="light"] button[class*="bg-blue-"] *,
+[data-theme="light"] button[class*="bg-red-"] *,
+[data-theme="light"] button[class*="bg-emerald-"] *,
+[data-theme="light"] button[class*="bg-rose-"] *,
+[data-theme="light"] button[class*="bg-indigo-"] *,
+[data-theme="light"] button[class*="bg-purple-"] *,
+[data-theme="light"] .btn-primary *,
+[data-theme="light"] [class*="bg-blue-600"] *,
+[data-theme="light"] [class*="bg-blue-500"] *,
+[data-theme="light"] [class*="bg-indigo-600"] *,
+[data-theme="light"] [class*="bg-red-600"] *,
+[data-theme="light"] [class*="bg-rose-600"] *,
+[data-theme="light"] [class*="bg-emerald-600"] * {
+  color: #ffffff !important;
 }
 
 /* ══════════════════════════════════════════════════════════════════

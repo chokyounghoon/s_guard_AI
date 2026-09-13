@@ -352,154 +352,45 @@
   .bg-white\/5,
   .bg-white\/10,
   .bg-black\/20,
-  .bg-black\/30,
-  .bg-black\/40,
-  .bg-black\/50,
-  .bg-slate-800,
-  .bg-slate-800\/40,
-  .bg-slate-800\/60,
-  .bg-slate-800\/80,
-  .bg-slate-900,
-  .bg-slate-900\/40,
-  .bg-slate-900\/50,
-  .bg-slate-900\/80,
-  .bg-slate-950,
-  .bg-zinc-800,
-  .bg-zinc-900,
-  .bg-zinc-900\/40 {
-    background-color: var(--sh-surface-card) !important;
-    border-color: var(--sh-border-color) !important;
-    color: var(--sh-text-primary) !important;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03) !important;
-  }
-
-  /* Sub-surfaces & Nested Cards */
-  .sub-panel-card,
-  .bg-\[\#13203e\],
-  .bg-\[\#0f1422\] {
-    background-color: var(--sh-surface-sub) !important;
-    border-color: var(--sh-border-color) !important;
-  }
-
-  /* 4. Sticky Headers in Sub-Pages */
-  header,
-  [class*="sticky top-0"],
-  [class*="sticky"][class*="top-0"] {
-    background-color: rgba(255, 255, 255, 0.96) !important;
-    border-bottom: 1px solid var(--sh-border-color) !important;
-    color: var(--sh-text-primary) !important;
-  }
-
-  /* 5. Typography */
-  /* On light surfaces, switch light text classes to primary text */
-  .bg-white,
-  .bg-slate-50,
-  .bg-slate-100,
-  .bg-slate-200 {
-    color: #0f172a;
-  }
-
-  .bg-white .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]):not([class*="bg-indigo-600"]):not([class*="bg-indigo-500"]):not([class*="bg-emerald-500"]),
-  .bg-slate-50 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]):not([class*="bg-indigo-600"]):not([class*="bg-indigo-500"]):not([class*="bg-emerald-500"]),
-  .bg-slate-100 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]):not([class*="bg-indigo-600"]):not([class*="bg-indigo-500"]):not([class*="bg-emerald-500"]),
-  .bg-slate-200 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]):not([class*="bg-indigo-600"]):not([class*="bg-indigo-500"]):not([class*="bg-emerald-500"]),
-  .skeuo-card .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]):not([class*="bg-indigo-600"]):not([class*="bg-indigo-500"]):not([class*="bg-emerald-500"]),
-  .pc-modal-content .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]):not([class*="bg-indigo-600"]):not([class*="bg-indigo-500"]):not([class*="bg-emerald-500"]) {
+  /* 5. Typography — High-Contrast Enterprise Light Theme */
+  .text-white:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+  .text-slate-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+  .text-slate-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+  .text-slate-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
+  .text-zinc-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-zinc-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-zinc-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-gray-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-gray-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-gray-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-neutral-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-neutral-200:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]),
+  .text-neutral-300:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]) {
     color: #0f172a !important;
   }
 
-  /* 흰색/밝은 바탕 위에서 흐릿한 텍스트 가시성 보정 (어두운 카드에는 절대 적용되지 않도록 스코프 한정) */
-  .bg-white .text-slate-300,
-  .bg-slate-50 .text-slate-300,
-  .bg-white .text-slate-400,
-  .bg-slate-50 .text-slate-400 {
-    color: #334155 !important;
+  .text-slate-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary),
+  .text-zinc-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary),
+  .text-gray-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary),
+  .text-neutral-400:not(.font-mono):not([class*="bg-"]):not(.btn-primary) {
+    color: #475569 !important;
   }
 
-  /* ══════════════════════════════════════════════════════════════════
-     ⭐ 절대 가시성 보장 규칙: 검은색/어두운 바탕이면 글씨는 흰색, 하얀 바탕이면 검은색!
-     ══════════════════════════════════════════════════════════════════ */
-  :root:not([data-theme="light"]) .bg-black,
-  :root:not([data-theme="light"]) .bg-zinc-950,
-  :root:not([data-theme="light"]) .bg-zinc-900,
-  :root:not([data-theme="light"]) .bg-zinc-850,
-  :root:not([data-theme="light"]) .bg-zinc-800,
-  :root:not([data-theme="light"]) .bg-slate-950,
-  :root:not([data-theme="light"]) .bg-slate-900,
-  :root:not([data-theme="light"]) .bg-slate-850,
-  :root:not([data-theme="light"]) .bg-slate-800,
-  :root:not([data-theme="light"]) .bg-\[\#0b0e17\],
-  :root:not([data-theme="light"]) .bg-\[\#0b0e17\]\/50,
-  :root:not([data-theme="light"]) .bg-\[\#0c1020\],
-  :root:not([data-theme="light"]) .bg-\[\#121622\],
-  :root:not([data-theme="light"]) .bg-\[\#0f1422\],
-  :root:not([data-theme="light"]) .bg-\[\#161b2a\],
-  :root:not([data-theme="light"]) .bg-\[\#070b12\],
-  :root:not([data-theme="light"]) .bg-\[\#060C1B\],
-  :root:not([data-theme="light"]) .bg-\[\#13203E\],
-  .bg-blue-600,
-  .bg-blue-500,
-  .bg-indigo-600,
-  .bg-red-600,
-  .bg-red-500,
-  .bg-emerald-600,
-  .bg-purple-600 {
-    color: #f8fafc;
-  }
-
-  /* 어두운 배경 내부의 .text-white는 순백색 보장 */
-  :root:not([data-theme="light"]) .bg-black .text-white,
-  :root:not([data-theme="light"]) .bg-zinc-950 .text-white,
-  :root:not([data-theme="light"]) .bg-zinc-900 .text-white,
-  :root:not([data-theme="light"]) .bg-zinc-850 .text-white,
-  :root:not([data-theme="light"]) .bg-zinc-800 .text-white,
-  :root:not([data-theme="light"]) .bg-slate-950 .text-white,
-  :root:not([data-theme="light"]) .bg-slate-900 .text-white,
-  :root:not([data-theme="light"]) .bg-slate-800 .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#0b0e17\] .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#0b0e17\]\/50 .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#0c1020\] .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#121622\] .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#0f1422\] .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#161b2a\] .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#070b12\] .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-white,
-  :root:not([data-theme="light"]) .bg-\[\#13203E\] .text-white,
-  .bg-blue-600 .text-white,
-  .bg-blue-500 .text-white,
-  .bg-indigo-600 .text-white,
-  .bg-red-600 .text-white,
-  .bg-red-500 .text-white,
-  .bg-emerald-600 .text-white,
-  .bg-purple-600 .text-white {
+  /* 어두운 버튼이나 배지 내부의 텍스트는 흰색 보장 */
+  button[class*="bg-blue-"] *,
+  button[class*="bg-red-"] *,
+  button[class*="bg-emerald-"] *,
+  button[class*="bg-rose-"] *,
+  button[class*="bg-indigo-"] *,
+  button[class*="bg-purple-"] *,
+  .btn-primary *,
+  [class*="bg-blue-600"] *,
+  [class*="bg-blue-500"] *,
+  [class*="bg-indigo-600"] *,
+  [class*="bg-red-600"] *,
+  [class*="bg-rose-600"] *,
+  [class*="bg-emerald-600"] * {
     color: #ffffff !important;
-  }
-
-  :root:not([data-theme="light"]) .bg-black .text-slate-100, 
-  :root:not([data-theme="light"]) .bg-zinc-900 .text-slate-100, 
-  :root:not([data-theme="light"]) .bg-zinc-800 .text-slate-100, 
-  :root:not([data-theme="light"]) .bg-slate-900 .text-slate-100, 
-  :root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-100, 
-  :root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-100 {
-    color: #f1f5f9 !important;
-  }
-
-  :root:not([data-theme="light"]) .bg-black .text-slate-200, 
-  :root:not([data-theme="light"]) .bg-zinc-900 .text-slate-200, 
-  :root:not([data-theme="light"]) .bg-zinc-800 .text-slate-200, 
-  :root:not([data-theme="light"]) .bg-slate-900 .text-slate-200, 
-  :root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-200, 
-  :root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-200 {
-    color: #e2e8f0 !important;
-  }
-
-  :root:not([data-theme="light"]) .bg-black .text-slate-300, 
-  :root:not([data-theme="light"]) .bg-zinc-900 .text-slate-300, 
-  :root:not([data-theme="light"]) .bg-zinc-800 .text-slate-300, 
-  :root:not([data-theme="light"]) .bg-slate-900 .text-slate-300, 
-  :root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-300, 
-  :root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-300 {
-    color: #cbd5e1 !important;
   }
 
   /* 6. Borders & Dividers */
@@ -519,13 +410,13 @@
   .border-\[\#303030\],
   .border-\[\#333333\],
   .border-\[\#404040\] {
-    border-color: var(--sh-border-color) !important;
+    border-color: #cbd5e1 !important;
   }
 
   .divide-white\/5 > * + *,
   .divide-white\/10 > * + *,
   .divide-slate-800 > * + * {
-    border-color: var(--sh-border-color) !important;
+    border-color: #cbd5e1 !important;
   }
 
   /* 7. Inputs, Selects & Textareas */
@@ -534,7 +425,7 @@
   textarea {
     background-color: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
-    color: var(--sh-text-primary) !important;
+    color: #0f172a !important;
   }
 
   input::placeholder,
@@ -555,13 +446,97 @@
   button.bg-white\/10 {
     background-color: #f1f5f9 !important;
     border-color: #e2e8f0 !important;
-    color: var(--sh-text-primary) !important;
+    color: #0f172a !important;
   }
 
   button.bg-white\/5:hover,
   button.bg-white\/10:hover {
     background-color: #e2e8f0 !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ⭐ 다크 테마 가시성 보장 규칙 (Light 테마 블록 외부)
+   ══════════════════════════════════════════════════════════════════ */
+:root:not([data-theme="light"]) .bg-black,
+:root:not([data-theme="light"]) .bg-zinc-950,
+:root:not([data-theme="light"]) .bg-zinc-900,
+:root:not([data-theme="light"]) .bg-zinc-850,
+:root:not([data-theme="light"]) .bg-zinc-800,
+:root:not([data-theme="light"]) .bg-slate-950,
+:root:not([data-theme="light"]) .bg-slate-900,
+:root:not([data-theme="light"]) .bg-slate-850,
+:root:not([data-theme="light"]) .bg-slate-800,
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\],
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\]\/50,
+:root:not([data-theme="light"]) .bg-\[\#0c1020\],
+:root:not([data-theme="light"]) .bg-\[\#121622\],
+:root:not([data-theme="light"]) .bg-\[\#0f1422\],
+:root:not([data-theme="light"]) .bg-\[\#161b2a\],
+:root:not([data-theme="light"]) .bg-\[\#070b12\],
+:root:not([data-theme="light"]) .bg-\[\#060C1B\],
+:root:not([data-theme="light"]) .bg-\[\#13203E\],
+.bg-blue-600,
+.bg-blue-500,
+.bg-indigo-600,
+.bg-red-600,
+.bg-red-500,
+.bg-emerald-600,
+.bg-purple-600 {
+  color: #f8fafc;
+}
+
+:root:not([data-theme="light"]) .bg-black .text-white,
+:root:not([data-theme="light"]) .bg-zinc-950 .text-white,
+:root:not([data-theme="light"]) .bg-zinc-900 .text-white,
+:root:not([data-theme="light"]) .bg-zinc-850 .text-white,
+:root:not([data-theme="light"]) .bg-zinc-800 .text-white,
+:root:not([data-theme="light"]) .bg-slate-950 .text-white,
+:root:not([data-theme="light"]) .bg-slate-900 .text-white,
+:root:not([data-theme="light"]) .bg-slate-800 .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\]\/50 .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0c1020\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#121622\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0f1422\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#161b2a\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#070b12\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-white,
+.bg-blue-600 .text-white,
+.bg-blue-500 .text-white,
+.bg-indigo-600 .text-white,
+.bg-red-600 .text-white,
+.bg-red-500 .text-white,
+.bg-emerald-600 .text-white,
+.bg-purple-600 .text-white {
+  color: #ffffff !important;
+}
+
+:root:not([data-theme="light"]) .bg-black .text-slate-100, 
+:root:not([data-theme="light"]) .bg-zinc-900 .text-slate-100, 
+:root:not([data-theme="light"]) .bg-zinc-800 .text-slate-100, 
+:root:not([data-theme="light"]) .bg-slate-900 .text-slate-100, 
+:root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-100, 
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-100 {
+  color: #f1f5f9 !important;
+}
+
+:root:not([data-theme="light"]) .bg-black .text-slate-200, 
+:root:not([data-theme="light"]) .bg-zinc-900 .text-slate-200, 
+:root:not([data-theme="light"]) .bg-zinc-800 .text-slate-200, 
+:root:not([data-theme="light"]) .bg-slate-900 .text-slate-200, 
+:root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-200, 
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+:root:not([data-theme="light"]) .bg-black .text-slate-300, 
+:root:not([data-theme="light"]) .bg-zinc-900 .text-slate-300, 
+:root:not([data-theme="light"]) .bg-zinc-800 .text-slate-300, 
+:root:not([data-theme="light"]) .bg-slate-900 .text-slate-300, 
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-300 {
+  color: #cbd5e1 !important;
 }
 
 /* ── 📱 Mobile Typography & Fluid Typography Standards (HIG & Material Design) ── */
