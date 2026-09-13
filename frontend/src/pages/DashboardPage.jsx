@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, RotateCcw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Cpu, BellDot, Keyboard, Network, BookOpen, Layers, Save, Apple, Download, ArrowRight, Check, TrendingUp } from 'lucide-react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, Search, Bell, Menu, User, ChevronRight, ChevronUp, Zap, Shield, Database, Sparkles, MessageSquare, Brain, MoreHorizontal, RefreshCw, RotateCcw, Info, X, BarChart2, Hash, Users, LogIn, AlertCircle, Home, Phone, Building2, IdCard, ChevronDown, BarChart3, FileText, Settings, LogOut, ExternalLink, CheckCircle2, Filter, Lock, Eye, EyeOff, Calendar, Camera, Bot, Cpu, BellDot, Keyboard, Network, BookOpen, Layers, Save, Apple, Download, ArrowRight, Check, TrendingUp, Sun, Moon } from 'lucide-react';
 import AgentDiscussionPanel from '../components/AgentDiscussionPanel';
 import EmergencyActionModal from '../components/EmergencyActionModal';
 import AiInsightPanel from '../components/AiInsightPanel';
@@ -10,9 +10,10 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import AIInsightModal from '../components/AIInsightModal';
 import BottomMenu from '../components/BottomMenu';
 import { useCodebook } from '../context/CodebookContext';
+import { useTheme } from '../context/ThemeContext';
 import { getAccessToken, clearSession, getAuthHeaders, getUserProfile, getAllowedPaths, addAuthListener } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
-import { maskName, maskEmail, maskPhone } from '../utils/maskingUtils';
+import { maskName, maskEmail, maskPhone, extractCleanErrorCount, formatOccurrenceCount } from '../utils/maskingUtils';
 
 const SHINHAN_COMPANIES = [
   '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
@@ -62,6 +63,11 @@ const parseSMS = (message) => {
 const cleanValue = (val) => {
   if (!val) return '';
   let cleaned = val.trim();
+
+  // 감싸고 있는 최외곽 대괄호 [ ... ] 안전하게 벗기기
+  if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
   
   const match = cleaned.match(/^\[(.*?)\](.*)$/);
   if (match) {
@@ -86,16 +92,20 @@ const cleanValue = (val) => {
     } else {
       cleaned = formattedInside;
     }
+  } else {
+    if (/^\d{8}$/.test(cleaned)) {
+      cleaned = `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
+    }
   }
   
   return cleaned;
 };
 
-const renderFormattedSMS = (message, severity) => {
+const renderFormattedSMS = (message, severity, isLight = false) => {
   const parsed = parseSMS(message);
   if (!parsed) {
     return (
-      <div className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
+      <div className={`text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap ${isLight ? 'text-slate-900' : 'text-[#ffffff]'} tracking-tight`}>
         {message}
       </div>
     );
@@ -104,15 +114,21 @@ const renderFormattedSMS = (message, severity) => {
   const { title, items } = parsed;
   const sev = String(severity || '').toUpperCase();
   
-  let headerBg = 'bg-blue-500/10 border-blue-500/20 text-blue-400';
-  let bulletColor = 'bg-blue-400';
+  let headerBg = isLight 
+    ? 'bg-blue-50 border-blue-200 text-blue-700'
+    : 'bg-blue-500/10 border-blue-500/20 text-blue-400';
+  let bulletColor = isLight ? 'bg-blue-600' : 'bg-blue-400';
   
   if (sev === 'CRITICAL') {
-    headerBg = 'bg-red-500/10 border-red-500/20 text-red-400';
-    bulletColor = 'bg-red-500';
+    headerBg = isLight
+      ? 'bg-red-50 border-red-200 text-red-700'
+      : 'bg-red-500/10 border-red-500/20 text-red-400';
+    bulletColor = isLight ? 'bg-red-600' : 'bg-red-500';
   } else if (sev === 'MAJOR' || sev === 'WARNING' || sev === 'HIGH') {
-    headerBg = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
-    bulletColor = 'bg-amber-500';
+    headerBg = isLight
+      ? 'bg-amber-50 border-amber-200 text-amber-800'
+      : 'bg-amber-500/10 border-amber-500/20 text-amber-400';
+    bulletColor = isLight ? 'bg-amber-600' : 'bg-amber-500';
   }
 
   // 📊 마이크로 데이터 시각화 (Micro Data Visualization) 메트릭 추출
@@ -152,7 +168,7 @@ const renderFormattedSMS = (message, severity) => {
   const hasRateGauge = currentRate !== null || thresholdRate !== null;
 
   return (
-    <div className="flex flex-col gap-2 w-full text-slate-200">
+    <div className={`flex flex-col gap-2 w-full ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
       {title && (
         <div className={`text-[13px] font-black border px-3 py-2 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
           <span className={`w-2 h-2 rounded-full animate-pulse ${bulletColor}`} />
@@ -162,20 +178,24 @@ const renderFormattedSMS = (message, severity) => {
 
       {/* 📊 마이크로 시각화 카드: 오류율 미니 게이지 바 + Delta 증감율 뱃지 */}
       {hasRateGauge && (
-        <div className="bg-[#13203E] border border-[#1E2F56] rounded-xl p-2.5 space-y-2 mb-0.5 shadow-sm">
+        <div className={`${isLight ? 'bg-[#F8FAFC] border border-[#E2E8F0] shadow-xs' : 'bg-[#13203E] border border-[#1E2F56] shadow-sm'} rounded-xl p-2.5 sm:p-3 space-y-2 mb-0.5`}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-[#F04438] shrink-0" />
-              <span className="text-[11px] font-bold text-slate-300">오류율 임계치 분석</span>
+              <TrendingUp className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${isLight ? 'text-[#DC2626]' : 'text-[#F04438]'} shrink-0`} />
+              <span className={`text-xs sm:text-[11px] font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>오류율 임계치 분석</span>
             </div>
 
-            {/* Delta 뱃지 (▲ Red 부각) */}
+            {/* Delta 뱃지 */}
             {rateDelta !== null && rateDelta > 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black font-shinhan-num bg-[#F04438]/15 text-[#F04438] border border-[#F04438]/30">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs sm:text-[10px] font-black font-shinhan-num ${
+                isLight ? 'bg-[#FEE2E2] text-[#DC2626] border border-[#FECACA]' : 'bg-[#F04438]/15 text-[#F04438] border border-[#F04438]/30'
+              }`}>
                 ▲ +{rateDelta.toFixed(1)}%p 초과
               </span>
             ) : rateDelta !== null && rateDelta <= 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-shinhan-num bg-[#00C48C]/15 text-[#00C48C] border border-[#00C48C]/30">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs sm:text-[10px] font-bold font-shinhan-num ${
+                isLight ? 'bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]' : 'bg-[#00C48C]/15 text-[#00C48C] border border-[#00C48C]/30'
+              }`}>
                 ▼ {rateDelta.toFixed(1)}%p 안정
               </span>
             ) : null}
@@ -183,28 +203,28 @@ const renderFormattedSMS = (message, severity) => {
 
           {/* 수평 미니 프로그레스 게이지 바 */}
           <div className="space-y-1">
-            <div className="flex justify-between items-baseline text-[10px] font-shinhan-num">
-              <span className="text-[#94A3B8]">
-                기준 임계치: <strong className="text-slate-300 font-semibold">{thresholdRate !== null ? `${thresholdRate}%` : '30%'}</strong>
+            <div className="flex justify-between items-baseline text-xs sm:text-[10px] font-shinhan-num">
+              <span className={isLight ? 'text-slate-500' : 'text-[#94A3B8]'}>
+                기준 임계치: <strong className={`${isLight ? 'text-slate-800' : 'text-slate-300'} font-semibold`}>{thresholdRate !== null ? `${thresholdRate}%` : '30%'}</strong>
               </span>
-              <span className="text-[#F04438] font-bold">
-                현재 오류율: <strong className="text-[#F04438] text-xs font-black">{currentRate !== null ? `${currentRate}%` : '87.5%'}</strong>
+              <span className={`${isLight ? 'text-[#DC2626]' : 'text-[#F04438]'} font-bold`}>
+                현재 오류율: <strong className={`${isLight ? 'text-[#DC2626]' : 'text-[#F04438]'} text-sm sm:text-xs font-black`}>{currentRate !== null ? `${currentRate}%` : '87.5%'}</strong>
               </span>
             </div>
 
-            <div className="relative h-2.5 w-full bg-[#060C1B] rounded-full overflow-hidden border border-[#1E2F56]">
-              {/* 기준 임계치 마커 라인 (차분한 슬레이트 그레이) */}
+            <div className={`relative h-2.5 w-full ${isLight ? 'bg-[#E2E8F0] border border-[#CBD5E1]' : 'bg-[#060C1B] border border-[#1E2F56]'} rounded-full overflow-hidden`}>
+              {/* 기준 임계치 마커 라인 */}
               {thresholdRate !== null && (
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-[#94A3B8] z-10"
+                  className={`absolute top-0 bottom-0 w-0.5 ${isLight ? 'bg-slate-400' : 'bg-[#94A3B8]'} z-10`}
                   style={{ left: `${Math.min(100, Math.max(0, thresholdRate))}%` }}
                   title={`임계치 ${thresholdRate}%`}
                 />
               )}
-              {/* 현재 오류율 프로그레스 바 (#F04438 선명한 대비) */}
+              {/* 현재 오류율 프로그레스 바 (#EF4444 산뜻한 코랄 레드) */}
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
-                  rateDelta !== null && rateDelta > 0 ? 'bg-[#F04438]' : 'bg-[#0046FF]'
+                  rateDelta !== null && rateDelta > 0 ? (isLight ? 'bg-[#EF4444]' : 'bg-[#F04438]') : 'bg-[#0046FF]'
                 }`}
                 style={{ width: `${Math.min(100, Math.max(0, currentRate || 87.5))}%` }}
               />
@@ -213,15 +233,15 @@ const renderFormattedSMS = (message, severity) => {
 
           {/* 건수 비교 행 */}
           {(curCount !== null || avgCount !== null) && (
-            <div className="flex items-center justify-between pt-1 border-t border-[#1E2F56] text-[10px] font-shinhan-num">
-              <span className="text-slate-400">
-                비교기간 평균: <span className="text-slate-200 font-semibold">{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
+            <div className={`flex items-center justify-between pt-1.5 border-t ${isLight ? 'border-slate-200' : 'border-[#1E2F56]'} text-xs sm:text-[10px] font-shinhan-num`}>
+              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+                비교기간 평균: <span className={`${isLight ? 'text-slate-700' : 'text-slate-200'} font-semibold`}>{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
               </span>
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-400">현재:</span>
-                <span className="text-[#F04438] font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>현재:</span>
+                <span className={`${isLight ? 'text-[#DC2626]' : 'text-[#F04438]'} font-bold`}>{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
                 {countDelta !== null && countDelta > 0 && (
-                  <span className="text-[9px] font-bold text-[#F04438] bg-[#F04438]/10 px-1 py-0.2 rounded border border-[#F04438]/20">
+                  <span className={`text-[11px] sm:text-[9px] font-bold ${isLight ? 'text-[#DC2626] bg-[#FEE2E2] border border-[#FECACA]' : 'text-[#F04438] bg-[#F04438]/10 border border-[#F04438]/20'} px-1.5 py-0.5 rounded`}>
                     ▲ +{countDelta.toLocaleString()}건
                   </span>
                 )}
@@ -231,9 +251,10 @@ const renderFormattedSMS = (message, severity) => {
         </div>
       )}
 
-      <div className="bg-[#13203E]/50 border border-[#1E2F56] rounded-xl overflow-hidden p-2.5 grid grid-cols-[auto_auto] gap-x-5 gap-y-1.5 items-start">
+      {/* 📋 정보 그리드: 모바일에서는 1열 스택(Stack), 태블릿/데스크톱은 2열 그리드 */}
+      <div className={`${isLight ? 'bg-[#F8FAFC] border border-[#E2E8F0]' : 'bg-[#0B132B]/60 border border-[#1E2F56]'} rounded-xl overflow-hidden p-2 sm:p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 items-stretch`}>
         {items.map((item, idx) => {
-          const isError = item.key.includes('오류') || item.key.includes('초과');
+          const isError = item.key.includes('오류') || item.key.includes('초과') || item.key.includes('에러');
           let cleanedVal = cleanValue(item.value);
           if (item.key === '거래집계일시') {
             const timeMatch = cleanedVal.match(/\d{2}:\d{2}:\d{2}/);
@@ -244,34 +265,84 @@ const renderFormattedSMS = (message, severity) => {
           
           if (!item.value) {
             return (
-              <div key={idx} className="col-span-2 text-[11px] font-bold text-slate-400 bg-[#060C1B]/80 -mx-2.5 px-2.5 py-1 border-y border-[#1E2F56]">
-                {item.key}
+              <div key={idx} className={`col-span-1 sm:col-span-2 text-xs sm:text-[11px] font-bold ${isLight ? 'text-[#0046FF] bg-blue-50/70 border-y border-blue-100' : 'text-[#00A3E0] bg-[#060C1B] border-y border-[#1E2F56]'} -mx-2 px-3 py-1.5 flex items-center gap-1.5 font-shinhan-display`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-[#00A3E0]'}`} />
+                <span>{item.key}</span>
               </div>
             );
           }
 
-          // MCI / TMS 전문 인터페이스 코드 식별 (SHB02681, CSL99922A, IF 등)
-          const isInterfaceCode = item.key.includes('인터페이스') || item.key.includes('IF') || item.key.includes('코드') || /SHB\w+|CSL\w+/i.test(cleanedVal);
+          const k = item.key.replace(/\s+/g, '');
+          const isRecipients = k.includes('수신자') || k.includes('담당자');
+          const isErrorMessage = k.includes('에러메시지') || k.includes('오류메시지') || k.includes('오류내용') || k.includes('상세');
+          const isInterfaceCode = k.includes('인터페이스') || k.includes('IF') || k.includes('코드') || /SHB\w+|CSL\w+/i.test(cleanedVal);
           
+          const totalLength = item.key.length + cleanedVal.length;
+          const isFullWidth = isRecipients || isErrorMessage || k.includes('서비스명') || k.includes('IF명') || totalLength > 18 || cleanedVal.length > 13;
+
+          // 1. 수신자 명단
+          if (isRecipients) {
+            const names = cleanedVal.split(/[,，\s]+/).map(n => n.trim()).filter(Boolean);
+            return (
+              <div key={idx} className={`col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg ${isLight ? 'bg-white border border-[#E2E8F0] shadow-xs' : 'bg-[#060C1B]/80 border border-[#1E2F56]/70'} text-xs sm:text-[11px]`}>
+                <div className={`flex items-center gap-1.5 ${isLight ? 'text-slate-600' : 'text-slate-400'} font-bold text-[13px] sm:text-[10.5px]`}>
+                  <Users className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-[#0046FF] shrink-0" />
+                  <span>{item.key}</span>
+                  <span className={`text-xs sm:text-[9.5px] ${isLight ? 'text-slate-400' : 'text-slate-500'} font-mono font-normal`}>({names.length}명)</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {names.map((name, nIdx) => (
+                    <span key={nIdx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${isLight ? 'bg-slate-100 border border-slate-200 text-slate-700' : 'bg-[#13203E] border border-[#1E2F56] text-slate-200'} text-xs sm:text-[10px] font-semibold`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-blue-400/80'}`} />
+                      {maskName(name)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          // 2. 에러 / 장애 메시지
+          if (isErrorMessage) {
+            return (
+              <div key={idx} className={`col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg ${isLight ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-red-500/[0.08] border border-red-500/30'} text-xs sm:text-[11px]`}>
+                <div className={`flex items-center gap-1.5 ${isLight ? 'text-red-700 font-bold' : 'text-red-300 font-bold'} text-[13px] sm:text-[10.5px]`}>
+                  <AlertTriangle className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${isLight ? 'text-red-600' : 'text-red-400'} shrink-0 animate-pulse`} />
+                  <span>{item.key}</span>
+                </div>
+                <div className={`text-[13.5px] sm:text-[11.5px] font-bold ${isLight ? 'text-red-900 border-l-2 border-red-400' : 'text-red-200 border-l-2 border-red-500/40'} break-all leading-relaxed pl-2`}>
+                  {cleanedVal}
+                </div>
+              </div>
+            );
+          }
+
+          // 3. 서비스명 등 단독 전체 너비
+          if (isFullWidth) {
+            return (
+              <div key={idx} className={`col-span-1 sm:col-span-2 flex items-start justify-between gap-2 px-3 py-2 rounded-lg ${isLight ? 'bg-white border border-[#E2E8F0] shadow-xs' : 'bg-[#060C1B]/60 border border-[#1E2F56]/60'} text-xs sm:text-[11px]`}>
+                <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] sm:text-[10.5px] pt-0.5 ${highlight ? (isLight ? 'text-red-600' : 'text-red-300') : (isLight ? 'text-slate-500' : 'text-slate-400')}`}>
+                  {item.key}
+                </span>
+                <span className={`font-shinhan-num text-right font-bold break-all leading-snug text-[13.5px] sm:text-[11px] ${highlight ? (isLight ? 'text-red-700 font-black' : 'text-red-400') : (isLight ? 'text-slate-900' : 'text-slate-100')}`} title={cleanedVal}>
+                  {cleanedVal}
+                </span>
+              </div>
+            );
+          }
+
+          // 4. 일반 컴팩트 항목 (모바일에서는 1열 스택으로 넓게 확보)
           return (
-            <div key={idx} className="flex items-start gap-1 text-[11px] leading-tight min-w-0">
-              <span className={`font-bold shrink-0 whitespace-nowrap ${highlight ? 'text-red-300' : 'text-slate-400'}`}>
-                {item.key}:
+            <div key={idx} className={`col-span-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg ${isLight ? 'bg-white border border-[#E2E8F0] shadow-xs' : 'bg-[#060C1B]/60 border border-[#1E2F56]/60'} text-xs sm:text-[11px] min-w-0`}>
+              <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] sm:text-[10.5px] ${highlight ? (isLight ? 'text-red-600' : 'text-red-300') : (isLight ? 'text-slate-500' : 'text-slate-400')}`}>
+                {item.key}
               </span>
               {isInterfaceCode ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-[#00A3E0] font-mono font-bold text-[11px] tracking-tight">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded ${isLight ? 'bg-blue-50 border border-blue-200 text-[#0046FF]' : 'bg-[#0046FF]/10 border border-[#0046FF]/30 text-[#00A3E0]'} font-mono font-bold text-xs sm:text-[10.5px] truncate`}>
                   {cleanedVal}
                 </span>
               ) : (
-                <span className={`font-shinhan-num text-left ${
-                  item.key.includes('메시지') || 
-                  item.key.includes('수신자') || 
-                  item.key.includes('노드') || 
-                  item.key.includes('건수') || 
-                  item.key.includes('명')
-                    ? 'break-all'
-                    : 'whitespace-nowrap'
-                } ${highlight ? 'text-red-400 font-black' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
+                <span className={`font-shinhan-num text-right text-[13.5px] sm:text-[11px] truncate ${highlight ? (isLight ? 'text-red-700 font-bold' : 'text-red-400 font-bold') : (isLight ? 'text-slate-900 font-semibold' : 'text-slate-100 font-semibold')}`} title={cleanedVal}>
                   {cleanedVal}
                 </span>
               )}
@@ -383,8 +454,9 @@ const parseDate = (val) => {
 
 export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const navigate = useNavigate();
+  const { theme, toggleTheme, isLight } = useTheme();
 
-  // authStore를 직접 구독하여 다른 킭/칬믁에서 권한 변경 시 즉시 반영
+  // authStore를 직접 구독하여 다른 컴포넌트에서 권한 변경 시 즉시 반영
   const [liveAllowedPaths, setLiveAllowedPaths] = useState(() => getAllowedPaths());
   useEffect(() => {
     const remove = addAuthListener(({ allowedPaths: newPaths }) => {
@@ -459,6 +531,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [isFlowSpinning, setIsFlowSpinning] = useState(false);
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
   const [smsRefreshCounter, setSmsRefreshCounter] = useState(0);
+  const [mobileColumnTab, setMobileColumnTab] = useState('col1'); // 'col1' | 'col2' | 'col3' | 'col4'
 
   // MTTR 타이머 실시간 동기화
   useEffect(() => {
@@ -1518,6 +1591,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     setActiveLogTab('ai');
     setSelectedIncidentIdFlow(incident.inc_id);
 
+    // 📱 모바일 환경에서 인시던트 선택 시 상세 AI 진단(col3) 탭으로 자동 전환하여 세부 리포트 확인 지원
+    if (typeof window !== 'undefined' && window.innerWidth < 1024 && source === 'col1') {
+      setMobileColumnTab('col3');
+    }
+
     // 1번 컬럼 스크롤 포커스 동기화 (2번 칩이나 외부에서 호출된 경우)
     if (source !== 'col1') {
       setTimeout(() => {
@@ -1843,63 +1921,71 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         }
       } catch {}
 
-      let v = Number(selectedSms.received_count) || Number(selectedSms.occurrence_count) || 1;
-      
-      if (selectedSms.message) {
-        const m = selectedSms.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
-        if (m) {
-          const parsedV = parseInt(m[1], 10);
-          if (parsedV > v) v = parsedV;
-        }
-      }
+      let v = extractCleanErrorCount(selectedSms);
 
       if (v >= cT) sev = 'CRITICAL';
       else if (v >= majT) sev = 'MAJOR';
     }
 
-    // 🏢 신한 디지털 금융 관제 표준: 크로스 컬럼 파이프라인 활성 액센트 테두리 (#0046FF / #1E2F56)
-    const pipelineOutlineActive = { 
-      border: '1px solid #0046FF', 
-      outline: 'none', 
-      boxShadow: '0 0 16px -2px rgba(0, 70, 255, 0.22)' 
-    };
-    const pipelineOutlineDim = { 
-      border: '1px solid #1E2F56', 
-      outline: 'none', 
-      boxShadow: 'none' 
-    };
+    // 🏢 신한 디지털 금융 관제 표준: 크로스 컬럼 파이프라인 활성 액센트 테두리
+    const pipelineOutlineActive = isLight
+      ? { 
+          border: '1.5px solid #0046FF', 
+          outline: 'none', 
+          boxShadow: '0 4px 14px -2px rgba(0, 70, 255, 0.16)' 
+        }
+      : { 
+          border: '1px solid #0046FF', 
+          outline: 'none', 
+          boxShadow: '0 0 16px -2px rgba(0, 70, 255, 0.22)' 
+        };
+    const pipelineOutlineDim = isLight
+      ? { 
+          border: '1px solid #E2E8F0', 
+          outline: 'none', 
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' 
+        }
+      : { 
+          border: '1px solid #1E2F56', 
+          outline: 'none', 
+          boxShadow: 'none' 
+        };
+
+    const currentBgStyle = isLight 
+      ? { background: '#F1F5F9' } 
+      : { background: '#060C1B' };
 
     if (sev === 'CRITICAL') {
       return {
-        bgStyle: { background: '#060C1B' },
-        gradientFrom: 'from-[#0D162B]',
-        gradientTo: 'to-[#060C1B]',
+        bgStyle: currentBgStyle,
+        gradientFrom: isLight ? 'from-slate-100' : 'from-[#0D162B]',
+        gradientTo: isLight ? 'to-slate-200' : 'to-[#060C1B]',
         borderColorActive: '',
         borderColorDim: '',
         shadowActive: '',
         shadowDim: '',
         outlineActive: pipelineOutlineActive,
         outlineDim:   pipelineOutlineDim,
-        accentColor: 'text-[#F04438]',
+        accentColor: isLight ? 'text-[#DC2626]' : 'text-[#F04438]',
       };
     } else if (sev === 'MAJOR') {
       return {
-        bgStyle: { background: '#060C1B' },
-        gradientFrom: 'from-[#0D162B]',
-        gradientTo: 'to-[#060C1B]',
+        bgStyle: currentBgStyle,
+        gradientFrom: isLight ? 'from-slate-100' : 'from-[#0D162B]',
+        gradientTo: isLight ? 'to-slate-200' : 'to-[#060C1B]',
         borderColorActive: '',
         borderColorDim: '',
         shadowActive: '',
         shadowDim: '',
         outlineActive: pipelineOutlineActive,
         outlineDim:   pipelineOutlineDim,
-        accentColor: 'text-[#F5A623]',
+        accentColor: isLight ? 'text-[#D97706]' : 'text-[#F5A623]',
       };
     }
     return {
-      bgStyle: { background: '#060C1B' },
-      gradientFrom: 'from-[#0D162B]',
-      gradientTo: 'to-[#060C1B]',
+      bgStyle: currentBgStyle,
+      gradientFrom: isLight ? 'from-slate-100' : 'from-[#0D162B]',
+      gradientTo: isLight ? 'to-slate-200' : 'to-[#060C1B]',
       borderColorActive: '',
       borderColorDim: '',
       shadowActive: '',
@@ -1908,23 +1994,23 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
       outlineDim:   pipelineOutlineDim,
       accentColor: 'text-[#0046FF]',
     };
-  }, [selectedSms, userProfile]);
+  }, [selectedSms, userProfile, isLight]);
 
   return (
     <>
-    <div className={`h-screen overflow-hidden text-white font-sans relative flex flex-col${isSmsSpinning || isAiAnalyzing || isFlowSpinning ? ' hud-fetching' : ''} transition-colors duration-1000`} style={activeTheme.bgStyle}>
+    <div className={`h-screen overflow-hidden ${isLight ? 'text-slate-900 bg-[#F1F5F9]' : 'text-white bg-[#060C1B]'} font-sans relative flex flex-col${isSmsSpinning || isAiAnalyzing || isFlowSpinning ? ' hud-fetching' : ''} transition-colors duration-500`} style={activeTheme.bgStyle}>
       {/* 헤더 접힘 상태일 때 좌상단 플로팅 버튼 */}
       {isNavCollapsed && (
         <div className="fixed top-3 left-4 z-50">
           <button onClick={() => setIsNavCollapsed(false)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0D162B]/95 border border-[#1E2F56] hover:border-[#0046FF]/50 transition-all shadow-xl group">
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${isLight ? 'bg-white/95 border border-[#E2E8F0] text-slate-700' : 'bg-[#0D162B]/95 border border-[#1E2F56] text-slate-400'} hover:border-[#0046FF]/50 transition-all shadow-xl group`}>
             <div className="w-5 h-5 rounded-md bg-[#0046FF] flex items-center justify-center font-bold text-xs text-white">S</div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white rotate-180" />
+            <ChevronDown className="w-3.5 h-3.5 group-hover:text-blue-500 rotate-180 transition-colors" />
           </button>
         </div>
       )}
       {/* Top Navigation */}
-      <nav className={`flex flex-col bg-[#0D162B] border-b border-[#1E2F56] sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'block'}`}>
+      <nav className={`flex flex-col ${isLight ? 'bg-white border-b border-[#E2E8F0] text-slate-800 shadow-xs' : 'bg-[#0D162B] border-b border-[#1E2F56] text-white'} sticky top-0 z-30 ${isNavCollapsed ? 'hidden' : 'block'} transition-colors duration-300`}>
 
         {/* ── 1행: 로고 + 설정버튼 + 우측액션 ── */}
         <div className="flex items-center gap-3 px-5 py-3">
@@ -1935,27 +2021,27 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               className="flex items-center cursor-pointer group shrink-0"
               onClick={() => window.location.reload()}
             >
-              <span className="text-lg font-black tracking-widest group-hover:text-[#00A3E0] transition-colors uppercase font-shinhan-display">S-GUARD <span className="text-[#0046FF]">AI</span></span>
+              <span className={`text-lg font-black tracking-widest ${isLight ? 'text-slate-900' : 'text-white'} group-hover:text-[#00A3E0] transition-colors uppercase font-shinhan-display`}>S-GUARD <span className="text-[#0046FF]">AI</span></span>
             </div>
 
             <button
               onClick={(e) => { e.stopPropagation(); setShowThresholdSettings(v => !v); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 ${
                 showThresholdSettings
-                  ? 'bg-blue-600/15 border-blue-500/40'
-                  : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20'
+                  ? (isLight ? 'bg-blue-50 border-blue-200' : 'bg-blue-600/15 border-blue-500/40')
+                  : (isLight ? 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300' : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20')
               }`}
               title="유사도 임계값 설정"
             >
               <Settings className={`w-3.5 h-3.5 shrink-0 transition-all ${
-                showThresholdSettings ? 'text-blue-400 rotate-45' : 'text-slate-400'
+                showThresholdSettings ? (isLight ? 'text-blue-600 rotate-45' : 'text-blue-400 rotate-45') : (isLight ? 'text-slate-500' : 'text-slate-400')
               } ${isSavingThreshold ? 'animate-spin' : ''}`} />
               <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
-                showThresholdSettings ? 'text-blue-400' : 'text-slate-400'
+                showThresholdSettings ? (isLight ? 'text-blue-600' : 'text-blue-400') : (isLight ? 'text-slate-600' : 'text-slate-400')
               }`}>Technical threshold</span>
-              <span className="text-[9px] text-slate-600">/</span>
+              <span className={`text-[9px] ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>/</span>
               <span className={`text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${
-                showThresholdSettings ? 'text-purple-400' : 'text-slate-400'
+                showThresholdSettings ? (isLight ? 'text-purple-600' : 'text-purple-400') : (isLight ? 'text-slate-600' : 'text-slate-400')
               }`}>Casual Match Strictness</span>
             </button>
 
@@ -1965,13 +2051,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 onClick={() => navigate('/s-callert')}
                 className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 group"
                 style={{
-                  background: 'rgba(251,146,60,0.06)',
-                  border: '1px solid rgba(251,146,60,0.25)',
+                  background: isLight ? 'rgba(251,146,60,0.1)' : 'rgba(251,146,60,0.06)',
+                  border: isLight ? '1px solid rgba(251,146,60,0.35)' : '1px solid rgba(251,146,60,0.25)',
                 }}
                 title="S-callert PDS 자동호출"
               >
-                <Phone className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors" style={{ filter: 'drop-shadow(0 0 4px rgba(251,146,60,0.5))' }} />
-                <span className="text-[9px] font-black uppercase tracking-wide text-orange-400 group-hover:text-orange-300 transition-colors whitespace-nowrap">S-callert</span>
+                <Phone className="w-3.5 h-3.5 text-orange-500 group-hover:text-orange-600 transition-colors" />
+                <span className="text-[9px] font-black uppercase tracking-wide text-orange-600 group-hover:text-orange-700 transition-colors whitespace-nowrap">S-callert</span>
               </button>
             )}
           </div>
@@ -1980,46 +2066,70 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
           {/* 우: 액션 */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* ☀️ / 🌙 Shinhan Clean Enterprise Theme Switcher */}
+            <button
+              onClick={toggleTheme}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none active:scale-95 shadow-xs ${
+                isLight 
+                  ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700' 
+                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
+              }`}
+              title={isLight ? '야간 다크 모드로 전환 (현재: 라이트 모드)' : '주간 라이트 모드로 전환 (현재: 다크 모드)'}
+            >
+              {isLight ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-500 animate-in spin-in-180 duration-300" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 hidden sm:inline-block">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-blue-400 animate-in spin-in-180 duration-300" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-300 hidden sm:inline-block">Dark</span>
+                </>
+              )}
+            </button>
+
             <div
-              className={`p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group ${isRefreshing ? 'opacity-50' : ''}`}
+              className={`p-2 rounded-xl ${isLight ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-white/5 text-slate-400'} transition-all cursor-pointer group ${isRefreshing ? 'opacity-50' : ''}`}
               onClick={handleManualRefresh}
               title="데이터 새로고침"
             >
-              <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+              <RefreshCw className={`w-5 h-5 ${isLight ? 'text-slate-600 group-hover:text-blue-600' : 'text-slate-400 group-hover:text-blue-400'} transition-all ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
             </div>
+
             <button
               onClick={onAiClick}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+              className={`p-2 rounded-xl ${isLight ? 'bg-purple-50 border border-purple-200 hover:bg-purple-100' : 'bg-white/5 border border-white/10 hover:bg-white/10'} transition-colors cursor-pointer`}
             >
               <Bot size={16} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
             </button>
             <div
-              className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-1 px-2 rounded-xl transition-colors group"
+              className={`flex items-center gap-2 cursor-pointer ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/5'} p-1 px-2 rounded-xl transition-colors group`}
               onClick={() => setShowProfileModal(true)}
             >
               {userProfile && (
-                <span className="text-xs font-bold text-slate-300 hidden sm:inline-block group-hover:text-blue-400">
+                <span className={`text-xs font-bold ${isLight ? 'text-slate-700 group-hover:text-blue-600' : 'text-slate-300 group-hover:text-blue-400'} hidden sm:inline-block`}>
                   {userProfile.name}
                 </span>
               )}
-              <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all">
+              <div className={`w-8 h-8 ${isLight ? 'bg-slate-200 border-slate-300' : 'bg-slate-700/50 border-white/10'} rounded-full flex items-center justify-center border overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all`}>
                 {userProfile?.profile_picture ? (
                   <img src={userProfile.profile_picture} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <User className="w-5 h-5 text-slate-300 group-hover:text-blue-400" />
+                  <User className={`w-5 h-5 ${isLight ? 'text-slate-600 group-hover:text-blue-600' : 'text-slate-300 group-hover:text-blue-400'}`} />
                 )}
               </div>
             </div>
 
             <button onClick={() => setIsNavCollapsed(true)}
-              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
-              <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white" />
+              className={`p-1.5 rounded-lg ${isLight ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-400'} transition-all group`}>
+              <ChevronDown className={`w-4 h-4 ${isLight ? 'text-slate-600 group-hover:text-slate-900' : 'text-slate-400 group-hover:text-white'}`} />
             </button>
           </div>
         </div>
 
         {/* ── 2행: PC/태블릿 전용 메뉴 링크 (lg 이상) ── */}
-        <div className="hidden lg:flex items-stretch border-t border-white/5">
+        <div className={`hidden lg:flex items-stretch ${isLight ? 'border-t border-slate-200 bg-slate-50/70' : 'border-t border-white/5 bg-transparent'}`}>
           {[
             { label: 'Realtime Pipeline', icon: Layers,    path: '/realtime-pipeline',      color: '#00e5ff' },
             { label: 'Orbital Command', icon: Cpu,         path: '/orbital-command',        color: '#06b6d4' },
@@ -2054,12 +2164,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 }}
                 disabled={!allowed}
                 className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-bold transition-all relative
-                  ${idx < arr.length - 1 ? 'border-r border-white/5' : ''}
+                  ${idx < arr.length - 1 ? (isLight ? 'border-r border-slate-200' : 'border-r border-white/5') : ''}
                   ${!allowed
-                    ? 'opacity-25 cursor-not-allowed text-slate-600'
+                    ? (isLight ? 'opacity-25 cursor-not-allowed text-slate-400' : 'opacity-25 cursor-not-allowed text-slate-600')
                     : isActive
-                      ? 'bg-white/8 text-white'
-                      : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+                      ? (isLight ? 'bg-white text-slate-900 shadow-xs' : 'bg-white/8 text-white')
+                      : (isLight ? 'text-slate-600 hover:bg-white hover:text-slate-900' : 'text-slate-500 hover:bg-white/5 hover:text-slate-300')
                   }`}
                 style={{ color: isActive ? item.color : undefined }}
                 title={!allowed ? '접근 권한 없음' : item.label}
@@ -2229,23 +2339,53 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             );
           })()}
 
+          {/* 📱 모바일 전용 4개 컬럼 세그먼트 탭 (Segmented Control) */}
+          <div className="flex lg:hidden items-center gap-1.5 p-1.5 mb-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 shrink-0 sticky top-0 z-30 backdrop-blur-md shadow-xs">
+            {[
+              { id: 'col1', label: '1. 수신내역', icon: MessageSquare },
+              { id: 'col2', label: '2. 지식대조', icon: Database },
+              { id: 'col3', label: '3. AI진단', icon: Sparkles },
+              { id: 'col4', label: '4. SLA현황', icon: Activity },
+            ].map((tab) => {
+              const TabIcon = tab.icon;
+              const isActive = mobileColumnTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMobileColumnTab(tab.id)}
+                  className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-center whitespace-nowrap active:scale-98 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-500/20'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <TabIcon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr_1.35fr_1fr] gap-4 h-full min-h-0">
 
           {/* ── 1/4: 원천 거래 관제 [Shinhan Signal] ── */}
-          <div className="flex flex-col h-full min-h-0 overflow-hidden">
+          <div className={`${mobileColumnTab === 'col1' ? 'flex' : 'hidden'} lg:flex flex-col h-full min-h-0 overflow-hidden`}>
           {/* 실시간 SMS 수신 내역 패널 */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-          <div className="bg-[#0D162B] rounded-2xl h-full overflow-hidden flex flex-col relative transition-all duration-300 border border-[#1E2F56]">
-              <div className="p-4 sm:p-5 flex justify-between items-center border-b border-[#1E2F56] shrink-0">
+          <div className={`rounded-2xl h-full overflow-hidden flex flex-col relative transition-all duration-300 ${
+            isLight ? 'bg-white border border-[#E2E8F0] shadow-sm shinhan-column-card' : 'bg-[#0D162B] border border-[#1E2F56] shinhan-column-card'
+          }`} style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
+              <div className={`p-4 sm:p-5 flex justify-between items-center ${isLight ? 'border-b border-[#E2E8F0] bg-white' : 'border-b border-[#1E2F56] bg-transparent'} shrink-0`}>
                   <div className="flex items-center gap-3.5">
                     <span className={`data-ring-wrapper shrink-0 ${isSmsSpinning ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-[#0046FF]/10 p-2.5 rounded-xl border border-[#1E2F56] shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
-                        <MessageSquare className="w-5 h-5 text-[#00A3E0]" />
+                      <div className={`${isLight ? 'bg-blue-50 border border-blue-100' : 'bg-[#0046FF]/10 border border-[#1E2F56]'} p-2.5 rounded-xl shrink-0 ${isSmsSpinning ? 'animate-pulse' : ''}`}>
+                        <MessageSquare className="w-5 h-5 text-[#0046FF]" />
                       </div>
                     </span>
                     <div>
-                      <h3 className="font-black text-white text-base tracking-tight font-shinhan-display">1. 원천 거래 관제</h3>
-                      <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Shinhan Signal]</span>
+                      <h3 className={`font-black ${isLight ? 'text-slate-900' : 'text-white'} text-lg sm:text-base tracking-tight font-shinhan-display`}>1. 원천 거래 관제</h3>
+                      <span className="text-[10px] font-bold text-[#0046FF] font-mono">[Signal Ingestion]</span>
                     </div>
                   </div>
                 <div className="flex items-center gap-2 sm:gap-4">
@@ -2257,27 +2397,30 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     }}
                     className="flex items-center gap-2 cursor-pointer group select-none"
                   >
-                    <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${hideCompletedSms ? 'text-blue-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${hideCompletedSms ? (isLight ? 'text-blue-600' : 'text-blue-400') : 'text-slate-400'}`}>
                       Hide Done
                     </span>
-                    <div className={`w-10 h-5 rounded-full p-1 transition-all duration-300 relative ${hideCompletedSms ? 'bg-blue-600' : 'bg-slate-800'}`}>
+                    <div className={`w-10 h-5 rounded-full p-1 transition-all duration-300 relative ${hideCompletedSms ? 'bg-blue-600' : (isLight ? 'bg-slate-300' : 'bg-slate-800')}`}>
                       <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-md ${hideCompletedSms ? 'translate-x-5' : 'translate-x-0'}`} />
                     </div>
                   </div>
-
 
                   {/* LIVE: is_analyzed=0 → Dify 미처리(깜빡), 1이상 → 처리완료(DONE) */}
                   {(() => {
                     const hasUnanalyzed = smsMessages.length > 0 && smsMessages.some(m => !m.is_analyzed || Number(m.is_analyzed) === 0);
                     return (
-                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all duration-500 ${hasUnanalyzed ? 'bg-blue-500/10 border-blue-500/30' : 'bg-white/[0.03] border-[#1E293B] opacity-40'}`}>
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all duration-500 ${
+                        hasUnanalyzed 
+                          ? (isLight ? 'bg-blue-50 border-blue-200' : 'bg-blue-500/10 border-blue-500/30') 
+                          : (isLight ? 'bg-slate-100 border-slate-200 opacity-60' : 'bg-white/[0.03] border-[#1E293B] opacity-40')
+                      }`}>
                         <span className="relative flex h-2 w-2">
                           {hasUnanalyzed && (
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
                           )}
-                          <span className={`relative inline-flex rounded-full h-2 w-2 ${hasUnanalyzed ? 'bg-blue-400' : 'bg-slate-600'}`}></span>
+                          <span className={`relative inline-flex rounded-full h-2 w-2 ${hasUnanalyzed ? 'bg-blue-500' : (isLight ? 'bg-slate-400' : 'bg-slate-600')}`}></span>
                         </span>
-                        <span className={`text-[10px] font-mono tracking-wider font-black ${hasUnanalyzed ? 'text-blue-400' : 'text-slate-500'}`}>
+                        <span className={`text-[10px] font-mono tracking-wider font-black ${hasUnanalyzed ? (isLight ? 'text-blue-700' : 'text-blue-400') : (isLight ? 'text-slate-500' : 'text-slate-500')}`}>
                           {hasUnanalyzed ? 'LIVE' : 'DONE'}
                         </span>
                       </div>
@@ -2287,42 +2430,42 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               </div>
 
               {/* 🛠️ similarity Threshold Control Panel */}
-              <div className={`transition-all duration-500 ease-in-out bg-[#0f172a]/80 border-y border-[#1E293B] ${showThresholdSettings ? 'max-h-64 opacity-100 p-6' : 'max-h-0 opacity-0 overflow-hidden py-0'}`}>
+              <div className={`transition-all duration-500 ease-in-out ${isLight ? 'bg-slate-50 border-y border-[#E2E8F0]' : 'bg-[#0f172a]/80 border-y border-[#1E293B]'} ${showThresholdSettings ? 'max-h-64 opacity-100 p-6' : 'max-h-0 opacity-0 overflow-hidden py-0'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-sky-400" />
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">Technical threshold</span>
+                        <Zap className="w-4 h-4 text-sky-500" />
+                        <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'} uppercase tracking-wider`}>Technical threshold</span>
                       </div>
-                      <span className="text-xs font-mono font-black text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">{(thresholds.technical * 100).toFixed(0)}%</span>
+                      <span className={`text-xs font-mono font-black ${isLight ? 'text-sky-700 bg-sky-100 border-sky-200' : 'text-sky-400 bg-sky-500/10 border-sky-500/20'} px-2 py-0.5 rounded border`}>{(thresholds.technical * 100).toFixed(0)}%</span>
                     </div>
                     <input 
                       type="range" min="0.5" max="1.0" step="0.01" 
                       value={thresholds.technical}
                       onChange={(e) => setThresholds(prev => ({ ...prev, technical: parseFloat(e.target.value) }))}
                       onMouseUp={() => updateThreshold('similarity_threshold_technical', thresholds.technical)}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                      className="w-full h-1.5 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-sky-600"
                     />
-                    <p className="text-[10px] text-slate-500 leading-relaxed italic">장애 키워드가 포함된 문자의 지식베이스 매칭 강도를 조절합니다.</p>
+                    <p className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-500'} leading-relaxed italic`}>장애 키워드가 포함된 문자의 지식베이스 매칭 강도를 조절합니다.</p>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-purple-400" />
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">Casual Match Strictness</span>
+                        <MessageSquare className="w-4 h-4 text-purple-500" />
+                        <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'} uppercase tracking-wider`}>Casual Match Strictness</span>
                       </div>
-                      <span className="text-xs font-mono font-black text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">{(thresholds.casual * 100).toFixed(0)}%</span>
+                      <span className={`text-xs font-mono font-black ${isLight ? 'text-purple-700 bg-purple-100 border-purple-200' : 'text-purple-400 bg-purple-500/10 border-purple-500/20'} px-2 py-0.5 rounded border`}>{(thresholds.casual * 100).toFixed(0)}%</span>
                     </div>
                     <input 
                       type="range" min="0.7" max="1.0" step="0.01" 
                       value={thresholds.casual}
                       onChange={(e) => setThresholds(prev => ({ ...prev, casual: parseFloat(e.target.value) }))}
                       onMouseUp={() => updateThreshold('similarity_threshold_casual', thresholds.casual)}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      className="w-full h-1.5 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-purple-600"
                     />
-                    <p className="text-[10px] text-slate-500 leading-relaxed italic">일상적인 대화(키워드 없음)가 지식베이스와 오탐지되는 것을 방지합니다.</p>
+                    <p className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-500'} leading-relaxed italic`}>일상적인 대화(키워드 없음)가 지식베이스와 오탐지되는 것을 방지합니다.</p>
                   </div>
                 </div>
               </div>
@@ -2375,15 +2518,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           onClick={() => handleSelectIncident(msg, 'col1')}
                           style={{
                             scrollSnapAlign: 'start',
-                            background: isSelected
-                              ? (isCritical ? 'rgba(239,68,68,0.12)' : isMaj ? 'rgba(249,115,22,0.12)' : 'rgba(59,130,246,0.12)')
-                              : (isCritical ? 'rgba(239,68,68,0.04)' : isMaj ? 'rgba(249,115,22,0.04)' : '#0B0F19'),
-                            border: isSelected
-                              ? `1px solid ${accentColor}`
-                              : '1px solid #1E293B',
+                            background: isLight
+                              ? (isSelected
+                                  ? (isCritical ? '#FEF2F2' : isMaj ? '#FFFBEB' : '#EFF6FF')
+                                  : '#FFFFFF')
+                              : (isSelected
+                                  ? (isCritical ? 'rgba(239,68,68,0.12)' : isMaj ? 'rgba(249,115,22,0.12)' : 'rgba(59,130,246,0.12)')
+                                  : (isCritical ? 'rgba(239,68,68,0.04)' : isMaj ? 'rgba(249,115,22,0.04)' : '#0B0F19')),
+                            border: isLight
+                              ? (isSelected ? `1.5px solid ${accentColor}` : '1px solid #E2E8F0')
+                              : (isSelected ? `1px solid ${accentColor}` : '1px solid #1E293B'),
                             borderLeft: `4px solid ${accentColor}`,
                             borderRadius: 14,
-                            boxShadow: 'none',
+                            boxShadow: isLight
+                              ? (isSelected ? '0 4px 12px rgba(0, 70, 255, 0.08)' : '0 1px 3px rgba(0,0,0,0.05)')
+                              : 'none',
                           }}
                           className={`rounded-xl py-3 px-4 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden`}
                         >
@@ -2399,7 +2548,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                   : <Info className="w-4 h-4" style={{ color: accentColor }} />
                                 }
                               </div>
-                              <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? 'text-blue-400' : 'text-white'}`}>
+                              <h4 className={`font-black text-[14.5px] truncate tracking-tight transition-colors ${isSelected ? (isLight ? 'text-blue-600' : 'text-blue-400') : (isLight ? 'text-slate-900' : 'text-white')}`}>
                                 {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
                               </h4>
                             </div>
@@ -2407,14 +2556,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               {(msg.incident_status === '처리완료' || msg.incident_status === 'Completed' || msg.status === '처리완료' || msg.status === 'Completed' || Number(msg.is_analyzed) >= 1) && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); navigate(`/ai-report/${msg.inc_id}`); }}
-                                  className="h-6 flex items-center gap-1 px-2.5 rounded-lg text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 whitespace-nowrap active:scale-95 transition-all"
+                                  className={`h-6 flex items-center gap-1 px-2.5 rounded-lg text-[9px] font-bold whitespace-nowrap active:scale-95 transition-all ${
+                                    isLight ? 'text-red-700 bg-red-50 border border-red-200 hover:bg-red-100' : 'text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20'
+                                  }`}
                                 >
                                   REPORT
                                 </button>
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); navigate(`/workflow/${msg.inc_id}`); }}
-                                className="h-6 flex items-center gap-1.5 px-2.5 rounded-lg text-[9px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 whitespace-nowrap active:scale-95 transition-all"
+                                className={`h-6 flex items-center gap-1.5 px-2.5 rounded-lg text-[9px] font-bold whitespace-nowrap active:scale-95 transition-all ${
+                                  isLight ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100' : 'text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20'
+                                }`}
                               >
                                 진행상태 <ExternalLink className="w-2.5 h-2.5" />
                               </button>
@@ -2423,18 +2576,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                           {/* 중단: 발신자 + 사번 + 분석 상태 뱃지 */}
                           <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <p className="text-[9px] text-slate-400 font-bold">발신: <span className="text-slate-200 font-mono font-semibold">{maskPhone(msg.sender)}</span></p>
+                            <p className={`text-[9px] ${isLight ? 'text-slate-500' : 'text-slate-400'} font-bold`}>발신: <span className={`${isLight ? 'text-slate-700' : 'text-slate-200'} font-mono font-semibold`}>{maskPhone(msg.sender)}</span></p>
                             {msg.employee_id && (
-                              <span className="h-5 flex items-center gap-1 bg-white/5 px-2 rounded-lg border border-white/15 text-[9px] text-slate-300 font-mono font-bold shrink-0">
+                              <span className={`h-5 flex items-center gap-1 ${isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white/5 border-white/15 text-slate-300'} px-2 rounded-lg border text-[9px] font-mono font-bold shrink-0`}>
                                 👤 {msg.employee_id} {msg.sender_name && `(${maskName(msg.sender_name)})`}
                               </span>
                             )}
                             <span className={`h-5 flex items-center px-2.5 rounded-lg border text-[9px] font-black whitespace-nowrap transition-all shrink-0 ml-auto sm:ml-0 ${
                               msg.incident_status === '처리완료'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                ? (isLight ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20')
                                 : Number(msg.is_analyzed) >= 1
-                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                  : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                  ? (isLight ? 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]' : 'bg-blue-500/10 text-blue-400 border-blue-500/20')
+                                  : (isLight ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]' : 'bg-amber-500/15 text-amber-400 border-amber-500/30')
                             }`}>
                               {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANL_COMPLETE' : 'ANALYZING'}
                             </span>
@@ -2442,22 +2595,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                           {/* 하단: 메시지 본문 + 타임스탬프 */}
                           <div className="flex flex-col gap-1.5 mt-1">
-                            <div className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
-                              {renderFormattedSMS(msg.message, msg.severity)}
+                            <div className={`text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap ${isLight ? 'text-slate-900' : 'text-[#ffffff]'} tracking-tight`}>
+                              {renderFormattedSMS(msg.message, msg.severity, isLight)}
                             </div>
                             {(msg.similarity_score !== undefined && msg.similarity_score !== null) && (() => {
                               const score = msg.similarity_score;
-                              let matchColor = '#38bdf8';
-                              let matchBg = 'rgba(56,189,248,0.1)';
-                              let matchBorder = 'rgba(56,189,248,0.2)';
+                              let matchColor = isLight ? '#0284c7' : '#38bdf8';
+                              let matchBg = isLight ? '#f0f9ff' : 'rgba(56,189,248,0.1)';
+                              let matchBorder = isLight ? '#bae6fd' : 'rgba(56,189,248,0.2)';
                               if (score >= 0.8) {
-                                matchColor = '#f87171';
-                                matchBg = 'rgba(248,113,113,0.15)';
-                                matchBorder = 'rgba(248,113,113,0.3)';
+                                matchColor = isLight ? '#dc2626' : '#f87171';
+                                matchBg = isLight ? '#fef2f2' : 'rgba(248,113,113,0.15)';
+                                matchBorder = isLight ? '#fecaca' : 'rgba(248,113,113,0.3)';
                               } else if (score >= 0.5) {
-                                matchColor = '#fb923c';
-                                matchBg = 'rgba(251,146,60,0.15)';
-                                matchBorder = 'rgba(251,146,60,0.3)';
+                                matchColor = isLight ? '#d97706' : '#fb923c';
+                                matchBg = isLight ? '#fffbeb' : 'rgba(251,146,60,0.15)';
+                                matchBorder = isLight ? '#fde68a' : 'rgba(251,146,60,0.3)';
                               }
                               return (
                                 <div className="flex gap-2 items-center mt-1">
@@ -2492,14 +2645,23 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                     else if (v >= majT) calculatedSeverity = 'MAJOR';
                                     else calculatedSeverity = 'NORMAL';
 
+                                    const isCrit = calculatedSeverity === 'CRITICAL';
+                                    const isM = calculatedSeverity === 'MAJOR';
+
                                     return (
-                                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider font-mono w-fit ${calculatedSeverity === 'CRITICAL' ? 'animate-pulse' : ''}`}
+                                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider font-mono w-fit ${isCrit ? 'animate-pulse' : ''}`}
                                         style={{ 
-                                          color: calculatedSeverity === 'CRITICAL' ? '#ef4444' : calculatedSeverity === 'MAJOR' ? '#f97316' : '#10b981',
-                                          background: calculatedSeverity === 'CRITICAL' ? 'rgba(239,68,68,0.1)' : calculatedSeverity === 'MAJOR' ? 'rgba(249,115,22,0.1)' : 'rgba(16,185,129,0.1)',
-                                          borderColor: calculatedSeverity === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : calculatedSeverity === 'MAJOR' ? 'rgba(249,115,22,0.2)' : 'rgba(16,185,129,0.2)'
+                                          color: isLight 
+                                            ? (isCrit ? '#dc2626' : isM ? '#d97706' : '#16a34a')
+                                            : (isCrit ? '#ef4444' : isM ? '#f97316' : '#10b981'),
+                                          background: isLight
+                                            ? (isCrit ? '#fef2f2' : isM ? '#fffbeb' : '#f0fdf4')
+                                            : (isCrit ? 'rgba(239,68,68,0.1)' : isM ? 'rgba(249,115,22,0.1)' : 'rgba(16,185,129,0.1)'),
+                                          borderColor: isLight
+                                            ? (isCrit ? '#fecaca' : isM ? '#fde68a' : '#bbf7d0')
+                                            : (isCrit ? 'rgba(239,68,68,0.2)' : isM ? 'rgba(249,115,22,0.2)' : 'rgba(16,185,129,0.2)')
                                         }}>
-                                        {calculatedSeverity === 'CRITICAL' ? <AlertTriangle className="w-3 h-3 shrink-0" /> : calculatedSeverity === 'MAJOR' ? <AlertCircle className="w-3 h-3 shrink-0" /> : <CheckCircle2 className="w-3 h-3 shrink-0" />}
+                                        {isCrit ? <AlertTriangle className="w-3 h-3 shrink-0" /> : isM ? <AlertCircle className="w-3 h-3 shrink-0" /> : <CheckCircle2 className="w-3 h-3 shrink-0" />}
                                         {calculatedSeverity}
                                       </div>
                                     );
@@ -2507,9 +2669,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 </div>
                               );
                             })()}
-                            <div className="flex justify-between items-center border-t border-white/5 pt-1 mt-0.5">
-                              <span className="text-[9px] text-slate-600 font-bold font-mono tracking-tight cursor-pointer hover:text-white transition-colors" title="클릭하여 복사" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(msg.inc_id); alert('ID가 복사되었습니다: ' + msg.inc_id); }}>ID: {msg.inc_id}</span>
-                              <span className="text-[9px] text-slate-500 font-bold font-mono">{formatYYMMDD(msg.timestamp)}</span>
+                            <div className={`flex justify-between items-center border-t ${isLight ? 'border-slate-200' : 'border-white/5'} pt-1 mt-0.5`}>
+                              <span className={`text-[9px] ${isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-600 hover:text-white'} font-bold font-mono tracking-tight cursor-pointer transition-colors`} title="클릭하여 복사" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(msg.inc_id); alert('ID가 복사되었습니다: ' + msg.inc_id); }}>ID: {msg.inc_id}</span>
+                              <span className={`text-[9px] ${isLight ? 'text-slate-500' : 'text-slate-500'} font-bold font-mono`}>{formatYYMMDD(msg.timestamp)}</span>
                             </div>
                           </div>
                         </div>
@@ -2550,7 +2712,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col1 */}
 
           {/* ── 2/4: S-Autopilot Insight Panel ── */}
-          <div className="flex flex-col h-full min-h-0 overflow-hidden">
+          <div className={`${mobileColumnTab === 'col2' ? 'flex' : 'hidden'} lg:flex flex-col h-full min-h-0 overflow-hidden`}>
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
               <AiInsightPanel 
                  onLogReceived={handleLogReceived} 
@@ -2574,30 +2736,48 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col2 */}
 
           {/* ── 3/4: S-Autopilot Expert Advisor ── */}
-          <div className="flex flex-col h-full min-h-0 overflow-hidden">
+          <div className={`${mobileColumnTab === 'col3' ? 'flex' : 'hidden'} lg:flex flex-col h-full min-h-0 overflow-hidden`}>
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <div className={`bg-[#0D162B] rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-300 border border-[#1E2F56]`}
+              <div className={`rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-300 shinhan-column-card ${
+                isLight 
+                  ? 'bg-white border border-[#E2E8F0] shadow-[0_4px_12px_-2px_rgba(15,23,42,0.06)]' 
+                  : 'bg-[#0D162B] border border-[#1E2F56]'
+              }`}
                 style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
                 {/* Header */}
-                <div className="p-4 sm:p-5 border-b border-[#1E2F56] flex items-center justify-between shrink-0">
+                <div className={`p-4 sm:p-5 border-b flex items-center justify-between shrink-0 ${
+                  isLight ? 'bg-white border-[#E2E8F0]' : 'border-[#1E2F56]'
+                }`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`data-ring-wrapper shrink-0 ${isAiAnalyzing ? 'data-ring-spinning' : ''}`}>
-                      <div className={`bg-[#0046FF]/10 border border-[#1E2F56] p-2.5 rounded-xl shrink-0 ${isAiAnalyzing ? 'animate-pulse' : ''}`}>
-                        <Sparkles className="w-5 h-5 text-[#00A3E0]" />
+                      <div className={`p-2.5 rounded-xl shrink-0 ${
+                        isAiAnalyzing ? 'animate-pulse' : ''
+                      } ${
+                        isLight 
+                          ? 'bg-[#EFF6FF] border border-[#BFDBFE]' 
+                          : 'bg-[#0046FF]/10 border border-[#1E2F56]'
+                      }`}>
+                        <Sparkles className={`w-5 h-5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                       </div>
                     </span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-black text-white text-base tracking-tight font-shinhan-display">3. AI 진단 및 승인</h3>
-                        <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Decision Exec]</span>
+                        <h3 className={`font-black text-base tracking-tight font-shinhan-display ${
+                          isLight ? 'text-[#0F172A]' : 'text-white'
+                        }`}>3. AI 진단 및 승인</h3>
+                        <span className={`text-[10px] font-bold font-mono ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>[Decision Exec]</span>
                         {selectedSms && (
-                          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30 text-[9px] font-mono font-bold animate-fadeIn">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0] animate-pulse" />
+                          <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold animate-fadeIn ${
+                            isLight 
+                              ? 'bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]' 
+                              : 'bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-[#00A3E0]'} animate-pulse`} />
                             PIPELINE SYNC
                           </span>
                         )}
                       </div>
-                      <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Real-time AI Response Engine</span>
+                      <span className={`text-[9px] font-bold tracking-widest uppercase ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Real-time AI Response Engine</span>
                     </div>
                   </div>
                 </div>
@@ -2625,7 +2805,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-30 gap-3">
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-40 gap-3">
                       <Brain className="w-10 h-10" />
                       <p className="text-xs font-bold uppercase tracking-wider">Select an incident to analyze</p>
                     </div>
@@ -2636,47 +2816,77 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           </div>{/* end col3 */}
 
           {/* ── 4/4: 전자금융 SLA [Incident Ops] ── */}
-          <div className="flex flex-col h-full min-h-0 overflow-hidden">
+          <div className={`${mobileColumnTab === 'col4' ? 'flex' : 'hidden'} lg:flex flex-col h-full min-h-0 overflow-hidden`}>
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <div className={`bg-[#0D162B] rounded-2xl h-full overflow-hidden flex flex-col transition-all duration-300 border border-[#1E2F56]`}
+              <div className={`rounded-2xl h-full overflow-hidden flex flex-col transition-all duration-300 shinhan-column-card ${
+                isLight 
+                  ? 'bg-white border border-[#E2E8F0] shadow-[0_4px_12px_-2px_rgba(15,23,42,0.06)]' 
+                  : 'bg-[#0D162B] border border-[#1E2F56]'
+              }`}
                 style={selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim}>
                 {/* Header */}
-                <div className="p-4 sm:p-5 border-b border-[#1E2F56] flex items-center justify-between gap-4 shrink-0">
+                <div className={`p-4 sm:p-5 border-b flex items-center justify-between gap-4 shrink-0 ${
+                  isLight ? 'bg-white border-[#E2E8F0]' : 'border-[#1E2F56]'
+                }`}>
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`data-ring-wrapper shrink-0 ${isFlowSpinning ? 'data-ring-spinning' : ''}`}>
-                    <div className={`bg-[#0046FF]/10 border border-[#1E2F56] p-2.5 rounded-xl shrink-0 ${isFlowSpinning ? 'animate-pulse' : ''}`}>
-                      <Activity className="w-5 h-5 text-[#00A3E0]" />
+                    <div className={`p-2.5 rounded-xl shrink-0 ${
+                      isFlowSpinning ? 'animate-pulse' : ''
+                    } ${
+                      isLight 
+                        ? 'bg-[#EFF6FF] border border-[#BFDBFE]' 
+                        : 'bg-[#0046FF]/10 border border-[#1E2F56]'
+                    }`}>
+                      <Activity className={`w-5 h-5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                     </div>
                   </span>
                   <div className="min-w-0 flex flex-col justify-center">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-white text-base sm:text-lg tracking-tight whitespace-nowrap font-shinhan-display">4. 전자금융 SLA</h3>
-                      <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Incident Ops]</span>
+                      <h3 className={`font-semibold text-lg sm:text-base tracking-tight whitespace-nowrap font-shinhan-display ${
+                        isLight ? 'text-[#0F172A]' : 'text-white'
+                      }`}>4. 전자금융 SLA</h3>
+                      <span className={`text-[10px] font-bold font-mono ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>[Incident Ops]</span>
                       {selectedSms && (
-                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30 text-[9px] font-shinhan-num font-bold animate-fadeIn">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0046FF]" />
+                        <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-shinhan-num font-bold animate-fadeIn ${
+                          isLight 
+                            ? 'bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]' 
+                            : 'bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-[#0046FF]'}`} />
                           PIPELINE SYNC
                         </span>
                       )}
                     </div>
-                    <span className="text-[9px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap hidden sm:block mt-0.5 font-shinhan-display">Incident Handling Progress</span>
+                    <span className={`text-[9px] font-bold tracking-widest uppercase whitespace-nowrap hidden sm:block mt-0.5 font-shinhan-display ${
+                      isLight ? 'text-slate-400' : 'text-slate-500'
+                    }`}>Incident Handling Progress</span>
                   </div>
                 </div>
                 {selectedIncidentIdFlow && (() => {
                   const isClosedFlow = incidentWorkflowSteps.some(s => s.id === 'KNOWLEDGE');
                   return isClosedFlow ? (
-                    <span className="text-[10px] font-semibold text-[#00C48C] bg-[#00C48C]/10 border border-[#00C48C]/30 px-2.5 py-1 rounded-md flex items-center gap-1.5 font-shinhan-num">
+                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 font-shinhan-num ${
+                      isLight 
+                        ? 'text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0]' 
+                        : 'text-[#00C48C] bg-[#00C48C]/10 border border-[#00C48C]/30'
+                    }`}>
                       <CheckCircle2 size={12} />COMPLETED FLOW
                     </span>
                   ) : (
-                    <span className="text-[10px] font-semibold text-[#F5A623] bg-[#F5A623]/10 border border-[#F5A623]/30 px-2.5 py-1 rounded-md flex items-center gap-1.5 font-shinhan-num">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#F5A623]" />LIVE FLOW
+                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 font-shinhan-num ${
+                      isLight 
+                        ? 'text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A]' 
+                        : 'text-[#F5A623] bg-[#F5A623]/10 border border-[#F5A623]/30'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#D97706]' : 'bg-[#F5A623]'}`} />LIVE FLOW
                     </span>
                   );
                 })()}
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar bg-transparent border-t border-[#1E2F56] flex flex-col">
+              <div className={`flex-1 overflow-y-auto custom-scrollbar border-t flex flex-col ${
+                isLight ? 'bg-white border-[#E2E8F0]' : 'bg-transparent border-[#1E2F56]'
+              }`}>
                 <div className="relative flex-1 flex flex-col">
                   {selectedIncidentIdFlow ? (
                     <div className="flex flex-col flex-1">
@@ -2745,7 +2955,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         return (
                           <div className="flex flex-col shrink-0">
                             {/* 가로 프로그레스 바 (Horizontal Stepper) */}
-                            <div className="flex flex-col gap-y-2 px-4 py-5 bg-[#060C1B]/60 border-b border-[#1E2F56] relative shrink-0">
+                            <div className={`flex flex-col gap-y-2 px-4 py-5 border-b relative shrink-0 ${
+                              isLight ? 'bg-slate-50 border-[#E2E8F0]' : 'bg-[#060C1B]/60 border-[#1E2F56]'
+                            }`}>
                               <div className="flex items-start justify-between w-full">
                                 {steps.map((st, i) => {
                                   const isDone = st.done;
@@ -2767,11 +2979,11 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                             <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all border relative ${
                                               isDone
                                                 ? (isBottleneck 
-                                                    ? 'bg-[#F5A623]/15 text-[#F5A623] border-[#F5A623]/40 font-bold' 
-                                                    : 'bg-[#00C48C]/15 text-[#00C48C] border-[#00C48C]/40 font-bold')
+                                                    ? (isLight ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A] font-bold' : 'bg-[#F5A623]/15 text-[#F5A623] border-[#F5A623]/40 font-bold')
+                                                    : (isLight ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0] font-bold' : 'bg-[#00C48C]/15 text-[#00C48C] border-[#00C48C]/40 font-bold'))
                                                 : isActive
-                                                  ? 'bg-[#0046FF] text-white border-[#0046FF] font-bold'
-                                                  : 'bg-[#060C1B] text-slate-500 border-[#1E2F56] font-medium'
+                                                  ? (isLight ? 'bg-[#0046FF] text-white border-[#0046FF] font-bold' : 'bg-[#0046FF] text-white border-[#0046FF] font-bold')
+                                                  : (isLight ? 'bg-[#F8FAFC] text-slate-400 border-[#E2E8F0] font-medium' : 'bg-[#060C1B] text-slate-500 border-[#1E2F56] font-medium')
                                             }`}>
                                               <span className="relative z-10 font-shinhan-num">{isDone ? <Check size={14} className="stroke-[2.5]" /> : i + 1}</span>
                                             </div>
@@ -2781,12 +2993,12 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                           <div className="mt-2 text-center w-full px-0.5">
                                             <span className={`text-[10px] tracking-tight break-keep leading-tight inline-block w-full whitespace-normal font-shinhan-display ${
                                               isBottleneck 
-                                                ? 'text-[#F5A623] font-semibold' 
+                                                ? (isLight ? 'text-[#B45309] font-semibold' : 'text-[#F5A623] font-semibold') 
                                                 : isDone 
-                                                  ? 'text-slate-200 font-medium' 
+                                                  ? (isLight ? 'text-slate-700 font-semibold' : 'text-slate-200 font-medium') 
                                                   : isActive 
-                                                    ? 'text-[#00A3E0] font-bold' 
-                                                    : 'text-slate-500 font-medium'
+                                                    ? (isLight ? 'text-[#0046FF] font-bold' : 'text-[#00A3E0] font-bold') 
+                                                    : (isLight ? 'text-slate-400 font-medium' : 'text-slate-500 font-medium')
                                             }`}>
                                               {st.label}
                                             </span>
@@ -2798,13 +3010,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                               <span className={`text-[9.5px] font-shinhan-num font-medium px-1.5 py-0.5 rounded border whitespace-nowrap inline-flex items-center justify-center ${
                                                 (st.dObj?.min > 60)
                                                   ? (isActive
-                                                      ? 'bg-[#F5A623]/20 text-[#F5A623] border-[#F5A623]/40 font-semibold'
-                                                      : 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30 font-semibold')
+                                                      ? (isLight ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A] font-semibold' : 'bg-[#F5A623]/20 text-[#F5A623] border-[#F5A623]/40 font-semibold')
+                                                      : (isLight ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A] font-semibold' : 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30 font-semibold'))
                                                   : isActive 
-                                                    ? 'bg-[#0046FF]/20 text-[#00A3E0] border-[#0046FF]/40 font-semibold'
+                                                    ? (isLight ? 'bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE] font-semibold' : 'bg-[#0046FF]/20 text-[#00A3E0] border-[#0046FF]/40 font-semibold')
                                                     : isDone
-                                                      ? 'bg-[#00C48C]/10 text-[#00C48C] border-[#00C48C]/20'
-                                                      : 'bg-[#060C1B] text-slate-500 border-[#1E2F56]'
+                                                      ? (isLight ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]' : 'bg-[#00C48C]/10 text-[#00C48C] border-[#00C48C]/20')
+                                                      : (isLight ? 'bg-[#F8FAFC] text-slate-400 border-[#E2E8F0]' : 'bg-[#060C1B] text-slate-500 border-[#1E2F56]')
                                               }`}>
                                                 {st.dObj.text}
                                               </span>
@@ -2818,17 +3030,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                             <div className="w-full flex items-center gap-1">
                                               <div className={`h-[1px] flex-1 transition-colors ${
                                                 isNextStepDone 
-                                                  ? (isArrowBottleneck ? 'bg-[#F5A623]/50' : 'bg-[#00C48C]/40') 
+                                                  ? (isArrowBottleneck 
+                                                      ? (isLight ? 'bg-[#F59E0B]/60' : 'bg-[#F5A623]/50') 
+                                                      : (isLight ? 'bg-[#16A34A]/50' : 'bg-[#00C48C]/40')) 
                                                   : isNextStepActive 
-                                                    ? 'bg-[#0046FF]' 
-                                                    : 'bg-[#1E2F56]'
+                                                    ? '#0046FF' 
+                                                    : (isLight ? 'bg-[#E2E8F0]' : 'bg-[#1E2F56]')
                                               }`} />
                                               <ArrowRight size={12} className={`shrink-0 transition-colors ${
                                                 isNextStepDone 
-                                                  ? (isArrowBottleneck ? 'text-[#F5A623]' : 'text-[#00C48C]') 
+                                                  ? (isArrowBottleneck 
+                                                      ? (isLight ? 'text-[#D97706]' : 'text-[#F5A623]') 
+                                                      : (isLight ? 'text-[#16A34A]' : 'text-[#00C48C]')) 
                                                   : isNextStepActive 
-                                                    ? 'text-[#00A3E0]' 
-                                                    : 'text-slate-600'
+                                                    ? (isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]') 
+                                                    : (isLight ? 'text-slate-300' : 'text-slate-600')
                                               }`} />
                                             </div>
                                           </div>
@@ -2840,21 +3056,23 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               </div>
                             </div>
 
-                            {/* 정제된 소요시간 게이지 (Activity Gauges) - 네온 효과 제거 */}
-                            <div className="py-6 xl:py-7 flex flex-col items-center justify-center border-b border-[#1E2F56] bg-transparent relative shrink-0">
+                            {/* 정제된 소요시간 게이지 (Activity Gauges) */}
+                            <div className={`py-6 xl:py-7 flex flex-col items-center justify-center border-b relative shrink-0 ${
+                              isLight ? 'border-[#E2E8F0] bg-white' : 'border-[#1E2F56] bg-transparent'
+                            }`}>
                               <div className="flex flex-row items-center justify-center gap-6 xl:gap-10 px-4">
                                 
                                 {/* MTTA Gauge */}
                                 <div className="relative w-[130px] h-[130px] xl:w-[145px] xl:h-[145px] flex items-center justify-center shrink-0">
                                   <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
-                                    {/* 베이스 트랙 */}
-                                    <circle cx="90" cy="90" r="70" stroke="#1E2F56" strokeWidth="8" fill="none" />
+                                    {/* 베이스 트랙: 라이트 모드 시 #E2E8F0 */}
+                                    <circle cx="90" cy="90" r="70" stroke={isLight ? "#E2E8F0" : "#1E2F56"} strokeWidth="8" fill="none" />
                                     {/* 활성 프로그레스 */}
                                     <circle
                                       cx="90"
                                       cy="90"
                                       r="70"
-                                      stroke={mttaRingColor}
+                                      stroke={isLight ? (isMttaClosed ? '#16A34A' : '#DC2626') : mttaRingColor}
                                       strokeWidth="8"
                                       fill="none"
                                       strokeDasharray={circum}
@@ -2864,14 +3082,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                     />
                                   </svg>
                                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5 font-shinhan-display">MTTA TIMER</span>
-                                    <span className="text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight text-white">
+                                    <span className={`text-[9px] font-semibold uppercase tracking-wider mb-0.5 font-shinhan-display ${
+                                      isLight ? 'text-slate-500' : 'text-slate-400'
+                                    }`}>MTTA TIMER</span>
+                                    <span className={`text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight ${
+                                      isLight ? 'text-[#0F172A]' : 'text-white'
+                                    }`}>
                                       {formatDuration(mttaDurationMs)}
                                     </span>
                                     <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all font-shinhan-num ${
                                       isMttaClosed 
-                                        ? 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]' 
-                                        : 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]'
+                                        ? (isLight ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]') 
+                                        : (isLight ? 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]' : 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]')
                                     }`}>
                                       {isMttaClosed ? '인지 완료' : '긴급 대기'}
                                     </span>
@@ -2882,13 +3104,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 <div className="relative w-[130px] h-[130px] xl:w-[145px] xl:h-[145px] flex items-center justify-center shrink-0">
                                   <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 180 180">
                                     {/* 베이스 트랙 */}
-                                    <circle cx="90" cy="90" r="70" stroke="#1E2F56" strokeWidth="8" fill="none" />
+                                    <circle cx="90" cy="90" r="70" stroke={isLight ? "#E2E8F0" : "#1E2F56"} strokeWidth="8" fill="none" />
                                     {/* 활성 프로그레스 */}
                                     <circle
                                       cx="90"
                                       cy="90"
                                       r="70"
-                                      stroke={ringColor}
+                                      stroke={isLight ? (isClosed ? '#16A34A' : isCritical ? '#DC2626' : isMajor ? '#D97706' : '#0046FF') : ringColor}
                                       strokeWidth="8"
                                       fill="none"
                                       strokeDasharray={circum}
@@ -2898,18 +3120,22 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                     />
                                   </svg>
                                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5 font-shinhan-display">MTTR TIMER</span>
-                                    <span className="text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight text-white">
+                                    <span className={`text-[9px] font-semibold uppercase tracking-wider mb-0.5 font-shinhan-display ${
+                                      isLight ? 'text-slate-500' : 'text-slate-400'
+                                    }`}>MTTR TIMER</span>
+                                    <span className={`text-[20px] xl:text-[24px] font-bold font-shinhan-num tracking-tight ${
+                                      isLight ? 'text-[#0F172A]' : 'text-white'
+                                    }`}>
                                       {formatDuration(durationMs)}
                                     </span>
                                     <span className={`text-[9px] font-semibold mt-1 px-2.5 py-0.5 rounded-full border transition-all font-shinhan-num ${
                                       isClosed 
-                                        ? 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]' 
+                                        ? (isLight ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#060C1B] border-[#1E2F56] text-[#00C48C]') 
                                         : isCritical 
-                                          ? 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]' 
+                                          ? (isLight ? 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]' : 'bg-[#F04438]/10 border-[#F04438]/40 text-[#F04438]') 
                                           : isMajor 
-                                            ? 'bg-[#F5A623]/10 border-[#F5A623]/40 text-[#F5A623]' 
-                                            : 'bg-[#0046FF]/10 border-[#0046FF]/40 text-[#00A3E0]'
+                                            ? (isLight ? 'bg-[#FFFBEB] border-[#FDE68A] text-[#B45309]' : 'bg-[#F5A623]/10 border-[#F5A623]/40 text-[#F5A623]') 
+                                            : (isLight ? 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]' : 'bg-[#0046FF]/10 border-[#0046FF]/40 text-[#00A3E0]')
                                     }`}>
                                       {isClosed ? '처리 완료' : '조치 진행중'}
                                     </span>
@@ -2919,26 +3145,40 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               </div>
 
                               {/* 전자금융감독규정 대응 골든타임 계측 기준 바 */}
-                              <div className="mt-4 flex flex-col items-center gap-1.5 px-3 py-2 border border-[#1E2F56] bg-[#060C1B] rounded-xl w-full max-w-[340px] mx-auto text-[10px] font-shinhan-num shadow-sm">
-                                <div className="flex items-center justify-between w-full pb-1 border-b border-[#1E2F56]/80 text-[9.5px]">
-                                  <span className="font-bold text-[#00A3E0] font-shinhan-display flex items-center gap-1">
-                                    <Shield className="w-3 h-3 text-[#00A3E0]" />
+                              <div className={`mt-4 flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl w-full max-w-[340px] mx-auto text-[10px] font-shinhan-num shadow-sm ${
+                                isLight 
+                                  ? 'bg-[#F8FAFC] border border-[#E2E8F0]' 
+                                  : 'bg-[#060C1B] border border-[#1E2F56]'
+                              }`}>
+                                <div className={`flex items-center justify-between w-full pb-1 border-b text-[9.5px] ${
+                                  isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]/80'
+                                }`}>
+                                  <span className={`font-bold font-shinhan-display flex items-center gap-1 ${
+                                    isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'
+                                  }`}>
+                                    <Shield className={`w-3 h-3 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                                     전자금융감독규정 SLA 골든타임 기준
                                   </span>
-                                  <span className="text-slate-400">FIN-SLA GOAL</span>
+                                  <span className={isLight ? 'text-slate-400 font-semibold' : 'text-slate-400'}>FIN-SLA GOAL</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-1.5 w-full text-center text-[9px] pt-0.5">
-                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
-                                    <span className="text-slate-400 block">장애 인지</span>
-                                    <span className="text-[#00C48C] font-bold">10분 이내</span>
+                                  <div className={`p-1 rounded ${
+                                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#13203E] border border-[#1E2F56]'
+                                  }`}>
+                                    <span className={isLight ? 'text-slate-500 block' : 'text-slate-400 block'}>장애 인지</span>
+                                    <span className={`${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'} font-bold`}>10분 이내</span>
                                   </div>
-                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
-                                    <span className="text-slate-400 block">상황 전파</span>
-                                    <span className="text-[#F5A623] font-bold">30분 이내</span>
+                                  <div className={`p-1 rounded ${
+                                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#13203E] border border-[#1E2F56]'
+                                  }`}>
+                                    <span className={isLight ? 'text-slate-500 block' : 'text-slate-400 block'}>상황 전파</span>
+                                    <span className={`${isLight ? 'text-[#B45309]' : 'text-[#F5A623]'} font-bold`}>30분 이내</span>
                                   </div>
-                                  <div className="p-1 rounded bg-[#13203E] border border-[#1E2F56]">
-                                    <span className="text-slate-400 block">시스템 복구</span>
-                                    <span className="text-[#0046FF] font-bold">2시간 이내</span>
+                                  <div className={`p-1 rounded ${
+                                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#13203E] border border-[#1E2F56]'
+                                  }`}>
+                                    <span className={isLight ? 'text-slate-500 block' : 'text-slate-400 block'}>시스템 복구</span>
+                                    <span className={`${isLight ? 'text-[#0046FF]' : 'text-[#0046FF]'} font-bold`}>2시간 이내</span>
                                   </div>
                                 </div>
                               </div>
@@ -2952,7 +3192,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                   <button 
                                     onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
                                     disabled={isOpeningWarRoom}
-                                    className={`w-full py-2.5 bg-[#F04438] hover:bg-[#d9382d] border border-[#F04438] text-white rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50 font-shinhan-display cursor-pointer`}
+                                    className={`w-full py-2.5 bg-[#DC2626] hover:bg-[#b91c1c] border border-[#DC2626] text-white rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50 font-shinhan-display cursor-pointer shadow-sm`}
                                   >
                                     <Users size={15} />{isOpeningWarRoom ? '워룸 개설 진행 중...' : '긴급 War-Room 개설'}
                                   </button>
@@ -2998,18 +3238,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               const isLineBottleneck = sIdx < FLOW_STEPS.length - 1 && !stepTimestamps[sIdx+1] && nextDurationMs > 60000;
 
                               const boxStyles = isCompleted
-                                ? 'bg-[#00C48C]/10 border-[#00C48C]/30 text-[#00C48C] font-bold'
+                                ? (isLight ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D] font-bold' : 'bg-[#00C48C]/10 border-[#00C48C]/30 text-[#00C48C] font-bold')
                                 : isNextStep
                                 ? 'bg-[#0046FF] text-white border-[#0046FF] font-bold z-30'
-                                : 'bg-[#060C1B] border-[#1E2F56] text-slate-600 opacity-50';
+                                : (isLight ? 'bg-[#F8FAFC] border-[#E2E8F0] text-slate-400 opacity-60' : 'bg-[#060C1B] border-[#1E2F56] text-slate-600 opacity-50');
 
                               const lineStyle = isLineBottleneck
-                                ? { background: '#F5A623', boxShadow: 'none' }
+                                ? { background: isLight ? '#F59E0B' : '#F5A623', boxShadow: 'none' }
                                 : isCompleted
-                                ? { background: '#00C48C', boxShadow: 'none' }
+                                ? { background: isLight ? '#16A34A' : '#00C48C', boxShadow: 'none' }
                                 : isNextStep
                                 ? { background: '#0046FF', boxShadow: 'none' }
-                                : { background: '#1E2F56', boxShadow: 'none' };
+                                : { background: isLight ? '#E2E8F0' : '#1E2F56', boxShadow: 'none' };
 
                               return (
                                 <div key={step.id} className="relative pl-11 transition-all duration-500 flex flex-col" style={{ flexGrow: flexGrowVal, flexBasis: minH, opacity: isCompleted || isNextStep ? 1 : 0.4 }}>
@@ -3019,7 +3259,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                                   <div className="absolute left-0 top-0 z-20">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all duration-300 relative ${boxStyles}`}>
-                                      <step.icon size={14} className={isNextStep ? 'text-white relative z-10' : isCompleted ? 'text-[#00C48C]' : 'text-slate-600'} />
+                                      <step.icon size={14} className={isNextStep ? 'text-white relative z-10' : isCompleted ? (isLight ? 'text-[#15803D]' : 'text-[#00C48C]') : (isLight ? 'text-slate-400' : 'text-slate-600')} />
                                     </div>
                                   </div>
 
@@ -3027,13 +3267,21 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                     <div className="flex flex-wrap items-center justify-between gap-1 mb-0.5 w-full">
                                       <div className="flex items-center gap-2 min-w-0">
                                         <h4 className={`tracking-tight text-[13px] truncate font-shinhan-display ${
-                                          isNextStep ? 'text-[#00A3E0] font-bold' : isCompleted ? 'text-white font-semibold' : 'text-slate-500 font-semibold'
+                                          isNextStep 
+                                            ? (isLight ? 'text-[#0046FF] font-bold' : 'text-[#00A3E0] font-bold') 
+                                            : isCompleted 
+                                              ? (isLight ? 'text-[#0F172A] font-semibold' : 'text-white font-semibold') 
+                                              : (isLight ? 'text-slate-400 font-semibold' : 'text-slate-500 font-semibold')
                                         }`}>
                                           {step.label}
                                         </h4>
                                         {isNextStep && (
-                                          <span className="shrink-0 text-[8.5px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider text-[#00A3E0] bg-[#0046FF]/20 border border-[#0046FF]/40 font-shinhan-num flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0]"></span>
+                                          <span className={`shrink-0 text-[8.5px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider font-shinhan-num flex items-center gap-1 ${
+                                            isLight 
+                                              ? 'text-[#1E40AF] bg-[#EFF6FF] border border-[#BFDBFE]' 
+                                              : 'text-[#00A3E0] bg-[#0046FF]/20 border border-[#0046FF]/40'
+                                          }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-[#00A3E0]'}`}></span>
                                             진행중
                                           </span>
                                         )}
@@ -3041,26 +3289,34 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                                       <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                                         {isCompleted && (
-                                          <span className="text-[9px] text-slate-400 font-shinhan-num font-medium bg-[#060C1B] px-2 py-0.5 rounded border border-[#1E2F56]">
+                                          <span className={`text-[9px] font-shinhan-num font-medium px-2 py-0.5 rounded border ${
+                                            isLight 
+                                              ? 'bg-[#F8FAFC] border-[#E2E8F0] text-slate-500' 
+                                              : 'bg-[#060C1B] border-[#1E2F56] text-slate-400'
+                                          }`}>
                                             {formatYYMMDD(stepData.timestamp)}
                                           </span>
                                         )}
                                         {durationMs > 1000 && sIdx > 0 && (
                                           <div className={`px-2 py-0.5 rounded-md flex items-center gap-1 font-shinhan-num text-[10px] font-medium border ${
                                             isBottleneck
-                                              ? 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30 font-semibold'
+                                              ? (isLight ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A] font-semibold' : 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30 font-semibold')
                                               : isNextStep
-                                                ? 'bg-[#0046FF]/15 text-[#00A3E0] border-[#0046FF]/40 font-semibold'
-                                                : 'bg-[#060C1B] text-slate-300 border-[#1E2F56]'
+                                                ? (isLight ? 'bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE] font-semibold' : 'bg-[#0046FF]/15 text-[#00A3E0] border-[#0046FF]/40 font-semibold')
+                                                : (isLight ? 'bg-[#F8FAFC] text-slate-700 border-[#E2E8F0]' : 'bg-[#060C1B] text-slate-300 border-[#1E2F56]')
                                           }`}>
-                                            <Clock size={10} className={isBottleneck ? 'text-[#F5A623] shrink-0' : 'text-slate-400 shrink-0'} />
+                                            <Clock size={10} className={isBottleneck ? (isLight ? 'text-[#B45309] shrink-0' : 'text-[#F5A623] shrink-0') : (isLight ? 'text-slate-400 shrink-0' : 'text-slate-400 shrink-0')} />
                                             <span className="tracking-wider">{formatDuration(durationMs)}</span>
                                           </div>
                                         )}
                                       </div>
                                     </div>
                                     <p className={`text-[11.5px] leading-relaxed tracking-tight ${
-                                      isNextStep ? 'text-sky-200/90 font-medium' : isCompleted ? 'text-slate-300 font-normal' : 'text-slate-600 font-normal'
+                                      isNextStep 
+                                        ? (isLight ? 'text-[#0046FF] font-medium' : 'text-sky-200/90 font-medium') 
+                                        : isCompleted 
+                                          ? (isLight ? 'text-slate-600 font-normal' : 'text-slate-300 font-normal') 
+                                          : (isLight ? 'text-slate-400 font-normal' : 'text-slate-600 font-normal')
                                     }`}>
                                       {isCompleted ? stepData.detail : isNextStep ? 'AI 및 시스템 분석 실시간 연동 중...' : '대기 중'}
                                     </p>

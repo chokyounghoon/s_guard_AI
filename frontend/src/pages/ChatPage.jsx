@@ -9,6 +9,7 @@ import ServerStatusChart from '../components/chat/ServerStatusChart';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useCodebook } from '../context/CodebookContext';
+import { useTheme } from '../context/ThemeContext';
 import DOMPurify from 'dompurify';
 import { maskName, maskPhone } from '../utils/maskingUtils';
 
@@ -683,6 +684,7 @@ const ChatInputBar = React.memo(({ roomStatus, onSendMessage, onTyping, uploadin
 
 
 export default function ChatPage() {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const { allCodes } = useCodebook();
@@ -1823,7 +1825,9 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="fixed inset-0 overflow-hidden overscroll-none bg-[#191919] text-white font-sans flex flex-col z-[350]" style={{ height: '100dvh' }}>
+    <div className={`fixed inset-0 overflow-hidden overscroll-none font-sans flex flex-col z-[350] ${
+      isLight ? 'bg-[#F1F5F9] text-slate-800' : 'bg-[#191919] text-white'
+    }`} style={{ height: '100dvh' }}>
       {/* Header */}
       {/* DM Notifications Toast */}
       <div className="fixed top-20 right-4 z-[360] flex flex-col items-end space-y-2 pointer-events-none">
@@ -1855,15 +1859,21 @@ export default function ChatPage() {
         ))}
       </div>
 
-      <header className="flex justify-between items-center px-3 py-2 sticky top-0 bg-[#191919]/90 backdrop-blur-md z-50 border-b border-[#242424]">
+      <header className={`flex justify-between items-center px-3 py-2 sticky top-0 backdrop-blur-md z-50 border-b ${
+        isLight ? 'bg-white/95 border-[#E2E8F0] shadow-sm' : 'bg-[#191919]/90 border-[#242424]'
+      }`}>
         <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 pr-2">
-          <button onClick={() => goBack()} className="p-1 rounded-full hover:bg-white/10 transition-colors shrink-0">
-            <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <button onClick={() => goBack()} className={`p-1 rounded-full transition-colors shrink-0 ${
+            isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-white/10 text-white'
+          }`}>
+            <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
           <div className="flex flex-col min-w-0 flex-1 pr-2">
             {/* 1. 방 이름 메인 타이틀 (인간 중심) */}
             <div className="flex items-center gap-2 truncate">
-              <span className="text-base sm:text-lg font-black truncate text-white tracking-wide">
+              <span className={`text-base sm:text-lg font-black truncate tracking-wide ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}>
                 {(() => {
                   const titleStr = roomTitle || roomDescription || '';
                   const cleaned = titleStr.replace(/^[\d-]+\s*\|\s*/, '').trim();

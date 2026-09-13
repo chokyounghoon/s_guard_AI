@@ -5,9 +5,11 @@ import { getAuthHeaders } from '../lib/authStore';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useResizable, useResizableVertical } from '../hooks/useResizable';
+import { useTheme } from '../context/ThemeContext';
 import AlertMonitorPage from './AlertMonitorPage';
 
 export default function OrbitalCommandPage() {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const [threshold, setThreshold] = useState(0.80);
@@ -149,48 +151,50 @@ export default function OrbitalCommandPage() {
   return (
     <div style={{
       height: '100dvh',
-      background: 'linear-gradient(160deg, #020917 0%, #070d1f 50%, #020917 100%)',
+      background: isLight ? 'var(--sh-bg-canvas, #F1F5F9)' : 'linear-gradient(160deg, #020917 0%, #070d1f 50%, #020917 100%)',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
       fontFamily: "'Pretendard', 'Inter', sans-serif",
-      color: '#cbd5e1',
+      color: isLight ? '#0F172A' : '#cbd5e1',
     }}>
 
       {/* ── 헤더 ── */}
       <header style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 16px 12px',
-        borderBottom: '1px solid rgba(6,182,212,0.1)',
-        background: 'rgba(2,9,23,0.8)',
+        borderBottom: isLight ? '1px solid #E2E8F0' : '1px solid rgba(6,182,212,0.1)',
+        background: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(2,9,23,0.8)',
         backdropFilter: 'blur(20px)',
         flexShrink: 0,
       }}>
         <button onClick={() => goBack()} style={{
           width: 34, height: 34, borderRadius: 10,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+          background: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
         }}>
-          <ChevronLeft size={16} color="#64748b" />
+          <ChevronLeft size={16} color={isLight ? '#475569' : '#64748b'} />
         </button>
 
         <div style={{ textAlign: 'center' }}>
           <div style={{
             fontSize: 16, fontWeight: 900, letterSpacing: '0.06em',
-            background: 'linear-gradient(90deg, #06b6d4, #818cf8)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+            ...(isLight ? { color: '#0F172A' } : {
+              background: 'linear-gradient(90deg, #06b6d4, #818cf8)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+            })
           }}>ORBITAL COMMAND</div>
-          <div style={{ fontSize: 11, color: '#06b6d4', fontWeight: 800, letterSpacing: '0.2em', opacity: 0.6 }}>
+          <div style={{ fontSize: 11, color: isLight ? '#0284c7' : '#06b6d4', fontWeight: 800, letterSpacing: '0.2em', opacity: 0.8 }}>
             ZERO-G RAG CONTROL
           </div>
         </div>
 
         <div style={{
           width: 34, height: 34, borderRadius: 10,
-          background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)',
+          background: isLight ? '#F0F9FF' : 'rgba(6,182,212,0.1)', border: isLight ? '1px solid #BAE6FD' : '1px solid rgba(6,182,212,0.2)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Compass size={16} color="#06b6d4" style={{ animation: 'spin 8s linear infinite' }} />
+          <Compass size={16} color={isLight ? '#0284c7' : '#06b6d4'} style={{ animation: 'spin 8s linear infinite' }} />
         </div>
       </header>
 
@@ -203,8 +207,9 @@ export default function OrbitalCommandPage() {
 
         {/* ── 섹션 1: 상태 게이지 + SYNC 버튼 ── */}
         <div style={{
-          background: 'rgba(79,70,229,0.06)',
-          border: '1px solid rgba(79,70,229,0.15)',
+          background: isLight ? '#FFFFFF' : 'rgba(79,70,229,0.06)',
+          border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(79,70,229,0.15)',
+          boxShadow: isLight ? '0 1px 3px rgba(15,23,42,0.05)' : 'none',
           borderRadius: 20, padding: '16px',
           flex: `0 0 ${leftH[0]}%`,
           display: 'flex', flexDirection: 'column',
@@ -214,7 +219,7 @@ export default function OrbitalCommandPage() {
             {/* 원형 게이지 */}
             <div style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
               <svg width="72" height="72" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="36" cy="36" r={radius} stroke="rgba(255,255,255,0.06)" strokeWidth="5" fill="transparent" />
+                <circle cx="36" cy="36" r={radius} stroke={isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)"} strokeWidth="5" fill="transparent" />
                 <circle
                   cx="36" cy="36" r={radius}
                   stroke="url(#cyanGrad)" strokeWidth="5" fill="transparent"
@@ -228,7 +233,7 @@ export default function OrbitalCommandPage() {
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexDirection: 'column'
               }}>
-                <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: isLight ? '#0F172A' : '#fff', letterSpacing: '-0.02em' }}>
                   {isStatsLoading ? '…' : `${syncPct}%`}
                 </span>
               </div>
@@ -299,8 +304,9 @@ export default function OrbitalCommandPage() {
 
         {/* ── 섹션 2: Threshold Controller ── */}
         <div style={{
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: isLight ? '#FFFFFF' : 'rgba(255,255,255,0.03)',
+          border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.07)',
+          boxShadow: isLight ? '0 1px 3px rgba(15,23,42,0.05)' : 'none',
           borderRadius: 20, padding: '16px',
           flex: `0 0 ${leftH[1]}%`,
           display: 'flex', flexDirection: 'column', overflow: 'hidden'
@@ -308,14 +314,14 @@ export default function OrbitalCommandPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{
               width: 38, height: 38, borderRadius: 12,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+              background: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.08)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
             }}>
               <SlidersHorizontal size={18} color="#94a3b8" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 900, color: '#e2e8f0', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>THRESHOLD CONTROLLER</div>
-              <div style={{ fontSize: 10, color: '#475569', fontFamily: 'monospace' }}>RAG Similarity Cutoff</div>
+              <div style={{ fontSize: 13, fontWeight: 900, color: isLight ? '#0F172A' : '#e2e8f0', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>THRESHOLD CONTROLLER</div>
+              <div style={{ fontSize: 10, color: isLight ? '#64748b' : '#475569', fontFamily: 'monospace' }}>RAG Similarity Cutoff</div>
             </div>
             <div style={{
               padding: '6px 12px', borderRadius: 10, minWidth: 64, textAlign: 'center',
@@ -374,8 +380,9 @@ export default function OrbitalCommandPage() {
 
         {/* ── 섹션 3: Similarity Sandbox ── */}
         <div style={{
-          background: 'rgba(6,182,212,0.04)',
-          border: '1px solid rgba(6,182,212,0.12)',
+          background: isLight ? '#FFFFFF' : 'rgba(6,182,212,0.04)',
+          border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(6,182,212,0.12)',
+          boxShadow: isLight ? '0 1px 3px rgba(15,23,42,0.05)' : 'none',
           borderRadius: 20,
           overflow: 'hidden',
           flex: `1 1 ${leftH[2]}%`,
@@ -391,14 +398,14 @@ export default function OrbitalCommandPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
                 width: 30, height: 30, borderRadius: 10,
-                background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)',
+                background: isLight ? '#F0F9FF' : 'rgba(6,182,212,0.1)', border: isLight ? '1px solid #BAE6FD' : '1px solid rgba(6,182,212,0.2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
                 <Search size={14} color="#06b6d4" />
               </div>
               <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.05em' }}>SIMILARITY SANDBOX</div>
-                <div style={{ fontSize: 9, color: '#475569', fontFamily: 'monospace' }}>Vector Search Test Bench</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: isLight ? '#0F172A' : '#e2e8f0', letterSpacing: '0.05em' }}>SIMILARITY SANDBOX</div>
+                <div style={{ fontSize: 9, color: isLight ? '#64748b' : '#475569', fontFamily: 'monospace' }}>Vector Search Test Bench</div>
               </div>
             </div>
             <div style={{
@@ -560,8 +567,9 @@ export default function OrbitalCommandPage() {
         {/* ── 2열: Alert Monitor Engine ── */}
         <div style={{ flex: `1 1 0%`, minWidth: 0 }} className="flex flex-col gap-3 lg:h-full lg:pl-3 lg:overflow-y-auto hide-scrollbar mt-3 lg:mt-0">
         <div style={{
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: isLight ? '#FFFFFF' : 'rgba(255,255,255,0.03)',
+          border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.07)',
+          boxShadow: isLight ? '0 1px 3px rgba(15,23,42,0.05)' : 'none',
           borderRadius: 20,
           overflow: 'hidden',
           flexShrink: 0,
@@ -573,21 +581,21 @@ export default function OrbitalCommandPage() {
           {/* 헤더 */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '13px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)',
-            background: 'rgba(0,0,0,0.2)',
+            padding: '13px 16px', borderBottom: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.05)',
+            background: isLight ? '#F8FAFC' : 'rgba(0,0,0,0.2)',
             flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
                 width: 30, height: 30, borderRadius: 10,
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                background: isLight ? '#EEF2FF' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid #C7D2FE' : '1px solid rgba(255,255,255,0.1)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <Activity size={14} color="#818cf8" />
+                <Activity size={14} color="#6366f1" />
               </div>
               <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.05em' }}>3-TIER SEVERITY ENGINE</div>
-                <div style={{ fontSize: 9, color: '#475569', fontFamily: 'monospace' }}>Global Alert Thresholds</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: isLight ? '#0F172A' : '#e2e8f0', letterSpacing: '0.05em' }}>3-TIER SEVERITY ENGINE</div>
+                <div style={{ fontSize: 9, color: isLight ? '#64748b' : '#475569', fontFamily: 'monospace' }}>Global Alert Thresholds</div>
               </div>
             </div>
           </div>

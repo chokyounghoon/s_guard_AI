@@ -3,11 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, MessageSquare, Activity, Search, MoreHorizontal, Users, User, Network, Shield, ShieldCheck, FileText, Bot, BookOpen, Inbox, Cpu, Layers, BellDot, Hash, Keyboard, Bell, Phone, UserCircle, Lock, Trash2 } from 'lucide-react';
 import { getUserProfile, getAllowedPaths, addAuthListener } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
+import { useTheme } from '../context/ThemeContext';
 
 export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick, onAiClick, showAiPulse = true, user, initialOpenMoreMenu, allowedPaths: _ignored }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const { isLight } = useTheme();
 
   // authStore 직접 구독
   const [liveAllowedPaths, setLiveAllowedPaths] = useState(() => getAllowedPaths());
@@ -54,7 +56,11 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
   return (
     <>
       {/* Flat Bottom Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-[250] bg-[#0f1219]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden">
+      <nav className={`fixed bottom-0 left-0 right-0 z-[250] ${
+        isLight
+          ? 'bg-white/95 border-t border-[#E2E8F0] shadow-[0_-4px_20px_rgba(0,0,0,0.05)] text-slate-700'
+          : 'bg-[#0f1219]/95 border-t border-white/10 text-white'
+      } backdrop-blur-md flex justify-around items-center px-2 pt-3 pb-[env(safe-area-inset-bottom,12px)] print:hidden`}>
         {[
           { id: 'home', label: '홈', icon: Home, path: '/dashboard' },
           { id: 'chat', label: 'War-Room', icon: MessageSquare, path: '/chat', action: onWarRoomClick },
@@ -70,19 +76,25 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
               key={item.id}
               onClick={() => item.action ? item.action() : navigate(item.path)}
               className={`flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all duration-200 relative min-w-[48px] ${
-                isActive ? 'text-blue-400' : 'text-slate-500'
+                isActive 
+                  ? (isLight ? 'text-blue-600' : 'text-blue-400')
+                  : (isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-500 hover:text-slate-300')
               }`}
             >
               {isActive && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                <span className={`absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full ${
+                  isLight ? 'bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]' : 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
+                }`} />
               )}
               <div className="relative">
-                <Icon className={`w-5 h-5 transition-all duration-200 ${isActive ? 'drop-shadow-[0_0_6px_rgba(59,130,246,0.6)]' : ''}`} />
+                <Icon className={`w-5 h-5 transition-all duration-200 ${isActive ? (isLight ? 'drop-shadow-[0_0_6px_rgba(37,99,235,0.3)]' : 'drop-shadow-[0_0_6px_rgba(59,130,246,0.6)]') : ''}`} />
                 {item.isAi && showAiPulse && (
                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border border-[#0f111a] animate-pulse" />
                 )}
               </div>
-              <span className={`text-[9px] font-bold tracking-tight leading-none ${isActive ? 'text-blue-400' : 'text-slate-600'}`}>
+              <span className={`text-[9px] font-bold tracking-tight leading-none ${
+                isActive ? (isLight ? 'text-blue-600' : 'text-blue-400') : (isLight ? 'text-slate-500' : 'text-slate-600')
+              }`}>
                 {item.label}
               </span>
             </button>
@@ -94,14 +106,16 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
       {showMoreMenu && (
         <div className="fixed inset-0 z-[260] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowMoreMenu(false)} />
-          <div className="w-full max-w-xl rounded-t-[2rem] border-t border-white/10 shadow-2xl relative z-10 overflow-hidden flex flex-col"
-            style={{ background: '#0e1118', maxHeight: '85vh' }}>
+          <div className={`w-full max-w-xl rounded-t-[2rem] border-t shadow-2xl relative z-10 overflow-hidden flex flex-col ${
+            isLight ? 'bg-white border-[#E2E8F0]' : 'border-white/10'
+          }`}
+            style={{ background: isLight ? '#ffffff' : '#0e1118', maxHeight: '85vh' }}>
 
             {/* 헤더 */}
-            <div className="pt-4 pb-3 px-6 flex flex-col items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="w-10 h-1 rounded-full mb-4" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <h3 className="text-lg font-black text-white tracking-tight">System Console</h3>
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] mt-0.5" style={{ color: '#3b82f6' }}>Management & Intelligence</p>
+            <div className="pt-4 pb-3 px-6 flex flex-col items-center" style={{ borderBottom: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="w-10 h-1 rounded-full mb-4" style={{ background: isLight ? '#cbd5e1' : 'rgba(255,255,255,0.1)' }} />
+              <h3 className={`text-lg font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>System Console</h3>
+              <p className="text-[9px] font-black uppercase tracking-[0.25em] mt-0.5" style={{ color: '#0046ff' }}>Management & Intelligence</p>
             </div>
 
             {/* Manual Entry - 전체 너비 강조 버튼 */}
@@ -115,8 +129,8 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
                   padding: '14px 18px',
-                  background: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.06) 100%)',
-                  border: '1px solid rgba(16,185,129,0.25)',
+                  background: isLight ? '#f0fdf4' : 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.06) 100%)',
+                  border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(16,185,129,0.25)',
                   borderRadius: 16, cursor: 'pointer',
                   position: 'relative', overflow: 'hidden',
                 }}
@@ -128,18 +142,18 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                 }} />
                 <div style={{
                   width: 40, height: 40, borderRadius: 12,
-                  background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
+                  background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.15)', border: isLight ? '1px solid #86efac' : '1px solid rgba(16,185,129,0.3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
                   <MessageSquare size={18} color="#10b981" />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#e2e8f0', letterSpacing: '0.01em' }}>Manual Entry</div>
-                  <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, letterSpacing: '0.06em', opacity: 0.8 }}>INCIDENT INJECTION · 장애 수동 접수</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: isLight ? '#0f172a' : '#e2e8f0', letterSpacing: '0.01em' }}>Manual Entry</div>
+                  <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, letterSpacing: '0.06em', opacity: 0.9 }}>INCIDENT INJECTION · 장애 수동 접수</div>
                 </div>
                 <div style={{
                   width: 28, height: 28, borderRadius: 9,
-                  background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)',
+                  background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.12)', border: isLight ? '1px solid #86efac' : '1px solid rgba(16,185,129,0.2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
                   <span style={{ fontSize: 14, color: '#10b981', fontWeight: 900 }}>›</span>
@@ -150,13 +164,13 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             {/* 그리드: 2열 (PC 버전 - s-callert 만) */}
             <div className="flex-1 overflow-y-auto p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {[
-                { label: '실시간 파이프라인', sub: 'REALTIME PIPELINE', icon: Layers, path: '/realtime-pipeline', color: '#00e5ff' },
+                { label: '실시간 파이프라인', sub: 'REALTIME PIPELINE', icon: Layers, path: '/realtime-pipeline', color: '#0046ff' },
                 { label: '대직자 관리', sub: 'DEPUTY MGMT', icon: UserCircle, path: '/admin/deputy', color: '#10b981' },
                 { label: '기술 명세', sub: 'ARCHITECTURE', icon: Cpu, path: '/processing-flow', color: '#a855f7' },
                 { label: '보안 체계', sub: 'SECURITY INFO', icon: ShieldCheck, path: '/security-features', color: '#10b981' },
-                { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#fb923c', adminOnly: true },
+                { label: 'S-callert', sub: 'PDS 자동호출', icon: Phone, path: '/s-callert', color: '#ea580c', adminOnly: true },
                 { label: '권한 관리', sub: 'RBAC SETTING', icon: Shield, path: '/admin/permissions', color: '#6366f1', adminOnly: true },
-                { label: '사용자 관리', sub: 'USER MGMT', icon: Users, path: '/user-management', color: '#3b82f6', adminOnly: true },
+                { label: '사용자 관리', sub: 'USER MGMT', icon: Users, path: '/user-management', color: '#0284c7', adminOnly: true },
                 { label: '데이터 삭제', sub: 'DATA CLEANUP', icon: Trash2, path: '/admin/incident-cleanup', color: '#ef4444', adminOnly: true },
               ].filter(m => !m.adminOnly || user?.is_admin === 1 || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'super_admin' || checkAllowed(m.path)).map((item) => {
                 const Icon = item.icon;
@@ -178,8 +192,8 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                       }
                     }}
                     style={{
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.07)',
+                      background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.04)',
+                      border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.07)',
                       borderRadius: 16,
                       padding: '14px 8px 12px',
                       cursor: !allowed ? 'not-allowed' : 'pointer',
@@ -190,7 +204,8 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                       textAlign: 'center',
                       gap: 6,
                       transition: 'all 0.2s',
-                      position: 'relative'
+                      position: 'relative',
+                      boxShadow: isLight ? '0 1px 3px rgba(15, 23, 42, 0.04)' : 'none'
                     }}
                   >
                     {!allowed && <Lock className="w-3.5 h-3.5 text-red-500 absolute top-2 right-2" />}
@@ -203,10 +218,10 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
                     }}>
                       <Icon size={18} color={item.color} />
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#e2e8f0', lineHeight: 1.3, whiteSpace: 'pre-line' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: isLight ? '#0f172a' : '#e2e8f0', lineHeight: 1.3, whiteSpace: 'pre-line' }}>
                       {item.label}
                     </span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: isLight ? '#64748b' : '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 1.2 }}>
                       {item.sub}
                     </span>
                   </div>
@@ -215,10 +230,10 @@ export default function BottomMenu({ currentPath, onWarRoomClick, onReportClick,
             </div>
 
             {/* 닫기 */}
-            <div style={{ padding: '12px 16px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ padding: '12px 16px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))', borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)' }}>
               <button
                 onClick={() => setShowMoreMenu(false)}
-                style={{ width: '100%', padding: '13px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: 13, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.06em' }}
+                style={{ width: '100%', padding: '13px', borderRadius: 14, background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.08)', color: isLight ? '#334155' : '#64748b', fontSize: 13, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.06em' }}
               >
                 CLOSE CONSOLE
               </button>

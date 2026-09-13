@@ -392,6 +392,14 @@ const IncidentPushPage = () => {
                 extract(label, keyMap[label]);
             });
 
+            if (!result.occurrence_count) {
+                ['현재오류건수', '오류발생건수', '발생오류건수', '오류건수', '현재거래건수'].forEach(label => {
+                    if (!result.occurrence_count) {
+                        extract(label, 'occurrence_count');
+                    }
+                });
+            }
+
             // Receivers parsing
             const receiverRegex = /▶\s*메시지 수신자\s*:\s*\[\s*([^%\n\r\[\]]+)|▶\s*메시지 수신자\s*:\s*\[\s*([^\]]+)\]/i;
             const receiverMatch = text.match(receiverRegex);

@@ -4,6 +4,8 @@ import {
   ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Flame, Clock, 
   ListChecks, CheckSquare, Square, Zap, Sparkles, Send, Sliders, Ticket, MessageSquare 
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { formatOccurrenceCount } from '../utils/maskingUtils';
 
 const AgentAvatar = ({ role }) => {
   const getAgentStyle = (role) => {
@@ -243,6 +245,7 @@ function parseConsensusSections(rawText, incident, status = { level: 'SAFE' }) {
 }
 
 export default function AgentDiscussionPanel({ messages, isVisible, onClose, embedded = false, incident }) {
+  const { isLight, theme } = useTheme();
   const scrollRef = useRef(null);
   const longPressTimer = useRef(null);
   const [contextMenu, setContextMenu] = useState(null); // { text, x, y }
@@ -316,8 +319,10 @@ export default function AgentDiscussionPanel({ messages, isVisible, onClose, emb
   if (!isVisible) return null;
 
   const containerClasses = embedded 
-    ? "w-full h-full bg-[#0D162B] flex flex-col overflow-hidden animate-in fade-in duration-500"
-    : "fixed right-4 bottom-4 w-96 max-h-[600px] bg-[#0D162B] border border-[#1E2F56] rounded-2xl shadow-2xl overflow-hidden flex flex-col z-40 animate-in slide-in-from-right duration-500";
+    ? `w-full h-full flex flex-col overflow-hidden animate-in fade-in duration-500 ${isLight ? 'bg-white text-slate-900' : 'bg-[#0D162B] text-white'}`
+    : `fixed right-4 bottom-4 w-96 max-h-[600px] rounded-2xl shadow-2xl overflow-hidden flex flex-col z-40 animate-in slide-in-from-right duration-500 ${
+        isLight ? 'bg-white border border-[#E2E8F0] text-slate-900' : 'bg-[#0D162B] border border-[#1E2F56] text-white'
+      }`;
 
   // 동적 상태 계산
   const getIncidentStatus = () => {
@@ -531,7 +536,9 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
       )}
 
       {/* 1. 에이전트 합의 메커니즘 시각화 (Multi-Agent Consensus Matrix Strip) */}
-      <div className="px-3.5 py-2.5 bg-[#0D162B] border-b border-[#1E2F56] shrink-0 relative">
+      <div className={`px-3.5 py-2.5 border-b shrink-0 relative ${
+        isLight ? 'bg-slate-50 border-[#E2E8F0]' : 'bg-[#0D162B] border-[#1E2F56]'
+      }`}>
         <div className="flex items-center justify-between gap-2">
           {agentConsensusMatrix.map((agent) => {
             const Icon = agent.icon;
@@ -545,15 +552,17 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                 title={`클릭 시 ${agent.role} 상세 추론 로그(Chain of Thought) 확인`}
                 className={`flex-1 flex flex-col p-2 rounded-xl transition-all duration-200 cursor-pointer text-left border relative group ${
                   isSelected 
-                    ? 'bg-[#13203E] border-[#0046FF] ring-1 ring-[#0046FF]' 
-                    : 'bg-[#060C1B] border-[#1E2F56] hover:border-slate-500 hover:bg-[#13203E]'
+                    ? (isLight ? 'bg-white border-[#0046FF] ring-2 ring-[#0046FF]/30 shadow-sm' : 'bg-[#13203E] border-[#0046FF] ring-1 ring-[#0046FF]') 
+                    : (isLight ? 'bg-white border-[#E2E8F0] hover:border-[#0046FF]/50 hover:bg-[#EFF6FF]/40' : 'bg-[#060C1B] border-[#1E2F56] hover:border-slate-500 hover:bg-[#13203E]')
                 }`}
               >
                 {/* 상단: 역할 + 신뢰도 점수 */}
                 <div className="flex items-center justify-between w-full mb-1">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <Icon className={`w-3.5 h-3.5 ${agent.color} shrink-0`} />
-                    <span className="text-[11px] font-black text-slate-200 tracking-wider font-shinhan-display">
+                    <span className={`text-[11px] font-black tracking-wider font-shinhan-display ${
+                      isLight ? 'text-slate-800' : 'text-slate-200'
+                    }`}>
                       {agent.role}
                     </span>
                   </div>
@@ -563,7 +572,9 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                 </div>
 
                 {/* 중단: 인라인 미니 프로그레스 게이지 */}
-                <div className="w-full h-1 bg-[#13203E] rounded-full overflow-hidden mb-1.5 border border-[#1E2F56]/60">
+                <div className={`w-full h-1 rounded-full overflow-hidden mb-1.5 border ${
+                  isLight ? 'bg-slate-200 border-[#E2E8F0]' : 'bg-[#13203E] border-[#1E2F56]/60'
+                }`}>
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${agent.barColor}`} 
                     style={{ width: `${agent.score}%` }} 
@@ -572,10 +583,14 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
 
                 {/* 하단: 보팅/원인 판정 텍스트 */}
                 <div className="flex items-center justify-between w-full min-w-0 gap-1">
-                  <span className="text-[9.5px] font-medium text-slate-300 truncate leading-tight" title={agent.verdict}>
+                  <span className={`text-[9.5px] font-medium truncate leading-tight ${
+                    isLight ? 'text-slate-600' : 'text-slate-300'
+                  }`} title={agent.verdict}>
                     {agent.verdict}
                   </span>
-                  <span className="text-[8px] font-shinhan-num text-slate-400 shrink-0 group-hover:text-[#00A3E0] transition-colors">
+                  <span className={`text-[8px] font-shinhan-num shrink-0 transition-colors ${
+                    isLight ? 'text-slate-400 group-hover:text-[#0046FF]' : 'text-slate-400 group-hover:text-[#00A3E0]'
+                  }`}>
                     CoT ▸
                   </span>
                 </div>
@@ -591,26 +606,32 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]" 
               onClick={() => setSelectedAgentCot(null)} 
             />
-            <div className="absolute inset-x-3.5 top-[76px] z-50 rounded-2xl bg-[#0D162B] border border-[#1E2F56] shadow-2xl p-4 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className={`absolute inset-x-3.5 top-[76px] z-50 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-150 border ${
+              isLight ? 'bg-white border-[#E2E8F0] text-slate-900' : 'bg-[#0D162B] border-[#1E2F56] text-slate-200'
+            }`}>
               {/* Modal Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#1E2F56]">
+              <div className={`flex items-center justify-between pb-3 border-b ${
+                isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]'
+              }`}>
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className={`p-2 rounded-xl ${selectedAgentCot.bg} border ${selectedAgentCot.border}`}>
                     <selectedAgentCot.icon className={`w-4 h-4 ${selectedAgentCot.color}`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-white tracking-wider font-shinhan-display">
+                      <span className={`text-xs font-black tracking-wider font-shinhan-display ${
+                        isLight ? 'text-slate-900' : 'text-white'
+                      }`}>
                         {selectedAgentCot.role}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-medium">
+                      <span className={`text-[10px] font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                         ({selectedAgentCot.name})
                       </span>
                       <span className={`text-[10px] font-shinhan-num font-black px-1.5 py-0.2 rounded-md ${selectedAgentCot.bg} ${selectedAgentCot.color} border ${selectedAgentCot.border}`}>
                         신뢰도 {selectedAgentCot.score}%
                       </span>
                     </div>
-                    <p className="text-[9.5px] font-shinhan-num text-slate-400 mt-0.5">
+                    <p className={`text-[9.5px] font-shinhan-num mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                       {selectedAgentCot.cot.model} • 추론 지연시간 {selectedAgentCot.cot.inferenceLatency}
                     </p>
                   </div>
@@ -619,7 +640,9 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
                 <button
                   type="button"
                   onClick={() => setSelectedAgentCot(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#13203E] transition-colors"
+                  className={`p-1 rounded-lg transition-colors ${
+                    isLight ? 'text-slate-400 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-[#13203E]'
+                  }`}
                   title="닫기"
                 >
                   <X className="w-4 h-4" />
@@ -629,27 +652,35 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
               {/* Modal Content: Chain of Thought */}
               <div className="pt-3 space-y-3">
                 {/* 프롬프트 분석 목표 */}
-                <div className="p-2.5 rounded-xl bg-[#060C1B] border border-[#1E2F56]">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1.5 font-shinhan-display">
-                    <Terminal className="w-3.5 h-3.5 text-[#00A3E0]" />
+                <div className={`p-2.5 rounded-xl border ${
+                  isLight ? 'bg-slate-50 border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+                }`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 font-shinhan-display ${
+                    isLight ? 'text-slate-600' : 'text-slate-400'
+                  }`}>
+                    <Terminal className={`w-3.5 h-3.5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                     프롬프트 분석 목표 (Prompt Objective)
                   </div>
-                  <p className="text-[12px] font-medium text-slate-200 leading-snug">
+                  <p className={`text-[12px] font-medium leading-snug ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                     {selectedAgentCot.cot.promptSummary}
                   </p>
                 </div>
 
                 {/* 단계별 추론 로그 (Chain of Thought Steps) */}
-                <div className="p-2.5 rounded-xl bg-[#060C1B] border border-[#1E2F56] space-y-2">
-                  <div className="text-[10px] font-bold text-[#00A3E0] uppercase tracking-wider mb-1.5 flex items-center gap-1.5 font-shinhan-display">
-                    <Sparkles className="w-3.5 h-3.5 text-[#00A3E0]" />
+                <div className={`p-2.5 rounded-xl border space-y-2 ${
+                  isLight ? 'bg-slate-50 border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+                }`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5 font-shinhan-display ${
+                    isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'
+                  }`}>
+                    <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                     단계별 추론 과정 (Chain of Thought Telemetry)
                   </div>
                   <div className="space-y-1.5 pl-0.5 font-shinhan-num text-[11px] leading-relaxed">
                     {selectedAgentCot.cot.thoughtSteps.map((step, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-slate-300">
-                        <span className="text-[#00C48C] font-bold shrink-0 mt-0.5">✓</span>
-                        <span className={idx === selectedAgentCot.cot.thoughtSteps.length - 1 ? 'font-bold text-slate-100' : ''}>
+                      <div key={idx} className={`flex items-start gap-2 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                        <span className={`${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'} font-bold shrink-0 mt-0.5`}>✓</span>
+                        <span className={idx === selectedAgentCot.cot.thoughtSteps.length - 1 ? (isLight ? 'font-bold text-slate-900' : 'font-bold text-slate-100') : ''}>
                           {step}
                         </span>
                       </div>
@@ -659,7 +690,7 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
 
                 {/* 최종 보팅 판정 */}
                 <div className="flex items-center justify-between px-2 pt-1 text-[11px]">
-                  <span className="text-slate-400 font-medium">최종 원인 판정(Vote):</span>
+                  <span className={`font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>최종 원인 판정(Vote):</span>
                   <span className={`font-bold px-2 py-0.5 rounded-md ${selectedAgentCot.bg} ${selectedAgentCot.color} border ${selectedAgentCot.border} font-shinhan-num`}>
                     {selectedAgentCot.vote}
                   </span>
@@ -671,12 +702,14 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
       </div>
 
       {/* 2. Scrollable Body: Consensus Cards + Action Items + Agent Discussion Log */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3.5 space-y-3 custom-scrollbar" ref={scrollRef}>
+      <div className={`flex-1 min-h-0 overflow-y-auto px-4 py-3.5 space-y-3 custom-scrollbar ${
+        isLight ? 'bg-white' : ''
+      }`} ref={scrollRef}>
         {/* Consensus Conclusion Header Strip */}
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${status.level === 'CRITICAL' ? 'bg-[#F04438]' : status.level === 'MAJOR' ? 'bg-[#F5A623]' : 'bg-[#00C48C]'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${status.level === 'CRITICAL' ? (isLight ? 'bg-[#DC2626]' : 'bg-[#F04438]') : status.level === 'MAJOR' ? (isLight ? 'bg-[#D97706]' : 'bg-[#F5A623]') : (isLight ? 'bg-[#16A34A]' : 'bg-[#00C48C]')}`}></span>
             </span>
             <span className={`text-[11px] font-black tracking-widest uppercase ${status.color} flex items-center gap-1.5 font-shinhan-display`}>
               Consensus Conclusion
@@ -688,13 +721,17 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
 
           <button
             onClick={handleCopyConsensus}
-            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-slate-400 hover:text-white rounded bg-[#13203E] hover:bg-[#1E2F56] border border-[#1E2F56] transition-all cursor-pointer font-shinhan-display"
+            className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded border transition-all cursor-pointer font-shinhan-display ${
+              isLight 
+                ? 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border-[#E2E8F0]' 
+                : 'text-slate-400 hover:text-white bg-[#13203E] hover:bg-[#1E2F56] border-[#1E2F56]'
+            }`}
             title="합의 결론 전체 복사"
           >
             {copiedConsensus ? (
               <>
-                <Check className="w-3 h-3 text-[#00C48C]" />
-                <span className="text-[#00C48C]">복사됨</span>
+                <Check className={`w-3 h-3 ${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'}`} />
+                <span className={isLight ? 'text-[#15803D]' : 'text-[#00C48C]'}>복사됨</span>
               </>
             ) : (
               <>
@@ -705,138 +742,253 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
           </button>
         </div>
 
-        {/* 💡 1줄 상황 브리핑 (Executive Summary) 인라인 브리핑 바 */}
-        <div className="p-3 rounded-xl bg-[#13203E] border border-[#00A3E0]/40 shadow-sm flex items-start gap-2.5">
-          <span className="px-2 py-0.5 rounded-md bg-[#0046FF]/20 text-[#00A3E0] border border-[#0046FF]/40 text-[10px] font-black tracking-wider shrink-0 mt-0.5 flex items-center gap-1 font-shinhan-display">
-            <Sparkles className="w-3 h-3 text-[#00A3E0]" />
+        {/* 💡 1줄 상황 브리핑 (Executive Summary) 신한 소프트 블루 배경 (bg-[#EFF6FF] text-[#1E40AF]) */}
+        <div className={`p-3 rounded-xl shadow-sm flex items-start gap-2.5 border ${
+          isLight 
+            ? 'bg-[#EFF6FF] border-[#BFDBFE]' 
+            : 'bg-[#13203E] border-[#00A3E0]/40'
+        }`}>
+          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 mt-0.5 flex items-center gap-1 font-shinhan-display border ${
+            isLight 
+              ? 'bg-[#DBEAFE] text-[#1D4ED8] border-[#93C5FD]' 
+              : 'bg-[#0046FF]/20 text-[#00A3E0] border-[#0046FF]/40'
+          }`}>
+            <Sparkles className={`w-3 h-3 ${isLight ? 'text-[#1D4ED8]' : 'text-[#00A3E0]'}`} />
             장애 요약
           </span>
-          <p className="text-[13px] font-bold text-slate-100 leading-snug tracking-tight break-keep">
+          <p className={`report-body-text text-[15px] md:text-[12.5px] leading-relaxed break-keep ${
+            isLight ? 'text-[#1E40AF]' : 'text-slate-100'
+          }`}>
             {consensusData.executiveSummary}
           </p>
         </div>
 
         {/* 4대 체계적 리포트 카드 (01~04 마크다운 파싱 및 시각화) */}
         <div className="space-y-2.5">
-          {/* 01 장애 내용: 영향 시스템 태그(MCI, 신한카드 TMS)와 오류 발생 건수(42건) 정돈된 표 형태 */}
-          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#00A3E0] shadow-sm transition-all hover:border-[#00A3E0]/50">
-            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
+          {/* 01 장애 내용: 라이트 그레이 서피스(bg-[#F8FAFC]) */}
+          <div className={`p-3 md:p-3.5 rounded-xl border-l-3 shadow-sm transition-all border ${
+            isLight 
+              ? 'bg-[#F8FAFC] border-[#E2E8F0] border-l-[#0046FF]' 
+              : 'bg-[#13203E] border-[#1E2F56] border-l-[#00A3E0] hover:border-[#00A3E0]/50'
+          }`}>
+            <div className={`flex items-center justify-between mb-2 pb-1.5 border-b ${
+              isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]'
+            }`}>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-[#00A3E0]/10 text-[#00A3E0] border border-[#00A3E0]/30 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
-                  <AlertCircle className="w-3.5 h-3.5 text-[#00A3E0]" />
+                <span className={`px-2 py-0.5 rounded text-sm md:text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display border ${
+                  isLight 
+                    ? 'bg-[#EFF6FF] text-[#0046FF] border-[#BFDBFE]' 
+                    : 'bg-[#00A3E0]/10 text-[#00A3E0] border-[#00A3E0]/30'
+                }`}>
+                  <AlertCircle className={`w-3.5 h-3.5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                   01 장애 내용
                 </span>
-                <span className="text-[9.5px] font-shinhan-num text-[#00A3E0]/70 tracking-widest uppercase">SYMPTOM & IMPACT</span>
+                <span className={`text-[10px] md:text-[9.5px] font-shinhan-num tracking-widest uppercase ${
+                  isLight ? 'text-slate-500 font-semibold' : 'text-[#00A3E0]/70'
+                }`}>SYMPTOM & IMPACT</span>
               </div>
             </div>
             
-            {/* 영향 시스템 및 오류 건수 표 */}
-            <div className="grid grid-cols-2 gap-2 mb-2 p-2 rounded-lg bg-[#060C1B] border border-[#1E2F56] text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 font-bold text-[11px]">영향 시스템:</span>
-                <div className="flex items-center gap-1">
-                  <span className="px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-[#00A3E0] font-mono font-bold text-[10px]">MCI</span>
-                  <span className="px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-slate-200 font-mono font-bold text-[10px]">신한카드 TMS</span>
+            {/* 영향 시스템 및 오류 건수 표 (모바일 1열 스택 대응) */}
+            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2 p-2 rounded-lg border text-xs ${
+              isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+            }`}>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`font-bold text-xs md:text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>영향 시스템:</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {(() => {
+                    const systems = [];
+                    const msg = incident?.message || incident?.rawMessage || '';
+                    if (incident?.channel && incident.channel !== '-') systems.push(incident.channel);
+                    if (incident?.biz_system && incident.biz_system !== '-' && !systems.includes(incident.biz_system)) systems.push(incident.biz_system);
+                    if (systems.length === 0 && msg) {
+                      const ch = msg.match(/▶\s*채널\s*:\s*\[([^\]]+)\]/);
+                      if (ch && ch[1] && ch[1] !== '-') systems.push(ch[1].trim());
+                      const biz = msg.match(/▶\s*업무(?:코드|시스템)?\s*:\s*\[([^\]]+)\]/);
+                      if (biz && biz[1] && biz[1] !== '-') systems.push(biz[1].trim());
+                    }
+                    if (incident?.service_name && incident.service_name !== '-') {
+                      systems.push(incident.service_name);
+                    } else if (msg) {
+                      const srv = msg.match(/▶\s*서비스명\s*:\s*\[([^\]]+)\]/);
+                      if (srv && srv[1] && srv[1] !== '-') systems.push(srv[1].trim());
+                      else if (msg.includes('신한카드') || msg.includes('TMS')) systems.push('신한카드 TMS');
+                    }
+                    const finalSystems = systems.length > 0 ? Array.from(new Set(systems)).slice(0, 2) : ['MCI', '신한카드 TMS'];
+                    return finalSystems.map((sys, sIdx) => (
+                      <span key={sIdx} className={`px-1.5 py-0.5 rounded font-mono font-bold text-xs md:text-[10px] border ${
+                        sIdx === 0
+                          ? (isLight ? 'bg-[#EFF6FF] border-[#BFDBFE] text-[#0046FF]' : 'bg-[#13203E] border-[#1E2F56] text-[#00A3E0]')
+                          : (isLight ? 'bg-slate-100 border-[#E2E8F0] text-slate-800' : 'bg-[#13203E] border-[#1E2F56] text-slate-200')
+                      }`}>
+                        {sys}
+                      </span>
+                    ));
+                  })()}
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-1.5">
-                <span className="text-slate-400 font-bold text-[11px]">오류 발생 건수:</span>
-                <span className="px-2 py-0.5 rounded bg-[#F04438]/15 border border-[#F04438]/30 text-[#F04438] font-shinhan-num font-black text-[11px]">
-                  {incident?.occurrence_count || '42'}건
+              <div className="flex items-center sm:justify-end gap-1.5">
+                <span className={`font-bold text-xs md:text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>오류 발생 건수:</span>
+                <span className={`px-2 py-0.5 rounded font-shinhan-num font-black text-xs md:text-[11px] border ${
+                  isLight 
+                    ? 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]' 
+                    : 'bg-[#F04438]/15 border-[#F04438]/30 text-[#F04438]'
+                }`}>
+                  {formatOccurrenceCount(incident)}
                 </span>
               </div>
             </div>
 
-            <p className="text-[12.5px] font-normal text-slate-200 leading-relaxed break-keep whitespace-pre-wrap pl-0.5">
+            <p className={`report-body-text text-[15px] md:text-[12.5px] leading-relaxed break-keep whitespace-pre-wrap pl-0.5 ${
+              isLight ? 'text-slate-800 font-medium' : 'text-slate-200 font-normal'
+            }`}>
               {consensusData.symptom}
             </p>
           </div>
 
-          {/* 02 발생 원인: WAS 커넥션 풀 고갈 원인을 원신한 산세리프 본문으로 가독성 높게 전달 */}
-          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#F5A623] shadow-sm transition-all hover:border-[#F5A623]/50">
-            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
+          {/* 02 발생 원인: 웜 아이보리 서피스(bg-[#FEFCE8]) + 볼드 텍스트 */}
+          <div className={`p-3 md:p-3.5 rounded-xl border-l-3 shadow-sm transition-all border ${
+            isLight 
+              ? 'bg-[#FEFCE8] border-[#FEF08A] border-l-[#F59E0B]' 
+              : 'bg-[#13203E] border-[#1E2F56] border-l-[#F5A623] hover:border-[#F5A623]/50'
+          }`}>
+            <div className={`flex items-center justify-between mb-2 pb-1.5 border-b ${
+              isLight ? 'border-[#FEF08A]' : 'border-[#1E2F56]'
+            }`}>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-[#F5A623]/10 text-[#F5A623] border border-[#F5A623]/30 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
-                  <Flame className="w-3.5 h-3.5 text-[#F5A623]" />
+                <span className={`px-2 py-0.5 rounded text-sm md:text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display border ${
+                  isLight 
+                    ? 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]' 
+                    : 'bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/30'
+                }`}>
+                  <Flame className={`w-3.5 h-3.5 ${isLight ? 'text-[#B45309]' : 'text-[#F5A623]'}`} />
                   02 발생 원인
                 </span>
-                <span className="text-[9.5px] font-shinhan-num text-[#F5A623]/70 tracking-widest uppercase">ROOT CAUSE</span>
+                <span className={`text-[10px] md:text-[9.5px] font-shinhan-num tracking-widest uppercase ${
+                  isLight ? 'text-[#B45309]/80 font-bold' : 'text-[#F5A623]/70'
+                }`}>ROOT CAUSE</span>
               </div>
             </div>
-            <p className="text-[12.5px] font-normal text-slate-100 leading-relaxed break-keep whitespace-pre-wrap pl-0.5 font-shinhan-sans">
+            <p className={`report-body-text text-[15px] md:text-[12.5px] leading-relaxed break-keep whitespace-pre-wrap pl-0.5 font-shinhan-sans ${
+              isLight ? 'text-[#713F12] font-semibold' : 'text-slate-100 font-normal'
+            }`}>
               WAS 인스턴스 내부 커넥션 풀(DB Connection Pool) 고갈 및 대외기관(정보계) 연동 지연에 따른 세션 타임아웃 락 경합 발생. {consensusData.cause}
             </p>
           </div>
 
-          {/* 03 진행 경과: 타임스탬프(08:33:45) 기반의 컴팩트 스텝퍼 적용 */}
-          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#0046FF] shadow-sm transition-all hover:border-[#0046FF]/50">
-            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
+          {/* 03 진행 경과: 깔끔한 라이트 타임라인 노드 */}
+          <div className={`p-3 md:p-3.5 rounded-xl border-l-3 shadow-sm transition-all border ${
+            isLight 
+              ? 'bg-[#F8FAFC] border-[#E2E8F0] border-l-[#0046FF]' 
+              : 'bg-[#13203E] border-[#1E2F56] border-l-[#0046FF] hover:border-[#0046FF]/50'
+          }`}>
+            <div className={`flex items-center justify-between mb-2 pb-1.5 border-b ${
+              isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]'
+            }`}>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-[#0046FF]/15 text-[#00A3E0] border border-[#0046FF]/40 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
-                  <Clock className="w-3.5 h-3.5 text-[#00A3E0]" />
+                <span className={`px-2 py-0.5 rounded text-sm md:text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display border ${
+                  isLight 
+                    ? 'bg-[#EFF6FF] text-[#0046FF] border-[#BFDBFE]' 
+                    : 'bg-[#0046FF]/15 text-[#00A3E0] border-[#0046FF]/40'
+                }`}>
+                  <Clock className={`w-3.5 h-3.5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                   03 진행 경과
                 </span>
-                <span className="text-[9.5px] font-shinhan-num text-[#00A3E0]/70 tracking-widest uppercase">STEPPER TIMELINE</span>
+                <span className={`text-[10px] md:text-[9.5px] font-shinhan-num tracking-widest uppercase ${
+                  isLight ? 'text-slate-500 font-semibold' : 'text-[#00A3E0]/70'
+                }`}>STEPPER TIMELINE</span>
               </div>
             </div>
 
             {/* 타임스탬프 컴팩트 스텝퍼 */}
-            <div className="space-y-1.5 mb-2 font-shinhan-num text-[11px]">
-              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-[#060C1B] border border-[#1E2F56]">
-                <span className="text-[#00A3E0] font-bold">08:33:45</span>
-                <span className="text-slate-400">|</span>
-                <span className="text-slate-200">TMS 온라인 이상 거래 임계치 초과 최초 감지</span>
-                <span className="ml-auto text-[#00C48C] font-semibold text-[10px]">COMPLETE</span>
+            <div className="space-y-1.5 mb-2 font-shinhan-num text-xs md:text-[11px]">
+              <div className={`flex items-center gap-2 p-1.5 rounded-lg border ${
+                isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+              }`}>
+                <span className={`${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'} font-bold`}>08:33:45</span>
+                <span className={isLight ? 'text-slate-300' : 'text-slate-400'}>|</span>
+                <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>TMS 온라인 이상 거래 임계치 초과 최초 감지</span>
+                <span className={`ml-auto font-semibold text-xs md:text-[10px] ${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'}`}>COMPLETE</span>
               </div>
-              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-[#060C1B] border border-[#1E2F56]">
-                <span className="text-[#00A3E0] font-bold">08:34:10</span>
-                <span className="text-slate-400">|</span>
-                <span className="text-slate-200">S-Autopilot 지식베이스 99.9% 과거 이력 매칭</span>
-                <span className="ml-auto text-[#00C48C] font-semibold text-[10px]">SYNCED</span>
+              <div className={`flex items-center gap-2 p-1.5 rounded-lg border ${
+                isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+              }`}>
+                <span className={`${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'} font-bold`}>08:34:10</span>
+                <span className={isLight ? 'text-slate-300' : 'text-slate-400'}>|</span>
+                <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>S-Autopilot 지식베이스 99.9% 과거 이력 매칭</span>
+                <span className={`ml-auto font-semibold text-xs md:text-[10px] ${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'}`}>SYNCED</span>
               </div>
             </div>
 
-            <p className="text-[12px] font-normal text-slate-300 leading-relaxed break-keep whitespace-pre-wrap pl-0.5 font-shinhan-sans">
+            <p className={`report-body-text text-[15px] md:text-[12px] leading-relaxed break-keep whitespace-pre-wrap pl-0.5 font-shinhan-sans ${
+              isLight ? 'text-slate-700 font-medium' : 'text-slate-300 font-normal'
+            }`}>
               {consensusData.progress}
             </p>
           </div>
 
-          {/* 04 조치 권고: 실행 가이드 스크립트를 다크 코드 블록으로 제공 */}
-          <div className="p-3.5 rounded-xl bg-[#13203E] border border-[#1E2F56] border-l-3 border-l-[#00C48C] shadow-sm transition-all hover:border-[#00C48C]/50">
-            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1E2F56]">
+          {/* 04 조치 권고: 옅은 슬레이트 박스 안에 다크/선명한 모노스페이스 폰트로 스크립트 표현 */}
+          <div className={`p-3 md:p-3.5 rounded-xl border-l-3 shadow-sm transition-all border ${
+            isLight 
+              ? 'bg-[#F8FAFC] border-[#E2E8F0] border-l-[#16A34A]' 
+              : 'bg-[#13203E] border-[#1E2F56] border-l-[#00C48C] hover:border-[#00C48C]/50'
+          }`}>
+            <div className={`flex items-center justify-between mb-2 pb-1.5 border-b ${
+              isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]'
+            }`}>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-[#00C48C]/10 text-[#00C48C] border border-[#00C48C]/30 text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#00C48C]" />
+                <span className={`px-2 py-0.5 rounded text-sm md:text-[11px] font-black tracking-wider flex items-center gap-1.5 font-shinhan-display border ${
+                  isLight 
+                    ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]' 
+                    : 'bg-[#00C48C]/10 text-[#00C48C] border-[#00C48C]/30'
+                }`}>
+                  <CheckCircle2 className={`w-3.5 h-3.5 ${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'}`} />
                   04 조치 권고
                 </span>
-                <span className="text-[9.5px] font-shinhan-num text-[#00C48C]/70 tracking-widest uppercase">REMEDIATION SCRIPT</span>
+                <span className={`text-[10px] md:text-[9.5px] font-shinhan-num tracking-widest uppercase ${
+                  isLight ? 'text-[#15803D]/80 font-bold' : 'text-[#00C48C]/70'
+                }`}>REMEDIATION SCRIPT</span>
               </div>
             </div>
 
-            <p className="text-[12px] font-normal text-slate-200 leading-relaxed break-keep whitespace-pre-wrap mb-2 pl-0.5 font-shinhan-sans">
+            <p className={`report-body-text text-[15px] md:text-[12px] leading-relaxed break-keep whitespace-pre-wrap mb-2 pl-0.5 font-shinhan-sans ${
+              isLight ? 'text-slate-800 font-medium' : 'text-slate-200 font-normal'
+            }`}>
               {consensusData.recommendation}
             </p>
 
-            {/* 다크 코드 블록 스크립트 */}
-            <div className="rounded-lg bg-[#060C1B] border border-[#1E2F56] p-2.5 font-mono text-[11px] text-slate-300 space-y-1 overflow-x-auto custom-scrollbar">
-              <div className="flex items-center justify-between pb-1 border-b border-white/5 text-[9px] text-slate-500 uppercase">
+            {/* 스크립트 박스 */}
+            <div className={`rounded-lg p-2.5 font-mono text-xs md:text-[11px] space-y-1 overflow-x-auto custom-scrollbar border ${
+              isLight 
+                ? 'bg-[#F1F5F9] border-[#CBD5E1] text-[#0F172A]' 
+                : 'bg-[#060C1B] border-[#1E2F56] text-slate-300'
+            }`}>
+              <div className={`flex items-center justify-between pb-1 border-b text-[10px] md:text-[9px] uppercase ${
+                isLight ? 'border-slate-300 text-slate-500' : 'border-white/5 text-slate-500'
+              }`}>
                 <span>Remediation Script</span>
-                <span className="text-[#00A3E0]">Bash / CLI</span>
+                <span className={isLight ? 'text-[#0046FF] font-bold' : 'text-[#00A3E0]'}>Bash / CLI</span>
               </div>
-              <div className="text-[#00C48C] select-all">$ /app/mci/bin/mci_proc_ctl --restart --target=CSL99922A</div>
-              <div className="text-slate-400 select-all">$ kill -9 $(pgrep -f "csl_worker_pool") && /app/bin/start_csl.sh</div>
+              <div className={`select-all font-semibold ${isLight ? 'text-[#15803D]' : 'text-[#00C48C]'}`}>$ /app/mci/bin/mci_proc_ctl --restart --target=CSL99922A</div>
+              <div className={`select-all ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>$ kill -9 $(pgrep -f "csl_worker_pool") && /app/bin/start_csl.sh</div>
             </div>
           </div>
         </div>
 
         {/* 🏢 신한 금융통제 Quick Actions 바 (Human-in-the-Loop) */}
-        <div className="p-3 rounded-xl bg-[#0D162B] border border-[#1E2F56] shadow-sm space-y-2">
-          <div className="flex items-center justify-between pb-1 border-b border-[#1E2F56]">
-            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1 font-shinhan-display">
-              <Shield className="w-3.5 h-3.5 text-[#0046FF]" />
+        <div className={`p-3 rounded-xl shadow-sm space-y-2 border ${
+          isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#0D162B] border-[#1E2F56]'
+        }`}>
+          <div className={`flex items-center justify-between pb-1 border-b ${
+            isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]'
+          }`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 font-shinhan-display ${
+              isLight ? 'text-slate-800' : 'text-slate-300'
+            }`}>
+              <Shield className={`w-3.5 h-3.5 ${isLight ? 'text-[#0046FF]' : 'text-[#0046FF]'}`} />
               신한 금융통제 Quick Actions (Human-in-the-Loop)
             </span>
-            <span className="text-[9px] font-mono text-[#00A3E0] font-bold">AUTHORITY REQUIRED</span>
+            <span className={`text-[9px] font-mono font-bold ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>AUTHORITY REQUIRED</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <button
@@ -847,13 +999,21 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
             </button>
             <button
               onClick={() => alert('유관부서(운영팀, 보안팀) 긴급 상황 전파가 발송되었습니다.')}
-              className="px-2.5 py-2 rounded-lg bg-transparent hover:bg-[#13203E] text-slate-200 border border-[#1E2F56] hover:border-slate-500 text-[11px] font-bold transition-all active:scale-95 text-center font-shinhan-display cursor-pointer"
+              className={`px-2.5 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-95 text-center font-shinhan-display cursor-pointer border ${
+                isLight 
+                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-[#E2E8F0]' 
+                  : 'bg-transparent hover:bg-[#13203E] text-slate-200 border-[#1E2F56] hover:border-slate-500'
+              }`}
             >
               유관부서 긴급 전파
             </button>
             <button
               onClick={() => alert('ITSM 시스템에 장애 티켓이 성공적으로 자동 발행되었습니다.')}
-              className="px-2.5 py-2 rounded-lg bg-[#13203E] hover:bg-[#1E2F56] text-[#00A3E0] border border-[#0046FF]/30 hover:border-[#0046FF] text-[11px] font-bold transition-all active:scale-95 text-center font-shinhan-display cursor-pointer"
+              className={`px-2.5 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-95 text-center font-shinhan-display cursor-pointer border ${
+                isLight 
+                  ? 'bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#0046FF] border-[#BFDBFE]' 
+                  : 'bg-[#13203E] hover:bg-[#1E2F56] text-[#00A3E0] border-[#0046FF]/30 hover:border-[#0046FF]'
+              }`}
             >
               ITSM 장애 티켓 등록
             </button>
@@ -861,19 +1021,29 @@ ${consensusData.actionItems.map((item, idx) => `${idx + 1}. [${item.assignee}] $
         </div>
 
         {/* 체크리스트 기반 액션 아이템 (Action Items UI) */}
-        <div className="p-3 rounded-xl bg-[#13203E] border border-[#1E2F56] shadow-sm space-y-2.5">
-          <div className="flex items-center justify-between pb-1 border-b border-[#1E2F56]">
+        <div className={`p-3 rounded-xl shadow-sm space-y-2.5 border ${
+          isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#13203E] border-[#1E2F56]'
+        }`}>
+          <div className={`flex items-center justify-between pb-1 border-b ${
+            isLight ? 'border-[#E2E8F0]' : 'border-[#1E2F56]'
+          }`}>
             <div className="flex items-center gap-2">
-              <ListChecks className="w-4 h-4 text-[#00A3E0]" />
-              <span className="text-[11px] font-black text-slate-200 uppercase tracking-wider font-shinhan-display">
+              <ListChecks className={`w-4 h-4 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
+              <span className={`text-[11px] font-black uppercase tracking-wider font-shinhan-display ${
+                isLight ? 'text-slate-800' : 'text-slate-200'
+              }`}>
                 Action Items
               </span>
-              <span className="text-[9px] text-slate-400 font-medium">
+              <span className={`text-[9px] font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 후속 조치 체크리스트
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-bold font-shinhan-num px-2 py-0.5 rounded-full ${completedCount === totalCount ? 'bg-[#00C48C]/20 text-[#00C48C] border border-[#00C48C]/30' : 'bg-[#060C1B] text-slate-300 border border-[#1E2F56]'}`}>
+              <span className={`text-[10px] font-bold font-shinhan-num px-2 py-0.5 rounded-full border ${
+                completedCount === totalCount 
+                  ? (isLight ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]' : 'bg-[#00C48C]/20 text-[#00C48C] border-[#00C48C]/30')
+                  : (isLight ? 'bg-slate-100 text-slate-700 border-[#E2E8F0]' : 'bg-[#060C1B] text-slate-300 border-[#1E2F56]')
+              }`}>
                 {completedCount}/{totalCount} 완료
               </span>
             </div>

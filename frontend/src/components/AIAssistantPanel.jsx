@@ -3,6 +3,7 @@ import { Sparkles, Bot, Send, X, Zap, FileText, TriangleAlert, MessageSquare, Pl
 import AIChatBubble from './AIChatBubble';
 import AIThinkingIndicator from './AIThinkingIndicator';
 import { getAccessToken } from '../lib/authStore';
+import { useTheme } from '../context/ThemeContext';
 
 // 🚀 AI 스트리밍 성능 최적화: Vite Proxy를 거치지 않고 Worker로 직접 호출합니다.
 // (모바일 기기에서 프록시 지연 및 스트리밍 끊김 문제를 방지하기 위함)
@@ -17,6 +18,7 @@ const formatTime = (d) => {
 };
 
 export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProfile, onShareToTeam }) {
+  const { isLight } = useTheme();
   const [chatSessions, setChatSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -225,7 +227,7 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
       {/* Panel — full-height right drawer, 100dvh for mobile browsers */}
       <div
         className="relative ml-auto flex flex-col animate-in slide-in-from-right duration-300"
-        style={{ width: '100%', maxWidth: 480, background: '#0a0d14', height: '100dvh' }}
+        style={{ width: '100%', maxWidth: 480, background: isLight ? '#f8fafc' : '#0a0d14', height: '100dvh', borderLeft: isLight ? '1px solid #e2e8f0' : 'none' }}
         onClick={e => e.stopPropagation()}
       >
         {/* ── History Sidebar overlay ── */}
@@ -233,20 +235,22 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
           <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}>
             <div
               className="absolute top-0 left-0 h-full flex flex-col"
-              style={{ width: 280, background: '#0d1018', borderRight: '1px solid rgba(255,255,255,0.08)' }}
+              style={{ width: 280, background: isLight ? '#ffffff' : '#0d1018', borderRight: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)' }}
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="flex items-center gap-2">
-                  <History size={14} className="text-purple-400" />
-                  <span className="text-sm font-bold text-white">채팅 내역</span>
+                  <History size={14} className="text-purple-500" />
+                  <span className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>채팅 내역</span>
                 </div>
-                <button onClick={() => setIsSidebarOpen(false)} className="p-1 rounded-lg hover:bg-white/10 text-slate-500"><X size={15} /></button>
+                <button onClick={() => setIsSidebarOpen(false)} className={`p-1 rounded-lg ${isLight ? 'hover:bg-slate-100 text-slate-400' : 'hover:bg-white/10 text-slate-500'}`}><X size={15} /></button>
               </div>
               <div className="px-3 py-3">
                 <button onClick={createNewSession}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-purple-300 transition-all"
-                  style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)' }}>
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    isLight ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200' : 'text-purple-300'
+                  }`}
+                  style={!isLight ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)' } : {}}>
                   <Plus size={14} /> 새 채팅
                 </button>
               </div>
@@ -254,10 +258,13 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
                 {chatSessions.map(s => (
                   <div key={s.id} onClick={() => switchSession(s.id)}
                     className="relative group flex items-center px-3 py-2.5 rounded-xl cursor-pointer transition-all"
-                    style={{ background: activeSessionId === s.id ? 'rgba(168,85,247,0.15)' : 'transparent', border: `1px solid ${activeSessionId === s.id ? 'rgba(168,85,247,0.3)' : 'transparent'}` }}>
-                    <MessageSquare size={12} className="text-slate-500 shrink-0 mr-2" />
-                    <span className="text-xs text-slate-300 truncate flex-1">{s.title}</span>
-                    <button onClick={e => deleteSession(e, s.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-all shrink-0">
+                    style={{
+                      background: activeSessionId === s.id ? (isLight ? '#f3e8ff' : 'rgba(168,85,247,0.15)') : 'transparent',
+                      border: `1px solid ${activeSessionId === s.id ? (isLight ? '#d8b4fe' : 'rgba(168,85,247,0.3)') : 'transparent'}`
+                    }}>
+                    <MessageSquare size={12} className={isLight ? 'text-slate-400 shrink-0 mr-2' : 'text-slate-500 shrink-0 mr-2'} />
+                    <span className={`text-xs truncate flex-1 ${isLight ? 'text-slate-700 font-medium' : 'text-slate-300'}`}>{s.title}</span>
+                    <button onClick={e => deleteSession(e, s.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-500 transition-all shrink-0">
                       <Trash2 size={11} />
                     </button>
                   </div>
@@ -272,40 +279,51 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-4 py-3 shrink-0"
-          style={{ background: 'rgba(168,85,247,0.06)', borderBottom: '1px solid rgba(168,85,247,0.15)', boxShadow: '0 1px 0 rgba(168,85,247,0.1)' }}>
+          style={{
+            background: isLight ? '#ffffff' : 'rgba(168,85,247,0.06)',
+            borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(168,85,247,0.15)',
+            boxShadow: isLight ? '0 1px 3px rgba(15,23,42,0.05)' : '0 1px 0 rgba(168,85,247,0.1)'
+          }}>
           <div className="flex items-center gap-3">
             <button onClick={() => setIsSidebarOpen(true)}
-              className="w-8 h-8 flex items-center justify-center rounded-xl transition-all"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <Menu size={15} className="text-slate-400" />
+              className={`w-8 h-8 flex items-center justify-center rounded-xl transition-all ${
+                isLight ? 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600' : 'text-slate-400'
+              }`}
+              style={!isLight ? { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' } : {}}>
+              <Menu size={15} />
             </button>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: 'linear-gradient(135deg, #a855f7, #6366f1)', boxShadow: '0 0 12px rgba(168,85,247,0.5)' }}>
               <Sparkles size={16} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-black text-white leading-none">AI Assistant</p>
-              <p className="text-[9px] text-purple-400 font-bold uppercase tracking-widest mt-0.5">S-Autopilot Intelligence</p>
+              <p className={`text-sm font-black leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>AI Assistant</p>
+              <p className="text-[9px] text-purple-600 font-bold uppercase tracking-widest mt-0.5">S-Autopilot Intelligence</p>
             </div>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:bg-white/10"
-            style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-            <X size={15} className="text-slate-400" />
+            className={`w-8 h-8 flex items-center justify-center rounded-xl transition-all ${
+              isLight ? 'hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900' : 'hover:bg-white/10 text-slate-400'
+            }`}
+            style={!isLight ? { border: '1px solid rgba(255,255,255,0.08)' } : {}}>
+            <X size={15} />
           </button>
         </div>
 
         {/* ── Context Badge / Warning ── */}
         {currentIncident ? (
           <div className="mx-4 mt-2.5 mb-0 px-3.5 py-2.5 rounded-xl shrink-0 flex items-start gap-2.5"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" style={{ boxShadow: '0 0 6px rgba(16,185,129,0.8)' }} />
+            style={{
+              background: isLight ? '#f0fdf4' : 'rgba(16,185,129,0.08)',
+              border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(16,185,129,0.25)'
+            }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" style={{ boxShadow: '0 0 6px rgba(16,185,129,0.8)' }} />
             <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 leading-none mb-1">분석 대상 장애</p>
-              <p className="text-[11px] font-bold text-white truncate">[{currentIncident.id}] {currentIncident.title}</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 leading-none mb-1">분석 대상 장애</p>
+              <p className={`text-[11px] font-bold truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>[{currentIncident.id}] {currentIncident.title}</p>
               {currentIncident.message && (
-                <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/15">
-                  <p className="text-[11px] text-emerald-100/90 leading-relaxed line-clamp-2 font-medium break-all whitespace-pre-wrap">
+                <div className={`mt-1.5 p-2 rounded-lg ${isLight ? 'bg-emerald-100/50 border border-emerald-200' : 'bg-emerald-950/30 border border-emerald-500/15'}`}>
+                  <p className={`text-[11px] leading-relaxed line-clamp-2 font-medium break-all whitespace-pre-wrap ${isLight ? 'text-emerald-950' : 'text-emerald-100/90'}`}>
                     {currentIncident.message}
                   </p>
                 </div>
@@ -314,14 +332,17 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
           </div>
         ) : (
           <div className="mx-4 mt-2.5 mb-0 px-3 py-2 rounded-xl shrink-0 flex items-center gap-2"
-            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
-            <span className="text-amber-400 text-xs shrink-0">⚠️</span>
-            <p className="text-[10px] font-bold text-amber-300">대시보드에서 SMS 장애를 선택하면 빠른 분석이 활성화됩니다</p>
+            style={{
+              background: isLight ? '#fffbeb' : 'rgba(245,158,11,0.08)',
+              border: isLight ? '1px solid #fde68a' : '1px solid rgba(245,158,11,0.25)'
+            }}>
+            <span className="text-amber-500 text-xs shrink-0">⚠️</span>
+            <p className={`text-[10px] font-bold ${isLight ? 'text-amber-800' : 'text-amber-300'}`}>대시보드에서 SMS 장애를 선택하면 빠른 분석이 활성화됩니다</p>
           </div>
         )}
 
         {/* ── Quick Actions (horizontal scroll chips) ── */}
-        <div className="px-4 py-2.5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="px-4 py-2.5 shrink-0" style={{ borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.05)' }}>
           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">빠른 질문</p>
           <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {quickActions.map(action => {
@@ -332,7 +353,12 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0 transition-all ${
                     disabled ? 'opacity-35 cursor-not-allowed' : 'active:scale-95 cursor-pointer'
                   }`}
-                  style={{ background: `${action.color}15`, border: `1px solid ${action.color}${disabled ? '20' : '35'}`, color: action.color }}>
+                  style={{
+                    background: isLight ? '#ffffff' : `${action.color}15`,
+                    border: `1px solid ${action.color}${disabled ? '20' : '35'}`,
+                    color: action.color,
+                    boxShadow: isLight ? '0 1px 2px rgba(15,23,42,0.05)' : 'none'
+                  }}>
                   <action.icon size={11} />
                   <span className="text-[10px] font-bold whitespace-nowrap">{action.label}</span>
                 </button>
@@ -416,18 +442,19 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
         {/* ── Input ── pill-shaped chat style, always pinned at bottom */}
         <div className="shrink-0 px-3 pt-2 pb-3"
           style={{
-            background: 'linear-gradient(to top, #0a0d14 85%, transparent)',
+            background: isLight ? '#ffffff' : 'linear-gradient(to top, #0a0d14 85%, transparent)',
+            borderTop: isLight ? '1px solid #e2e8f0' : 'none',
             paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
           }}>
 
           {/* 응답 중 진행 표시바 */}
           {isAiThinking && (
             <div className="flex items-center gap-2 mb-2 px-1">
-              <div className="flex-1 h-0.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <div className="flex-1 h-0.5 rounded-full overflow-hidden" style={{ background: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.06)' }}>
                 <div className="ai-progress-bar h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500"
                   style={{ width: '40%' }} />
               </div>
-              <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest shrink-0 animate-pulse">
+              <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest shrink-0 animate-pulse">
                 AI 응답 중...
               </span>
             </div>
@@ -437,10 +464,10 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
             {/* pill input */}
             <div className="flex-1 flex items-center gap-2 px-4 py-2.5"
               style={{
-                background: isAiThinking ? 'rgba(168,85,247,0.06)' : 'rgba(255,255,255,0.07)',
-                border: `1px solid ${isAiThinking ? 'rgba(168,85,247,0.3)' : userInput.trim() ? 'rgba(168,85,247,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                background: isLight ? '#f8fafc' : (isAiThinking ? 'rgba(168,85,247,0.06)' : 'rgba(255,255,255,0.07)'),
+                border: isLight ? (userInput.trim() ? '1px solid #a855f7' : '1px solid #cbd5e1') : (isAiThinking ? '1px solid rgba(168,85,247,0.3)' : userInput.trim() ? '1px solid rgba(168,85,247,0.45)' : '1px solid rgba(255,255,255,0.1)'),
                 borderRadius: 28,
-                boxShadow: userInput.trim() && !isAiThinking ? '0 0 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.05)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                boxShadow: isLight ? (userInput.trim() ? '0 0 0 2px rgba(168,85,247,0.15)' : 'inset 0 1px 2px rgba(0,0,0,0.03)') : (userInput.trim() && !isAiThinking ? '0 0 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.05)' : 'inset 0 1px 0 rgba(255,255,255,0.04)'),
                 transition: 'all 0.2s ease',
                 minHeight: 44,
               }}>
@@ -452,7 +479,9 @@ export default function AIAssistantPanel({ isOpen, onClose, incidentId, userProf
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !isAiThinking && handleAIMessage(userInput)}
                 placeholder={isAiThinking ? 'AI가 답변 중입니다...' : '메시지를 입력하세요...'}
                 disabled={isAiThinking}
-                className="flex-1 bg-transparent text-sm text-white placeholder:text-purple-400/50 focus:outline-none leading-relaxed disabled:cursor-not-allowed"
+                className={`flex-1 bg-transparent text-sm focus:outline-none leading-relaxed disabled:cursor-not-allowed ${
+                  isLight ? 'text-slate-900 placeholder:text-slate-400' : 'text-white placeholder:text-purple-400/50'
+                }`}
                 style={{ caretColor: '#a855f7' }}
               />
             </div>

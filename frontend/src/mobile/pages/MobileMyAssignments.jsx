@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getAuthHeaders } from '../../lib/authStore';
 import { useCodebook } from '../../context/CodebookContext';
+import { extractCleanErrorCount } from '../../utils/maskingUtils';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -269,7 +270,7 @@ export default function MobileMyAssignments({ user, onAiClick }) {
                     
                     {Number(item.received_count || 1) >= 2 && (
                       <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gradient-to-r from-blue-600/20 to-indigo-500/20 border border-blue-500/30">
-                        <span className="text-[9px] font-black font-mono text-blue-400">{Number(item.occurrence_count) > 0 ? Number(item.occurrence_count) : (Number(item.received_count) || 1)}</span>
+                        <span className="text-[9px] font-black font-mono text-blue-400">{extractCleanErrorCount(item)}</span>
                         <span className="text-[7px] font-bold text-blue-500/60 uppercase">Event</span>
                       </div>
                     )}

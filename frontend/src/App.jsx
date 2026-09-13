@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'react-hot-toast';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 
@@ -108,6 +109,7 @@ function ProtectedRoute({ children, isRefreshing, userProfile }) {
 }
 
 function AppContent() {
+  const { isLight } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -478,19 +480,23 @@ function AppContent() {
       {showWarRoomPopup && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 lg:p-10 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowWarRoomPopup(false)} />
-          <div className="bg-[#0f1219]/95 w-full max-w-5xl rounded-[2.5rem] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative z-10 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-300 pb-safe">
+          <div className={`w-full max-w-5xl rounded-[2.5rem] border relative z-10 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-300 pb-safe ${
+            isLight
+              ? 'bg-white border-[#E2E8F0] text-slate-900 shadow-[0_20px_50px_rgba(15,23,42,0.12)]'
+              : 'bg-[#0f1219]/95 border-white/10 text-white shadow-[0_20px_50px_rgba(0,0,0,0.5)]'
+          }`}>
             {/* Top Bar matching PCPageModal feel */}
             <div className="flex justify-center pt-3 pb-1 lg:hidden">
-              <div className="w-12 h-1.5 bg-white/10 rounded-full" />
+              <div className={`w-12 h-1.5 rounded-full ${isLight ? 'bg-slate-300' : 'bg-white/10'}`} />
             </div>
             
-            <div className="px-6 py-4 flex items-center justify-between">
+            <div className={`px-6 py-4 flex items-center justify-between border-b ${isLight ? 'border-[#E2E8F0] bg-white' : 'border-transparent'}`}>
               <div className="flex items-center space-x-4">
                 <div className="bg-blue-600/20 p-3 rounded-2xl border border-blue-500/30 shadow-[0_0_15px_rgba(37,99,235,0.2)]">
-                  <MessageSquare className="w-6 h-6 text-blue-400" />
+                  <MessageSquare className="w-6 h-6 text-blue-500" />
                 </div>
                 <div>
-                  <h3 className="font-black text-xl text-white tracking-tight">참여 중인 워룸</h3>
+                  <h3 className={`font-black text-xl tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>참여 중인 워룸</h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Active Channels ({warRooms.length})</p>
@@ -504,23 +510,23 @@ function AppContent() {
                     id="hideCompletedWarRoomsApp"
                     checked={hideCompletedWarRooms}
                     onChange={(e) => setHideCompletedWarRooms(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border-white/20 bg-black/50 checked:bg-blue-500 checked:border-blue-500 transition-all cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-slate-300 bg-white checked:bg-blue-600 checked:border-blue-600 transition-all cursor-pointer"
                   />
-                  <label htmlFor="hideCompletedWarRoomsApp" className="text-xs font-bold text-slate-400 cursor-pointer select-none hover:text-white transition-colors">
+                  <label htmlFor="hideCompletedWarRoomsApp" className={`text-xs font-bold cursor-pointer select-none transition-colors ${isLight ? 'text-slate-600 hover:text-slate-950' : 'text-slate-400 hover:text-white'}`}>
                     완료숨김
                   </label>
                 </div>
-                <button onClick={() => setShowWarRoomPopup(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors border border-white/5">
-                  <X className="w-5 h-5 text-slate-400" />
+                <button onClick={() => setShowWarRoomPopup(false)} className={`p-2 rounded-full transition-colors border ${isLight ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-white/5 hover:bg-white/10 border-white/5 text-slate-400'}`}>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
+            <div className={`flex-1 overflow-y-auto p-6 custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max ${isLight ? 'bg-[#F8FAFC]' : ''}`}>
               {warRooms.length === 0 ? (
                 <div className="col-span-full text-center py-20">
-                  <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
-                    <MessageSquare className="w-8 h-8 text-slate-700" />
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${isLight ? 'bg-white border-slate-200' : 'bg-white/5 border-white/5'}`}>
+                    <MessageSquare className="w-8 h-8 text-slate-400" />
                   </div>
                   <p className="text-slate-500 text-sm font-bold">진행 중인 War-Room이 없습니다.</p>
                 </div>
@@ -529,10 +535,10 @@ function AppContent() {
                 const isCurrent = roomId === currentIncidentId;
                 const cleanTitle = (room.msg || room.title || roomId).replace(/^INC-[\d-]+\s*\|\s*/, '');
                 const severity = (room.severity || 'WARNING').toUpperCase();
-                let sevStyles = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                if (severity === 'CRITICAL') sevStyles = 'bg-red-500/10 text-red-400 border-red-500/20';
-                if (severity === 'MAJOR') sevStyles = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-                if (severity === 'WARNING') sevStyles = 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+                let sevStyles = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                if (severity === 'CRITICAL') sevStyles = 'bg-red-500/10 text-red-500 border-red-500/20';
+                if (severity === 'MAJOR') sevStyles = 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+                if (severity === 'WARNING') sevStyles = 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
 
                 return (
                   <div
@@ -540,31 +546,33 @@ function AppContent() {
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
                     className={`p-5 rounded-[1.5rem] border transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${
                       isCurrent 
-                        ? 'bg-blue-900/20 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.1)]' 
-                        : 'bg-white/[0.02] border-white/5 hover:border-blue-500/30 hover:bg-white/[0.04]'
+                        ? (isLight ? 'bg-blue-50/80 border-blue-400 shadow-sm' : 'bg-blue-900/20 border-blue-500/40 shadow-[0_0_20px_rgba(37,99,235,0.1)]')
+                        : (isLight ? 'bg-white border-[#E2E8F0] hover:border-blue-400 shadow-sm' : 'bg-white/[0.02] border-white/5 hover:border-blue-500/30 hover:bg-white/[0.04]')
                     }`}
                   >
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${sevStyles} tracking-tighter`}>{severity}</span>
-                          {isCurrent && <span className="text-[10px] text-blue-400 font-black tracking-tight flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                          {isCurrent && <span className="text-[10px] text-blue-500 font-black tracking-tight flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
                             NOW
                           </span>}
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono font-bold">{room.reg_dt ? new Date(room.reg_dt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                       </div>
-                      <p className="text-[14px] font-bold text-slate-200 group-hover:text-blue-400 transition-colors line-clamp-2 pr-2 mb-3 leading-snug">{cleanTitle}</p>
+                      <p className={`text-[14px] font-bold transition-colors line-clamp-2 pr-2 mb-3 leading-snug ${
+                        isLight ? 'text-slate-900 group-hover:text-blue-600' : 'text-slate-200 group-hover:text-blue-400'
+                      }`}>{cleanTitle}</p>
                     </div>
-                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/5 opacity-80">
+                    <div className={`flex items-center justify-between mt-2 pt-3 border-t ${isLight ? 'border-slate-100' : 'border-white/5'} opacity-90`}>
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                          <MessageSquare className="w-3 h-3 text-blue-400" />
+                          <MessageSquare className="w-3 h-3 text-blue-500" />
                         </div>
-                        <span className="text-[10px] text-slate-400 font-mono font-bold tracking-tight line-clamp-1 max-w-[120px]">{roomId}</span>
+                        <span className="text-[10px] text-slate-500 font-mono font-bold tracking-tight line-clamp-1 max-w-[120px]">{roomId}</span>
                       </div>
-                      <span className="text-[10px] font-black text-slate-500 tracking-wider">ENTER</span>
+                      <span className="text-[10px] font-black text-slate-400 tracking-wider">ENTER</span>
                     </div>
                   </div>
                 );
@@ -578,33 +586,37 @@ function AppContent() {
       {showReportPopup && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowReportPopup(false)} />
-          <div className="bg-[#0f1219] w-full max-w-md rounded-[2.5rem] border border-white/10 shadow-2xl relative z-10 animate-in zoom-in-95 duration-300 overflow-hidden max-h-[80vh] flex flex-col">
+          <div className={`w-full max-w-md rounded-[2.5rem] border shadow-2xl relative z-10 animate-in zoom-in-95 duration-300 overflow-hidden max-h-[80vh] flex flex-col ${
+            isLight ? 'bg-white border-[#E2E8F0] text-slate-900' : 'bg-[#0f1219] border-white/10 text-white'
+          }`}>
             
-            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-emerald-600/10 to-transparent">
+            <div className={`p-6 border-b flex items-center justify-between ${
+              isLight ? 'bg-gradient-to-r from-emerald-50 to-transparent border-[#e2e8f0]' : 'border-white/5 bg-gradient-to-r from-emerald-600/10 to-transparent'
+            }`}>
               <div className="flex items-center gap-3">
                 <div className="bg-emerald-500/20 p-2 rounded-xl border border-emerald-500/30">
-                  <FileText className="w-5 h-5 text-emerald-400" />
+                  <FileText className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div>
-                  <h3 className="font-black text-lg text-white tracking-tight">Report Selection</h3>
+                  <h3 className={`font-black text-lg tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>Report Selection</h3>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active War-Rooms</p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowReportPopup(false)}
-                className="p-2 rounded-full hover:bg-white/5 transition-colors group"
+                className={`p-2 rounded-full transition-colors group ${isLight ? 'hover:bg-slate-100 text-slate-500 hover:text-slate-900' : 'hover:bg-white/5 text-slate-500 group-hover:text-white'}`}
               >
-                <X className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            <div className={`flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar ${isLight ? 'bg-[#F8FAFC]' : ''}`}>
               {warRooms.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-center px-6">
-                  <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/5">
-                    <FileText className="w-8 h-8 text-slate-700" />
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 border ${isLight ? 'bg-white border-slate-200' : 'bg-white/5 border-white/5'}`}>
+                    <FileText className="w-8 h-8 text-slate-400" />
                   </div>
-                  <p className="text-slate-400 font-bold text-sm">발행된 리포트가 없습니다.</p>
+                  <p className="text-slate-500 font-bold text-sm">발행된 리포트가 없습니다.</p>
                 </div>
               ) : warRooms.map((room, index) => {
                 const roomId = room.inc_id || room.id;
@@ -612,15 +624,21 @@ function AppContent() {
                   <div
                     key={`${roomId}-${index}`}
                     onClick={() => { setShowReportPopup(false); navigate(`/ai-report/${roomId}`); }}
-                    className="group bg-white/[0.02] p-4 rounded-2xl border border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all cursor-pointer relative overflow-hidden active:scale-[0.98]"
+                    className={`group p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden active:scale-[0.98] ${
+                      isLight
+                        ? 'bg-white border-[#E2E8F0] hover:border-emerald-400 shadow-sm'
+                        : 'bg-white/[0.02] border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5'
+                    }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <div className="bg-emerald-500/10 text-emerald-400 text-[9px] font-black px-2 py-0.5 rounded-md border border-emerald-500/20 tracking-tighter">
+                      <div className="bg-emerald-500/10 text-emerald-600 text-[9px] font-black px-2 py-0.5 rounded-md border border-emerald-500/20 tracking-tighter">
                         COMPLETED
                       </div>
-                      <span className="text-[10px] text-slate-600 font-mono font-bold">{roomId}</span>
+                      <span className="text-[10px] text-slate-500 font-mono font-bold">{roomId}</span>
                     </div>
-                    <h4 className="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition-colors line-clamp-1">{room.msg || room.title || roomId}</h4>
+                    <h4 className={`text-sm font-bold transition-colors line-clamp-1 ${
+                      isLight ? 'text-slate-900 group-hover:text-emerald-600' : 'text-slate-200 group-hover:text-emerald-400'
+                    }`}>{room.msg || room.title || roomId}</h4>
                     <div className="flex items-center justify-between mt-3 text-[10px] text-slate-500">
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -653,9 +671,11 @@ function App() {
   console.log('App Loaded - Version: Dashboard-Rearrange-v1');
   return (
     <Router>
-      <GoogleOAuthProvider clientId="368028308466-placeholder.apps.googleusercontent.com">
-        <AppContent />
-      </GoogleOAuthProvider>
+      <ThemeProvider>
+        <GoogleOAuthProvider clientId="368028308466-placeholder.apps.googleusercontent.com">
+          <AppContent />
+        </GoogleOAuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

@@ -12,6 +12,7 @@ import AIInsightModal from '../../components/AIInsightModal';
 import { useCodebook } from '../../context/CodebookContext';
 import { getAccessToken, clearSession, getAuthHeaders, getUserProfile, getAllowedPaths, addAuthListener } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
+import { maskName, maskPhone, extractCleanErrorCount, formatOccurrenceCount } from '../../utils/maskingUtils';
 
 const SHINHAN_COMPANIES = [
   '신한금융지주', '신한은행', '신한카드', '신한투자증권', '신한라이프',
@@ -76,6 +77,11 @@ const parseDate = (val) => {
 const cleanValue = (val) => {
   if (!val) return '';
   let cleaned = val.trim();
+
+  // 최외곽 [ ... ] 대괄호 안전하게 벗기기
+  if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
   
   const match = cleaned.match(/^\[(.*?)\](.*)$/);
   if (match) {
@@ -99,6 +105,10 @@ const cleanValue = (val) => {
       }
     } else {
       cleaned = formattedInside;
+    }
+  } else {
+    if (/^\d{8}$/.test(cleaned)) {
+      cleaned = `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
     }
   }
   
@@ -166,30 +176,30 @@ const renderFormattedSMS = (message, severity) => {
   const hasRateGauge = currentRate !== null || thresholdRate !== null;
 
   return (
-    <div className="flex flex-col gap-2 w-full text-slate-200">
+    <div className="flex flex-col gap-2.5 w-full text-slate-200">
       {title && (
-        <div className={`text-[13px] font-semibold border px-3 py-2 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
-          <span className={`w-2 h-2 rounded-full animate-pulse ${bulletColor}`} />
+        <div className={`text-sm font-semibold border px-3.5 py-2.5 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
+          <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${bulletColor}`} />
           <span>{title}</span>
         </div>
       )}
 
       {/* 📊 마이크로 시각화 카드: 오류율 미니 게이지 바 + Delta 증감율 뱃지 */}
       {hasRateGauge && (
-        <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-2.5 space-y-2 mb-0.5 shadow-sm">
+        <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-3 space-y-2 mb-0.5 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-red-400 shrink-0" />
-              <span className="text-[11px] font-bold text-slate-300">오류율 임계치 분석</span>
+              <TrendingUp className="w-4 h-4 text-red-400 shrink-0" />
+              <span className="text-xs font-bold text-slate-300">오류율 임계치 분석</span>
             </div>
 
             {/* Delta 뱃지 (▲ Red 부각) */}
             {rateDelta !== null && rateDelta > 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black font-shinhan-num bg-[#F04438]/15 text-[#F04438] border border-[#F04438]/30">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black font-shinhan-num bg-[#F04438]/15 text-[#F04438] border border-[#F04438]/30">
                 ▲ +{rateDelta.toFixed(1)}%p 초과
               </span>
             ) : rateDelta !== null && rateDelta <= 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-shinhan-num bg-[#00C48C]/15 text-[#00C48C] border border-[#00C48C]/30">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-shinhan-num bg-[#00C48C]/15 text-[#00C48C] border border-[#00C48C]/30">
                 ▼ {rateDelta.toFixed(1)}%p 안정
               </span>
             ) : null}
@@ -197,12 +207,12 @@ const renderFormattedSMS = (message, severity) => {
 
           {/* 수평 미니 프로그레스 게이지 바 */}
           <div className="space-y-1">
-            <div className="flex justify-between items-baseline text-[10px] font-shinhan-num">
+            <div className="flex justify-between items-baseline text-xs font-shinhan-num">
               <span className="text-[#94A3B8]">
                 기준 임계치: <strong className="text-slate-300 font-semibold">{thresholdRate !== null ? `${thresholdRate}%` : '30%'}</strong>
               </span>
               <span className="text-[#F04438] font-bold">
-                현재 오류율: <strong className="text-[#F04438] text-xs font-black">{currentRate !== null ? `${currentRate}%` : '87.5%'}</strong>
+                현재 오류율: <strong className="text-[#F04438] text-sm font-black">{currentRate !== null ? `${currentRate}%` : '87.5%'}</strong>
               </span>
             </div>
 
@@ -215,7 +225,7 @@ const renderFormattedSMS = (message, severity) => {
                   title={`임계치 ${thresholdRate}%`}
                 />
               )}
-              {/* 현재 오류율 프로그레스 바 (#F04438 선명한 대비) */}
+              {/* 현재 오류율 프로그레스 바 (#F04438) */}
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
                   rateDelta !== null && rateDelta > 0 ? 'bg-[#F04438]' : 'bg-[#0046FF]'
@@ -225,9 +235,9 @@ const renderFormattedSMS = (message, severity) => {
             </div>
           </div>
 
-          {/* 오류건수 비교 서브 스트립 (평균 vs 현재) */}
-          {(avgCount !== null || curCount !== null) && (
-            <div className="flex items-center justify-between pt-1 border-t border-[#1E2F56] text-[10px] font-shinhan-num">
+          {/* 건수 비교 행 */}
+          {(curCount !== null || avgCount !== null) && (
+            <div className="flex items-center justify-between pt-1.5 border-t border-[#1E2F56] text-xs font-shinhan-num">
               <span className="text-slate-400">
                 비교기간 평균: <span className="text-slate-200 font-semibold">{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
               </span>
@@ -235,7 +245,7 @@ const renderFormattedSMS = (message, severity) => {
                 <span className="text-slate-400">현재:</span>
                 <span className="text-[#F04438] font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
                 {countDelta !== null && countDelta > 0 && (
-                  <span className="text-[9px] font-bold text-[#F04438] bg-[#F04438]/10 px-1 py-0.2 rounded border border-[#F04438]/20">
+                  <span className="text-[11px] font-bold text-[#F04438] bg-[#F04438]/10 px-1.5 py-0.5 rounded border border-[#F04438]/20">
                     ▲ +{countDelta.toLocaleString()}건
                   </span>
                 )}
@@ -245,9 +255,10 @@ const renderFormattedSMS = (message, severity) => {
         </div>
       )}
 
-      <div className="bg-[#13203E]/50 border border-[#1E2F56] rounded-xl overflow-hidden p-2.5 grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5 items-start">
+      {/* 📋 정보 그리드: 모바일 1열 스택(Stack), 태블릿 2열 */}
+      <div className="bg-[#0B132B]/60 border border-[#1E2F56] rounded-xl overflow-hidden p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 items-stretch">
         {items.map((item, idx) => {
-          const isError = item.key.includes('오류') || item.key.includes('초과');
+          const isError = item.key.includes('오류') || item.key.includes('초과') || item.key.includes('에러');
           let cleanedVal = cleanValue(item.value);
           if (item.key === '거래집계일시') {
             const timeMatch = cleanedVal.match(/\d{2}:\d{2}:\d{2}/);
@@ -258,26 +269,84 @@ const renderFormattedSMS = (message, severity) => {
           
           if (!item.value) {
             return (
-              <div key={idx} className="col-span-2 text-[11px] font-bold text-slate-400 bg-[#060C1B]/80 -mx-2.5 px-2.5 py-1 border-y border-[#1E2F56]">
-                {item.key}
+              <div key={idx} className="col-span-1 sm:col-span-2 text-xs font-bold text-[#00A3E0] bg-[#060C1B] -mx-2.5 px-3 py-1.5 border-y border-[#1E2F56] flex items-center gap-1.5 font-shinhan-display">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0]" />
+                <span>{item.key}</span>
               </div>
             );
           }
 
-          // MCI / TMS 전문 인터페이스 코드 식별 (SHB02681, CSL99922A 등)
-          const isInterfaceCode = item.key.includes('인터페이스') || item.key.includes('IF') || item.key.includes('코드') || /SHB\w+|CSL\w+/i.test(cleanedVal);
+          const k = item.key.replace(/\s+/g, '');
+          const isRecipients = k.includes('수신자') || k.includes('담당자');
+          const isErrorMessage = k.includes('에러메시지') || k.includes('오류메시지') || k.includes('오류내용') || k.includes('상세');
+          const isInterfaceCode = k.includes('인터페이스') || k.includes('IF') || k.includes('코드') || /SHB\w+|CSL\w+/i.test(cleanedVal);
           
+          const totalLength = item.key.length + cleanedVal.length;
+          const isFullWidth = isRecipients || isErrorMessage || k.includes('서비스명') || k.includes('IF명') || totalLength > 16 || cleanedVal.length > 12;
+
+          // 1. 수신자 명단
+          if (isRecipients) {
+            const names = cleanedVal.split(/[,，\s]+/).map(n => n.trim()).filter(Boolean);
+            return (
+              <div key={idx} className="col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg bg-[#060C1B]/80 border border-[#1E2F56]/70 text-xs">
+                <div className="flex items-center gap-1.5 text-slate-400 font-bold text-[13px]">
+                  <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span>{item.key}</span>
+                  <span className="text-xs text-slate-500 font-mono font-normal">({names.length}명)</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {names.map((name, nIdx) => (
+                    <span key={nIdx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-xs font-semibold text-slate-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400/80" />
+                      {maskName(name)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          // 2. 에러 / 장애 메시지
+          if (isErrorMessage) {
+            return (
+              <div key={idx} className="col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg bg-red-500/[0.08] border border-red-500/30 text-xs">
+                <div className="flex items-center gap-1.5 text-red-300 font-bold text-[13px]">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 animate-pulse" />
+                  <span>{item.key}</span>
+                </div>
+                <div className="text-[13.5px] font-bold text-red-200 break-all leading-relaxed pl-2 border-l-2 border-red-500/40">
+                  {cleanedVal}
+                </div>
+              </div>
+            );
+          }
+
+          // 3. 서비스명 등 단독 전체 너비
+          if (isFullWidth) {
+            return (
+              <div key={idx} className="col-span-1 sm:col-span-2 flex items-start justify-between gap-2 px-3 py-2 rounded-lg bg-[#060C1B]/60 border border-[#1E2F56]/60 text-xs">
+                <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] pt-0.5 ${highlight ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
+                  {item.key}
+                </span>
+                <span className={`font-shinhan-num text-right font-bold break-all leading-snug text-[13.5px] ${highlight ? 'text-[#F04438]' : 'text-slate-100'}`} title={cleanedVal}>
+                  {cleanedVal}
+                </span>
+              </div>
+            );
+          }
+
+          // 4. 일반 컴팩트 항목 (1열 스택으로 쾌적하게)
           return (
-            <div key={idx} className="contents text-[11px] leading-relaxed">
-              <span className={`font-normal shrink-0 whitespace-nowrap ${highlight ? 'text-red-300 font-medium' : 'text-slate-400'}`}>
-                {item.key}:
+            <div key={idx} className="col-span-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#060C1B]/60 border border-[#1E2F56]/60 text-xs min-w-0">
+              <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] ${highlight ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
+                {item.key}
               </span>
               {isInterfaceCode ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-[#00A3E0] font-mono font-bold text-[11px] tracking-tight">
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#0046FF]/10 border border-[#0046FF]/30 text-[#00A3E0] font-mono font-bold text-xs truncate">
                   {cleanedVal}
                 </span>
               ) : (
-                <span className={`font-shinhan-num text-left break-all ${highlight ? 'text-[#F04438] font-bold' : 'text-slate-100 font-bold'}`} title={cleanedVal}>
+                <span className={`font-shinhan-num text-right text-[13.5px] truncate ${highlight ? 'text-[#F04438] font-bold' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
                   {cleanedVal}
                 </span>
               )}
@@ -434,6 +503,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
   const [incidentWorkflowSteps, setIncidentWorkflowSteps] = useState([]);
   const [totalSmsVolume, setTotalSmsVolume] = useState(0);
 
+
+
   // MTTR 타이머 실시간 동기화
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -537,11 +608,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
         const s = localStorage.getItem('sguard_alert_thresholds_v3');
         if (s) { const p = JSON.parse(s); cT = p.critical?.errorCount || cT; majT = p.major?.errorCount || majT; }
       } catch {}
-      let v = Number(selectedSms.received_count) || Number(selectedSms.occurrence_count) || 1;
-      if (selectedSms.message) {
-        const m = selectedSms.message.match(/(?:장애|오류|미처리|발생|테스트 오류)\s*(\d+)건/);
-        if (m) { const pv = parseInt(m[1], 10); if (pv > v) v = pv; }
-      }
+      let v = extractCleanErrorCount(selectedSms);
       if (v >= cT) sev = 'CRITICAL';
       else if (v >= majT) sev = 'MAJOR';
     }
@@ -1981,7 +2048,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
 
       {/* ── MAIN BENTO GRID SCROLL ───────────────────────────────── */}
-      <div className="px-3.5 pt-5 sm:pt-6 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="px-3.5 pt-4 space-y-4" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
 
         {/* ── PANEL 1: SMS FEED (Bento Wide) ── */}
         {(() => {
@@ -1996,68 +2063,51 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           ...(selectedSms ? activeTheme.outlineActive : activeTheme.outlineDim),
         }}>
 
-          {/* Panel header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F56] bg-[#0D162B]">
-            <div className="flex items-center gap-2.5">
-              <MessageSquare size={16} className="text-[#00A3E0]" />
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-black text-slate-100 uppercase tracking-tight font-shinhan-display">1. 원천 거래 관제</span>
-                <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Shinhan Signal]</span>
+          {/* Panel header — 2-row mobile-optimised layout */}
+          <div className="flex flex-col border-b border-[#1E2F56] bg-[#0D162B]">
+            {/* Row 1: Icon + Title + Live badge */}
+            <div className="flex items-center justify-between px-4 pt-3 pb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <MessageSquare size={14} className="text-[#00A3E0] shrink-0" />
+                <span className="text-[13px] font-black text-slate-100 tracking-tight font-shinhan-display whitespace-nowrap">1. 원천 거래 관제</span>
+                <span className="text-[9px] font-bold text-[#00A3E0] font-mono bg-[#00A3E0]/10 border border-[#00A3E0]/30 px-1.5 py-0.5 rounded whitespace-nowrap">Signal Ingestion</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* 1-unit Step Navigation */}
-              <div className="flex items-center gap-0.5 bg-slate-900/60 p-0.5 rounded-lg border border-slate-700/50">
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); scrollSmsByItem('up'); }}
-                  disabled={!canScrollSmsUp}
-                  title="이전 문자 (1건 위로)"
-                  className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
-                >
-                  <ChevronUp size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); scrollSmsByItem('down'); }}
-                  disabled={!canScrollSmsDown}
-                  title="다음 문자 (1건 아래로)"
-                  className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
-                >
-                  <ChevronDown size={13} />
-                </button>
-              </div>
-
-              {/* Hide Done toggle */}
-              <button 
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[10px] font-medium transition-colors ${
-                  hideCompletedSms 
-                    ? 'bg-blue-600 text-white border-blue-500 font-semibold' 
-                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-                }`}
-              >
-                <span className="text-[9px] uppercase tracking-wider font-semibold">Done 숨김</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${hideCompletedSms ? 'bg-white' : 'bg-slate-500'}`} />
-              </button>
-
-              {/* LIVE dot */}
+              {/* LIVE / DONE status */}
               {(() => {
                 const isLive = smsMessages.length > 0 && smsMessages.some(m => !m.is_analyzed || Number(m.is_analyzed) === 0);
                 return (
-                  <div 
-                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[9px] font-semibold tracking-wider font-mono ${
-                      isLive 
-                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' 
-                        : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                    <span>{isLive ? 'LIVE' : 'DONE'}</span>
+                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold tracking-widest font-mono shrink-0 ${
+                    isLive
+                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                      : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isLive ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+                    <span>{isLive ? 'LIVE' : 'ALL DONE'}</span>
                   </div>
                 );
               })()}
+            </div>
+
+            {/* Row 2: 건수 표시 + Done hide toggle */}
+            <div className="flex items-center justify-between px-4 pb-2.5 gap-2">
+              {/* SMS count badge */}
+              <span className="text-[10px] font-mono text-slate-500">
+                {visibleSms.length}건 수신
+              </span>
+
+              {/* Done hide toggle */}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-semibold transition-all active:scale-95 shrink-0 ${
+                  hideCompletedSms
+                    ? 'bg-[#0046FF] text-white border-[#0046FF]'
+                    : 'bg-[#060C1B] text-slate-400 border-[#1E2F56]'
+                }`}
+              >
+                <Eye size={10} />
+                <span>완료 {hideCompletedSms ? '숨김' : '표시'}</span>
+              </button>
             </div>
           </div>
 
@@ -2133,40 +2183,33 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     if (selectedSms?.inc_id === msg.inc_id) { setSelectedSms(null); selectedSmsRef.current = null; setShowAgentPanel(false); setAgentMessages([]); }
                     else { setSelectedSms(msg); selectedSmsRef.current = msg; setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
                   }}
-                  className={`rounded-2xl p-4.5 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-3 relative overflow-hidden snap-start ${isCritical ? 'sms-pulse-critical' : isMaj ? 'sms-pulse-major' : ''}`}
-                  style={isCritical ? {
-                    background: isSel
-                      ? `repeating-linear-gradient(-45deg, rgba(239,68,68,0.18) 0px, rgba(239,68,68,0.18) 12px, rgba(60,10,10,0.6) 12px, rgba(60,10,10,0.6) 28px)`
-                      : `repeating-linear-gradient(-45deg, rgba(239,68,68,0.10) 0px, rgba(239,68,68,0.10) 12px, rgba(25,4,4,0.75) 12px, rgba(25,4,4,0.75) 28px)`,
-                    border: `2px solid rgba(239,68,68,${isSel ? '0.95' : '0.65'})`,
-                    borderRadius: 16,
-                    boxShadow: isSel
-                      ? '0 4px 12px rgba(0,0,0,0.5)'
-                      : 'none',
-                  } : {
-                    background: isSel ? `rgba(${accentBgRGB},0.12)` : isMaj ? `rgba(${accentBgRGB},0.05)` : 'rgba(18,21,26,0.85)',
-                    borderTop: '1px solid rgba(255,255,255,0.05)',
-                    borderRight: '1px solid rgba(255,255,255,0.05)',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    borderLeft: `4px solid ${accentColor}`,
-                    borderRadius: 16,
-                    boxShadow: isSel ? '0 4px 12px rgba(0,0,0,0.5)' : 'none'
+                  className={`rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-2.5 relative overflow-hidden snap-start shadow-sm border ${
+                    isSel 
+                      ? 'bg-[#13203E] border-[#0046FF] ring-1 ring-[#0046FF]' 
+                      : 'bg-[#0D162B] border-[#1E2F56] hover:border-slate-500'
+                  }`}
+                  style={{
+                    borderLeftWidth: '4px',
+                    borderLeftColor: accentColor,
                   }}>
                   {/* Header: Notification Type & Severity */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {msg.keyword_detected ? <AlertCircle size={15} style={{ color: accentColor }} /> : <Info size={15} style={{ color: accentColor }} />}
-                      <span className="text-[12px] font-semibold tracking-wide text-slate-300 uppercase">
-                        {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'Manual Registration' : 'SMS Detected'}
+                  <div className="flex items-center justify-between pb-2 border-b border-[#1E2F56]">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {msg.keyword_detected ? <AlertCircle size={13} style={{ color: accentColor }} className="shrink-0" /> : <Info size={13} style={{ color: accentColor }} className="shrink-0" />}
+                      <span className="text-[11px] font-bold tracking-wide text-slate-200 uppercase font-shinhan-display truncate">
+                        {msg.sender === 'Manual Entry' || msg.channel === 'MANUAL' ? 'MANUAL' : 'SMS'}
                       </span>
                       {msg.severity && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider font-shinhan-num shrink-0"
                           style={{ color: accentColor, border: `1px solid ${accentColor}`, background: `${accentColor}15` }}>
                           {msg.severity}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] font-mono text-slate-500">{formatYYMMDD(msg.timestamp)}</span>
+                    {/* 시간만 표시 (날짜 제거로 공간 절약) */}
+                    <span className="text-[10px] font-mono text-slate-500 shrink-0 ml-2">
+                      {msg.timestamp ? String(formatYYMMDD(msg.timestamp)).slice(11, 19) : ''}
+                    </span>
                   </div>
 
                   {/* Main Contents: SMS Message */}
@@ -2248,14 +2291,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         );
                       })()}
 
-                      {(() => {
-                        const isDone = msg.incident_status === '처리완료' || Number(msg.is_analyzed) >= 1;
-                        return (
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg shrink-0 ${!isDone ? 'animate-pulse bg-amber-500/15 text-amber-400 border border-amber-500/30 font-black' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold'}`}>
-                            {msg.incident_status === '처리완료' ? '완료' : Number(msg.is_analyzed) >= 1 ? 'ANALYZED' : 'ANALYZING'}
-                          </span>
-                        );
-                      })()}
                     </div>
 
                     <div className="flex items-center flex-wrap gap-2 ml-auto">
@@ -2301,6 +2336,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           );
         })()}
 
+
+
         {/* ── PANEL 2: AI Insight (Bento Wide) ── */}
         {(visibleSms.length > 0 || selectedSms) && (
         <div className="md:col-span-2 transition-all duration-700 shadow-2xl" style={{
@@ -2324,6 +2361,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             />
           </div>
         )}
+
+
 
         {/* ── PANEL 3: Expert Advisor (Bento Card) ── */}
         <div className="md:col-span-1 transition-all duration-700 flex flex-col shadow-2xl" style={{
@@ -2412,6 +2451,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
             )}
           </div>
         </div>
+
+
 
         {/* ── PANEL 4: 장애 처리 현황 (Bento Card) ── */}
         {(() => {

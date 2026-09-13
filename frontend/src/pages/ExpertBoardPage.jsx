@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useTheme } from '../context/ThemeContext';
 import {
   Medal, ChevronLeft, Loader2, RefreshCw, Trophy,
   MessageSquare, Database, Users, Zap, Crown, Star
@@ -9,12 +10,13 @@ import {
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
 const RANK_STYLES = [
-  { icon: '🥇', bg: 'bg-amber-500/20', border: 'border-amber-500/40', text: 'text-amber-400', glow: '0 0 20px rgba(245,158,11,0.25)', barFrom: 'rgba(245,158,11,0.25)', barTo: 'rgba(245,158,11,0.05)' },
-  { icon: '🥈', bg: 'bg-slate-400/20', border: 'border-slate-400/40', text: 'text-slate-300', glow: '0 0 15px rgba(148,163,184,0.2)', barFrom: 'rgba(148,163,184,0.15)', barTo: 'rgba(148,163,184,0.03)' },
-  { icon: '🥉', bg: 'bg-orange-600/20', border: 'border-orange-600/40', text: 'text-orange-400', glow: '0 0 12px rgba(234,88,12,0.2)', barFrom: 'rgba(234,88,12,0.18)', barTo: 'rgba(234,88,12,0.03)' },
+  { icon: '🥇', bg: 'bg-amber-500/20', border: 'border-amber-500/40', text: 'text-amber-500', glow: '0 0 20px rgba(245,158,11,0.2)', barFrom: 'rgba(245,158,11,0.25)', barTo: 'rgba(245,158,11,0.05)' },
+  { icon: '🥈', bg: 'bg-slate-400/20', border: 'border-slate-400/40', text: 'text-slate-600', glow: '0 0 15px rgba(148,163,184,0.15)', barFrom: 'rgba(148,163,184,0.15)', barTo: 'rgba(148,163,184,0.03)' },
+  { icon: '🥉', bg: 'bg-orange-600/20', border: 'border-orange-600/40', text: 'text-orange-600', glow: '0 0 12px rgba(234,88,12,0.15)', barFrom: 'rgba(234,88,12,0.18)', barTo: 'rgba(234,88,12,0.03)' },
 ];
 
 export default function ExpertBoardPage() {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/realtime-pipeline');
   const [contributors, setContributors] = useState([]);
@@ -42,24 +44,26 @@ export default function ExpertBoardPage() {
   const maxScore = contributors[0]?.synergy_score || 1;
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: '#09090b', color: '#cbd5e1', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: isLight ? 'var(--sh-bg-canvas, #F1F5F9)' : '#09090b', color: isLight ? '#0F172A' : '#cbd5e1', overflow: 'hidden' }}>
       {/* Background layer — separate from flex to avoid pushing header down */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full" />
-      </div>
+      {!isLight && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full" />
+        </div>
+      )}
 
       {/* Flex column layout — starts at top:0 */}
       <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Header */}
-        <header className="flex-shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md gap-3">
+        <header className={`flex-shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b backdrop-blur-md gap-3 ${isLight ? 'bg-white/95 border-[#E2E8F0] text-slate-900 shadow-sm' : 'border-white/5 bg-zinc-950/90'}`}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => goBack()}
-            className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center cursor-pointer active:scale-95"
+            className={`w-8 h-8 rounded-xl transition-all flex items-center justify-center cursor-pointer active:scale-95 border ${isLight ? 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-600' : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-400'}`}
           >
-            <ChevronLeft className="w-4 h-4 text-slate-400" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20">

@@ -9,6 +9,8 @@ import {
 import MarkdownViewer from './MarkdownViewer';
 import { getAccessToken, getAuthHeaders } from '../lib/authStore';
 import { toast } from 'react-hot-toast';
+import { useTheme } from '../context/ThemeContext';
+import { formatOccurrenceCount } from '../utils/maskingUtils';
 
 // 🔗 장애 ID (INC-숫자 또는 단순 20으로 시작하는 8~18자리 숫자) 를 마크다운 링크로 변환
 const linkIncidentIds = (text) => {
@@ -191,31 +193,7 @@ const parseHistoricalIncident = (text, similarityReason, defaultTicketId) => {
 
 // 🔢 발생건수 이상값 필터링 및 복구 헬퍼 (지수 표기법 e+ 등 비정상 값 방지)
 const cleanOccurrenceCount = (count, rawMessage) => {
-  // 1. 메시지 원문에서 발생건수 직접 추출 시도
-  if (rawMessage) {
-    const directMatch = rawMessage.match(/(?:▶\s*)?(?:발생|오류|거래)?\s*건수\s*[:：]?\s*\[?([0-9,]+)\s*건?\]?/i);
-    if (directMatch) {
-      const parsed = parseInt(directMatch[1].replace(/,/g, ''), 10);
-      if (!isNaN(parsed) && parsed > 0 && parsed < 1000000) {
-        return `${parsed.toLocaleString()}건`;
-      }
-    }
-  }
-
-  // 2. 전달받은 count 값 유효성 검증
-  if (count !== null && count !== undefined && count !== '') {
-    const countStr = String(count).trim();
-    // 비정상 지수 표기법 (e+) 또는 7자리 이상의 비정상 숫자 필터링
-    if (countStr.includes('e+') || countStr.includes('E+') || countStr.length > 6) {
-      return null;
-    }
-    const num = Number(countStr.replace(/[^0-9.]/g, ''));
-    if (!isNaN(num) && num > 0 && num < 1000000 && Number.isInteger(num)) {
-      return `${num.toLocaleString()}건`;
-    }
-  }
-
-  return null;
+  return formatOccurrenceCount(count, rawMessage);
 };
 
 const getApiUrl = (endpoint) => {
@@ -272,6 +250,7 @@ const getCategoryFromAnalysis = (analysisText, message) => {
 
 export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSms, onOpenWarRoom, onAgentContent, warRooms, onAnalyzingChange, isOpening = false, hideWarRoomButton = false, onAnalysisComplete, onClose, activeTheme, onEntityClick }) {
   const navigate = useNavigate();
+  const { isLight, theme } = useTheme();
   
   const handleChipClick = (value, label) => {
     if (!value) return;
@@ -873,43 +852,59 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
 
   return (
     <div
-      className="rounded-2xl overflow-hidden relative h-full flex flex-col transition-all duration-300 bg-[#0D162B] border border-[#1E2F56]"
+      className={`rounded-2xl overflow-hidden relative h-full flex flex-col transition-all duration-300 shinhan-column-card ${
+        isLight 
+          ? 'bg-white border border-[#E2E8F0] shadow-[0_4px_12px_-2px_rgba(15,23,42,0.06)]' 
+          : 'bg-[#0D162B] border border-[#1E2F56]'
+      }`}
       style={selectedSms
-        ? { border: '1px solid #0046FF', outline: 'none', boxShadow: '0 0 16px -2px rgba(0, 70, 255, 0.22)' }
-        : { border: '1px solid #1E2F56', outline: 'none', boxShadow: 'none' }
+        ? { border: '1px solid #0046FF', outline: 'none', boxShadow: isLight ? '0 4px 14px -2px rgba(0, 70, 255, 0.16)' : '0 0 16px -2px rgba(0, 70, 255, 0.22)' }
+        : { border: isLight ? '1px solid #E2E8F0' : '1px solid #1E2F56', outline: 'none', boxShadow: 'none' }
       }>
       {/* 고정 헤더 영역 */}
-      <div className="shrink-0 p-4 sm:p-5 border-b border-[#1E2F56] relative">
+      <div className={`shrink-0 p-4 sm:p-5 border-b relative ${
+        isLight ? 'bg-white border-[#E2E8F0]' : 'border-[#1E2F56]'
+      }`}>
 
       {/* 헤더 - SMS 수신내역과 동일한 구조 */}
       <div className="flex items-center justify-between gap-3 relative z-10">
         {/* 왼쪽: 아이콘 + 타이틀 */}
         <div className="flex items-center gap-3 min-w-0">
           <span className={`data-ring-wrapper shrink-0 ${isAnalyzingSms ? 'data-ring-spinning' : ''} ${isAnalyzingSms && isCritical ? 'data-ring-active' : ''}`}>
-            <div className={`p-2.5 rounded-xl border ${isAnalyzingSms && isCritical ? 'bg-[#F04438]/15 border-[#F04438]/30' : 'bg-[#0046FF]/10 border-[#1E2F56]'}`}>
+            <div className={`p-2.5 rounded-xl border ${
+              isAnalyzingSms && isCritical 
+                ? (isLight ? 'bg-[#FEF2F2] border-[#FECACA]' : 'bg-[#F04438]/15 border-[#F04438]/30')
+                : isLight 
+                  ? 'bg-[#EFF6FF] border-[#BFDBFE]' 
+                  : 'bg-[#0046FF]/10 border-[#1E2F56]'
+            }`}>
               {isAnalyzingSms && isCritical
-                ? <AlertTriangle className="w-5 h-5 text-[#F04438] animate-pulse" />
+                ? <AlertTriangle className="w-5 h-5 text-[#DC2626] animate-pulse" />
                 : isAnalyzingSms
-                ? <MessageSquare className="w-5 h-5 text-[#00A3E0] animate-pulse" />
-                : <Brain className="w-5 h-5 text-[#00A3E0]" />
+                ? <MessageSquare className={`w-5 h-5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'} animate-pulse`} />
+                : <Brain className={`w-5 h-5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
               }
             </div>
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-white text-sm sm:text-base tracking-tight whitespace-nowrap font-shinhan-display">
+              <h2 className={`font-semibold text-sm sm:text-base tracking-tight whitespace-nowrap font-shinhan-display ${
+                isLight ? 'text-[#0F172A]' : 'text-white'
+              }`}>
                 2. 지능형 지식 대조
               </h2>
-              <span className="text-[10px] font-bold text-[#00A3E0] font-mono">[Insight Archive]</span>
+              <span className={`text-[10px] font-bold font-mono ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`}>[Insight Archive]</span>
               {selectedSms && (
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30 text-[9px] font-mono font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0] animate-pulse" />
+                <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold ${
+                  isLight ? 'bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]' : 'bg-[#0046FF]/10 text-[#00A3E0] border border-[#0046FF]/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0046FF]' : 'bg-[#00A3E0]'} animate-pulse`} />
                   PIPELINE SYNC
                 </span>
               )}
             </div>
             {insightTimestamp && (
-              <p className="text-[9px] text-slate-400 font-normal font-mono mt-0.5 truncate">
+              <p className={`text-[9px] font-normal font-mono mt-0.5 truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {(() => {
                   const d = new Date(insightTimestamp);
                   const yyyy = d.getFullYear();
@@ -1063,23 +1058,31 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
           const formattedTicketId = ticketId ? (ticketId.toLowerCase().startsWith('inc-') ? ticketId : `inc-${ticketId}`) : null;
 
           return (
-            <div className="mb-4 rounded-xl bg-[#13203E] border border-[#1E2F56] p-3.5 sm:p-4 animate-in fade-in duration-500 relative z-10 shadow-sm">
+            <div className={`mb-4 rounded-xl p-3.5 sm:p-4 animate-in fade-in duration-500 relative z-10 shadow-sm ${
+              isLight 
+                ? 'bg-[#F8FAFC] border border-[#E2E8F0]' 
+                : 'bg-[#13203E] border border-[#1E2F56]'
+            }`}>
               {/* 1. 상단 AI 매칭 KPI 위젯: 타이틀 + 티켓 ID 아웃라인 뱃지 + 게이지 수치 */}
               <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[#0046FF]/15 border border-[#0046FF]/30 flex items-center justify-center">
-                    <Zap className="w-3.5 h-3.5 text-[#00A3E0]" />
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                    isLight ? 'bg-[#EFF6FF] border border-[#BFDBFE]' : 'bg-[#0046FF]/15 border-[#0046FF]/30'
+                  }`}>
+                    <Zap className={`w-3.5 h-3.5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-slate-200">S-Autopilot 지식베이스 매칭</span>
+                      <span className={`text-xs font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>S-Autopilot 지식베이스 매칭</span>
                       {parsed?.matchType && (
-                        <span className="text-[9px] font-semibold text-[#00A3E0] bg-[#00A3E0]/10 px-1.5 py-0.5 rounded border border-[#00A3E0]/20">
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${
+                          isLight ? 'text-[#1E40AF] bg-[#EFF6FF] border-[#BFDBFE]' : 'text-[#00A3E0] bg-[#00A3E0]/10 border-[#00A3E0]/20'
+                        }`}>
                           {parsed.matchType}
                         </span>
                       )}
                     </div>
-                    <p className="text-[9px] text-slate-400 font-mono">Vectorize & RAG Semantic Alignment</p>
+                    <p className={`text-[9px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Vectorize & RAG Semantic Alignment</p>
                   </div>
                 </div>
 
@@ -1088,15 +1091,21 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   {formattedTicketId && (
                     <button
                       onClick={() => navigate(`/ai-report/${ticketId.replace(/^inc-?/i, '')}`)}
-                      className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0046FF]/10 hover:bg-[#0046FF]/20 text-[#00A3E0] hover:text-white border border-[#0046FF]/40 hover:border-[#0046FF] text-xs font-shinhan-num font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+                      className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-shinhan-num font-bold transition-all active:scale-95 cursor-pointer shadow-sm ${
+                        isLight 
+                          ? 'bg-white hover:bg-[#EFF6FF] text-[#0046FF] border border-[#BFDBFE]' 
+                          : 'bg-[#0046FF]/10 hover:bg-[#0046FF]/20 text-[#00A3E0] hover:text-white border border-[#0046FF]/40 hover:border-[#0046FF]'
+                      }`}
                       title="연동된 과거 인시던트 티켓 리포트 열기"
                     >
                       <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                       <span>{formattedTicketId}</span>
                     </button>
                   )}
-                  <div className="flex items-baseline gap-1 bg-[#060C1B] px-2.5 py-1 rounded-lg border border-[#1E2F56]">
-                    <span className="text-[10px] text-slate-400 font-medium">유사도</span>
+                  <div className={`flex items-baseline gap-1 px-2.5 py-1 rounded-lg border ${
+                    isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+                  }`}>
+                    <span className={`text-[10px] font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>유사도</span>
                     <span className={`text-base font-bold font-shinhan-num tabular-nums ${textColor}`}>
                       {pct.toFixed(1)}%
                     </span>
@@ -1105,7 +1114,9 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               </div>
 
               {/* 프로그레스 바 형태의 게이지 위젯 */}
-              <div className="h-2 bg-[#060C1B] rounded-full overflow-hidden border border-[#1E2F56] relative mb-3">
+              <div className={`h-2 rounded-full overflow-hidden border relative mb-3 ${
+                isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+              }`}>
                 <div
                   className="h-full rounded-full transition-all duration-1000 ease-out"
                   style={{ width: `${pct}%`, background: score > 0.8 ? '#00C48C' : score > 0.6 ? '#0046FF' : '#F5A623' }}
@@ -1113,24 +1124,28 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               </div>
 
               {/* 2. 분석 데이터의 Key-Value 테이블화 (출처 DB / 매칭 기준 + [추출 엔티티] 컴팩트 태그) */}
-              <div className="bg-[#060C1B] border border-[#1E2F56] rounded-xl p-3 flex flex-col gap-2 text-xs">
+              <div className={`rounded-xl p-3 flex flex-col gap-2 text-xs border ${
+                isLight ? 'bg-white border-[#E2E8F0]' : 'bg-[#060C1B] border-[#1E2F56]'
+              }`}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-bold text-slate-400 shrink-0 whitespace-nowrap text-[11px]">출처 DB:</span>
-                    <span className="font-mono text-slate-100 font-semibold truncate text-[11px]" title={parsed?.sourceDB || 'Vectorize & SQL Hybrid'}>
+                    <span className={`font-bold shrink-0 whitespace-nowrap text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>출처 DB:</span>
+                    <span className={`font-mono font-semibold truncate text-[11px] ${isLight ? 'text-slate-800' : 'text-slate-100'}`} title={parsed?.sourceDB || 'Vectorize & SQL Hybrid'}>
                       {parsed?.sourceDB || 'Vectorize & SQL Hybrid'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-bold text-slate-400 shrink-0 whitespace-nowrap text-[11px]">매칭 기준:</span>
-                    <span className="text-slate-100 font-semibold truncate text-[11px]" title={parsed?.matchCriteria || '유사 장애 텍스트 벡터 임베딩'}>
+                    <span className={`font-bold shrink-0 whitespace-nowrap text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>매칭 기준:</span>
+                    <span className={`font-semibold truncate text-[11px] ${isLight ? 'text-slate-800' : 'text-slate-100'}`} title={parsed?.matchCriteria || '유사 장애 텍스트 벡터 임베딩'}>
                       {parsed?.matchCriteria || '유사 장애 텍스트 벡터 임베딩'}
                     </span>
                   </div>
                 </div>
 
                 {/* 🏷️ [추출 엔티티] 컴팩트 태그 바 (불필요한 전체 텍스트 박스 전면 삭제 및 키 엔티티만 축약) */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#1E293B]/70">
+                <div className={`flex flex-wrap items-center gap-1.5 pt-2 border-t ${
+                  isLight ? 'border-[#E2E8F0]' : 'border-[#1E293B]/70'
+                }`}>
                   <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider shrink-0 mr-1">
                     <Sliders className="w-3 h-3 text-blue-400" />
                     [추출 엔티티]
@@ -1221,68 +1236,104 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               {/* 과거 티켓 원인 및 해결 조치 (Resolution 카드 면적 확장) */}
               <div className="space-y-2.5">
                 {/* 1. 당시 적용 조치 (Resolution) - 신한 골드/앰버 좌측 액센트 라인 및 조치 내용 강조 */}
-                <div className="p-3.5 sm:p-4 rounded-xl bg-[#1E170A] border border-[#F5A623]/40 border-l-4 border-l-[#F5A623] space-y-1.5 shadow-sm">
+                <div className={`p-3.5 sm:p-4 rounded-xl border-l-4 space-y-1.5 shadow-sm ${
+                  isLight 
+                    ? 'bg-[#FFFBEB] border border-[#FDE68A] border-l-[#F59E0B]' 
+                    : 'bg-[#1E170A] border border-[#F5A623]/40 border-l-[#F5A623]'
+                }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-[#F5A623] flex items-center gap-1.5 tracking-wider uppercase font-shinhan-display">
-                      <Wrench className="w-4 h-4 text-[#F5A623]" />
+                    <span className={`text-xs md:text-[11px] font-black flex items-center gap-1.5 tracking-wider uppercase font-shinhan-display ${
+                      isLight ? 'text-[#B45309]' : 'text-[#F5A623]'
+                    }`}>
+                      <Wrench className={`w-4 h-4 ${isLight ? 'text-[#B45309]' : 'text-[#F5A623]'}`} />
                       과거 동일 장애 해결 조치 (Resolution)
                     </span>
-                    <span className="text-[9px] font-shinhan-num px-1.5 py-0.5 rounded bg-[#F5A623]/15 text-[#F5A623] border border-[#F5A623]/30 font-bold">
+                    <span className={`text-[10px] md:text-[9px] font-shinhan-num px-1.5 py-0.5 rounded font-bold ${
+                      isLight 
+                        ? 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]' 
+                        : 'bg-[#F5A623]/15 text-[#F5A623] border border-[#F5A623]/30'
+                    }`}>
                       PROVEN REMEDY
                     </span>
                   </div>
-                  <p className="text-[13px] font-bold text-amber-100 leading-relaxed break-keep">
+                  <p className={`report-body-text text-[15px] md:text-[13px] font-bold leading-relaxed break-keep ${
+                    isLight ? 'text-[#451A03]' : 'text-amber-100'
+                  }`}>
                     {hist?.resolution || 'MCI 인터페이스 프로세스 긴급 재기동 및 슬로우 쿼리 Kill 조치 완료'}
                   </p>
                 </div>
 
                 {/* 2. 과거 발생 원인 (Root Cause) */}
-                <div className="p-3.5 rounded-xl bg-[#1E170A] border border-[#F5A623]/35 border-l-3 border-l-[#F5A623] space-y-1 shadow-sm">
+                <div className={`p-3.5 rounded-xl border-l-3 space-y-1 shadow-sm ${
+                  isLight 
+                    ? 'bg-[#FEFCE8] border border-[#FEF08A] border-l-[#F59E0B]' 
+                    : 'bg-[#1E170A] border border-[#F5A623]/35 border-l-[#F5A623]'
+                }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10.5px] font-bold text-[#F5A623] flex items-center gap-1.5 tracking-wider uppercase font-shinhan-display">
-                      <ShieldAlert className="w-3.5 h-3.5 text-[#F5A623]" />
+                    <span className={`text-xs md:text-[10.5px] font-bold flex items-center gap-1.5 tracking-wider uppercase font-shinhan-display ${
+                      isLight ? 'text-[#B45309]' : 'text-[#F5A623]'
+                    }`}>
+                      <ShieldAlert className={`w-3.5 h-3.5 ${isLight ? 'text-[#B45309]' : 'text-[#F5A623]'}`} />
                       과거 발생 원인 (Root Cause)
                     </span>
-                    <span className="text-[9px] font-shinhan-num text-slate-500">PAST CAUSE</span>
+                    <span className={`text-[10px] md:text-[9px] font-shinhan-num ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>PAST CAUSE</span>
                   </div>
-                  <p className="text-[12px] font-medium text-slate-200 leading-relaxed break-keep">
+                  <p className={`report-body-text text-[14.5px] md:text-[12px] font-medium leading-relaxed break-keep ${
+                    isLight ? 'text-slate-800' : 'text-slate-200'
+                  }`}>
                     {hist?.cause || 'WAS 인스턴스 커넥션 풀 고갈 및 DB 세션 경합 발생'}
                   </p>
                 </div>
               </div>
 
               {/* 과거 티켓 해결 타임라인 스트립 (Timeline Track) */}
-              <div className="p-3 rounded-xl bg-[#060C1B] border border-[#1E2F56] space-y-2">
+              <div className={`p-3 rounded-xl space-y-2 ${
+                isLight 
+                  ? 'bg-[#F8FAFC] border border-[#E2E8F0]' 
+                  : 'bg-[#060C1B] border border-[#1E2F56]'
+              }`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider font-shinhan-display">
-                    <Clock className="w-3 h-3 text-[#00A3E0]" />
+                  <span className={`text-xs md:text-[10px] font-bold flex items-center gap-1.5 uppercase tracking-wider font-shinhan-display ${
+                    isLight ? 'text-slate-500' : 'text-slate-400'
+                  }`}>
+                    <Clock className={`w-3.5 h-3.5 ${isLight ? 'text-[#0046FF]' : 'text-[#00A3E0]'}`} />
                     과거 티켓 복구 타임라인 (MTTR 이력)
                   </span>
-                  <span className="text-[10px] font-shinhan-num text-[#00C48C] bg-[#00C48C]/10 px-2 py-0.2 rounded border border-[#00C48C]/20 font-bold">
+                  <span className={`text-xs md:text-[10px] font-shinhan-num px-2 py-0.5 rounded font-bold ${
+                    isLight 
+                      ? 'text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0]' 
+                      : 'text-[#00C48C] bg-[#00C48C]/10 border border-[#00C48C]/20'
+                  }`}>
                     총 12분 소요 복구 완료
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0D162B] border border-[#1E2F56]">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#0D162B] border border-[#1E2F56]'
+                  }`}>
                     <div className="w-2 h-2 rounded-full bg-[#0046FF] shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-200 truncate">1. 발생 감지</p>
-                      <p className="text-[9px] text-slate-400 font-shinhan-num">임계치 초과 1분 내</p>
+                      <p className={`text-xs md:text-[10px] font-bold truncate ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>1. 발생 감지</p>
+                      <p className={`text-[11px] md:text-[9px] font-shinhan-num ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>임계치 초과 1분 내</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0D162B] border border-[#1E2F56]">
-                    <div className="w-2 h-2 rounded-full bg-[#F5A623] shrink-0" />
+                  <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#0D162B] border border-[#1E2F56]'
+                  }`}>
+                    <div className="w-2 h-2 rounded-full bg-[#F59E0B] shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-200 truncate">2. 원인 특정</p>
-                      <p className="text-[9px] text-slate-400 font-shinhan-num">세션 락 분석 4분</p>
+                      <p className={`text-xs md:text-[10px] font-bold truncate ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>2. 원인 특정</p>
+                      <p className={`text-[11px] md:text-[9px] font-shinhan-num ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>세션 락 분석 4분</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0D162B] border border-[#1E2F56]">
+                  <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                    isLight ? 'bg-white border border-[#E2E8F0]' : 'bg-[#0D162B] border border-[#1E2F56]'
+                  }`}>
                     <div className="w-2 h-2 rounded-full bg-[#00C48C] shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-200 truncate">3. 조치 완료</p>
-                      <p className="text-[9px] text-slate-400 font-shinhan-num">프로세스 재기동 7분</p>
+                      <p className={`text-xs md:text-[10px] font-bold truncate ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>3. 복구 완료</p>
+                      <p className={`text-[11px] md:text-[9px] font-shinhan-num ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>프로세스 재기동 7분</p>
                     </div>
                   </div>
                 </div>

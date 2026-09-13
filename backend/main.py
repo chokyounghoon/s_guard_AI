@@ -633,6 +633,42 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
         except (ValueError, TypeError):
             logger.warning(f"Invalid timestamp format: {sms.received_at}. Falling back to server time.")
 
+    # 발생건수(occurrence_count) 정제 및 추출 방어 로직 (e+ 표기, 초대형 수치 방지)
+    clean_occ_count = sms.occurrence_count
+    if clean_occ_count is not None:
+        s_count = str(clean_occ_count).strip()
+        if 'e' in s_count.lower() or len(s_count) > 6:
+            clean_occ_count = None
+        else:
+            try:
+                num = int(float(s_count))
+                if num > 1000000:
+                    clean_occ_count = None
+                else:
+                    clean_occ_count = num
+            except Exception:
+                clean_occ_count = None
+
+    if clean_occ_count is None and sms.message:
+        import re
+        patterns = [
+            r'▶\s*현재오류건수\s*:\s*\[?(\d+)',
+            r'▶\s*오류발생건수\s*:\s*\[?(\d+)',
+            r'▶\s*발생오류건수\s*:\s*\[?(\d+)',
+            r'▶\s*발생건수\s*:\s*\[?(\d+)',
+            r'▶\s*오류건수\s*:\s*\[?(\d+)',
+            r'총\s*(\d+)\s*건',
+            r'▶\s*현재거래건수\s*:\s*\[?(\d+)'
+        ]
+        for pat in patterns:
+            m = re.search(pat, sms.message)
+            if m:
+                try:
+                    clean_occ_count = int(m.group(1))
+                    break
+                except Exception:
+                    pass
+
     # 3. Worker에 SMS 저장 요청 (모든 상세 필드 포함)
     worker_payload = {
         "sender": sms.sender,
@@ -644,7 +680,7 @@ async def receive_sms(sms: SMSMessage, background_tasks: BackgroundTasks):
         "service_name": sms.service_name,
         "biz_system": sms.biz_system,
         "error_code": sms.error_code,
-        "occurrence_count": sms.occurrence_count,
+        "occurrence_count": clean_occ_count if clean_occ_count is not None else sms.occurrence_count,
         "occurrence_node": sms.occurrence_node,
         "error_message": sms.error_message,
         "occurrence_time": sms.occurrence_time or ts.isoformat(),

@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, ArrowLeft } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 /**
  * PCPageModal
@@ -11,6 +12,7 @@ import { X, ArrowLeft } from 'lucide-react';
 export default function PCPageModal({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isLight } = useTheme();
 
   const isPC = typeof window !== 'undefined'
     ? window.matchMedia('(min-width: 1024px)').matches
@@ -62,7 +64,7 @@ export default function PCPageModal({ children }) {
       <div
         className={`
           relative z-10 w-full ${isFullscreen ? 'max-w-full h-full rounded-none' : location.pathname.includes('/workflow') ? 'max-w-[92vw] h-fit rounded-[2.5rem]' : 'max-w-5xl h-fit rounded-[2.5rem]'}
-          bg-[#0f1421] border ${isFullscreen ? 'border-0' : 'border-white/10'} shadow-2xl
+          ${isLight ? 'bg-[#F8FAFC] border border-[#E2E8F0] shadow-2xl text-slate-900' : 'bg-[#0f1421] border border-white/10 shadow-2xl text-white'}
           flex flex-col overflow-hidden
           animate-in ${isFullscreen ? 'fade-in' : 'zoom-in-95 fade-in'} duration-300
         `}
@@ -71,15 +73,23 @@ export default function PCPageModal({ children }) {
       >
         {/* Modal Top Bar - 특정 페이지들은 자체 헤더를 사용하므로 숨김 */}
         {!isModalPage && (
-          <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#080c18] shrink-0">
+          <div className={`flex items-center justify-between px-6 py-3 border-b shrink-0 ${
+            isLight ? 'border-[#E2E8F0] bg-white' : 'border-white/5 bg-[#080c18]'
+          }`}>
             {/* 현재 경로 표시 (왼쪽 정렬로 변경) */}
-            <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">
+            <span className={`text-[10px] font-mono uppercase tracking-widest ${
+              isLight ? 'text-slate-400 font-semibold' : 'text-slate-600'
+            }`}>
               {location.pathname}
             </span>
 
             <button
               onClick={handleClose}
-              className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all ml-auto"
+              className={`w-8 h-8 flex items-center justify-center rounded-xl border transition-all ml-auto cursor-pointer ${
+                isLight 
+                  ? 'bg-slate-100 hover:bg-slate-200 border-[#E2E8F0] text-slate-600 hover:text-slate-900' 
+                  : 'bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+              }`}
             >
               <X className="w-4 h-4" />
             </button>
@@ -87,7 +97,7 @@ export default function PCPageModal({ children }) {
         )}
 
         {/* Page Content — each page manages its own scroll */}
-        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col custom-scrollbar pc-modal-content">
           {children}
         </div>
       </div>

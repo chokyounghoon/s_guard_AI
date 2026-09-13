@@ -14,6 +14,7 @@ import {
 
 import { getAuthHeaders } from '../lib/authStore';
 import { useResizable, useResizableVertical } from '../hooks/useResizable';
+import { useTheme } from '../context/ThemeContext';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -29,6 +30,7 @@ const EMPTY_STATS = {
 const TABS = ['개요', 'MTTA 분석', '카테고리', '기여자', '피드'];
 
 export default function OverallStatusPage() {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const [loading, setLoading] = useState(true);
@@ -214,42 +216,60 @@ export default function OverallStatusPage() {
   }
 
   return (
-    <div className="h-[100dvh] lg:h-full w-full overflow-hidden bg-zinc-950 text-slate-300 font-sans flex flex-col select-none relative">
+    <div className={`h-[100dvh] lg:h-full w-full overflow-hidden ${
+      isLight ? 'bg-[#F1F5F9] text-slate-800' : 'bg-zinc-950 text-slate-300'
+    } font-sans flex flex-col select-none relative`}>
       {/* Background Effects */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
-      <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
+      {!isLight && (
+        <>
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
+          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
+        </>
+      )}
 
       {/* Header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-3 md:px-6 py-3 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md z-10 gap-2">
+      <header className={`flex-shrink-0 flex items-center justify-between px-3 md:px-6 py-3 border-b ${
+        isLight ? 'bg-white/95 border-[#E2E8F0] text-slate-900' : 'bg-zinc-950/90 border-white/5 text-slate-300'
+      } backdrop-blur-md z-10 gap-2`}>
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
           
-          <button onClick={() => goBack()} className="w-7 h-7 md:w-8 md:h-8 min-w-[28px] md:min-w-[32px] shrink-0 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center cursor-pointer active:scale-95">
-            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-slate-400" />
+          <button onClick={() => goBack()} className={`w-7 h-7 md:w-8 md:h-8 min-w-[28px] md:min-w-[32px] shrink-0 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center cursor-pointer active:scale-95 ${
+            isLight ? 'bg-slate-100 border-slate-200 hover:bg-slate-200' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+          }`}>
+            <ChevronLeft className={`w-4 h-4 md:w-5 md:h-5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`} />
           </button>
           
           <div className="flex flex-col justify-center min-w-0">
-            <h1 className="text-[11px] sm:text-xs md:text-sm lg:text-base font-black tracking-tight flex items-center gap-1.5 text-indigo-400 md:text-transparent md:bg-clip-text md:bg-gradient-to-r md:from-indigo-400 md:via-purple-400 md:to-pink-400 truncate">
-              <Layers className="w-3.5 h-3.5 md:w-4 md:h-4 text-indigo-400 shrink-0" /> 
+            <h1 className={`text-[11px] sm:text-xs md:text-sm lg:text-base font-black tracking-tight flex items-center gap-1.5 truncate ${
+              isLight ? 'text-blue-600' : 'text-indigo-400 md:text-transparent md:bg-clip-text md:bg-gradient-to-r md:from-indigo-400 md:via-purple-400 md:to-pink-400'
+            }`}>
+              <Layers className={`w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} /> 
               <span className="truncate">Global Stats Dashboard</span>
             </h1>
             <p className="text-[8px] md:text-[9px] text-slate-500 font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] mt-0.5 flex items-center gap-1.5 truncate">
-              <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-indigo-500 animate-pulse"></span>
-              <span className="truncate">DREAM MODE LIVE</span>
+              <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-blue-600 animate-pulse"></span>
+              <span className="truncate">LIVE INTELLIGENCE</span>
             </p>
           </div>
 
         </div>
 
         <div className="flex items-center gap-2 md:gap-3 shrink-0">
-          <div className="hidden lg:flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
-             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none cursor-pointer" />
-             <span className="text-slate-500 text-xs">~</span>
-             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none cursor-pointer" />
+          <div className={`hidden lg:flex items-center gap-2 border rounded-xl px-3 py-1.5 ${
+            isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'
+          }`}>
+             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={`bg-transparent text-xs font-bold outline-none cursor-pointer ${isLight ? 'text-slate-800' : 'text-slate-300'}`} />
+             <span className="text-slate-400 text-xs">~</span>
+             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={`bg-transparent text-xs font-bold outline-none cursor-pointer ${isLight ? 'text-slate-800' : 'text-slate-300'}`} />
           </div>
-          <div className="px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] md:text-xs font-mono font-bold text-slate-400 whitespace-nowrap">
+          <div className={`px-2 md:px-3 py-1 md:py-1.5 rounded-xl border text-[10px] md:text-xs font-mono font-bold whitespace-nowrap ${
+            isLight ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-white/5 border-white/10 text-slate-400'
+          }`}>
             {now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
-          <button onClick={() => fetchData(true, startDate, endDate)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 transition-all flex items-center justify-center cursor-pointer">
+          <button onClick={() => fetchData(true, startDate, endDate)} className={`w-8 h-8 md:w-9 md:h-9 rounded-xl border transition-all flex items-center justify-center cursor-pointer ${
+            isLight ? 'bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-600' : 'bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400'
+          }`}>
             <RefreshCw className={`w-3.5 h-3.5 md:w-4 md:h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>

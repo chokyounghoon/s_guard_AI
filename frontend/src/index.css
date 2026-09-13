@@ -34,7 +34,7 @@
   --color-status-danger: #F04438;   /* 위험 (Shinhan Danger) */
 }
 
-:root {
+:root, :root[data-theme="dark"] {
   /* Font Family */
   --font-shinhan-display: 'One Shinhan', 'Pretendard', sans-serif;
   --font-shinhan-body: 'One Shinhan Sans', 'Pretendard', -apple-system, sans-serif;
@@ -48,16 +48,60 @@
 
   /* Shinhan Brand & Semantic Accents */
   --sh-blue-primary: #0046ff;    /* 신한 시그니처 블루 */
+  --sh-blue-surface: rgba(0, 70, 255, 0.12);
   --sh-blue-hover: #0036c8;
   --sh-sky-accent: #00a3e0;      /* 에이전트/인사이트 하이라이트 */
   --sh-danger: #f04438;          /* 오류 임계치 초과 */
+  --sh-danger-text: #f04438;
+  --sh-danger-bg: rgba(240, 68, 56, 0.15);
   --sh-warning: #f5a623;         /* 신한 골드 / 원인 인디케이터 */
+  --sh-warning-text: #f5a623;
+  --sh-warning-bg: rgba(245, 166, 35, 0.15);
   --sh-success: #00c48c;         /* 정상 상태 / 조치 완료 */
+  --sh-success-text: #00c48c;
+  --sh-success-bg: rgba(0, 196, 140, 0.15);
 
   /* Typography Colors */
   --sh-text-primary: #f8fafc;
   --sh-text-secondary: #94a3b8;
   --sh-text-muted: #64748b;
+  --sh-header-bg: #0d162b;
+  --sh-header-border: #1e2f56;
+}
+
+/* 🏢 신한 클린 엔터프라이즈 라이트 테마 (Shinhan Clean Enterprise Light Theme) */
+:root[data-theme="light"] {
+  /* Canvas & Card Elevation */
+  --sh-bg-canvas: #f1f5f9;       /* Slate 100: 은은하고 눈부심 없는 쿨 그레이 기본 대시보드 바탕 */
+  --sh-surface-card: #ffffff;    /* Pure White: 4대 메인 컬럼 카드의 순백색 배경 */
+  --sh-surface-sub: #f8fafc;     /* Slate 50: 01~04 리포트 카드 내부, 과거 이력 박스 배경 */
+  --sh-border-color: #e2e8f0;    /* Slate 200: 1px 두께의 깔끔한 테두리 및 구분선 */
+
+  /* Typography */
+  --sh-text-primary: #0f172a;    /* Slate 900: 선명한 본문 딥 슬레이트 블랙 */
+  --sh-text-secondary: #475569;  /* Slate 600: 보조 설명 및 메타데이터 텍스트 */
+  --sh-text-muted: #94a3b8;      /* Slate 400: 비활성 안내 및 캡션 */
+
+  /* Shinhan Brand & Semantic (Light Version) */
+  --sh-blue-primary: #0046ff;    /* 신한 시그니처 블루 (메인 헤더, 액션 버튼, 활성 탭) */
+  --sh-blue-surface: #eff6ff;    /* 에이전트 브리핑 및 정보 알림 블록의 소프트 블루 배경 */
+  --sh-blue-hover: #0036c8;
+  --sh-sky-accent: #0284c7;      /* 하이라이트 스카이 */
+
+  --sh-danger: #dc2626;          /* 오류율 임계치 초과 텍스트 */
+  --sh-danger-text: #dc2626;
+  --sh-danger-bg: #fef2f2;       /* 위험 뱃지 및 프로그레스 배경 */
+
+  --sh-warning: #d97706;         /* 원인 분석 인디케이터, 신한 골드 톤 */
+  --sh-warning-text: #b45309;
+  --sh-warning-bg: #fffbeb;      /* 경고 뱃지 배경 */
+
+  --sh-success: #16a34a;         /* 정상 작동(SAFE), 처리 완료 체크마크 */
+  --sh-success-text: #15803d;
+  --sh-success-bg: #f0fdf4;      /* 정상 뱃지 배경 */
+
+  --sh-header-bg: #ffffff;       /* 라이트 모드 헤더 순백색 */
+  --sh-header-border: #e2e8f0;   /* 라이트 모드 헤더 구분선 */
 }
 
 /* 4단 그리드 뷰포트 고정 레이아웃 */
@@ -69,16 +113,426 @@
   padding: 16px 20px;
   background-color: var(--sh-bg-canvas);
   overflow: hidden;
+  transition: background-color 0.3s ease;
 }
 
-/* 카드 서피스 스타일 */
+/* 카드 서피스 스타일 (Dark 기본) */
 .shinhan-column-card {
   background-color: var(--sh-surface-card);
   border: 1px solid var(--sh-border-color);
-  border-radius: 12px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.sub-panel-card {
+  background-color: var(--sh-surface-sub);
+  border: 1px solid var(--sh-border-color);
+  border-radius: 12px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* 라이트 모드 전용 그림자 및 부드러운 카드 렌더링 */
+[data-theme="light"] body {
+  background-color: var(--sh-bg-canvas);
+  color: var(--sh-text-primary);
+}
+
+[data-theme="light"] .shinhan-column-card {
+  background-color: var(--sh-surface-card) !important;
+  border: 1px solid var(--sh-border-color) !important;
+  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.07) !important;
+}
+
+[data-theme="light"] .sub-panel-card {
+  background-color: var(--sh-surface-sub) !important;
+  border: 1px solid var(--sh-border-color) !important;
+}
+
+[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 라이트 모드 소프트 서피스 뱃지 (Soft Tint Badges) */
+.soft-badge-danger {
+  background-color: var(--sh-danger-bg);
+  color: var(--sh-danger-text);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+.soft-badge-warning {
+  background-color: var(--sh-warning-bg);
+  color: var(--sh-warning-text);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+}
+.soft-badge-success {
+  background-color: var(--sh-success-bg);
+  color: var(--sh-success-text);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+.soft-badge-blue {
+  background-color: var(--sh-blue-surface);
+  color: var(--sh-blue-primary);
+  border: 1px solid rgba(0, 70, 255, 0.2);
+}
+
+/* ─── Light Mode Specific Styling Overrides for Columns & Components ─── */
+[data-theme="light"] .sh-light-paper-card {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .sh-light-paper-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-theme="light"] .sh-progress-track {
+  background-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .sh-amber-tint-box {
+  background-color: #fffbeb !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  border-left: 4px solid #f59e0b !important;
+  color: #78350f !important;
+}
+
+[data-theme="light"] .sh-blue-briefing-bar {
+  background-color: #eff6ff !important;
+  color: #1e40af !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+[data-theme="light"] .sh-report-block-01 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .sh-report-block-02 {
+  background-color: #fefce8 !important;
+  border-color: #fef08a !important;
+  color: #713f12 !important;
+}
+
+[data-theme="light"] .sh-report-block-03 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .sh-report-block-04 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .sh-timer-track {
+  stroke: #e2e8f0 !important;
+}
+
+[data-theme="light"] .sh-timer-text {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .sh-nav-bar {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .sh-nav-text {
+  color: #0f172a !important;
+}
+
+/* ─── Global Clean Enterprise Light Theme Overrides for All Remaining Screens & Modals ─── */
+[data-theme="light"] {
+  /* 1. Modal Content & Viewport Transparency */
+  .pc-modal-content {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  .pc-modal-content > div,
+  .pc-modal-content > main,
+  .pc-modal-content > div > main {
+    background-color: transparent !important;
+  }
+  .pc-modal-content .h-screen,
+  .pc-modal-content .min-h-screen,
+  .pc-modal-content .h-\[100dvh\] {
+    height: auto !important;
+    min-height: 100% !important;
+    background-color: transparent !important;
+  }
+
+  /* 2. Standalone Page Roots & Canvases */
+  .min-h-screen:not(.pc-modal-content *),
+  .h-screen:not(.pc-modal-content *),
+  .h-\[100dvh\]:not(.pc-modal-content *),
+  .bg-\[\#020917\],
+  .bg-\[\#04070f\],
+  .bg-\[\#040712\],
+  .bg-\[\#050810\],
+  .bg-\[\#06080e\],
+  .bg-\[\#060810\],
+  .bg-\[\#060C1B\],
+  .bg-\[\#060c1b\],
+  .bg-\[\#07090e\],
+  .bg-\[\#07090f\],
+  .bg-\[\#070b14\],
+  .bg-\[\#070b18\],
+  .bg-\[\#070d1f\],
+  .bg-\[\#080c14\],
+  .bg-\[\#080c18\],
+  .bg-\[\#09090b\],
+  .bg-\[\#090c14\],
+  .bg-\[\#0a0d14\],
+  .bg-\[\#0a0e17\],
+  .bg-\[\#0b0f19\],
+  .bg-\[\#0c1018\],
+  .bg-\[\#0c1020\],
+  .bg-\[\#0c1020\]\/60,
+  .bg-\[\#0c1020\]\/40,
+  .bg-\[\#0d0f14\],
+  .bg-\[\#0d1018\],
+  .bg-\[\#0d1117\],
+  .bg-\[\#0d162b\],
+  .bg-\[\#0e1118\],
+  .bg-\[\#0f111a\],
+  .bg-\[\#0f1219\],
+  .bg-\[\#0f1421\],
+  .bg-\[\#0f1422\],
+  .bg-\[\#0f172a\],
+  .bg-\[\#191919\],
+  .bg-zinc-950 {
+    background-color: var(--sh-bg-canvas) !important;
+    background-image: none !important;
+    color: var(--sh-text-primary) !important;
+  }
+
+  /* 3. Cards, List Items & Content Blocks across all Pages */
+  .skeuo-card,
+  .bg-\[\#11141d\],
+  .bg-\[\#12151a\],
+  .bg-\[\#121620\],
+  .bg-\[\#13203e\],
+  .bg-\[\#141825\],
+  .bg-\[\#151923\],
+  .bg-\[\#161b2a\],
+  .bg-\[\#161f36\],
+  .bg-\[\#181d28\],
+  .bg-\[\#1a1f26\],
+  .bg-\[\#1a1f2e\],
+  .bg-\[\#1a2035\],
+  .bg-\[\#1c202d\],
+  .bg-\[\#1e1e1e\],
+  .bg-\[\#1e2538\],
+  .bg-\[\#202020\],
+  .bg-\[\#242424\],
+  .bg-\[\#252a3d\],
+  .bg-\[\#2A2A2A\],
+  .bg-white\/\[0\.02\],
+  .bg-white\/\[0\.03\],
+  .bg-white\/\[0\.04\],
+  .bg-white\/\[0\.05\],
+  .bg-white\/5,
+  .bg-white\/10,
+  .bg-black\/20,
+  .bg-black\/30,
+  .bg-black\/40,
+  .bg-black\/50,
+  .bg-slate-800,
+  .bg-slate-800\/40,
+  .bg-slate-800\/60,
+  .bg-slate-800\/80,
+  .bg-slate-900,
+  .bg-slate-900\/40,
+  .bg-slate-900\/50,
+  .bg-slate-900\/80,
+  .bg-slate-950,
+  .bg-zinc-900 {
+    background-color: var(--sh-surface-card) !important;
+    border-color: var(--sh-border-color) !important;
+    color: var(--sh-text-primary) !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+  }
+
+  /* Sub-surfaces & Nested Cards */
+  .sub-panel-card,
+  .bg-\[\#13203e\],
+  .bg-\[\#0f1422\] {
+    background-color: var(--sh-surface-sub) !important;
+    border-color: var(--sh-border-color) !important;
+  }
+
+  /* 4. Sticky Headers in Sub-Pages */
+  header,
+  [class*="sticky top-0"],
+  [class*="sticky"][class*="top-0"] {
+    background-color: rgba(255, 255, 255, 0.96) !important;
+    border-bottom: 1px solid var(--sh-border-color) !important;
+    color: var(--sh-text-primary) !important;
+  }
+
+  /* 5. Typography */
+  .text-white,
+  .text-slate-100,
+  .text-slate-200 {
+    color: var(--sh-text-primary) !important;
+  }
+
+  .text-slate-300,
+  .text-slate-400 {
+    color: var(--sh-text-secondary) !important;
+  }
+
+  .text-slate-500 {
+    color: #64748b !important;
+  }
+
+  /* 6. Borders & Dividers */
+  .border-white\/5,
+  .border-white\/8,
+  .border-white\/10,
+  .border-white\/15,
+  .border-white\/20,
+  .border-white\/30,
+  .border-slate-700,
+  .border-slate-800,
+  .border-zinc-800,
+  .border-zinc-900,
+  .border-\[\#1e2f56\],
+  .border-\[\#1e293b\],
+  .border-\[\#242424\],
+  .border-\[\#303030\],
+  .border-\[\#333333\],
+  .border-\[\#404040\] {
+    border-color: var(--sh-border-color) !important;
+  }
+
+  .divide-white\/5 > * + *,
+  .divide-white\/10 > * + *,
+  .divide-slate-800 > * + * {
+    border-color: var(--sh-border-color) !important;
+  }
+
+  /* 7. Inputs, Selects & Textareas */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    background-color: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: var(--sh-text-primary) !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  /* 8. Interactive & Hover States */
+  .hover\:bg-white\/5:hover,
+  .hover\:bg-white\/10:hover,
+  .hover\:bg-slate-800\/60:hover,
+  .hover\:bg-slate-800\/40:hover {
+    background-color: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  button.bg-white\/5,
+  button.bg-white\/10 {
+    background-color: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+    color: var(--sh-text-primary) !important;
+  }
+
+  button.bg-white\/5:hover,
+  button.bg-white\/10:hover {
+    background-color: #e2e8f0 !important;
+  }
+}
+
+/* ── 📱 Mobile Typography & Fluid Typography Standards (HIG & Material Design) ── */
+:root {
+  --fs-title: 16px;
+  --fs-body: 13px;
+  --fs-label: 12px;
+  --fs-caption: 11px;
+  --fs-metric: 22px;
+  --line-height-body: 1.45;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --fs-title: 19px;
+    --fs-body: 15px;          /* 본문 폰트를 15px까지 키워 줄글 판독성 향상 */
+    --fs-label: 13.5px;
+    --fs-caption: 12px;       /* 12px 미만으로 떨어지지 않도록 방어 */
+    --fs-metric: 24px;        /* 타이머 및 오류율 강조 */
+    --line-height-body: 1.6;  /* 행간을 넓혀 터치 시 스크롤 및 읽기 편의 확보 */
+  }
+
+  /* 모바일 본문 및 리포트 카드 적용 */
+  .report-body-text, 
+  .advisor-content {
+    font-size: var(--fs-body) !important;
+    line-height: var(--line-height-body) !important;
+    letter-spacing: -0.01em;  /* 한국어 폰트 자간 최적화 */
+  }
+
+  .meta-label, 
+  .kv-table-key {
+    font-size: var(--fs-label) !important;
+  }
+
+  .timestamp, 
+  .sub-desc {
+    font-size: var(--fs-caption) !important;
+  }
+
+  /* 모바일 최소 폰트 크기 보호 규칙 (12px 미만 텍스트 뭉개짐 방지) */
+  .text-\[8px\],
+  .text-\[9px\],
+  .text-\[9\.5px\],
+  .text-\[10px\],
+  .text-\[10\.5px\],
+  .text-\[11px\] {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  .text-\[12px\],
+  .text-\[12\.5px\] {
+    font-size: 13.5px !important;
+    line-height: 1.5 !important;
+  }
+
+  .text-\[13px\] {
+    font-size: 14.5px !important;
+    line-height: 1.55 !important;
+  }
+
+  /* 모바일 Key-Value 스택 레이아웃 전환 */
+  .mobile-kv-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+
+  /* 모바일 내부 패딩 최적화 */
+  .shinhan-column-card {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
 }
 
 @layer base {

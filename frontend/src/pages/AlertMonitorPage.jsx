@@ -4,6 +4,7 @@ import { useBackNavigation } from '../hooks/useBackNavigation';
 import { ArrowLeft, AlertTriangle, CheckCircle, Compass, BarChart3, TrendingUp, Zap, Shield } from 'lucide-react';
 import { getAuthHeaders } from '../lib/authStore';
 import { Toaster, toast } from 'react-hot-toast';
+import { extractCleanErrorCount } from '../utils/maskingUtils';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -221,8 +222,8 @@ export default function AlertMonitorPage({ embedded = false }) {
      MAJOR    : 개별 오류건수 >= MAJOR 설정치     OR  시스템 오류율 >= MAJOR 설정치
      NORMAL   : CRITICAL·MAJOR 조건 모두 미해당 (기본값)              */
   const classify = (inc) => {
-    // 개별 인시던트의 중복 수신 횟수(received_count)와 시스템 전체 오류율(errorRate)을 함께 평가합니다.
-    const currentCount = Number(inc.received_count) || Number(inc.occurrence_count) || 1;
+    // 개별 인시던트의 오류건수(extractCleanErrorCount)와 시스템 전체 오류율(errorRate)을 함께 평가합니다.
+    const currentCount = extractCleanErrorCount(inc);
 
     // 1순위: CRITICAL
     if (currentCount >= thresholds.critical.errorCount || errorRate >= thresholds.critical.errorRate) return 'CRITICAL';

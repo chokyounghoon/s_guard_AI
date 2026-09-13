@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useTheme } from '../context/ThemeContext';
 import {
   ArrowLeft, Phone, Users, Activity, RefreshCw,
   Plus, Trash2, Edit3, Check, X, Save,
@@ -81,6 +82,7 @@ function SectionHeader({ icon: Icon, title, sub, color, children }) {
 
 // ══════════════════════════════════════════════════════════════
 export default function SCallertPage() {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const userProfile = getUserProfile();
@@ -1110,30 +1112,34 @@ export default function SCallertPage() {
 
   return (
     <div
-      className="text-white font-sans flex flex-col h-screen overflow-hidden"
-      style={{ background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' }}
+      className={`${isLight ? 'text-slate-900' : 'text-white'} font-sans flex flex-col h-screen overflow-hidden`}
+      style={{ background: isLight ? 'var(--sh-bg-canvas, #F1F5F9)' : 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' }}
     >
       {/* 배경 그로우 */}
-      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-orange-600/5 blur-[160px] rounded-full -z-10 pointer-events-none" />
-      <div className="fixed bottom-0 left-0  w-[400px] h-[400px] bg-red-600/5   blur-[120px] rounded-full -z-10 pointer-events-none" />
+      {!isLight && (
+        <>
+          <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-orange-600/5 blur-[160px] rounded-full -z-10 pointer-events-none" />
+          <div className="fixed bottom-0 left-0  w-[400px] h-[400px] bg-red-600/5   blur-[120px] rounded-full -z-10 pointer-events-none" />
+        </>
+      )}
 
       {/* ── 헤더 ───────────────────────────────────── */}
-      <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{ background: 'rgba(4,7,15,0.94)', borderColor: 'rgba(251,146,60,0.15)' }}>
+      <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{ background: isLight ? 'rgba(255,255,255,0.96)' : 'rgba(4,7,15,0.94)', borderColor: isLight ? '#E2E8F0' : 'rgba(251,146,60,0.15)' }}>
         <div className="w-full px-4 lg:px-6 py-3 flex items-center gap-3">
           <button
             onClick={() => goBack()}
-            style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            style={{ width: 36, height: 36, borderRadius: 10, background: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
           >
             <ArrowLeft className="w-4 h-4 text-slate-400" />
           </button>
           <div className="shrink-0">
             <div className="flex items-center gap-2">
-              <Phone size={14} color="#fb923c" />
-              <h1 className="text-base font-black tracking-tight whitespace-nowrap" style={{ background: 'linear-gradient(90deg,#f1f5f9,#fb923c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              <Phone size={14} color="#ea580c" />
+              <h1 className="text-base font-black tracking-tight whitespace-nowrap" style={isLight ? { color: '#0F172A' } : { background: 'linear-gradient(90deg,#f1f5f9,#fb923c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 S-callert
               </h1>
             </div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(251,146,60,0.6)' }}>
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: isLight ? '#64748b' : 'rgba(251,146,60,0.6)' }}>
               PDS 자동호출관리
             </p>
           </div>

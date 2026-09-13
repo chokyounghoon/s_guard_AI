@@ -7,6 +7,7 @@ import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar,
          LayoutDashboard, UserX, MessageSquare, AlertTriangle, Users } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
 import toast from 'react-hot-toast';
+import { formatOccurrenceCount } from '../utils/maskingUtils';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -159,7 +160,7 @@ export default function WorkflowPage() {
             service_code:   d.service_code   || p['서비스코드'] || null,
             biz_system:     d.biz_system     || p['업무시스템'] || null,
             error_code:     d.error_code     || null,
-            occurrence_count: d.occurrence_count || p['발생건수'] || null,
+            occurrence_count: formatOccurrenceCount(d.occurrence_count, rawMsg),
             occurrence_node:  d.occurrence_node  || p['발생노드'] || null,
             error_message:    d.error_message    || p['에러메시지'] || null,
             occurrence_time:  d.occurrence_time  || p['발생시각'] || null,
