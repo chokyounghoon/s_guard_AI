@@ -36,30 +36,48 @@ const CodeBlock = ({ children, className }) => {
   );
 };
 
-const highlightString = (str) => {
+const highlightString = (str, isLight) => {
   const regex = /(\b\d+(?:\.\d+)?%|행원 권한 누락|권한 점검 프로세스 가동|오류율|급증|누락|실패|초과|지연|권한|비정상|중단|불가|예외|버그|정상|복구|점검|가동|해결|성공|안정|재시작)/g;
   const parts = str.split(regex);
   return parts.map((part, index) => {
     if (/^\d+(?:\.\d+)?%$/.test(part)) {
-      return <span key={index} className="font-mono font-black text-[#fb923c] px-1.5 py-0.5 bg-orange-500/15 border border-orange-500/30 rounded shadow-sm mx-0.5 inline-block">{part}</span>;
+      return (
+        <span key={index} className={`font-mono font-black px-1.5 py-0.5 rounded shadow-xs mx-0.5 inline-block ${
+          isLight ? 'text-orange-900 bg-orange-100 border border-orange-300' : 'text-[#fb923c] bg-orange-500/15 border border-orange-500/30'
+        }`}>
+          {part}
+        </span>
+      );
     }
     if (/^(행원 권한 누락|오류율|급증|누락|실패|초과|지연|권한|비정상|중단|불가|예외|버그)$/.test(part)) {
-      return <span key={index} className="font-black text-white underline decoration-amber-500 decoration-2 underline-offset-4 bg-amber-500/15 px-1.5 py-0.5 rounded border-b border-amber-500 mx-0.5 shadow-[0_0_10px_rgba(245,158,11,0.2)] inline-block">{part}</span>;
+      return (
+        <span key={index} className={`font-black underline decoration-amber-500 decoration-2 underline-offset-4 px-1.5 py-0.5 rounded border-b mx-0.5 inline-block ${
+          isLight ? 'text-amber-950 bg-amber-100 border-amber-400' : 'text-white bg-amber-500/15 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+        }`}>
+          {part}
+        </span>
+      );
     }
     if (/^(권한 점검 프로세스 가동|정상|복구|점검|가동|해결|성공|안정|재시작)$/.test(part)) {
-      return <span key={index} className="font-bold text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30 mx-0.5 inline-block">{part}</span>;
+      return (
+        <span key={index} className={`font-bold px-1.5 py-0.5 rounded border mx-0.5 inline-block ${
+          isLight ? 'text-emerald-900 bg-emerald-100 border-emerald-300' : 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+        }`}>
+          {part}
+        </span>
+      );
     }
     return part;
   });
 };
 
-const highlightKeywords = (node) => {
-  if (typeof node === 'string') return highlightString(node);
-  if (Array.isArray(node)) return node.map((child, i) => React.createElement(React.Fragment, { key: i }, highlightKeywords(child)));
+const highlightKeywords = (node, isLight) => {
+  if (typeof node === 'string') return highlightString(node, isLight);
+  if (Array.isArray(node)) return node.map((child, i) => React.createElement(React.Fragment, { key: i }, highlightKeywords(child, isLight)));
   if (React.isValidElement(node)) {
     if (node.type === 'code' || node.type === 'pre' || node.type === 'a' || node.type === 'button' || node.type === 'span') return node;
     if (node.props && node.props.children) {
-      return React.cloneElement(node, {}, highlightKeywords(node.props.children));
+      return React.cloneElement(node, {}, highlightKeywords(node.props.children, isLight));
     }
   }
   return node;
@@ -170,7 +188,7 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
                   <TriangleAlert className={`w-4 h-4 mt-0.5 shrink-0 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
                   <div className="min-w-0 flex-1">
                     <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${isLight ? 'text-amber-800' : 'text-amber-500'}`}>Root Cause</span>
-                    <div className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-amber-50/90'}`}>{highlightKeywords(children)}</div>
+                    <div className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-amber-50/90'}`}>{highlightKeywords(children, isLight)}</div>
                   </div>
                 </div>
               );
@@ -183,13 +201,13 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
                   <CircleCheckBig className={`w-4 h-4 mt-0.5 shrink-0 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
                   <div className="min-w-0 flex-1">
                     <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${isLight ? 'text-emerald-800' : 'text-emerald-500'}`}>Resolution</span>
-                    <div className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-emerald-50/90'}`}>{highlightKeywords(children)}</div>
+                    <div className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-emerald-50/90'}`}>{highlightKeywords(children, isLight)}</div>
                   </div>
                 </div>
               );
             }
 
-            return <div className={`mb-1.5 leading-relaxed text-[14px] break-words ${isLight ? 'text-slate-900 font-medium' : 'text-slate-200'}`}>{highlightKeywords(children)}</div>;
+            return <div className={`mb-1.5 leading-relaxed text-[14px] break-words ${isLight ? 'text-slate-900 font-medium' : 'text-slate-200'}`}>{highlightKeywords(children, isLight)}</div>;
           },
 
           ol: ({ children }) => <div className="space-y-1 my-2">{children}</div>,
@@ -237,28 +255,42 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
             return !inline ? (
               <CodeBlock children={children} className={className} />
             ) : (
-              <code className="rounded bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-black text-blue-400 border border-blue-500/20">
+              <code className={`rounded px-1.5 py-0.5 font-mono text-[11px] font-bold border ${
+                isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+              }`}>
                 {children}
               </code>
             );
           },
 
           blockquote: ({ children }) => (
-            <div className="relative my-3 pl-4 border-l-2 border-blue-500/60 bg-blue-500/5 py-2 rounded-r-lg">
-              <div className="text-[14px] text-blue-100/85 italic leading-relaxed">{children}</div>
+            <div className={`relative my-3 pl-4 border-l-4 py-2.5 pr-3 rounded-r-xl italic ${
+              isLight ? 'border-blue-600 bg-blue-50/80 text-slate-800' : 'border-blue-500/60 bg-blue-500/5 text-blue-100/85'
+            }`}>
+              <div className="text-[14px] leading-relaxed">{children}</div>
             </div>
           ),
 
           table: ({ children }) => (
-            <div className="my-3 overflow-hidden rounded-xl border border-white/10 bg-[#1a1f2e]/40 shadow-xl">
-              <table className="w-full border-collapse text-left text-[12px]">{children}</table>
+            <div className={`my-4 overflow-hidden rounded-xl border shadow-md ${
+              isLight ? 'border-slate-200 bg-white' : 'border-white/10 bg-[#0b101d]'
+            }`}>
+              <table className="w-full border-collapse text-left text-[13px]">{children}</table>
             </div>
           ),
           th: ({ children }) => (
-            <th className="bg-white/5 px-3 py-2.5 font-black text-white uppercase tracking-wide border-b border-white/10 text-[11px]">{children}</th>
+            <th className={`px-4 py-2.5 font-bold uppercase tracking-wider border-b text-xs ${
+              isLight ? 'bg-slate-100 text-slate-900 border-slate-200' : 'bg-[#161f33] text-[#93c5fd] border-blue-500/20'
+            }`}>
+              {children}
+            </th>
           ),
           td: ({ children }) => (
-            <td className="px-3 py-2 text-slate-200 border-b border-white/5 text-[14px]">{children}</td>
+            <td className={`px-4 py-2.5 border-b text-[13.5px] leading-relaxed ${
+              isLight ? 'text-slate-900 border-slate-200' : 'text-slate-200 border-white/5'
+            }`}>
+              {children}
+            </td>
           ),
           img: ({ src, alt }) => {
             if (src && (src.includes('aitopia.ai') || src.includes('logo.svg'))) {

@@ -28,36 +28,80 @@ const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
 const getMdComponents = (isLight) => ({
   h1: ({ children }) => (
-    <div style={{ margin: '28px 0 12px', paddingBottom: 10, borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(59,130,246,0.2)'}` }}>
-      <h1 style={{ fontSize: 17, fontWeight: 900, color: isLight ? '#0f172a' : '#f1f5f9', letterSpacing: '-0.01em', lineHeight: 1.3, margin: 0 }}>
+    <div style={{
+      margin: '24px 0 16px',
+      paddingBottom: 12,
+      borderBottom: `2px solid ${isLight ? '#cbd5e1' : 'rgba(59,130,246,0.3)'}`
+    }}>
+      <h1 style={{
+        fontSize: 18,
+        fontWeight: 900,
+        color: isLight ? '#0f172a' : '#f8fafc',
+        letterSpacing: '-0.02em',
+        lineHeight: 1.3,
+        margin: 0
+      }}>
         {children}
       </h1>
     </div>
   ),
   h2: ({ children }) => (
-    <div style={{ margin: '22px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ width: 3, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#3b82f6,#6366f1)', flexShrink: 0 }} />
-      <h2 style={{ fontSize: 13, fontWeight: 800, color: isLight ? '#1d4ed8' : '#3b82f6', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
+    <div style={{
+      margin: '28px 0 14px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      paddingBottom: 8,
+      borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.06)'}`
+    }}>
+      <div style={{
+        width: 4,
+        height: 18,
+        borderRadius: 2,
+        background: 'linear-gradient(180deg,#2563eb,#6366f1)',
+        flexShrink: 0
+      }} />
+      <h2 style={{
+        fontSize: 15,
+        fontWeight: 800,
+        color: isLight ? '#1d4ed8' : '#60a5fa',
+        letterSpacing: '-0.01em',
+        margin: 0
+      }}>
         {children}
       </h2>
     </div>
   ),
   h3: ({ children }) => (
-    <h3 style={{ fontSize: 13, fontWeight: 700, color: isLight ? '#0f172a' : '#e2e8f0', margin: '16px 0 6px', paddingLeft: 8, borderLeft: `2px solid ${isLight ? '#2563eb' : 'rgba(99,102,241,0.5)'}` }}>
+    <h3 style={{
+      fontSize: 14,
+      fontWeight: 700,
+      color: isLight ? '#0f172a' : '#e2e8f0',
+      margin: '20px 0 8px',
+      paddingLeft: 10,
+      borderLeft: `3px solid ${isLight ? '#2563eb' : '#3b82f6'}`
+    }}>
       {children}
     </h3>
   ),
   p: ({ children }) => (
-    <div className="md-p" style={{ fontSize: 13.5, color: isLight ? '#0f172a' : '#cbd5e1', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word', fontWeight: isLight ? 500 : 400 }}>
+    <div className="md-p" style={{
+      fontSize: 14,
+      color: isLight ? '#0f172a' : '#e2e8f0',
+      lineHeight: 1.8,
+      marginBottom: 12,
+      wordBreak: 'break-word',
+      fontWeight: isLight ? 500 : 400
+    }}>
       {children}
     </div>
   ),
   strong: ({ children }) => (
     <strong style={{
-      color: isLight ? '#0f172a' : '#93c5fd',
+      color: isLight ? '#1e3a8a' : '#93c5fd',
       fontWeight: 800,
-      background: isLight ? 'rgba(37,99,235,0.08)' : 'rgba(59,130,246,0.12)',
-      border: `1px solid ${isLight ? 'rgba(37,99,235,0.2)' : 'rgba(59,130,246,0.25)'}`,
+      background: isLight ? '#eff6ff' : 'rgba(59,130,246,0.18)',
+      border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(59,130,246,0.3)'}`,
       padding: '2px 8px',
       borderRadius: 6,
       display: 'inline-block',
@@ -72,37 +116,41 @@ const getMdComponents = (isLight) => ({
   ),
   blockquote: ({ children }) => (
     <blockquote style={{
-      margin: '12px 0', padding: '10px 14px',
-      background: isLight ? '#f8fafc' : 'rgba(59,130,246,0.06)',
-      borderLeft: `3px solid ${isLight ? '#2563eb' : '#3b82f6'}`,
-      borderRadius: '0 8px 8px 0',
-      color: isLight ? '#1e293b' : '#94a3b8',
-      fontSize: 13,
-      lineHeight: 1.6
+      margin: '16px 0',
+      padding: '14px 18px',
+      background: isLight ? '#f8fafc' : 'rgba(30,41,59,0.5)',
+      borderLeft: `4px solid ${isLight ? '#2563eb' : '#3b82f6'}`,
+      borderTop: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
+      borderRight: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
+      borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
+      borderRadius: '0 12px 12px 0',
+      color: isLight ? '#0f172a' : '#e2e8f0',
+      fontSize: 13.5,
+      lineHeight: 1.8
     }}>
       {children}
     </blockquote>
   ),
   code: ({ inline, children }) => inline
     ? <code style={{
-        background: isLight ? '#f1f5f9' : 'rgba(16,185,129,0.12)',
-        color: isLight ? '#0f172a' : '#10b981',
-        fontSize: 11.5,
-        padding: '2px 6px',
-        borderRadius: 5,
+        background: isLight ? '#f1f5f9' : 'rgba(16,185,129,0.15)',
+        color: isLight ? '#0f172a' : '#34d399',
+        fontSize: 12,
+        padding: '2px 7px',
+        borderRadius: 6,
         fontFamily: 'monospace',
-        border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(16,185,129,0.25)'}`,
+        border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(16,185,129,0.3)'}`,
         fontWeight: 600
       }}>{children}</code>
     : (
       <pre style={{
-        background: isLight ? '#f8fafc' : '#0a0e1a',
-        border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)'}`,
-        borderRadius: 10,
-        padding: '14px 16px',
-        margin: '12px 0',
+        background: isLight ? '#f8fafc' : '#0b101d',
+        border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.1)'}`,
+        borderRadius: 12,
+        padding: '16px 18px',
+        margin: '14px 0',
         overflowX: 'auto',
-        fontSize: 11.5,
+        fontSize: 12,
         color: isLight ? '#0f172a' : '#6ee7b7',
         fontFamily: 'monospace',
         lineHeight: 1.7
@@ -111,12 +159,12 @@ const getMdComponents = (isLight) => ({
       </pre>
     ),
   ul: ({ children }) => (
-    <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol style={{ listStyleType: 'decimal', paddingLeft: 20, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5, color: isLight ? '#0f172a' : '#cbd5e1' }}>
+    <ol style={{ listStyleType: 'decimal', paddingLeft: 22, margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6, color: isLight ? '#0f172a' : '#e2e8f0' }}>
       {children}
     </ol>
   ),
@@ -124,75 +172,89 @@ const getMdComponents = (isLight) => ({
     <li style={{
       display: 'flex',
       alignItems: 'flex-start',
-      gap: 8,
-      fontSize: 13.5,
-      color: isLight ? '#0f172a' : '#cbd5e1',
+      gap: 10,
+      fontSize: 14,
+      color: isLight ? '#0f172a' : '#e2e8f0',
       lineHeight: 1.7,
       fontWeight: isLight ? 500 : 400
     }}>
       <span style={{
-        marginTop: 7,
-        width: 5,
-        height: 5,
+        marginTop: 8,
+        width: 6,
+        height: 6,
         borderRadius: '50%',
         background: isLight ? '#2563eb' : '#3b82f6',
         flexShrink: 0,
         display: 'inline-block'
       }} />
-      <div style={{ flex: 1, wordBreak: 'break-word', color: isLight ? '#0f172a' : '#cbd5e1' }}>{children}</div>
+      <div style={{ flex: 1, wordBreak: 'break-word', color: isLight ? '#0f172a' : '#e2e8f0' }}>{children}</div>
     </li>
   ),
   hr: () => (
-    <div style={{ margin: '20px 0', height: 1, background: isLight ? '#e2e8f0' : 'linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)' }} />
+    <div style={{ margin: '24px 0', height: 1, background: isLight ? '#cbd5e1' : 'rgba(255,255,255,0.1)' }} />
   ),
   table: ({ children }) => (
     <div style={{
       overflowX: 'auto',
-      margin: '16px 0',
-      borderRadius: 12,
-      border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
-      boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.04)' : '0 4px 20px rgba(0,0,0,0.1)'
+      margin: '18px 0',
+      borderRadius: 14,
+      border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.12)'}`,
+      background: isLight ? '#ffffff' : '#0b101d',
+      boxShadow: isLight ? '0 2px 10px rgba(0,0,0,0.04)' : '0 4px 20px rgba(0,0,0,0.2)'
     }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, wordBreak: 'keep-all' }}>{children}</table>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, wordBreak: 'keep-all' }}>{children}</table>
     </div>
   ),
   thead: ({ children }) => (
-    <thead style={{ background: isLight ? '#f1f5f9' : 'rgba(30,41,59,0.9)', borderBottom: `2px solid ${isLight ? '#cbd5e1' : 'rgba(59,130,246,0.3)'}` }}>{children}</thead>
+    <thead style={{
+      background: isLight ? '#f1f5f9' : '#161f33',
+      borderBottom: `2px solid ${isLight ? '#94a3b8' : 'rgba(59,130,246,0.4)'}`
+    }}>{children}</thead>
   ),
   th: ({ children }) => (
     <th style={{
-      padding: '12px 16px',
+      padding: '13px 18px',
       textAlign: 'left',
       fontWeight: 800,
       color: isLight ? '#0f172a' : '#93c5fd',
-      fontSize: 11.5,
+      background: isLight ? '#f1f5f9' : '#161f33',
+      fontSize: 12,
       letterSpacing: '0.05em',
       textTransform: 'uppercase',
       whiteSpace: 'nowrap',
-      minWidth: 100
+      minWidth: 110,
+      borderBottom: `2px solid ${isLight ? '#cbd5e1' : 'rgba(59,130,246,0.3)'}`
     }}>
       {children}
     </th>
   ),
-  td: ({ children }) => (
-    <td style={{
-      padding: '12px 16px',
-      color: isLight ? '#1e293b' : '#e2e8f0',
-      borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'}`,
-      verticalAlign: 'top',
-      wordBreak: 'break-word'
-    }}>
-      {children}
-    </td>
+  tbody: ({ children }) => (
+    <tbody style={{
+      background: isLight ? '#ffffff' : '#0b101d'
+    }}>{children}</tbody>
   ),
   tr: ({ children }) => (
     <tr
-      style={{ transition: 'background 0.15s' }}
-      onMouseEnter={e => e.currentTarget.style.background = isLight ? 'rgba(0,70,255,0.04)' : 'rgba(59,130,246,0.06)'}
-      onMouseLeave={e => e.currentTarget.style.background = ''}
+      style={{ transition: 'background 0.15s', background: isLight ? '#ffffff' : '#0b101d' }}
+      onMouseEnter={e => e.currentTarget.style.background = isLight ? '#f8fafc' : '#161f33'}
+      onMouseLeave={e => e.currentTarget.style.background = isLight ? '#ffffff' : '#0b101d'}
     >
       {children}
     </tr>
+  ),
+  td: ({ children }) => (
+    <td style={{
+      padding: '13px 18px',
+      color: isLight ? '#0f172a' : '#e2e8f0',
+      background: isLight ? '#ffffff' : '#0b101d',
+      borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
+      verticalAlign: 'top',
+      wordBreak: 'break-word',
+      fontSize: 13,
+      fontWeight: isLight ? 500 : 400
+    }}>
+      {children}
+    </td>
   ),
 });
 
@@ -600,19 +662,35 @@ function MarkdownBlock({ text, report, checkedItems = {}, onToggleCheck = () => 
 }
 
 
-const severityColors = {
-  CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/40',
-  HIGH:     'bg-orange-500/20 text-orange-400 border-orange-500/40',
-  NORMAL:   'bg-blue-500/20 text-blue-400 border-blue-500/40',
-  INFO:     'bg-slate-500/20 text-slate-400 border-slate-500/40',
-};
+const getSeverityColors = (isLight) => ({
+  CRITICAL: isLight ? 'bg-red-100 text-red-800 border-red-300' : 'bg-red-500/20 text-red-400 border-red-500/40',
+  HIGH:     isLight ? 'bg-orange-100 text-orange-800 border-orange-300' : 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+  NORMAL:   isLight ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-blue-500/20 text-blue-400 border-blue-500/40',
+  INFO:     isLight ? 'bg-slate-100 text-slate-800 border-slate-300' : 'bg-slate-500/20 text-slate-400 border-slate-500/40',
+});
 
-const agentColors = {
-  Security: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', icon: Shield },
-  DB:       { bg: 'bg-purple-500/15', border: 'border-purple-500/30', text: 'text-purple-400', icon: Database },
-  DevOps:   { bg: 'bg-green-500/15', border: 'border-green-500/30', text: 'text-green-400', icon: Server },
-  Leader:   { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-400', icon: Bot },
-};
+const getAgentColors = (isLight) => ({
+  Security: {
+    bg: isLight ? 'bg-red-50 border-red-200' : 'bg-red-500/15 border-red-500/30',
+    text: isLight ? 'text-red-800' : 'text-red-400',
+    icon: Shield
+  },
+  DB: {
+    bg: isLight ? 'bg-purple-50 border-purple-200' : 'bg-purple-500/15 border-purple-500/30',
+    text: isLight ? 'text-purple-800' : 'text-purple-400',
+    icon: Database
+  },
+  DevOps: {
+    bg: isLight ? 'bg-emerald-50 border-emerald-200' : 'bg-green-500/15 border-green-500/30',
+    text: isLight ? 'text-emerald-800' : 'text-green-400',
+    icon: Server
+  },
+  Leader: {
+    bg: isLight ? 'bg-amber-50 border-amber-200' : 'bg-amber-500/15 border-amber-500/30',
+    text: isLight ? 'text-amber-900' : 'text-amber-400',
+    icon: Bot
+  },
+});
 
 const getStatusName = (status) => {
   if (!status) return '미확인';
@@ -1260,7 +1338,8 @@ export default function AiReportPage() {
 
 
   const sev = report?.severity || 'NORMAL';
-  const sevClass = severityColors[sev] || severityColors.NORMAL;
+  const sevColors = getSeverityColors(isLight);
+  const sevClass = sevColors[sev] || sevColors.NORMAL;
 
   return (
     <div className={`h-[100dvh] font-sans flex flex-col overflow-hidden ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#0a0d14] text-white'}`}>
@@ -1550,14 +1629,15 @@ export default function AiReportPage() {
                   <div className="text-center py-10 text-slate-500 text-sm">에이전트 로그가 없습니다.</div>
                 )}
                 {(report.agent_logs || []).map((log, i) => {
-                  const cfg = agentColors[log.agent_role] || agentColors.Leader;
+                  const agentStyles = getAgentColors(isLight);
+                  const cfg = agentStyles[log.agent_role] || agentStyles.Leader;
                   const Icon = cfg.icon;
                   return (
-                    <div key={i} className={`rounded-xl border p-3.5 ${cfg.bg} ${cfg.border}`}>
-                      <div className="flex items-center gap-2 mb-2">
+                    <div key={i} className={`rounded-xl border p-4 shadow-xs ${cfg.bg}`}>
+                      <div className="flex items-center gap-2 mb-2.5">
                         <Icon className={`w-4 h-4 ${cfg.text}`} />
                         <span className={`text-xs font-bold ${cfg.text}`}>{log.agent_role} Agent</span>
-                        <span className="ml-auto text-[10px] text-slate-500">{log.reg_dt?.slice(0, 16)}</span>
+                        <span className={`ml-auto text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{log.reg_dt?.slice(0, 16)}</span>
                       </div>
                       <MarkdownBlock text={log.content} report={report} />
                     </div>
@@ -1569,10 +1649,14 @@ export default function AiReportPage() {
             {/* ── War-Room 채팅 전체 기록 ── */}
             {activeTab === 'chat' && (
               <div className="space-y-6 animate-in fade-in duration-300 overflow-visible">
-                <section className="bg-blue-600/5 rounded-2xl border border-blue-500/20 overflow-visible shadow-lg shadow-blue-500/5">
-                  <div className="px-4 py-2.5 flex items-center gap-2 border-b border-blue-500/10 bg-blue-500/10">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
+                <section className={`rounded-2xl overflow-visible shadow-sm ${
+                  isLight ? 'bg-white border border-slate-200 shadow-slate-100' : 'bg-blue-600/5 border border-blue-500/20 shadow-blue-500/5'
+                }`}>
+                  <div className={`px-4 py-2.5 flex items-center gap-2 border-b ${
+                    isLight ? 'border-slate-100 bg-blue-50/60' : 'border-blue-500/10 bg-blue-500/10'
+                  }`}>
+                    <Sparkles className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                    <span className={`text-xs font-bold uppercase tracking-widest ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>War-Room Response Timeline</span>
                   </div>
                   <div className="p-5 overflow-visible">
                     {chatSummary ? (() => {
@@ -1599,14 +1683,54 @@ export default function AiReportPage() {
 
                       const icons = ['🚨','📡','🔍','🛠️','✅','📋','🔔','💡'];
                       const colors = [
-                        { dot: 'bg-red-500', line: 'bg-red-500/30', badge: 'bg-red-500/15 border-red-500/30 text-red-400', card: 'border-red-500/20 bg-red-500/5' },
-                        { dot: 'bg-orange-400', line: 'bg-orange-400/30', badge: 'bg-orange-500/15 border-orange-500/30 text-orange-400', card: 'border-orange-500/20 bg-orange-500/5' },
-                        { dot: 'bg-yellow-400', line: 'bg-yellow-400/30', badge: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400', card: 'border-yellow-500/20 bg-yellow-500/5' },
-                        { dot: 'bg-blue-500', line: 'bg-blue-500/30', badge: 'bg-blue-500/15 border-blue-500/30 text-blue-400', card: 'border-blue-500/20 bg-blue-500/5' },
-                        { dot: 'bg-violet-500', line: 'bg-violet-500/30', badge: 'bg-violet-500/15 border-violet-500/30 text-violet-400', card: 'border-violet-500/20 bg-violet-500/5' },
-                        { dot: 'bg-emerald-500', line: 'bg-emerald-500/30', badge: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400', card: 'border-emerald-500/20 bg-emerald-500/5' },
-                        { dot: 'bg-cyan-500', line: 'bg-cyan-500/30', badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400', card: 'border-cyan-500/20 bg-cyan-500/5' },
-                        { dot: 'bg-pink-500', line: 'bg-pink-500/30', badge: 'bg-pink-500/15 border-pink-500/30 text-pink-400', card: 'border-pink-500/20 bg-pink-500/5' },
+                        {
+                          dot: isLight ? 'bg-red-600' : 'bg-red-500',
+                          line: isLight ? 'bg-red-200' : 'bg-red-500/30',
+                          badge: isLight ? 'bg-red-100 border-red-300 text-red-800' : 'bg-red-500/15 border-red-500/30 text-red-400',
+                          card: isLight ? 'border-red-200 bg-red-50/40' : 'border-red-500/20 bg-red-500/5'
+                        },
+                        {
+                          dot: isLight ? 'bg-orange-600' : 'bg-orange-400',
+                          line: isLight ? 'bg-orange-200' : 'bg-orange-400/30',
+                          badge: isLight ? 'bg-orange-100 border-orange-300 text-orange-800' : 'bg-orange-500/15 border-orange-500/30 text-orange-400',
+                          card: isLight ? 'border-orange-200 bg-orange-50/40' : 'border-orange-500/20 bg-orange-500/5'
+                        },
+                        {
+                          dot: isLight ? 'bg-amber-600' : 'bg-yellow-400',
+                          line: isLight ? 'bg-amber-200' : 'bg-yellow-400/30',
+                          badge: isLight ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400',
+                          card: isLight ? 'border-amber-200 bg-amber-50/40' : 'border-yellow-500/20 bg-yellow-500/5'
+                        },
+                        {
+                          dot: isLight ? 'bg-blue-600' : 'bg-blue-500',
+                          line: isLight ? 'bg-blue-200' : 'bg-blue-500/30',
+                          badge: isLight ? 'bg-blue-100 border-blue-300 text-blue-800' : 'bg-blue-500/15 border-blue-500/30 text-blue-400',
+                          card: isLight ? 'border-blue-200 bg-blue-50/40' : 'border-blue-500/20 bg-blue-500/5'
+                        },
+                        {
+                          dot: isLight ? 'bg-violet-600' : 'bg-violet-500',
+                          line: isLight ? 'bg-violet-200' : 'bg-violet-500/30',
+                          badge: isLight ? 'bg-violet-100 border-violet-300 text-violet-800' : 'bg-violet-500/15 border-violet-500/30 text-violet-400',
+                          card: isLight ? 'border-violet-200 bg-violet-50/40' : 'border-violet-500/20 bg-violet-500/5'
+                        },
+                        {
+                          dot: isLight ? 'bg-emerald-600' : 'bg-emerald-500',
+                          line: isLight ? 'bg-emerald-200' : 'bg-emerald-500/30',
+                          badge: isLight ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400',
+                          card: isLight ? 'border-emerald-200 bg-emerald-50/40' : 'border-emerald-500/20 bg-emerald-500/5'
+                        },
+                        {
+                          dot: isLight ? 'bg-cyan-600' : 'bg-cyan-500',
+                          line: isLight ? 'bg-cyan-200' : 'bg-cyan-500/30',
+                          badge: isLight ? 'bg-cyan-100 border-cyan-300 text-cyan-800' : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400',
+                          card: isLight ? 'border-cyan-200 bg-cyan-50/40' : 'border-cyan-500/20 bg-cyan-500/5'
+                        },
+                        {
+                          dot: isLight ? 'bg-rose-600' : 'bg-pink-500',
+                          line: isLight ? 'bg-rose-200' : 'bg-pink-500/30',
+                          badge: isLight ? 'bg-rose-100 border-rose-300 text-rose-800' : 'bg-pink-500/15 border-pink-500/30 text-pink-400',
+                          card: isLight ? 'border-rose-200 bg-rose-50/40' : 'border-pink-500/20 bg-pink-500/5'
+                        },
                       ];
 
                       return (
@@ -1620,7 +1744,7 @@ export default function AiReportPage() {
                                 {/* 수직 연결선 + 점 */}
                                 <div className="flex flex-col items-center shrink-0 w-8">
                                   <div className={`w-8 h-8 rounded-full ${c.dot} bg-opacity-20 border-2 border-opacity-60 flex items-center justify-center text-base shrink-0 shadow-lg`}
-                                    style={{ borderColor: 'currentColor', boxShadow: `0 0 12px rgba(0,0,0,0.3)` }}>
+                                    style={{ borderColor: 'currentColor', boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.08)' : '0 0 12px rgba(0,0,0,0.3)' }}>
                                     <span style={{ fontSize: 14 }}>{icon}</span>
                                   </div>
                                   {!isLast && (
@@ -1628,16 +1752,18 @@ export default function AiReportPage() {
                                   )}
                                 </div>
                                 {/* 카드 */}
-                                <div className={`flex-1 mb-5 rounded-2xl border p-4 ${c.card} transition-all hover:brightness-110`}>
+                                <div className={`flex-1 mb-5 rounded-2xl border p-4 ${c.card} transition-all hover:brightness-105`}>
                                   <div className="flex items-center gap-2 mb-2">
                                     <span className={`text-[11px] font-black font-mono px-2.5 py-1 rounded-lg border ${c.badge}`}>
                                       {item.time}
                                     </span>
-                                    <span className="text-[10px] text-slate-500 font-mono">
+                                    <span className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                                       STEP {idx + 1} / {items.length}
                                     </span>
                                     {isLast && (
-                                      <span className="ml-auto text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest">
+                                      <span className={`ml-auto text-[9px] font-black px-2 py-0.5 rounded-full border uppercase tracking-widest ${
+                                        isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                      }`}>
                                         완료
                                       </span>
                                     )}
@@ -1713,80 +1839,63 @@ export default function AiReportPage() {
                   </div>
                 )}
                 {aiGenText && (
-                  <section style={isLight ? {
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 20,
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 20px rgba(15,23,42,0.06)'
-                  } : {
-                    background: 'linear-gradient(180deg, rgba(13,18,36,0.9) 0%, rgba(10,13,20,0.95) 100%)',
-                    border: '1px solid rgba(59,130,246,0.15)',
-                    borderRadius: 20,
-                    overflow: 'hidden',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(59,130,246,0.05)'
-                  }}>
+                  <section className={`rounded-2xl overflow-hidden transition-all shadow-xl ${
+                    isLight
+                      ? 'bg-white border border-slate-200 shadow-slate-200/60'
+                      : 'bg-[#0b101d] border border-blue-500/20 shadow-[0_20px_60px_rgba(0,0,0,0.5)]'
+                  }`}>
                     {/* 헤더 */}
-                    <div style={isLight ? {
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderBottom: '1px solid #e2e8f0',
-                      background: '#f8fafc'
-                    } : {
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderBottom: '1px solid rgba(59,130,246,0.1)',
-                      background: 'rgba(59,130,246,0.05)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 10, background: isLight ? '#eff6ff' : 'rgba(59,130,246,0.15)', border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(59,130,246,0.3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Sparkles style={{ width: 15, height: 15, color: isLight ? '#2563eb' : '#60a5fa' }} />
+                    <div className={`px-5 py-3.5 flex items-center justify-between border-b ${
+                      isLight ? 'bg-slate-50 border-slate-200' : 'bg-blue-500/10 border-blue-500/20'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+                          isLight ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-blue-500/20 border-blue-500/30 text-blue-400'
+                        }`}>
+                          <Sparkles className="w-4 h-4" />
                         </div>
                         <div>
-                          <p style={{ fontSize: 13, fontWeight: 800, color: isLight ? '#1e3a8a' : '#93c5fd', margin: 0 }}>AI 종합 장애 보고서</p>
-                          <p style={{ fontSize: 10, color: isLight ? '#64748b' : 'rgba(255,255,255,0.3)', margin: 0 }}>Dify 전문가 멀티에이전트 분석 결과</p>
+                          <p className={`text-sm font-black ${isLight ? 'text-blue-950' : 'text-blue-300'}`}>AI 종합 장애 보고서</p>
+                          <p className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Dify 전문가 멀티에이전트 분석 결과</p>
                         </div>
                         {isGenerating && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8, padding: '3px 10px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.15)', borderRadius: 20, border: `1px solid ${isLight ? '#93c5fd' : 'rgba(59,130,246,0.25)'}` }}>
-                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', animation: 'ping 1s ease-in-out infinite' }} />
-                            <span style={{ fontSize: 10, color: isLight ? '#1e40af' : '#93c5fd', fontWeight: 600 }}>분석 중...</span>
+                          <div className={`flex items-center gap-1.5 ml-2 px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${
+                            isLight ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                          }`}>
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+                            <span>분석 중...</span>
                           </div>
                         )}
                       </div>
                       <button
                         onClick={generateAiReport}
                         disabled={isGenerating}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8,
-                          border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.08)'}`,
-                          background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)',
-                          color: isLight ? '#334155' : '#64748b',
-                          fontSize: 11, fontWeight: 600, cursor: isGenerating ? 'not-allowed' : 'pointer',
-                          opacity: isGenerating ? 0.4 : 1, transition: 'all 0.2s'
-                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                          isLight
+                            ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700 shadow-xs'
+                            : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
+                        } ${isGenerating ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
-                        <RefreshCw style={{ width: 11, height: 11, animation: isGenerating ? 'spin 1s linear infinite' : 'none' }} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
                         재생성
                       </button>
                     </div>
 
                     {/* 본문 */}
-                    <div style={{ padding: '24px 28px', minHeight: 400 }}>
+                    <div className={`p-6 sm:p-8 min-h-[400px] ${isLight ? 'bg-white text-slate-900' : 'bg-[#0b101d] text-slate-100'}`}>
                       <MarkdownBlock text={aiGenText} report={report} />
                       {isGenerating && (
-                        <span style={{ display: 'inline-block', width: 2, height: 18, background: '#3b82f6', animation: 'pulse 1s ease-in-out infinite', marginLeft: 4, verticalAlign: 'middle', borderRadius: 1 }} />
+                        <span className="inline-block w-0.5 h-4 bg-blue-500 animate-pulse ml-1 align-middle rounded" />
                       )}
                     </div>
 
                     {/* 푸터 */}
                     {!isGenerating && (
-                      <div style={{ padding: '12px 20px', borderTop: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.04)'}`, background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 10, color: isLight ? '#64748b' : 'rgba(255,255,255,0.2)' }}>S-Guard AI · Dify 전문가 분석</span>
-                        <span style={{ fontSize: 10, color: isLight ? '#64748b' : 'rgba(255,255,255,0.2)' }}>{new Date().toLocaleString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                      <div className={`px-5 py-3 border-t flex items-center justify-between text-[11px] ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-black/20 border-white/5 text-slate-500'
+                      }`}>
+                        <span>S-Guard AI · Dify 전문가 분석</span>
+                        <span>{new Date().toLocaleString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     )}
                   </section>

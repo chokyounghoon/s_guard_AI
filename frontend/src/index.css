@@ -1276,7 +1276,9 @@
   color: #0f172a !important;
 }
 [data-theme="light"] .markdown-body-custom strong {
-  color: #0f172a !important;
+  color: #1e3a8a !important;
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
   font-weight: 800 !important;
 }
 [data-theme="light"] .markdown-body-custom p,
@@ -1285,9 +1287,96 @@
 [data-theme="light"] .markdown-body-custom li div {
   color: #0f172a !important;
 }
-[data-theme="light"] .markdown-body-custom th,
-[data-theme="light"] .markdown-body-custom td {
+[data-theme="light"] .markdown-body-custom table {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
   color: #0f172a !important;
+}
+[data-theme="light"] .markdown-body-custom thead {
+  background-color: #f1f5f9 !important;
+  border-bottom-color: #cbd5e1 !important;
+}
+[data-theme="light"] .markdown-body-custom th {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-bottom-color: #cbd5e1 !important;
+}
+[data-theme="light"] .markdown-body-custom tbody,
+[data-theme="light"] .markdown-body-custom tr,
+[data-theme="light"] .markdown-body-custom td {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+[data-theme="light"] .markdown-body-custom tr:hover,
+[data-theme="light"] .markdown-body-custom tr:hover td {
+  background-color: #f8fafc !important;
+}
+[data-theme="light"] .markdown-body-custom blockquote {
+  background-color: #f8fafc !important;
+  border-left-color: #2563eb !important;
+  color: #0f172a !important;
+}
+
+/* 🏢 다크 모드 마크다운 본문 및 카드 시인성 보장 */
+[data-theme="dark"] .markdown-body-custom,
+:root:not([data-theme="light"]) .markdown-body-custom {
+  color: #e2e8f0 !important;
+}
+[data-theme="dark"] .markdown-body-custom strong,
+:root:not([data-theme="light"]) .markdown-body-custom strong {
+  color: #93c5fd !important;
+  background-color: rgba(59, 130, 246, 0.18) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+[data-theme="dark"] .markdown-body-custom p,
+[data-theme="dark"] .markdown-body-custom div.md-p,
+[data-theme="dark"] .markdown-body-custom li,
+[data-theme="dark"] .markdown-body-custom li div,
+:root:not([data-theme="light"]) .markdown-body-custom p,
+:root:not([data-theme="light"]) .markdown-body-custom div.md-p,
+:root:not([data-theme="light"]) .markdown-body-custom li,
+:root:not([data-theme="light"]) .markdown-body-custom li div {
+  color: #e2e8f0 !important;
+}
+[data-theme="dark"] .markdown-body-custom table,
+:root:not([data-theme="light"]) .markdown-body-custom table {
+  background-color: #0b101d !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #e2e8f0 !important;
+}
+[data-theme="dark"] .markdown-body-custom thead,
+:root:not([data-theme="light"]) .markdown-body-custom thead {
+  background-color: #161f33 !important;
+  border-bottom-color: rgba(59, 130, 246, 0.4) !important;
+}
+[data-theme="dark"] .markdown-body-custom th,
+:root:not([data-theme="light"]) .markdown-body-custom th {
+  background-color: #161f33 !important;
+  color: #93c5fd !important;
+  border-bottom-color: rgba(59, 130, 246, 0.3) !important;
+}
+[data-theme="dark"] .markdown-body-custom tbody,
+[data-theme="dark"] .markdown-body-custom tr,
+[data-theme="dark"] .markdown-body-custom td,
+:root:not([data-theme="light"]) .markdown-body-custom tbody,
+:root:not([data-theme="light"]) .markdown-body-custom tr,
+:root:not([data-theme="light"]) .markdown-body-custom td {
+  background-color: #0b101d !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+[data-theme="dark"] .markdown-body-custom tr:hover,
+[data-theme="dark"] .markdown-body-custom tr:hover td,
+:root:not([data-theme="light"]) .markdown-body-custom tr:hover,
+:root:not([data-theme="light"]) .markdown-body-custom tr:hover td {
+  background-color: #161f33 !important;
+}
+[data-theme="dark"] .markdown-body-custom blockquote,
+:root:not([data-theme="light"]) .markdown-body-custom blockquote {
+  background-color: rgba(30, 41, 59, 0.5) !important;
+  border-left-color: #3b82f6 !important;
+  color: #e2e8f0 !important;
 }
 
 
