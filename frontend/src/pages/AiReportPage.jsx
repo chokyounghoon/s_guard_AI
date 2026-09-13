@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useTheme } from '../context/ThemeContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -27,8 +28,8 @@ const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
 const mdComponents = {
   h1: ({ children }) => (
-    <div style={{ margin: '28px 0 12px', paddingBottom: 10, borderBottom: '1px solid rgba(59,130,246,0.2)' }}>
-      <h1 style={{ fontSize: 17, fontWeight: 900, color: '#f1f5f9', letterSpacing: '-0.01em', lineHeight: 1.3, margin: 0 }}>
+    <div style={{ margin: '28px 0 12px', paddingBottom: 10, borderBottom: '1px solid var(--sh-border-color, rgba(59,130,246,0.2))' }}>
+      <h1 style={{ fontSize: 17, fontWeight: 900, color: 'var(--sh-text-primary, #f1f5f9)', letterSpacing: '-0.01em', lineHeight: 1.3, margin: 0 }}>
         {children}
       </h1>
     </div>
@@ -36,42 +37,42 @@ const mdComponents = {
   h2: ({ children }) => (
     <div style={{ margin: '22px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
       <div style={{ width: 3, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#3b82f6,#6366f1)', flexShrink: 0 }} />
-      <h2 style={{ fontSize: 13, fontWeight: 800, color: '#93c5fd', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
+      <h2 style={{ fontSize: 13, fontWeight: 800, color: '#3b82f6', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
         {children}
       </h2>
     </div>
   ),
   h3: ({ children }) => (
-    <h3 style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', margin: '16px 0 6px', paddingLeft: 8, borderLeft: '2px solid rgba(99,102,241,0.5)' }}>
+    <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-text-primary, #e2e8f0)', margin: '16px 0 6px', paddingLeft: 8, borderLeft: '2px solid rgba(99,102,241,0.5)' }}>
       {children}
     </h3>
   ),
   p: ({ children }) => (
-    <div className="md-p" style={{ fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word' }}>
+    <div className="md-p" style={{ fontSize: 13.5, color: 'var(--sh-text-secondary, #cbd5e1)', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word' }}>
       {children}
     </div>
   ),
   strong: ({ children }) => (
-    <strong style={{ color: '#93c5fd', fontWeight: 800, background: 'linear-gradient(90deg, rgba(59,130,246,0.2), rgba(99,102,241,0.2))', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginRight: 6, marginBottom: 2 }}>
+    <strong style={{ color: 'var(--sh-text-primary, #93c5fd)', fontWeight: 800, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginRight: 6, marginBottom: 2 }}>
       {children}
     </strong>
   ),
   em: ({ children }) => (
-    <em style={{ color: '#94a3b8', fontStyle: 'italic' }}>{children}</em>
+    <em style={{ color: 'var(--sh-text-muted, #94a3b8)', fontStyle: 'italic' }}>{children}</em>
   ),
   blockquote: ({ children }) => (
     <blockquote style={{
       margin: '12px 0', padding: '10px 14px',
       background: 'rgba(59,130,246,0.06)', borderLeft: '3px solid #3b82f6',
-      borderRadius: '0 8px 8px 0', color: '#94a3b8', fontSize: 13,
+      borderRadius: '0 8px 8px 0', color: 'var(--sh-text-secondary, #94a3b8)', fontSize: 13,
     }}>
       {children}
     </blockquote>
   ),
   code: ({ inline, children }) => inline
-    ? <code style={{ background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', fontSize: 11.5, padding: '2px 6px', borderRadius: 5, fontFamily: 'monospace', border: '1px solid rgba(16,185,129,0.2)' }}>{children}</code>
+    ? <code style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', fontSize: 11.5, padding: '2px 6px', borderRadius: 5, fontFamily: 'monospace', border: '1px solid rgba(16,185,129,0.25)' }}>{children}</code>
     : (
-      <pre style={{ background: '#0a0e1a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '14px 16px', margin: '12px 0', overflowX: 'auto', fontSize: 11.5, color: '#6ee7b7', fontFamily: 'monospace', lineHeight: 1.7 }}>
+      <pre style={{ background: 'var(--sh-surface-card, #0a0e1a)', border: '1px solid var(--sh-border-color, rgba(255,255,255,0.07))', borderRadius: 10, padding: '14px 16px', margin: '12px 0', overflowX: 'auto', fontSize: 11.5, color: 'var(--sh-text-primary, #6ee7b7)', fontFamily: 'monospace', lineHeight: 1.7 }}>
         <code>{children}</code>
       </pre>
     ),
@@ -86,7 +87,7 @@ const mdComponents = {
     </ol>
   ),
   li: ({ children }) => (
-    <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.7 }}>
+    <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: 'var(--sh-text-secondary, #cbd5e1)', lineHeight: 1.7 }}>
       <span style={{ marginTop: 6, width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, display: 'inline-block' }} />
       <div style={{ flex: 1, wordBreak: 'break-word' }}>{children}</div>
     </li>
@@ -95,18 +96,18 @@ const mdComponents = {
     <div style={{ margin: '20px 0', height: 1, background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)' }} />
   ),
   table: ({ children }) => (
-    <div style={{ overflowX: 'auto', margin: '16px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+    <div style={{ overflowX: 'auto', margin: '16px 0', borderRadius: 12, border: '1px solid var(--sh-border-color, rgba(255,255,255,0.08))', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, wordBreak: 'keep-all' }}>{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead style={{ background: 'rgba(30,41,59,0.9)', borderBottom: '2px solid rgba(59,130,246,0.3)' }}>{children}</thead>,
+  thead: ({ children }) => <thead style={{ background: 'var(--sh-surface-sub, rgba(30,41,59,0.9))', borderBottom: '2px solid rgba(59,130,246,0.3)' }}>{children}</thead>,
   th: ({ children }) => (
-    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 800, color: '#93c5fd', fontSize: 11.5, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', minWidth: 100 }}>
+    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 800, color: 'var(--sh-text-primary, #93c5fd)', fontSize: 11.5, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', minWidth: 100 }}>
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td style={{ padding: '12px 16px', color: '#e2e8f0', borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', wordBreak: 'break-word' }}>
+    <td style={{ padding: '12px 16px', color: 'var(--sh-text-secondary, #e2e8f0)', borderBottom: '1px solid var(--sh-border-color, rgba(255,255,255,0.05))', verticalAlign: 'top', wordBreak: 'break-word' }}>
       {children}
     </td>
   ),
@@ -116,6 +117,279 @@ const mdComponents = {
     </tr>
   ),
 };
+
+// ── [NEW] 워룸 타임라인 단락/서식 특화 렌더러 (일목요연한 단락/헤더/불릿 분리) ──
+function WarRoomStepContent({ text, isLight, isLast }) {
+  if (!text) return null;
+
+  const hasSections = text.includes('---') || text.includes('###') || /(?:^|\s)[1-9]\d?\.\s+/.test(text);
+
+  // 일반 텍스트 포맷터 (단락 및 줄바꿈/불릿 정리)
+  if (!hasSections) {
+    const clean = text.replace(/^\*+|\*+$/g, '').trim();
+    const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    if (lines.length > 1) {
+      return (
+        <div className="flex flex-col gap-2 w-full">
+          {lines.map((line, idx) => {
+            const isBullet = line.startsWith('-') || line.startsWith('•') || line.startsWith('*');
+            const content = isBullet ? line.replace(/^[-•*]\s*/, '') : line;
+            return (
+              <div key={idx} className="flex items-start gap-2 text-xs sm:text-[13px] leading-relaxed">
+                {isBullet && (
+                  <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isLight ? 'bg-blue-600' : 'bg-blue-400'}`} />
+                )}
+                <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{content}</span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (clean.includes(' - ')) {
+      const segments = clean.split(/\s+-\s+/).map(s => s.trim()).filter(Boolean);
+      if (segments.length > 1) {
+        return (
+          <div className="flex flex-col gap-2 w-full">
+            {segments.map((seg, idx) => (
+              <div key={idx} className="flex items-start gap-2 text-xs sm:text-[13px] leading-relaxed">
+                <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isLight ? 'bg-blue-600' : 'bg-blue-400'}`} />
+                <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{seg}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+    }
+
+    return (
+      <div className={`text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+        {clean}
+      </div>
+    );
+  }
+
+  // --- 구분자 및 ### 헤더 분리
+  const rawParts = text.split(/\s*(?:---+|(?=###\s+))\s*/).map(p => p.trim()).filter(Boolean);
+
+  const sectionColors = {
+    '1': { badge: isLight ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-500/20 text-rose-300 border-rose-500/30', dot: isLight ? 'bg-rose-500' : 'bg-rose-400' },
+    '2': { badge: isLight ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-amber-500/20 text-amber-300 border-amber-500/30', dot: isLight ? 'bg-amber-500' : 'bg-amber-400' },
+    '3': { badge: isLight ? 'bg-cyan-100 text-cyan-800 border-cyan-200' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30', dot: isLight ? 'bg-cyan-500' : 'bg-cyan-400' },
+    '4': { badge: isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', dot: isLight ? 'bg-emerald-500' : 'bg-emerald-400' },
+    '5': { badge: isLight ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-purple-500/20 text-purple-300 border-purple-500/30', dot: isLight ? 'bg-purple-500' : 'bg-purple-400' },
+  };
+
+  return (
+    <div className="flex flex-col gap-3 w-full mt-1">
+      {rawParts.map((part, partIdx) => {
+        // Case A: RCA / 핵심 원인
+        if (part.includes('핵심 원인') || part.includes('Root Cause') || part.includes('💡')) {
+          const titleMatch = part.match(/###\s*(.+?)(?:\s*>|\n|$)/);
+          const rcaTitle = titleMatch ? titleMatch[1].replace(/^[#\s]+/, '').trim() : '핵심 원인 (Root Cause Analysis)';
+          const quoteText = part.replace(/###.+?(?:\s*>|\n|$)/, '').replace(/^>\s*/gm, '').trim();
+
+          return (
+            <div 
+              key={partIdx} 
+              className={`rounded-xl p-3.5 border transition-all ${
+                isLight 
+                  ? 'bg-amber-50/90 border-amber-200/90 shadow-sm' 
+                  : 'bg-amber-500/10 border-amber-500/30 shadow-inner'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-base shrink-0">💡</span>
+                <span className={`text-xs font-black tracking-wide ${isLight ? 'text-amber-900' : 'text-amber-300'}`}>
+                  {rcaTitle.replace(/^💡\s*/, '')}
+                </span>
+                <span className={`ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full font-mono ${
+                  isLight ? 'bg-amber-200/70 text-amber-900 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  RCA
+                </span>
+              </div>
+              <div className={`text-xs sm:text-[12.5px] leading-relaxed font-medium pl-3 border-l-2 ${
+                isLight ? 'border-amber-400 text-slate-800' : 'border-amber-500/60 text-slate-100'
+              }`}>
+                {quoteText}
+              </div>
+            </div>
+          );
+        }
+
+        // Case B: Final Report / 최종 보고서 및 넘버링 세션
+        if (part.includes('최종 보고서') || part.includes('Resolution Report') || /(?:^|\s)[1-9]\d?\.\s+/.test(part)) {
+          const titleMatch = part.match(/^###\s*([^\d\n]+?)(?=\s*[1-9]\d?\.\s+|$)/);
+          const reportTitle = titleMatch ? titleMatch[1].replace(/^[#\s]+/, '').trim() : '최종 보고서 (Resolution Report)';
+          const body = titleMatch ? part.slice(titleMatch[0].length).trim() : part;
+
+          const sectionRegex = /(?:^|\s)([1-9]\d?)\.\s+([^-\n:]+?)(?=\s*-\s*|\s*[1-9]\d?\.\s+|$)/g;
+          const sections = [];
+          let match;
+          const indices = [];
+          while ((match = sectionRegex.exec(body)) !== null) {
+            indices.push({ num: match[1], title: match[2].trim(), index: match.index, end: sectionRegex.lastIndex });
+          }
+
+          if (indices.length > 0) {
+            indices.forEach((sec, idx) => {
+              const nextStart = indices[idx + 1] ? indices[idx + 1].index : body.length;
+              const content = body.slice(sec.end, nextStart).trim();
+              const bullets = content.split(/(?:^|\s)-\s+/).map(b => b.trim()).filter(Boolean);
+              sections.push({ num: sec.num, title: sec.title, bullets });
+            });
+          }
+
+          return (
+            <div 
+              key={partIdx} 
+              className={`rounded-xl p-3.5 border transition-all ${
+                isLight 
+                  ? 'bg-slate-50/90 border-slate-200/90 shadow-sm' 
+                  : 'bg-slate-900/60 border-white/10 shadow-inner'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-inherit">
+                <span className="text-base shrink-0">📋</span>
+                <span className={`text-xs font-black tracking-wide ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
+                  {reportTitle.replace(/^✅\s*/, '')}
+                </span>
+                <span className={`ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full font-mono ${
+                  isLight ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                }`}>
+                  REPORT
+                </span>
+              </div>
+
+              {sections.length > 0 ? (
+                <div className="flex flex-col gap-2.5">
+                  {sections.map((sec) => {
+                    const col = sectionColors[sec.num] || {
+                      badge: isLight ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                      dot: isLight ? 'bg-blue-500' : 'bg-blue-400'
+                    };
+
+                    return (
+                      <div 
+                        key={sec.num} 
+                        className={`p-3 rounded-lg border flex flex-col gap-2 ${
+                          isLight 
+                            ? 'bg-white border-slate-200/80 shadow-xs' 
+                            : 'bg-[#0b101d]/70 border-white/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-black shrink-0 border ${col.badge}`}>
+                            {sec.num}
+                          </span>
+                          <span className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
+                            {sec.title}
+                          </span>
+                        </div>
+
+                        {sec.bullets.length > 0 && (
+                          <div className="flex flex-col gap-1.5 pl-6">
+                            {sec.bullets.map((b, bIdx) => {
+                              // 1. 타임스탬프 시작 감지 e.g. "17:52:54 거래집계..."
+                              const timeMatch = b.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*(.*)$/);
+                              if (timeMatch) {
+                                return (
+                                  <div key={bIdx} className="flex items-start gap-2 text-xs sm:text-[12px] leading-relaxed">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
+                                      isLight ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                    }`}>
+                                      {timeMatch[1]}
+                                    </span>
+                                    <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>
+                                      {timeMatch[2]}
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              // 2. 키-밸류 라벨 감지 e.g. "서비스 영향 범위: ..."
+                              const colonIdx = b.indexOf(':');
+                              const keyCandidate = colonIdx > 0 ? b.slice(0, colonIdx).trim() : '';
+                              const isTimestamp = /\d{1,2}:\d{2}/.test(keyCandidate);
+                              const hasKeyValue = colonIdx > 0 && colonIdx < 30 && !isTimestamp && !/^\d+$/.test(keyCandidate);
+                              const keyPart = hasKeyValue ? keyCandidate : null;
+                              const valPart = hasKeyValue ? b.slice(colonIdx + 1).trim() : b;
+
+                              return (
+                                <div key={bIdx} className="flex items-start gap-2 text-xs sm:text-[12px] leading-relaxed">
+                                  {keyPart ? (
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                                      isLight ? 'bg-slate-200/80 text-slate-800 border border-slate-300' : 'bg-white/10 text-slate-200 border border-white/15'
+                                    }`}>
+                                      {keyPart}
+                                    </span>
+                                  ) : (
+                                    <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${col.dot}`} />
+                                  )}
+                                  <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>
+                                    {valPart}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={`text-xs sm:text-[12px] leading-relaxed whitespace-pre-wrap ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                  {body}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Case C: Standard status or note paragraph (조치 현황 등)
+        const cleanPart = part.replace(/\*\*/g, '').replace(/^-+\s*/gm, '').trim();
+        const colonIdx = cleanPart.indexOf(':');
+        const hasPrefix = colonIdx > 0 && colonIdx < 30;
+        const prefix = hasPrefix ? cleanPart.slice(0, colonIdx).trim() : null;
+        const rest = hasPrefix ? cleanPart.slice(colonIdx + 1).trim() : cleanPart;
+
+        return (
+          <div 
+            key={partIdx} 
+            className={`rounded-xl p-3 border transition-all ${
+              isLight 
+                ? 'bg-blue-50/70 border-blue-200/80 shadow-xs' 
+                : 'bg-blue-500/10 border-blue-500/25'
+            }`}
+          >
+            <div className="flex items-start gap-2.5">
+              <span className="text-base shrink-0 mt-0.5">🔍</span>
+              <div className="flex-1 min-w-0">
+                {prefix && (
+                  <div className={`text-xs font-bold mb-1 flex items-center gap-1.5 ${isLight ? 'text-blue-950' : 'text-blue-300'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide ${
+                      isLight ? 'bg-blue-200/70 text-blue-900 border border-blue-300/60' : 'bg-blue-500/20 text-blue-200 border border-blue-400/30'
+                    }`}>
+                      조치 현황
+                    </span>
+                    <span>{prefix}</span>
+                  </div>
+                )}
+                <p className={`text-xs sm:text-[12.5px] leading-relaxed ${isLight ? 'text-slate-800 font-medium' : 'text-slate-200'}`}>
+                  {rest}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function MarkdownBlock({ text, report, checkedItems = {}, onToggleCheck = () => {} }) {
   if (!text) return <span style={{ color: '#475569' }}>-</span>;
@@ -247,6 +521,7 @@ const getStatusName = (status) => {
 export default function AiReportPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
+  const { isLight } = useTheme();
   const location = useLocation();
   const params = useParams();
   
@@ -254,7 +529,6 @@ export default function AiReportPage() {
   const incidentId = rawId ? String(rawId).replace("INC-", "").trim() : null;
   const currentUser = JSON.parse(localStorage.getItem('sguard_user') || '{}');
 
-  // — 검색 목록 모드 state (항상 선언 — Hook 규칙) —
   // — 검색 목록 모드 state (항상 선언 — Hook 규칙) —
   const listMode = !incidentId;
   const dates = useMemo(() => getDefaultDates(), []);
@@ -294,8 +568,13 @@ export default function AiReportPage() {
 
   const formatTimeline = (text) => {
     if (!text) return '';
-    // [HH:MM:SS] 패턴을 마크다운 글머리 기호와 굵은 글씨로 변환하여 타임라인 형태로 표시
-    return text.replace(/(?:\s*)(\[\d{2}:\d{2}:\d{2}\])/g, '\n\n- **$1**').trim();
+    return text
+      .replace(/(?:\s*)(\[\d{2}:\d{2}(?::\d{2})?[^\]]*\])/g, '\n\n- **$1** ')
+      .replace(/\s*---\s*/g, '\n\n---\n\n')
+      .replace(/\s*(###\s+[^\n]+)/g, '\n\n$1\n\n')
+      .replace(/(?:^|\s)([1-9]\d?\.\s+[가-힣][^\-\n:]*?)\s*-\s+/g, '\n\n#### $1\n- ')
+      .replace(/\s*-\s+/g, '\n- ')
+      .trim();
   };
   const [checkedActionItems, setCheckedActionItems] = useState({});
   const toggleActionItem = useCallback((key) => {
@@ -1164,11 +1443,10 @@ export default function AiReportPage() {
                   </div>
                   <div className="p-5 overflow-visible">
                     {chatSummary ? (() => {
-                      // [HH:MM:SS] or [HH:MM] 등 패턴 (뒤에 '이후' 등의 글자도 허용)
+                      // [HH:MM:SS] or [HH:MM] 등 패턴 (앞뒤 **나 공백 허용)
                       const raw = chatSummary;
-                      const regex = /\[(\d{2}:\d{2}(?::\d{2})?[^\]]*)\]\s*/g;
+                      const regex = /(?:\*\*)?\[(\d{2}:\d{2}(?::\d{2})?[^\]]*)\](?:\*\*)?\s*/g;
                       const items = [];
-                      let lastIndex = 0;
                       let match;
                       const timestamps = [];
                       while ((match = regex.exec(raw)) !== null) {
@@ -1176,7 +1454,9 @@ export default function AiReportPage() {
                       }
                       timestamps.forEach((ts, i) => {
                         const nextStart = timestamps[i + 1]?.index ?? raw.length;
-                        const text = raw.slice(ts.end, nextStart).trim();
+                        let text = raw.slice(ts.end, nextStart).trim();
+                        // 앞뒤 잔여 마크다운 별표(*) 정리
+                        text = text.replace(/^\*+|\*+$/g, '').trim();
                         if (text) items.push({ time: ts.time, text });
                       });
                       // 타임스탬프 없으면 fallback
@@ -1229,7 +1509,7 @@ export default function AiReportPage() {
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-sm text-slate-200 leading-relaxed">{item.text}</p>
+                                  <WarRoomStepContent text={item.text} isLight={isLight} isLast={isLast} />
                                 </div>
                               </div>
                             );

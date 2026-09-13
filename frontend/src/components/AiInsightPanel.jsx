@@ -31,7 +31,7 @@ const maskName = (name) => {
 };
 
 // 🏷️ RAG 엔진 검색 키(Key) 추출 엔티티 파서
-const extractSearchEntities = (selectedSms, parsedSimilarity) => {
+const extractSearchEntities = (selectedSms, parsedSimilarity, isLight = false) => {
   if (!selectedSms) return [];
   const msg = selectedSms.message || '';
   const entities = [];
@@ -43,7 +43,14 @@ const extractSearchEntities = (selectedSms, parsedSimilarity) => {
     if (ifM) ifVal = ifM[1];
   }
   if (ifVal) {
-    entities.push({ key: 'IF', val: ifVal, rawVal: ifVal, color: 'text-[#00A3E0] bg-[#00A3E0]/10 border-[#00A3E0]/30 font-shinhan-num' });
+    entities.push({ 
+      key: 'IF', 
+      val: ifVal, 
+      rawVal: ifVal, 
+      color: isLight 
+        ? 'text-[#0369a1] bg-[#e0f2fe] border-[#7dd3fc] hover:bg-[#bae6fd] font-shinhan-num font-bold' 
+        : 'text-[#00A3E0] bg-[#00A3E0]/10 border-[#00A3E0]/30 font-shinhan-num' 
+    });
   }
 
   // 2. 업무 / 시스템
@@ -53,7 +60,14 @@ const extractSearchEntities = (selectedSms, parsedSimilarity) => {
     if (bizM) bizVal = bizM[1];
   }
   if (bizVal) {
-    entities.push({ key: '업무', val: bizVal, rawVal: bizVal, color: 'text-[#0046FF] bg-[#0046FF]/10 border-[#0046FF]/30' });
+    entities.push({ 
+      key: '업무', 
+      val: bizVal, 
+      rawVal: bizVal, 
+      color: isLight 
+        ? 'text-[#1e40af] bg-[#dbeafe] border-[#93c5fd] hover:bg-[#bfdbfe] font-bold' 
+        : 'text-[#0046FF] bg-[#0046FF]/10 border-[#0046FF]/30' 
+    });
   }
 
   // 3. 오류율 & 초과폭 (Delta)
@@ -71,22 +85,56 @@ const extractSearchEntities = (selectedSms, parsedSimilarity) => {
       const sign = delta > 0 ? `+${delta.toFixed(1)}%p` : `${delta.toFixed(1)}%p`;
       rateText += ` (초과폭 ${sign})`;
     }
-    entities.push({ key: '오류율', val: rateText, rawVal: `${curRate}%`, color: 'text-[#F04438] bg-[#F04438]/10 border-[#F04438]/30 font-shinhan-num' });
+    entities.push({ 
+      key: '오류율', 
+      val: rateText, 
+      rawVal: `${curRate}%`, 
+      color: isLight 
+        ? 'text-[#b91c1c] bg-[#fee2e2] border-[#fca5a5] hover:bg-[#fecaca] font-shinhan-num font-bold' 
+        : 'text-[#F04438] bg-[#F04438]/10 border-[#F04438]/30 font-shinhan-num' 
+    });
   } else if (selectedSms.error_code) {
-    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-[#F5A623] bg-[#F5A623]/10 border-[#F5A623]/30 font-shinhan-num' });
+    entities.push({ 
+      key: '에러코드', 
+      val: selectedSms.error_code, 
+      rawVal: selectedSms.error_code, 
+      color: isLight 
+        ? 'text-[#92400e] bg-[#fef3c7] border-[#fcd34d] hover:bg-[#fde68a] font-shinhan-num font-bold' 
+        : 'text-[#F5A623] bg-[#F5A623]/10 border-[#F5A623]/30 font-shinhan-num' 
+    });
   }
 
   // 4. 에러코드 (오류율이 있었어도 에러코드가 있으면 추가)
   if (selectedSms.error_code && curRate !== null) {
-    entities.push({ key: '에러코드', val: selectedSms.error_code, rawVal: selectedSms.error_code, color: 'text-[#F5A623] bg-[#F5A623]/10 border-[#F5A623]/30 font-shinhan-num' });
+    entities.push({ 
+      key: '에러코드', 
+      val: selectedSms.error_code, 
+      rawVal: selectedSms.error_code, 
+      color: isLight 
+        ? 'text-[#92400e] bg-[#fef3c7] border-[#fcd34d] hover:bg-[#fde68a] font-shinhan-num font-bold' 
+        : 'text-[#F5A623] bg-[#F5A623]/10 border-[#F5A623]/30 font-shinhan-num' 
+    });
   }
 
   // Fallback
   if (entities.length === 0) {
     if (parsedSimilarity?.inputValue) {
-      entities.push({ key: '검색키', val: parsedSimilarity.inputValue.slice(0, 25), rawVal: parsedSimilarity.inputValue.slice(0, 25), color: 'text-[#0046FF] bg-[#0046FF]/10 border-[#0046FF]/30' });
+      entities.push({ 
+        key: '검색키', 
+        val: parsedSimilarity.inputValue.slice(0, 25), 
+        rawVal: parsedSimilarity.inputValue.slice(0, 25), 
+        color: isLight 
+          ? 'text-[#1e40af] bg-[#dbeafe] border-[#93c5fd] font-bold' 
+          : 'text-[#0046FF] bg-[#0046FF]/10 border-[#0046FF]/30' 
+      });
     } else {
-      entities.push({ key: '검색키', val: '실시간 이상징후 패턴', color: 'text-slate-300 bg-[#0D162B] border-[#1E2F56]' });
+      entities.push({ 
+        key: '검색키', 
+        val: '실시간 이상징후 패턴', 
+        color: isLight 
+          ? 'text-slate-800 bg-slate-100 border-slate-300 font-bold' 
+          : 'text-slate-300 bg-[#0D162B] border-[#1E2F56]' 
+      });
     }
   }
 
@@ -1151,7 +1199,7 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                     [추출 엔티티]
                   </span>
                   <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                    {extractSearchEntities(selectedSms, parsed).map((item, idx) => (
+                    {extractSearchEntities(selectedSms, parsed, isLight).map((item, idx) => (
                       <button
                         key={idx}
                         type="button"
@@ -1159,8 +1207,8 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                         title={`클릭 시 [${item.key}: ${item.val}] 관련 인시던트 파이프라인 전체 동기화`}
                         className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md border text-[11px] font-mono font-semibold transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 hover:border-blue-400 hover:shadow-[0_0_10px_rgba(59,130,246,0.35)] ${item.color}`}
                       >
-                        <span className="opacity-70 font-sans text-[10px]">{item.key}:</span>
-                        <span>{item.val}</span>
+                        <span className={`font-sans text-[10px] ${isLight ? 'opacity-85 font-bold' : 'opacity-70'}`}>{item.key}:</span>
+                        <span className={isLight ? 'font-bold' : ''}>{item.val}</span>
                       </button>
                     ))}
                   </div>

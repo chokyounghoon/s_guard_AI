@@ -8,6 +8,7 @@ import { Activity, ArrowLeft, CheckCircle2, Zap, Shield, Calendar,
 import { getAuthHeaders, getUserProfile } from '../lib/authStore';
 import toast from 'react-hot-toast';
 import { formatOccurrenceCount } from '../utils/maskingUtils';
+import { useTheme } from '../context/ThemeContext';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -53,6 +54,7 @@ const parseMciFields = (msg) => {
 };
 
 export default function WorkflowPage() {
+  const { isLight, theme } = useTheme();
   const { inc_id } = useParams();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
@@ -241,73 +243,91 @@ export default function WorkflowPage() {
   const InfoContent = () => (
     <div className="space-y-4 pb-20 lg:pb-0">
       {/* 뱃지 & MTTR */}
-      <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl p-5 shadow-lg">
+      <div className={`rounded-3xl p-5 border transition-all ${
+        isLight ? 'bg-white border-slate-200/90 shadow-sm shadow-slate-200/50' : 'bg-[#151926]/80 backdrop-blur-xl border-white/5 shadow-lg'
+      }`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className={`p-2 rounded-xl ${isClosed ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-              <Shield className={`w-4 h-4 ${isClosed ? 'text-emerald-400' : 'text-red-400'}`} />
+              <Shield className={`w-4 h-4 ${isClosed ? 'text-emerald-500' : 'text-red-500'}`} />
             </div>
             <div>
-              <span className={`text-[10px] font-black uppercase tracking-widest ${isClosed ? 'text-emerald-400' : 'text-red-400/90'}`}>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${isClosed ? (isLight ? 'text-emerald-700' : 'text-emerald-400') : (isLight ? 'text-red-700' : 'text-red-400/90')}`}>
                 {isClosed ? 'Incident Closed' : 'Active Emergency'}
               </span>
               <p className="text-[10px] text-slate-500">LIFECYCLE ALPHA-7</p>
             </div>
           </div>
           <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${
-            isClosed ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                     : 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse'}`}>
+            isClosed ? (isLight ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20')
+                     : (isLight ? 'bg-red-50 text-red-700 border-red-200 animate-pulse' : 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse')}`}>
             {isClosed ? 'CLOSED' : 'LIVE'}
           </span>
         </div>
         
-        <div className="bg-black/20 rounded-2xl p-4 border border-white/5 flex items-center justify-between">
+        <div className={`rounded-2xl p-4 border flex items-center justify-between transition-colors ${
+          isLight ? 'bg-slate-50 border-slate-200/80' : 'bg-black/20 border-white/5'
+        }`}>
           <div>
             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest block mb-1">MTTR (복구소요시간)</span>
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${isClosed ? 'bg-emerald-500' : 'bg-blue-400 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]'}`} />
-              <span className="text-3xl font-black font-mono tracking-tighter tabular-nums text-white drop-shadow-sm">{formatDuration(durMs)}</span>
+              <span className={`text-3xl font-black font-mono tracking-tighter tabular-nums drop-shadow-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {formatDuration(durMs)}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between bg-white/[0.02] rounded-2xl p-3.5 border border-white/5 mt-3 text-xs flex-wrap gap-y-2">
+        <div className={`flex items-center justify-between rounded-2xl p-3.5 border mt-3 text-xs flex-wrap gap-y-2 transition-colors ${
+          isLight ? 'bg-slate-50/90 border-slate-200' : 'bg-white/[0.02] border-white/5'
+        }`}>
           <div className="flex items-center gap-2">
             <Calendar className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-slate-400 font-bold">인지시각:</span>
-            <span className="font-mono font-bold text-slate-200">{fmt(incidentData?.created_at) || '-'}</span>
+            <span className={`font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>인지시각:</span>
+            <span className={`font-mono font-bold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{fmt(incidentData?.created_at) || '-'}</span>
           </div>
           {isClosed && endT && (
-            <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+            <div className={`flex items-center gap-2 border-l pl-4 ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="text-slate-400 font-bold">완료시각:</span>
-              <span className="font-mono font-bold text-emerald-400">{fmt(endT)}</span>
+              <span className={`font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>완료시각:</span>
+              <span className={`font-mono font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{fmt(endT)}</span>
             </div>
           )}
-          <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+          <div className={`flex items-center gap-2 border-l pl-4 ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
             <User className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-slate-400 font-bold">발신자:</span>
-            <span className="font-bold text-blue-400 truncate max-w-[120px]">{incidentData?.sender || 'SYSTEM'}</span>
+            <span className={`font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>발신자:</span>
+            <span className={`font-bold truncate max-w-[120px] ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>{incidentData?.sender || 'SYSTEM'}</span>
           </div>
         </div>
       </div>
 
       {/* 구조화 장애 정보 */}
       {fields.length > 0 && (
-        <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden shadow-lg">
-          <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02]">
-            <h3 className="text-xs font-black text-white flex items-center gap-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-blue-400" />
+        <div className={`rounded-3xl overflow-hidden border transition-all ${
+          isLight ? 'bg-white border-slate-200/90 shadow-sm shadow-slate-200/50' : 'bg-[#151926]/80 backdrop-blur-xl border-white/5 shadow-lg'
+        }`}>
+          <div className={`px-5 py-4 border-b transition-colors ${
+            isLight ? 'border-slate-200 bg-slate-50/80' : 'border-white/5 bg-white/[0.02]'
+          }`}>
+            <h3 className={`text-xs font-black flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              <AlertTriangle className="w-3.5 h-3.5 text-blue-500" />
               상세 정보
             </h3>
           </div>
           <div className="p-2">
             {fields.map(f => (
-              <div key={f.label} className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 p-3 hover:bg-white/[0.02] rounded-xl transition-colors">
-                <span className="text-[11px] text-slate-500 font-bold shrink-0 pt-0.5">{f.label}</span>
-                <span className={`text-[13px] break-all sm:text-right
-                  ${f.highlight ? 'text-orange-400 font-bold' : f.mono ? 'text-slate-300 font-mono' : 'text-white'}
-                  ${f.wrap ? 'whitespace-pre-wrap mt-1 sm:mt-0' : ''}`}>
+              <div key={f.label} className={`flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 p-3 rounded-xl transition-colors ${
+                isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'
+              }`}>
+                <span className={`text-[11px] font-bold shrink-0 pt-0.5 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>{f.label}</span>
+                <span className={`text-[13px] break-all sm:text-right ${
+                  f.highlight 
+                    ? (isLight ? 'text-amber-600 font-black' : 'text-orange-400 font-bold') 
+                    : f.mono 
+                      ? (isLight ? 'text-slate-900 font-mono font-semibold' : 'text-slate-300 font-mono') 
+                      : (isLight ? 'text-slate-900 font-semibold' : 'text-white')
+                } ${f.wrap ? 'whitespace-pre-wrap mt-1 sm:mt-0' : ''}`}>
                   {f.value}
                 </span>
               </div>
@@ -317,13 +337,19 @@ export default function WorkflowPage() {
       )}
 
       {/* Response Team */}
-      <div className="bg-[#151926]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden shadow-lg">
-        <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
-          <h3 className="text-xs font-black text-white flex items-center gap-2">
-            <Users className="w-3.5 h-3.5 text-indigo-400" />
+      <div className={`rounded-3xl overflow-hidden border transition-all ${
+        isLight ? 'bg-white border-slate-200/90 shadow-sm shadow-slate-200/50' : 'bg-[#151926]/80 backdrop-blur-xl border-white/5 shadow-lg'
+      }`}>
+        <div className={`px-5 py-4 border-b flex items-center justify-between transition-colors ${
+          isLight ? 'border-slate-200 bg-slate-50/80' : 'border-white/5 bg-white/[0.02]'
+        }`}>
+          <h3 className={`text-xs font-black flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            <Users className="w-3.5 h-3.5 text-indigo-500" />
             대응팀
           </h3>
-          <span className="text-[10px] font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+            isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
+          }`}>
             {assignees.length} 명
           </span>
         </div>
@@ -335,21 +361,23 @@ export default function WorkflowPage() {
             
             const badgeLabel = isDone ? '처리완료' : isUnparticipated ? '미참여' : isActive ? '참여중' : a.status;
             const badgeCls = isDone || isActive
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-black'
-              : 'bg-slate-800 text-slate-400 border-white/10';
+              ? (isLight ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-black' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-black')
+              : (isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-slate-800 text-slate-400 border-white/10');
             const avatarBg = isDone || isActive
               ? 'bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.5)] font-black'
-              : 'bg-slate-800 text-slate-500 border border-white/10';
+              : (isLight ? 'bg-slate-200 text-slate-600 border border-slate-300' : 'bg-slate-800 text-slate-500 border border-white/10');
 
             return (
-              <div key={`${a.user_id}-${i}`} className="flex items-center justify-between p-3 bg-white/[0.02] rounded-2xl border border-white/5">
+              <div key={`${a.user_id}-${i}`} className={`flex items-center justify-between p-3 rounded-2xl border transition-colors ${
+                isLight ? 'bg-slate-50/90 border-slate-200 hover:bg-slate-100/70' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05]'
+              }`}>
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] ${avatarBg}`}>
                     {getInitials(a.name || a.user_id)}
                   </div>
                   <div>
-                    <p className="text-[13px] font-black text-white tracking-tight">{a.name || a.user_id}</p>
-                    <p className="text-[10px] text-slate-500/70 font-normal whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px] tracking-tight">
+                    <p className={`text-[13px] font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>{a.name || a.user_id}</p>
+                    <p className={`text-[10px] font-normal whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px] tracking-tight ${isLight ? 'text-slate-500' : 'text-slate-500/70'}`}>
                       {a.user_id} {a.team_name || a.part_name ? `· ${[a.team_name, a.part_name].filter(Boolean).join(' ')}` : ''}
                     </p>
                   </div>
@@ -375,13 +403,19 @@ export default function WorkflowPage() {
     const knwStep = workflowLogs.find(s => s.id === 'KNOWLEDGE');
 
     return (
-      <div className="bg-[#151926]/40 backdrop-blur-xl border border-white/5 rounded-3xl shadow-2xl p-5 lg:p-8 pb-10">
+      <div className={`rounded-3xl p-5 lg:p-8 pb-10 transition-all ${
+        isLight 
+          ? 'bg-white border border-slate-200/90 shadow-sm shadow-slate-200/40 text-slate-900' 
+          : 'bg-[#151926]/40 backdrop-blur-xl border border-white/5 shadow-2xl text-white'
+      }`}>
         
         {/* 장애 처리 현황 요약 바 */}
-        <div className="mb-8 p-4 bg-white/[0.02] border border-white/5 rounded-2xl">
+        <div className={`mb-8 p-4 rounded-2xl border transition-colors ${
+          isLight ? 'bg-slate-50/90 border-slate-200' : 'bg-white/[0.02] border-white/5'
+        }`}>
           <div className="flex items-center gap-2 mb-3">
-            <Activity className="w-4 h-4 text-purple-400" />
-            <h3 className="text-sm font-bold text-white">장애 처리 현황</h3>
+            <Activity className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-purple-400'}`} />
+            <h3 className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>장애 처리 현황</h3>
           </div>
           
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -399,13 +433,15 @@ export default function WorkflowPage() {
               const timeStr = from ? (m > 0 ? `${m}m ${s}s` : `${s}s`) : '-';
               return (
                 <div key={label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black ${
-                  isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                  : isActive ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                  : 'bg-white/5 border-white/5 text-slate-500'
+                  isDone 
+                    ? (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400')
+                    : isActive 
+                      ? (isLight ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-blue-500/10 border-blue-500/30 text-blue-400')
+                      : (isLight ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-white/5 border-white/5 text-slate-500')
                 }`}>
                   <span className="opacity-80">{label}</span>
                   <span className="font-mono tabular-nums inline-block w-[3.5rem] text-right">{timeStr}</span>
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 ml-1" />}
+                  {isActive && <span className={`w-1.5 h-1.5 rounded-full ml-1 ${isLight ? 'bg-blue-600' : 'bg-blue-400'}`} />}
                 </div>
               );
             })}
@@ -414,7 +450,11 @@ export default function WorkflowPage() {
 
         <div className="relative">
           {/* 타임라인 선 */}
-          <div className="absolute left-[15px] lg:left-[15px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-600/50 via-white/10 to-transparent pointer-events-none" />
+          <div className={`absolute left-[15px] lg:left-[15px] top-4 bottom-4 w-[2px] pointer-events-none ${
+            isLight 
+              ? 'bg-gradient-to-b from-blue-500 via-slate-200 to-transparent' 
+              : 'bg-gradient-to-b from-blue-600/50 via-white/10 to-transparent'
+          }`} />
 
           <div className="space-y-6 relative z-10">
             <AnimatePresence>
@@ -463,43 +503,97 @@ export default function WorkflowPage() {
                   <motion.div key={step.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: sIdx * 0.1 }} className="relative pl-10 lg:pl-10">
                     {/* 정제된 타임라인 노드 */}
                     <div className={`absolute left-[3px] lg:left-[3px] top-4 w-6 h-6 rounded-lg z-20 flex items-center justify-center transition-all duration-300 border ${
-                      done ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : next ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-[#1E293B] text-slate-500'
+                      done 
+                        ? (isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400') 
+                        : next 
+                          ? 'bg-blue-600 border-blue-500 text-white' 
+                          : (isLight ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-slate-900 border-[#1E293B] text-slate-500')
                     }`}>
                       <Icon className="w-3.5 h-3.5" />
                     </div>
 
                     {/* 콘텐츠 카드 */}
-                    <div className={`p-4 lg:p-5 rounded-2xl border transition-all duration-300 ${done ? 'bg-white/[0.03] border-[#1E293B]' : next ? 'bg-blue-900/15 border-blue-500/30' : 'bg-transparent border-transparent opacity-40'}`}>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 border-b border-white/5 pb-2.5">
-                        <h4 className={`text-sm font-black tracking-tight flex items-center gap-1.5 ${done ? 'text-white' : next ? 'text-blue-400 font-bold tracking-wide' : 'text-slate-500'}`}>
-                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">STEP {sIdx + 1}</span>
+                    <div className={`p-4 lg:p-5 rounded-2xl border transition-all duration-300 ${
+                      done 
+                        ? (isLight ? 'bg-slate-50/90 border-slate-200 hover:border-slate-300 shadow-xs' : 'bg-white/[0.03] border-[#1E293B]') 
+                        : next 
+                          ? (isLight ? 'bg-blue-50/90 border-blue-200 shadow-xs' : 'bg-blue-900/15 border-blue-500/30') 
+                          : (isLight ? 'bg-slate-50/40 border-slate-200/50 opacity-50' : 'bg-transparent border-transparent opacity-40')
+                    }`}>
+                      <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2.5 border-b ${
+                        isLight ? 'border-slate-200/80' : 'border-white/5'
+                      }`}>
+                        <h4 className={`text-sm font-black tracking-tight flex items-center gap-1.5 ${
+                          done 
+                            ? (isLight ? 'text-slate-900' : 'text-white') 
+                            : next 
+                              ? (isLight ? 'text-blue-700' : 'text-blue-400 font-bold tracking-wide') 
+                              : (isLight ? 'text-slate-400' : 'text-slate-500')
+                        }`}>
+                          <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded border ${
+                            isLight ? 'bg-white border-slate-200 text-slate-700 shadow-xs' : 'bg-white/5 border-white/10 text-slate-400'
+                          }`}>
+                            STEP {sIdx + 1}
+                          </span>
                           {step.label}
                         </h4>
                         {done ? (
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-slate-400 bg-black/30 px-2 py-0.5 rounded-md">{fmt(log.timestamp)}</span>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md ${
+                              isLight ? 'text-slate-600 bg-white border border-slate-200' : 'text-slate-400 bg-black/30'
+                            }`}>
+                              {fmt(log.timestamp)}
+                            </span>
+                            <CheckCircle2 className={`w-4 h-4 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
                           </div>
                         ) : next && (
-                          <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md uppercase border border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.5)]">Processing</span>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase border ${
+                            isLight ? 'text-blue-700 bg-blue-100/80 border-blue-300' : 'text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
+                          }`}>
+                            Processing
+                          </span>
                         )}
                       </div>
                       
-                      <div className={`text-xs sm:text-sm leading-relaxed mt-2 ${done ? 'text-slate-300' : next ? 'text-blue-200' : 'text-slate-600'}`}>
+                      <div className="text-xs sm:text-sm leading-relaxed mt-2">
                         {done ? (
                           <div className="space-y-1">
-                            <strong className="text-white font-black block text-xs tracking-tight text-blue-400">{stepPrefixes[step.id]}</strong>
-                            <p className="font-normal text-slate-300 leading-relaxed">{log.detail}</p>
+                            <strong className={`font-black block text-xs tracking-tight ${
+                              isLight ? 'text-blue-700' : 'text-blue-400'
+                            }`}>
+                              {stepPrefixes[step.id]}
+                            </strong>
+                            <p className={`font-medium leading-relaxed ${
+                              isLight ? 'text-slate-800' : 'text-slate-300'
+                            }`}>
+                              {log.detail}
+                            </p>
                           </div>
                         ) : next ? (
                           <div className="space-y-1">
-                            <strong className="text-blue-400 font-black block text-xs tracking-tight">{stepPrefixes[step.id]} (진행 중)</strong>
-                            <p className="font-normal text-blue-200/90 leading-relaxed">실시간 AI 분석 및 보안 정책 대조를 통한 대응 시퀀스가 활성화되었습니다.</p>
+                            <strong className={`font-black block text-xs tracking-tight ${
+                              isLight ? 'text-blue-700' : 'text-blue-400'
+                            }`}>
+                              {stepPrefixes[step.id]} (진행 중)
+                            </strong>
+                            <p className={`font-medium leading-relaxed ${
+                              isLight ? 'text-slate-700' : 'text-blue-200/90'
+                            }`}>
+                              실시간 AI 분석 및 보안 정책 대조를 통한 대응 시퀀스가 활성화되었습니다.
+                            </p>
                           </div>
                         ) : (
                           <div className="space-y-1">
-                            <strong className="text-slate-500 font-black block text-xs tracking-tight">{stepPrefixes[step.id]} (대기)</strong>
-                            <p className="font-normal text-slate-600 leading-relaxed">이전 단계 완료 대기 중</p>
+                            <strong className={`font-black block text-xs tracking-tight ${
+                              isLight ? 'text-slate-500' : 'text-slate-500'
+                            }`}>
+                              {stepPrefixes[step.id]} (대기)
+                            </strong>
+                            <p className={`font-normal leading-relaxed ${
+                              isLight ? 'text-slate-500' : 'text-slate-600'
+                            }`}>
+                              이전 단계 완료 대기 중
+                            </p>
                           </div>
                         )}
                       </div>
@@ -517,7 +611,11 @@ export default function WorkflowPage() {
                               }
                             }}
                             disabled={isOpeningWarRoom}
-                            className="px-4 py-2 rounded-xl text-[11px] font-black bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+                            className={`px-4 py-2 rounded-xl text-[11px] font-black border active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 ${
+                              isLight 
+                                ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-sm shadow-indigo-200' 
+                                : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)]'
+                            }`}
                           >
                             {isOpeningWarRoom ? '개설 중...' : done ? '합동 워룸 입장' : '워룸 즉시 개설'}
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -529,7 +627,11 @@ export default function WorkflowPage() {
                       {intervalText && sIdx > 0 && (
                         <div className="mt-3.5 flex justify-end">
                           {isElapsedLive ? (
-                            <span className="text-[11px] font-black px-3 py-1 rounded-full border bg-orange-500/15 text-orange-400 border-orange-500/30 shadow-[0_0_12px_rgba(249,115,22,0.25)] flex items-center gap-2">
+                            <span className={`text-[11px] font-black px-3 py-1 rounded-full border flex items-center gap-2 ${
+                              isLight 
+                                ? 'bg-amber-50 text-amber-800 border-amber-300' 
+                                : 'bg-orange-500/15 text-orange-400 border-orange-500/30 shadow-[0_0_12px_rgba(249,115,22,0.25)]'
+                            }`}>
                               <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
@@ -537,8 +639,10 @@ export default function WorkflowPage() {
                               {intervalText} (진행 중)
                             </span>
                           ) : (
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${
-                              intervalMinutes > 60 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-xs ${
+                              intervalMinutes > 60 
+                                ? (isLight ? 'text-amber-800 bg-amber-50 border-amber-300' : 'text-amber-400 bg-amber-500/10 border-amber-500/20') 
+                                : (isLight ? 'text-emerald-800 bg-emerald-50 border-emerald-300' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20')
                             }`}>
                               {intervalText}
                             </span>
@@ -550,43 +654,61 @@ export default function WorkflowPage() {
                 );
               })}
             </AnimatePresence>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-);
-};
+    );
+  };
 
   return (
-    <div className="bg-[#0a0c14] text-white font-sans flex flex-col min-h-screen">
+    <div className={`font-sans flex flex-col min-h-screen ${
+      isLight ? 'bg-[#F8FAFC] text-slate-900' : 'bg-[#0a0c14] text-white'
+    }`}>
       {/* 배경 */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-600/10 blur-[120px] rounded-full mix-blend-screen" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-indigo-600/10 blur-[120px] rounded-full mix-blend-screen" />
-      </div>
+      {!isLight && (
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-600/10 blur-[120px] rounded-full mix-blend-screen" />
+          <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-indigo-600/10 blur-[120px] rounded-full mix-blend-screen" />
+        </div>
+      )}
 
       {/* 상단 앱바 */}
-      <header className="sticky top-0 z-50 bg-[#0a0c14]/80 backdrop-blur-2xl border-b border-white/5">
+      <header className={`sticky top-0 z-50 backdrop-blur-2xl border-b transition-colors ${
+        isLight ? 'bg-white/95 border-slate-200/90 shadow-xs' : 'bg-[#0a0c14]/80 border-white/5'
+      }`}>
         <div className="max-w-none mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => goBack()} className="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors">
-              <ArrowLeft className="w-5 h-5 text-slate-300" />
+            <button onClick={() => goBack()} className={`p-2 -ml-2 rounded-xl transition-colors ${
+              isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-white/10 text-slate-300'
+            }`}>
+              <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-sm font-black tracking-tight text-white flex items-center gap-2">
+              <h1 className={`text-sm font-black tracking-tight flex items-center gap-2 ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}>
                 Incident Flow
-                <span className="px-1.5 py-0.5 rounded-md bg-blue-500/20 text-[9px] text-blue-400 uppercase">Live</span>
+                <span className={`px-1.5 py-0.5 rounded-md text-[9px] uppercase font-bold ${
+                  isLight ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-blue-500/20 text-blue-400'
+                }`}>Live</span>
               </h1>
               <p className="text-[10px] text-slate-500 font-mono mt-0.5">{inc_id}</p>
             </div>
           </div>
-          {/* 진행도 미니바 (형광 Cyan 포인트 튜닝) */}
+          {/* 진행도 미니바 */}
           <div className="flex flex-col items-end gap-1 font-mono">
-            <span className="text-[11px] font-black text-[#00e5ff] tracking-wider drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]">
+            <span className={`text-[11px] font-black tracking-wider ${
+              isLight ? 'text-cyan-700' : 'text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]'
+            }`}>
               {Math.round(progress)}%
             </span>
-            <div className="w-20 h-1.5 bg-slate-800/80 rounded-full overflow-hidden p-0.5 border border-white/5">
+            <div className={`w-20 h-1.5 rounded-full overflow-hidden p-0.5 border ${
+              isLight ? 'bg-slate-200 border-slate-300' : 'bg-slate-800/80 border-white/5'
+            }`}>
               <div 
-                className="h-full bg-gradient-to-r from-blue-500 via-[#00e5ff] to-[#00ffc4] rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.6)] animate-pulse" 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isLight ? 'bg-cyan-500' : 'bg-gradient-to-r from-blue-500 via-[#00e5ff] to-[#00ffc4] shadow-[0_0_10px_rgba(0,229,255,0.6)] animate-pulse'
+                }`} 
                 style={{ width: `${progress}%` }} 
               />
             </div>
@@ -594,12 +716,14 @@ export default function WorkflowPage() {
         </div>
 
         {/* 모바일 탭 네비게이션 (lg 이하에서만 표시) */}
-        <div className="lg:hidden flex border-t border-white/5">
-          <button onClick={() => setActiveTab('info')} className={`flex-1 py-3 text-xs font-black transition-colors relative ${activeTab === 'info' ? 'text-blue-400' : 'text-slate-500'}`}>
+        <div className={`lg:hidden flex border-t ${
+          isLight ? 'border-slate-200 bg-white' : 'border-white/5'
+        }`}>
+          <button onClick={() => setActiveTab('info')} className={`flex-1 py-3 text-xs font-black transition-colors relative ${activeTab === 'info' ? (isLight ? 'text-blue-600' : 'text-blue-400') : 'text-slate-500'}`}>
             상세 정보
             {activeTab === 'info' && <motion.div layoutId="tab-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />}
           </button>
-          <button onClick={() => setActiveTab('timeline')} className={`flex-1 py-3 text-xs font-black transition-colors relative ${activeTab === 'timeline' ? 'text-blue-400' : 'text-slate-500'}`}>
+          <button onClick={() => setActiveTab('timeline')} className={`flex-1 py-3 text-xs font-black transition-colors relative ${activeTab === 'timeline' ? (isLight ? 'text-blue-600' : 'text-blue-400') : 'text-slate-500'}`}>
             대응 타임라인
             {activeTab === 'timeline' && <motion.div layoutId="tab-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />}
           </button>

@@ -268,8 +268,8 @@ const renderFormattedSMS = (message, severity, isLight = false) => {
         </div>
       )}
 
-      {/* 📋 정보 그리드: 모바일 1열 스택(Stack), 태블릿 2열 */}
-      <div className={`rounded-xl overflow-hidden p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 items-stretch border ${
+      {/* 📋 정보 그리드: 모바일/태블릿 2열 그리드로 스크롤 최소화 */}
+      <div className={`rounded-xl overflow-hidden p-2 grid grid-cols-2 gap-1.5 items-stretch border ${
         isLight ? 'bg-slate-50/80 border-slate-200' : 'bg-[#0B132B]/60 border-[#1E2F56]'
       }`}>
         {items.map((item, idx) => {
@@ -284,7 +284,7 @@ const renderFormattedSMS = (message, severity, isLight = false) => {
           
           if (!item.value) {
             return (
-              <div key={idx} className={`col-span-1 sm:col-span-2 text-xs font-bold -mx-2.5 px-3 py-1.5 border-y flex items-center gap-1.5 font-shinhan-display ${
+              <div key={idx} className={`col-span-2 text-xs font-bold -mx-2 px-2.5 py-1.5 border-y flex items-center gap-1.5 font-shinhan-display ${
                 isLight ? 'text-blue-700 bg-blue-50 border-blue-100' : 'text-[#00A3E0] bg-[#060C1B] border-[#1E2F56]'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-blue-600' : 'bg-[#00A3E0]'}`} />
@@ -298,24 +298,23 @@ const renderFormattedSMS = (message, severity, isLight = false) => {
           const isErrorMessage = k.includes('에러메시지') || k.includes('오류메시지') || k.includes('오류내용') || k.includes('상세');
           const isInterfaceCode = k.includes('인터페이스') || k.includes('IF') || k.includes('코드') || /SHB\w+|CSL\w+/i.test(cleanedVal);
           
-          const totalLength = item.key.length + cleanedVal.length;
-          const isFullWidth = isRecipients || isErrorMessage || k.includes('서비스명') || k.includes('IF명') || totalLength > 16 || cleanedVal.length > 12;
+          const isFullWidth = isRecipients || isErrorMessage || (k.includes('서비스명') && cleanedVal.length > 15) || cleanedVal.length > 25;
 
           // 1. 수신자 명단
           if (isRecipients) {
             const names = cleanedVal.split(/[,，\s]+/).map(n => n.trim()).filter(Boolean);
             return (
-              <div key={idx} className={`col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg text-xs border ${
-                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#060C1B]/80 border-[#1E2F56]/70'
+              <div key={idx} className={`col-span-2 flex flex-col gap-1 px-2.5 py-1.5 rounded-lg text-xs border ${
+                isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-[#060C1B]/80 border-[#1E2F56]/70'
               }`}>
-                <div className={`flex items-center gap-1.5 font-bold text-[13px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                <div className={`flex items-center gap-1.5 font-bold text-[12px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                   <Users className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-blue-400'} shrink-0`} />
                   <span>{item.key}</span>
-                  <span className={`text-xs font-mono font-normal ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>({names.length}명)</span>
+                  <span className={`text-[11px] font-mono font-normal ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>({names.length}명)</span>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {names.map((name, nIdx) => (
-                    <span key={nIdx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border ${
+                    <span key={nIdx} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold border ${
                       isLight ? 'bg-slate-100 border-slate-200 text-slate-800' : 'bg-[#13203E] border-[#1E2F56] text-slate-200'
                     }`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-blue-600' : 'bg-blue-400/80'}`} />
@@ -330,14 +329,14 @@ const renderFormattedSMS = (message, severity, isLight = false) => {
           // 2. 에러 / 장애 메시지
           if (isErrorMessage) {
             return (
-              <div key={idx} className={`col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg text-xs border ${
-                isLight ? 'bg-red-50/80 border-red-200 text-red-900 shadow-sm' : 'bg-red-500/[0.08] border-red-500/30'
+              <div key={idx} className={`col-span-2 flex flex-col gap-1 px-2.5 py-1.5 rounded-lg text-xs border ${
+                isLight ? 'bg-red-50/80 border-red-200 text-red-900 shadow-xs' : 'bg-red-500/[0.08] border-red-500/30'
               }`}>
-                <div className={`flex items-center gap-1.5 font-bold text-[13px] ${isLight ? 'text-red-700' : 'text-red-300'}`}>
-                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 animate-pulse" />
+                <div className={`flex items-center gap-1.5 font-bold text-[12px] ${isLight ? 'text-red-700' : 'text-red-300'}`}>
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 animate-pulse" />
                   <span>{item.key}</span>
                 </div>
-                <div className={`text-[13.5px] font-bold break-all leading-relaxed pl-2 border-l-2 ${
+                <div className={`text-[12px] font-bold break-all leading-relaxed pl-2 border-l-2 ${
                   isLight ? 'border-red-400 text-red-800' : 'border-red-500/40 text-red-200'
                 }`}>
                   {cleanedVal}
@@ -349,17 +348,17 @@ const renderFormattedSMS = (message, severity, isLight = false) => {
           // 3. 서비스명 등 단독 전체 너비
           if (isFullWidth) {
             return (
-              <div key={idx} className={`col-span-1 sm:col-span-2 flex items-start justify-between gap-2 px-3 py-2 rounded-lg text-xs border ${
-                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#060C1B]/60 border-[#1E2F56]/60'
+              <div key={idx} className={`col-span-2 flex items-start justify-between gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border ${
+                isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-[#060C1B]/60 border-[#1E2F56]/60'
               }`}>
-                <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] pt-0.5 ${
+                <span className={`font-bold shrink-0 whitespace-nowrap text-[11.5px] pt-0.5 ${
                   highlight 
                     ? (isLight ? 'text-red-600 font-bold' : 'text-rose-300 font-bold') 
                     : (isLight ? 'text-slate-500' : 'text-slate-400')
                 }`}>
                   {item.key}
                 </span>
-                <span className={`font-shinhan-num text-right font-bold break-all leading-snug text-[13.5px] ${
+                <span className={`font-shinhan-num text-right font-bold break-all leading-snug text-[12px] ${
                   highlight 
                     ? 'text-[#F04438]' 
                     : (isLight ? 'text-slate-900' : 'text-slate-100')
@@ -370,12 +369,12 @@ const renderFormattedSMS = (message, severity, isLight = false) => {
             );
           }
 
-          // 4. 일반 컴팩트 항목 (1열 스택으로 쾌적하게)
+          // 4. 일반 컴팩트 항목 (2열 그리드 배치)
           return (
-            <div key={idx} className={`col-span-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs min-w-0 border ${
-              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#060C1B]/60 border-[#1E2F56]/60'
+            <div key={idx} className={`col-span-1 flex flex-col justify-center gap-0.5 px-2.5 py-1.5 rounded-lg text-xs min-w-0 border ${
+              isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-[#060C1B]/60 border-[#1E2F56]/60'
             }`}>
-              <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] ${
+              <span className={`font-semibold shrink-0 truncate text-[11px] ${
                 highlight 
                   ? (isLight ? 'text-red-600 font-bold' : 'text-rose-300 font-bold') 
                   : (isLight ? 'text-slate-500' : 'text-slate-400')
@@ -383,15 +382,15 @@ const renderFormattedSMS = (message, severity, isLight = false) => {
                 {item.key}
               </span>
               {isInterfaceCode ? (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded font-mono font-bold text-xs truncate border ${
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-mono font-bold text-[10.5px] truncate border self-start max-w-full ${
                   isLight ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-[#0046FF]/10 border-[#0046FF]/30 text-[#00A3E0]'
                 }`}>
                   {cleanedVal}
                 </span>
               ) : (
-                <span className={`font-shinhan-num text-right text-[13.5px] truncate font-semibold ${
+                <span className={`font-shinhan-num text-left text-[12px] truncate font-bold ${
                   highlight 
-                    ? 'text-[#F04438] font-bold' 
+                    ? 'text-[#F04438]' 
                     : (isLight ? 'text-slate-900' : 'text-slate-100')
                 }`} title={cleanedVal}>
                   {cleanedVal}

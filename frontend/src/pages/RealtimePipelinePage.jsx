@@ -104,11 +104,11 @@ const cleanValue = (val) => {
   return cleaned;
 };
 
-const renderFormattedSMS = (message, severity) => {
+const renderFormattedSMS = (message, severity, isLight = false) => {
   const parsed = parseSMS(message);
   if (!parsed) {
     return (
-      <div className="text-[12px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
+      <div className={`text-[12px] leading-relaxed font-bold break-all whitespace-pre-wrap tracking-tight ${isLight ? 'text-slate-900' : 'text-[#ffffff]'}`}>
         {message}
       </div>
     );
@@ -117,26 +117,28 @@ const renderFormattedSMS = (message, severity) => {
   const { title, items } = parsed;
   const sev = String(severity || '').toUpperCase();
   
-  let headerBg = 'bg-[#00e5ff]/10 border-[#00e5ff]/20 text-[#00e5ff]';
+  let headerBg = isLight ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-[#00e5ff]/10 border-[#00e5ff]/20 text-[#00e5ff]';
   let bulletColor = 'bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]';
   
   if (sev === 'CRITICAL') {
-    headerBg = 'bg-red-500/10 border-red-500/20 text-red-400';
+    headerBg = isLight ? 'bg-red-50 border-red-200 text-red-600' : 'bg-red-500/10 border-red-500/20 text-red-400';
     bulletColor = 'bg-red-500 shadow-[0_0_8px_#ef4444]';
   } else if (sev === 'MAJOR' || sev === 'WARNING' || sev === 'HIGH') {
-    headerBg = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
+    headerBg = isLight ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-amber-500/10 border-amber-500/20 text-amber-400';
     bulletColor = 'bg-amber-500 shadow-[0_0_8px_#f59e0b]';
   }
 
   return (
-    <div className="flex flex-col gap-2 w-full text-slate-200">
+    <div className={`flex flex-col gap-2 w-full ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
       {title && (
         <div className={`text-[12px] font-black border px-3 py-1.5 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
           <span className={`w-2 h-2 rounded-full animate-pulse ${bulletColor}`} />
           <span>{title}</span>
         </div>
       )}
-      <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden p-2.5 grid grid-cols-[auto_auto] gap-x-4 gap-y-1 items-start">
+      <div className={`border rounded-2xl overflow-hidden p-2.5 grid grid-cols-[auto_auto] gap-x-4 gap-y-1 items-start ${
+        isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/5'
+      }`}>
         {items.map((item, idx) => {
           const isError = item.key.includes('오류') || item.key.includes('초과');
           let cleanedVal = cleanValue(item.value);
@@ -147,9 +149,11 @@ const renderFormattedSMS = (message, severity) => {
           const hasValue = cleanedVal && cleanedVal !== '-' && cleanedVal !== '0' && cleanedVal !== '[-]' && cleanedVal !== '[0]';
           const highlight = isError && hasValue;
           
-           if (!item.value) {
+          if (!item.value) {
             return (
-              <div key={idx} className="col-span-2 text-[10px] font-bold text-slate-400 bg-white/5 -mx-2.5 px-2.5 py-0.5 border-y border-white/5">
+              <div key={idx} className={`col-span-2 text-[10px] font-bold -mx-2.5 px-2.5 py-0.5 border-y ${
+                isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'text-slate-400 bg-white/5 border-white/5'
+              }`}>
                 {item.key}
               </div>
             );
@@ -157,7 +161,9 @@ const renderFormattedSMS = (message, severity) => {
           
           return (
             <div key={idx} className="flex items-start gap-1 text-[10px] leading-tight min-w-0">
-              <span className={`font-bold shrink-0 whitespace-nowrap ${highlight ? 'text-red-300' : 'text-slate-400'}`}>
+              <span className={`font-bold shrink-0 whitespace-nowrap ${
+                highlight ? (isLight ? 'text-red-600' : 'text-red-300') : (isLight ? 'text-slate-500' : 'text-slate-400')
+              }`}>
                 {item.key}:
               </span>
               <span className={`font-mono text-left ${
@@ -168,7 +174,11 @@ const renderFormattedSMS = (message, severity) => {
                 item.key.includes('명')
                   ? 'break-all'
                   : 'whitespace-nowrap'
-              } ${highlight ? 'text-red-400 font-black' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
+              } ${
+                highlight 
+                  ? (isLight ? 'text-red-600 font-black' : 'text-red-400 font-black') 
+                  : (isLight ? 'text-slate-900 font-semibold' : 'text-slate-100 font-semibold')
+              }`} title={cleanedVal}>
                 {cleanedVal}
               </span>
             </div>
@@ -1277,12 +1287,18 @@ export default function RealtimePipelinePage() {
     });
 
     return (
-      <div className="flex-1 flex flex-col min-h-0 bg-[#070b12] rounded-2xl p-4 overflow-y-auto custom-scrollbar border border-white/5">
+      <div className={`flex-1 flex flex-col min-h-0 rounded-2xl p-4 overflow-y-auto custom-scrollbar border ${
+        isLight ? 'bg-slate-50/70 border-slate-200 shadow-xs' : 'bg-[#070b12] border-white/5'
+      }`}>
         
         {/* MTTR Timer & Stepper Section (Stacked for narrow screens) */}
-        <div className="flex flex-col gap-3 mb-4 shrink-0 bg-black/20 p-3 rounded-xl border border-white/5">
+        <div className={`flex flex-col gap-3 mb-4 shrink-0 p-3 rounded-xl border ${
+          isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-black/20 border-white/5'
+        }`}>
           {/* Top: Activity Ring */}
-          <div className="flex flex-col items-center justify-center relative bg-gradient-to-b from-black/40 to-transparent p-2 rounded-lg shrink-0">
+          <div className={`flex flex-col items-center justify-center relative p-2 rounded-lg shrink-0 ${
+            isLight ? 'bg-slate-100/70' : 'bg-gradient-to-b from-black/40 to-transparent'
+          }`}>
             <div className="flex flex-row items-center justify-center gap-6">
               {/* MTTA Ring */}
               <div className="relative w-28 h-28 flex items-center justify-center">
@@ -1327,7 +1343,7 @@ export default function RealtimePipelinePage() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                   <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">MTTR TIMER</span>
-                  <span className="text-sm font-black font-mono tracking-tighter text-white" style={{ textShadow: isClosed ? `0 0 10px rgba(${ringColorRGB},0.3)` : `0 0 15px rgba(${ringColorRGB},0.8)` }}>
+                  <span className={`text-sm font-black font-mono tracking-tighter ${isLight ? 'text-slate-900' : 'text-white'}`} style={{ textShadow: isClosed ? `0 0 10px rgba(${ringColorRGB},0.3)` : `0 0 15px rgba(${ringColorRGB},0.8)` }}>
                     {formatDuration(durationMs)}
                   </span>
                   <span className="text-[7.5px] font-mono text-slate-500 scale-90 mt-0.5">
@@ -1338,17 +1354,21 @@ export default function RealtimePipelinePage() {
             </div>
 
             {/* 하단 등급 기준 안내 (한 줄) */}
-            <div className="mt-4 text-[7px] xl:text-[8px] text-slate-500 tracking-tighter whitespace-nowrap px-2 py-1 border border-white/5 bg-black/20 rounded-md shadow-inner w-fit mx-auto">
-              <span className="font-bold text-slate-400 mr-1">MTTA 기준</span> 
-              <span className="text-emerald-400 ml-0.5">상:</span> 주간3/야간5분 <span className="mx-0.5 text-slate-600">|</span> 
-              <span className="text-orange-400">중:</span> 주간3~5/야간5~10분 <span className="mx-0.5 text-slate-600">|</span> 
-              <span className="text-red-400">하:</span> 초과
+            <div className={`mt-4 text-[7px] xl:text-[8px] tracking-tighter whitespace-nowrap px-2 py-1 border rounded-md shadow-inner w-fit mx-auto ${
+              isLight ? 'bg-slate-100 border-slate-200 text-slate-600' : 'border-white/5 bg-black/20 text-slate-500'
+            }`}>
+              <span className={`font-bold mr-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>MTTA 기준</span> 
+              <span className="text-emerald-500 font-bold ml-0.5">상:</span> 주간3/야간5분 <span className={`mx-0.5 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>|</span> 
+              <span className="text-orange-500 font-bold">중:</span> 주간3~5/야간5~10분 <span className={`mx-0.5 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>|</span> 
+              <span className="text-red-500 font-bold">하:</span> 초과
             </div>
           </div>
 
           {/* Bottom: 4-Step Stepper arranged in a horizontal line */}
           <div className="flex flex-col justify-center">
-            <div className="flex flex-col gap-y-2 px-1 py-4 bg-black/20 rounded-xl border border-white/5 relative shrink-0">
+            <div className={`flex flex-col gap-y-2 px-1 py-4 rounded-xl border relative shrink-0 ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-black/20 border-white/5'
+            }`}>
               <div className="flex flex-col w-full">
               {/* Row 1: Circles & Long Arrow Lines */}
               <div className="flex items-start justify-between w-full">
@@ -1368,13 +1388,21 @@ export default function RealtimePipelinePage() {
                       <div className="w-full flex items-start">
                         <div className="w-[72px] flex flex-col items-center shrink-0">
                           <div className="h-7 flex items-center justify-center">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] transition-all ${isDone ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_8px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-80') : isActive ? 'bg-[#00e5ff] text-black ring-2 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_8px_#00e5ff]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] transition-all ${
+                              isDone 
+                                ? (isBottleneck ? 'bg-[#fb923c] text-black shadow-[0_0_8px_rgba(251,146,60,0.6)] ring-2 ring-orange-400 font-black' : 'bg-[#00e5ff] text-black opacity-90') 
+                                : isActive 
+                                  ? 'bg-[#00e5ff] text-black ring-2 ring-[#00e5ff]/30 animate-pulse shadow-[0_0_8px_#00e5ff]' 
+                                  : (isLight ? 'bg-slate-200 text-slate-500 border border-slate-300' : 'bg-slate-800 text-slate-500 border border-slate-700')
+                            }`}>
                               {isDone ? <CheckCircle2 size={12} /> : i + 1}
                             </div>
                           </div>
                           
                           <div className="mt-1.5 text-center w-full px-0.5">
-                            <span className={`text-[9px] font-black tracking-tight leading-[1.2] whitespace-normal break-keep inline-block ${isBottleneck ? 'text-[#fb923c]' : isDone ? 'text-[#00e5ff]' : isActive ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+                            <span className={`text-[9px] font-black tracking-tight leading-[1.2] whitespace-normal break-keep inline-block ${
+                              isBottleneck ? 'text-[#fb923c]' : isDone ? (isLight ? 'text-sky-700' : 'text-[#00e5ff]') : isActive ? (isLight ? 'text-sky-700' : 'text-[#00e5ff]') : (isLight ? 'text-slate-400' : 'text-slate-500')
+                            }`}>
                               {st.label}
                             </span>
                           </div>
@@ -1390,11 +1418,11 @@ export default function RealtimePipelinePage() {
                                     ? 'bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/50 animate-pulse'
                                     : isDone
                                       ? 'bg-[#00e5ff]/5 text-[#00e5ff]/80 border border-[#00e5ff]/20'
-                                      : 'bg-slate-900/40 text-slate-600 border border-slate-800'
+                                      : (isLight ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-slate-900/40 text-slate-600 border border-slate-800')
                               }`}>
                                 {st.dObj.text}
                               </span>
-                            ) : (i > 0 && <span className="text-[8px] text-slate-600 font-mono">-</span>)}
+                            ) : (i > 0 && <span className={`text-[8px] font-mono ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>-</span>)}
                           </div>
                         </div>
 
@@ -1405,14 +1433,14 @@ export default function RealtimePipelinePage() {
                                 ? (isArrowBottleneck ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.4)]') 
                                 : isNextStepActive 
                                   ? 'bg-[#00e5ff]/40 animate-pulse' 
-                                  : 'bg-slate-800'
+                                  : (isLight ? 'bg-slate-200' : 'bg-slate-800')
                             }`} />
                             <svg className={`w-3 h-3 absolute right-0 transition-all ${
                               isNextStepDone 
                                 ? (isArrowBottleneck ? 'text-orange-500' : 'text-[#00e5ff]') 
                                 : isNextStepActive 
                                   ? 'text-[#00e5ff] animate-pulse' 
-                                  : 'text-slate-800'
+                                  : (isLight ? 'text-slate-200' : 'text-slate-800')
                             }`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4.5" style={{ transform: 'translateX(2px)' }}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                             </svg>
@@ -1452,10 +1480,12 @@ export default function RealtimePipelinePage() {
                   )}
 
                   {/* Node Icon */}
-                  <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-[#0b0e17] border-2 flex items-center justify-center z-10 shadow-lg transition-all duration-350" 
+                  <div className={`absolute left-0 top-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 shadow-lg transition-all duration-350 ${
+                    isLight ? 'bg-white' : 'bg-[#0b0e17]'
+                  }`} 
                        style={{ 
-                         borderColor: isCompleted ? step.color : '#1e293b', 
-                         color: isCompleted ? step.color : '#475569',
+                         borderColor: isCompleted ? step.color : (isLight ? '#cbd5e1' : '#1e293b'), 
+                         color: isCompleted ? step.color : (isLight ? '#64748b' : '#475569'),
                          boxShadow: isCompleted ? `0 0 8px ${step.color}20` : 'none'
                        }}>
                     {step.icon}
@@ -1465,7 +1495,7 @@ export default function RealtimePipelinePage() {
                   <div className="flex-1 pb-1">
                     <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-[12px] font-bold ${isCompleted ? 'text-white' : 'text-slate-600'}`}>{step.label}</span>
+                        <span className={`text-[12px] font-bold ${isCompleted ? (isLight ? 'text-slate-900' : 'text-white') : (isLight ? 'text-slate-500' : 'text-slate-600')}`}>{step.label}</span>
                         {isNextStep && (
                           <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 animate-pulse">
                             진행중
@@ -1474,11 +1504,13 @@ export default function RealtimePipelinePage() {
                       </div>
                       {isCompleted && step.stepData.timestamp && (
                         <div className="flex items-center gap-1.5 ml-auto">
-                          <span className="text-[8px] font-mono font-bold bg-[#0b0e17] border border-white/5 px-1.5 py-0.5 rounded text-slate-500">{formatDt(new Date(step.stepData.timestamp))}</span>
+                          <span className={`text-[8px] font-mono font-bold border px-1.5 py-0.5 rounded ${
+                            isLight ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-[#0b0e17] border-white/5 text-slate-500'
+                          }`}>{formatDt(new Date(step.stepData.timestamp))}</span>
                         </div>
                       )}
                     </div>
-                    <div className={`text-[10px] font-bold leading-relaxed ${isCompleted ? 'text-slate-400' : 'text-slate-700'}`}>
+                    <div className={`text-[10px] font-bold leading-relaxed ${isCompleted ? (isLight ? 'text-slate-600' : 'text-slate-400') : (isLight ? 'text-slate-400' : 'text-slate-700')}`}>
                       {isCompleted ? step.stepData.detail : isNextStep ? '처리 진행 중...' : '대기 중'}
                     </div>
 
@@ -1677,65 +1709,65 @@ export default function RealtimePipelinePage() {
       .slice(0, 5);
 
     return (
-      <div className="flex-1 flex flex-col h-full bg-zinc-950 min-h-0 overflow-hidden">
+      <div className={`flex-1 flex flex-col h-full ${isLight ? 'bg-[#F1F5F9]' : 'bg-zinc-950'} min-h-0 overflow-hidden`}>
         
         {/* Full-width Funnel Header with Broadcasting Ticker */}
-        <div className="flex-shrink-0 flex items-center px-4 py-2 border-b border-white/5 bg-[#0b0e17]/50 z-10 relative gap-6">
+        <div className={`flex-shrink-0 flex items-center px-4 py-2 border-b z-10 relative gap-6 ${isLight ? 'bg-white/95 border-slate-200 shadow-xs' : 'border-white/5 bg-[#0b0e17]/50'}`}>
           {/* Left: Funnel Buttons */}
           <div className="flex items-center gap-1.5 shrink-0">
             {/* 전체 수신 */}
             <button
               onClick={() => setFilterStage('all')}
-              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[70px] ${filterStage === 'all' ? 'bg-slate-500/25 border-2 border-slate-400/50 shadow-[0_0_20px_rgba(100,116,139,0.3)]' : 'bg-slate-500/10 border border-slate-500/20 hover:border-slate-500/40'}`}
+              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[70px] ${filterStage === 'all' ? (isLight ? 'bg-slate-200 border-2 border-slate-400 text-slate-900 shadow-xs' : 'bg-slate-500/25 border-2 border-slate-400/50 shadow-[0_0_20px_rgba(100,116,139,0.3)]') : (isLight ? 'bg-slate-100 border border-slate-200 hover:bg-slate-200/60' : 'bg-slate-500/10 border border-slate-500/20 hover:border-slate-500/40')}`}
             >
-              <span className="text-[8px] font-bold text-slate-400 mb-0.5 tracking-tight text-center">전체 수신</span>
-              <span className="text-sm font-black text-white font-mono">{totalCount}건</span>
+              <span className={`text-[8px] font-bold mb-0.5 tracking-tight text-center ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>전체 수신</span>
+              <span className={`text-sm font-black font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalCount}건</span>
             </button>
-            <ArrowRight className="w-3 h-3 text-slate-600 animate-pulse shrink-0" />
+            <ArrowRight className={`w-3 h-3 animate-pulse shrink-0 ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
             
             {/* 1. SMS수신및 장애인지 */}
             <button
               onClick={() => setFilterStage(filterStage === '1' ? 'all' : '1')}
-              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[105px] ${filterStage === '1' ? 'bg-blue-500/25 border-2 border-blue-400/60 shadow-[0_0_20px_rgba(59,130,246,0.35)]' : 'bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40'}`}
+              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[105px] ${filterStage === '1' ? (isLight ? 'bg-blue-50 border-2 border-blue-500 shadow-xs ring-1 ring-blue-500/30' : 'bg-blue-500/25 border-2 border-blue-400/60 shadow-[0_0_20px_rgba(59,130,246,0.35)]') : (isLight ? 'bg-blue-50/40 border border-blue-200 hover:bg-blue-50/80' : 'bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40')}`}
             >
-              <span className="text-[8px] font-bold text-blue-400 mb-0.5 tracking-tight text-center flex items-center gap-0.5"><Bell className="w-2.5 h-2.5" /> SMS수신·장애인지</span>
-              <span className="text-sm font-black text-white font-mono">{countsByStage[1]}건</span>
+              <span className="text-[8px] font-bold text-blue-500 mb-0.5 tracking-tight text-center flex items-center gap-0.5"><Bell className="w-2.5 h-2.5" /> SMS수신·장애인지</span>
+              <span className={`text-sm font-black font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{countsByStage[1]}건</span>
             </button>
-            <ArrowRight className="w-3 h-3 text-slate-600 animate-pulse shrink-0" />
+            <ArrowRight className={`w-3 h-3 animate-pulse shrink-0 ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
             
             {/* 2. RAG및 AI AGENT 분석완료 */}
             <button
               onClick={() => setFilterStage(filterStage === '2' ? 'all' : '2')}
-              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[125px] relative overflow-hidden ${filterStage === '2' ? 'bg-purple-500/25 border-2 border-purple-400/60 shadow-[0_0_20px_rgba(168,85,247,0.35)]' : 'bg-purple-500/10 border border-purple-500/30 hover:border-purple-500/50'}`}
+              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[125px] relative overflow-hidden ${filterStage === '2' ? (isLight ? 'bg-purple-50 border-2 border-purple-500 shadow-xs ring-1 ring-purple-500/30' : 'bg-purple-500/25 border-2 border-purple-400/60 shadow-[0_0_20px_rgba(168,85,247,0.35)]') : (isLight ? 'bg-purple-50/40 border border-purple-200 hover:bg-purple-50/80' : 'bg-purple-500/10 border border-purple-500/30 hover:border-purple-500/50')}`}
             >
-              <span className="text-[8px] font-bold text-purple-400 mb-0.5 tracking-tight text-center relative z-10 flex items-center gap-0.5"><Cpu className="w-2.5 h-2.5" /> RAG·AI AGENT 분석</span>
-              <span className="text-sm font-black text-white font-mono relative z-10">{countsByStage[2]}건</span>
+              <span className="text-[8px] font-bold text-purple-500 mb-0.5 tracking-tight text-center relative z-10 flex items-center gap-0.5"><Cpu className="w-2.5 h-2.5" /> RAG·AI AGENT 분석</span>
+              <span className={`text-sm font-black font-mono relative z-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>{countsByStage[2]}건</span>
             </button>
-            <ArrowRight className="w-3 h-3 text-slate-600 animate-pulse shrink-0" />
+            <ArrowRight className={`w-3 h-3 animate-pulse shrink-0 ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
             
             {/* 3. 처리중(워룸생성및 할당완료) */}
             <button
               onClick={() => setFilterStage(filterStage === '3' ? 'all' : '3')}
-              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[115px] relative overflow-hidden ${filterStage === '3' ? 'bg-red-500/25 border-2 border-red-400/60 shadow-[0_0_25px_rgba(239,68,68,0.4)]' : 'bg-red-500/10 border border-red-500/40 hover:border-red-500/60'}`}
+              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[115px] relative overflow-hidden ${filterStage === '3' ? (isLight ? 'bg-red-50 border-2 border-red-500 shadow-xs ring-1 ring-red-500/30' : 'bg-red-500/25 border-2 border-red-400/60 shadow-[0_0_25px_rgba(239,68,68,0.4)]') : (isLight ? 'bg-red-50/40 border border-red-200 hover:bg-red-50/80' : 'bg-red-500/10 border border-red-500/40 hover:border-red-500/60')}`}
             >
-              <span className="text-[8px] font-bold text-red-400 mb-0.5 tracking-tight text-center relative z-10 flex items-center gap-0.5"><Users className="w-2.5 h-2.5 animate-pulse" /> 워룸·할당완료</span>
-              <span className="text-sm font-black text-white font-mono relative z-10">{countsByStage[3]}건</span>
+              <span className="text-[8px] font-bold text-red-500 mb-0.5 tracking-tight text-center relative z-10 flex items-center gap-0.5"><Users className="w-2.5 h-2.5 animate-pulse" /> 워룸·할당완료</span>
+              <span className={`text-sm font-black font-mono relative z-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>{countsByStage[3]}건</span>
             </button>
-            <ArrowRight className="w-3 h-3 text-slate-600 animate-pulse shrink-0" />
+            <ArrowRight className={`w-3 h-3 animate-pulse shrink-0 ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
             
             {/* 4. 지식화/장애완료 */}
             <button
               onClick={() => setFilterStage(filterStage === '4' ? 'all' : '4')}
-              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[100px] ${filterStage === '4' ? 'bg-emerald-500/25 border-2 border-emerald-400/60 shadow-[0_0_20px_rgba(16,185,129,0.35)]' : 'bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40'}`}
+              className={`flex flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-all cursor-pointer w-[100px] ${filterStage === '4' ? (isLight ? 'bg-emerald-50 border-2 border-emerald-500 shadow-xs ring-1 ring-emerald-500/30' : 'bg-emerald-500/25 border-2 border-emerald-400/60 shadow-[0_0_20px_rgba(16,185,129,0.35)]') : (isLight ? 'bg-emerald-50/40 border border-emerald-200 hover:bg-emerald-50/80' : 'bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40')}`}
             >
-              <span className="text-[8px] font-bold text-emerald-400 mb-0.5 tracking-tight text-center flex items-center gap-0.5"><CheckCircle2 className="w-2.5 h-2.5" /> 지식화·장애완료</span>
-              <span className="text-sm font-black text-white font-mono">{countsByStage[4]}건</span>
+              <span className="text-[8px] font-bold text-emerald-500 mb-0.5 tracking-tight text-center flex items-center gap-0.5"><CheckCircle2 className="w-2.5 h-2.5" /> 지식화·장애완료</span>
+              <span className={`text-sm font-black font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{countsByStage[4]}건</span>
             </button>
           </div>
 
           {/* Right: Broadcasting Ticker */}
-          <div className="flex-1 flex items-center bg-[#121622] rounded-xl border border-white/5 pl-3 pr-1 h-[42px] overflow-hidden relative shadow-inner">
-             <div className="flex items-center gap-1.5 text-red-400 font-black text-[9px] shrink-0 mr-4 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20 z-10">
+          <div className={`flex-1 flex items-center rounded-xl border pl-3 pr-1 h-[42px] overflow-hidden relative shadow-inner ${isLight ? 'bg-slate-100/90 border-slate-200 text-slate-800' : 'bg-[#121622] border-white/5 text-slate-300'}`}>
+             <div className="flex items-center gap-1.5 text-red-500 font-black text-[9px] shrink-0 mr-4 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20 z-10">
                <AlertCircle className="w-3 h-3 animate-pulse" />
                <span className="tracking-widest uppercase mt-0.5">Breaking</span>
              </div>
@@ -1748,29 +1780,29 @@ export default function RealtimePipelinePage() {
                    {latestIncidents.map((incident, idx) => (
                      <div 
                        key={`ticker-${incident.inc_id}-${idx}`} 
-                       className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer hover:text-white transition-colors"
+                       className={`flex items-center gap-2 text-[11px] cursor-pointer transition-colors ${isLight ? 'text-slate-700 hover:text-blue-600' : 'text-slate-300 hover:text-white'}`}
                        onClick={() => {
                          setFilterStage('all');
                          setSearchQuery('');
                          setSelectedCardId(incident.inc_id);
                        }}
                      >
-                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${incident.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' : incident.severity === 'MAJOR' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${incident.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-500' : incident.severity === 'MAJOR' ? 'bg-orange-500/20 text-orange-500' : 'bg-blue-500/20 text-blue-500'}`}>
                          {incident.severity}
                        </span>
-                       <span className="font-bold text-white hover:underline underline-offset-2">
+                       <span className={`font-bold hover:underline underline-offset-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
                          {(incident.message || incident.keyword).length > 30 
                            ? (incident.message || incident.keyword).substring(0, 30) + '...' 
                            : (incident.message || incident.keyword)}
                        </span>
-                       <span className="text-[10px] text-slate-500 font-mono">
+                       <span className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                          ({incident.bizSystem} · {incident.reg_dt ? formatDtTimeOnly(parseDate(incident.reg_dt)) : '-'})
                        </span>
                      </div>
                    ))}
                  </div>
                ) : (
-                 <span className="text-[10px] text-slate-500 font-bold">최근 수신된 장애 내역이 없습니다.</span>
+                 <span className={`text-[10px] font-bold ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>최근 수신된 장애 내역이 없습니다.</span>
                )}
              </div>
           </div>
@@ -1785,8 +1817,8 @@ export default function RealtimePipelinePage() {
             <div style={{ height: `${leftHeights[0]}%`, minHeight: 120 }} className="flex flex-col sm:flex-row gap-3 shrink-0 overflow-hidden">
               
               {/* Chart 1 - System Occupancy */}
-              <div className="flex-1 min-w-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
-                <div className="flex items-center gap-1.5 mb-1 shrink-0"><Layers className="w-3 h-3 text-[#00e5ff]" /><span className="text-[10px] font-black text-white">시스템 점유비</span></div>
+              <div className={`flex-1 min-w-0 rounded-3xl p-3 border flex flex-col shadow-lg overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5'}`}>
+                <div className="flex items-center gap-1.5 mb-1 shrink-0"><Layers className="w-3 h-3 text-[#00e5ff]" /><span className={`text-[10px] font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>시스템 점유비</span></div>
                 <div className="flex-1 flex flex-col justify-center px-2 py-1">
                   {(() => {
                     const total = bizSystemPieData.reduce((acc, curr) => acc + curr.value, 0);
@@ -1794,7 +1826,7 @@ export default function RealtimePipelinePage() {
                     
                     return (
                       <>
-                        <div className="w-full h-8 rounded-lg overflow-hidden flex bg-slate-800 shadow-inner mb-3">
+                        <div className={`w-full h-8 rounded-lg overflow-hidden flex shadow-inner mb-3 ${isLight ? 'bg-slate-100' : 'bg-slate-800'}`}>
                           {bizSystemPieData.map((item, i) => {
                             const pct = (item.value / total) * 100;
                             return (
@@ -1818,8 +1850,8 @@ export default function RealtimePipelinePage() {
                           {bizSystemPieData.map((item, i) => (
                             <div key={i} className="flex items-center gap-1.5 min-w-[30%]">
                               <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                              <span className="text-[10px] text-slate-400 truncate flex-1">{item.name}</span>
-                              <span className="text-[10px] font-bold text-slate-200 shrink-0">{item.value}</span>
+                              <span className={`text-[10px] truncate flex-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{item.name}</span>
+                              <span className={`text-[10px] font-bold shrink-0 ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{item.value}</span>
                             </div>
                           ))}
                         </div>
@@ -1830,23 +1862,23 @@ export default function RealtimePipelinePage() {
               </div>
 
               {/* Chart 2 - MTTA / MTTR Trend */}
-              <div className="flex-1 min-w-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
+              <div className={`flex-1 min-w-0 rounded-3xl p-3 border flex flex-col shadow-lg overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5'}`}>
                 <div className="flex items-center justify-between mb-1 shrink-0">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3 h-3 text-purple-400" />
-                    <span className="text-[10px] font-black text-white">시간대별 평균 소요시간 추이</span>
+                    <span className={`text-[10px] font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>시간대별 평균 소요시간 추이</span>
                   </div>
                 </div>
                 <div style={{ flex: 1, minHeight: 0, height: 120, width: '100%' }}>
                   <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <ComposedChart data={mttData} margin={{ top: 5, right: -5, left: -25, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
-                      <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="left" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} orientation="left" />
-                      <YAxis yAxisId="right" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} orientation="right" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.02)'} />
+                      <XAxis dataKey="hour" tick={{ fill: isLight ? '#64748b' : '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="left" tick={{ fill: isLight ? '#64748b' : '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} orientation="left" />
+                      <YAxis yAxisId="right" tick={{ fill: isLight ? '#64748b' : '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} orientation="right" />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)' }} 
-                        itemStyle={{ fontSize: 9 }}
+                        contentStyle={{ backgroundColor: isLight ? '#ffffff' : '#0f172a', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} 
+                        itemStyle={{ fontSize: 9, color: isLight ? '#0f172a' : '#ffffff' }}
                         formatter={(value, name) => [`${value}분`, name]}
                       />
                       <Legend wrapperStyle={{ fontSize: 9, paddingTop: '5px' }} />
@@ -1859,8 +1891,8 @@ export default function RealtimePipelinePage() {
               </div>
 
               {/* Chart 3 - Hourly Traffic (Renamed to 실시간 장애 접수 추이) */}
-              <div className="flex-1 min-w-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-3 border border-white/5 flex flex-col shadow-lg overflow-hidden">
-                <div className="flex items-center gap-1.5 mb-1 shrink-0"><TrendingUp className="w-3 h-3 text-[#00e5ff]" /><span className="text-[10px] font-black text-white">실시간 장애 접수 추이</span></div>
+              <div className={`flex-1 min-w-0 rounded-3xl p-3 border flex flex-col shadow-lg overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5'}`}>
+                <div className="flex items-center gap-1.5 mb-1 shrink-0"><TrendingUp className="w-3 h-3 text-[#00e5ff]" /><span className={`text-[10px] font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>실시간 장애 접수 추이</span></div>
                 <div style={{ flex: 1, minHeight: 0, height: 120, width: '100%' }}>
                   <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <AreaChart 
@@ -1874,10 +1906,10 @@ export default function RealtimePipelinePage() {
                       style={{ cursor: 'pointer' }}
                     >
                       <defs><linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00e5ff" stopOpacity={0.4}/><stop offset="95%" stopColor="#00e5ff" stopOpacity={0}/></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
-                      <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)' }} itemStyle={{ color: '#fff', fontSize: 9 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.02)'} />
+                      <XAxis dataKey="hour" tick={{ fill: isLight ? '#64748b' : '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: isLight ? '#64748b' : '#64748b', fontSize: 7 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: isLight ? '#ffffff' : '#0f172a', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 9 }} />
                       <Area type="monotone" dataKey="count" stroke="#00e5ff" strokeWidth={1.5} fillOpacity={1} fill="url(#colorTraffic)" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -1898,14 +1930,14 @@ export default function RealtimePipelinePage() {
             </div>
 
             {/* Bottom Row: Organizational Grid */}
-            <div style={{ height: `${leftHeights[1]}%`, minHeight: 100 }} className="bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg overflow-hidden">
+            <div style={{ height: `${leftHeights[1]}%`, minHeight: 100 }} className={`rounded-3xl p-4 border flex flex-col min-h-0 shadow-lg overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5'}`}>
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center gap-2">
-                  <Network className="w-4 h-4 text-blue-400" />
-                  <h2 className="text-sm font-black text-white">조직 기반 실시간 처리 현황</h2>
+                  <Network className="w-4 h-4 text-blue-500" />
+                  <h2 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>조직 기반 실시간 처리 현황</h2>
                 </div>
                 
-                <div className="flex items-center gap-1.5 bg-[#121622] p-1 rounded-xl border border-white/5">
+                <div className={`flex items-center gap-1.5 p-1 rounded-xl border ${isLight ? 'bg-slate-100 border-slate-200' : 'bg-[#121622] border-white/5'}`}>
                   {['bumun', 'honbu', 'team', 'part'].map(level => (
                     <button 
                       key={level}
@@ -1916,7 +1948,7 @@ export default function RealtimePipelinePage() {
                         if (level === 'honbu') { setSelectedHonbu('all'); setSelectedTeam('all'); }
                         if (level === 'team') { setSelectedTeam('all'); }
                       }}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${orgLevel === level ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${orgLevel === level ? (isLight ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-500/20 text-blue-400') : (isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-500 hover:text-slate-300')}`}
                     >
                       {level === 'bumun' ? '부문' : level === 'honbu' ? '본부' : level === 'team' ? '팀' : '파트'}
                     </button>
@@ -1930,7 +1962,7 @@ export default function RealtimePipelinePage() {
                 <select
                   value={selectedBumun}
                   onChange={(e) => { setSelectedBumun(e.target.value); setSelectedHonbu('all'); setSelectedTeam('all'); }}
-                  className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-blue-500/40"
+                  className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none ${isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-blue-500/40'}`}
                 >
                   <option value="all">전체 부문</option>
                   {allBumuns.map(b => <option key={b} value={b}>{b}</option>)}
@@ -1942,7 +1974,7 @@ export default function RealtimePipelinePage() {
                     value={selectedHonbu}
                     disabled={selectedBumun === 'all'}
                     onChange={(e) => { setSelectedHonbu(e.target.value); setSelectedTeam('all'); }}
-                    className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-purple-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-purple-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-purple-500/40'}`}
                   >
                     {selectedBumun === 'all' ? (
                       <option value="all">부문 선택 필수</option>
@@ -1961,7 +1993,7 @@ export default function RealtimePipelinePage() {
                     value={selectedTeam}
                     disabled={selectedBumun === 'all' || selectedHonbu === 'all'}
                     onChange={(e) => setSelectedTeam(e.target.value)}
-                    className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-cyan-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-cyan-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-cyan-500/40'}`}
                   >
                     {selectedBumun === 'all' || selectedHonbu === 'all' ? (
                       <option value="all">본부 선택 필수</option>
@@ -1975,30 +2007,30 @@ export default function RealtimePipelinePage() {
                 )}
               </div>
 
-              <div className="bg-[#121622] border border-white/5 rounded-xl p-3 mb-3 flex items-center justify-between shrink-0 shadow-inner">
-                <span className="text-xs font-black text-slate-300">
+              <div className={`border rounded-xl p-3 mb-3 flex items-center justify-between shrink-0 shadow-inner ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-[#121622] border-white/5'}`}>
+                <span className={`text-xs font-black ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
                   {orgLevel === 'bumun' ? '부문' : orgLevel === 'honbu' ? `${selectedBumun !== 'all' ? selectedBumun + ' > ' : ''}본부` : orgLevel === 'team' ? `${selectedBumun !== 'all' ? selectedBumun + ' > ' : ''}${selectedHonbu !== 'all' ? selectedHonbu + ' > ' : ''}팀` : '파트'} 기준 현황
                 </span>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"/><span className="text-[9px] font-bold text-slate-400">수신: <strong className="text-white ml-0.5">{orgList.reduce((s, o) => s + o.수신, 0)}건</strong></span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"/><span className="text-[9px] font-bold text-slate-400">대기중: <strong className="text-white ml-0.5">{orgList.reduce((s, o) => s + o.처리대기중, 0)}건</strong></span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"/><span className="text-[9px] font-bold text-slate-400">처리중: <strong className="text-white ml-0.5">{orgList.reduce((s, o) => s + o.처리중, 0)}건</strong></span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"/><span className="text-[9px] font-bold text-slate-400">완료: <strong className="text-white ml-0.5">{orgList.reduce((s, o) => s + o.처리완료, 0)}건</strong></span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>수신: <strong className={`ml-0.5 ${isLight ? 'text-slate-900 font-bold' : 'text-white'}`}>{orgList.reduce((s, o) => s + o.수신, 0)}건</strong></span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>대기중: <strong className={`ml-0.5 ${isLight ? 'text-slate-900 font-bold' : 'text-white'}`}>{orgList.reduce((s, o) => s + o.처리대기중, 0)}건</strong></span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>처리중: <strong className={`ml-0.5 ${isLight ? 'text-slate-900 font-bold' : 'text-white'}`}>{orgList.reduce((s, o) => s + o.처리중, 0)}건</strong></span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>완료: <strong className={`ml-0.5 ${isLight ? 'text-slate-900 font-bold' : 'text-white'}`}>{orgList.reduce((s, o) => s + o.처리완료, 0)}건</strong></span></div>
                 </div>
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2">
                 {orgLevel === 'honbu' && selectedBumun === 'all' ? (
-                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-white/5 rounded-2xl bg-black/10">
-                    <User className="w-8 h-8 text-slate-600 mb-2 animate-pulse" />
-                    <p className="text-xs font-bold text-slate-400">본부별 현황 조회 불가</p>
-                    <p className="text-[10px] text-slate-500 mt-1">본부 현황을 조회하기 위해서는 반드시 부문을 먼저 선택하셔야 합니다.</p>
+                  <div className={`flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed rounded-2xl ${isLight ? 'border-slate-300 bg-slate-50/50' : 'border-white/5 bg-black/10'}`}>
+                    <User className={`w-8 h-8 mb-2 animate-pulse ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
+                    <p className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>본부별 현황 조회 불가</p>
+                    <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>본부 현황을 조회하기 위해서는 반드시 부문을 먼저 선택하셔야 합니다.</p>
                   </div>
                 ) : orgLevel === 'team' && (selectedBumun === 'all' || selectedHonbu === 'all') ? (
-                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-white/5 rounded-2xl bg-black/10">
-                    <User className="w-8 h-8 text-slate-600 mb-2 animate-pulse" />
-                    <p className="text-xs font-bold text-slate-400">팀별 현황 조회 불가</p>
-                    <p className="text-[10px] text-slate-500 mt-1">팀 현황을 조회하기 위해서는 상위 부문과 본부를 모두 선택하셔야 합니다.</p>
+                  <div className={`flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed rounded-2xl ${isLight ? 'border-slate-300 bg-slate-50/50' : 'border-white/5 bg-black/10'}`}>
+                    <User className={`w-8 h-8 mb-2 animate-pulse ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
+                    <p className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>팀별 현황 조회 불가</p>
+                    <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>팀 현황을 조회하기 위해서는 상위 부문과 본부를 모두 선택하셔야 합니다.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2012,10 +2044,10 @@ export default function RealtimePipelinePage() {
                       const activeCritical = org.incidents.filter(c => c.stage === 3 && (c.severity === 'CRITICAL' || c.severity === 'MAJOR')).length;
 
                       return (
-                        <div key={idx} className="bg-[#121622] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors flex flex-col">
+                        <div key={idx} className={`border rounded-2xl p-4 transition-colors flex flex-col ${isLight ? 'bg-slate-50/70 border-slate-200 hover:border-slate-300 hover:bg-white shadow-xs' : 'bg-[#121622] border-white/5 hover:border-white/10'}`}>
                           <div className="flex items-center justify-between mb-3 shrink-0">
-                            <div className="flex items-center gap-2"><User className="w-3.5 h-3.5 text-slate-400" /><h3 className="text-xs font-black text-white truncate max-w-[120px]">{org.name}</h3></div>
-                            {activeCritical > 0 && <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-[9px] font-bold text-red-400 flex items-center gap-1 animate-pulse border border-red-500/30"><AlertTriangle className="w-2.5 h-2.5" /> 긴급 {activeCritical}건</span>}
+                            <div className="flex items-center gap-2"><User className={`w-3.5 h-3.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`} /><h3 className={`text-xs font-black truncate max-w-[120px] ${isLight ? 'text-slate-900' : 'text-white'}`}>{org.name}</h3></div>
+                            {activeCritical > 0 && <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-[9px] font-bold text-red-500 flex items-center gap-1 animate-pulse border border-red-500/30"><AlertTriangle className="w-2.5 h-2.5" /> 긴급 {activeCritical}건</span>}
                           </div>
                           <div className="h-[90px] w-full shrink-0 min-w-0 min-h-0">
                             <ReactECharts
@@ -2024,16 +2056,16 @@ export default function RealtimePipelinePage() {
                                 tooltip: {
                                   trigger: 'axis',
                                   axisPointer: { type: 'shadow' },
-                                  backgroundColor: '#0f172a',
-                                  borderColor: 'rgba(255,255,255,0.1)',
-                                  textStyle: { color: '#fff', fontSize: 10, fontWeight: 'bold' }
+                                  backgroundColor: isLight ? '#ffffff' : '#0f172a',
+                                  borderColor: isLight ? '#cbd5e1' : 'rgba(255,255,255,0.1)',
+                                  textStyle: { color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }
                                 },
                                 xAxis: {
                                   type: 'category',
                                   data: chartData.map(d => d.name),
                                   axisLine: { show: false },
                                   axisTick: { show: false },
-                                  axisLabel: { color: '#64748b', fontSize: 8, fontWeight: 'bold', interval: 0 }
+                                  axisLabel: { color: isLight ? '#64748b' : '#64748b', fontSize: 8, fontWeight: 'bold', interval: 0 }
                                 },
                                 yAxis: {
                                   type: 'value',
@@ -2042,7 +2074,7 @@ export default function RealtimePipelinePage() {
                                   axisTick: { show: false },
                                   splitLine: { 
                                     show: true,
-                                    lineStyle: { type: 'dashed', color: 'rgba(255,255,255,0.05)' } 
+                                    lineStyle: { type: 'dashed', color: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)' } 
                                   }
                                 },
                                 series: [
@@ -2083,7 +2115,7 @@ export default function RealtimePipelinePage() {
                                     label: {
                                       show: true,
                                       position: 'top',
-                                      color: '#fff',
+                                      color: isLight ? '#0f172a' : '#fff',
                                       fontWeight: 'bold',
                                       fontSize: 10,
                                       formatter: (params) => params.value > 0 ? params.value : ''
@@ -2100,34 +2132,34 @@ export default function RealtimePipelinePage() {
                               }}
                             />
                           </div>
-                          <div className="mt-auto pt-2 border-t border-white/5 grid grid-cols-4 gap-1 shrink-0">
+                          <div className={`mt-auto pt-2 border-t grid grid-cols-4 gap-1 shrink-0 ${isLight ? 'border-slate-200' : 'border-white/5'}`}>
                             <div 
                               onClick={() => { setFilterOrgName(org.name); setFilterOrgStage('수신'); }}
-                              className="bg-white/5 hover:bg-white/10 cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center"
+                              className={`cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center ${isLight ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white/5 hover:bg-white/10'}`}
                             >
-                              <p className="text-[8px] text-slate-500 font-bold mb-0.5">수신</p>
-                              <p className="text-[10px] font-black text-slate-300 font-mono">{org.수신}</p>
+                              <p className={`text-[8px] font-bold mb-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>수신</p>
+                              <p className={`text-[10px] font-black font-mono ${isLight ? 'text-slate-900' : 'text-slate-300'}`}>{org.수신}</p>
                             </div>
                             <div 
                               onClick={() => { setFilterOrgName(org.name); setFilterOrgStage('대기중'); }}
-                              className="bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/10 cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center"
+                              className={`cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center border ${isLight ? 'bg-amber-50 hover:bg-amber-100 border-amber-200' : 'bg-amber-500/5 hover:bg-amber-500/15 border-amber-500/10'}`}
                             >
-                              <p className="text-[8px] text-amber-400/70 font-bold mb-0.5">대기중</p>
-                              <p className="text-[10px] font-black text-amber-400 font-mono">{org.처리대기중}</p>
+                              <p className="text-[8px] text-amber-500 font-bold mb-0.5">대기중</p>
+                              <p className={`text-[10px] font-black font-mono ${isLight ? 'text-amber-800' : 'text-amber-400'}`}>{org.처리대기중}</p>
                             </div>
                             <div 
                               onClick={() => { setFilterOrgName(org.name); setFilterOrgStage('처리중'); }}
-                              className="bg-red-500/5 hover:bg-red-500/15 border border-red-500/10 cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center"
+                              className={`cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center border ${isLight ? 'bg-red-50 hover:bg-red-100 border-red-200' : 'bg-red-500/5 hover:bg-red-500/15 border-red-500/10'}`}
                             >
-                              <p className="text-[8px] text-red-400/70 font-bold mb-0.5">처리중</p>
-                              <p className="text-[10px] font-black text-red-400 font-mono">{org.처리중}</p>
+                              <p className="text-[8px] text-red-500 font-bold mb-0.5">처리중</p>
+                              <p className={`text-[10px] font-black font-mono ${isLight ? 'text-red-800' : 'text-red-400'}`}>{org.처리중}</p>
                             </div>
                             <div 
                               onClick={() => { setFilterOrgName(org.name); setFilterOrgStage('완료'); }}
-                              className="bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/10 cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center"
+                              className={`cursor-pointer active:scale-95 transition-all rounded-lg p-1 text-center border ${isLight ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200' : 'bg-emerald-500/5 hover:bg-emerald-500/15 border-emerald-500/10'}`}
                             >
-                              <p className="text-[8px] text-emerald-400/70 font-bold mb-0.5">완료</p>
-                              <p className="text-[10px] font-black text-emerald-400 font-mono">{org.처리완료}</p>
+                              <p className="text-[8px] text-emerald-500 font-bold mb-0.5">완료</p>
+                              <p className={`text-[10px] font-black font-mono ${isLight ? 'text-emerald-800' : 'text-emerald-400'}`}>{org.처리완료}</p>
                             </div>
                           </div>
                         </div>
@@ -2151,10 +2183,14 @@ export default function RealtimePipelinePage() {
 
           {/* MIDDLE PANEL: INCIDENT LIST PICKER */}
           <div style={{ flex: `${widths[1]} 1 0%`, minWidth: 0 }} className="w-full xl:w-auto shrink-0 flex flex-col min-h-[400px] xl:min-h-0 xl:px-3 mb-6 xl:mb-0">
-            <div className="flex-1 bg-zinc-900/40 backdrop-blur-sm border border-white/5 rounded-3xl p-4 flex flex-col min-h-0 overflow-hidden shadow-lg">
+            <div className={`flex-1 backdrop-blur-sm border rounded-3xl p-4 flex flex-col min-h-0 overflow-hidden shadow-lg ${
+              isLight ? 'bg-white border-slate-200' : 'bg-zinc-900/40 border-white/5'
+            }`}>
               <div className="flex items-center justify-between mb-3 shrink-0">
-                <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-amber-400" /><h4 className="text-sm font-black text-white">인시던트 탐색기</h4></div>
-                <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono font-bold text-slate-400">{searchedCards.length} 건</span>
+                <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-amber-500" /><h4 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>인시던트 탐색기</h4></div>
+                <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold ${
+                  isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-400'
+                }`}>{searchedCards.length} 건</span>
               </div>
               
               {/* Active stage filter badge from funnel header */}
@@ -2210,14 +2246,18 @@ export default function RealtimePipelinePage() {
               {/* Filters */}
               <div className="flex flex-col gap-2 mb-3 shrink-0">
                 <div className="flex gap-2">
-                  <select value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)} className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-blue-500/40">
+                  <select value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)} className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-blue-500/40'
+                  }`}>
                     <option value="all">등급 전체</option>
                     <option value="CRITICAL">CRITICAL</option>
                     <option value="MAJOR">MAJOR</option>
                     <option value="WARNING">WARNING</option>
                     <option value="INFO">INFO</option>
                   </select>
-                  <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-blue-500/40">
+                  <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-blue-500/40'
+                  }`}>
                     <option value="all">단계 전체</option>
                     <option value="1">1. SMS수신</option>
                     <option value="2">2. AI분석완료</option>
@@ -2227,7 +2267,9 @@ export default function RealtimePipelinePage() {
                 </div>
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input type="text" placeholder="ID, 시스템, 부서명 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#121622] border border-white/5 rounded-xl pl-8 pr-3 py-1.5 text-[10px] font-bold text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/40" />
+                  <input type="text" placeholder="ID, 시스템, 부서명 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full border rounded-xl pl-8 pr-3 py-1.5 text-[10px] font-bold placeholder-slate-400 focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500' : 'bg-[#121622] border-white/5 text-slate-200 focus:border-blue-500/40'
+                  }`} />
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
@@ -2256,14 +2298,14 @@ export default function RealtimePipelinePage() {
                         'sms-pulse-safe'
                       ) : ''
                     } ${
-                      isSelected ? 'bg-zinc-800 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)] ring-1 ring-blue-500/50' 
-                      : card.stage === 1 ? 'bg-zinc-800 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:border-red-500/70'
-                      : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'
+                      isSelected ? (isLight ? 'bg-blue-50/90 border-blue-500 shadow-sm ring-1 ring-blue-500/40' : 'bg-zinc-800 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)] ring-1 ring-blue-500/50') 
+                      : card.stage === 1 ? (isLight ? 'bg-red-50/50 border-red-300 shadow-xs hover:border-red-400' : 'bg-zinc-800 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:border-red-500/70')
+                      : (isLight ? 'bg-white border-slate-200 hover:border-slate-300 shadow-xs' : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500')
                     }`}>
                       <div className="flex items-center justify-between min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${stageColor}`} />
-                          <span className="text-[12px] font-black text-white font-mono">{card.inc_id}</span>
+                          <span className={`text-[12px] font-black font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{card.inc_id}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           {/* Badges */}
@@ -2272,7 +2314,7 @@ export default function RealtimePipelinePage() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-black text-white truncate max-w-[150px]">{card.keyword || '서버/네트워크 이상'}</span>
+                        <span className={`text-[11px] font-black truncate max-w-[150px] ${isLight ? 'text-slate-800' : 'text-white'}`}>{card.keyword || '서버/네트워크 이상'}</span>
                         <div className="shrink-0 flex items-center gap-2">
                           {card.stage === 1 ? (
                             <div className="flex items-center gap-1.5 bg-red-500/10 px-2 py-1 rounded-lg border border-red-500/20">
@@ -2297,13 +2339,9 @@ export default function RealtimePipelinePage() {
                                 MTTR: {formatTime(getMttrSeconds(card.reg_dt, card.closed_dt))}
                               </span>
                             </div>
-                          ) : (
-                            <span className={`text-[9px] font-bold tracking-widest px-2 py-1 rounded-lg border flex items-center justify-center text-center uppercase ${card.stage === 1 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}>
-                              분석완료
-                            </span>
-                          )}
-                          <span className="text-[10px] text-zinc-400 font-mono">{card.reg_dt ? formatDtTimeOnly(parseDate(card.reg_dt)) : '-'}</span>
-                          <button onClick={(e) => { e.stopPropagation(); setWorkflowPanelId(card.inc_id); }} className="p-1 hover:bg-zinc-700 text-zinc-500 hover:text-white rounded transition-colors group-hover:opacity-100 opacity-0" title="워크플로우 상세보기"><ExternalLink className="w-3.5 h-3.5" /></button>
+                          ) : null}
+                          <span className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>{card.reg_dt ? formatDtTimeOnly(parseDate(card.reg_dt)) : '-'}</span>
+                          <button onClick={(e) => { e.stopPropagation(); setWorkflowPanelId(card.inc_id); }} className={`p-1 rounded transition-colors group-hover:opacity-100 opacity-0 ${isLight ? 'hover:bg-slate-100 text-slate-500 hover:text-slate-900' : 'hover:bg-zinc-700 text-zinc-500 hover:text-white'}`} title="워크플로우 상세보기"><ExternalLink className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
                     </div>
@@ -2313,7 +2351,6 @@ export default function RealtimePipelinePage() {
             </div>
           </div>
 
-          {/* Splitter 2 */}
           {/* Splitter 2 */}
           <div
             onMouseDown={() => startDrag(1)}
@@ -2328,14 +2365,16 @@ export default function RealtimePipelinePage() {
           <div style={{ flex: `${widths[2]} 1 0%`, minWidth: 0 }} className="w-full xl:w-auto shrink-0 flex flex-col min-h-[500px] xl:min-h-0 xl:pl-3">
             
             {/* 상단: 실시간 SMS 수신내역 */}
-            <div style={{ height: `${rightHeights[0]}%`, minHeight: 150 }} className="shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg overflow-hidden">
+            <div style={{ height: `${rightHeights[0]}%`, minHeight: 150 }} className={`shrink-0 rounded-3xl p-4 border flex flex-col min-h-0 shadow-lg overflow-hidden ${
+              isLight ? 'bg-white border-slate-200' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5'
+            }`}>
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <div className="flex items-center gap-1.5">
                   <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
                     <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
                   </div>
                   <div>
-                    <h4 className="text-[13px] font-black text-white leading-none pt-0.5">실시간 SMS 수신내역</h4>
+                    <h4 className={`text-[13px] font-black leading-none pt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>실시간 SMS 수신내역</h4>
                   </div>
                 </div>
                 {activeDagCard && (
@@ -2354,21 +2393,23 @@ export default function RealtimePipelinePage() {
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
                 {activeDagCard ? (
                   <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-white/5">
-                      <p className="text-[10px] text-slate-400 font-bold">인시던트 ID: <span className="text-white font-mono font-semibold">{activeDagCard.inc_id}</span></p>
-                      <p className="text-[10px] text-slate-400 font-bold ml-auto">발신: <span className="text-slate-200 font-mono font-semibold">{activeDagCard.sender || 'UNKNOWN'}</span></p>
+                    <div className={`flex flex-wrap items-center gap-2 pb-2 border-b ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+                      <p className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>인시던트 ID: <span className={`font-mono font-semibold ${isLight ? 'text-slate-900' : 'text-white'}`}>{activeDagCard.inc_id}</span></p>
+                      <p className={`text-[10px] font-bold ml-auto ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>발신: <span className={`font-mono font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{activeDagCard.sender || 'UNKNOWN'}</span></p>
                       {activeDagCard.assignee && activeDagCard.assignee !== '미정' && (
-                        <span className="h-5 flex items-center gap-1 bg-white/5 px-2 rounded-lg border border-white/10 text-[9px] text-slate-300 font-mono font-bold shrink-0">
+                        <span className={`h-5 flex items-center gap-1 px-2 rounded-lg border text-[9px] font-mono font-bold shrink-0 ${
+                          isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-300'
+                        }`}>
                           👤 {activeDagCard.assignee}
                         </span>
                       )}
                     </div>
                     <div>
-                      {renderFormattedSMS(activeDagCard.message, activeDagCard.severity)}
+                      {renderFormattedSMS(activeDagCard.message, activeDagCard.severity, isLight)}
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-slate-500 text-xs font-bold">
+                  <div className={`h-full flex items-center justify-center text-xs font-bold ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                     선택된 인시던트가 없습니다
                   </div>
                 )}
@@ -2387,13 +2428,15 @@ export default function RealtimePipelinePage() {
             </div>
 
             {/* 하단: 장애 처리현황 */}
-            <div style={{ height: `${rightHeights[1]}%`, minHeight: 200 }} className="bg-[#0b0e17] rounded-3xl p-4 border border-white/5 flex flex-col min-h-0 shadow-lg overflow-hidden">
+            <div style={{ height: `${rightHeights[1]}%`, minHeight: 200 }} className={`rounded-3xl p-4 border flex flex-col min-h-0 shadow-lg overflow-hidden ${
+              isLight ? 'bg-white border-slate-200' : 'bg-[#0b0e17] border-white/5'
+            }`}>
               <div className="flex items-center gap-1.5 mb-2 shrink-0">
                 <div className="w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center">
                   <Activity className="w-3.5 h-3.5 text-indigo-400" />
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-black text-white leading-none pt-0.5">장애 처리현황</h4>
+                  <h4 className={`text-[13px] font-black leading-none pt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>장애 처리현황</h4>
                 </div>
               </div>
               
@@ -2515,10 +2558,10 @@ export default function RealtimePipelinePage() {
     const growthPrefix = growthRate > 0 ? '+' : '';
 
     return (
-      <div className="flex-1 p-4 bg-[#07090f] min-h-0 flex flex-col gap-4">
+      <div className={`flex-1 p-4 min-h-0 flex flex-col gap-4 ${isLight ? 'bg-slate-100' : 'bg-[#07090f]'}`}>
         {/* HEADER TITLE */}
         <div className="shrink-0 flex items-center justify-between">
-          <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+          <h2 className={`text-xl font-black tracking-tight flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
             <div className="p-2 bg-purple-500/20 rounded-xl border border-purple-500/30"><TrendingUp className="w-5 h-5 text-purple-400" /></div>
             C-Level 경영진 통합 성과 보고서 (Realtime D1 Sync)
           </h2>
@@ -2535,17 +2578,19 @@ export default function RealtimePipelinePage() {
             <div style={{ height: `${execLeftHeights[0]}%` }} className="grid grid-cols-4 gap-3 shrink-0 w-full relative z-10">
 
               {/* Card 2 */}
-              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+              <div className={`rounded-3xl border p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col transition-colors group overflow-hidden ${
+                isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-[#0b0e17] border-white/5 hover:border-white/10'
+              }`}>
                 <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
                   <Rocket className="w-4 h-4 text-blue-500" />
                 </div>
-                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 flex items-baseline gap-0.5 relative z-10">
-                  {avgMttr}<span className="text-sm font-bold text-blue-400">m</span>
+                <div className={`text-2xl xl:text-4xl font-black tracking-tighter mb-3 xl:mb-4 shrink-0 flex items-baseline gap-0.5 relative z-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {avgMttr}<span className="text-sm font-bold text-blue-500">m</span>
                 </div>
                 
                 <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
-                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">평균 복구 소요시간</div>
-                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">MTTR (인지→지식화)</div>
+                  <div className={`text-[10px] xl:text-[11px] font-bold truncate ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>평균 복구 소요시간</div>
+                  <div className={`text-[8px] xl:text-[9px] font-bold truncate mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>MTTR (인지→지식화)</div>
                 </div>
                 
                 <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
@@ -2557,7 +2602,7 @@ export default function RealtimePipelinePage() {
                 <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dynamicRoiTrendData}>
-                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <Tooltip cursor={{ fill: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.9)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)', boxShadow: isLight ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none' }} itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: isLight ? '#64748b' : '#94a3b8', fontSize: 9, marginBottom: 4 }} />
                       <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
                       <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} tickFormatter={(v) => `${v}m`} />
                       <Line type="monotone" dataKey="mttr" name="MTTR" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
@@ -2567,17 +2612,19 @@ export default function RealtimePipelinePage() {
               </div>
 
               {/* Card 3 */}
-              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+              <div className={`rounded-3xl border p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col transition-colors group overflow-hidden ${
+                isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-[#0b0e17] border-white/5 hover:border-white/10'
+              }`}>
                 <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
                   <Clock className="w-4 h-4 text-purple-500" />
                 </div>
-                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 flex items-baseline gap-0.5 relative z-10">
-                  {avgMtta}<span className="text-sm font-bold text-purple-400">m</span>
+                <div className={`text-2xl xl:text-4xl font-black tracking-tighter mb-3 xl:mb-4 shrink-0 flex items-baseline gap-0.5 relative z-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {avgMtta}<span className="text-sm font-bold text-purple-500">m</span>
                 </div>
                 
                 <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
-                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">평균 인지 소요시간</div>
-                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">주간: {avgDayMtta}m / 야간: {avgNightMtta}m</div>
+                  <div className={`text-[10px] xl:text-[11px] font-bold truncate ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>평균 인지 소요시간</div>
+                  <div className={`text-[8px] xl:text-[9px] font-bold truncate mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>주간: {avgDayMtta}m / 야간: {avgNightMtta}m</div>
                 </div>
                 
                 <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
@@ -2589,7 +2636,7 @@ export default function RealtimePipelinePage() {
                 <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dynamicRoiTrendData}>
-                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <Tooltip cursor={{ fill: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.9)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)', boxShadow: isLight ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none' }} itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: isLight ? '#64748b' : '#94a3b8', fontSize: 9, marginBottom: 4 }} />
                       <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
                       <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} tickFormatter={(v) => `${v}m`} />
                       <Line type="monotone" dataKey="mtta" name="MTTA" stroke="#a855f7" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
@@ -2599,17 +2646,19 @@ export default function RealtimePipelinePage() {
               </div>
 
               {/* Card 4 */}
-              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+              <div className={`rounded-3xl border p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col transition-colors group overflow-hidden ${
+                isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-[#0b0e17] border-white/5 hover:border-white/10'
+              }`}>
                 <div className="w-8 h-8 rounded-full bg-rose-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
                   <Heart className="w-4 h-4 text-rose-500" />
                 </div>
-                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 relative z-10">
+                <div className={`text-2xl xl:text-4xl font-black tracking-tighter mb-3 xl:mb-4 shrink-0 relative z-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {period === 'all' ? currentKbCount : `${growthPrefix}${growthRate}%`}
                 </div>
                 
                 <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
-                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">{growthTitle}</div>
-                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">{growthSub}</div>
+                  <div className={`text-[10px] xl:text-[11px] font-bold truncate ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{growthTitle}</div>
+                  <div className={`text-[8px] xl:text-[9px] font-bold truncate mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{growthSub}</div>
                 </div>
                 
                 <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
@@ -2621,7 +2670,7 @@ export default function RealtimePipelinePage() {
                 <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dynamicRoiTrendData}>
-                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <Tooltip cursor={{ fill: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.9)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)', boxShadow: isLight ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none' }} itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: isLight ? '#64748b' : '#94a3b8', fontSize: 9, marginBottom: 4 }} />
                       <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
                       <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} />
                       <Line type="monotone" dataKey="kb" name="KB 증가" stroke="#f43f5e" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
@@ -2631,15 +2680,17 @@ export default function RealtimePipelinePage() {
               </div>
 
               {/* Card 5 */}
-              <div className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col hover:border-white/10 transition-colors group overflow-hidden">
+              <div className={`rounded-3xl border p-4 xl:p-5 shadow-xl relative min-w-0 flex flex-col transition-colors group overflow-hidden ${
+                isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-[#0b0e17] border-white/5 hover:border-white/10'
+              }`}>
                 <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center mb-3 xl:mb-4 shrink-0 transition-transform group-hover:scale-110 relative z-10">
                   <Zap className="w-4 h-4 text-amber-500" />
                 </div>
-                <div className="text-2xl xl:text-4xl font-black text-white tracking-tighter mb-3 xl:mb-4 shrink-0 relative z-10">{resolveRate}%</div>
+                <div className={`text-2xl xl:text-4xl font-black tracking-tighter mb-3 xl:mb-4 shrink-0 relative z-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>{resolveRate}%</div>
                 
                 <div className="flex flex-col mb-3 xl:mb-4 min-h-[28px] justify-center shrink-0 relative z-10">
-                  <div className="text-[10px] xl:text-[11px] font-bold text-slate-400 truncate">전사 조치 지수</div>
-                  <div className="text-[8px] xl:text-[9px] font-bold text-slate-500 truncate mt-0.5">High Intelligence</div>
+                  <div className={`text-[10px] xl:text-[11px] font-bold truncate ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>전사 조치 지수</div>
+                  <div className={`text-[8px] xl:text-[9px] font-bold truncate mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>High Intelligence</div>
                 </div>
                 
                 <div className="shrink-0 flex items-start relative z-10 mb-4 xl:mb-6">
@@ -2651,7 +2702,7 @@ export default function RealtimePipelinePage() {
                 <div className="flex-1 min-h-0 relative w-full opacity-80 group-hover:opacity-100 transition-opacity">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dynamicRoiTrendData}>
-                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }} />
+                      <Tooltip cursor={{ fill: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.9)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)', boxShadow: isLight ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none' }} itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }} labelStyle={{ color: isLight ? '#64748b' : '#94a3b8', fontSize: 9, marginBottom: 4 }} />
                       <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} minTickGap={10} />
                       <YAxis tick={{ fill: '#64748b', fontSize: 8 }} axisLine={false} tickLine={false} width={24} tickFormatter={(v) => `${v}%`} />
                       <Line type="monotone" dataKey="resolveRate" name="조치 지수" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{r: 4}} isAnimationActive={false} connectNulls />
@@ -2667,15 +2718,22 @@ export default function RealtimePipelinePage() {
             </div>
 
             {/* Chart 1: ROI Trend */}
-            <div style={{ height: `calc(${execLeftHeights[1]}% - 16px)` }} className="bg-[#0b0e17] rounded-3xl border border-white/5 p-4 xl:p-5 shadow-xl flex flex-col relative overflow-hidden shrink-0">
+            <div style={{ height: `calc(${execLeftHeights[1]}% - 16px)` }} className={`rounded-3xl border p-4 xl:p-5 shadow-xl flex flex-col relative overflow-hidden shrink-0 ${
+              isLight ? 'bg-white border-slate-200' : 'bg-[#0b0e17] border-white/5'
+            }`}>
               <div className="absolute left-1/2 top-0 w-64 h-32 bg-purple-500/10 blur-[50px] rounded-full pointer-events-none -translate-x-1/2" />
               <div className="flex items-center justify-between mb-3 shrink-0 relative z-10">
-                <div className="flex items-center gap-2"><Cpu className="w-4 h-4 text-purple-400" /><h2 className="text-sm font-black text-white">AI 자동화 ROI 및 장애 유입 트렌드</h2></div>
-                <div className="flex flex-wrap items-center justify-end gap-3 text-[9px] font-bold bg-white/5 px-3 py-1.5 rounded-full">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-purple-400" />
+                  <h2 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>AI 자동화 ROI 및 장애 유입 트렌드</h2>
+                </div>
+                <div className={`flex flex-wrap items-center justify-end gap-3 text-[9px] font-bold px-3 py-1.5 rounded-full ${
+                  isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/5 text-slate-300'
+                }`}>
                   <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-blue-500" />접수건수</div>
                   <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-orange-400" />처리중</div>
                   <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-emerald-400" />처리완료</div>
-                  <div className="w-px h-3 bg-white/20 mx-1"></div>
+                  <div className={`w-px h-3 mx-1 ${isLight ? 'bg-slate-300' : 'bg-white/20'}`}></div>
                   <div className="flex items-center gap-1.5"><div className="w-2 h-[2px] bg-yellow-400" />MTTA(주간)</div>
                   <div className="flex items-center gap-1.5"><div className="w-2 h-[2px] bg-purple-400" />MTTA(야간)</div>
                   <div className="flex items-center gap-1.5"><div className="w-2 h-[2px] bg-cyan-400" />MTTR</div>
@@ -2684,11 +2742,11 @@ export default function RealtimePipelinePage() {
               <div className="flex-1 min-h-0 relative z-10">
                 <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <ComposedChart data={dynamicRoiTrendData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }} barGap={2}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#f1f5f9' : 'rgba(255,255,255,0.02)'} vertical={false} />
                     <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="left" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}m`} />
-                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
+                    <Tooltip cursor={{ fill: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.9)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)', boxShadow: isLight ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none' }} itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }} />
                     <Bar yAxisId="left" dataKey="received" name="접수건수" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={8} />
                     <Bar yAxisId="left" dataKey="processing" name="처리중" fill="#fb923c" radius={[2, 2, 0, 0]} barSize={8} />
                     <Bar yAxisId="left" dataKey="resolved" name="처리완료" fill="#10b981" radius={[2, 2, 0, 0]} barSize={8} />
@@ -2707,14 +2765,18 @@ export default function RealtimePipelinePage() {
           </div>
 
           {/* Right Column (Organization Status matching Operator Mode) */}
-          <div style={{ width: `${execChartWidths[1]}%` }} className="bg-[#0b0e17] backdrop-blur-sm rounded-3xl p-4 xl:p-5 border border-white/5 flex flex-col h-full shadow-lg overflow-hidden shrink-0 z-10">
+          <div style={{ width: `${execChartWidths[1]}%` }} className={`backdrop-blur-sm rounded-3xl p-4 xl:p-5 border flex flex-col h-full shadow-lg overflow-hidden shrink-0 z-10 ${
+            isLight ? 'bg-white border-slate-200' : 'bg-[#0b0e17] border-white/5'
+          }`}>
             <div className="flex items-center justify-between mb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <Network className="w-4 h-4 text-blue-400" />
-                <h2 className="text-sm font-black text-white">조직 기반 실시간 처리 현황</h2>
+                <h2 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>조직 기반 실시간 처리 현황</h2>
               </div>
               
-              <div className="flex items-center gap-1.5 bg-[#121622] p-1 rounded-xl border border-white/5">
+              <div className={`flex items-center gap-1.5 p-1 rounded-xl border ${
+                isLight ? 'bg-slate-100 border-slate-200' : 'bg-[#121622] border-white/5'
+              }`}>
                 {['부문', '본부', '팀', '파트'].map(level => (
                   <button 
                     key={level}
@@ -2724,7 +2786,11 @@ export default function RealtimePipelinePage() {
                       if (level === '본부') { setExecOrgHonbu('all'); setExecOrgTeam('all'); }
                       if (level === '팀') { setExecOrgTeam('all'); }
                     }}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${execOrgLevel === level ? 'bg-blue-500/20 text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      execOrgLevel === level 
+                        ? (isLight ? 'bg-white text-blue-600 shadow-xs' : 'bg-blue-500/20 text-blue-400') 
+                        : (isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-500 hover:text-slate-300')
+                    }`}
                   >
                     {level}
                   </button>
@@ -2737,7 +2803,9 @@ export default function RealtimePipelinePage() {
               <select
                 value={execOrgBumun}
                 onChange={(e) => { setExecOrgBumun(e.target.value); setExecOrgHonbu('all'); setExecOrgTeam('all'); }}
-                className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-blue-500/40"
+                className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none ${
+                  isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-blue-500/40'
+                }`}
               >
                 <option value="all">전체 부문</option>
                 {execOrgLists.bumun.map(b => <option key={b} value={b}>{b}</option>)}
@@ -2748,7 +2816,9 @@ export default function RealtimePipelinePage() {
                   value={execOrgHonbu}
                   disabled={execOrgBumun === 'all'}
                   onChange={(e) => { setExecOrgHonbu(e.target.value); setExecOrgTeam('all'); }}
-                  className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-purple-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-purple-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-purple-500/40'
+                  }`}
                 >
                   {execOrgBumun === 'all' ? (
                     <option value="all">부문 선택 필수</option>
@@ -2766,7 +2836,9 @@ export default function RealtimePipelinePage() {
                   value={execOrgTeam}
                   disabled={execOrgBumun === 'all' || execOrgHonbu === 'all'}
                   onChange={(e) => setExecOrgTeam(e.target.value)}
-                  className="flex-1 bg-[#121622] border border-white/5 rounded-xl px-2 py-1.5 text-[10px] font-bold text-slate-300 focus:outline-none focus:border-cyan-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className={`flex-1 border rounded-xl px-2 py-1.5 text-[10px] font-bold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isLight ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-cyan-500' : 'bg-[#121622] border-white/5 text-slate-300 focus:border-cyan-500/40'
+                  }`}
                 >
                   {execOrgBumun === 'all' || execOrgHonbu === 'all' ? (
                     <option value="all">본부 선택 필수</option>
@@ -2780,15 +2852,17 @@ export default function RealtimePipelinePage() {
               )}
             </div>
 
-            <div className="bg-[#121622] border border-white/5 rounded-xl p-3 mb-3 flex items-center justify-between shrink-0 shadow-inner">
-              <span className="text-xs font-black text-slate-300">
+            <div className={`border rounded-xl p-3 mb-3 flex items-center justify-between shrink-0 shadow-inner ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-[#121622] border-white/5'
+            }`}>
+              <span className={`text-xs font-black ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
                 {execOrgLevel === '부문' ? '부문' : execOrgLevel === '본부' ? `${execOrgBumun !== 'all' ? execOrgBumun + ' > ' : ''}본부` : execOrgLevel === '팀' ? `${execOrgBumun !== 'all' ? execOrgBumun + ' > ' : ''}${execOrgHonbu !== 'all' ? execOrgHonbu + ' > ' : ''}팀` : '파트'} 기준 현황
               </span>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"/><span className="text-[9px] font-bold text-slate-400">수신: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.수신, 0)}건</strong></span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"/><span className="text-[9px] font-bold text-slate-400">대기중: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.처리대기중, 0)}건</strong></span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"/><span className="text-[9px] font-bold text-slate-400">처리중: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.처리중, 0)}건</strong></span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"/><span className="text-[9px] font-bold text-slate-400">완료: <strong className="text-white ml-0.5">{execOrgGroupedData.list.reduce((s, o) => s + o.처리완료, 0)}건</strong></span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>수신: <strong className={`ml-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{execOrgGroupedData.list.reduce((s, o) => s + o.수신, 0)}건</strong></span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>대기중: <strong className={`ml-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{execOrgGroupedData.list.reduce((s, o) => s + o.처리대기중, 0)}건</strong></span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>처리중: <strong className={`ml-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{execOrgGroupedData.list.reduce((s, o) => s + o.처리중, 0)}건</strong></span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"/><span className={`text-[9px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>완료: <strong className={`ml-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{execOrgGroupedData.list.reduce((s, o) => s + o.처리완료, 0)}건</strong></span></div>
               </div>
             </div>
 
@@ -2804,9 +2878,11 @@ export default function RealtimePipelinePage() {
                     const activeCritical = org.incidents.filter(c => c.stage === 3 && (c.severity === 'CRITICAL' || c.severity === 'MAJOR')).length;
 
                     return (
-                      <div key={idx} className="bg-[#121622] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors flex flex-col">
+                      <div key={idx} className={`border rounded-2xl p-4 transition-colors flex flex-col ${
+                        isLight ? 'bg-slate-50/70 border-slate-200 hover:border-slate-300 hover:bg-white shadow-xs' : 'bg-[#121622] border-white/5 hover:border-white/10'
+                      }`}>
                         <div className="flex items-center justify-between mb-3 shrink-0">
-                          <div className="flex items-center gap-2"><User className="w-3.5 h-3.5 text-slate-400" /><h3 className="text-xs font-black text-white truncate max-w-[120px]">{org.name}</h3></div>
+                          <div className="flex items-center gap-2"><User className={`w-3.5 h-3.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`} /><h3 className={`text-xs font-black truncate max-w-[120px] ${isLight ? 'text-slate-900' : 'text-white'}`}>{org.name}</h3></div>
                           {activeCritical > 0 && <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-[9px] font-bold text-red-400 flex items-center gap-1 animate-pulse border border-red-500/30"><AlertTriangle className="w-2.5 h-2.5" /> 긴급 {activeCritical}건</span>}
                         </div>
                         <div className="h-[90px] w-full shrink-0 min-w-0 min-h-0">
@@ -2816,16 +2892,16 @@ export default function RealtimePipelinePage() {
                               tooltip: {
                                 trigger: 'axis',
                                 axisPointer: { type: 'shadow' },
-                                backgroundColor: '#0f172a',
-                                borderColor: 'rgba(255,255,255,0.1)',
-                                textStyle: { color: '#fff', fontSize: 10, fontWeight: 'bold' }
+                                backgroundColor: isLight ? '#ffffff' : '#0f172a',
+                                borderColor: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.1)',
+                                textStyle: { color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }
                               },
                               xAxis: {
                                 type: 'category',
                                 data: chartData.map(d => d.name),
                                 axisLine: { show: false },
                                 axisTick: { show: false },
-                                axisLabel: { color: '#64748b', fontSize: 8, fontWeight: 'bold', interval: 0 }
+                                axisLabel: { color: isLight ? '#64748b' : '#64748b', fontSize: 8, fontWeight: 'bold', interval: 0 }
                               },
                               yAxis: {
                                 type: 'value',
@@ -2834,7 +2910,7 @@ export default function RealtimePipelinePage() {
                                 axisTick: { show: false },
                                 splitLine: { 
                                   show: true,
-                                  lineStyle: { type: 'dashed', color: 'rgba(255,255,255,0.05)' } 
+                                  lineStyle: { type: 'dashed', color: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)' } 
                                 }
                               },
                               series: [
@@ -2874,7 +2950,7 @@ export default function RealtimePipelinePage() {
                                       label: {
                                         show: true,
                                         position: 'top',
-                                        color: entry.count > 0 ? '#fff' : '#475569',
+                                        color: entry.count > 0 ? (isLight ? '#0f172a' : '#fff') : (isLight ? '#94a3b8' : '#475569'),
                                         fontSize: 9,
                                         fontWeight: 'bold',
                                         formatter: (p) => p.value > 0 ? p.value : ''
@@ -2888,11 +2964,13 @@ export default function RealtimePipelinePage() {
                           />
                         </div>
                         
-                        <div className="flex mt-2 pt-2 border-t border-white/5 shrink-0 gap-1">
+                        <div className={`flex mt-2 pt-2 border-t shrink-0 gap-1 ${isLight ? 'border-slate-200' : 'border-white/5'}`}>
                           {chartData.map((d, i) => (
-                            <div key={i} className="flex-1 flex flex-col items-center justify-center p-1 rounded-lg bg-black/20">
+                            <div key={i} className={`flex-1 flex flex-col items-center justify-center p-1 rounded-lg ${
+                              isLight ? 'bg-white border border-slate-200 shadow-2xs' : 'bg-black/20'
+                            }`}>
                               <span className="text-[8px] text-slate-500 font-bold mb-0.5">{d.name}</span>
-                              <span className="text-[10px] font-black text-white">{d.count}</span>
+                              <span className={`text-[10px] font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{d.count}</span>
                             </div>
                           ))}
                         </div>

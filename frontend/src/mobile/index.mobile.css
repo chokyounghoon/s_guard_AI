@@ -218,9 +218,14 @@
 
 /* 2. Cards, List Items & Content Blocks */
 [data-theme="light"] .skeuo-card,
+[data-theme="light"] .bg-\[\#0b0e17\],
+[data-theme="light"] .bg-\[\#0b0e17\]\/50,
+[data-theme="light"] .bg-\[\#0c1020\],
+[data-theme="light"] .bg-\[\#070b12\],
 [data-theme="light"] .bg-\[\#11141d\],
 [data-theme="light"] .bg-\[\#12151a\],
 [data-theme="light"] .bg-\[\#121620\],
+[data-theme="light"] .bg-\[\#121622\],
 [data-theme="light"] .bg-\[\#141825\],
 [data-theme="light"] .bg-\[\#151923\],
 [data-theme="light"] .bg-\[\#161b2a\],
@@ -251,7 +256,9 @@
 [data-theme="light"] .bg-slate-900\/50,
 [data-theme="light"] .bg-slate-900\/80,
 [data-theme="light"] .bg-slate-950,
-[data-theme="light"] .bg-zinc-900 {
+[data-theme="light"] .bg-zinc-800,
+[data-theme="light"] .bg-zinc-900,
+[data-theme="light"] .bg-zinc-900\/40 {
   background-color: var(--sh-surface-card) !important;
   border-color: var(--sh-border-color) !important;
   color: var(--sh-text-primary) !important;
@@ -286,30 +293,107 @@
   color: #0f172a !important;
 }
 
-/* 5. Typography — Core fix: text-white on light bg becomes dark */
-[data-theme="light"] .text-white,
-[data-theme="light"] .text-slate-100,
-[data-theme="light"] .text-slate-200,
-/* semi-transparent white variants — invisible on white bg */
-[data-theme="light"] .text-white\/40,
-[data-theme="light"] .text-white\/50,
-[data-theme="light"] .text-white\/70,
-[data-theme="light"] .text-white\/80,
-[data-theme="light"] .text-white\/90,
-[data-theme="light"] .text-white\/95 {
-  color: var(--sh-text-primary) !important;
+/* 5. Typography — On light surfaces, turn text into high-contrast dark */
+[data-theme="light"] .bg-white,
+[data-theme="light"] .bg-slate-50,
+[data-theme="light"] .bg-slate-100,
+[data-theme="light"] .bg-slate-200 {
+  color: #0f172a;
 }
 
-[data-theme="light"] .text-slate-300,
-[data-theme="light"] .text-slate-400,
-[data-theme="light"] .text-zinc-400,
-[data-theme="light"] .text-zinc-500 {
-  color: var(--sh-text-secondary) !important;
+[data-theme="light"] .bg-white .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
+[data-theme="light"] .bg-slate-50 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
+[data-theme="light"] .bg-slate-100 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
+[data-theme="light"] .bg-slate-200 .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]),
+[data-theme="light"] .skeuo-card .text-white:not(.btn-primary):not([class*="bg-blue-600"]):not([class*="bg-red-600"]):not([class*="bg-emerald-600"]):not([class*="bg-rose-600"]) {
+  color: #0f172a !important;
 }
 
-[data-theme="light"] .text-slate-500,
-[data-theme="light"] .text-slate-600 {
-  color: #334155 !important;
+/* ══════════════════════════════════════════════════════════════════
+   ⭐ 절대 가시성 보장 규칙: 검은색/어두운 바탕이면 글씨는 흰색, 하얀 바탕이면 검은색!
+   ══════════════════════════════════════════════════════════════════ */
+/* 어두운 테마 또는 솔리드 다크 배경 */
+:root:not([data-theme="light"]) .bg-black,
+:root:not([data-theme="light"]) .bg-zinc-950,
+:root:not([data-theme="light"]) .bg-zinc-900,
+:root:not([data-theme="light"]) .bg-zinc-850,
+:root:not([data-theme="light"]) .bg-zinc-800,
+:root:not([data-theme="light"]) .bg-slate-950,
+:root:not([data-theme="light"]) .bg-slate-900,
+:root:not([data-theme="light"]) .bg-slate-850,
+:root:not([data-theme="light"]) .bg-slate-800,
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\],
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\]\/50,
+:root:not([data-theme="light"]) .bg-\[\#0c1020\],
+:root:not([data-theme="light"]) .bg-\[\#121622\],
+:root:not([data-theme="light"]) .bg-\[\#0f1422\],
+:root:not([data-theme="light"]) .bg-\[\#161b2a\],
+:root:not([data-theme="light"]) .bg-\[\#070b12\],
+:root:not([data-theme="light"]) .bg-\[\#060C1B\],
+:root:not([data-theme="light"]) .bg-\[\#13203E\],
+.bg-blue-600,
+.bg-blue-500,
+.bg-indigo-600,
+.bg-red-600,
+.bg-red-500,
+.bg-emerald-600,
+.bg-purple-600 {
+  color: #f8fafc;
+}
+
+/* 어두운 배경 내부의 .text-white는 순백색 보장 */
+:root:not([data-theme="light"]) .bg-black .text-white,
+:root:not([data-theme="light"]) .bg-zinc-950 .text-white,
+:root:not([data-theme="light"]) .bg-zinc-900 .text-white,
+:root:not([data-theme="light"]) .bg-zinc-850 .text-white,
+:root:not([data-theme="light"]) .bg-zinc-800 .text-white,
+:root:not([data-theme="light"]) .bg-slate-950 .text-white,
+:root:not([data-theme="light"]) .bg-slate-900 .text-white,
+:root:not([data-theme="light"]) .bg-slate-800 .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0b0e17\]\/50 .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0c1020\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#121622\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#0f1422\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#161b2a\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#070b12\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-white,
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-white,
+.bg-blue-600 .text-white,
+.bg-blue-500 .text-white,
+.bg-indigo-600 .text-white,
+.bg-red-600 .text-white,
+.bg-red-500 .text-white,
+.bg-emerald-600 .text-white,
+.bg-purple-600 .text-white {
+  color: #ffffff !important;
+}
+
+:root:not([data-theme="light"]) .bg-black .text-slate-100, 
+:root:not([data-theme="light"]) .bg-zinc-900 .text-slate-100, 
+:root:not([data-theme="light"]) .bg-zinc-800 .text-slate-100, 
+:root:not([data-theme="light"]) .bg-slate-900 .text-slate-100, 
+:root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-100, 
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-100 {
+  color: #f1f5f9 !important;
+}
+
+:root:not([data-theme="light"]) .bg-black .text-slate-200, 
+:root:not([data-theme="light"]) .bg-zinc-900 .text-slate-200, 
+:root:not([data-theme="light"]) .bg-zinc-800 .text-slate-200, 
+:root:not([data-theme="light"]) .bg-slate-900 .text-slate-200, 
+:root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-200, 
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+:root:not([data-theme="light"]) .bg-black .text-slate-300, 
+:root:not([data-theme="light"]) .bg-zinc-900 .text-slate-300, 
+:root:not([data-theme="light"]) .bg-zinc-800 .text-slate-300, 
+:root:not([data-theme="light"]) .bg-slate-900 .text-slate-300, 
+:root:not([data-theme="light"]) .bg-\[\#060C1B\] .text-slate-300, 
+:root:not([data-theme="light"]) .bg-\[\#13203E\] .text-slate-300 {
+  color: #cbd5e1 !important;
 }
 
 /* 6. Borders & Dividers */
