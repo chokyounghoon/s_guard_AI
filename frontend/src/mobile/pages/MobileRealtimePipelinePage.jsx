@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { getAccessToken, getAuthHeaders, getUserProfile } from '../../lib/authStore';
 import { toast } from 'react-hot-toast';
+import { useTheme } from '../../context/ThemeContext';
 
 // --- Shared Helper Functions ---
 const parseDate = (val) => {
@@ -198,6 +199,7 @@ const findNodeInTree = (nodes, target, targetDepth = null, currentDepth = 1) => 
 
 // --- Mobile Realtime Pipeline Component ---
 export default function MobileRealtimePipelinePage() {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const user = getUserProfile();
@@ -745,12 +747,12 @@ export default function MobileRealtimePipelinePage() {
                     TOTAL {org.수신}
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] pl-2 bg-black/20 rounded-xl p-2 mt-1">
-                  <span className="text-slate-400 font-bold flex flex-col items-center">대기 <b className="text-amber-400 text-[12px]">{org.처리대기중}</b></span>
-                  <div className="w-px h-6 bg-white/10" />
-                  <span className="text-slate-400 font-bold flex flex-col items-center">대응 <b className="text-red-400 text-[12px]">{org.처리중}</b></span>
-                  <div className="w-px h-6 bg-white/10" />
-                  <span className="text-slate-400 font-bold flex flex-col items-center">완료 <b className="text-emerald-400 text-[12px]">{org.처리완료}</b></span>
+                <div className={`flex items-center justify-between text-[10px] pl-2 rounded-xl p-2 mt-1 ${isLight ? 'bg-slate-100' : 'bg-black/20'}`}>
+                  <span className="text-slate-400 font-bold flex flex-col items-center">대기 <b className="text-amber-500 text-[12px]">{org.처리대기중}</b></span>
+                  <div className={`w-px h-6 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
+                  <span className="text-slate-400 font-bold flex flex-col items-center">대응 <b className="text-red-500 text-[12px]">{org.처리중}</b></span>
+                  <div className={`w-px h-6 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
+                  <span className="text-slate-400 font-bold flex flex-col items-center">완료 <b className="text-emerald-600 text-[12px]">{org.처리완료}</b></span>
                 </div>
               </div>
             ))}
@@ -761,84 +763,86 @@ export default function MobileRealtimePipelinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050810] text-slate-200 font-sans flex flex-col relative overflow-hidden">
+    <div className={`min-h-screen ${isLight ? 'bg-[#F1F5F9] text-slate-800' : 'bg-[#050810] text-slate-200'} font-sans flex flex-col relative overflow-hidden`}>
       {/* Background glow effects */}
-      <div className="fixed top-0 left-0 w-full h-96 bg-[#00e5ff]/5 rounded-full blur-[120px] -z-10 opacity-60 pointer-events-none" />
-      <div className="fixed bottom-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none" />
+      {!isLight && (
+        <>
+          <div className="fixed top-0 left-0 w-full h-96 bg-[#00e5ff]/5 rounded-full blur-[120px] -z-10 opacity-60 pointer-events-none" />
+          <div className="fixed bottom-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none" />
+        </>
+      )}
 
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#070b14]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+      <div className={`sticky top-0 z-50 ${isLight ? 'bg-white/95 border-slate-200 text-slate-900 shadow-sm' : 'bg-[#070b14]/80 border-white/5 text-white shadow-[0_4px_30px_rgba(0,0,0,0.5)]'} backdrop-blur-xl border-b px-4 py-3 flex items-center justify-between`}>
         <div className="flex items-center gap-3">
-          <button onClick={() => goBack()} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center active:scale-95 text-slate-300 transition-all shadow-sm">
+          <button onClick={() => goBack()} className={`w-8 h-8 rounded-full ${isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-white/5 hover:bg-white/10 text-slate-300'} flex items-center justify-center active:scale-95 transition-all shadow-sm`}>
             <ArrowLeft size={16} />
           </button>
-          <h1 className="text-sm font-black tracking-tight text-white flex items-center gap-2" style={{ textShadow: '0 0 10px rgba(0,229,255,0.3)' }}>
-            <Activity className="w-4 h-4 text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" /> Pipeline
+          <h1 className={`text-sm font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'} flex items-center gap-2`}>
+            <Activity className="w-4 h-4 text-blue-600" /> Pipeline
           </h1>
         </div>
         
         {/* Segmented Control */}
-        <div className="relative flex items-center bg-black/40 p-1 rounded-xl shadow-inner border border-white/5">
+        <div className={`relative flex items-center p-1 rounded-xl shadow-inner border ${isLight ? 'bg-slate-100 border-slate-200' : 'bg-black/40 border-white/5'}`}>
           <button 
             onClick={() => setActiveTab('live')} 
-            className={`relative z-10 px-4 py-1.5 rounded-lg text-[11px] font-black transition-colors duration-300 ${activeTab === 'live' ? 'text-white' : 'text-slate-500'}`}
+            className={`relative z-10 px-4 py-1.5 rounded-lg text-[11px] font-black transition-colors duration-300 ${activeTab === 'live' ? (isLight ? 'bg-white text-blue-600 shadow-sm' : 'text-white') : 'text-slate-500'}`}
           >
             LIVE
           </button>
           <button 
             onClick={() => setActiveTab('analytics')} 
-            className={`relative z-10 px-4 py-1.5 rounded-lg text-[11px] font-black transition-colors duration-300 ${activeTab === 'analytics' ? 'text-white' : 'text-slate-500'}`}
+            className={`relative z-10 px-4 py-1.5 rounded-lg text-[11px] font-black transition-colors duration-300 ${activeTab === 'analytics' ? (isLight ? 'bg-white text-blue-600 shadow-sm' : 'text-white') : 'text-slate-500'}`}
           >
             분석
           </button>
           {/* Active Slider */}
-          <div 
-            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-blue-600/80 to-purple-600/80 rounded-lg shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-transform duration-300 ease-out border border-white/10`} 
-            style={{ transform: activeTab === 'analytics' ? 'translateX(calc(100% + 8px))' : 'translateX(0)' }}
-          />
+          {!isLight && (
+            <div 
+              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-blue-600/80 to-purple-600/80 rounded-lg shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-transform duration-300 ease-out border border-white/10`} 
+              style={{ transform: activeTab === 'analytics' ? 'translateX(calc(100% + 8px))' : 'translateX(0)' }}
+            />
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-5 pb-10 custom-scrollbar z-10">
         {/* Funnel Dashboard Header (Always Visible) */}
-        <div className="bg-white/[0.02] backdrop-blur-md border border-white/10 rounded-3xl p-4 mb-5 shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+        <div className={`backdrop-blur-md border rounded-3xl p-4 mb-5 relative overflow-hidden ${isLight ? 'bg-white border-slate-200/80 shadow-sm' : 'bg-white/[0.02] border-white/10 shadow-2xl'}`}>
           <div className="grid grid-cols-4 gap-2 mb-4 relative z-10">
             {[
-              { label: '수신/인지', count: countsByStage[1], color: 'text-[#00e5ff]', glow: 'shadow-[#00e5ff]/20', bg: 'bg-gradient-to-b from-[#00e5ff]/10 to-[#00e5ff]/5 border-[#00e5ff]/20' },
-              { label: 'AI 분석', count: countsByStage[2], color: 'text-purple-400', glow: 'shadow-purple-500/20', bg: 'bg-gradient-to-b from-purple-500/10 to-purple-500/5 border-purple-500/20' },
-              { label: '처리중', count: countsByStage[3], color: 'text-red-400', glow: 'shadow-red-500/20', bg: 'bg-gradient-to-b from-red-500/10 to-red-500/5 border-red-500/20' },
-              { label: '처리완료', count: countsByStage[4], color: 'text-emerald-400', glow: 'shadow-emerald-500/20', bg: 'bg-gradient-to-b from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' }
+              { label: '수신/인지', count: countsByStage[1], color: isLight ? 'text-cyan-600' : 'text-[#00e5ff]', bg: isLight ? 'bg-cyan-50 border-cyan-200' : 'bg-gradient-to-b from-[#00e5ff]/10 to-[#00e5ff]/5 border-[#00e5ff]/20' },
+              { label: 'AI 분석', count: countsByStage[2], color: isLight ? 'text-purple-600' : 'text-purple-400', bg: isLight ? 'bg-purple-50 border-purple-200' : 'bg-gradient-to-b from-purple-500/10 to-purple-500/5 border-purple-500/20' },
+              { label: '처리중', count: countsByStage[3], color: isLight ? 'text-red-600' : 'text-red-400', bg: isLight ? 'bg-red-50 border-red-200' : 'bg-gradient-to-b from-red-500/10 to-red-500/5 border-red-500/20' },
+              { label: '처리완료', count: countsByStage[4], color: isLight ? 'text-emerald-600' : 'text-emerald-400', bg: isLight ? 'bg-emerald-50 border-emerald-200' : 'bg-gradient-to-b from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' }
             ].map((st, i) => (
               <div 
                 key={i} 
-                className={`${st.bg} ${st.glow} flex flex-col items-center justify-center rounded-2xl py-3 border backdrop-blur-sm shadow-inner transition-transform active:scale-95`} 
+                className={`${st.bg} flex flex-col items-center justify-center rounded-2xl py-3 border shadow-sm transition-transform active:scale-95 cursor-pointer`} 
                 onClick={() => { setFilterStage(String(i+1)); setActiveTab('live'); }}
               >
-                <span className="text-[10px] font-black text-slate-300 mb-1 tracking-tighter whitespace-nowrap drop-shadow-md">{st.label}</span>
-                <span className={`text-[15px] font-black font-mono ${st.color} drop-shadow-[0_0_8px_currentColor]`}>{st.count}</span>
+                <span className={`text-[10px] font-black mb-1 tracking-tighter whitespace-nowrap ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{st.label}</span>
+                <span className={`text-[15px] font-black font-mono ${st.color}`}>{st.count}</span>
               </div>
             ))}
           </div>
           
           {/* Ticker */}
-          <div className="bg-black/60 rounded-xl border border-white/5 h-10 flex items-center overflow-hidden pl-3 pr-2 relative shadow-inner">
-            <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-black shrink-0 mr-2 z-20 bg-black/60 pr-2 h-full">
+          <div className={`rounded-xl border h-10 flex items-center overflow-hidden pl-3 pr-2 relative ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-black/60 border-white/5 shadow-inner'}`}>
+            <div className={`flex items-center gap-1.5 text-red-500 text-[10px] font-black shrink-0 mr-2 z-20 ${isLight ? 'bg-slate-50' : 'bg-black/60'} pr-2 h-full`}>
               <span className="relative flex h-2.5 w-2.5 mr-1">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
               </span>
               BREAKING
             </div>
-            {/* Fade masks */}
-            <div className="absolute left-20 top-0 bottom-0 w-8 bg-gradient-to-r from-black/60 to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-black/60 to-transparent z-10 pointer-events-none" />
             
             <div className="flex-1 overflow-hidden relative h-full flex items-center">
               <div className="whitespace-nowrap animate-marquee flex items-center gap-10 absolute left-0" style={{ animationPlayState: isSimulationActive ? 'running' : 'paused' }}>
                 {displayedCards.slice(0, 5).map((c, i) => (
-                  <span key={i} className="text-[11px] text-slate-300 font-bold tracking-wide" onClick={() => { setSelectedCardId(c.inc_id); setActiveTab('live'); }}>
-                    <span className="text-[#00e5ff] mr-1.5">[{c.bizSystem}]</span>{c.inc_id} 유입
+                  <span key={i} className={`text-[11px] font-bold tracking-wide cursor-pointer ${isLight ? 'text-slate-700' : 'text-slate-300'}`} onClick={() => { setSelectedCardId(c.inc_id); setActiveTab('live'); }}>
+                    <span className={`${isLight ? 'text-blue-600' : 'text-[#00e5ff]'} mr-1.5`}>[{c.bizSystem}]</span>{c.inc_id} 유입
                   </span>
                 ))}
               </div>

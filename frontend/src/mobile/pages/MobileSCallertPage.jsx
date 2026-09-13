@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getAuthHeaders, getUserProfile } from '../../lib/authStore';
 import { SMS_WORKER_URL } from '../../config/api';
+import { useTheme } from '../../context/ThemeContext';
 
 const API_BASE = SMS_WORKER_URL || 'https://sguardai.khcho0421.workers.dev';
 
@@ -34,16 +35,16 @@ function EventBadge({ type }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${cls}`}>{label}</span>;
 }
 
-function Card({ children, accent = '#6366f1' }) {
+function Card({ children, accent = '#6366f1', isLight = false }) {
   return (
-    <div className="rounded-2xl border border-white/5 p-4 relative overflow-hidden" style={{ background: 'rgba(12,16,32,0.8)', backdropFilter: 'blur(20px)' }}>
+    <div className={`rounded-2xl border p-4 relative overflow-hidden ${isLight ? 'bg-white border-slate-200/80 shadow-sm' : 'border-white/5'}`} style={!isLight ? { background: 'rgba(12,16,32,0.8)', backdropFilter: 'blur(20px)' } : {}}>
       <div className="absolute top-0 left-0 w-full h-[2px]" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
       {children}
     </div>
   );
 }
 
-function CardHeader({ icon: Icon, title, sub, color = '#6366f1', extra }) {
+function CardHeader({ icon: Icon, title, sub, color = '#6366f1', extra, isLight = false }) {
   return (
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2.5">
@@ -51,7 +52,7 @@ function CardHeader({ icon: Icon, title, sub, color = '#6366f1', extra }) {
           <Icon size={14} color={color} />
         </div>
         <div>
-          <p className="text-xs font-black text-white leading-tight">{title}</p>
+          <p className={`text-xs font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>{title}</p>
           <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color }}>{sub}</p>
         </div>
       </div>
@@ -61,6 +62,7 @@ function CardHeader({ icon: Icon, title, sub, color = '#6366f1', extra }) {
 }
 
 export default function MobileSCallertPage() {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const userProfile = getUserProfile();
 
@@ -639,23 +641,27 @@ export default function MobileSCallertPage() {
   }, [stratForm, nowTime]);
 
   return (
-    <div className="min-h-screen text-white font-sans pb-24" style={{ background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' }}>
-      <div className="fixed top-0 right-0 w-64 h-64 bg-orange-600/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="fixed bottom-20 left-0 w-64 h-64 bg-cyan-600/5 blur-[120px] rounded-full pointer-events-none" />
+    <div className={`min-h-screen font-sans pb-24 ${isLight ? 'bg-[#F1F5F9] text-slate-800' : 'text-white'}`} style={!isLight ? { background: 'linear-gradient(160deg,#04070f 0%,#070b18 60%,#04070f 100%)' } : {}}>
+      {!isLight && (
+        <>
+          <div className="fixed top-0 right-0 w-64 h-64 bg-orange-600/5 blur-[120px] rounded-full pointer-events-none" />
+          <div className="fixed bottom-20 left-0 w-64 h-64 bg-cyan-600/5 blur-[120px] rounded-full pointer-events-none" />
+        </>
+      )}
 
       {/* 헤더 */}
-      <div className="sticky top-0 z-40 px-4 pt-safe-top pb-3" style={{ background: 'rgba(4,7,15,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className={`sticky top-0 z-40 px-4 pt-safe-top pb-3 border-b ${isLight ? 'bg-white/95 border-slate-200 text-slate-900 shadow-sm' : 'border-white/5 text-white shadow-[0_4px_30px_rgba(0,0,0,0.5)]'}`} style={!isLight ? { background: 'rgba(4,7,15,0.85)', backdropFilter: 'blur(20px)' } : {}}>
         <div className="flex items-center gap-3 pt-2">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center active:scale-95">
-            <ArrowLeft size={15} className="text-slate-300" />
+          <button onClick={() => navigate(-1)} className={`w-8 h-8 rounded-xl border flex items-center justify-center active:scale-95 ${isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-300'}`}>
+            <ArrowLeft size={15} />
           </button>
           <div className="flex-1">
-            <h1 className="text-base font-black text-white tracking-tight">S-Callert</h1>
-            <p className="text-[9px] font-bold uppercase tracking-widest text-orange-400">장애 대응 PDS 전략 관리</p>
+            <h1 className={`text-base font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>S-Callert</h1>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-orange-500">장애 대응 PDS 전략 관리</p>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-            <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Live</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: isLight ? '#ecfdf5' : 'rgba(16,185,129,0.1)', border: isLight ? '1px solid #a7f3d0' : '1px solid rgba(16,185,129,0.2)' }}>
+            <div className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? (isLight ? 'bg-emerald-600 animate-pulse' : 'bg-emerald-400 animate-pulse') : 'bg-slate-400'}`} />
+            <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>Live</span>
           </div>
         </div>
       </div>
@@ -663,10 +669,10 @@ export default function MobileSCallertPage() {
       <div className="px-4 py-4 space-y-3">
 
         {/* 1. 장애 대응 전략 선택 및 생성 */}
-        <Card accent="#f97316">
+        <Card accent="#f97316" isLight={isLight}>
           <div className="flex items-center justify-between">
             <div className="flex-1 cursor-pointer" onClick={() => setStratOpen(v => !v)}>
-              <CardHeader icon={Zap} title="장애 대응 전략" sub="Strategy Master" color="#f97316" />
+              <CardHeader icon={Zap} title="장애 대응 전략" sub="Strategy Master" color="#f97316" isLight={isLight} />
             </div>
             <button
               onClick={() => setShowCreateForm(v => !v)}

@@ -167,47 +167,72 @@ export default function OverallStatusPage() {
     {
       label: '자산화 성공률', sub: 'Fidelity Index',
       value: `${stats.incidents.integrity}%`,
-      icon: Shield, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', iconBg: 'bg-emerald-500/20', iconBorder: 'border-emerald-500/30',
+      icon: Shield,
+      color: isLight ? 'text-emerald-600' : 'text-emerald-400',
+      bg: isLight ? 'bg-emerald-50' : 'bg-emerald-500/10',
+      border: isLight ? 'border-emerald-200' : 'border-emerald-500/20',
+      iconBg: isLight ? 'bg-emerald-100' : 'bg-emerald-500/20',
+      iconBorder: isLight ? 'border-emerald-300' : 'border-emerald-500/30',
       formula: 'KB_COUNT / TOTAL_INC × 100',
     },
     {
       label: '평균 복구 소요시간', sub: 'MTTR (인지→지식화)',
       value: stats.incidents.mttr > 0 ? `${stats.incidents.mttr}m` : '-',
-      icon: Rocket, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', iconBg: 'bg-blue-500/20', iconBorder: 'border-blue-500/30',
+      icon: Rocket,
+      color: isLight ? 'text-blue-600' : 'text-blue-400',
+      bg: isLight ? 'bg-blue-50' : 'bg-blue-500/10',
+      border: isLight ? 'border-blue-200' : 'border-blue-500/20',
+      iconBg: isLight ? 'bg-blue-100' : 'bg-blue-500/20',
+      iconBorder: isLight ? 'border-blue-300' : 'border-blue-500/30',
       formula: 'AVG(KB_REG - SMS_RECV)',
     },
     {
       label: '평균 인지 소요시간', sub: `주간: ${stats.incidents.dayMtta || 0}m / 야간: ${stats.incidents.nightMtta || 0}m`,
       value: stats.incidents.mtta > 0 ? `${stats.incidents.mtta}m` : '-',
-      icon: Clock, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', iconBg: 'bg-purple-500/20', iconBorder: 'border-purple-500/30',
+      icon: Clock,
+      color: isLight ? 'text-purple-600' : 'text-purple-400',
+      bg: isLight ? 'bg-purple-50' : 'bg-purple-500/10',
+      border: isLight ? 'border-purple-200' : 'border-purple-500/20',
+      iconBg: isLight ? 'bg-purple-100' : 'bg-purple-500/20',
+      iconBorder: isLight ? 'border-purple-300' : 'border-purple-500/30',
       formula: 'AVG(WARROOM - SMS_RECV)',
     },
     {
       label: '이번달 KB 증가', sub: '전월 대비 지식 성장률',
       value: stats.knowledge.growth || '-',
-      icon: Heart, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', iconBg: 'bg-red-500/20', iconBorder: 'border-red-500/30',
+      icon: Heart,
+      color: isLight ? 'text-rose-600' : 'text-red-400',
+      bg: isLight ? 'bg-rose-50' : 'bg-red-500/10',
+      border: isLight ? 'border-rose-200' : 'border-red-500/20',
+      iconBg: isLight ? 'bg-rose-100' : 'bg-red-500/20',
+      iconBorder: isLight ? 'border-rose-300' : 'border-red-500/30',
       formula: 'THIS_MONTH / LAST_MONTH',
     },
     {
       label: '전사 조치 지수', sub: 'High Intelligence',
       value: `${stats.incidents.rate}%`,
-      icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', iconBg: 'bg-amber-500/20', iconBorder: 'border-amber-500/30',
+      icon: Zap,
+      color: isLight ? 'text-amber-600' : 'text-amber-400',
+      bg: isLight ? 'bg-amber-50' : 'bg-amber-500/10',
+      border: isLight ? 'border-amber-200' : 'border-amber-500/20',
+      iconBg: isLight ? 'bg-amber-100' : 'bg-amber-500/20',
+      iconBorder: isLight ? 'border-amber-300' : 'border-amber-500/30',
       formula: 'RESOLVED / TOTAL × 100',
     },
   ];
 
   const FLOW = [
-    { label: 'SMS 수신', value: stats.incidents.total, icon: MessageSquare, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' },
-    { label: '전문가 배정', value: stats.warrooms?.assignedUsers ?? stats.warrooms.active, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
-    { label: '대응 중', value: Math.max(0, stats.incidents.total - stats.incidents.resolved), icon: Activity, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
-    { label: '조치 완료', value: stats.incidents.resolved, icon: CheckCircle2, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
-    { label: '지식 자산', value: stats.knowledge.total, icon: Database, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', glow: true },
+    { label: 'SMS 수신', value: stats.incidents.total, icon: MessageSquare, color: isLight ? 'text-rose-600' : 'text-red-400', bg: isLight ? 'bg-rose-50' : 'bg-red-500/10', border: isLight ? 'border-rose-200' : 'border-red-500/30' },
+    { label: '전문가 배정', value: stats.warrooms?.assignedUsers ?? stats.warrooms.active, icon: Users, color: isLight ? 'text-blue-600' : 'text-blue-400', bg: isLight ? 'bg-blue-50' : 'bg-blue-500/10', border: isLight ? 'border-blue-200' : 'border-blue-500/30' },
+    { label: '대응 중', value: Math.max(0, stats.incidents.total - stats.incidents.resolved), icon: Activity, color: isLight ? 'text-purple-600' : 'text-purple-400', bg: isLight ? 'bg-purple-50' : 'bg-purple-500/10', border: isLight ? 'border-purple-200' : 'border-purple-500/30' },
+    { label: '조치 완료', value: stats.incidents.resolved, icon: CheckCircle2, color: isLight ? 'text-amber-600' : 'text-amber-400', bg: isLight ? 'bg-amber-50' : 'bg-amber-500/10', border: isLight ? 'border-amber-200' : 'border-amber-500/30' },
+    { label: '지식 자산', value: stats.knowledge.total, icon: Database, color: isLight ? 'text-emerald-600' : 'text-emerald-400', bg: isLight ? 'bg-emerald-50' : 'bg-emerald-500/10', border: isLight ? 'border-emerald-200' : 'border-emerald-500/30', glow: true },
   ];
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-zinc-950 gap-4">
-        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+      <div className={`h-screen flex flex-col items-center justify-center ${isLight ? 'bg-slate-50' : 'bg-zinc-950'} gap-4`}>
+        <Loader2 className={`w-10 h-10 ${isLight ? 'text-blue-600' : 'text-indigo-500'} animate-spin`} />
         <div className="text-sm font-black text-slate-500 tracking-widest">
           SYNCING DREAM ANALYTICS...
         </div>
@@ -234,7 +259,7 @@ export default function OverallStatusPage() {
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
           
           <button onClick={() => goBack()} className={`w-7 h-7 md:w-8 md:h-8 min-w-[28px] md:min-w-[32px] shrink-0 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center cursor-pointer active:scale-95 ${
-            isLight ? 'bg-slate-100 border-slate-200 hover:bg-slate-200' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+            isLight ? 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
           }`}>
             <ChevronLeft className={`w-4 h-4 md:w-5 md:h-5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`} />
           </button>
@@ -281,7 +306,11 @@ export default function OverallStatusPage() {
           <button 
             key={i} 
             onClick={() => setTab(i)} 
-            className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-black transition-all ${tab === i ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'}`}
+            className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              tab === i 
+                ? (isLight ? 'bg-blue-600 text-white border border-blue-600 shadow-md shadow-blue-500/20' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30') 
+                : (isLight ? 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm' : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10')
+            }`}
           >
             {t}
           </button>
@@ -303,22 +332,26 @@ export default function OverallStatusPage() {
             {KPI.map((k, i) => {
               const Icon = k.icon;
               return (
-                <div key={i} className={`rounded-3xl p-4 bg-gradient-to-br from-white/5 to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col gap-3 ${i === 4 ? 'col-span-2 lg:col-span-1' : ''}`}>
-                  <div className={`absolute -right-4 -top-4 w-24 h-24 ${k.bg} blur-[30px] rounded-full group-hover:scale-110 transition-transform opacity-50`}></div>
+                <div key={i} className={`rounded-3xl p-4 relative overflow-hidden group transition-all flex flex-col gap-3 ${i === 4 ? 'col-span-2 lg:col-span-1' : ''} ${
+                  isLight 
+                    ? 'bg-white border border-slate-200/80 shadow-sm hover:border-slate-300' 
+                    : 'bg-gradient-to-br from-white/5 to-transparent border border-white/5 hover:border-white/10'
+                }`}>
+                  {!isLight && <div className={`absolute -right-4 -top-4 w-24 h-24 ${k.bg} blur-[30px] rounded-full group-hover:scale-110 transition-transform opacity-50`}></div>}
                   
                   <div>
                     <div className={`w-8 h-8 rounded-xl mb-3 flex items-center justify-center ${k.iconBg} border ${k.iconBorder} shrink-0`}>
                       <Icon className={`w-4 h-4 ${k.color}`} />
                     </div>
-                    <div className="text-3xl font-black text-slate-100 font-mono tracking-tighter mb-1 leading-none">
+                    <div className={`text-3xl font-black font-mono tracking-tighter mb-1 leading-none ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
                       {k.value}
                     </div>
                   </div>
                   
-                  <div className="flex flex-col gap-0.5 pt-2 border-t border-white/5">
-                    <div className="text-[11px] font-bold text-slate-400 leading-tight">{k.label}</div>
+                  <div className={`flex flex-col gap-0.5 pt-2 border-t ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+                    <div className={`text-[11px] font-bold leading-tight ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>{k.label}</div>
                     <div className="text-[9px] font-bold text-slate-500 leading-tight">{k.sub}</div>
-                    <div className={`mt-2 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-80 shrink-0`}>
+                    <div className={`mt-2 text-[9px] font-mono font-bold px-2 py-1 rounded-lg border inline-flex self-start ${k.color} ${k.bg} ${k.iconBorder} opacity-90 shrink-0`}>
                       {k.formula}
                     </div>
                   </div>
@@ -330,10 +363,16 @@ export default function OverallStatusPage() {
           {isPC && <div onMouseDown={(e) => hDrag1(0, e)} className={`w-1.5 md:w-2 cursor-ew-resize shrink-0 bg-transparent hover:bg-blue-500/50 transition-colors z-20 ${hDragIng1 ? 'bg-blue-500/50' : ''}`} />}
 
           {/* Incident Lifecycle Flow */}
-          <div className="lg:w-[450px] shrink-0 bg-zinc-900/40 backdrop-blur-sm rounded-3xl p-4 border border-white/5 flex flex-col shadow-lg overflow-hidden lg:h-full" style={isPC ? { width: `${wR1[1]}%`, flex: 'none' } : {}}>
+          <div className={`lg:w-[450px] shrink-0 rounded-3xl p-4 border flex flex-col overflow-hidden lg:h-full ${
+            isLight 
+              ? 'bg-white border-slate-200/80 shadow-sm' 
+              : 'bg-zinc-900/40 backdrop-blur-sm border-white/5 shadow-lg'
+          }`} style={isPC ? { width: `${wR1[1]}%`, flex: 'none' } : {}}>
             <div className="flex items-center gap-2 mb-4 shrink-0">
-              <div className="p-1.5 bg-indigo-500/10 rounded-lg"><Activity className="w-4 h-4 text-indigo-400" /></div>
-              <span className="text-sm font-black text-slate-200">인시던트 생애주기</span>
+              <div className={`p-1.5 rounded-lg ${isLight ? 'bg-indigo-50' : 'bg-indigo-500/10'}`}>
+                <Activity className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+              </div>
+              <span className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>인시던트 생애주기</span>
             </div>
             <div className="flex-1 flex items-center justify-between gap-1 mt-1 md:mt-0">
               {FLOW.map((f, i) => {
@@ -346,11 +385,11 @@ export default function OverallStatusPage() {
                       </div>
                       <div className="text-center">
                          <span className={`text-[11px] md:text-base font-black font-mono leading-tight block md:inline ${f.color}`}>{f.value}</span>
-                         <span className="text-[8px] md:text-[9px] font-bold text-slate-400 text-center leading-tight break-keep block md:inline md:ml-1 whitespace-nowrap md:whitespace-normal">{f.label}</span>
+                         <span className={`text-[8px] md:text-[9px] font-bold text-center leading-tight break-keep block md:inline md:ml-1 whitespace-nowrap md:whitespace-normal ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{f.label}</span>
                       </div>
                     </div>
                     {i < FLOW.length - 1 && (
-                      <div className="w-2 md:w-4 h-[1px] bg-white/10 shrink-0" />
+                      <div className={`w-2 md:w-4 h-[1px] shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
                     )}
                   </React.Fragment>
                 );
@@ -371,15 +410,17 @@ export default function OverallStatusPage() {
           
           {/* Column 1: MTTA (Tab 1 on Mobile) */}
           {(isPC || tab === 1) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
+            <div className={`flex rounded-3xl px-4 pt-2 md:pt-3 pb-4 border flex-col justify-start lg:flex-1 lg:min-h-0 relative overflow-hidden ${
+              isLight ? 'bg-white border-slate-200/80 shadow-sm' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5 shadow-lg'
+            }`} style={isPC ? { width: `${wR2[0]}%`, flex: 'none' } : {}}>
+            {!isLight && <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>}
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-purple-400" />
-                <h3 className="text-sm font-black text-slate-200">일자별 MTTA 추이</h3>
+                <Clock className={`w-4 h-4 ${isLight ? 'text-purple-600' : 'text-purple-400'}`} />
+                <h3 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>일자별 MTTA 추이</h3>
               </div>
             </div>
-            <div className="flex items-center gap-3 text-[9px] font-bold mb-3 shrink-0 relative z-10 px-1">
+            <div className={`flex items-center gap-3 text-[9px] font-bold mb-3 shrink-0 relative z-10 px-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-400"></div>주간 평균(m)</div>
                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-400"></div>야간 평균(m)</div>
             </div>
@@ -392,17 +433,17 @@ export default function OverallStatusPage() {
                         <linearGradient id="colorDay" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4}/><stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/></linearGradient>
                         <linearGradient id="colorNight" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/><stop offset="95%" stopColor="#818cf8" stopOpacity={0}/></linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.substring(5)} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} itemStyle={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)'} vertical={false} />
+                      <XAxis dataKey="date" tick={{ fill: isLight ? '#64748b' : '#64748b', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.substring(5)} />
+                      <YAxis tick={{ fill: isLight ? '#64748b' : '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.95)', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }} itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 10, fontWeight: 'bold' }} />
                       <Area type="monotone" dataKey="dayMtta" name="주간(분)" stroke="#fbbf24" strokeWidth={2} fill="url(#colorDay)" />
                       <Area type="monotone" dataKey="nightMtta" name="야간(분)" stroke="#818cf8" strokeWidth={2} fill="url(#colorNight)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500 absolute inset-0">데이터 없음</div>
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-400 absolute inset-0">데이터 없음</div>
               )}
             </div>
           </div>
@@ -412,12 +453,14 @@ export default function OverallStatusPage() {
 
           {/* Column 2: Categories (Tab 2 on Mobile) */}
           {(isPC || tab === 2) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>
+            <div className={`flex rounded-3xl px-4 pt-2 md:pt-3 pb-4 border flex-col justify-start lg:flex-1 lg:min-h-0 relative overflow-hidden ${
+              isLight ? 'bg-white border-slate-200/80 shadow-sm' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5 shadow-lg'
+            }`} style={isPC ? { width: `${wR2[1]}%`, flex: 'none' } : {}}>
+            {!isLight && <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none"></div>}
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-black text-slate-200">인텔리전스 카테고리</h3>
+                <BarChart3 className={`w-4 h-4 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                <h3 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>인텔리전스 카테고리</h3>
               </div>
             </div>
             <div className="flex-1 min-h-[200px] lg:min-h-0 relative flex items-center justify-center z-10">
@@ -427,8 +470,8 @@ export default function OverallStatusPage() {
                     <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
                       <PieChart>
                         <Tooltip 
-                          contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }} 
-                          itemStyle={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }} 
+                          contentStyle={{ backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.95)', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }} 
+                          itemStyle={{ color: isLight ? '#0f172a' : '#fff', fontSize: 11, fontWeight: 'bold' }} 
                           formatter={(val) => [`${val}건`, '문서 수']} 
                         />
                         <Pie
@@ -452,13 +495,13 @@ export default function OverallStatusPage() {
                     </ResponsiveContainer>
                   </div>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <Database className="w-5 h-5 text-emerald-400 opacity-60 mb-1" />
-                    <span className="text-2xl font-black text-white font-mono">{stats.knowledge.total}</span>
-                    <span className="text-[8px] font-bold text-slate-400">TOTAL ASSETS</span>
+                    <Database className={`w-5 h-5 opacity-80 mb-1 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                    <span className={`text-2xl font-black font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{stats.knowledge.total}</span>
+                    <span className={`text-[8px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>TOTAL ASSETS</span>
                   </div>
                 </>
               ) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500 absolute inset-0">데이터 없음</div>
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-400 absolute inset-0">데이터 없음</div>
               )}
             </div>
           </div>
@@ -468,14 +511,16 @@ export default function OverallStatusPage() {
 
           {/* Column 3: Contributors (Tab 3 on Mobile) */}
           {(isPC || tab === 3) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>
+            <div className={`flex rounded-3xl px-4 pt-2 md:pt-3 pb-4 border flex-col justify-start lg:flex-1 lg:min-h-0 relative overflow-hidden ${
+              isLight ? 'bg-white border-slate-200/80 shadow-sm' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5 shadow-lg'
+            }`} style={isPC ? { width: `${wR2[2]}%`, flex: 'none' } : {}}>
+            {!isLight && <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none"></div>}
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
-                <Medal className="w-4 h-4 text-amber-400" />
-                <h3 className="text-sm font-black text-slate-200">전문가 기여도</h3>
+                <Medal className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
+                <h3 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>전문가 기여도</h3>
               </div>
-              <span className="text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">Honor Board</span>
+              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${isLight ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>Honor Board</span>
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-2.5 relative z-10">
@@ -485,31 +530,52 @@ export default function OverallStatusPage() {
                 const pct = Math.max(8, (user.synergy_score / maxScore) * 100);
 
                 return (
-                  <div key={i} className={`flex items-center gap-3 rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${isTop ? 'border border-amber-500/30' : 'border border-white/5 hover:border-white/10'}`}>
+                  <div key={i} className={`flex items-center gap-3 rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${
+                    isTop
+                      ? (isLight ? 'bg-amber-50/70 border-2 border-amber-300 shadow-sm' : 'border border-amber-500/30')
+                      : (isLight ? 'bg-white border border-slate-200 hover:border-slate-300 shadow-sm' : 'border border-white/5 hover:border-white/10')
+                  }`}>
                     
                     {/* Background Progress Bar */}
-                    <div className="absolute top-0 bottom-0 left-0 z-0 transition-all duration-1000" style={{ width: `${pct}%`, background: isTop ? 'linear-gradient(90deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05))' : 'rgba(255,255,255,0.03)' }} />
+                    <div className="absolute top-0 bottom-0 left-0 z-0 transition-all duration-1000" style={{
+                      width: `${pct}%`,
+                      background: isTop
+                        ? (isLight ? 'linear-gradient(90deg, rgba(245,158,11,0.18), rgba(245,158,11,0.04))' : 'linear-gradient(90deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05))')
+                        : (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)')
+                    }} />
                     
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 relative z-10 ${isTop ? 'bg-amber-500/20 border-2 border-amber-500/40 text-amber-400' : 'bg-white/5 border border-white/10 text-slate-400'}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 relative z-10 ${
+                      isTop
+                        ? (isLight ? 'bg-amber-100 border-2 border-amber-400 text-amber-700' : 'bg-amber-500/20 border-2 border-amber-500/40 text-amber-400')
+                        : (isLight ? 'bg-slate-100 border border-slate-200 text-slate-700' : 'bg-white/5 border border-white/10 text-slate-400')
+                    }`}>
                       {isTop ? '🥇' : `${i + 1}`}
                     </div>
                     <div className="flex-1 min-w-0 relative z-10">
-                      <div className={`text-xs font-black truncate mb-0.5 ${isTop ? 'text-amber-200' : 'text-slate-200'}`}>@{user.name}</div>
+                      <div className={`text-xs font-black truncate mb-0.5 ${
+                        isTop
+                          ? (isLight ? 'text-amber-950' : 'text-amber-200')
+                          : (isLight ? 'text-slate-900' : 'text-slate-200')
+                      }`}>@{user.name}</div>
                       <div className="text-[9px] font-bold text-slate-500 truncate mb-1.5">{user.full_org}</div>
                       <div className="flex gap-2">
-                        <span className="text-[9px] font-bold text-pink-400">전파:{user.warroom_count}</span>
-                        <span className="text-[9px] font-bold text-emerald-400">KB:{user.kb_count}</span>
-                        <span className="text-[9px] font-bold text-blue-400">참여:{user.chat_count}</span>
+                        <span className={`text-[9px] font-bold ${isLight ? 'text-pink-600 bg-pink-50 px-1.5 py-0.5 rounded border border-pink-200' : 'text-pink-400'}`}>전파:{user.warroom_count}</span>
+                        <span className={`text-[9px] font-bold ${isLight ? 'text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200' : 'text-emerald-400'}`}>KB:{user.kb_count}</span>
+                        <span className={`text-[9px] font-bold ${isLight ? 'text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200' : 'text-blue-400'}`}>참여:{user.chat_count}</span>
                       </div>
                     </div>
                     <div className="text-right shrink-0 relative z-10">
-                      <div className={`text-lg font-black font-mono leading-none ${isTop ? 'text-amber-400' : 'text-slate-400'}`}>{user.synergy_score}</div>
-                      <div className="text-[8px] font-bold text-slate-500 mt-1">SCORE</div>
+                      <div className={`text-lg font-black font-mono leading-none ${
+                        isTop
+                          ? (isLight ? 'text-amber-600' : 'text-amber-400')
+                          : (isLight ? 'text-blue-600' : 'text-slate-400')
+                      }`}>{user.synergy_score}</div>
+                      <div className="text-[8px] font-bold text-slate-400 mt-1">SCORE</div>
                     </div>
                   </div>
                 );
               }) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">기여자 데이터 없음</div>
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-400">기여자 데이터 없음</div>
               )}
             </div>
           </div>
@@ -519,35 +585,43 @@ export default function OverallStatusPage() {
 
           {/* Column 4: Feed (Tab 4 on Mobile) */}
           {(isPC || tab === 4) && (
-            <div className="flex bg-zinc-900/40 backdrop-blur-sm rounded-3xl px-4 pt-2 md:pt-3 pb-4 border border-white/5 flex-col justify-start lg:flex-1 lg:min-h-0 shadow-lg relative overflow-hidden" style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>
+            <div className={`flex rounded-3xl px-4 pt-2 md:pt-3 pb-4 border flex-col justify-start lg:flex-1 lg:min-h-0 relative overflow-hidden ${
+              isLight ? 'bg-white border-slate-200/80 shadow-sm' : 'bg-zinc-900/40 backdrop-blur-sm border-white/5 shadow-lg'
+            }`} style={isPC ? { width: `${wR2[3]}%`, flex: 'none' } : {}}>
+            {!isLight && <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] pointer-events-none"></div>}
             <div className="flex items-center justify-between mb-4 shrink-0 relative z-10 min-h-[28px]">
               <div className="flex items-center gap-2">
-                <FileSearch className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-black text-slate-200">인텔리전스 피드</h3>
+                <FileSearch className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                <h3 className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>인텔리전스 피드</h3>
               </div>
               <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3 relative z-10">
               {stats.recentFeed.length > 0 ? stats.recentFeed.map((item, i) => (
-                <div key={i} className={`rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${i === 0 ? 'bg-blue-500/10 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
+                <div key={i} className={`rounded-2xl p-3 shrink-0 relative overflow-hidden transition-all ${
+                  i === 0 
+                    ? (isLight ? 'bg-blue-50/60 border border-blue-200 shadow-sm' : 'bg-blue-500/10 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]')
+                    : (isLight ? 'bg-white border border-slate-200 hover:border-slate-300 shadow-sm' : 'bg-white/5 border border-white/10 hover:bg-white/10')
+                }`}>
                   {i === 0 && (
                     <div className="absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-indigo-500" />
                   )}
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md">
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border ${
+                      isLight ? 'bg-blue-100/70 text-blue-700 border-blue-200' : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                    }`}>
                       {item.category || '기타'} · APPROVED
                     </span>
                     <span className="text-[9px] font-mono font-bold text-slate-500">{(item.reg_dt || '').substring(5, 16)}</span>
                   </div>
-                  <div className="text-xs font-black text-slate-200 leading-snug mb-2 line-clamp-2">
+                  <div className={`text-xs font-black leading-snug mb-2 line-clamp-2 ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>
                     {item.title}
                   </div>
-                  <div className="flex items-center justify-between gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="flex items-center justify-between gap-2 mt-2 pt-2" style={{ borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)' }}>
                     <div className="flex items-center gap-1.5">
-                      <Brain className="w-3 h-3 text-slate-500" />
-                      <span className="text-[9px] font-bold text-slate-400">@{item.reg_name || 'SYSTEM'}</span>
-                      <span className="text-[9px] font-bold text-slate-600 ml-1">· RAG Synced ✦</span>
+                      <Brain className={`w-3 h-3 ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
+                      <span className={`text-[9px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>@{item.reg_name || 'SYSTEM'}</span>
+                      <span className={`text-[9px] font-bold ml-1 ${isLight ? 'text-blue-600' : 'text-slate-600'}`}>· RAG Synced ✦</span>
                     </div>
                     {(() => {
                       // Extract inc_id from title: "[S-GUARD AI 보고서] {inc_id}: ..."
@@ -559,13 +633,11 @@ export default function OverallStatusPage() {
                             onClick={() => navigate(`/chat/${incId}`)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black transition-all active:scale-95 shrink-0"
                             style={{
-                              background: 'rgba(239,68,68,0.10)',
-                              border: '1px solid rgba(239,68,68,0.3)',
-                              color: '#f87171',
-                              boxShadow: '0 0 8px rgba(239,68,68,0.15)'
+                              background: isLight ? '#fef2f2' : 'rgba(239,68,68,0.10)',
+                              border: isLight ? '1px solid #fecaca' : '1px solid rgba(239,68,68,0.3)',
+                              color: isLight ? '#dc2626' : '#f87171',
+                              boxShadow: isLight ? '0 1px 2px rgba(0,0,0,0.05)' : '0 0 8px rgba(239,68,68,0.15)'
                             }}
-                            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 14px rgba(239,68,68,0.35)'}
-                            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 8px rgba(239,68,68,0.15)'}
                           >
                             <Swords className="w-2.5 h-2.5" />
                             <span>워룸</span>
@@ -575,13 +647,11 @@ export default function OverallStatusPage() {
                             onClick={() => navigate(`/ai-report/${incId}`)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black transition-all active:scale-95 shrink-0"
                             style={{
-                              background: 'rgba(59,130,246,0.12)',
-                              border: '1px solid rgba(59,130,246,0.3)',
-                              color: '#60a5fa',
-                              boxShadow: '0 0 8px rgba(59,130,246,0.15)'
+                              background: isLight ? '#eff6ff' : 'rgba(59,130,246,0.12)',
+                              border: isLight ? '1px solid #bfdbfe' : '1px solid rgba(59,130,246,0.3)',
+                              color: isLight ? '#2563eb' : '#60a5fa',
+                              boxShadow: isLight ? '0 1px 2px rgba(0,0,0,0.05)' : '0 0 8px rgba(59,130,246,0.15)'
                             }}
-                            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 14px rgba(59,130,246,0.35)'}
-                            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 8px rgba(59,130,246,0.15)'}
                           >
                             <FileText className="w-2.5 h-2.5" />
                             <span>AI 레포트</span>
@@ -593,7 +663,7 @@ export default function OverallStatusPage() {
                   </div>
                 </div>
               )) : (
-                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-500">피드 데이터 없음</div>
+                <div className="flex items-center justify-center h-full text-xs font-bold text-slate-400">피드 데이터 없음</div>
               )}
             </div>
           </div>
