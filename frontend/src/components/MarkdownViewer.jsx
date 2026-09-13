@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, Terminal, Brain, MessageSquare, TriangleAlert, CircleCheckBig, Clock, Zap, Shield, Database, Server, Star, CirclePlus } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const CodeBlock = ({ children, className }) => {
   const [copied, setCopied] = useState(false);
@@ -65,6 +66,7 @@ const highlightKeywords = (node) => {
 };
 
 const MarkdownViewer = ({ text, onLinkClick }) => {
+  const { isLight } = useTheme();
   if (!text) return null;
 
   // 📝 Pre-process: 불필요 요소 제거 (번호 제목 **N.** 패턴은 유지)
@@ -77,28 +79,28 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
     .replace(/(?<!\*\*\d+\..*?)\*\*([^*\n]*)\*\*/g, '$1')  // 일반 bold만 제거
     .replace(/\*([^*\n]+)\*/g, '$1')
     .replace(/\*\*/g, '')
-    .replace(/^[\*]\s+/gm, '- ')
+    .replace(/^[\*•●]\s+/gm, '- ')
     // 숫자. 패턴 변환은 하지 않음 (번호 제목 보존)
     .replace(/([^\n])\n?(💡 핵심 원인|Root Cause:)/g, '$1\n\n$2')
     .replace(/([^\n])\n?(✅ 최종 조치 결과|Resolution:)/g, '$1\n\n$2')
     .replace(/\n{3,}/g, '\n\n');
 
   return (
-    <div className="prose prose-invert max-w-none space-y-2 pb-2">
+    <div className={`max-w-none space-y-2 pb-2 ${isLight ? 'text-slate-900' : 'prose prose-invert text-slate-100'}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => (
-            <h1 className="mb-2 text-xl font-black text-white tracking-tight">{children}</h1>
+            <h1 className={`mb-2 text-xl font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mb-2 mt-5 text-[15px] font-black text-white flex items-center gap-2 pb-1.5 border-b border-white/5">
+            <h2 className={`mb-2 mt-5 text-[15px] font-black flex items-center gap-2 pb-1.5 border-b ${isLight ? 'text-slate-900 border-slate-200' : 'text-white border-white/5'}`}>
               <div className="w-2 h-4 bg-blue-500 rounded-full" />
               {children}
             </h2>
           ),
-          strong: ({ children }) => <span className="font-black text-white">{children}</span>,
-          em: ({ children }) => <span className="text-slate-400 italic">{children}</span>,
+          strong: ({ children }) => <span className={`font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{children}</span>,
+          em: ({ children }) => <span className={`italic ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{children}</span>,
 
           // 🔗 링크 렌더러: 내부 해시 링크는 현재 창에서, 외부 링크는 새 창에서 열기
           a: ({ href, children }) => {
@@ -108,7 +110,7 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
                 href={href} 
                 target={isInternal ? undefined : "_blank"} 
                 rel={isInternal ? undefined : "noreferrer"}
-                className="text-blue-400 underline underline-offset-2 hover:text-blue-300 font-bold"
+                className={`${isLight ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'} underline underline-offset-2 font-bold`}
                 onClick={(e) => {
                   if (isInternal) {
                     // 이벤트 전파 방지하여 부모 컴포넌트의 클릭 이벤트 간섭 차단
@@ -140,19 +142,19 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
               
               return (
                 <div className="my-3 space-y-2">
-                  {prefixText && <div className="text-slate-300 text-xs font-bold mb-2">{prefixText}</div>}
-                  <div className="text-[10px] font-black text-[#00e5ff] uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                  {prefixText && <div className={`${isLight ? 'text-slate-700' : 'text-slate-300'} text-xs font-bold mb-2`}>{prefixText}</div>}
+                  <div className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 mb-1.5 ${isLight ? 'text-blue-700' : 'text-[#00e5ff]'}`}>
                     <Database size={12} /> 분석 입력값 메타데이터
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-[#0c181c]/90 p-3 rounded-xl border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.1)]">
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-200 shadow-xs' : 'bg-[#0c181c]/90 border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.1)]'}`}>
                     {parts.map((pt, i) => {
                       const colonIdx = pt.indexOf(':');
                       const k = colonIdx !== -1 ? pt.substring(0, colonIdx).trim() : '항목';
                       const v = colonIdx !== -1 ? pt.substring(colonIdx + 1).trim() : pt;
                       return (
-                        <div key={i} className="flex items-center justify-between p-2.5 bg-[#00e5ff]/10 border border-[#00e5ff]/20 rounded-lg shadow-sm">
-                          <span className="text-[11px] font-bold text-slate-400 truncate mr-2">{k}</span>
-                          <span className="text-xs font-mono font-black text-[#ffffff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)] shrink-0">{v}</span>
+                        <div key={i} className={`flex items-center justify-between p-2.5 rounded-lg border ${isLight ? 'bg-white border-slate-200' : 'bg-[#00e5ff]/10 border-[#00e5ff]/20'}`}>
+                          <span className={`text-[11px] font-bold truncate mr-2 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{k}</span>
+                          <span className={`text-xs font-mono font-black shrink-0 ${isLight ? 'text-blue-700' : 'text-[#ffffff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]'}`}>{v}</span>
                         </div>
                       );
                     })}
@@ -164,11 +166,11 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
             // 💡 핵심 원인 (Root Cause)
             if (contentStr.includes('💡 핵심 원인') || contentStr.includes('Root Cause:')) {
               return (
-                <div className="my-3 flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-                  <TriangleAlert className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <div className={`my-3 flex items-start gap-3 rounded-xl p-4 border ${isLight ? 'bg-amber-50/90 border-amber-200 text-slate-900 shadow-xs' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                  <TriangleAlert className={`w-4 h-4 mt-0.5 shrink-0 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Root Cause</span>
-                    <div className="text-amber-50/90 text-[14px] leading-relaxed break-words">{highlightKeywords(children)}</div>
+                    <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${isLight ? 'text-amber-800' : 'text-amber-500'}`}>Root Cause</span>
+                    <div className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-amber-50/90'}`}>{highlightKeywords(children)}</div>
                   </div>
                 </div>
               );
@@ -177,17 +179,17 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
             // ✅ 최종 조치 결과 (Resolution)
             if (contentStr.includes('✅ 최종 조치 결과') || contentStr.includes('Resolution:')) {
               return (
-                <div className="my-3 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
-                  <CircleCheckBig className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div className={`my-3 flex items-start gap-3 rounded-xl p-4 border ${isLight ? 'bg-emerald-50/90 border-emerald-200 text-slate-900 shadow-xs' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
+                  <CircleCheckBig className={`w-4 h-4 mt-0.5 shrink-0 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Resolution</span>
-                    <div className="text-emerald-50/90 text-[14px] leading-relaxed break-words">{highlightKeywords(children)}</div>
+                    <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${isLight ? 'text-emerald-800' : 'text-emerald-500'}`}>Resolution</span>
+                    <div className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-emerald-50/90'}`}>{highlightKeywords(children)}</div>
                   </div>
                 </div>
               );
             }
 
-            return <div className="mb-1.5 text-slate-200 leading-relaxed text-[14px] break-words">{highlightKeywords(children)}</div>;
+            return <div className={`mb-1.5 leading-relaxed text-[14px] break-words ${isLight ? 'text-slate-900 font-medium' : 'text-slate-200'}`}>{highlightKeywords(children)}</div>;
           },
 
           ol: ({ children }) => <div className="space-y-1 my-2">{children}</div>,
@@ -212,19 +214,21 @@ const MarkdownViewer = ({ text, onLinkClick }) => {
               // We keep the original children but try to indent them
               return (
                 <div className="flex items-start gap-2 py-1 group">
-                  <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                  <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono text-[11px] font-black border border-blue-500/20 shrink-0">
+                  <div className={`mt-2 w-1.5 h-1.5 rounded-full shrink-0 ${isLight ? 'bg-blue-600' : 'bg-blue-400'}`} />
+                  <span className={`px-1.5 py-0.5 rounded-md font-mono text-[11px] font-black shrink-0 border ${
+                    isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  }`}>
                     {timestamp}
                   </span>
-                  <span className="text-slate-200 text-[14px] leading-relaxed break-words">{children}</span>
+                  <span className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-slate-200'}`}>{children}</span>
                 </div>
               );
             }
 
             return (
               <div className="flex items-start gap-2 py-1">
-                <div className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500/70 shrink-0" />
-                <span className="text-slate-200 text-[14px] leading-relaxed break-words">{children}</span>
+                <div className={`mt-2 w-1.5 h-1.5 rounded-full shrink-0 ${isLight ? 'bg-blue-600' : 'bg-blue-500/70'}`} />
+                <span className={`text-[14px] leading-relaxed break-words ${isLight ? 'text-slate-900 font-medium' : 'text-slate-200'}`}>{children}</span>
               </div>
             );
           },

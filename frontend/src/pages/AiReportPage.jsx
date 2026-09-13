@@ -26,10 +26,10 @@ const getDefaultDates = () => {
 
 const API_BASE_URL = 'https://sguardai.khcho0421.workers.dev';
 
-const mdComponents = {
+const getMdComponents = (isLight) => ({
   h1: ({ children }) => (
-    <div style={{ margin: '28px 0 12px', paddingBottom: 10, borderBottom: '1px solid var(--sh-border-color, rgba(59,130,246,0.2))' }}>
-      <h1 style={{ fontSize: 17, fontWeight: 900, color: 'var(--sh-text-primary, #f1f5f9)', letterSpacing: '-0.01em', lineHeight: 1.3, margin: 0 }}>
+    <div style={{ margin: '28px 0 12px', paddingBottom: 10, borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(59,130,246,0.2)'}` }}>
+      <h1 style={{ fontSize: 17, fontWeight: 900, color: isLight ? '#0f172a' : '#f1f5f9', letterSpacing: '-0.01em', lineHeight: 1.3, margin: 0 }}>
         {children}
       </h1>
     </div>
@@ -37,42 +37,76 @@ const mdComponents = {
   h2: ({ children }) => (
     <div style={{ margin: '22px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
       <div style={{ width: 3, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#3b82f6,#6366f1)', flexShrink: 0 }} />
-      <h2 style={{ fontSize: 13, fontWeight: 800, color: '#3b82f6', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
+      <h2 style={{ fontSize: 13, fontWeight: 800, color: isLight ? '#1d4ed8' : '#3b82f6', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
         {children}
       </h2>
     </div>
   ),
   h3: ({ children }) => (
-    <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-text-primary, #e2e8f0)', margin: '16px 0 6px', paddingLeft: 8, borderLeft: '2px solid rgba(99,102,241,0.5)' }}>
+    <h3 style={{ fontSize: 13, fontWeight: 700, color: isLight ? '#0f172a' : '#e2e8f0', margin: '16px 0 6px', paddingLeft: 8, borderLeft: `2px solid ${isLight ? '#2563eb' : 'rgba(99,102,241,0.5)'}` }}>
       {children}
     </h3>
   ),
   p: ({ children }) => (
-    <div className="md-p" style={{ fontSize: 13.5, color: 'var(--sh-text-secondary, #cbd5e1)', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word' }}>
+    <div className="md-p" style={{ fontSize: 13.5, color: isLight ? '#0f172a' : '#cbd5e1', lineHeight: 1.8, marginBottom: 10, wordBreak: 'break-word', fontWeight: isLight ? 500 : 400 }}>
       {children}
     </div>
   ),
   strong: ({ children }) => (
-    <strong style={{ color: 'var(--sh-text-primary, #93c5fd)', fontWeight: 800, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginRight: 6, marginBottom: 2 }}>
+    <strong style={{
+      color: isLight ? '#0f172a' : '#93c5fd',
+      fontWeight: 800,
+      background: isLight ? 'rgba(37,99,235,0.08)' : 'rgba(59,130,246,0.12)',
+      border: `1px solid ${isLight ? 'rgba(37,99,235,0.2)' : 'rgba(59,130,246,0.25)'}`,
+      padding: '2px 8px',
+      borderRadius: 6,
+      display: 'inline-block',
+      marginRight: 6,
+      marginBottom: 2
+    }}>
       {children}
     </strong>
   ),
   em: ({ children }) => (
-    <em style={{ color: 'var(--sh-text-muted, #94a3b8)', fontStyle: 'italic' }}>{children}</em>
+    <em style={{ color: isLight ? '#475569' : '#94a3b8', fontStyle: 'italic' }}>{children}</em>
   ),
   blockquote: ({ children }) => (
     <blockquote style={{
       margin: '12px 0', padding: '10px 14px',
-      background: 'rgba(59,130,246,0.06)', borderLeft: '3px solid #3b82f6',
-      borderRadius: '0 8px 8px 0', color: 'var(--sh-text-secondary, #94a3b8)', fontSize: 13,
+      background: isLight ? '#f8fafc' : 'rgba(59,130,246,0.06)',
+      borderLeft: `3px solid ${isLight ? '#2563eb' : '#3b82f6'}`,
+      borderRadius: '0 8px 8px 0',
+      color: isLight ? '#1e293b' : '#94a3b8',
+      fontSize: 13,
+      lineHeight: 1.6
     }}>
       {children}
     </blockquote>
   ),
   code: ({ inline, children }) => inline
-    ? <code style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', fontSize: 11.5, padding: '2px 6px', borderRadius: 5, fontFamily: 'monospace', border: '1px solid rgba(16,185,129,0.25)' }}>{children}</code>
+    ? <code style={{
+        background: isLight ? '#f1f5f9' : 'rgba(16,185,129,0.12)',
+        color: isLight ? '#0f172a' : '#10b981',
+        fontSize: 11.5,
+        padding: '2px 6px',
+        borderRadius: 5,
+        fontFamily: 'monospace',
+        border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(16,185,129,0.25)'}`,
+        fontWeight: 600
+      }}>{children}</code>
     : (
-      <pre style={{ background: 'var(--sh-surface-card, #0a0e1a)', border: '1px solid var(--sh-border-color, rgba(255,255,255,0.07))', borderRadius: 10, padding: '14px 16px', margin: '12px 0', overflowX: 'auto', fontSize: 11.5, color: 'var(--sh-text-primary, #6ee7b7)', fontFamily: 'monospace', lineHeight: 1.7 }}>
+      <pre style={{
+        background: isLight ? '#f8fafc' : '#0a0e1a',
+        border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)'}`,
+        borderRadius: 10,
+        padding: '14px 16px',
+        margin: '12px 0',
+        overflowX: 'auto',
+        fontSize: 11.5,
+        color: isLight ? '#0f172a' : '#6ee7b7',
+        fontFamily: 'monospace',
+        lineHeight: 1.7
+      }}>
         <code>{children}</code>
       </pre>
     ),
@@ -82,41 +116,85 @@ const mdComponents = {
     </ul>
   ),
   ol: ({ children }) => (
-    <ol style={{ listStyleType: 'decimal', paddingLeft: 20, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <ol style={{ listStyleType: 'decimal', paddingLeft: 20, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5, color: isLight ? '#0f172a' : '#cbd5e1' }}>
       {children}
     </ol>
   ),
   li: ({ children }) => (
-    <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: 'var(--sh-text-secondary, #cbd5e1)', lineHeight: 1.7 }}>
-      <span style={{ marginTop: 6, width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, display: 'inline-block' }} />
-      <div style={{ flex: 1, wordBreak: 'break-word' }}>{children}</div>
+    <li style={{
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 8,
+      fontSize: 13.5,
+      color: isLight ? '#0f172a' : '#cbd5e1',
+      lineHeight: 1.7,
+      fontWeight: isLight ? 500 : 400
+    }}>
+      <span style={{
+        marginTop: 7,
+        width: 5,
+        height: 5,
+        borderRadius: '50%',
+        background: isLight ? '#2563eb' : '#3b82f6',
+        flexShrink: 0,
+        display: 'inline-block'
+      }} />
+      <div style={{ flex: 1, wordBreak: 'break-word', color: isLight ? '#0f172a' : '#cbd5e1' }}>{children}</div>
     </li>
   ),
   hr: () => (
-    <div style={{ margin: '20px 0', height: 1, background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)' }} />
+    <div style={{ margin: '20px 0', height: 1, background: isLight ? '#e2e8f0' : 'linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)' }} />
   ),
   table: ({ children }) => (
-    <div style={{ overflowX: 'auto', margin: '16px 0', borderRadius: 12, border: '1px solid var(--sh-border-color, rgba(255,255,255,0.08))', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+    <div style={{
+      overflowX: 'auto',
+      margin: '16px 0',
+      borderRadius: 12,
+      border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
+      boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.04)' : '0 4px 20px rgba(0,0,0,0.1)'
+    }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, wordBreak: 'keep-all' }}>{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead style={{ background: 'var(--sh-surface-sub, rgba(30,41,59,0.9))', borderBottom: '2px solid rgba(59,130,246,0.3)' }}>{children}</thead>,
+  thead: ({ children }) => (
+    <thead style={{ background: isLight ? '#f1f5f9' : 'rgba(30,41,59,0.9)', borderBottom: `2px solid ${isLight ? '#cbd5e1' : 'rgba(59,130,246,0.3)'}` }}>{children}</thead>
+  ),
   th: ({ children }) => (
-    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 800, color: 'var(--sh-text-primary, #93c5fd)', fontSize: 11.5, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', minWidth: 100 }}>
+    <th style={{
+      padding: '12px 16px',
+      textAlign: 'left',
+      fontWeight: 800,
+      color: isLight ? '#0f172a' : '#93c5fd',
+      fontSize: 11.5,
+      letterSpacing: '0.05em',
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+      minWidth: 100
+    }}>
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td style={{ padding: '12px 16px', color: 'var(--sh-text-secondary, #e2e8f0)', borderBottom: '1px solid var(--sh-border-color, rgba(255,255,255,0.05))', verticalAlign: 'top', wordBreak: 'break-word' }}>
+    <td style={{
+      padding: '12px 16px',
+      color: isLight ? '#1e293b' : '#e2e8f0',
+      borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'}`,
+      verticalAlign: 'top',
+      wordBreak: 'break-word'
+    }}>
       {children}
     </td>
   ),
   tr: ({ children }) => (
-    <tr style={{ transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(59,130,246,0.06)'} onMouseLeave={e => e.currentTarget.style.background=''}>
+    <tr
+      style={{ transition: 'background 0.15s' }}
+      onMouseEnter={e => e.currentTarget.style.background = isLight ? 'rgba(0,70,255,0.04)' : 'rgba(59,130,246,0.06)'}
+      onMouseLeave={e => e.currentTarget.style.background = ''}
+    >
       {children}
     </tr>
   ),
-};
+});
 
 // ── [NEW] 워룸 타임라인 단락/서식 특화 렌더러 (일목요연한 단락/헤더/불릿 분리) ──
 function WarRoomStepContent({ text, isLight, isLast }) {
@@ -392,7 +470,8 @@ function WarRoomStepContent({ text, isLight, isLast }) {
 }
 
 function MarkdownBlock({ text, report, checkedItems = {}, onToggleCheck = () => {} }) {
-  if (!text) return <span style={{ color: '#475569' }}>-</span>;
+  const { isLight } = useTheme();
+  if (!text) return <span style={{ color: isLight ? '#64748b' : '#475569' }}>-</span>;
   
   let clean = text;
 
@@ -414,8 +493,9 @@ function MarkdownBlock({ text, report, checkedItems = {}, onToggleCheck = () => 
       .replace(/(?:^|\s|\n)\[리더의 최종 조치 가이드\]/gi, '\n\n### 🎯 리더의 최종 조치 가이드 (긴급 작전 체크리스트)\n\n');
   }
 
-  // 2. 문자열 내의 기존 마크다운 별표(*) 및 불필요한 대시(-) 기호 정리
-  clean = clean.replace(/\*/g, '').replace(/^-+\s*/gm, '');
+  // 2. 유니코드 글머리 기호(•, ●)를 마크다운 목록 기호(- )로 표준화 및 테이블 서식 보정
+  clean = clean.replace(/^([ \t]*)[•●]\s*/gm, '$1- ');
+  clean = clean.replace(/([^\n])\n(\s*\|.*?\|)/g, '$1\n\n$2');
 
   // 3. 주요 키워드들을 감지하여 단 한 번씩만 불릿 문단으로 변환
   const keywords = [
@@ -442,53 +522,78 @@ function MarkdownBlock({ text, report, checkedItems = {}, onToggleCheck = () => 
     }
   }
 
-  const customComponents = useMemo(() => ({
-    ...mdComponents,
-    li: ({ children }) => {
-      let textStr = '';
-      React.Children.forEach(children, child => {
-        if (typeof child === 'string') textStr += child;
-        else if (child?.props?.children && typeof child.props.children === 'string') textStr += child.props.children;
-      });
-      
-      const isCheckItem = textStr.trim().startsWith('[ ]') || textStr.trim().startsWith('[x]') || textStr.trim().startsWith('[X]');
-      
-      if (isCheckItem) {
-        const cleanText = textStr.replace(/^\[[ xX]?\]/, '').trim();
-        const isChecked = checkedItems[cleanText] || textStr.trim().startsWith('[x]') || textStr.trim().startsWith('[X]');
+  const customComponents = useMemo(() => {
+    const base = getMdComponents(isLight);
+    return {
+      ...base,
+      li: ({ children }) => {
+        let textStr = '';
+        React.Children.forEach(children, child => {
+          if (typeof child === 'string') textStr += child;
+          else if (child?.props?.children && typeof child.props.children === 'string') textStr += child.props.children;
+        });
+        
+        const isCheckItem = textStr.trim().startsWith('[ ]') || textStr.trim().startsWith('[x]') || textStr.trim().startsWith('[X]');
+        
+        if (isCheckItem) {
+          const cleanText = textStr.replace(/^\[[ xX]?\]/, '').trim();
+          const isChecked = checkedItems[cleanText] || textStr.trim().startsWith('[x]') || textStr.trim().startsWith('[X]');
+          return (
+            <li 
+              onClick={(e) => { e.stopPropagation(); onToggleCheck(cleanText); }}
+              className={`flex items-start gap-3 p-3.5 my-2.5 rounded-2xl border transition-all cursor-pointer select-none shadow-sm text-left ${
+                isChecked 
+                  ? (isLight ? 'bg-emerald-50 border-emerald-300 text-slate-400 line-through' : 'bg-emerald-500/10 border-emerald-500/30 text-slate-400 line-through') 
+                  : (isLight ? 'bg-white border-blue-200 hover:border-blue-500 text-slate-900 font-bold shadow-xs' : 'bg-[#161b2a] border-blue-500/30 hover:border-blue-500 text-slate-100 font-bold')
+              }`}
+            >
+              <div className={`w-5 h-5 mt-0.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                isChecked
+                  ? 'bg-emerald-500 border-emerald-400 text-white'
+                  : (isLight ? 'border-slate-400 bg-slate-100 text-transparent' : 'border-slate-500 bg-black/40 text-transparent')
+              }`}>
+                <Check size={14} className="stroke-[3]" />
+              </div>
+              <div className={`flex-1 text-xs leading-relaxed break-words ${isChecked ? 'text-slate-400' : (isLight ? 'text-slate-900' : 'text-slate-100')}`}>{cleanText}</div>
+              <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-black uppercase shrink-0 ${
+                isChecked
+                  ? (isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]')
+                  : (isLight ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30')
+              }`}>
+                {isChecked ? 'Done' : 'Action'}
+              </span>
+            </li>
+          );
+        }
+        
         return (
-          <li 
-            onClick={(e) => { e.stopPropagation(); onToggleCheck(cleanText); }}
-            className={`flex items-start gap-3 p-3.5 my-2.5 rounded-2xl border transition-all cursor-pointer select-none shadow-lg text-left ${
-              isChecked 
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-slate-400 line-through' 
-                : 'bg-[#161b2a] border-blue-500/30 hover:border-blue-500 text-slate-100 font-bold'
-            }`}
-          >
-            <div className={`w-5 h-5 mt-0.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-              isChecked ? 'bg-emerald-500 border-emerald-400 text-black' : 'border-slate-500 bg-black/40 text-transparent'
-            }`}>
-              <Check size={14} className="stroke-[3]" />
-            </div>
-            <div className="flex-1 text-xs leading-relaxed break-words">{cleanText}</div>
-            <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-black uppercase shrink-0 ${isChecked ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
-              {isChecked ? 'Done' : 'Action'}
-            </span>
+          <li style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 8,
+            fontSize: 13.5,
+            color: isLight ? '#0f172a' : '#cbd5e1',
+            lineHeight: 1.7,
+            fontWeight: isLight ? 500 : 400
+          }}>
+            <span style={{
+              marginTop: 7,
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              background: isLight ? '#2563eb' : '#3b82f6',
+              flexShrink: 0,
+              display: 'inline-block'
+            }} />
+            <div style={{ flex: 1, wordBreak: 'break-word', color: isLight ? '#0f172a' : '#cbd5e1' }}>{children}</div>
           </li>
         );
       }
-      
-      return (
-        <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.7 }}>
-          <span style={{ marginTop: 6, width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, display: 'inline-block' }} />
-          <div style={{ flex: 1, wordBreak: 'break-word' }}>{children}</div>
-        </li>
-      );
-    }
-  }), [checkedItems, onToggleCheck]);
+    };
+  }, [isLight, checkedItems, onToggleCheck]);
 
   return (
-    <div className="markdown-body-custom" style={{ fontSize: 13.5, lineHeight: 1.8, wordBreak: 'break-word' }}>
+    <div className="markdown-body-custom" style={{ fontSize: 13.5, lineHeight: 1.8, wordBreak: 'break-word', color: isLight ? '#0f172a' : '#cbd5e1' }}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={customComponents}>{clean}</ReactMarkdown>
     </div>
   );
@@ -769,19 +874,19 @@ export default function AiReportPage() {
 
   if (listMode) {
     return (
-      <div className="min-h-[100dvh] bg-[#0a0d14] text-white font-sans flex flex-col pb-24 select-none overflow-y-auto">
+      <div className={`min-h-[100dvh] font-sans flex flex-col pb-24 select-none overflow-y-auto ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#0a0d14] text-white'}`}>
         {/* ── Sticky Header (Slim 1-line + Quick Search) ───────────── */}
-        <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5 flex flex-col gap-2.5 px-4 py-3">
+        <header className={`sticky top-0 z-50 backdrop-blur-xl border-b flex flex-col gap-2.5 px-4 py-3 ${isLight ? 'bg-white/95 border-slate-200 shadow-xs' : 'bg-[#0a0d14]/95 border-white/5'}`}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
-                <ArrowLeft className="w-4 h-4 text-slate-400" />
+              <button onClick={() => goBack()} className={`p-2 rounded-xl transition-colors ${isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-white/5 hover:bg-white/10 text-slate-400'}`}>
+                <ArrowLeft className="w-4 h-4" />
               </button>
               <div>
-                <h1 className="text-sm font-black text-white flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-blue-400" /> AI 장애 보고서
+                <h1 className={`text-sm font-black flex items-center gap-1.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  <Sparkles className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} /> AI 장애 보고서
                 </h1>
-                <p className="text-[10px] text-slate-500 font-mono">
+                <p className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                   {srchParams.startDate.substring(2).replace(/-/g, '.')} ~ {srchParams.endDate.substring(2).replace(/-/g, '.')}
                 </p>
               </div>
@@ -789,47 +894,47 @@ export default function AiReportPage() {
 
             <button
               onClick={() => setShowFilterSheet(true)}
-              className="skeuo-btn flex items-center gap-1.5 px-3 py-2 bg-blue-500/15 border border-blue-500/40 rounded-xl text-xs font-black text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)] active:scale-95 transition-all cursor-pointer"
+              className={`skeuo-btn flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer ${isLight ? 'bg-blue-50 border border-blue-200 text-blue-700 shadow-sm' : 'bg-blue-500/15 border border-blue-500/40 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)]'}`}
             >
               <Filter size={14} />
               <span>상세 필터</span>
-              {(srchParams.keyword || srchParams.incidentId || srchParams.assignee) && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />}
+              {(srchParams.keyword || srchParams.incidentId || srchParams.assignee) && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />}
             </button>
           </div>
 
           {/* 빠른 키워드 검색 바 */}
-          <div className="flex items-center bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-blue-500/50 transition-colors">
-            <Search size={14} className="text-slate-400 mr-2 shrink-0" />
+          <div className={`flex items-center rounded-xl px-3 py-1.5 transition-colors border ${isLight ? 'bg-slate-100 border-slate-200 focus-within:border-blue-500 focus-within:bg-white' : 'bg-black/40 border-white/10 focus-within:border-blue-500/50'}`}>
+            <Search size={14} className={`${isLight ? 'text-slate-500' : 'text-slate-400'} mr-2 shrink-0`} />
             <input
               type="text" placeholder="제목 · ID · 메시지 빠른 검색"
               value={srchParams.keyword}
               onChange={e => { const v = e.target.value; setSrchParams(p => ({ ...p, keyword: v })); }}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleListSearch(); } }}
-              className="w-full bg-transparent py-1 text-xs text-white placeholder-slate-500 focus:outline-none"
+              className={`w-full bg-transparent py-1 text-xs focus:outline-none ${isLight ? 'text-slate-900 placeholder-slate-400' : 'text-white placeholder-slate-500'}`}
             />
             {srchParams.keyword && (
               <button onClick={() => { setSrchParams(p => ({ ...p, keyword: '' })); }} className="p-1 hover:opacity-80">
-                <X size={12} className="text-slate-400" />
+                <X size={12} className={isLight ? 'text-slate-500' : 'text-slate-400'} />
               </button>
             )}
           </div>
         </header>
 
         {/* ── Sticky 요약 카드 (Summary Cards - 필터링 연동) ──────────────────────── */}
-        <div className="sticky top-[102px] z-40 bg-[#0a0d14]/90 backdrop-blur-md px-4 py-3 border-b border-white/5 shadow-lg">
+        <div className={`sticky top-[102px] z-40 backdrop-blur-md px-4 py-3 border-b ${isLight ? 'bg-white/90 border-slate-200 shadow-xs' : 'bg-[#0a0d14]/90 border-white/5 shadow-lg'}`}>
           <div className="grid grid-cols-3 gap-2.5 max-w-5xl mx-auto">
-            {[{label:'전체 장애', val:'', count:srchStats.total, color:'blue', border:'border-blue-500/30', bg:'bg-blue-500/5'},
-              {label:'CRITICAL', val:'CRITICAL', count:srchStats.critical, color:'red', border:'border-red-500/40', bg:'bg-red-500/5'},
-              {label:'HIGH / MAJOR', val:'HIGH', count:srchStats.high, color:'orange', border:'border-orange-500/40', bg:'bg-orange-500/5'}].map(s => {
+            {[{label:'전체 장애', val:'', count:srchStats.total, color:'blue', border: isLight ? 'border-blue-200' : 'border-blue-500/30', bg: isLight ? 'bg-blue-50/90' : 'bg-blue-500/5', text: isLight ? 'text-blue-700' : 'text-blue-400'},
+              {label:'CRITICAL', val:'CRITICAL', count:srchStats.critical, color:'red', border: isLight ? 'border-red-200' : 'border-red-500/40', bg: isLight ? 'bg-red-50/90' : 'bg-red-500/5', text: isLight ? 'text-red-700' : 'text-red-400'},
+              {label:'HIGH / MAJOR', val:'HIGH', count:srchStats.high, color:'orange', border: isLight ? 'border-orange-200' : 'border-orange-500/40', bg: isLight ? 'bg-orange-50/90' : 'bg-orange-500/5', text: isLight ? 'text-orange-700' : 'text-orange-400'}].map(s => {
               const active = srchParams.severity === s.val;
               return (
                 <button
                   key={s.label}
                   onClick={() => setSrchParams(p => ({ ...p, severity: s.val }))}
-                  className={`border rounded-xl p-2.5 text-center flex flex-col justify-center transition-all cursor-pointer select-none active:scale-95 ${active ? `border-${s.color}-400 bg-${s.color}-500/20 shadow-[0_0_15px_rgba(${s.color === 'red' ? '239,68,68': s.color === 'orange' ? '249,115,22' : '59,130,246'},0.3)]` : `${s.bg} ${s.border} opacity-70 hover:opacity-100`}`}
+                  className={`border rounded-xl p-2.5 text-center flex flex-col justify-center transition-all cursor-pointer select-none active:scale-95 ${active ? (isLight ? `border-${s.color}-500 bg-${s.color}-100/80 shadow-sm ring-2 ring-${s.color}-400/30` : `border-${s.color}-400 bg-${s.color}-500/20 shadow-[0_0_15px_rgba(${s.color === 'red' ? '239,68,68': s.color === 'orange' ? '249,115,22' : '59,130,246'},0.3)]`) : `${s.bg} ${s.border} ${isLight ? 'opacity-90 hover:opacity-100 shadow-xs' : 'opacity-70 hover:opacity-100'}`}`}
                 >
-                  <p className={`text-xl font-black text-${s.color}-400 font-mono leading-none`}>{s.count}</p>
-                  <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mt-1">{s.label}</p>
+                  <p className={`text-xl font-black font-mono leading-none ${s.text}`}>{s.count}</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{s.label}</p>
                 </button>
               );
             })}
@@ -841,13 +946,13 @@ export default function AiReportPage() {
           {srchLoading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500">
               <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-              <span className="text-sm font-bold">장애 이력 실시간 필터링 중...</span>
+              <span className={`text-sm font-bold ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>장애 이력 실시간 필터링 중...</span>
             </div>
           ) : searchResults.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 bg-white/5 border border-white/10 rounded-2xl text-center my-4">
-              <FileText size={36} className="text-slate-600 mb-3" />
-              <p className="text-sm font-black text-slate-300 mb-1">검색 결과가 없습니다</p>
-              <p className="text-xs text-slate-500">상단 필터 버튼을 눌러 조건을 변경해 보세요</p>
+            <div className={`flex flex-col items-center justify-center py-16 rounded-2xl text-center my-4 border ${isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-white/5 border-white/10'}`}>
+              <FileText size={36} className={`${isLight ? 'text-slate-400' : 'text-slate-600'} mb-3`} />
+              <p className={`text-sm font-black mb-1 ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>검색 결과가 없습니다</p>
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>상단 필터 버튼을 눌러 조건을 변경해 보세요</p>
             </div>
           ) : (() => {
             const displayList = searchResults.filter(inc => {
@@ -859,10 +964,10 @@ export default function AiReportPage() {
 
             if (displayList.length === 0) {
               return (
-                <div className="flex flex-col items-center justify-center py-16 bg-white/5 border border-white/10 rounded-2xl text-center my-4">
-                  <AlertCircle size={36} className="text-slate-600 mb-3" />
-                  <p className="text-sm font-black text-slate-300 mb-1">선택된 심각도에 해당하는 장애가 없습니다</p>
-                  <button onClick={() => setSrchParams(p => ({ ...p, severity: '' }))} className="text-xs text-blue-400 mt-2 underline cursor-pointer">전체 장애 보기</button>
+                <div className={`flex flex-col items-center justify-center py-16 rounded-2xl text-center my-4 border ${isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-white/5 border-white/10'}`}>
+                  <AlertCircle size={36} className={`${isLight ? 'text-slate-400' : 'text-slate-600'} mb-3`} />
+                  <p className={`text-sm font-black mb-1 ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>선택된 심각도에 해당하는 장애가 없습니다</p>
+                  <button onClick={() => setSrchParams(p => ({ ...p, severity: '' }))} className="text-xs text-blue-600 font-bold mt-2 underline cursor-pointer">전체 장애 보기</button>
                 </div>
               );
             }
@@ -870,22 +975,30 @@ export default function AiReportPage() {
             return (
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between px-1 mb-1">
-                  <span className="text-xs font-bold text-slate-400">조회된 장애 <strong className="text-blue-400">{displayList.length}</strong>건</span>
-                  <span className="text-[10px] text-slate-500 font-mono bg-white/5 px-2.5 py-1 rounded-full border border-white/10">최신 발생순</span>
+                  <span className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>조회된 장애 <strong className={isLight ? 'text-blue-600' : 'text-blue-400'}>{displayList.length}</strong>건</span>
+                  <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full border ${isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-white/5 text-slate-500 border-white/10'}`}>최신 발생순</span>
                 </div>
                 {displayList.map(inc => {
                   const sev = (inc.severity || 'NORMAL').toUpperCase();
-                  const sc = sev === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border-red-500/40' :
-                             sev === 'HIGH' || sev === 'MAJOR' ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' :
-                             sev === 'NORMAL' ? 'bg-blue-500/20 text-blue-400 border-blue-500/40' : 'bg-slate-500/20 text-slate-400 border-slate-500/40';
+                  const sc = isLight
+                    ? (sev === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200 font-bold' :
+                       sev === 'HIGH' || sev === 'MAJOR' ? 'bg-orange-50 text-orange-700 border-orange-200 font-bold' :
+                       sev === 'NORMAL' ? 'bg-blue-50 text-blue-700 border-blue-200 font-bold' : 'bg-slate-100 text-slate-700 border-slate-200')
+                    : (sev === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border-red-500/40' :
+                       sev === 'HIGH' || sev === 'MAJOR' ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' :
+                       sev === 'NORMAL' ? 'bg-blue-500/20 text-blue-400 border-blue-500/40' : 'bg-slate-500/20 text-slate-400 border-slate-500/40');
                   
                   const st = String(inc.status || '').toUpperCase();
                   const isComplete = st.includes('완료') || st.includes('COMPLETED') || st === 'INC_003' || st === 'CLOSED' || st === '정상';
                   const isProgress = st.includes('분석중') || st.includes('처리중') || st.includes('PROGRESS') || st === 'INC_002';
                   
-                  const statusCls = isComplete ? 'bg-slate-500/10 border-slate-500/20 text-slate-400 font-normal' :
-                                    isProgress ? 'bg-[#ff8800]/15 border-[#ff8800]/40 text-[#ff8800] font-black animate-pulse shadow-[0_0_10px_rgba(255,136,0,0.2)]' :
-                                    'bg-blue-500/10 border-blue-500/30 text-blue-400 font-bold';
+                  const statusCls = isLight
+                    ? (isComplete ? 'bg-slate-100 border-slate-200 text-slate-600 font-medium' :
+                       isProgress ? 'bg-amber-50 border-amber-300 text-amber-800 font-black animate-pulse shadow-xs' :
+                       'bg-blue-50 border-blue-200 text-blue-700 font-bold')
+                    : (isComplete ? 'bg-slate-500/10 border-slate-500/20 text-slate-400 font-normal' :
+                       isProgress ? 'bg-[#ff8800]/15 border-[#ff8800]/40 text-[#ff8800] font-black animate-pulse shadow-[0_0_10px_rgba(255,136,0,0.2)]' :
+                       'bg-blue-500/10 border-blue-500/30 text-blue-400 font-bold');
                   const statusName = isComplete ? '처리완료' : isProgress ? '분석중' : getStatusName(inc.status);
                   const assignee = inc.assignee_name || inc.assigned_to || '-';
 
@@ -893,33 +1006,47 @@ export default function AiReportPage() {
                     <div
                       key={inc.inc_id}
                       onClick={() => navigate(`/ai-report/${inc.inc_id}`)}
-                      className="skeuo-card p-4 rounded-2xl bg-[#12151a] hover:bg-[#1a1f26] border border-white/10 transition-all duration-300 flex flex-col gap-2.5 cursor-pointer relative overflow-hidden shadow-xl active:scale-[0.98] group"
+                      className={`p-4 rounded-2xl transition-all duration-300 flex flex-col gap-2.5 cursor-pointer relative overflow-hidden active:scale-[0.98] group border ${
+                        isLight 
+                          ? 'bg-white hover:bg-slate-50/90 border-slate-200/90 shadow-sm hover:shadow-md' 
+                          : 'skeuo-card bg-[#12151a] hover:bg-[#1a1f26] border-white/10 shadow-xl'
+                      }`}
                     >
-                      <div className="absolute top-0 left-0 bottom-0 w-1.5" style={{ background: sev === 'CRITICAL' ? '#ff2a2a' : sev === 'HIGH' || sev === 'MAJOR' ? '#ffb700' : '#3b82f6' }} />
+                      <div className="absolute top-0 left-0 bottom-0 w-1.5" style={{ background: sev === 'CRITICAL' ? '#ef4444' : sev === 'HIGH' || sev === 'MAJOR' ? '#f59e0b' : '#3b82f6' }} />
                       
                       <div className="flex items-center justify-between pl-2">
                         <div className="flex items-center gap-2">
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-wide ${sc}`}>{sev}</span>
                           <span className={`text-[10px] px-2.5 py-0.5 rounded-full border ${statusCls}`}>{statusName}</span>
                         </div>
-                        <span className="text-[10px] font-mono text-slate-400">{inc.created_at?.slice(0, 16) || '-'}</span>
+                        <span className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{inc.created_at?.slice(0, 16) || '-'}</span>
                       </div>
 
                       <div className="pl-2 pr-1">
-                        <h3 className="text-sm font-black text-white leading-snug break-words line-clamp-3 group-hover:text-blue-400 transition-colors">
+                        <h3 className={`text-sm font-black leading-snug break-words line-clamp-3 transition-colors ${
+                          isLight ? 'text-slate-900 group-hover:text-blue-600' : 'text-white group-hover:text-blue-400'
+                        }`}>
                           {(inc.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '') || `INC-${inc.inc_id}`}
                         </h3>
                         {inc.message && (
-                          <p className="text-xs text-slate-400 line-clamp-2 mt-1.5 font-normal leading-relaxed">{inc.message}</p>
+                          <p className={`text-xs line-clamp-2 mt-1.5 font-normal leading-relaxed ${
+                            isLight ? 'text-slate-600' : 'text-slate-400'
+                          }`}>{inc.message}</p>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between pt-2.5 border-t border-white/5 pl-2 mt-1">
+                      <div className={`flex items-center justify-between pt-2.5 pl-2 mt-1 border-t ${
+                        isLight ? 'border-slate-100' : 'border-white/5'
+                      }`}>
                         <div className="flex items-center gap-3">
-                          <span className="text-[10px] text-slate-500 font-mono tracking-tighter truncate max-w-[140px]">INC-{inc.inc_id}</span>
-                          {assignee !== '-' && <span className="text-[10px] text-blue-400 font-bold">담당: {assignee}</span>}
+                          <span className={`text-[10px] font-mono tracking-tighter truncate max-w-[140px] ${
+                            isLight ? 'text-slate-500' : 'text-slate-500'
+                          }`}>INC-{inc.inc_id}</span>
+                          {assignee !== '-' && <span className={`text-[10px] font-bold ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>담당: {assignee}</span>}
                         </div>
-                        <div className="flex items-center gap-0.5 text-[11px] font-bold text-blue-400 group-hover:translate-x-1 transition-transform shrink-0">
+                        <div className={`flex items-center gap-0.5 text-[11px] font-bold group-hover:translate-x-1 transition-transform shrink-0 ${
+                          isLight ? 'text-blue-600' : 'text-blue-400'
+                        }`}>
                           <span>보고서 보기</span>
                           <ChevronRight size={14} />
                         </div>
@@ -935,35 +1062,37 @@ export default function AiReportPage() {
         {/* ── Bottom Sheet Modal (상세 검색 필터) ────────────────── */}
         {showFilterSheet && (
           <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/75 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowFilterSheet(false)}>
-            <div className="bg-[#12151a] border-t border-white/10 rounded-t-3xl p-6 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto select-none" onClick={e => e.stopPropagation()}>
-              <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-1" />
+            <div className={`border-t rounded-t-3xl p-6 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto select-none ${
+              isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#12151a] border-white/10 text-white'
+            }`} onClick={e => e.stopPropagation()}>
+              <div className={`w-12 h-1 rounded-full mx-auto mb-1 ${isLight ? 'bg-slate-300' : 'bg-white/20'}`} />
               
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <h2 className="text-base font-black text-white flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-blue-400" /> 상세 검색 필터
+              <div className={`flex items-center justify-between border-b pb-4 ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+                <h2 className={`text-base font-black flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  <Filter className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} /> 상세 검색 필터
                 </h2>
-                <button onClick={() => setShowFilterSheet(false)} className="p-1.5 rounded-full bg-white/5 text-slate-400 hover:text-white transition-colors cursor-pointer">
+                <button onClick={() => setShowFilterSheet(false)} className={`p-1.5 rounded-full transition-colors cursor-pointer ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-white/5 text-slate-400 hover:text-white'}`}>
                   <X size={16} />
                 </button>
               </div>
 
-              <div className="flex flex-col gap-4 text-left">
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-400 ml-1">장애 ID</label>
+                    <label className={`text-xs font-bold ml-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>장애 ID</label>
                     <input
                       type="text" placeholder="INC-번호 입력"
                       value={srchParams.incidentId}
                       onChange={e => setSrchParams(p => ({ ...p, incidentId: e.target.value }))}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+                      className={`w-full rounded-xl px-3.5 py-2.5 text-xs focus:outline-none ${isLight ? 'bg-slate-100 border border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white' : 'bg-black/40 border border-white/10 text-white placeholder-slate-600 focus:border-blue-500/50'}`}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-400 ml-1">처리자</label>
+                    <label className={`text-xs font-bold ml-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>처리자</label>
                     <select
                       value={srchParams.assignee}
                       onChange={e => setSrchParams(p => ({ ...p, assignee: e.target.value }))}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50"
+                      className={`w-full rounded-xl px-3.5 py-2.5 text-xs focus:outline-none ${isLight ? 'bg-slate-100 border border-slate-200 text-slate-900 focus:border-blue-500 focus:bg-white' : 'bg-black/40 border border-white/10 text-white focus:border-blue-500/50'}`}
                     >
                       <option value="">전체 담당자</option>
                       {allUsers.map(u => <option key={u.employee_id} value={u.name}>{u.name}</option>)}
@@ -973,28 +1102,28 @@ export default function AiReportPage() {
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between ml-1">
-                    <label className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-400" /> 조회 기간
+                    <label className={`text-xs font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>
+                      <Calendar className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} /> 조회 기간
                     </label>
                     <div className="flex gap-1">
                       {[[1,'오늘'],[7,'7일'],[30,'30일'],[90,'90일']].map(([d,l]) => (
                         <button key={d} type="button" onClick={() => handleQuickDate(d)}
-                          className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all">
+                          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white'}`}>
                           {l}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <input type="date" value={srchParams.startDate} onChange={e => setSrchParams(p => ({...p, startDate: e.target.value}))} className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" style={{colorScheme:'dark'}} />
-                    <input type="date" value={srchParams.endDate} onChange={e => setSrchParams(p => ({...p, endDate: e.target.value}))} className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" style={{colorScheme:'dark'}} />
+                    <input type="date" value={srchParams.startDate} onChange={e => setSrchParams(p => ({...p, startDate: e.target.value}))} className={`rounded-xl px-3 py-2 text-xs ${isLight ? 'bg-slate-100 border border-slate-200 text-slate-900' : 'bg-black/40 border border-white/10 text-white'}`} style={{colorScheme: isLight ? 'light' : 'dark'}} />
+                    <input type="date" value={srchParams.endDate} onChange={e => setSrchParams(p => ({...p, endDate: e.target.value}))} className={`rounded-xl px-3 py-2 text-xs ${isLight ? 'bg-slate-100 border border-slate-200 text-slate-900' : 'bg-black/40 border border-white/10 text-white'}`} style={{colorScheme: isLight ? 'light' : 'dark'}} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-400 ml-1">심각도</label>
-                    <select value={srchParams.severity} onChange={e => setSrchParams(p => ({...p, severity: e.target.value}))} className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50">
+                    <label className={`text-xs font-bold ml-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>심각도</label>
+                    <select value={srchParams.severity} onChange={e => setSrchParams(p => ({...p, severity: e.target.value}))} className={`w-full rounded-xl px-3.5 py-2.5 text-xs focus:outline-none ${isLight ? 'bg-slate-100 border border-slate-200 text-slate-900 focus:border-blue-500 focus:bg-white' : 'bg-black/40 border border-white/10 text-white focus:border-blue-500/50'}`}>
                       <option value="">전체</option>
                       <option value="CRITICAL">CRITICAL</option>
                       <option value="HIGH">HIGH / MAJOR</option>
@@ -1003,8 +1132,8 @@ export default function AiReportPage() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-400 ml-1">처리 상태</label>
-                    <select value={srchParams.status} onChange={e => setSrchParams(p => ({...p, status: e.target.value}))} className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50">
+                    <label className={`text-xs font-bold ml-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>처리 상태</label>
+                    <select value={srchParams.status} onChange={e => setSrchParams(p => ({...p, status: e.target.value}))} className={`w-full rounded-xl px-3.5 py-2.5 text-xs focus:outline-none ${isLight ? 'bg-slate-100 border border-slate-200 text-slate-900 focus:border-blue-500 focus:bg-white' : 'bg-black/40 border border-white/10 text-white focus:border-blue-500/50'}`}>
                       <option value="">전체</option>
                       <option value="처리완료">처리완료</option>
                       <option value="처리중">처리중 / 분석중</option>
@@ -1014,11 +1143,11 @@ export default function AiReportPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-4 border-t border-white/10 mt-2">
-                <button onClick={() => { const p = { incidentId:'', keyword:'', ...getDefaultDates(), severity:'', status:'처리완료', assignee:'' }; setSrchParams(p); }} className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-slate-400 hover:text-white cursor-pointer">
+              <div className={`flex items-center gap-3 pt-4 border-t mt-2 ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+                <button onClick={() => { const p = { incidentId:'', keyword:'', ...getDefaultDates(), severity:'', status:'처리완료', assignee:'' }; setSrchParams(p); }} className={`px-4 py-3 rounded-xl text-xs font-bold cursor-pointer border ${isLight ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}>
                   초기화
                 </button>
-                <button onClick={() => { handleListSearch(); setShowFilterSheet(false); }} className="flex-1 py-3.5 bg-gradient-to-r from-blue-500 to-blue-400 text-black font-black text-sm rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                <button onClick={() => { handleListSearch(); setShowFilterSheet(false); }} className={`flex-1 py-3.5 font-black text-sm rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer ${isLight ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' : 'bg-gradient-to-r from-blue-500 to-blue-400 text-black shadow-[0_0_20px_rgba(59,130,246,0.4)]'}`}>
                   <Search size={16} />적용 및 조회하기
                 </button>
               </div>
@@ -1134,13 +1263,13 @@ export default function AiReportPage() {
   const sevClass = severityColors[sev] || severityColors.NORMAL;
 
   return (
-    <div className="h-[100dvh] bg-[#0a0d14] text-white font-sans flex flex-col overflow-hidden">
+    <div className={`h-[100dvh] font-sans flex flex-col overflow-hidden ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#0a0d14] text-white'}`}>
       {/* Header — 2줄 풀-width */}
-      <header className="sticky top-0 z-50 bg-[#0a0d14]/95 backdrop-blur-xl border-b border-white/5">
+      <header className={`sticky top-0 z-50 backdrop-blur-xl border-b ${isLight ? 'bg-white/95 border-slate-200' : 'bg-[#0a0d14]/95 border-white/5'}`}>
         {/* Row 1: 네비게이션 + 타이틀 */}
         <div className="max-w-5xl mx-auto w-full flex items-center gap-2 px-3 py-2">
-          <button onClick={() => goBack()} className="shrink-0 p-2 rounded-full hover:bg-white/5 transition-colors">
-            <ArrowLeft className="w-5 h-5 text-slate-400" />
+          <button onClick={() => goBack()} className={`shrink-0 p-2 rounded-full transition-colors ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-white/5 text-slate-400'}`}>
+            <ArrowLeft className="w-5 h-5" />
           </button>
 
           {/* 중앙 타이틀 영역: severity+ID 한 줄, 제목 별도 줄로 wrap */}
@@ -1152,7 +1281,7 @@ export default function AiReportPage() {
                   <span className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter ${sevClass}`}>
                     {sev}
                   </span>
-                  <span className="text-[11px] text-slate-500 font-mono">
+                  <span className={`text-[11px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                     INC-{incidentId}
                   </span>
                   {isTestIncident && (
@@ -1161,19 +1290,19 @@ export default function AiReportPage() {
                     </span>
                   )}
                   {report.similarity_score != null && (
-                    <span className="flex items-center gap-1 text-[10px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg">
-                      <Zap className="w-2.5 h-2.5 fill-blue-400/30" />
+                    <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg ${isLight ? 'text-blue-700 bg-blue-50 border border-blue-200' : 'text-blue-400 bg-blue-500/10 border border-blue-500/20'}`}>
+                      <Zap className={`w-2.5 h-2.5 ${isLight ? 'fill-blue-600/30' : 'fill-blue-400/30'}`} />
                       {Math.round(report.similarity_score * 100)}%
                     </span>
                   )}
                 </div>
                 {/* 제목: 풀텍스트, 줄바꿈 허용 */}
-                <h1 className="font-bold text-sm text-slate-100 leading-snug break-words whitespace-normal">
+                <h1 className={`font-bold text-sm leading-snug break-words whitespace-normal ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
                   {(report.title || '').replace(/^INC-[\w-]+\s*\|\s*/i, '')}
                 </h1>
               </>
             ) : (
-              <span className="text-sm text-slate-400">장애 보고서</span>
+              <span className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>장애 보고서</span>
             )}
           </div>
 
@@ -1184,25 +1313,28 @@ export default function AiReportPage() {
                 setShowShareTooltip(true);
                 setTimeout(() => setShowShareTooltip(false), 2500);
               }}
-              className="p-2 rounded-full hover:bg-white/5 transition-colors"
+              className={`p-2 rounded-full transition-colors ${isLight ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-white/5 text-slate-400'}`}
             >
-              <Share2 className="w-5 h-5 text-slate-400" />
+              <Share2 className="w-5 h-5" />
             </button>
             {showShareTooltip && (
               <div style={{
                 position: 'absolute', top: '110%', right: 0,
-                background: 'rgba(15,18,32,0.97)', backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: isLight ? '#ffffff' : 'rgba(15,18,32,0.97)',
+                backdropFilter: 'blur(12px)',
+                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: 12, padding: '10px 14px', minWidth: 180,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 200,
+                boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.1)' : '0 8px 24px rgba(0,0,0,0.5)',
+                zIndex: 200,
               }}>
-                <p style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>공유 옵션</p>
+                <p style={{ fontSize: 11, fontWeight: 800, color: isLight ? '#0f172a' : 'rgba(255,255,255,0.7)', marginBottom: 8 }}>공유 옵션</p>
                 <button
                   onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowShareTooltip(false); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                     padding: '7px 8px', borderRadius: 8, border: 'none',
-                    background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
+                    background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                    color: isLight ? '#334155' : '#94a3b8',
                     fontSize: 12, fontWeight: 600, cursor: 'pointer', marginBottom: 4,
                   }}
                 >
@@ -1213,7 +1345,8 @@ export default function AiReportPage() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                     padding: '7px 8px', borderRadius: 8, border: 'none',
-                    background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
+                    background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                    color: isLight ? '#334155' : '#94a3b8',
                     fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   }}
                 >
@@ -1226,33 +1359,33 @@ export default function AiReportPage() {
 
         {/* Row 2: 메타데이터 스와이프 칩 바 (대상 시스템 제거 및 극도로 간결한 미니 바 유지) */}
         {report && (
-          <div className="bg-[#0d1220] border-t border-white/5 py-1.5 px-2 shadow-inner">
+          <div className={`border-t py-1.5 px-2 ${isLight ? 'bg-slate-100/90 border-slate-200' : 'bg-[#0d1220] border-white/5 shadow-inner'}`}>
             <div className="relative max-w-5xl mx-auto">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-1 py-1 pr-12 text-left">
-                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold flex items-center gap-1.5 shadow-sm">
+                <span className={`skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-1.5 shadow-xs ${isLight ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-purple-500/10 text-purple-400 border border-purple-500/30'}`}>
                   <Clock size={13} /> {report.created_at?.slice(5, 16) || '05-15 11:41'}
                 </span>
                 
-                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className={`skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-xs ${isLight ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'}`}>
                   <Users size={13} /> {report.who_name || report.creator_name || (report.who && String(report.who).startsWith('S') ? '조경훈' : report.who) || '조경훈'}
                 </span>
 
-                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-mono font-black bg-red-500/10 text-red-400 border border-red-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className={`skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-mono font-black flex items-center gap-1.5 shadow-xs ${isLight ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
                   <Activity size={13} /> MTTR {report.duration_label ?? (report.duration_min != null ? `${report.duration_min}분` : '51분')}
                 </span>
 
-                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className={`skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-xs ${isLight ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'}`}>
                   <MessageSquare size={13} /> 채팅 {report.message_count || 0}
                 </span>
 
-                <span className="skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className={`skeuo-pill shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-xs ${isLight ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}`}>
                   <Paperclip size={13} /> 첨부 {report.attachment_count || 0}
                 </span>
               </div>
 
               {/* 우측 스와이프 시각적 인디케이터 */}
-              <div className="absolute right-0 top-0 bottom-0 w-14 bg-gradient-to-l from-[#0d1220] via-[#0d1220]/80 to-transparent flex items-center justify-end pr-2 pointer-events-none z-10 animate-pulse">
-                <div className="bg-white/10 text-slate-300 p-1 rounded-full border border-white/20 shadow-lg flex items-center justify-center">
+              <div className={`absolute right-0 top-0 bottom-0 w-14 bg-gradient-to-l flex items-center justify-end pr-2 pointer-events-none z-10 animate-pulse ${isLight ? 'from-slate-100 via-slate-100/80 to-transparent' : 'from-[#0d1220] via-[#0d1220]/80 to-transparent'}`}>
+                <div className={`p-1 rounded-full border shadow-sm flex items-center justify-center ${isLight ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-white/10 text-slate-300 border-white/20'}`}>
                   <ChevronRight size={14} className="stroke-[3]" />
                 </div>
               </div>
@@ -1263,7 +1396,7 @@ export default function AiReportPage() {
 
 
       {/* Tabs with Horizontal Scroll Indicator */}
-      <div className="relative border-b border-white/5 bg-[#0a0d14] shrink-0">
+      <div className={`relative border-b shrink-0 ${isLight ? 'border-slate-200 bg-white' : 'border-white/5 bg-[#0a0d14]'}`}>
         <div 
           ref={tabsRef}
           onScroll={checkTabsScroll}
@@ -1280,13 +1413,13 @@ export default function AiReportPage() {
               id={`tab-${t.id}`}
               className={`px-5 py-3 text-[13px] font-bold whitespace-nowrap transition-all border-b-2 relative shrink-0 ${
                 activeTab === t.id
-                  ? 'border-blue-500 text-blue-400 bg-blue-500/5'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
+                  ? (isLight ? 'border-blue-600 text-blue-600 bg-blue-50/60' : 'border-blue-500 text-blue-400 bg-blue-500/5')
+                  : (isLight ? 'border-transparent text-slate-500 hover:text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-300')
               }`}
             >
               {t.label}
               {activeTab === t.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]" />
+                <div className={`absolute bottom-0 left-0 right-0 h-[2px] ${isLight ? 'bg-blue-600' : 'bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]'}`} />
               )}
             </button>
           ))}
@@ -1294,8 +1427,8 @@ export default function AiReportPage() {
 
         {/* 🚀 우측 스크롤 인디케이터 (탭이 더 있음을 시각적으로 알림) */}
         {hasMoreTabs && (
-          <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#0a0d14] via-[#0a0d14]/90 to-transparent flex items-center justify-end pr-2 pointer-events-none z-10 animate-in fade-in duration-300">
-            <div className="bg-blue-500/20 text-blue-400 p-1.5 rounded-full border border-blue-500/30 animate-pulse flex items-center shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+          <div className={`absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l flex items-center justify-end pr-2 pointer-events-none z-10 animate-in fade-in duration-300 ${isLight ? 'from-white via-white/90 to-transparent' : 'from-[#0a0d14] via-[#0a0d14]/90 to-transparent'}`}>
+            <div className={`p-1.5 rounded-full border animate-pulse flex items-center ${isLight ? 'bg-blue-100 text-blue-700 border-blue-300 shadow-sm' : 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.5)]'}`}>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
@@ -1317,11 +1450,11 @@ export default function AiReportPage() {
         )}
         {error && error === '아직 보고서 생성 전입니다.' ? (
           <div className="flex flex-col items-center justify-center py-20 px-4 text-center animate-in fade-in duration-300 max-w-md mx-auto">
-            <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4 shadow-[0_0_25px_rgba(59,130,246,0.15)]">
-              <FileText className="w-8 h-8 text-blue-400 opacity-80" />
+            <div className={`w-16 h-16 rounded-full border flex items-center justify-center mb-4 ${isLight ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-blue-500/10 border-blue-500/20 shadow-[0_0_25px_rgba(59,130,246,0.15)]'}`}>
+              <FileText className="w-8 h-8 text-blue-500 opacity-80" />
             </div>
-            <h3 className="text-base font-bold text-slate-200 mb-2">아직 보고서가 생성되지 않았습니다</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h3 className={`text-base font-bold mb-2 ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>아직 보고서가 생성되지 않았습니다</h3>
+            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
               AI 에이전트가 실시간 데이터를 수집 및 분석 중이거나 아직 워룸 리포트 생성이 요청되지 않은 상태입니다. 잠시 후 다시 확인해 주세요.
             </p>
           </div>
@@ -1345,16 +1478,16 @@ export default function AiReportPage() {
               <div className="space-y-3 animate-in fade-in duration-300">
                 {/* S-Autopilot Insight */}
                 {report.autopilot_insight && (
-                  <section className="bg-[#0f1421] rounded-2xl border border-blue-500/10 overflow-visible">
-                    <div className="px-4 py-2.5 flex items-center justify-between border-b border-white/5 bg-blue-500/5">
+                  <section className={`rounded-2xl overflow-visible transition-colors ${isLight ? 'bg-white border border-slate-200/90 shadow-sm' : 'bg-[#0f1421] border border-blue-500/10'}`}>
+                    <div className={`px-4 py-2.5 flex items-center justify-between border-b ${isLight ? 'border-slate-100 bg-blue-50/60' : 'border-white/5 bg-blue-500/5'}`}>
                       <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-blue-400" />
-                        <span className="text-xs font-bold text-blue-400">S-Autopilot Insight</span>
+                        <Sparkles className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                        <span className={`text-xs font-bold ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>S-Autopilot Insight</span>
                       </div>
                       {report.similarity_score !== undefined && report.similarity_score !== null && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 rounded-lg border border-blue-500/20 shadow-lg shadow-blue-500/5">
-                          <Zap className="w-3 h-3 text-blue-400 fill-blue-400/20" />
-                          <span className="text-[10px] font-black text-blue-400 font-mono">
+                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border shadow-xs ${isLight ? 'bg-blue-100/80 text-blue-700 border-blue-200' : 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-blue-500/5'}`}>
+                          <Zap className={`w-3 h-3 ${isLight ? 'text-blue-600 fill-blue-600/20' : 'text-blue-400 fill-blue-400/20'}`} />
+                          <span className={`text-[10px] font-black font-mono ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>
                             {Math.round(report.similarity_score * 100)}% Similarity
                           </span>
                         </div>
@@ -1362,13 +1495,13 @@ export default function AiReportPage() {
                     </div>
                     <div className="p-4">
                       {report.similarity_reason && (
-                        <div className="mb-4 bg-blue-500/5 border border-blue-500/10 rounded-xl p-3 flex items-start gap-2.5 animate-in slide-in-from-top-1 duration-500">
-                          <div className="mt-0.5 bg-blue-500/20 p-1.5 rounded-lg border border-blue-500/20 shadow-sm">
-                            <Zap className="w-3.5 h-3.5 text-blue-400 fill-blue-400/20" />
+                        <div className={`mb-4 rounded-xl p-3 flex items-start gap-2.5 animate-in slide-in-from-top-1 duration-500 ${isLight ? 'bg-blue-50/80 border border-blue-200/80 shadow-xs' : 'bg-blue-500/5 border border-blue-500/10'}`}>
+                          <div className={`mt-0.5 p-1.5 rounded-lg border shadow-xs ${isLight ? 'bg-blue-100 border-blue-200' : 'bg-blue-500/20 border-blue-500/20'}`}>
+                            <Zap className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600 fill-blue-600/20' : 'text-blue-400 fill-blue-400/20'}`} />
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-blue-400/70 uppercase tracking-widest mb-1">AI Matching Rationale</p>
-                            <p className="text-xs text-slate-300 font-medium italic leading-relaxed">
+                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isLight ? 'text-blue-900' : 'text-blue-400/70'}`}>AI Matching Rationale</p>
+                            <p className={`text-xs font-medium italic leading-relaxed ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
                               "{report.similarity_reason}"
                             </p>
                           </div>
@@ -1380,10 +1513,10 @@ export default function AiReportPage() {
                 )}
                 {/* Leader Summary */}
                 {report.leader_summary && (
-                  <section className="bg-[#0f1421] rounded-2xl border border-amber-500/10 overflow-visible">
-                    <div className="px-4 py-2.5 flex items-center gap-2 border-b border-white/5 bg-amber-500/5">
-                      <Bot className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-amber-400">Leader Agent 종합 요약</span>
+                  <section className={`rounded-2xl overflow-visible transition-colors ${isLight ? 'bg-white border border-slate-200/90 shadow-sm' : 'bg-[#0f1421] border border-amber-500/10'}`}>
+                    <div className={`px-4 py-2.5 flex items-center gap-2 border-b ${isLight ? 'border-slate-100 bg-amber-50/60' : 'border-white/5 bg-amber-50/5'}`}>
+                      <Bot className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
+                      <span className={`text-xs font-bold ${isLight ? 'text-amber-800' : 'text-amber-400'}`}>Leader Agent 종합 요약</span>
                     </div>
                     <div className="p-4">
                       <MarkdownBlock text={report.leader_summary} report={report} checkedItems={checkedActionItems} onToggleCheck={toggleActionItem} />
@@ -1393,10 +1526,10 @@ export default function AiReportPage() {
 
                 {/* ── [NEW] War-Room Response Timeline (moved to main summary tab) ── */}
                 {chatSummary && (
-                  <section className="bg-blue-600/5 rounded-2xl border border-blue-500/20 overflow-visible shadow-lg shadow-blue-500/5">
-                    <div className="px-4 py-2.5 flex items-center gap-2 border-b border-blue-500/10 bg-blue-500/10">
-                      <Sparkles className="w-4 h-4 text-blue-400" />
-                      <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">War-Room Response Timeline</span>
+                  <section className={`rounded-2xl overflow-visible shadow-sm ${isLight ? 'bg-white border border-slate-200/90 shadow-slate-100' : 'bg-blue-600/5 border border-blue-500/20 shadow-blue-500/5'}`}>
+                    <div className={`px-4 py-2.5 flex items-center gap-2 border-b ${isLight ? 'border-slate-100 bg-blue-50/60' : 'border-blue-500/10 bg-blue-500/10'}`}>
+                      <Sparkles className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                      <span className={`text-xs font-bold uppercase tracking-widest ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>War-Room Response Timeline</span>
                     </div>
                     <div className="p-5 overflow-visible">
                       <MarkdownBlock text={formatTimeline(chatSummary)} report={report} checkedItems={checkedActionItems} onToggleCheck={toggleActionItem} />
@@ -1539,16 +1672,24 @@ export default function AiReportPage() {
                     href={`${API_BASE_URL}${att.url}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 bg-[#0f1421] rounded-xl p-3 border border-white/5 hover:border-blue-500/30 transition-colors"
+                    className={`flex items-center gap-3 rounded-xl p-3 border transition-colors ${
+                      isLight
+                        ? 'bg-white border-slate-200 hover:border-blue-400 shadow-xs'
+                        : 'bg-[#0f1421] border-white/5 hover:border-blue-500/30'
+                    }`}
                   >
-                    <div className="w-9 h-9 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center shrink-0">
-                      <Paperclip className="w-4 h-4 text-blue-400" />
+                    <div className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${
+                      isLight ? 'bg-blue-50 border-blue-200' : 'bg-blue-500/15 border-blue-500/20'
+                    }`}>
+                      <Paperclip className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-200 truncate">{att.original_name}</p>
+                      <p className={`text-sm font-medium truncate ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{att.original_name}</p>
                       <p className="text-[10px] text-slate-500">{att.uploaded_by} · {att.timestamp?.slice(0, 16)}</p>
                     </div>
-                    <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 shrink-0">다운로드</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 ${
+                      isLight ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                    }`}>다운로드</span>
                   </a>
                 ))}
               </div>
@@ -1559,41 +1700,74 @@ export default function AiReportPage() {
               <div className="space-y-4 animate-in fade-in duration-300">
                 {!aiGenText && !isGenerating && (
                   <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
-                    <div style={{ width: 56, height: 56, borderRadius: 18, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Sparkles style={{ width: 26, height: 26, color: '#60a5fa' }} />
+                    <div style={{ width: 56, height: 56, borderRadius: 18, background: isLight ? 'rgba(37,99,235,0.08)' : 'rgba(59,130,246,0.1)', border: `1px solid ${isLight ? 'rgba(37,99,235,0.2)' : 'rgba(59,130,246,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Sparkles style={{ width: 26, height: 26, color: isLight ? '#2563eb' : '#60a5fa' }} />
                     </div>
-                    <p className="text-sm font-medium">데이터 분석을 바탕으로 종합 보고서를 생성합니다...</p>
+                    <p className={`text-sm font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>데이터 분석을 바탕으로 종합 보고서를 생성합니다...</p>
                   </div>
                 )}
                 {isGenerating && !aiGenText && (
                   <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-400">
                     <div style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.2)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' }} />
-                    <p className="text-sm">Dify AI 전문가 분석 진행 중...</p>
+                    <p className={`text-sm ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Dify AI 전문가 분석 진행 중...</p>
                   </div>
                 )}
                 {aiGenText && (
-                  <section style={{ background: 'linear-gradient(180deg, rgba(13,18,36,0.9) 0%, rgba(10,13,20,0.95) 100%)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(59,130,246,0.05)' }}>
+                  <section style={isLight ? {
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 20,
+                    overflow: 'hidden',
+                    boxShadow: '0 4px 20px rgba(15,23,42,0.06)'
+                  } : {
+                    background: 'linear-gradient(180deg, rgba(13,18,36,0.9) 0%, rgba(10,13,20,0.95) 100%)',
+                    border: '1px solid rgba(59,130,246,0.15)',
+                    borderRadius: 20,
+                    overflow: 'hidden',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(59,130,246,0.05)'
+                  }}>
                     {/* 헤더 */}
-                    <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(59,130,246,0.1)', background: 'rgba(59,130,246,0.05)' }}>
+                    <div style={isLight ? {
+                      padding: '14px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid #e2e8f0',
+                      background: '#f8fafc'
+                    } : {
+                      padding: '14px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid rgba(59,130,246,0.1)',
+                      background: 'rgba(59,130,246,0.05)'
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Sparkles style={{ width: 15, height: 15, color: '#60a5fa' }} />
+                        <div style={{ width: 32, height: 32, borderRadius: 10, background: isLight ? '#eff6ff' : 'rgba(59,130,246,0.15)', border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(59,130,246,0.3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Sparkles style={{ width: 15, height: 15, color: isLight ? '#2563eb' : '#60a5fa' }} />
                         </div>
                         <div>
-                          <p style={{ fontSize: 13, fontWeight: 800, color: '#93c5fd', margin: 0 }}>AI 종합 장애 보고서</p>
-                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Dify 전문가 멀티에이전트 분석 결과</p>
+                          <p style={{ fontSize: 13, fontWeight: 800, color: isLight ? '#1e3a8a' : '#93c5fd', margin: 0 }}>AI 종합 장애 보고서</p>
+                          <p style={{ fontSize: 10, color: isLight ? '#64748b' : 'rgba(255,255,255,0.3)', margin: 0 }}>Dify 전문가 멀티에이전트 분석 결과</p>
                         </div>
                         {isGenerating && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8, padding: '3px 10px', background: 'rgba(59,130,246,0.15)', borderRadius: 20, border: '1px solid rgba(59,130,246,0.25)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8, padding: '3px 10px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.15)', borderRadius: 20, border: `1px solid ${isLight ? '#93c5fd' : 'rgba(59,130,246,0.25)'}` }}>
                             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', animation: 'ping 1s ease-in-out infinite' }} />
-                            <span style={{ fontSize: 10, color: '#93c5fd', fontWeight: 600 }}>분석 중...</span>
+                            <span style={{ fontSize: 10, color: isLight ? '#1e40af' : '#93c5fd', fontWeight: 600 }}>분석 중...</span>
                           </div>
                         )}
                       </div>
                       <button
                         onClick={generateAiReport}
                         disabled={isGenerating}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#64748b', fontSize: 11, fontWeight: 600, cursor: isGenerating ? 'not-allowed' : 'pointer', opacity: isGenerating ? 0.4 : 1, transition: 'all 0.2s' }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8,
+                          border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.08)'}`,
+                          background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)',
+                          color: isLight ? '#334155' : '#64748b',
+                          fontSize: 11, fontWeight: 600, cursor: isGenerating ? 'not-allowed' : 'pointer',
+                          opacity: isGenerating ? 0.4 : 1, transition: 'all 0.2s'
+                        }}
                       >
                         <RefreshCw style={{ width: 11, height: 11, animation: isGenerating ? 'spin 1s linear infinite' : 'none' }} />
                         재생성
@@ -1610,9 +1784,9 @@ export default function AiReportPage() {
 
                     {/* 푸터 */}
                     {!isGenerating && (
-                      <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>S-Guard AI · Dify 전문가 분석</span>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>{new Date().toLocaleString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                      <div style={{ padding: '12px 20px', borderTop: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.04)'}`, background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 10, color: isLight ? '#64748b' : 'rgba(255,255,255,0.2)' }}>S-Guard AI · Dify 전문가 분석</span>
+                        <span style={{ fontSize: 10, color: isLight ? '#64748b' : 'rgba(255,255,255,0.2)' }}>{new Date().toLocaleString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     )}
                   </section>
@@ -1627,13 +1801,15 @@ export default function AiReportPage() {
       {modalStep && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => modalStep !== 'generating' && setModalStep(null)} />
-          <div className="relative z-10 w-full max-w-2xl bg-[#0f1219] rounded-t-3xl border border-white/10 overflow-visible max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between">
-              <h3 className="font-bold text-white">
+          <div className={`relative z-10 w-full max-w-2xl rounded-t-3xl border overflow-visible max-h-[90vh] flex flex-col ${
+            isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#0f1219] border-white/10'
+          }`}>
+            <div className={`p-5 border-b flex items-center justify-between ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+              <h3 className={`font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 {modalStep === 'preview' ? '📋 보고서 최종 확인' : '📤 보고 대상 선정'}
               </h3>
-              <button onClick={() => setModalStep(null)} className="p-1.5 rounded-full hover:bg-white/10">
-                <X className="w-4 h-4 text-slate-400" />
+              <button onClick={() => setModalStep(null)} className={`p-1.5 rounded-full ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/10 text-slate-400'}`}>
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -1644,12 +1820,12 @@ export default function AiReportPage() {
                     { k: 'WHERE', v: report?.where }, { k: 'WHAT', v: report?.what },
                     { k: 'WHY', v: report?.why }, { k: 'HOW', v: report?.how },
                   ].map(({ k, v }) => (
-                    <div key={k} className="bg-[#161b24] rounded-xl p-3 border border-white/5">
+                    <div key={k} className={`rounded-xl p-3 border ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-[#161b24] border-white/5'}`}>
                       <span className="text-[10px] text-slate-500 uppercase font-bold">{k}</span>
-                      <p className="text-slate-300 mt-0.5 text-xs break-words">{v || '-'}</p>
+                      <p className={`mt-0.5 text-xs break-words ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>{v || '-'}</p>
                     </div>
                   ))}
-                  {memo && <div className="bg-blue-500/10 rounded-xl p-3 border border-blue-500/20 text-blue-200 text-xs italic">"{memo}"</div>}
+                  {memo && <div className={`rounded-xl p-3 border text-xs italic ${isLight ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-blue-500/10 border-blue-500/20 text-blue-200'}`}>"{memo}"</div>}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1658,19 +1834,25 @@ export default function AiReportPage() {
                       key={line.id}
                       onClick={() => toggleLine(line.id)}
                       className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
-                        selectedLines.includes(line.id) ? 'bg-blue-600/10 border-blue-500' : 'bg-[#161b2a]/50 border-white/5'
+                        selectedLines.includes(line.id)
+                          ? (isLight ? 'bg-blue-50 border-blue-500 shadow-xs' : 'bg-blue-600/10 border-blue-500')
+                          : (isLight ? 'bg-slate-50 border-slate-200 hover:border-slate-300' : 'bg-[#161b2a]/50 border-white/5')
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${selectedLines.includes(line.id) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          selectedLines.includes(line.id) ? 'bg-blue-600 text-white' : (isLight ? 'bg-slate-200 text-slate-600' : 'bg-slate-800 text-slate-400')
+                        }`}>
                           <User className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-slate-200">{line.role} {line.name}</p>
+                          <p className={`font-bold text-sm ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{line.role} {line.name}</p>
                           <p className="text-[10px] text-slate-500">{line.desc}</p>
                         </div>
                       </div>
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedLines.includes(line.id) ? 'bg-blue-600 border-blue-400' : 'border-slate-600'}`}>
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                        selectedLines.includes(line.id) ? 'bg-blue-600 border-blue-400' : (isLight ? 'border-slate-300' : 'border-slate-600')
+                      }`}>
                         {selectedLines.includes(line.id) && <Check className="w-3 h-3 text-white" />}
                       </div>
                     </div>
@@ -1678,17 +1860,19 @@ export default function AiReportPage() {
                 </div>
               )}
             </div>
-            <div className="p-4 border-t border-white/5 flex gap-3">
+            <div className={`p-4 border-t flex gap-3 ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
               <button
                 onClick={() => modalStep === 'preview' ? setModalStep(null) : setModalStep('preview')}
-                className="flex-1 h-12 rounded-2xl bg-slate-800 text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all border border-white/5"
+                className={`flex-1 h-12 rounded-2xl text-sm font-bold transition-all border ${
+                  isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border-white/5'
+                }`}
               >
                 {modalStep === 'preview' ? '닫기' : '이전'}
               </button>
               <button
                 onClick={() => modalStep === 'preview' ? setModalStep('selection') : (selectedLines.length > 0 && handleFinalSubmit())}
                 disabled={modalStep === 'selection' && selectedLines.length === 0}
-                className="flex-[1.5] h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-bold flex items-center justify-center gap-2 hover:from-blue-500 hover:to-blue-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-[1.5] h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-bold flex items-center justify-center gap-2 hover:from-blue-500 hover:to-blue-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
               >
                 {modalStep === 'preview' ? (<><span>보고라인 선택</span><ChevronRight className="w-4 h-4" /></>) : (<><span>최종 전송 ({selectedLines.length}명)</span><Send className="w-4 h-4" /></>)}
               </button>

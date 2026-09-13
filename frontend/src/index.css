@@ -1271,3 +1271,23 @@
   scroll-margin-top: 10px !important;
 }
 
+/* 🏢 라이트 모드 마크다운 본문 및 카드 고대비 시인성 보장 */
+[data-theme="light"] .markdown-body-custom {
+  color: #0f172a !important;
+}
+[data-theme="light"] .markdown-body-custom strong {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+[data-theme="light"] .markdown-body-custom p,
+[data-theme="light"] .markdown-body-custom div.md-p,
+[data-theme="light"] .markdown-body-custom li,
+[data-theme="light"] .markdown-body-custom li div {
+  color: #0f172a !important;
+}
+[data-theme="light"] .markdown-body-custom th,
+[data-theme="light"] .markdown-body-custom td {
+  color: #0f172a !important;
+}
+
+
