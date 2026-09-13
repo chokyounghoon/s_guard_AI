@@ -258,7 +258,60 @@ const getMdComponents = (isLight) => ({
   ),
 });
 
-// ── [NEW] 워룸 타임라인 단락/서식 특화 렌더러 (일목요연한 단락/헤더/불릿 분리) ──
+// ── [NEW] 텍스트 내의 **굵은글씨**, 라벨: 등을 파싱하여 ** 기호를 완전히 없애고 시각적으로 볼드 처리 ──
+function renderLineContent(rawText, isLight) {
+  if (!rawText) return null;
+
+  // 1. 앞쪽의 **가 누락되어 "라벨:** 내용" 형태로 된 경우 복원/정규화
+  let normalized = String(rawText).replace(/^([^*:\n]{1,40}):\*\*\s*/, '**$1:** ');
+
+  // 2. **...** 쌍 파싱
+  const parts = normalized.split(/(\*\*[^*]+\*\*)/g);
+  
+  if (parts.length === 1) {
+    const cleanText = normalized.replace(/\*\*/g, '').trim();
+
+    // "라벨: 내용" 형태인 경우 라벨 볼드 처리 (시간 패턴 e.g. 17:52:54 제외)
+    const colonIdx = cleanText.indexOf(':');
+    const isTime = /\d{1,2}:\d{2}/.test(cleanText.slice(0, Math.max(0, colonIdx)));
+    if (colonIdx > 0 && colonIdx < 35 && !isTime) {
+      const label = cleanText.slice(0, colonIdx).trim();
+      const val = cleanText.slice(colonIdx + 1).trim();
+      return (
+        <span>
+          <strong className={`font-bold ${isLight ? 'text-slate-950' : 'text-white'}`}>{label}:</strong>{' '}
+          <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{val}</span>
+        </span>
+      );
+    }
+
+    return <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{cleanText}</span>;
+  }
+
+  // ** 쌍이 있는 경우 분할 렌더링
+  return (
+    <span>
+      {parts.map((part, pIdx) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          const inner = part.slice(2, -2).trim();
+          return (
+            <strong key={pIdx} className={`font-bold ${isLight ? 'text-slate-950' : 'text-white'}`}>
+              {inner}
+            </strong>
+          );
+        }
+        const cleanedPart = part.replace(/\*\*/g, '');
+        return (
+          <span key={pIdx} className={isLight ? 'text-slate-800' : 'text-slate-200'}>
+            {cleanedPart}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+// ── [NEW] 워룸 타임라인 단락/서식 특화 렌더러 (일목요연한 단락/헤더/불릿 분리 및 ** 기호 완벽 제거) ──
 function WarRoomStepContent({ text, isLight, isLast }) {
   if (!text) return null;
 
@@ -266,21 +319,31 @@ function WarRoomStepContent({ text, isLight, isLast }) {
 
   // 일반 텍스트 포맷터 (단락 및 줄바꿈/불릿 정리)
   if (!hasSections) {
-    const clean = text.replace(/^\*+|\*+$/g, '').trim();
-    const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const clean = text.trim();
+    const lines = clean
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(l => {
+        // 불릿 기호(-, •, *, ·)만 있고 실제 내용이 없는 빈 줄 필터링 (불필요한 고립 불릿 점 방지)
+        const stripped = l.replace(/^[-•*·]\s*/, '').replace(/\*\*/g, '').trim();
+        return stripped.length > 0;
+      });
 
     if (lines.length > 1) {
       return (
         <div className="flex flex-col gap-2 w-full">
           {lines.map((line, idx) => {
-            const isBullet = line.startsWith('-') || line.startsWith('•') || line.startsWith('*');
-            const content = isBullet ? line.replace(/^[-•*]\s*/, '') : line;
+            const isBullet = line.startsWith('-') || line.startsWith('•') || line.startsWith('*') || line.startsWith('·');
+            const content = isBullet ? line.replace(/^[-•*·]\s*/, '').trim() : line.trim();
+            if (!content) return null;
             return (
               <div key={idx} className="flex items-start gap-2 text-xs sm:text-[13px] leading-relaxed">
                 {isBullet && (
                   <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isLight ? 'bg-blue-600' : 'bg-blue-400'}`} />
                 )}
-                <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{content}</span>
+                <div className="flex-1 min-w-0">
+                  {renderLineContent(content, isLight)}
+                </div>
               </div>
             );
           })}
@@ -289,14 +352,19 @@ function WarRoomStepContent({ text, isLight, isLast }) {
     }
 
     if (clean.includes(' - ')) {
-      const segments = clean.split(/\s+-\s+/).map(s => s.trim()).filter(Boolean);
+      const segments = clean
+        .split(/\s+-\s+/)
+        .map(s => s.trim())
+        .filter(s => s.replace(/^[-•*·]\s*/, '').replace(/\*\*/g, '').trim().length > 0);
       if (segments.length > 1) {
         return (
           <div className="flex flex-col gap-2 w-full">
             {segments.map((seg, idx) => (
               <div key={idx} className="flex items-start gap-2 text-xs sm:text-[13px] leading-relaxed">
                 <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isLight ? 'bg-blue-600' : 'bg-blue-400'}`} />
-                <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{seg}</span>
+                <div className="flex-1 min-w-0">
+                  {renderLineContent(seg, isLight)}
+                </div>
               </div>
             ))}
           </div>
@@ -306,7 +374,7 @@ function WarRoomStepContent({ text, isLight, isLast }) {
 
     return (
       <div className={`text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
-        {clean}
+        {renderLineContent(clean, isLight)}
       </div>
     );
   }
@@ -328,7 +396,7 @@ function WarRoomStepContent({ text, isLight, isLast }) {
         // Case A: RCA / 핵심 원인
         if (part.includes('핵심 원인') || part.includes('Root Cause') || part.includes('💡')) {
           const titleMatch = part.match(/###\s*(.+?)(?:\s*>|\n|$)/);
-          const rcaTitle = titleMatch ? titleMatch[1].replace(/^[#\s]+/, '').trim() : '핵심 원인 (Root Cause Analysis)';
+          const rcaTitle = titleMatch ? titleMatch[1].replace(/^[#\s]+/, '').replace(/\*\*/g, '').trim() : '핵심 원인 (Root Cause Analysis)';
           const quoteText = part.replace(/###.+?(?:\s*>|\n|$)/, '').replace(/^>\s*/gm, '').trim();
 
           return (
@@ -354,7 +422,7 @@ function WarRoomStepContent({ text, isLight, isLast }) {
               <div className={`text-xs sm:text-[12.5px] leading-relaxed font-medium pl-3 border-l-2 ${
                 isLight ? 'border-amber-400 text-slate-800' : 'border-amber-500/60 text-slate-100'
               }`}>
-                {quoteText}
+                {renderLineContent(quoteText, isLight)}
               </div>
             </div>
           );
@@ -363,7 +431,7 @@ function WarRoomStepContent({ text, isLight, isLast }) {
         // Case B: Final Report / 최종 보고서 및 넘버링 세션
         if (part.includes('최종 보고서') || part.includes('Resolution Report') || /(?:^|\s)[1-9]\d?\.\s+/.test(part)) {
           const titleMatch = part.match(/^###\s*([^\d\n]+?)(?=\s*[1-9]\d?\.\s+|$)/);
-          const reportTitle = titleMatch ? titleMatch[1].replace(/^[#\s]+/, '').trim() : '최종 보고서 (Resolution Report)';
+          const reportTitle = titleMatch ? titleMatch[1].replace(/^[#\s]+/, '').replace(/\*\*/g, '').trim() : '최종 보고서 (Resolution Report)';
           const body = titleMatch ? part.slice(titleMatch[0].length).trim() : part;
 
           const sectionRegex = /(?:^|\s)([1-9]\d?)\.\s+([^-\n:]+?)(?=\s*-\s*|\s*[1-9]\d?\.\s+|$)/g;
@@ -378,7 +446,7 @@ function WarRoomStepContent({ text, isLight, isLast }) {
             indices.forEach((sec, idx) => {
               const nextStart = indices[idx + 1] ? indices[idx + 1].index : body.length;
               const content = body.slice(sec.end, nextStart).trim();
-              const bullets = content.split(/(?:^|\s)-\s+/).map(b => b.trim()).filter(Boolean);
+              const bullets = content.split(/(?:^|\s)-\s+/).map(b => b.trim()).filter(b => b.replace(/^[-•*·]\s*/, '').replace(/\*\*/g, '').trim().length > 0);
               sections.push({ num: sec.num, title: sec.title, bullets });
             });
           }
@@ -426,7 +494,7 @@ function WarRoomStepContent({ text, isLight, isLast }) {
                             {sec.num}
                           </span>
                           <span className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
-                            {sec.title}
+                            {renderLineContent(sec.title, isLight)}
                           </span>
                         </div>
 
@@ -443,20 +511,21 @@ function WarRoomStepContent({ text, isLight, isLast }) {
                                     }`}>
                                       {timeMatch[1]}
                                     </span>
-                                    <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>
-                                      {timeMatch[2]}
-                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      {renderLineContent(timeMatch[2], isLight)}
+                                    </div>
                                   </div>
                                 );
                               }
 
                               // 2. 키-밸류 라벨 감지 e.g. "서비스 영향 범위: ..."
-                              const colonIdx = b.indexOf(':');
-                              const keyCandidate = colonIdx > 0 ? b.slice(0, colonIdx).trim() : '';
+                              const cleanB = b.replace(/\*\*/g, '');
+                              const colonIdx = cleanB.indexOf(':');
+                              const keyCandidate = colonIdx > 0 ? cleanB.slice(0, colonIdx).trim() : '';
                               const isTimestamp = /\d{1,2}:\d{2}/.test(keyCandidate);
                               const hasKeyValue = colonIdx > 0 && colonIdx < 30 && !isTimestamp && !/^\d+$/.test(keyCandidate);
                               const keyPart = hasKeyValue ? keyCandidate : null;
-                              const valPart = hasKeyValue ? b.slice(colonIdx + 1).trim() : b;
+                              const valPart = hasKeyValue ? cleanB.slice(colonIdx + 1).trim() : cleanB;
 
                               return (
                                 <div key={bIdx} className="flex items-start gap-2 text-xs sm:text-[12px] leading-relaxed">
@@ -469,9 +538,9 @@ function WarRoomStepContent({ text, isLight, isLast }) {
                                   ) : (
                                     <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${col.dot}`} />
                                   )}
-                                  <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>
-                                    {valPart}
-                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    {renderLineContent(valPart, isLight)}
+                                  </div>
                                 </div>
                               );
                             })}
@@ -483,7 +552,7 @@ function WarRoomStepContent({ text, isLight, isLast }) {
                 </div>
               ) : (
                 <div className={`text-xs sm:text-[12px] leading-relaxed whitespace-pre-wrap ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
-                  {body}
+                  {renderLineContent(body, isLight)}
                 </div>
               )}
             </div>
@@ -516,12 +585,12 @@ function WarRoomStepContent({ text, isLight, isLast }) {
                     }`}>
                       조치 현황
                     </span>
-                    <span>{prefix}</span>
+                    <span>{renderLineContent(prefix, isLight)}</span>
                   </div>
                 )}
-                <p className={`text-xs sm:text-[12.5px] leading-relaxed ${isLight ? 'text-slate-800 font-medium' : 'text-slate-200'}`}>
-                  {rest}
-                </p>
+                <div className={`text-xs sm:text-[12.5px] leading-relaxed ${isLight ? 'text-slate-800 font-medium' : 'text-slate-200'}`}>
+                  {renderLineContent(rest, isLight)}
+                </div>
               </div>
             </div>
           </div>
@@ -752,7 +821,7 @@ export default function AiReportPage() {
   const formatTimeline = (text) => {
     if (!text) return '';
     return text
-      .replace(/(?:\s*)(\[\d{2}:\d{2}(?::\d{2})?[^\]]*\])/g, '\n\n- **$1** ')
+      .replace(/(?:\*\*|\s*)\[(\d{2}:\d{2}(?::\d{2})?[^\]]*)\](?:\*\*|\s*)*/g, '\n\n- **[$1]** ')
       .replace(/\s*---\s*/g, '\n\n---\n\n')
       .replace(/\s*(###\s+[^\n]+)/g, '\n\n$1\n\n')
       .replace(/(?:^|\s)([1-9]\d?\.\s+[가-힣][^\-\n:]*?)\s*-\s+/g, '\n\n#### $1\n- ')
@@ -1672,6 +1741,8 @@ export default function AiReportPage() {
                       timestamps.forEach((ts, i) => {
                         const nextStart = timestamps[i + 1]?.index ?? raw.length;
                         let text = raw.slice(ts.end, nextStart).trim();
+                        // 앞쪽 잔여 `:**` 보정 (e.g. `**[17:52:54] 라벨:**` 형태였을 경우)
+                        text = text.replace(/^([^*:\n]{1,40}):\*\*\s*/, '**$1:** ');
                         // 앞뒤 잔여 마크다운 별표(*) 정리
                         text = text.replace(/^\*+|\*+$/g, '').trim();
                         if (text) items.push({ time: ts.time, text });
