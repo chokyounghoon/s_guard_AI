@@ -1512,16 +1512,20 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
         {/* Feedback Buttons (👍/👎) - 플랫 그리드 액션 바 */}
         {analysisComplete && displayedText && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <div className={`w-full rounded-2xl border border-[#1E2F56] p-4 sm:p-5 transition-all duration-300 ${
+            <div className={`w-full rounded-2xl border p-4 sm:p-5 transition-all duration-300 ${
               feedback === 'UP'
-                ? 'bg-[#00C48C]/10'
+                ? (isLight ? 'bg-emerald-50 border-emerald-200' : 'bg-[#00C48C]/10 border-emerald-500/30')
                 : feedback === 'DOWN'
-                ? 'bg-[#F04438]/10'
-                : 'bg-[#13203E]'
+                ? (isLight ? 'bg-rose-50 border-rose-200' : 'bg-[#F04438]/10 border-rose-500/30')
+                : (isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#13203E] border-[#1E2F56]')
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className={`text-xs font-semibold flex items-center gap-2 ${
-                  feedback === 'UP' ? 'text-[#00C48C]' : feedback === 'DOWN' ? 'text-[#F04438]' : 'text-slate-300'
+                <p className={`text-xs font-bold flex items-center gap-2 ${
+                  feedback === 'UP' 
+                    ? (isLight ? 'text-emerald-700' : 'text-[#00C48C]') 
+                    : feedback === 'DOWN' 
+                      ? (isLight ? 'text-rose-700' : 'text-[#F04438]') 
+                      : (isLight ? 'text-slate-900' : 'text-white')
                 }`}>
                   {feedback === 'UP' ? '정확한 분석으로 평가하셨습니다' : feedback === 'DOWN' ? '피드백을 제출해 주셔서 감사합니다' : 'AI 진단 결과가 실무에 도움이 되었나요?'}
                 </p>
@@ -1529,25 +1533,41 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   <button
                     onClick={() => handleFeedback('UP')}
                     disabled={feedback === 'UP'}
-                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all active:scale-95 border ${
+                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs transition-all active:scale-95 border ${
                       feedback === 'UP'
-                        ? 'bg-[#00C48C] text-white border-[#00C48C] font-semibold'
-                        : 'bg-[#0D162B] hover:bg-[#1E2F56] text-slate-300 border-[#1E2F56]'
+                        ? 'bg-[#00C48C] text-white border-[#00C48C] font-bold shadow-sm'
+                        : isLight
+                          ? 'bg-slate-50 hover:bg-emerald-50 text-slate-800 hover:text-emerald-700 border-slate-200 hover:border-emerald-300 font-bold shadow-xs'
+                          : 'bg-[#0D162B] hover:bg-[#1E2F56] text-white border-[#1E2F56] font-medium'
                     }`}
                   >
-                    <ThumbsUp className={`w-3.5 h-3.5 ${feedback === 'UP' ? 'fill-current text-white' : 'text-slate-400'}`} />
+                    <ThumbsUp className={`w-3.5 h-3.5 ${
+                      feedback === 'UP' 
+                        ? 'fill-current text-white' 
+                        : isLight 
+                          ? 'text-slate-700' 
+                          : 'text-slate-300'
+                    }`} />
                     <span>정확해요</span>
                   </button>
                   <button
                     onClick={() => handleFeedback('DOWN')}
                     disabled={feedback === 'DOWN' && !showFeedbackModal}
-                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all active:scale-95 border ${
+                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs transition-all active:scale-95 border ${
                       feedback === 'DOWN'
-                        ? 'bg-[#F04438] text-white border-[#F04438] font-semibold'
-                        : 'bg-[#0D162B] hover:bg-[#1E2F56] text-slate-300 border-[#1E2F56]'
+                        ? 'bg-[#F04438] text-white border-[#F04438] font-bold shadow-sm'
+                        : isLight
+                          ? 'bg-slate-50 hover:bg-rose-50 text-slate-800 hover:text-rose-700 border-slate-200 hover:border-rose-300 font-bold shadow-xs'
+                          : 'bg-[#0D162B] hover:bg-[#1E2F56] text-white border-[#1E2F56] font-medium'
                     }`}
                   >
-                    <ThumbsDown className={`w-3.5 h-3.5 ${feedback === 'DOWN' ? 'fill-current text-white' : 'text-slate-400'}`} />
+                    <ThumbsDown className={`w-3.5 h-3.5 ${
+                      feedback === 'DOWN' 
+                        ? 'fill-current text-white' 
+                        : isLight 
+                          ? 'text-slate-700' 
+                          : 'text-slate-300'
+                    }`} />
                     <span>아니에요</span>
                   </button>
                 </div>
@@ -1561,13 +1581,21 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
       {/* Detailed Feedback Modal (Popup) */}
       {showFeedbackModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#0D162B] border border-[#1E2F56] rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-[#1E2F56] flex items-center justify-between bg-[#13203E]">
+          <div className={`border rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 ${
+            isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#0D162B] border-[#1E2F56] text-white'
+          }`}>
+            <div className={`p-4 border-b flex items-center justify-between ${
+              isLight ? 'border-slate-200 bg-slate-50' : 'border-[#1E2F56] bg-[#13203E]'
+            }`}>
               <div className="flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 text-[#F04438]" />
-                <h3 className="text-sm font-bold text-white font-shinhan-display">무엇이 잘못되었나요?</h3>
+                <h3 className={`text-sm font-bold font-shinhan-display ${
+                  isLight ? 'text-slate-900' : 'text-white'
+                }`}>무엇이 잘못되었나요?</h3>
               </div>
-              <button onClick={() => setShowFeedbackModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowFeedbackModal(false)} className={`${
+                isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+              }`}>
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1578,7 +1606,11 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
                   <button
                     key={reason}
                     onClick={() => setDownReason(reason)}
-                    className={`text-left px-3 py-2.5 rounded-xl text-xs transition-all border ${downReason === reason ? 'bg-[#0046FF]/20 border-[#0046FF] text-[#00A3E0]' : 'bg-[#060C1B] border-[#1E2F56] text-slate-400 hover:bg-[#13203E]'}`}
+                    className={`text-left px-3 py-2.5 rounded-xl text-xs transition-all border ${
+                      downReason === reason 
+                        ? (isLight ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold' : 'bg-[#0046FF]/20 border-[#0046FF] text-[#00A3E0]') 
+                        : (isLight ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100' : 'bg-[#060C1B] border-[#1E2F56] text-slate-400 hover:bg-[#13203E]')
+                    }`}
                   >
                     {reason}
                   </button>
@@ -1586,19 +1618,25 @@ export default function AiInsightPanel({ onLogReceived, onShowDetail, selectedSm
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-shinhan-display">교정 내용 (직접 수정)</label>
+                <label className={`text-[10px] font-bold uppercase tracking-wider font-shinhan-display ${
+                  isLight ? 'text-slate-700' : 'text-slate-400'
+                }`}>교정 내용 (직접 수정)</label>
                 <textarea
                   value={correction}
                   onChange={(e) => setCorrection(e.target.value)}
                   placeholder="올바른 정답이나 수정 사항을 입력해 주세요..."
-                  className="w-full h-24 bg-[#060C1B] border border-[#1E2F56] rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-[#0046FF] transition-all resize-none"
+                  className={`w-full h-24 rounded-xl p-3 text-xs focus:outline-none transition-all resize-none border ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 placeholder:text-slate-400' 
+                      : 'bg-[#060C1B] border-[#1E2F56] text-slate-200 focus:border-[#0046FF] placeholder:text-slate-500'
+                  }`}
                 />
               </div>
 
               <button
                 onClick={() => handleFeedback('DOWN', { reason: downReason, correction })}
                 disabled={!downReason || isSubmitting}
-                className="w-full py-2.5 bg-[#0046FF] hover:bg-[#0038cc] disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-all border border-[#0046FF] flex items-center justify-center space-x-2 font-shinhan-display"
+                className="w-full py-2.5 bg-[#0046FF] hover:bg-[#0038cc] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all border border-[#0046FF] flex items-center justify-center space-x-2 font-shinhan-display shadow-sm"
               >
                 {isSubmitting ? <span>제출 중...</span> : (
                   <>

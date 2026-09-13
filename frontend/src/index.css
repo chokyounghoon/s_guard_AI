@@ -408,16 +408,12 @@
     color: #0f172a !important;
   }
 
-  /* 흰색/밝은 바탕 위에서 흐릿한 텍스트 가시성 보정 */
+  /* 흰색/밝은 바탕 위에서 흐릿한 텍스트 가시성 보정 (어두운 카드에는 절대 적용되지 않도록 스코프 한정) */
   .bg-white .text-slate-300,
   .bg-slate-50 .text-slate-300,
   .bg-white .text-slate-400,
-  .bg-slate-50 .text-slate-400,
-  .pc-modal-content .text-slate-300 {
+  .bg-slate-50 .text-slate-400 {
     color: #334155 !important;
-  }
-  .pc-modal-content .text-slate-400 {
-    color: #475569 !important;
   }
 
   /* ══════════════════════════════════════════════════════════════════
