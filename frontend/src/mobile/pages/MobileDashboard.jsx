@@ -116,11 +116,11 @@ const cleanValue = (val) => {
   return cleaned;
 };
 
-const renderFormattedSMS = (message, severity) => {
+const renderFormattedSMS = (message, severity, isLight = false) => {
   const parsed = parseSMS(message);
   if (!parsed) {
     return (
-      <p className="text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap text-[#ffffff] tracking-tight">
+      <p className={`text-[14px] leading-relaxed font-bold break-all whitespace-pre-wrap tracking-tight ${isLight ? 'text-slate-900' : 'text-[#ffffff]'}`}>
         {message}
       </p>
     );
@@ -129,14 +129,20 @@ const renderFormattedSMS = (message, severity) => {
   const { title, items } = parsed;
   const sev = String(severity || '').toUpperCase();
   
-  let headerBg = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+  let headerBg = isLight 
+    ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
   let bulletColor = 'bg-emerald-500 shadow-none';
   
   if (sev === 'CRITICAL') {
-    headerBg = 'bg-red-500/10 border-red-500/20 text-red-400';
+    headerBg = isLight 
+      ? 'bg-red-50 border-red-200 text-red-800' 
+      : 'bg-red-500/10 border-red-500/20 text-red-400';
     bulletColor = 'bg-red-500 shadow-none';
   } else if (sev === 'MAJOR' || sev === 'WARNING' || sev === 'HIGH') {
-    headerBg = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
+    headerBg = isLight 
+      ? 'bg-amber-50 border-amber-200 text-amber-800' 
+      : 'bg-amber-500/10 border-amber-500/20 text-amber-400';
     bulletColor = 'bg-amber-500 shadow-none';
   }
 
@@ -177,21 +183,23 @@ const renderFormattedSMS = (message, severity) => {
   const hasRateGauge = currentRate !== null || thresholdRate !== null;
 
   return (
-    <div className="flex flex-col gap-2.5 w-full text-slate-200">
+    <div className={`flex flex-col gap-2.5 w-full ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
       {title && (
         <div className={`text-sm font-semibold border px-3.5 py-2.5 rounded-xl flex items-center gap-2 mb-1 ${headerBg}`}>
           <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${bulletColor}`} />
-          <span>{title}</span>
+          <span className="font-bold">{title}</span>
         </div>
       )}
 
       {/* 📊 마이크로 시각화 카드: 오류율 미니 게이지 바 + Delta 증감율 뱃지 */}
       {hasRateGauge && (
-        <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-3 space-y-2 mb-0.5 shadow-sm">
+        <div className={`rounded-xl p-3 space-y-2 mb-0.5 shadow-sm border ${
+          isLight ? 'bg-white border-slate-200' : 'bg-[#0B0F19] border-[#1E293B]'
+        }`}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-red-400 shrink-0" />
-              <span className="text-xs font-bold text-slate-300">오류율 임계치 분석</span>
+              <TrendingUp className="w-4 h-4 text-red-500 shrink-0" />
+              <span className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>오류율 임계치 분석</span>
             </div>
 
             {/* Delta 뱃지 (▲ Red 부각) */}
@@ -209,16 +217,18 @@ const renderFormattedSMS = (message, severity) => {
           {/* 수평 미니 프로그레스 게이지 바 */}
           <div className="space-y-1">
             <div className="flex justify-between items-baseline text-xs font-shinhan-num">
-              <span className="text-[#94A3B8]">
-                기준 임계치: <strong className="text-slate-300 font-semibold">{thresholdRate !== null ? `${thresholdRate}%` : '30%'}</strong>
+              <span className={isLight ? 'text-slate-500' : 'text-[#94A3B8]'}>
+                기준 임계치: <strong className={isLight ? 'text-slate-800 font-semibold' : 'text-slate-300 font-semibold'}>{thresholdRate !== null ? `${thresholdRate}%` : '30%'}</strong>
               </span>
               <span className="text-[#F04438] font-bold">
                 현재 오류율: <strong className="text-[#F04438] text-sm font-black">{currentRate !== null ? `${currentRate}%` : '87.5%'}</strong>
               </span>
             </div>
 
-            <div className="relative h-2.5 w-full bg-[#060C1B] rounded-full overflow-hidden border border-[#1E2F56]">
-              {/* 임계치 마커 라인 (차분한 슬레이트 그레이) */}
+            <div className={`relative h-2.5 w-full rounded-full overflow-hidden border ${
+              isLight ? 'bg-slate-100 border-slate-200' : 'bg-[#060C1B] border-[#1E2F56]'
+            }`}>
+              {/* 임계치 마커 라인 */}
               {thresholdRate !== null && (
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-[#94A3B8] z-10"
@@ -238,12 +248,14 @@ const renderFormattedSMS = (message, severity) => {
 
           {/* 건수 비교 행 */}
           {(curCount !== null || avgCount !== null) && (
-            <div className="flex items-center justify-between pt-1.5 border-t border-[#1E2F56] text-xs font-shinhan-num">
-              <span className="text-slate-400">
-                비교기간 평균: <span className="text-slate-200 font-semibold">{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
+            <div className={`flex items-center justify-between pt-1.5 border-t text-xs font-shinhan-num ${
+              isLight ? 'border-slate-200' : 'border-[#1E2F56]'
+            }`}>
+              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+                비교기간 평균: <span className={`${isLight ? 'text-slate-800' : 'text-slate-200'} font-semibold`}>{avgCount !== null ? `${avgCount.toLocaleString()}건` : '-'}</span>
               </span>
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-400">현재:</span>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>현재:</span>
                 <span className="text-[#F04438] font-bold">{curCount !== null ? `${curCount.toLocaleString()}건` : '-'}</span>
                 {countDelta !== null && countDelta > 0 && (
                   <span className="text-[11px] font-bold text-[#F04438] bg-[#F04438]/10 px-1.5 py-0.5 rounded border border-[#F04438]/20">
@@ -257,7 +269,9 @@ const renderFormattedSMS = (message, severity) => {
       )}
 
       {/* 📋 정보 그리드: 모바일 1열 스택(Stack), 태블릿 2열 */}
-      <div className="bg-[#0B132B]/60 border border-[#1E2F56] rounded-xl overflow-hidden p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 items-stretch">
+      <div className={`rounded-xl overflow-hidden p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 items-stretch border ${
+        isLight ? 'bg-slate-50/80 border-slate-200' : 'bg-[#0B132B]/60 border-[#1E2F56]'
+      }`}>
         {items.map((item, idx) => {
           const isError = item.key.includes('오류') || item.key.includes('초과') || item.key.includes('에러');
           let cleanedVal = cleanValue(item.value);
@@ -270,8 +284,10 @@ const renderFormattedSMS = (message, severity) => {
           
           if (!item.value) {
             return (
-              <div key={idx} className="col-span-1 sm:col-span-2 text-xs font-bold text-[#00A3E0] bg-[#060C1B] -mx-2.5 px-3 py-1.5 border-y border-[#1E2F56] flex items-center gap-1.5 font-shinhan-display">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00A3E0]" />
+              <div key={idx} className={`col-span-1 sm:col-span-2 text-xs font-bold -mx-2.5 px-3 py-1.5 border-y flex items-center gap-1.5 font-shinhan-display ${
+                isLight ? 'text-blue-700 bg-blue-50 border-blue-100' : 'text-[#00A3E0] bg-[#060C1B] border-[#1E2F56]'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-blue-600' : 'bg-[#00A3E0]'}`} />
                 <span>{item.key}</span>
               </div>
             );
@@ -289,16 +305,20 @@ const renderFormattedSMS = (message, severity) => {
           if (isRecipients) {
             const names = cleanedVal.split(/[,，\s]+/).map(n => n.trim()).filter(Boolean);
             return (
-              <div key={idx} className="col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg bg-[#060C1B]/80 border border-[#1E2F56]/70 text-xs">
-                <div className="flex items-center gap-1.5 text-slate-400 font-bold text-[13px]">
-                  <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <div key={idx} className={`col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg text-xs border ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#060C1B]/80 border-[#1E2F56]/70'
+              }`}>
+                <div className={`flex items-center gap-1.5 font-bold text-[13px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                  <Users className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-blue-400'} shrink-0`} />
                   <span>{item.key}</span>
-                  <span className="text-xs text-slate-500 font-mono font-normal">({names.length}명)</span>
+                  <span className={`text-xs font-mono font-normal ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>({names.length}명)</span>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {names.map((name, nIdx) => (
-                    <span key={nIdx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#13203E] border border-[#1E2F56] text-xs font-semibold text-slate-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400/80" />
+                    <span key={nIdx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border ${
+                      isLight ? 'bg-slate-100 border-slate-200 text-slate-800' : 'bg-[#13203E] border-[#1E2F56] text-slate-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-blue-600' : 'bg-blue-400/80'}`} />
                       {maskName(name)}
                     </span>
                   ))}
@@ -310,12 +330,16 @@ const renderFormattedSMS = (message, severity) => {
           // 2. 에러 / 장애 메시지
           if (isErrorMessage) {
             return (
-              <div key={idx} className="col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg bg-red-500/[0.08] border border-red-500/30 text-xs">
-                <div className="flex items-center gap-1.5 text-red-300 font-bold text-[13px]">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 animate-pulse" />
+              <div key={idx} className={`col-span-1 sm:col-span-2 flex flex-col gap-1.5 px-3 py-2 rounded-lg text-xs border ${
+                isLight ? 'bg-red-50/80 border-red-200 text-red-900 shadow-sm' : 'bg-red-500/[0.08] border-red-500/30'
+              }`}>
+                <div className={`flex items-center gap-1.5 font-bold text-[13px] ${isLight ? 'text-red-700' : 'text-red-300'}`}>
+                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 animate-pulse" />
                   <span>{item.key}</span>
                 </div>
-                <div className="text-[13.5px] font-bold text-red-200 break-all leading-relaxed pl-2 border-l-2 border-red-500/40">
+                <div className={`text-[13.5px] font-bold break-all leading-relaxed pl-2 border-l-2 ${
+                  isLight ? 'border-red-400 text-red-800' : 'border-red-500/40 text-red-200'
+                }`}>
                   {cleanedVal}
                 </div>
               </div>
@@ -325,11 +349,21 @@ const renderFormattedSMS = (message, severity) => {
           // 3. 서비스명 등 단독 전체 너비
           if (isFullWidth) {
             return (
-              <div key={idx} className="col-span-1 sm:col-span-2 flex items-start justify-between gap-2 px-3 py-2 rounded-lg bg-[#060C1B]/60 border border-[#1E2F56]/60 text-xs">
-                <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] pt-0.5 ${highlight ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
+              <div key={idx} className={`col-span-1 sm:col-span-2 flex items-start justify-between gap-2 px-3 py-2 rounded-lg text-xs border ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#060C1B]/60 border-[#1E2F56]/60'
+              }`}>
+                <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] pt-0.5 ${
+                  highlight 
+                    ? (isLight ? 'text-red-600 font-bold' : 'text-rose-300 font-bold') 
+                    : (isLight ? 'text-slate-500' : 'text-slate-400')
+                }`}>
                   {item.key}
                 </span>
-                <span className={`font-shinhan-num text-right font-bold break-all leading-snug text-[13.5px] ${highlight ? 'text-[#F04438]' : 'text-slate-100'}`} title={cleanedVal}>
+                <span className={`font-shinhan-num text-right font-bold break-all leading-snug text-[13.5px] ${
+                  highlight 
+                    ? 'text-[#F04438]' 
+                    : (isLight ? 'text-slate-900' : 'text-slate-100')
+                }`} title={cleanedVal}>
                   {cleanedVal}
                 </span>
               </div>
@@ -338,16 +372,28 @@ const renderFormattedSMS = (message, severity) => {
 
           // 4. 일반 컴팩트 항목 (1열 스택으로 쾌적하게)
           return (
-            <div key={idx} className="col-span-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#060C1B]/60 border border-[#1E2F56]/60 text-xs min-w-0">
-              <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] ${highlight ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
+            <div key={idx} className={`col-span-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs min-w-0 border ${
+              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#060C1B]/60 border-[#1E2F56]/60'
+            }`}>
+              <span className={`font-bold shrink-0 whitespace-nowrap text-[13px] ${
+                highlight 
+                  ? (isLight ? 'text-red-600 font-bold' : 'text-rose-300 font-bold') 
+                  : (isLight ? 'text-slate-500' : 'text-slate-400')
+              }`}>
                 {item.key}
               </span>
               {isInterfaceCode ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#0046FF]/10 border border-[#0046FF]/30 text-[#00A3E0] font-mono font-bold text-xs truncate">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded font-mono font-bold text-xs truncate border ${
+                  isLight ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-[#0046FF]/10 border-[#0046FF]/30 text-[#00A3E0]'
+                }`}>
                   {cleanedVal}
                 </span>
               ) : (
-                <span className={`font-shinhan-num text-right text-[13.5px] truncate ${highlight ? 'text-[#F04438] font-bold' : 'text-slate-100 font-semibold'}`} title={cleanedVal}>
+                <span className={`font-shinhan-num text-right text-[13.5px] truncate font-semibold ${
+                  highlight 
+                    ? 'text-[#F04438] font-bold' 
+                    : (isLight ? 'text-slate-900' : 'text-slate-100')
+                }`} title={cleanedVal}>
                   {cleanedVal}
                 </span>
               )}
@@ -2241,7 +2287,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
 
                   {/* Main Contents: SMS Message */}
-                  {renderFormattedSMS(msg.message, msg.severity)}
+                  {renderFormattedSMS(msg.message, msg.severity, isLight)}
 
                   {/* Sub Contents: Sender & Employee Chip */}
                   <div className={`flex flex-wrap items-center gap-2 text-[11px] font-normal ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -2649,16 +2695,16 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 {i > 0 && st.dObj ? (
                                   <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap inline-flex items-center justify-center ${
                                     (st.dObj?.min > 60)
-                                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-semibold'
+                                      ? (isLight ? 'bg-amber-50 text-amber-600 border-amber-300 font-semibold' : 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-semibold')
                                       : isActive 
-                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 font-semibold'
+                                        ? (isLight ? 'bg-blue-50 text-blue-600 border-blue-200 font-semibold' : 'bg-blue-500/10 text-blue-400 border-blue-500/30 font-semibold')
                                         : isDone
-                                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                          : 'bg-slate-900/60 text-slate-500 border-[#1E293B]'
+                                          ? (isLight ? 'bg-emerald-50 text-emerald-600 border-emerald-200 font-medium' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20')
+                                          : (isLight ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-slate-900/60 text-slate-500 border-[#1E293B]')
                                   }`}>
                                     {st.dObj.text}
                                   </span>
-                                ) : (i > 0 && <span className="text-[9px] text-slate-600 font-mono">-</span>)}
+                                ) : (i > 0 && <span className={`text-[9px] font-mono ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>-</span>)}
                               </div>
                             </div>
 
@@ -2668,17 +2714,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                                 <div className="w-full flex items-center gap-1">
                                   <div className={`h-[1px] flex-1 transition-colors ${
                                     isNextStepDone 
-                                      ? (isArrowBottleneck ? 'bg-amber-500/50' : 'bg-emerald-500/40') 
+                                      ? (isArrowBottleneck ? 'bg-amber-500/50' : (isLight ? 'bg-emerald-500' : 'bg-emerald-500/40')) 
                                       : isNextStepActive 
-                                        ? 'bg-blue-500/50' 
-                                        : 'bg-[#1E293B]'
+                                        ? (isLight ? 'bg-blue-500' : 'bg-blue-500/50') 
+                                        : (isLight ? 'bg-slate-200' : 'bg-[#1E293B]')
                                   }`} />
                                   <ArrowRight size={12} className={`shrink-0 transition-colors ${
                                     isNextStepDone 
-                                      ? (isArrowBottleneck ? 'text-amber-400' : 'text-emerald-400') 
+                                      ? (isArrowBottleneck ? 'text-amber-500' : (isLight ? 'text-emerald-600' : 'text-emerald-400')) 
                                       : isNextStepActive 
-                                        ? 'text-blue-400' 
-                                        : 'text-slate-600'
+                                        ? (isLight ? 'text-[#0046FF]' : 'text-blue-400') 
+                                        : (isLight ? 'text-slate-400' : 'text-slate-600')
                                   }`} />
                                 </div>
                               </div>
@@ -2690,8 +2736,8 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   </div>
                 </div>
 
-                {/* 정제된 소요시간 게이지 (Activity Gauges) - 네온 효과 제거 */}
-                <div className="py-6 flex flex-col items-center justify-center border-b border-[#1E293B] relative shrink-0">
+                {/* 정제된 소요시간 게이지 (Activity Gauges) - 다크 콘솔 스타일 유지로 높은 대비 및 타이머 가독성 보장 */}
+                <div className="py-6 flex flex-col items-center justify-center border-b border-[#1E2F56] bg-[#060C1B] relative shrink-0">
                   <div className="flex flex-row items-center justify-center gap-4 px-2">
                     
                     {/* MTTA Gauge */}
@@ -2791,18 +2837,18 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 </div>
 
                 {/* 워룸 이동/개설 액션 및 아코디언 버튼 */}
-                <div className="px-5 pb-5 flex flex-col gap-3">
+                <div className="px-5 pb-5 pt-4 flex flex-col gap-3">
                   {warStep && !knwStep && (() => {
                     const roomExists = warRooms.some(r => String(r.id) === String(selectedIncidentIdFlow) || String(r.inc_id) === String(selectedIncidentIdFlow));
                     return roomExists ? (
-                      <button onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)} className="skeuo-btn w-full py-3.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 rounded-xl font-bold text-sm text-blue-400 flex items-center justify-center gap-2 shadow-sm">
+                      <button onClick={() => navigate(`/chat/${selectedIncidentIdFlow}`)} className="skeuo-btn w-full py-3.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 rounded-xl font-bold text-sm text-blue-500 flex items-center justify-center gap-2 shadow-sm">
                         <Zap size={16} />해당 워룸으로 이동<ChevronRight size={16} />
                       </button>
                     ) : (
                       <button 
                         onClick={() => handleOpenWarRoomFromInsight(selectedSms)} 
                         disabled={isOpeningWarRoom}
-                        className={`skeuo-btn w-full py-3.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 rounded-xl font-bold text-sm text-red-400 flex items-center justify-center gap-2 shadow-sm ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`skeuo-btn w-full py-3.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 rounded-xl font-bold text-sm text-red-500 flex items-center justify-center gap-2 shadow-sm ${isOpeningWarRoom ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <Users size={16} />{isOpeningWarRoom ? '워룸 개설 진행 중...' : '긴급 워룸 개설하기'}
                       </button>
@@ -2811,13 +2857,19 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
 
                   <button
                     onClick={() => setShowFullTimeline(!showFullTimeline)}
-                    className="skeuo-btn w-full py-3.5 px-4 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl text-slate-300 font-bold text-xs flex items-center justify-between transition-all shadow-sm"
+                    className={`skeuo-btn w-full py-3.5 px-4 rounded-xl font-bold text-xs flex items-center justify-between transition-all shadow-sm ${
+                      isLight
+                        ? 'bg-[#F8FAFC] hover:bg-slate-100 border border-[#E2E8F0] text-slate-800'
+                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300'
+                    }`}
                   >
                     <span className="flex items-center gap-2">
-                      <Clock size={16} className="text-blue-400" />
+                      <Clock size={16} className="text-[#0046FF]" />
                       전체 스텝 상세 히스토리 타임라인 {showFullTimeline ? '접기' : '보기'}
                     </span>
-                    {showFullTimeline ? <ChevronUp size={22} className="text-blue-400 shrink-0 ml-auto" /> : <ChevronDown size={22} className="text-slate-300 shrink-0 ml-auto" />}
+                    {showFullTimeline 
+                      ? <ChevronUp size={22} className="text-[#0046FF] shrink-0 ml-auto" /> 
+                      : <ChevronDown size={22} className={`shrink-0 ml-auto ${isLight ? 'text-slate-500' : 'text-slate-400'}`} />}
                   </button>
                 </div>
               </div>
@@ -2825,11 +2877,15 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           })()}
 
           {/* 기존 상세 Timeline (아코디언 토글 시에만 노출) */}
-          <div className={`transition-all duration-300 overflow-hidden ${showFullTimeline ? 'block border-t border-white/5 bg-black/20' : 'hidden'}`}>
+          <div className={`transition-all duration-300 overflow-hidden ${
+            showFullTimeline 
+              ? `block border-t ${isLight ? 'border-[#E2E8F0] bg-slate-50/70' : 'border-white/5 bg-black/20'}` 
+              : 'hidden'
+          }`}>
             <div className="p-5 flex-1">
               {selectedIncidentIdFlow ? (
               <div className="relative">
-                <div className="absolute left-[9px] top-0 bottom-0 w-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                <div className="absolute left-[9px] top-0 bottom-0 w-px" style={{ background: isLight ? '#E2E8F0' : 'rgba(255,255,255,0.1)' }} />
                 {(() => {
                   const firstPendingIdx = FLOW_STEPS.findIndex(step => {
                     if (step.id === 'RAG_AGENT') {
@@ -2908,15 +2964,19 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         </div>
                         <div className="ml-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-semibold" style={{ color: isBottleneck ? '#f59e0b' : isCompleted ? '#fff' : isNextStep ? '#60a5fa' : '#64748b', textShadow: 'none' }}>{step.label}</span>
-                            {isNextStep && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse text-blue-400 border border-blue-500/40 bg-blue-500/15 font-mono">진행중</span>}
-                            {isCompleted && <span className="text-[10px] font-mono font-normal text-slate-400">{formatYYMMDD(stepData.timestamp)}</span>}
+                            <span className="text-[13px] font-semibold" style={{ color: isBottleneck ? '#f59e0b' : isCompleted ? (isLight ? '#0F172A' : '#fff') : isNextStep ? (isLight ? '#0046FF' : '#60a5fa') : (isLight ? '#64748B' : '#64748b'), textShadow: 'none' }}>{step.label}</span>
+                            {isNextStep && <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse font-mono ${isLight ? 'text-[#0046FF] border border-blue-200 bg-blue-50' : 'text-blue-400 border border-blue-500/40 bg-blue-500/15'}`}>진행중</span>}
+                            {isCompleted && <span className={`text-[10px] font-mono font-normal ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{formatYYMMDD(stepData.timestamp)}</span>}
                           </div>
-                          <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? '#94a3b8' : isNextStep ? '#cbd5e1' : '#475569' }}>
+                          <p className="text-[12px] leading-relaxed font-normal" style={{ color: isCompleted ? (isLight ? '#334155' : '#94a3b8') : isNextStep ? (isLight ? '#1E293B' : '#cbd5e1') : (isLight ? '#94A3B8' : '#475569') }}>
                             {isCompleted ? stepData.detail : isNextStep ? '처리 진행 중...' : '대기 중'}
                           </p>
                           {intervalText && sIdx > 0 && (
-                            <span className="inline-block mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm font-mono" style={{ color: isBottleneck ? '#f59e0b' : '#ffffff', border: `1px solid ${isBottleneck ? '#f59e0b' : 'rgba(255,255,255,0.2)'}`, background: isBottleneck ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.06)' }}>{intervalText}</span>
+                            <span className="inline-block mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm font-mono" style={{ 
+                              color: isBottleneck ? '#f59e0b' : (isLight ? '#1e293b' : '#ffffff'), 
+                              border: `1px solid ${isBottleneck ? '#f59e0b' : (isLight ? '#cbd5e1' : 'rgba(255,255,255,0.2)')}`, 
+                              background: isBottleneck ? 'rgba(245,158,11,0.15)' : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)') 
+                            }}>{intervalText}</span>
                           )}
                           {(isCompleted||isNextStep)&&step.id==='WARROOM'&&(()=>{
                             const roomExists=warRooms.some(r=>String(r.id)===String(selectedIncidentIdFlow)||String(r.inc_id)===String(selectedIncidentIdFlow));
