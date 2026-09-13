@@ -2155,44 +2155,44 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 {visibleSms.length}건 수신
               </span>
 
-              {/* Done hide toggle */}
+              {/* Done hide toggle — subtle soft chip */}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setHideCompletedSms(!hideCompletedSms); }}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-semibold transition-all active:scale-95 shrink-0 ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold transition-all active:scale-95 shrink-0 ${
                   hideCompletedSms
-                    ? 'bg-[#0046FF] text-white border-[#0046FF]'
-                    : (isLight ? 'bg-slate-100 text-slate-600 border-[#CBD5E1]' : 'bg-[#060C1B] text-slate-400 border-[#1E2F56]')
+                    ? (isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-500/15 text-blue-400 border-blue-500/30')
+                    : (isLight ? 'bg-slate-50 text-slate-500 border-slate-200' : 'bg-[#060C1B] text-slate-400 border-[#1E2F56]')
                 }`}
               >
-                <Eye size={10} />
+                <Eye size={9} />
                 <span>완료 {hideCompletedSms ? '숨김' : '표시'}</span>
               </button>
             </div>
           </div>
 
           {/* Threshold panel */}
-          <div style={{ maxHeight: showThresholdSettings ? 200 : 0, overflow: 'hidden', transition: 'max-height 0.3s', borderBottom: showThresholdSettings ? '1px solid rgba(255,255,255,0.08)' : 'none', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ maxHeight: showThresholdSettings ? 200 : 0, overflow: 'hidden', transition: 'max-height 0.3s', borderBottom: showThresholdSettings ? `1px solid ${isLight ? '#E2E8F0' : 'rgba(255,255,255,0.08)'}` : 'none', background: isLight ? '#F8FAFC' : 'rgba(255,255,255,0.02)' }}>
             <div className="px-5 py-4 space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Technical Threshold</span>
-                  <span className="text-[10px] font-bold font-mono text-blue-400">{(thresholds.technical * 100).toFixed(0)}%</span>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Technical Threshold</span>
+                  <span className="text-[10px] font-bold font-mono text-blue-500">{(thresholds.technical * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0.5" max="1.0" step="0.01" value={thresholds.technical}
                   onChange={(e) => setThresholds(prev => ({ ...prev, technical: parseFloat(e.target.value) }))}
                   onMouseUp={() => updateThreshold('similarity_threshold_technical', thresholds.technical)}
-                  className="w-full h-1 rounded appearance-none cursor-pointer accent-blue-500" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                  className="w-full h-1 rounded appearance-none cursor-pointer accent-blue-500" style={{ background: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.15)' }} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Casual Strictness</span>
-                  <span className="text-[10px] font-bold font-mono text-purple-400">{(thresholds.casual * 100).toFixed(0)}%</span>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Casual Strictness</span>
+                  <span className="text-[10px] font-bold font-mono text-purple-500">{(thresholds.casual * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0.7" max="1.0" step="0.01" value={thresholds.casual}
                   onChange={(e) => setThresholds(prev => ({ ...prev, casual: parseFloat(e.target.value) }))}
                   onMouseUp={() => updateThreshold('similarity_threshold_casual', thresholds.casual)}
-                  className="w-full h-1 rounded appearance-none cursor-pointer accent-purple-500" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                  className="w-full h-1 rounded appearance-none cursor-pointer accent-purple-500" style={{ background: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.15)' }} />
               </div>
             </div>
           </div>
@@ -2391,9 +2391,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                 </div>
               );
             }) : (
-              <div className="py-12 flex flex-col items-center gap-3 opacity-40">
-                <MessageSquare size={28} className="text-slate-400" />
-                <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">수신된 SMS 없음</p>
+              <div className={`py-12 flex flex-col items-center gap-3 ${isLight ? 'opacity-60' : 'opacity-40'}`}>
+                <MessageSquare size={28} className={isLight ? 'text-slate-400' : 'text-slate-400'} />
+                <p className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-300'}`}>수신된 SMS 없음</p>
               </div>
             )}
           </div>
@@ -2401,13 +2401,15 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           {/* Floating scroll indicator */}
           {showSmsScrollIndicator && (
             <div 
-              onClick={() => {
-                scrollSmsByItem('down');
-              }}
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 text-blue-400 border border-blue-500/40 font-black text-xs transition-all hover:scale-105 active:scale-95 select-none"
+              onClick={() => { scrollSmsByItem('down'); }}
+              className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full font-black text-xs transition-all hover:scale-105 active:scale-95 select-none ${
+                isLight
+                  ? 'bg-white text-blue-600 border border-blue-200 shadow-sm'
+                  : 'bg-slate-900 text-blue-400 border border-blue-500/40'
+              }`}
             >
               <span>아래 수신내역 더보기</span>
-              <ChevronDown className="w-4 h-4 text-blue-400 shrink-0" />
+              <ChevronDown className={`w-4 h-4 shrink-0 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
             </div>
           )}
         </div>
