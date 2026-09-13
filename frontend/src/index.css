@@ -386,12 +386,21 @@
   /* 5. Typography */
   .text-white,
   .text-slate-100,
-  .text-slate-200 {
+  .text-slate-200,
+  /* semi-transparent white variants — invisible on white bg */
+  .text-white\/40,
+  .text-white\/50,
+  .text-white\/70,
+  .text-white\/80,
+  .text-white\/90,
+  .text-white\/95 {
     color: var(--sh-text-primary) !important;
   }
 
   .text-slate-300,
-  .text-slate-400 {
+  .text-slate-400,
+  .text-zinc-400,
+  .text-zinc-500 {
     color: var(--sh-text-secondary) !important;
   }
 
