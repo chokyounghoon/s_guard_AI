@@ -67,8 +67,8 @@
 
   /* Typography */
   --sh-text-primary: #0f172a;    /* Slate 900: 선명한 텍스트 */
-  --sh-text-secondary: #475569;  /* Slate 600: 보조 텍스트 */
-  --sh-text-muted: #94a3b8;      /* Slate 400: 비활성 텍스트 */
+  --sh-text-secondary: #1e293b;  /* Slate 800: 보조 텍스트 (고대비) */
+  --sh-text-muted: #475569;      /* Slate 600: 비활성 텍스트 (가독성 확보) */
 
   /* Brand & Accents */
   --sh-blue-primary: #0046ff;
@@ -307,8 +307,9 @@
   color: var(--sh-text-secondary) !important;
 }
 
-[data-theme="light"] .text-slate-500 {
-  color: #64748b !important;
+[data-theme="light"] .text-slate-500,
+[data-theme="light"] .text-slate-600 {
+  color: #334155 !important;
 }
 
 /* 6. Borders & Dividers */

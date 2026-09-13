@@ -79,8 +79,8 @@
 
   /* Typography */
   --sh-text-primary: #0f172a;    /* Slate 900: 선명한 본문 딥 슬레이트 블랙 */
-  --sh-text-secondary: #475569;  /* Slate 600: 보조 설명 및 메타데이터 텍스트 */
-  --sh-text-muted: #94a3b8;      /* Slate 400: 비활성 안내 및 캡션 */
+  --sh-text-secondary: #1e293b;  /* Slate 800: 보조 설명 및 메타데이터 텍스트 (고대비) */
+  --sh-text-muted: #475569;      /* Slate 600: 비활성 안내 및 캡션 (가독성 확보) */
 
   /* Shinhan Brand & Semantic (Light Version) */
   --sh-blue-primary: #0046ff;    /* 신한 시그니처 블루 (메인 헤더, 액션 버튼, 활성 탭) */
@@ -404,8 +404,9 @@
     color: var(--sh-text-secondary) !important;
   }
 
-  .text-slate-500 {
-    color: #64748b !important;
+  .text-slate-500,
+  .text-slate-600 {
+    color: #334155 !important;
   }
 
   /* 6. Borders & Dividers */
