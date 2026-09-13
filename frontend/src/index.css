@@ -295,7 +295,6 @@
   .bg-\[\#080c18\],
   .bg-\[\#09090b\],
   .bg-\[\#090c14\],
-  .bg-\[\#0a0d14\],
   .bg-\[\#0a0e17\],
   .bg-\[\#0b0f19\],
   .bg-\[\#0c1018\],
@@ -304,7 +303,6 @@
   .bg-\[\#0c1020\]\/40,
   .bg-\[\#0d0f14\],
   .bg-\[\#0d1018\],
-  .bg-\[\#0d1117\],
   .bg-\[\#0d162b\],
   .bg-\[\#0e1118\],
   .bg-\[\#0f111a\],
@@ -327,7 +325,6 @@
   .bg-\[\#070b12\],
   .bg-\[\#11141d\],
   .bg-\[\#12151a\],
-  .bg-\[\#121620\],
   .bg-\[\#121622\],
   .bg-\[\#13203e\],
   .bg-\[\#141825\],
@@ -351,7 +348,25 @@
   .bg-white\/\[0\.05\],
   .bg-white\/5,
   .bg-white\/10,
-  .bg-black\/20,
+  .bg-black\/20 {
+    background-color: var(--sh-surface-card) !important;
+    border-color: var(--sh-border-color) !important;
+    color: var(--sh-text-primary) !important;
+  }
+
+  /* 4. Code Blocks & Terminals must ALWAYS stay dark with crisp syntax highlighting */
+  pre:not(.preserve-light),
+  code:not(.preserve-light),
+  .terminal-box,
+  .code-block {
+    background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+  }
+  pre:not(.preserve-light) code,
+  .terminal-box code {
+    background-color: transparent !important;
+  }
+
   /* 5. Typography — High-Contrast Enterprise Light Theme */
   .text-white:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),
   .text-slate-100:not(.btn-primary):not([class*="bg-blue-"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-slate-900"]):not([class*="bg-black"]):not([class*="bg-zinc-900"]),

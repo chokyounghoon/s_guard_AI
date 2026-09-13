@@ -188,7 +188,6 @@
 [data-theme="light"] .bg-\[\#09090b\],
 [data-theme="light"] .bg-\[\#090c14\],
 [data-theme="light"] .bg-\[\#0a0c12\],
-[data-theme="light"] .bg-\[\#0a0d14\],
 [data-theme="light"] .bg-\[\#0a0e17\],
 [data-theme="light"] .bg-\[\#060a12\],
 [data-theme="light"] .bg-\[\#030a18\],
@@ -198,7 +197,6 @@
 [data-theme="light"] .bg-\[\#0c1020\],
 [data-theme="light"] .bg-\[\#0d0f14\],
 [data-theme="light"] .bg-\[\#0d1018\],
-[data-theme="light"] .bg-\[\#0d1117\],
 [data-theme="light"] .bg-\[\#0d162b\],
 [data-theme="light"] .bg-\[\#0e1118\],
 [data-theme="light"] .bg-\[\#0f111a\],
@@ -214,6 +212,19 @@
   background-color: var(--sh-bg-canvas) !important;
   background-image: none !important;
   color: var(--sh-text-primary) !important;
+}
+
+/* Code Blocks & Terminals must ALWAYS stay dark with crisp syntax highlighting */
+[data-theme="light"] pre:not(.preserve-light),
+[data-theme="light"] code:not(.preserve-light),
+[data-theme="light"] .terminal-box,
+[data-theme="light"] .code-block {
+  background-color: #0d1117 !important;
+  color: #e6edf3 !important;
+}
+[data-theme="light"] pre:not(.preserve-light) code,
+[data-theme="light"] .terminal-box code {
+  background-color: transparent !important;
 }
 
 /* 2. Cards, List Items & Content Blocks */

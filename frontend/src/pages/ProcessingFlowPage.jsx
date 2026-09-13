@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useTheme } from '../context/ThemeContext';
 import {
   ChevronLeft, ShieldCheck, Database, Cpu, MessageSquare,
   Lock, EyeOff, Terminal, Layers, Activity, ChevronDown, ChevronUp, Network, Smartphone, Zap, Code2, Share2, Users
@@ -170,6 +171,21 @@ await fetch('https://fcm.googleapis.com/v1/projects/s-guard/messages:send', {
   }
 ];
 
+function getStepColor(step, isLight) {
+  if (!isLight) return step.color;
+  const lightColors = {
+    'step-1': '#0284c7', // Darker Cyan/Sky
+    'step-2': '#7c3aed', // Darker Purple
+    'step-3': '#ea580c', // Darker Orange
+    'step-4': '#db2777', // Darker Pink
+    'step-5': '#d97706', // Darker Amber
+    'step-6': '#059669', // Darker Emerald
+    'step-7': '#4f46e5', // Darker Indigo
+    'step-8': '#0891b2', // Darker Cyan
+  };
+  return lightColors[step.id] || step.color;
+}
+
 // Helper icon component since Brain isn't imported from lucide-react in the old file properly
 function BrainIcon(props) {
   return (
@@ -190,14 +206,25 @@ function BrainIcon(props) {
 export default function ProcessingFlowPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
-  const [expanded, setExpanded] = useState(null);
+  const { isLight } = useTheme();
+  const [expanded, setExpanded] = useState(0);
 
   return (
-    <div className="h-[100dvh] w-full max-w-full bg-[#050810] text-slate-200 font-sans flex flex-col relative overflow-y-auto overflow-x-hidden pb-10">
+    <div className={`h-[100dvh] w-full max-w-full font-sans flex flex-col relative overflow-y-auto overflow-x-hidden pb-10 ${
+      isLight ? 'bg-slate-50 text-slate-800' : 'bg-[#050810] text-slate-200'
+    }`}>
       {/* Background glow effects */}
-      <div className="fixed top-20 left-0 w-[500px] h-[500px] bg-[#00e5ff]/5 rounded-full blur-[120px] -z-10 opacity-60 pointer-events-none" />
-      <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none" />
-      
+      {!isLight && (
+        <>
+          <div className="fixed top-20 left-0 w-[500px] h-[500px] bg-[#00e5ff]/5 rounded-full blur-[120px] -z-10 opacity-60 pointer-events-none" />
+          <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none" />
+          {/* Cyberpunk Scanline */}
+          <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-20">
+            <div className="w-full h-10 bg-gradient-to-b from-transparent via-[#00e5ff]/20 to-transparent animate-scanline" />
+          </div>
+        </>
+      )}
+
       <style>{`
         ::-webkit-scrollbar{width:4px}
         ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:99px}
@@ -210,35 +237,70 @@ export default function ProcessingFlowPage() {
         }
       `}</style>
 
-      {/* Cyberpunk Scanline */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-20">
-        <div className="w-full h-10 bg-gradient-to-b from-transparent via-[#00e5ff]/20 to-transparent animate-scanline" />
-      </div>
-
       {/* 헤더 */}
-      <header className="sticky top-0 z-50 bg-[#070b14]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-        <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center active:scale-95 transition-all text-slate-300">
+      <header className={`sticky top-0 z-50 backdrop-blur-xl border-b px-4 py-3 flex items-center justify-between transition-colors ${
+        isLight 
+          ? 'bg-white/95 border-slate-200 shadow-sm text-slate-900' 
+          : 'bg-[#070b14]/80 border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.5)] text-white'
+      }`}>
+        <button 
+          onClick={() => goBack()} 
+          className={`w-9 h-9 rounded-xl border flex items-center justify-center active:scale-95 transition-all ${
+            isLight 
+              ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700' 
+              : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
+          }`}
+        >
           <ChevronLeft size={20} />
         </button>
         <div className="text-center">
-          <div className="text-[15px] font-black tracking-tight" style={{ background: 'linear-gradient(90deg, #00e5ff, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div 
+            className="text-[15px] font-black tracking-tight" 
+            style={{ 
+              background: isLight 
+                ? 'linear-gradient(90deg, #0284c7, #7c3aed)' 
+                : 'linear-gradient(90deg, #00e5ff, #a855f7)', 
+              WebkitBackgroundClip: 'text', 
+              WebkitTextFillColor: 'transparent' 
+            }}
+          >
             System Architecture
           </div>
-          <div className="text-[9px] font-black tracking-[0.2em] text-[#00e5ff] opacity-80 mt-0.5">S-GUARD AI TECH STACK</div>
+          <div className={`text-[9px] font-black tracking-[0.2em] mt-0.5 ${
+            isLight ? 'text-sky-600' : 'text-[#00e5ff] opacity-80'
+          }`}>
+            S-GUARD AI TECH STACK
+          </div>
         </div>
-        <div className="w-9 h-9 rounded-xl bg-[#00e5ff]/10 border border-[#00e5ff]/20 flex items-center justify-center shadow-[0_0_15px_rgba(0,229,255,0.2)]">
-          <Code2 size={16} className="text-[#00e5ff] animate-pulse" />
+        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shadow-sm ${
+          isLight 
+            ? 'bg-sky-50 border-sky-200 text-sky-600' 
+            : 'bg-[#00e5ff]/10 border-[#00e5ff]/20 text-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.2)]'
+        }`}>
+          <Code2 size={16} className={`${isLight ? 'text-sky-600' : 'text-[#00e5ff]'} animate-pulse`} />
         </div>
       </header>
 
       {/* Security Banner */}
-      <div className="shrink-0 mx-4 mt-5 p-3 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 flex items-center gap-3 shadow-[0_0_20px_rgba(16,185,129,0.1)] backdrop-blur-sm z-10 relative">
-        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
-          <ShieldCheck size={16} className="text-emerald-400" />
+      <div className={`shrink-0 mx-4 mt-5 p-3.5 rounded-2xl border flex items-center gap-3 z-10 relative transition-all ${
+        isLight 
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-950 shadow-sm' 
+          : 'bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)] backdrop-blur-sm'
+      }`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border ${
+          isLight 
+            ? 'bg-emerald-100 border-emerald-300' 
+            : 'bg-emerald-500/20 border-emerald-500/30'
+        }`}>
+          <ShieldCheck size={16} className={isLight ? 'text-emerald-700' : 'text-emerald-400'} />
         </div>
         <div>
-          <div className="text-[13px] font-black text-emerald-400 tracking-wide">Privacy by Design Architecture</div>
-          <div className="text-[10px] font-bold text-emerald-500/80 mt-0.5">모든 데이터 처리는 Edge 환경에서 수행되며 즉시 파기됩니다.</div>
+          <div className={`text-[13px] font-black tracking-wide ${isLight ? 'text-emerald-900' : 'text-emerald-400'}`}>
+            Privacy by Design Architecture
+          </div>
+          <div className={`text-[11px] font-bold mt-0.5 ${isLight ? 'text-emerald-700' : 'text-emerald-500/80'}`}>
+            모든 데이터 처리는 Edge 환경에서 수행되며 즉시 파기됩니다.
+          </div>
         </div>
       </div>
 
@@ -247,23 +309,35 @@ export default function ProcessingFlowPage() {
         {STEPS.map((step, i) => {
           const Icon = step.icon;
           const isOpen = expanded === i;
+          const stepColor = getStepColor(step, isLight);
+
           return (
             <div 
               key={step.id} 
-              className="rounded-3xl overflow-hidden backdrop-blur-md transition-all duration-300 relative group"
+              className={`rounded-3xl overflow-hidden transition-all duration-300 relative group ${
+                isLight 
+                  ? (isOpen ? 'bg-white shadow-xl ring-2' : 'bg-white shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md')
+                  : 'backdrop-blur-md'
+              }`}
               style={{ 
-                border: `1px solid ${isOpen ? step.color : 'rgba(255,255,255,0.05)'}`, 
-                background: isOpen ? `linear-gradient(135deg, ${step.color}15 0%, rgba(10,14,23,0.9) 100%)` : 'rgba(255,255,255,0.02)',
-                boxShadow: isOpen ? `0 0 30px ${step.color}20` : 'none'
+                border: isLight 
+                  ? (isOpen ? `2px solid ${stepColor}` : undefined) 
+                  : `1px solid ${isOpen ? step.color : 'rgba(255,255,255,0.05)'}`, 
+                background: isLight 
+                  ? '#ffffff' 
+                  : (isOpen ? `linear-gradient(135deg, ${step.color}15 0%, rgba(10,14,23,0.9) 100%)` : 'rgba(255,255,255,0.02)'),
+                boxShadow: isLight
+                  ? (isOpen ? `0 12px 28px -6px ${stepColor}25, 0 4px 10px -2px rgba(0,0,0,0.05)` : undefined)
+                  : (isOpen ? `0 0 30px ${step.color}20` : 'none')
               }}
             >
               {/* 왼쪽 하이라이트 바 */}
               <div 
-                className="absolute left-0 top-0 bottom-0 w-1 transition-all duration-300"
+                className="absolute left-0 top-0 bottom-0 w-1.5 transition-all duration-300"
                 style={{ 
-                  background: step.color,
-                  opacity: isOpen ? 1 : 0.3,
-                  boxShadow: isOpen ? `0 0 10px ${step.color}` : 'none'
+                  background: stepColor,
+                  opacity: isOpen ? 1 : (isLight ? 0.6 : 0.3),
+                  boxShadow: isOpen ? `0 0 10px ${stepColor}` : 'none'
                 }} 
               />
 
@@ -290,14 +364,14 @@ export default function ProcessingFlowPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: `${step.color}15`, 
-                    border: `1px solid ${step.color}30`,
-                    boxShadow: isOpen ? `0 0 15px ${step.color}40` : 'none',
+                    background: isLight ? `${stepColor}15` : `${step.color}15`, 
+                    border: isLight ? `1px solid ${stepColor}35` : `1px solid ${step.color}30`,
+                    boxShadow: isOpen ? `0 0 15px ${stepColor}40` : 'none',
                     transform: isOpen ? 'scale(1.05)' : 'scale(1)',
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  <Icon size={20} color={step.color} />
+                  <Icon size={20} color={stepColor} />
                 </div>
                 
                 {/* 텍스트 영역 (가변 크기, 텍스트 넘침 방지) */}
@@ -313,7 +387,7 @@ export default function ProcessingFlowPage() {
                   <div style={{
                     fontSize: '14px',
                     fontWeight: 900,
-                    color: '#ffffff',
+                    color: isLight ? '#0f172a' : '#ffffff',
                     lineHeight: 1.2,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -324,7 +398,7 @@ export default function ProcessingFlowPage() {
                   <div style={{
                     fontSize: '11px',
                     fontWeight: 700,
-                    color: '#94a3b8',
+                    color: isLight ? '#64748b' : '#94a3b8',
                     marginTop: '4px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -344,23 +418,31 @@ export default function ProcessingFlowPage() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.05)'
+                  background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                  border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.05)'
                 }}>
-                  {isOpen ? <ChevronUp size={16} color="#ffffff" /> : <ChevronDown size={16} color="#64748b" />}
+                  {isOpen ? (
+                    <ChevronUp size={16} color={isLight ? '#0f172a' : '#ffffff'} />
+                  ) : (
+                    <ChevronDown size={16} color={isLight ? '#64748b' : '#64748b'} />
+                  )}
                 </div>
               </div>
 
               {/* 확장 상세 (Animated) */}
               <div 
-                className={`overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}
+                className={`overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}
               >
                 <div className="px-5 pb-5 pt-1 flex flex-col gap-4">
                   {/* Badges */}
                   <div className="flex flex-wrap gap-2">
                     {step.badges.map(badge => (
-                      <span key={badge} className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider"
-                            style={{ background: `${step.color}20`, color: step.color, border: `1px solid ${step.color}40` }}>
+                      <span key={badge} className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm"
+                            style={{ 
+                              background: isLight ? `${stepColor}15` : `${step.color}20`, 
+                              color: stepColor, 
+                              border: `1px solid ${isLight ? stepColor + '40' : step.color + '40'}` 
+                            }}>
                         {badge}
                       </span>
                     ))}
@@ -368,35 +450,42 @@ export default function ProcessingFlowPage() {
                   
                   {/* Function Highlight */}
                   {step.fn && (
-                    <div className="flex items-center gap-2.5 px-3 py-2 bg-black/40 rounded-xl border border-white/5 shadow-inner overflow-hidden">
-                      <Terminal size={14} color={step.color} className="opacity-70 shrink-0" />
-                      <span className="text-[11px] font-mono font-bold break-all" style={{ color: step.color }}>{step.fn}</span>
+                    <div className={`flex items-center gap-2.5 px-3 py-2 rounded-xl overflow-hidden ${
+                      isLight ? 'bg-slate-100 border border-slate-200 shadow-inner' : 'bg-black/40 border border-white/5 shadow-inner'
+                    }`}>
+                      <Terminal size={14} color={stepColor} className="opacity-80 shrink-0" />
+                      <span className="text-[11px] font-mono font-bold break-all" style={{ color: stepColor }}>{step.fn}</span>
                     </div>
                   )}
                   
                   {/* Description */}
-                  <p className="text-[12px] font-bold text-slate-300 leading-relaxed tracking-wide">
+                  <p className={`text-[12px] font-medium leading-relaxed tracking-wide ${
+                    isLight ? 'text-slate-700' : 'text-slate-300'
+                  }`}>
                     {step.desc}
                   </p>
                   
-                  {/* Code Snippet */}
+                  {/* Code Snippet: Guaranteed Dark Terminal with crisp syntax highlighting */}
                   {step.code && (
-                    <div className="mt-2 rounded-xl overflow-hidden border border-white/10 bg-[#0a0d14] shadow-2xl relative group max-w-full">
+                    <div className="mt-2 rounded-xl overflow-hidden shadow-2xl relative group max-w-full"
+                         style={{ backgroundColor: '#0d1117', border: '1px solid #30363d' }}>
                       {/* Terminal Header */}
-                      <div className="flex items-center justify-between px-3 py-2 bg-[#121620] border-b border-white/5">
+                      <div className="flex items-center justify-between px-3 py-2 border-b"
+                           style={{ backgroundColor: '#161b22', borderColor: '#30363d' }}>
                         <div className="flex gap-1.5">
-                          <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                          <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
                         </div>
-                        <div className="text-[9px] font-mono text-slate-500 font-bold uppercase tracking-widest">
+                        <div className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-widest">
                           edge_worker.js
                         </div>
                       </div>
                       {/* Code Content */}
-                      <div className="p-3 overflow-x-auto w-full">
-                        <pre className="text-[10px] leading-relaxed font-mono text-[#a5b4fc] w-full" style={{ whiteSpace: 'pre', minWidth: 'min-content' }}>
-                          <code>
+                      <div className="p-3 overflow-x-auto w-full" style={{ backgroundColor: '#0d1117' }}>
+                        <pre className="text-[11px] leading-relaxed font-mono w-full" 
+                             style={{ color: '#79c0ff', whiteSpace: 'pre', minWidth: 'min-content', margin: 0, backgroundColor: 'transparent' }}>
+                          <code style={{ color: '#79c0ff', backgroundColor: 'transparent' }}>
                             {step.code}
                           </code>
                         </pre>
@@ -410,17 +499,31 @@ export default function ProcessingFlowPage() {
         })}
 
         {/* 하단 인증서 */}
-        <div className="mt-6 p-5 rounded-3xl bg-gradient-to-br from-[#0b0e17] to-[#121622] border border-white/10 shadow-2xl text-center relative overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#00e5ff]/10 rounded-full blur-2xl" />
-          <Lock size={24} className="text-[#00e5ff] mx-auto mb-3 drop-shadow-[0_0_10px_rgba(0,229,255,0.5)]" />
-          <h3 className="text-[14px] font-black text-white mb-2 tracking-wide">Cloudflare Edge Security Certified</h3>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+        <div className={`mt-6 p-5 rounded-3xl text-center relative overflow-hidden transition-all ${
+          isLight 
+            ? 'bg-white border border-slate-200 shadow-lg' 
+            : 'bg-gradient-to-br from-[#0b0e17] to-[#121622] border border-white/10 shadow-2xl'
+        }`}>
+          <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl pointer-events-none ${
+            isLight ? 'bg-sky-500/10' : 'bg-[#00e5ff]/10'
+          }`} />
+          <Lock size={24} className={`mx-auto mb-3 ${
+            isLight ? 'text-sky-600' : 'text-[#00e5ff] drop-shadow-[0_0_10px_rgba(0,229,255,0.5)]'
+          }`} />
+          <h3 className={`text-[14px] font-black mb-2 tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            Cloudflare Edge Security Certified
+          </h3>
+          <p className={`text-[10px] font-bold uppercase tracking-widest leading-relaxed ${
+            isLight ? 'text-slate-500' : 'text-slate-400'
+          }`}>
             All data flows are fully encrypted and audited in real-time under Zero Trust Architecture.
           </p>
           <div className="flex justify-center gap-2 mt-5">
-            <div className="h-1 w-12 bg-[#00e5ff] rounded-full shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
-            <div className="h-1 w-4 bg-white/20 rounded-full" />
-            <div className="h-1 w-4 bg-white/20 rounded-full" />
+            <div className={`h-1 w-12 rounded-full ${
+              isLight ? 'bg-sky-600' : 'bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.8)]'
+            }`} />
+            <div className={`h-1 w-4 rounded-full ${isLight ? 'bg-slate-200' : 'bg-white/20'}`} />
+            <div className={`h-1 w-4 rounded-full ${isLight ? 'bg-slate-200' : 'bg-white/20'}`} />
           </div>
         </div>
       </div>

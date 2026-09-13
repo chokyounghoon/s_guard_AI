@@ -5,6 +5,7 @@ import {
   Activity, Radio, Trash2, Database, MonitorSmartphone
 } from 'lucide-react';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useTheme } from '../context/ThemeContext';
 import { getAccessToken } from '../lib/authStore';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -35,12 +36,13 @@ function StatusBadge({ label, isOk, isWarn }) {
 
 /* ── Card ─────────────────────────────────────────────────────── */
 function Card({ accent = '#3b82f6', icon: Icon, title, children, style = {} }) {
+  const { isLight } = useTheme();
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: isLight ? '#ffffff' : 'rgba(255,255,255,0.03)',
+      border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.07)',
       borderRadius: 20, overflow: 'hidden',
-      boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)`,
+      boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)' : `0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)`,
       ...style,
     }}>
       <div style={{ height: 2, background: `linear-gradient(90deg, transparent, ${accent}90, transparent)` }} />
@@ -53,7 +55,7 @@ function Card({ accent = '#3b82f6', icon: Icon, title, children, style = {} }) {
           }}>
             <Icon size={13} color={accent} />
           </div>
-          <span style={{ fontSize: 10, fontWeight: 900, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{title}</span>
+          <span style={{ fontSize: 10, fontWeight: 900, color: isLight ? '#64748b' : 'rgba(255,255,255,0.45)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{title}</span>
         </div>
         {children}
       </div>
@@ -63,12 +65,13 @@ function Card({ accent = '#3b82f6', icon: Icon, title, children, style = {} }) {
 
 /* ── Info Row ─────────────────────────────────────────────────── */
 function Row({ label, children }) {
+  const { isLight } = useTheme();
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+      padding: '8px 0', borderBottom: isLight ? '1px solid #f1f5f9' : '1px solid rgba(255,255,255,0.04)',
     }}>
-      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 11, color: isLight ? '#475569' : 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{label}</span>
       {children}
     </div>
   );
@@ -76,6 +79,7 @@ function Row({ label, children }) {
 
 /* ── Action Button ────────────────────────────────────────────── */
 function Btn({ onClick, disabled, color = '#3b82f6', icon: Icon, children, outline = false, full = false }) {
+  const { isLight } = useTheme();
   return (
     <button
       onClick={onClick}
@@ -87,11 +91,11 @@ function Btn({ onClick, disabled, color = '#3b82f6', icon: Icon, children, outli
         borderRadius: 12,
         border: outline ? `1px solid ${color}35` : 'none',
         background: disabled
-          ? 'rgba(255,255,255,0.04)'
+          ? (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)')
           : outline
-            ? `${color}0e`
+            ? (isLight ? `${color}10` : `${color}0e`)
             : `linear-gradient(135deg, ${color}, ${color}cc)`,
-        color: disabled ? 'rgba(255,255,255,0.2)' : outline ? color : '#fff',
+        color: disabled ? (isLight ? '#94a3b8' : 'rgba(255,255,255,0.2)') : outline ? color : '#fff',
         fontSize: 11, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
         transition: 'all 0.2s',
@@ -108,6 +112,7 @@ function Btn({ onClick, disabled, color = '#3b82f6', icon: Icon, children, outli
 /* ── Main ─────────────────────────────────────────────────────── */
 export default function PushDiagnosticPage() {
   const goBack = useBackNavigation('/dashboard');
+  const { isLight } = useTheme();
   const [status,    setStatus]    = useState(null);
   const [serverSubs, setServerSubs] = useState(null);
   const [loading,   setLoading]   = useState(false);
@@ -290,30 +295,39 @@ export default function PushDiagnosticPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)',
-      color: '#fff',
+      background: isLight ? '#f8fafc' : 'radial-gradient(ellipse 120% 100% at 50% 0%, #0d1528 0%, #080e1a 40%, #050a15 100%)',
+      color: isLight ? '#0f172a' : '#fff',
       fontFamily: "'Inter', 'Noto Sans KR', sans-serif",
     }}>
 
       {/* ── Hero ────────────────────────────────────────────── */}
       <div style={{
-        background: 'linear-gradient(160deg, #030a2a 0%, #001155 55%, #002080 100%)',
+        background: isLight ? '#ffffff' : 'linear-gradient(160deg, #030a2a 0%, #001155 55%, #002080 100%)',
+        borderBottom: isLight ? '1px solid #e2e8f0' : 'none',
         padding: 'calc(16px + env(safe-area-inset-top)) 16px 16px',
         position: 'relative', overflow: 'hidden',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {/* glows */}
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -20, left: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        {!isLight && (
+          <>
+            <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: -20, left: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+          </>
+        )}
 
         {/* back */}
         <button
           onClick={() => goBack()}
           style={{
             position: 'absolute', left: 16,
-            background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
-            padding: '6px 10px', color: '#fff', cursor: 'pointer',
+            background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)', 
+            backdropFilter: 'blur(8px)',
+            border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', 
+            borderRadius: 8,
+            padding: '6px 10px', 
+            color: isLight ? '#334155' : '#fff', 
+            cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, zIndex: 2,
           }}
         >
@@ -323,28 +337,29 @@ export default function PushDiagnosticPage() {
         <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 32, height: 32, borderRadius: 10,
-            background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(16,185,129,0.18))',
-            border: '1px solid rgba(59,130,246,0.35)',
+            background: isLight ? '#eff6ff' : 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(16,185,129,0.18))',
+            border: isLight ? '1px solid #bfdbfe' : '1px solid rgba(59,130,246,0.35)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 16px rgba(59,130,246,0.2)',
+            boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.05)' : '0 0 16px rgba(59,130,246,0.2)',
           }}>
-            <Radio size={16} color="#60a5fa" />
+            <Radio size={16} color={isLight ? '#2563eb' : '#60a5fa'} />
           </div>
           <div style={{ textAlign: 'left' }}>
-            <h1 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '0.04em', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h1 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '0.04em', margin: 0, display: 'flex', alignItems: 'center', gap: 8, color: isLight ? '#0f172a' : '#fff' }}>
               Push Diagnostic
               {/* Health pill */}
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)',
-                border: `1px solid ${hColor}30`, borderRadius: 20, padding: '3px 8px', marginLeft: 4,
+                background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)', 
+                backdropFilter: 'blur(8px)',
+                border: `1px solid ${hColor}40`, borderRadius: 20, padding: '3px 8px', marginLeft: 4,
               }}>
                 <Activity size={10} color={hColor} />
                 <span style={{ fontSize: 10, fontWeight: 900, color: hColor }}>
                   {status ? `${healthPct}%` : '—'}
                 </span>
-                <span style={{ width: 1, height: 8, background: 'rgba(255,255,255,0.1)' }} />
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                <span style={{ width: 1, height: 8, background: isLight ? '#cbd5e1' : 'rgba(255,255,255,0.1)' }} />
+                <span style={{ fontSize: 9, color: isLight ? '#64748b' : 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
                   {status ? `${health}/${healthMax}` : '...'}
                 </span>
               </div>
@@ -495,12 +510,15 @@ export default function PushDiagnosticPage() {
             <div style={{ marginBottom: 7, padding: '12px', borderRadius: 12, border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.06)' }}>
               <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(99,102,241,0.8)', letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 8px' }}>커스텀 데이터 테스트</p>
               <input
+                type="text"
                 value={customTitle}
                 onChange={e => setCustomTitle(e.target.value)}
                 placeholder="알림 제목"
                 style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, marginBottom: 6, boxSizing: 'border-box'
+                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)',
+                  background: isLight ? '#ffffff' : 'rgba(0,0,0,0.3)', 
+                  color: isLight ? '#0f172a' : '#fff', fontSize: 11, marginBottom: 6, boxSizing: 'border-box'
                 }}
               />
               <textarea
@@ -509,8 +527,10 @@ export default function PushDiagnosticPage() {
                 placeholder="알림 내용 (SMS 메시지 내용 등)"
                 rows={2}
                 style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, marginBottom: 8,
+                  width: '100%', padding: '8px 10px', borderRadius: 8, 
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)',
+                  background: isLight ? '#ffffff' : 'rgba(0,0,0,0.3)', 
+                  color: isLight ? '#0f172a' : '#fff', fontSize: 11, marginBottom: 8,
                   resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit'
                 }}
               />
@@ -520,8 +540,8 @@ export default function PushDiagnosticPage() {
                 style={{
                   width: '100%', padding: '9px', borderRadius: 9,
                   border: 'none',
-                  background: customLoad ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  color: customLoad ? 'rgba(255,255,255,0.3)' : '#fff',
+                  background: customLoad ? (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)') : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  color: customLoad ? (isLight ? '#94a3b8' : 'rgba(255,255,255,0.3)') : '#fff',
                   fontSize: 11, fontWeight: 800, cursor: customLoad ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   boxShadow: customLoad ? 'none' : '0 4px 14px rgba(99,102,241,0.35)',
@@ -538,7 +558,7 @@ export default function PushDiagnosticPage() {
               style={{
                 width: '100%', padding: '10px', borderRadius: 10,
                 border: '1px solid rgba(239,68,68,0.18)',
-                background: 'rgba(239,68,68,0.04)', color: '#f87171',
+                background: 'rgba(239,68,68,0.04)', color: '#ef4444',
                 fontSize: 11, fontWeight: 700, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 transition: 'all 0.2s',
@@ -551,18 +571,18 @@ export default function PushDiagnosticPage() {
           {/* 실시간 로그 */}
           <Card icon={Terminal} title="실시간 로그" accent="#6366f1">
             <div style={{
-              background: 'rgba(0,0,0,0.45)', borderRadius: 10,
-              border: '1px solid rgba(99,102,241,0.12)',
+              background: '#0d1117', borderRadius: 10,
+              border: isLight ? '1px solid #30363d' : '1px solid rgba(99,102,241,0.12)',
               padding: '9px 11px',
               height: 200, overflowY: 'auto',
               fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 10,
             }}>
               {log.length === 0 && (
-                <span style={{ color: 'rgba(255,255,255,0.18)' }}>대기 중...</span>
+                <span style={{ color: '#64748b' }}>대기 중...</span>
               )}
               {log.map((e, i) => (
                 <div key={i} style={{ marginBottom: 5, display: 'flex', gap: 7, alignItems: 'flex-start', lineHeight: 1.5 }}>
-                  <span style={{ color: '#1e293b', flexShrink: 0, fontSize: 9 }}>[{e.time}]</span>
+                  <span style={{ color: '#64748b', flexShrink: 0, fontSize: 9 }}>[{e.time}]</span>
                   <span style={{
                     color: e.type === 'ok'   ? '#34d399'
                          : e.type === 'err'  ? '#f87171'
