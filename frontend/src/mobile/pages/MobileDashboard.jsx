@@ -2141,7 +2141,14 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
           <div 
             ref={smsListContainerRef}
             onScroll={checkSmsScroll}
-            className="overflow-y-auto max-h-[420px] p-3.5 space-y-3 custom-scrollbar scroll-smooth snap-y snap-mandatory"
+            className="overflow-y-auto max-h-[440px] p-3.5 space-y-3 custom-scrollbar sms-snap-container touch-pan-y"
+            style={{
+              scrollSnapType: 'y mandatory',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehaviorY: 'contain',
+              scrollPaddingTop: '10px',
+              scrollPaddingBottom: '10px',
+            }}
           >
             {visibleSms.length > 0 ? visibleSms.map((msg) => {
               const isSel = selectedSms?.inc_id === msg.inc_id;
@@ -2183,7 +2190,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                     if (selectedSms?.inc_id === msg.inc_id) { setSelectedSms(null); selectedSmsRef.current = null; setShowAgentPanel(false); setAgentMessages([]); }
                     else { setSelectedSms(msg); selectedSmsRef.current = msg; setShowAgentPanel(true); setAgentMessages([{ role: 'Security', text: '🔍 AI 분석을 시작합니다...', delay: 0 }]); }
                   }}
-                  className={`rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-2.5 relative overflow-hidden snap-start shadow-sm border ${
+                  className={`rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[0.99] active:scale-[0.98] flex flex-col gap-2.5 relative overflow-hidden sms-snap-item shadow-sm border ${
                     isSel 
                       ? 'bg-[#13203E] border-[#0046FF] ring-1 ring-[#0046FF]' 
                       : 'bg-[#0D162B] border-[#1E2F56] hover:border-slate-500'
@@ -2191,6 +2198,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                   style={{
                     borderLeftWidth: '4px',
                     borderLeftColor: accentColor,
+                    scrollSnapAlign: 'start',
+                    scrollSnapStop: 'always',
+                    scrollMarginTop: '10px',
                   }}>
                   {/* Header: Notification Type & Severity */}
                   <div className="flex items-center justify-between pb-2 border-b border-[#1E2F56]">

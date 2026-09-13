@@ -678,6 +678,32 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
     }
   }, []);
 
+  const scrollSmsByItem = React.useCallback((direction = 'down') => {
+    const container = smsListContainerRef.current;
+    if (!container) return;
+    const items = Array.from(container.querySelectorAll('[data-sms-card="true"]'));
+    if (items.length === 0) return;
+
+    const containerTop = container.scrollTop;
+
+    if (direction === 'down') {
+      const nextItem = items.find(item => item.offsetTop > containerTop + 15);
+      if (nextItem) {
+        container.scrollTo({ top: nextItem.offsetTop - 10, behavior: 'smooth' });
+      } else {
+        container.scrollBy({ top: 140, behavior: 'smooth' });
+      }
+    } else {
+      const prevItems = items.filter(item => item.offsetTop < containerTop - 15);
+      if (prevItems.length > 0) {
+        const prevItem = prevItems[prevItems.length - 1];
+        container.scrollTo({ top: prevItem.offsetTop - 10, behavior: 'smooth' });
+      } else {
+        container.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, []);
+
   React.useEffect(() => {
     const timer = setTimeout(checkSmsScroll, 150);
     return () => clearTimeout(timer);
@@ -2473,12 +2499,17 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               <div 
                 ref={smsListContainerRef}
                 onScroll={checkSmsScroll}
-                className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
-                style={{ scrollSnapType: 'y mandatory' }}
+                className="flex-1 min-h-0 overflow-y-auto custom-scrollbar sms-snap-container p-3 space-y-3 touch-pan-y"
+                style={{ 
+                  scrollSnapType: 'y mandatory',
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehaviorY: 'contain',
+                  scrollPaddingTop: '10px',
+                  scrollPaddingBottom: '10px'
+                }}
               >
                 {visibleSms.length > 0 ? (
-                  <div className="p-3 space-y-2">
-                    {visibleSms.map((msg) => {
+                    visibleSms.map((msg) => {
                       const isSelected = selectedSms?.inc_id === msg.inc_id;
 
                       let calculatedSeverity = msg.severity || 'NORMAL';
@@ -2515,9 +2546,13 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                         <div
                           key={`sms-${msg.inc_id}`}
                           id={`sms-card-${msg.inc_id}`}
+                          data-sms-card="true"
                           onClick={() => handleSelectIncident(msg, 'col1')}
+                          className="sms-snap-item rounded-xl py-3 px-4 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden shadow-sm select-none"
                           style={{
                             scrollSnapAlign: 'start',
+                            scrollSnapStop: 'always',
+                            scrollMarginTop: '10px',
                             background: isLight
                               ? (isSelected
                                   ? (isCritical ? '#FEF2F2' : isMaj ? '#FFFBEB' : '#EFF6FF')
@@ -2534,7 +2569,6 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                               ? (isSelected ? '0 4px 12px rgba(0, 70, 255, 0.08)' : '0 1px 3px rgba(0,0,0,0.05)')
                               : 'none',
                           }}
-                          className={`rounded-xl py-3 px-4 flex flex-col group transition-all cursor-pointer hover:scale-[0.99] active:scale-[0.98] relative overflow-hidden`}
                         >
                           {isSelected && (
                             <div className="absolute inset-0 pointer-events-none rounded-xl" style={{ outline: `1px solid ${accentColor}`, outlineOffset: '-1px' }} />
@@ -2676,8 +2710,7 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    })
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-4 opacity-40">
                     <div className="w-12 h-12 rounded-2xl bg-slate-800/50 border border-[#1E293B] flex items-center justify-center">
@@ -2695,11 +2728,9 @@ export default function DashboardPage({ allowedPaths: _ignored, onAiClick }) {
               {showSmsScrollIndicator && (
                 <div 
                   onClick={() => {
-                    if (smsListContainerRef.current) {
-                      smsListContainerRef.current.scrollTo({ top: smsListContainerRef.current.scrollHeight, behavior: 'smooth' });
-                    }
+                    scrollSmsByItem('down');
                   }}
-                  className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 text-blue-400 border border-[#1E293B] font-bold text-xs hover:border-blue-500/40 transition-all hover:scale-105 active:scale-95 select-none"
+                  className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 cursor-pointer animate-bounce flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 text-blue-400 border border-[#1E293B] font-bold text-xs hover:border-blue-500/40 transition-all hover:scale-105 active:scale-95 select-none shadow-lg"
                 >
                   <span>아래 수신내역 더보기</span>
                   <ChevronDown className="w-4 h-4 text-blue-400 shrink-0" />
