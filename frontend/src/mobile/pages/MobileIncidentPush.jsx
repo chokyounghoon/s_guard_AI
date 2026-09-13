@@ -6,6 +6,7 @@ import {
   Clock, RefreshCw, ChevronRight, Bot
 } from 'lucide-react';
 import { getUserProfile, getAuthHeaders } from '../../lib/authStore';
+import { useTheme } from '../../context/ThemeContext';
 import { useBackNavigation } from '../../hooks/useBackNavigation';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -29,6 +30,8 @@ const STATUS_COLOR = {
 export default function MobileIncidentPush({ user, onAiClick }) {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const [tab, setTab] = useState('push'); // 'push' | 'log'
 
   // ─── Push 탭 State ───
@@ -158,15 +161,16 @@ export default function MobileIncidentPush({ user, onAiClick }) {
   return (
     <div style={{
       height: '100dvh', display: 'flex', flexDirection: 'column',
-      background: 'linear-gradient(160deg, #030a18 0%, #060d1e 60%, #030a18 100%)',
-      fontFamily: "'Pretendard', 'Inter', sans-serif", color: '#cbd5e1',
+      background: isLight ? '#f1f5f9' : 'linear-gradient(160deg, #030a18 0%, #060d1e 60%, #030a18 100%)',
+      fontFamily: "'Pretendard', 'Inter', sans-serif", color: isLight ? '#0f172a' : '#cbd5e1',
+      transition: 'background 0.2s ease',
     }}>
       <style>{`
         @keyframes spin  { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
-        textarea::placeholder { color:#2d3748; }
-        textarea:focus { border-color:rgba(16,185,129,.35)!important; box-shadow:0 0 0 3px rgba(16,185,129,.06); }
-        input::placeholder { color:#1e293b; }
+        textarea::placeholder { color:${isLight ? '#94a3b8' : '#2d3748'}; }
+        textarea:focus { border-color:${isLight ? '#10b981' : 'rgba(16,185,129,.35)'}!important; box-shadow:0 0 0 3px rgba(16,185,129,.1); }
+        input::placeholder { color:${isLight ? '#94a3b8' : '#1e293b'}; }
         ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-thumb{background:rgba(16,185,129,.2);border-radius:99px}
       `}</style>
 
@@ -174,24 +178,27 @@ export default function MobileIncidentPush({ user, onAiClick }) {
       <header style={{
         flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '13px 16px',
-        borderBottom: '1px solid rgba(16,185,129,0.12)',
-        background: 'rgba(3,10,24,0.96)', backdropFilter: 'blur(20px)',
+        borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(16,185,129,0.12)',
+        background: isLight ? 'rgba(255,255,255,0.95)' : 'rgba(3,10,24,0.96)',
+        backdropFilter: 'blur(20px)',
+        boxShadow: isLight ? '0 1px 4px rgba(0,0,0,0.03)' : 'none',
       }}>
         <button onClick={() => goBack()} style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+          background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+          border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
         }}>
-          <ChevronLeft size={18} color="#64748b" />
+          <ChevronLeft size={18} color={isLight ? '#475569' : '#64748b'} />
         </button>
 
         <div style={{ textAlign: 'center' }}>
           <div style={{
             fontSize: 16, fontWeight: 900, letterSpacing: '0.04em',
-            background: 'linear-gradient(90deg,#10b981,#34d399)',
+            background: 'linear-gradient(90deg,#059669,#10b981)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>장애 수동 접수</div>
-          <div style={{ fontSize: 11, color: '#10b981', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.6 }}>
+          <div style={{ fontSize: 11, color: '#059669', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.8 }}>
             MANUAL ENTRY · INCIDENT PUSH
           </div>
         </div>
@@ -199,7 +206,8 @@ export default function MobileIncidentPush({ user, onAiClick }) {
         {onAiClick ? (
           <button onClick={onAiClick} style={{
             width: 36, height: 36, borderRadius: 10,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+            background: isLight ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.05)',
+            border: isLight ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(255,255,255,0.08)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
           }}>
             <Bot size={18} color="#a855f7" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.4))' }} />
@@ -219,9 +227,14 @@ export default function MobileIncidentPush({ user, onAiClick }) {
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             padding: '11px', borderRadius: 12, cursor: 'pointer',
             fontSize: 14, fontWeight: 800,
-            background: tab === key ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)',
-            border: tab === key ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
-            color: tab === key ? '#10b981' : '#475569',
+            background: tab === key
+              ? (isLight ? 'rgba(16,185,129,0.14)' : 'rgba(16,185,129,0.12)')
+              : (isLight ? '#ffffff' : 'rgba(255,255,255,0.03)'),
+            border: tab === key
+              ? '1px solid rgba(16,185,129,0.4)'
+              : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)'),
+            color: tab === key ? '#059669' : (isLight ? '#64748b' : '#475569'),
+            boxShadow: (tab !== key && isLight) ? '0 1px 2px rgba(0,0,0,0.02)' : 'none',
             transition: 'all 0.15s',
           }}>
             <Icon size={15} />
@@ -240,9 +253,15 @@ export default function MobileIncidentPush({ user, onAiClick }) {
               { label: '사번',   value: employeeId || '-' },
               { label: '채널',   value: 'MANUAL' },
             ].map(item => (
-              <div key={item.label} style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, color: '#475569', fontWeight: 700, letterSpacing: '0.06em', marginBottom: 3 }}>{item.label}</div>
-                <div style={{ fontSize: 14, color: '#94a3b8', fontFamily: 'monospace', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div key={item.label} style={{
+                flex: 1,
+                background: isLight ? '#ffffff' : 'transparent',
+                padding: isLight ? '6px 10px' : 0,
+                borderRadius: isLight ? 10 : 0,
+                border: isLight ? '1px solid #e2e8f0' : 'none',
+              }}>
+                <div style={{ fontSize: 11, color: isLight ? '#64748b' : '#475569', fontWeight: 700, letterSpacing: '0.06em', marginBottom: 2 }}>{item.label}</div>
+                <div style={{ fontSize: 13, color: isLight ? '#0f172a' : '#94a3b8', fontFamily: 'monospace', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.value}
                 </div>
               </div>
@@ -251,14 +270,15 @@ export default function MobileIncidentPush({ user, onAiClick }) {
 
           {/* AI 보조 입력 */}
           <div style={{ flexShrink: 0, padding: '10px 16px 0' }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', marginBottom: 8 }}>AI 보조 입력</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: isLight ? '#475569' : '#64748b', letterSpacing: '0.06em', marginBottom: 8 }}>AI 보조 입력</div>
             <input type="file" accept="image/*" multiple ref={fileRef} onChange={handleImage} style={{ display: 'none' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <button onClick={() => fileRef.current.click()} disabled={converting} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 padding: '13px', borderRadius: 12,
-                background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                color: '#818cf8', fontWeight: 700, fontSize: 15, cursor: converting ? 'not-allowed' : 'pointer',
+                background: isLight ? 'rgba(99,102,241,0.09)' : 'rgba(99,102,241,0.08)',
+                border: isLight ? '1px solid rgba(99,102,241,0.25)' : '1px solid rgba(99,102,241,0.2)',
+                color: isLight ? '#4f46e5' : '#818cf8', fontWeight: 700, fontSize: 15, cursor: converting ? 'not-allowed' : 'pointer',
                 opacity: converting ? 0.6 : 1,
               }}>
                 {converting ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <ImageIcon size={14} />}
@@ -267,9 +287,13 @@ export default function MobileIncidentPush({ user, onAiClick }) {
               <button onClick={toggleSTT} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 padding: '13px', borderRadius: 12,
-                background: isListening ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)',
-                border: isListening ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.08)',
-                color: isListening ? '#f87171' : '#94a3b8',
+                background: isListening
+                  ? 'rgba(239,68,68,0.12)'
+                  : (isLight ? '#ffffff' : 'rgba(255,255,255,0.05)'),
+                border: isListening
+                  ? '1px solid rgba(239,68,68,0.35)'
+                  : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                color: isListening ? '#ef4444' : (isLight ? '#475569' : '#94a3b8'),
                 fontWeight: 700, fontSize: 15, cursor: 'pointer',
               }}>
                 {isListening ? <Square size={14} /> : <Mic size={14} />}
@@ -281,11 +305,11 @@ export default function MobileIncidentPush({ user, onAiClick }) {
           {/* 텍스트 영역 */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 0' }}>
             <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#64748b', letterSpacing: '0.06em' }}>장애 상세 내용</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: isLight ? '#475569' : '#64748b', letterSpacing: '0.06em' }}>장애 상세 내용</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {message && <span style={{ fontSize: 13, color: '#334155', fontFamily: 'monospace' }}>{message.length}자</span>}
+                {message && <span style={{ fontSize: 13, color: isLight ? '#64748b' : '#334155', fontFamily: 'monospace' }}>{message.length}자</span>}
                 {message && (
-                  <button onClick={() => setMessage('')} style={{ fontSize: 13, color: '#f87171', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <button onClick={() => setMessage('')} style={{ fontSize: 13, color: '#ef4444', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                     초기화
                   </button>
                 )}
@@ -297,11 +321,13 @@ export default function MobileIncidentPush({ user, onAiClick }) {
               placeholder="예: 센터 네트워크 장비 L3 고용량 트래픽으로 인한 간헐적 지연 발생..."
               style={{
                 flex: 1, width: '100%', boxSizing: 'border-box', resize: 'none',
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                background: isLight ? '#ffffff' : 'rgba(255,255,255,0.03)',
+                border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.08)',
                 borderRadius: 14, padding: '12px 14px',
-                color: '#f1f5f9', fontSize: 16, lineHeight: 1.7, outline: 'none',
+                color: isLight ? '#0f172a' : '#f1f5f9', fontSize: 16, lineHeight: 1.7, outline: 'none',
                 fontFamily: "'Pretendard', 'Inter', sans-serif",
                 transition: 'border-color 0.2s, box-shadow 0.2s',
+                boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.03)' : 'none',
               }}
             />
           </div>
@@ -323,11 +349,11 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                   ? <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
                   : <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />}
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: result.type === 'success' ? '#10b981' : '#f87171' }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: result.type === 'success' ? '#10b981' : '#ef4444' }}>
                     {result.text}
                   </div>
                   {result.incId && (
-                    <div style={{ fontSize: 13, color: '#475569', fontFamily: 'monospace', marginTop: 3 }}>
+                    <div style={{ fontSize: 13, color: isLight ? '#64748b' : '#475569', fontFamily: 'monospace', marginTop: 3 }}>
                       INC-{result.incId} · 2초 후 대시보드로 이동합니다
                     </div>
                   )}
@@ -346,9 +372,9 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                 cursor: canSubmit ? 'pointer' : 'not-allowed',
                 background: canSubmit
                   ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-                  : 'rgba(255,255,255,0.05)',
-                border: canSubmit ? 'none' : '1px solid rgba(255,255,255,0.08)',
-                color: canSubmit ? '#fff' : '#334155',
+                  : (isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'),
+                border: canSubmit ? 'none' : (isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.08)'),
+                color: canSubmit ? '#fff' : (isLight ? '#94a3b8' : '#334155'),
                 boxShadow: canSubmit ? '0 0 30px rgba(16,185,129,0.3)' : 'none',
                 transition: 'all 0.2s',
               }}>
@@ -367,9 +393,9 @@ export default function MobileIncidentPush({ user, onAiClick }) {
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <ClipboardList size={16} color="#10b981" />
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0' }}>내 접수 로그</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: isLight ? '#0f172a' : '#e2e8f0' }}>내 접수 로그</span>
               <span style={{
-                fontSize: 12, color: '#10b981', fontWeight: 700,
+                fontSize: 12, color: '#059669', fontWeight: 700,
                 background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
                 borderRadius: 6, padding: '1px 8px',
               }}>{logs.length}건</span>
@@ -391,8 +417,8 @@ export default function MobileIncidentPush({ user, onAiClick }) {
               </div>
             ) : logs.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 150, gap: 8 }}>
-                <ClipboardList size={32} color="#1e293b" />
-                <span style={{ fontSize: 14, color: '#334155', fontWeight: 700 }}>접수 로그가 없습니다</span>
+                <ClipboardList size={32} color={isLight ? '#cbd5e1' : '#1e293b'} />
+                <span style={{ fontSize: 14, color: isLight ? '#64748b' : '#334155', fontWeight: 700 }}>접수 로그가 없습니다</span>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -402,7 +428,9 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                   return (
                     <div key={i} onClick={() => navigate(`/dashboard`)} style={{
                       borderRadius: 18, padding: '14px 16px', cursor: 'pointer',
-                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+                      background: isLight ? '#ffffff' : 'rgba(255,255,255,0.03)',
+                      border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.07)',
+                      boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.04)' : 'none',
                       position: 'relative', overflow: 'hidden',
                       transition: 'border-color 0.15s',
                     }}>
@@ -415,8 +443,10 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                       {/* 1행: 인시던트 ID + 상태 + 시각 */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                         <span style={{
-                          fontSize: 13, fontWeight: 800, fontFamily: 'monospace', color: '#818cf8',
-                          background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)',
+                          fontSize: 13, fontWeight: 800, fontFamily: 'monospace',
+                          color: isLight ? '#4f46e5' : '#818cf8',
+                          background: isLight ? 'rgba(99,102,241,0.1)' : 'rgba(129,140,248,0.1)',
+                          border: isLight ? '1px solid rgba(99,102,241,0.2)' : '1px solid rgba(129,140,248,0.2)',
                           borderRadius: 6, padding: '2px 8px',
                         }}>INC-{String(incId)}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -425,8 +455,8 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                             background: `${stColor}15`, borderRadius: 6, padding: '2px 8px',
                           }}>{log.status || '미처리'}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <Clock size={11} color="#334155" />
-                            <span style={{ fontSize: 11, color: '#334155', fontFamily: 'monospace' }}>
+                            <Clock size={11} color={isLight ? '#64748b' : '#334155'} />
+                            <span style={{ fontSize: 11, color: isLight ? '#64748b' : '#334155', fontFamily: 'monospace' }}>
                               {formatTime(log.assigned_at || log.message_at)}
                             </span>
                           </div>
@@ -436,7 +466,7 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                       {/* 2행: 메시지 내용 */}
                       {log.message && (
                         <div style={{
-                          fontSize: 14, color: '#94a3b8', lineHeight: 1.5, marginBottom: 8,
+                          fontSize: 14, color: isLight ? '#334155' : '#94a3b8', lineHeight: 1.5, marginBottom: 8,
                           overflow: 'hidden', display: '-webkit-box',
                           WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                         }}>
@@ -446,7 +476,7 @@ export default function MobileIncidentPush({ user, onAiClick }) {
 
                       {/* 3행: 발신자 + 채팅 수 */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 12, color: '#475569', fontWeight: 700 }}>
+                        <span style={{ fontSize: 12, color: isLight ? '#64748b' : '#475569', fontWeight: 700 }}>
                           {log.sender || log.sms_sender || '수동접수'}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -455,7 +485,7 @@ export default function MobileIncidentPush({ user, onAiClick }) {
                               💬 {log.chat_count}
                             </span>
                           )}
-                          <ChevronRight size={14} color="#334155" />
+                          <ChevronRight size={14} color={isLight ? '#94a3b8' : '#334155'} />
                         </div>
                       </div>
                     </div>

@@ -6,6 +6,7 @@ import WarRoomChatPanel from '../../components/WarRoomChatPanel';
 import AiInsightPanel from '../../components/AiInsightPanel';
 import { getAuthHeaders } from '../../lib/authStore';
 import { useBackNavigation } from '../../hooks/useBackNavigation';
+import { useTheme } from '../../context/ThemeContext';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
 
@@ -13,6 +14,8 @@ export default function MobileExpertAdvisor({ user }) {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const { incidentId } = useParams();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
 
   const [smsData, setSmsData] = useState(null);
   const [agentMessages, setAgentMessages] = useState([]);
@@ -174,24 +177,24 @@ export default function MobileExpertAdvisor({ user }) {
   ];
 
   return (
-    <div className="flex flex-col bg-[#060a12] min-h-screen pb-24">
+    <div className={`flex flex-col min-h-screen pb-24 ${isLight ? 'bg-[#f1f5f9] text-slate-800' : 'bg-[#060a12] text-white'}`}>
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-[#060a12]/90 backdrop-blur-xl border-b border-white/5 px-4 pt-6 pb-4">
+      <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-4 pt-6 pb-4 ${isLight ? 'bg-white/95 border-slate-200 shadow-sm' : 'bg-[#060a12]/90 border-white/5'}`}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => goBack()}
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center active:scale-95 transition-transform ${isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-300'}`}
           >
-            <ArrowLeft className="w-4 h-4 text-slate-300" />
+            <ArrowLeft className="w-4 h-4" />
           </button>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="bg-indigo-500/15 border border-indigo-500/25 p-2 rounded-xl shrink-0">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
+            <div className={`p-2 rounded-xl shrink-0 border ${isLight ? 'bg-indigo-50 border-indigo-200' : 'bg-indigo-500/15 border-indigo-500/25'}`}>
+              <Sparkles className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
             </div>
             <div className="min-w-0">
-              <h1 className="font-black text-white text-base tracking-tight leading-none">S-Autopilot Expert Advisor</h1>
+              <h1 className={`font-black text-base tracking-tight leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>S-Autopilot Expert Advisor</h1>
               {smsData && (
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                <p className={`text-[10px] font-mono mt-0.5 truncate ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                   {String(smsData.inc_id)}
                 </p>
               )}
@@ -199,22 +202,22 @@ export default function MobileExpertAdvisor({ user }) {
           </div>
           <button
             onClick={() => { fetchIncident(); fetchWarRooms(); }}
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center active:scale-95 transition-transform ${isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-400'}`}
           >
-            <RefreshCw className="w-4 h-4 text-slate-400" />
+            <RefreshCw className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1.5 mt-4 bg-white/[0.03] rounded-2xl p-1">
+        <div className={`flex gap-1.5 mt-4 rounded-2xl p-1 ${isLight ? 'bg-slate-200/80' : 'bg-white/[0.03]'}`}>
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 py-2 rounded-xl text-xs font-black tracking-tight transition-all ${
                 activeTab === tab.id
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : (isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-500 hover:text-slate-300')
               }`}
             >
               {tab.label}
@@ -225,17 +228,17 @@ export default function MobileExpertAdvisor({ user }) {
 
       {/* Incident info bar */}
       {smsData && (
-        <div className="mx-4 mt-4 px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/5">
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Source SMS</p>
-          <p className="text-xs text-slate-200 leading-relaxed line-clamp-3">{smsData.message}</p>
+        <div className={`mx-4 mt-4 px-4 py-3 rounded-2xl border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/5'}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Source SMS</p>
+          <p className={`text-xs leading-relaxed line-clamp-3 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{smsData.message}</p>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {smsData.service_name && (
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border ${isLight ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
                 {smsData.service_name}
               </span>
             )}
             {smsData.incident_status && (
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-slate-400">
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border ${isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-400'}`}>
                 {smsData.incident_status}
               </span>
             )}
@@ -252,13 +255,13 @@ export default function MobileExpertAdvisor({ user }) {
             </div>
           </div>
         ) : !smsData ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-600">
+          <div className={`flex flex-col items-center justify-center py-20 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
             <Brain className="w-12 h-12 mb-3 opacity-30" />
             <p className="text-xs font-black uppercase tracking-widest">인시던트를 찾을 수 없습니다</p>
           </div>
         ) : (
           <>
-            <div className={`flex-1 bg-[#0a0c12] rounded-3xl border border-white/5 overflow-hidden ${activeTab === 'ai' ? 'flex flex-col' : 'hidden'}`} style={{ minHeight: 400 }}>
+            <div className={`flex-1 rounded-3xl border overflow-hidden ${activeTab === 'ai' ? 'flex flex-col' : 'hidden'} ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a0c12] border-white/5'}`} style={{ minHeight: 400 }}>
               <AgentDiscussionPanel
                 messages={agentMessages}
                 isVisible={true}
@@ -268,7 +271,7 @@ export default function MobileExpertAdvisor({ user }) {
               />
             </div>
 
-            <div className={`flex-1 bg-[#0a0c12] rounded-3xl border border-white/5 overflow-hidden ${activeTab === 'warroom' ? 'flex flex-col' : 'hidden'}`} style={{ minHeight: 400 }}>
+            <div className={`flex-1 rounded-3xl border overflow-hidden ${activeTab === 'warroom' ? 'flex flex-col' : 'hidden'} ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a0c12] border-white/5'}`} style={{ minHeight: 400 }}>
               <WarRoomChatPanel
                 incidentId={smsData.inc_id}
                 currentUser={user || {}}

@@ -7,6 +7,7 @@ import {
   Radio, Eye, X, Trash2
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
+import { useTheme } from '../../context/ThemeContext';
 import PullToRefresh from '../components/PullToRefresh';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -35,6 +36,8 @@ function getTypeStyle(item) {
 
 export default function MobileInbox({ user, onAiClick }) {
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ALL');
@@ -114,21 +117,22 @@ export default function MobileInbox({ user, onAiClick }) {
 
   return (
     <PullToRefresh onRefresh={fetchInbox}>
-      <div style={{ minHeight: '100dvh', background: '#060810', paddingBottom: 100 }}>
+      <div style={{ minHeight: '100dvh', background: isLight ? '#f1f5f9' : '#060810', paddingBottom: 100, transition: 'background 0.2s ease' }}>
 
         {/* ─── STICKY HEADER ─────────────────────────────────── */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 50,
-          background: 'linear-gradient(160deg, #0b0e1a 0%, #0d1020 100%)',
+          background: isLight ? 'rgba(255, 255, 255, 0.94)' : 'linear-gradient(160deg, #0b0e1a 0%, #0d1020 100%)',
           backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          borderBottom: isLight ? '1px solid #e2e8f0' : 'rgba(255,255,255,0.06)',
           padding: '16px 18px 12px',
+          boxShadow: isLight ? '0 1px 4px rgba(0,0,0,0.04)' : 'none',
         }}>
           {/* Title row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                <span style={{ fontSize: 20, fontWeight: 900, color: isLight ? '#0f172a' : '#fff', letterSpacing: '-0.02em' }}>
                   Incident{' '}
                   <span style={{ background: 'linear-gradient(90deg,#818cf8,#6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     Reports
@@ -146,12 +150,12 @@ export default function MobileInbox({ user, onAiClick }) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {onAiClick && (
-                <button onClick={onAiClick} style={{ padding: 9, borderRadius: 12, background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)', cursor: 'pointer' }}>
+                <button onClick={onAiClick} style={{ padding: 9, borderRadius: 12, background: isLight ? 'rgba(168,85,247,0.12)' : 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)', cursor: 'pointer' }}>
                   <Bot size={16} color="#a855f7" />
                 </button>
               )}
-              <button onClick={fetchInbox} style={{ padding: 9, borderRadius: 12, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', cursor: 'pointer' }}>
-                <RefreshCw size={16} color="#818cf8" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+              <button onClick={fetchInbox} style={{ padding: 9, borderRadius: 12, background: isLight ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', cursor: 'pointer' }}>
+                <RefreshCw size={16} color="#6366f1" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
               </button>
             </div>
           </div>
@@ -163,9 +167,14 @@ export default function MobileInbox({ user, onAiClick }) {
               { label: 'Unread',  val: unreadCount,    color: '#f59e0b' },
               { label: 'Reports', val: reportsCount,   color: '#10b981' },
             ].map(s => (
-              <div key={s.label} style={{ background: `${s.color}0d`, border: `1px solid ${s.color}25`, borderRadius: 14, padding: '8px 10px', textAlign: 'center' }}>
+              <div key={s.label} style={{
+                background: isLight ? '#ffffff' : `${s.color}0d`,
+                border: isLight ? `1px solid #e2e8f0` : `1px solid ${s.color}25`,
+                borderRadius: 14, padding: '8px 10px', textAlign: 'center',
+                boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.03)' : 'none',
+              }}>
                 <div style={{ fontSize: 18, fontWeight: 900, color: s.color, lineHeight: 1.1 }}>{s.val}</div>
-                <div style={{ fontSize: 9, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 2 }}>{s.label}</div>
+                <div style={{ fontSize: 9, color: isLight ? '#64748b' : '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -183,8 +192,8 @@ export default function MobileInbox({ user, onAiClick }) {
                     padding: '6px 13px', borderRadius: 99,
                     fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
                     border: 'none', cursor: 'pointer', flexShrink: 0,
-                    background: isActive ? '#6366f1' : 'rgba(255,255,255,0.05)',
-                    color: isActive ? '#fff' : '#64748b',
+                    background: isActive ? '#6366f1' : (isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'),
+                    color: isActive ? '#fff' : (isLight ? '#475569' : '#64748b'),
                     boxShadow: isActive ? '0 0 14px rgba(99,102,241,0.35)' : 'none',
                     transition: 'all 0.15s',
                   }}
@@ -202,13 +211,13 @@ export default function MobileInbox({ user, onAiClick }) {
           {loading && items.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 14 }}>
               <div style={{ width: 32, height: 32, border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-              <span style={{ fontSize: 11, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Syncing Feed...</span>
+              <span style={{ fontSize: 11, color: isLight ? '#64748b' : '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Syncing Feed...</span>
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 0', color: '#334155' }}>
+            <div style={{ textAlign: 'center', padding: '80px 0', color: isLight ? '#94a3b8' : '#334155' }}>
               <InboxIcon size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>No incidents found</p>
-              <p style={{ fontSize: 12, color: '#334155', marginTop: 4 }}>새로운 리포트가 도착하면 여기에 표시됩니다</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: isLight ? '#64748b' : '#475569' }}>No incidents found</p>
+              <p style={{ fontSize: 12, color: isLight ? '#94a3b8' : '#334155', marginTop: 4 }}>새로운 리포트가 도착하면 여기에 표시됩니다</p>
             </div>
           ) : filtered.map((item) => {
             const t = getTypeStyle(item);
@@ -251,16 +260,17 @@ export default function MobileInbox({ user, onAiClick }) {
                   style={{
                     textAlign: 'left',
                     background: !item.is_read
-                      ? `linear-gradient(135deg, ${t.bg} 0%, rgba(8,10,18,0.95) 70%)`
-                      : 'rgba(13,15,22,0.9)',
-                    border: `1px solid ${!item.is_read ? t.border : 'rgba(255,255,255,0.05)'}`,
-                    borderLeft: `3px solid ${!item.is_read ? t.accent : 'rgba(255,255,255,0.06)'}`,
+                      ? (isLight ? '#ffffff' : `linear-gradient(135deg, ${t.bg} 0%, rgba(8,10,18,0.95) 70%)`)
+                      : (isLight ? '#ffffff' : 'rgba(13,15,22,0.9)'),
+                    border: `1px solid ${isLight ? '#e2e8f0' : (!item.is_read ? t.border : 'rgba(255,255,255,0.05)')}`,
+                    borderLeft: `3px solid ${!item.is_read ? t.accent : (isLight ? '#cbd5e1' : 'rgba(255,255,255,0.06)')}`,
                     borderRadius: 20,
                     padding: '14px 14px 14px 13px',
                     cursor: 'pointer',
                     transform: isSwiped ? 'translateX(-72px)' : 'translateX(0)',
                     transition: 'transform 0.22s ease',
                     position: 'relative', zIndex: 1,
+                    boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
                   }}
                 >
                   {/* Row 1: type badge + time */}
@@ -277,40 +287,40 @@ export default function MobileInbox({ user, onAiClick }) {
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: 9, color: '#475569', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{timeStr}</span>
+                    <span style={{ fontSize: 9, color: isLight ? '#64748b' : '#475569', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{timeStr}</span>
                   </div>
 
                   {/* Row 2: title */}
-                  <p style={{ fontSize: 14, fontWeight: 800, color: !item.is_read ? '#fff' : '#64748b', lineHeight: 1.4, marginBottom: 6 }}>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: !item.is_read ? (isLight ? '#0f172a' : '#fff') : (isLight ? '#475569' : '#64748b'), lineHeight: 1.4, marginBottom: 6 }}>
                     {item.title || `INC-${item.inc_id}`}
                   </p>
 
                   {/* Row 3: body preview */}
                   {body && (
-                    <div style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px', marginBottom: 10 }}>
-                      <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    <div style={{ background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.25)', border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '8px 10px', marginBottom: 10 }}>
+                      <p style={{ fontSize: 12, color: isLight ? '#334155' : '#94a3b8', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {stripMarkdown(body)}
                       </p>
                     </div>
                   )}
 
                   {/* Row 4: sender + actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)'}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#64748b' }}>
+                      <div style={{ width: 22, height: 22, borderRadius: '50%', background: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.06)', border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: isLight ? '#475569' : '#64748b' }}>
                         {(item.sender_name || 'S').charAt(0).toUpperCase()}
                       </div>
-                      <span style={{ fontSize: 11, color: '#475569', fontWeight: 700 }}>{item.sender_name || 'System'}</span>
+                      <span style={{ fontSize: 11, color: isLight ? '#334155' : '#475569', fontWeight: 700 }}>{item.sender_name || 'System'}</span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {item.inc_id && (
                         <button
                           onClick={e => { e.stopPropagation(); handleAiReport(item); }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 10, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.28)', cursor: 'pointer' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 10, background: isLight ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.28)', cursor: 'pointer' }}
                         >
-                          <BrainCircuit size={11} color="#818cf8" />
-                          <span style={{ fontSize: 10, fontWeight: 800, color: '#818cf8' }}>AI</span>
+                          <BrainCircuit size={11} color="#6366f1" />
+                          <span style={{ fontSize: 10, fontWeight: 800, color: '#6366f1' }}>AI</span>
                         </button>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 800, color: t.accent }}>
@@ -332,44 +342,44 @@ export default function MobileInbox({ user, onAiClick }) {
             <div onClick={() => setContextItem(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 350, backdropFilter: 'blur(6px)' }} />
             <div style={{
               position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 351,
-              background: '#0d0f18',
+              background: isLight ? '#ffffff' : '#0d0f18',
               borderRadius: '24px 24px 0 0',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
               borderBottom: 'none',
               padding: '12px 0 44px',
-              boxShadow: '0 -20px 50px rgba(0,0,0,0.7)',
+              boxShadow: isLight ? '0 -10px 40px rgba(0,0,0,0.1)' : '0 -20px 50px rgba(0,0,0,0.7)',
             }}>
-              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 99, margin: '0 auto 16px' }} />
+              <div style={{ width: 36, height: 4, background: isLight ? '#cbd5e1' : 'rgba(255,255,255,0.12)', borderRadius: 99, margin: '0 auto 16px' }} />
               
-              <div style={{ padding: '0 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ padding: '0 20px 14px', borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}` }}>
                 <p style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Selected Item</p>
-                <p style={{ fontSize: 14, color: '#fff', fontWeight: 800, lineHeight: 1.4 }}>{contextItem.title || `INC-${contextItem.inc_id}`}</p>
+                <p style={{ fontSize: 14, color: isLight ? '#0f172a' : '#fff', fontWeight: 800, lineHeight: 1.4 }}>{contextItem.title || `INC-${contextItem.inc_id}`}</p>
               </div>
 
               <div style={{ marginTop: 6 }}>
                 {!contextItem.is_read && (
                   <button onClick={() => { markRead(contextItem.id); setContextItem(null); }} style={actionBtnStyle}>
                     <CheckCircle2 size={20} color="#10b981" />
-                    <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 700 }}>Mark as Read</span>
+                    <span style={{ fontSize: 15, color: isLight ? '#0f172a' : '#e2e8f0', fontWeight: 700 }}>Mark as Read</span>
                   </button>
                 )}
                 {contextItem.inc_id && (
                   <>
                     <button onClick={() => { handleOpen(contextItem); setContextItem(null); }} style={actionBtnStyle}>
                       <Eye size={20} color="#6366f1" />
-                      <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 700 }}>
+                      <span style={{ fontSize: 15, color: isLight ? '#0f172a' : '#e2e8f0', fontWeight: 700 }}>
                         {contextItem.type === 'REPORT' ? 'View Report' : 'Open War-Room'}
                       </span>
                     </button>
                     <button onClick={() => { handleAiReport(contextItem); setContextItem(null); }} style={actionBtnStyle}>
-                      <BrainCircuit size={20} color="#818cf8" />
-                      <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 700 }}>AI Analysis</span>
+                      <BrainCircuit size={20} color="#6366f1" />
+                      <span style={{ fontSize: 15, color: isLight ? '#0f172a' : '#e2e8f0', fontWeight: 700 }}>AI Analysis</span>
                     </button>
                   </>
                 )}
-                <button onClick={() => setContextItem(null)} style={{ ...actionBtnStyle, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20 }}>
-                  <X size={20} color="#475569" />
-                  <span style={{ fontSize: 15, color: '#475569', fontWeight: 700 }}>Cancel</span>
+                <button onClick={() => setContextItem(null)} style={{ ...actionBtnStyle, marginTop: 8, borderTop: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}`, paddingTop: 20 }}>
+                  <X size={20} color={isLight ? '#64748b' : '#475569'} />
+                  <span style={{ fontSize: 15, color: isLight ? '#64748b' : '#475569', fontWeight: 700 }}>Cancel</span>
                 </button>
               </div>
             </div>

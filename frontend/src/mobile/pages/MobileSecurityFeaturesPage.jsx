@@ -2,10 +2,13 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, Lock, EyeOff, RefreshCcw, Users, Smartphone, FileSignature, Server, Key, Shield, Network, Database, Brain } from 'lucide-react';
 import { useBackNavigation } from '../../hooks/useBackNavigation';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function MobileSecurityFeaturesPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
 
   const securityFeatures = [
     {
@@ -110,34 +113,34 @@ export default function MobileSecurityFeaturesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#070b12] text-white font-sans flex flex-col pb-6">
+    <div className={`min-h-screen font-sans flex flex-col pb-6 ${isLight ? 'bg-[#f1f5f9] text-slate-800' : 'bg-[#070b12] text-white'}`}>
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0b0e17]/90 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => goBack()} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center active:scale-95 text-slate-300">
+      <div className={`sticky top-0 z-50 backdrop-blur-md border-b px-4 py-3 flex items-center gap-3 ${isLight ? 'bg-white/95 border-slate-200 shadow-sm' : 'bg-[#0b0e17]/90 border-white/10'}`}>
+        <button onClick={() => goBack()} className={`w-8 h-8 rounded-full flex items-center justify-center active:scale-95 ${isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/5 text-slate-300'}`}>
           <ArrowLeft size={16} />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-black tracking-tight text-white flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" /> Security Implementation
+          <h1 className={`text-sm font-black tracking-tight flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Security Implementation
           </h1>
         </div>
       </div>
 
       <div className="px-5 pt-6 pb-2">
         <div className="text-center mb-8 relative">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center relative shadow-[0_0_30px_rgba(16,185,129,0.15)]">
-            <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-[spin_4s_linear_infinite]" style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }} />
-            <Shield className="w-8 h-8 text-emerald-400" />
+          <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center relative ${isLight ? 'bg-emerald-50 border border-emerald-200 shadow-md' : 'bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.15)]'}`}>
+            <div className={`absolute inset-0 rounded-full border animate-[spin_4s_linear_infinite] ${isLight ? 'border-emerald-400/40' : 'border-emerald-500/30'}`} style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }} />
+            <Shield className="w-8 h-8 text-emerald-500" />
           </div>
-          <h2 className="text-xl font-black text-white tracking-tight mb-1">시스템 보안 아키텍처</h2>
-          <p className="text-xs text-slate-400 font-medium">안전한 무결점 관제 환경을 위한 보안 적용 현황</p>
+          <h2 className={`text-xl font-black tracking-tight mb-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>시스템 보안 아키텍처</h2>
+          <p className={`text-xs font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>안전한 무결점 관제 환경을 위한 보안 적용 현황</p>
         </div>
 
         <div className="space-y-4">
           {securityFeatures.map((feat, idx) => {
             const Icon = feat.icon;
             return (
-              <div key={feat.id} className="relative bg-white/[0.02] border border-white/5 rounded-2xl p-4 overflow-hidden transition-all">
+              <div key={feat.id} className={`relative rounded-2xl p-4 overflow-hidden transition-all ${isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-white/[0.02] border border-white/5'}`}>
                 {/* Background Glow */}
                 <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: feat.color, transform: 'translate(30%, -30%)' }} />
                 
@@ -146,14 +149,14 @@ export default function MobileSecurityFeaturesPage() {
                     <Icon size={20} color={feat.color} />
                   </div>
                   <div className="flex-1 min-w-0 pt-0.5">
-                    <h3 className="text-[13px] font-black text-white mb-0.5">{feat.title}</h3>
+                    <h3 className={`text-[13px] font-black mb-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{feat.title}</h3>
                     <p className="text-[10px] font-bold tracking-wide uppercase mb-2" style={{ color: feat.color }}>{feat.subtitle}</p>
-                    <p className="text-[11px] leading-relaxed text-slate-300 font-medium mb-3">
+                    <p className={`text-[11px] leading-relaxed font-medium mb-3 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
                       {feat.description}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {feat.tags.map(tag => (
-                        <span key={tag} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 text-slate-400 border border-white/10">
+                        <span key={tag} className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isLight ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
                           {tag}
                         </span>
                       ))}

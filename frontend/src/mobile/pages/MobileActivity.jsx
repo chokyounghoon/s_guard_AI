@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getAccessToken, getAuthHeaders } from '../../lib/authStore';
 import { useBackNavigation } from '../../hooks/useBackNavigation';
+import { useTheme } from '../../context/ThemeContext';
 import PullToRefresh from '../components/PullToRefresh';
 
 const API_BASE = 'https://sguardai.khcho0421.workers.dev';
@@ -36,6 +37,7 @@ const formatDate = (ts) => {
 };
 
 export default function MobileActivity({ user, onAiClick }) {
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const goBack = useBackNavigation('/dashboard');
   const [rawLogs, setRawLogs] = useState([]);
@@ -98,39 +100,51 @@ export default function MobileActivity({ user, onAiClick }) {
 
   return (
     <PullToRefresh onRefresh={() => fetchLogs(true)}>
-      <div className="flex flex-col bg-[#0a0e17] pb-24 min-h-full">
+      <div className={`flex flex-col pb-24 min-h-full ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#0a0e17] text-slate-100'}`}>
 
       {/* 헤더 */}
-      <header className="sticky top-0 z-40 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/5 px-4 pt-4 pb-3">
+      <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-4 pt-4 pb-3 ${
+        isLight ? 'bg-white/95 border-slate-200 shadow-sm' : 'bg-[#0a0e17]/95 border-white/5'
+      }`}>
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => goBack()} className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90">
-            <ChevronLeft className="w-5 h-5 text-slate-300" />
+          <button onClick={() => goBack()} className={`p-2 rounded-full transition-colors active:scale-90 ${
+            isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+          }`}>
+            <ChevronLeft className={`w-5 h-5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`} />
           </button>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-400" />
-              <h1 className="font-black text-white text-lg">장애 처리 현황</h1>
+              <Activity className="w-5 h-5 text-blue-500" />
+              <h1 className={`font-black text-lg ${isLight ? 'text-slate-900' : 'text-white'}`}>장애 처리 현황</h1>
             </div>
-            <p className="text-[11px] text-slate-500">최근 50건 처리 내역</p>
+            <p className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>최근 50건 처리 내역</p>
           </div>
           {onAiClick && (
-            <button onClick={onAiClick} className="p-2 rounded-full hover:bg-white/10 transition-colors">
-              <Bot className="w-4 h-4 text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.4)]" />
+            <button onClick={onAiClick} className={`p-2 rounded-full transition-colors ${
+              isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+            }`}>
+              <Bot className="w-4 h-4 text-purple-500" />
             </button>
           )}
           <button onClick={() => fetchLogs(true)} disabled={refreshing}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors">
-            <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
+            className={`p-2 rounded-full transition-colors ${
+              isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+            }`}>
+            <RefreshCw className={`w-4 h-4 ${isLight ? 'text-slate-500' : 'text-slate-400'} ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
         {/* 검색 */}
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
           <input type="text" value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="장애명, 담당자로 검색..."
-            className="w-full bg-[#131927] border border-white/10 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/30 transition-all" />
+            className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+              isLight 
+                ? 'bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 shadow-sm' 
+                : 'bg-[#131927] border border-white/10 text-white placeholder:text-slate-600 focus:border-blue-500/30'
+            }`} />
         </div>
       </header>
 
@@ -138,21 +152,23 @@ export default function MobileActivity({ user, onAiClick }) {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500/30 mb-4" />
-          <p className="text-sm text-slate-600">처리 내역 로드 중...</p>
+          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-600'}`}>처리 내역 로드 중...</p>
         </div>
       ) : sections.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-600">
+        <div className={`flex flex-col items-center justify-center py-16 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
           <CalendarDays className="w-12 h-12 mb-4 opacity-30" />
           <p className="text-sm">{searchQuery ? '검색 결과가 없습니다.' : '처리 내역이 없습니다.'}</p>
         </div>
       ) : sections.map(({ date, items }) => (
         <div key={date}>
           {/* 날짜 구분 */}
-          <div className="sticky top-[113px] z-30 bg-[#0d1117]/90 backdrop-blur-sm px-4 py-2 border-b border-white/5">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{date}</span>
+          <div className={`sticky top-[113px] z-30 backdrop-blur-sm px-4 py-2 border-b ${
+            isLight ? 'bg-slate-100/90 border-slate-200' : 'bg-[#0d1117]/90 border-white/5'
+          }`}>
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>{date}</span>
           </div>
 
-          <div className="divide-y divide-white/5">
+          <div className={`divide-y ${isLight ? 'divide-slate-200 bg-white' : 'divide-white/5'}`}>
             {items.map((item) => (
               <button key={item.id} id={`activity-${item.id}`}
                 onClick={() => {
@@ -165,26 +181,36 @@ export default function MobileActivity({ user, onAiClick }) {
                     navigate(`/chat/${cleanId}`);
                   }
                 }}
-                className="w-full text-left px-4 py-4 flex items-start gap-4 hover:bg-white/5 active:bg-white/10 transition-colors group">
-                <div className="w-10 h-10 rounded-full bg-blue-600/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                className={`w-full text-left px-4 py-4 flex items-start gap-4 transition-colors group ${
+                  isLight ? 'hover:bg-slate-50 active:bg-slate-100' : 'hover:bg-white/5 active:bg-white/10'
+                }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                  isLight ? 'bg-blue-50 border border-blue-100' : 'bg-blue-600/10 border border-blue-500/20'
+                }`}>
                   <CheckCircle2 className="w-5 h-5 text-blue-500" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-bold bg-blue-600/20 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                      isLight 
+                        ? 'bg-blue-50 text-blue-600 border border-blue-200' 
+                        : 'bg-blue-600/20 text-blue-400 border border-blue-500/20'
+                    }`}>
                       {item.type}
                     </span>
-                    <span className="text-[10px] text-slate-500">{item.time} 완료</span>
+                    <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{item.time} 완료</span>
                   </div>
-                  <h4 className="text-sm font-semibold text-slate-200 leading-snug line-clamp-2">{item.title}</h4>
-                  <p className="text-xs text-slate-500">
+                  <h4 className={`text-sm font-semibold leading-snug line-clamp-2 ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{item.title}</h4>
+                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                     <span className="text-blue-500 font-medium">{item.action}</span>
-                    <span className="mx-2 text-slate-700">|</span>
+                    <span className={`mx-2 ${isLight ? 'text-slate-300' : 'text-slate-700'}`}>|</span>
                     <span>{item.team}</span>
                   </p>
                 </div>
                 {item.incId && (
-                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 mt-3 shrink-0 transition-colors" />
+                  <ChevronRight className={`w-4 h-4 mt-3 shrink-0 transition-colors ${
+                    isLight ? 'text-slate-400 group-hover:text-slate-600' : 'text-slate-600 group-hover:text-slate-400'
+                  }`} />
                 )}
               </button>
             ))}

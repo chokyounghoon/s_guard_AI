@@ -66,6 +66,7 @@ import ConsentModal           from '../components/ConsentModal';
 import BottomMenu             from './components/BottomMenu.mobile';      // 모바일 전용 BottomMenu!
 import AIAssistantPanel       from '../components/AIAssistantPanel';
 import { CodebookProvider }   from '../context/CodebookContext';
+import { useTheme }           from '../context/ThemeContext';
 import { PushManager }       from '../lib/pushManager';
 
 // ── Auth Store ────────────────────────────────────────────────────────────────
@@ -121,6 +122,8 @@ function ProtectedRoute({ children, isRefreshing, userProfile }) {
 
 // ─── App Content ──────────────────────────────────────────────────────────────
 function AppContent() {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const location  = useLocation();
   const navigate  = useNavigate();
   const isAuthPage    = location.pathname === '/';
@@ -443,28 +446,28 @@ function AppContent() {
       {showWarRoomPopup && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center">
           {/* 배경 딤 */}
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowWarRoomPopup(false)} />
 
           {/* 시트 본체 */}
-          <div className="skeuo-card relative z-10 w-full max-w-xl flex flex-col rounded-t-[2rem] border-t border-white/20 overflow-hidden max-h-[78vh] shadow-[0_-15px_50px_rgba(0,0,0,0.95)] animate-slide-in-smooth duration-300"
-            style={{ background: 'linear-gradient(180deg, #1e222b 0%, #12151a 100%)' }}>
+          <div className={`skeuo-card relative z-10 w-full max-w-xl flex flex-col rounded-t-[2rem] border-t overflow-hidden max-h-[78vh] animate-slide-in-smooth duration-300 ${isLight ? 'border-slate-200 shadow-2xl' : 'border-white/20 shadow-[0_-15px_50px_rgba(0,0,0,0.95)]'}`}
+            style={{ background: isLight ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #1e222b 0%, #12151a 100%)' }}>
 
             {/* 헤더 */}
             <div style={{
-              background: '#1c2027',
+              background: isLight ? '#f8fafc' : '#1c2027',
               padding: '14px 20px 16px',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)',
               flexShrink: 0,
             }}>
-              <div className="skeuo-pill w-10 h-1.5 rounded-full mb-3.5 mx-auto bg-white/20" />
+              <div className={`skeuo-pill w-10 h-1.5 rounded-full mb-3.5 mx-auto ${isLight ? 'bg-slate-300' : 'bg-white/20'}`} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h3 style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 900, color: isLight ? '#0f172a' : '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                     참여 중인 워룸
                   </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     <span style={{ width: 6, height: 6, background: '#00e5ff', borderRadius: 99, display: 'inline-block', boxShadow: '0 0 10px #00e5ff', animation: 'pulse 2s infinite' }} />
-                    <p style={{ fontSize: 10, color: '#00e5ff', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', textShadow: '0 0 8px rgba(0,229,255,0.4)' }}>
+                    <p style={{ fontSize: 10, color: isLight ? '#0284c7' : '#00e5ff', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
                       Active Channels
                     </p>
                   </div>
@@ -476,23 +479,23 @@ function AppContent() {
                       id="hideCompletedMobile"
                       checked={hideCompletedWarRooms}
                       onChange={(e) => setHideCompletedWarRooms(e.target.checked)}
-                      style={{ width: 14, height: 14, accentColor: '#00e5ff', cursor: 'pointer' }}
+                      style={{ width: 14, height: 14, accentColor: '#0284c7', cursor: 'pointer' }}
                     />
-                    <label htmlFor="hideCompletedMobile" style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, cursor: 'pointer' }}>
+                    <label htmlFor="hideCompletedMobile" style={{ fontSize: 12, color: isLight ? '#475569' : '#94a3b8', fontWeight: 600, cursor: 'pointer' }}>
                       완료숨김
                     </label>
                   </div>
                   {warRooms.length > 0 && (
-                    <div className="skeuo-pill" style={{ background: 'rgba(0,229,255,0.1)', border: '1px solid rgba(0,229,255,0.3)', borderRadius: 99, padding: '4px 10px', fontSize: 11, fontWeight: 900, color: '#00e5ff', boxShadow: '0 0 10px rgba(0,229,255,0.15)' }}>
+                    <div className="skeuo-pill" style={{ background: isLight ? '#e0f2fe' : 'rgba(0,229,255,0.1)', border: isLight ? '1px solid #7dd3fc' : '1px solid rgba(0,229,255,0.3)', borderRadius: 99, padding: '4px 10px', fontSize: 11, fontWeight: 900, color: isLight ? '#0284c7' : '#00e5ff' }}>
                       {warRooms.length}건
                     </div>
                   )}
                   <button
                     onClick={() => setShowWarRoomPopup(false)}
                     className="skeuo-btn w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer active:scale-95"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)' }}
+                    style={{ background: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.06)', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.15)' }}
                   >
-                    <X size={14} color="#64748b" />
+                    <X size={14} color={isLight ? '#475569' : '#64748b'} />
                   </button>
                 </div>
               </div>
@@ -502,10 +505,10 @@ function AppContent() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {warRooms.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', textAlign: 'center' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                    <MessageSquare size={24} color="#334155" />
+                  <div style={{ width: 56, height: 56, borderRadius: 20, background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <MessageSquare size={24} color={isLight ? '#94a3b8' : '#334155'} />
                   </div>
-                  <p style={{ color: '#475569', fontSize: 14, fontWeight: 600 }}>진행 중인 War-Room이 없습니다.</p>
+                  <p style={{ color: isLight ? '#64748b' : '#475569', fontSize: 14, fontWeight: 600 }}>진행 중인 War-Room이 없습니다.</p>
                 </div>
               ) : warRooms.filter(r => hideCompletedWarRooms ? r.status !== 'Completed' && r.status !== 'CLOSED' && r.status !== '완료' && r.status !== 'INC_003' : true).map((room, index) => {
                 const roomId = room.inc_id || room.code || room.id;
@@ -524,36 +527,32 @@ function AppContent() {
                 let smsText = room.sms_message || (pipeIdx !== -1 ? rawTitle.slice(pipeIdx + 1).trim() : rawTitle) || '';
                 smsText = smsText.replace(/\[Web발신\]/g, '').trim();
 
-                const accentColor = isCurrent ? '#00e5ff' : '#00e5ff';
+                const accentColor = isLight ? '#0284c7' : '#00e5ff';
 
                 return (
                   <div
                     key={`${roomId}-${index}`}
                     onClick={() => { setShowWarRoomPopup(false); navigate(`/chat/${roomId}`); }}
-                    className="skeuo-card hover:border-[#00e5ff]/50 active:scale-[0.98] active:translate-y-0.5 transition-all duration-200 group"
+                    className="skeuo-card active:scale-[0.98] active:translate-y-0.5 transition-all duration-200 group"
                     style={{
                       background: isCurrent
-                        ? 'linear-gradient(135deg, rgba(0,229,255,0.2) 0%, rgba(0,229,255,0.05) 100%)'
-                        : 'linear-gradient(180deg, rgba(30,35,45,0.8) 0%, rgba(18,21,26,0.95) 100%)',
-                      borderTop: '1px solid rgba(255,255,255,0.15)',
-                      borderRight: '1px solid rgba(255,255,255,0.06)',
-                      borderBottom: '1px solid rgba(0,0,0,0.8)',
-                      borderLeft: `1px solid rgba(255,255,255,0.06)`,
+                        ? (isLight ? '#eff6ff' : 'linear-gradient(135deg, rgba(0,229,255,0.2) 0%, rgba(0,229,255,0.05) 100%)')
+                        : (isLight ? '#ffffff' : 'linear-gradient(180deg, rgba(30,35,45,0.8) 0%, rgba(18,21,26,0.95) 100%)'),
+                      border: isLight ? (isCurrent ? '1.5px solid #3b82f6' : '1px solid #e2e8f0') : (isCurrent ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.1)'),
                       borderRadius: 20,
                       padding: '18px 16px 18px 20px',
                       cursor: 'pointer',
                       position: 'relative',
                       overflow: 'hidden',
                       minHeight: 110,
-                      boxShadow: isCurrent ? '0 8px 24px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.2)' : '0 6px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1)',
+                      boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.04)' : (isCurrent ? '0 8px 24px rgba(0,229,255,0.3)' : '0 6px 18px rgba(0,0,0,0.6)'),
                     }}
                   >
                     {/* 왼쪽 강조 바 */}
                     <div style={{
                       position: 'absolute', top: 0, left: 0, bottom: 0, width: 4,
-                      background: isCurrent ? '#00e5ff' : 'rgba(0,229,255,0.5)',
+                      background: isCurrent ? '#00e5ff' : (isLight ? '#93c5fd' : 'rgba(0,229,255,0.5)'),
                       borderRadius: '20px 0 0 20px',
-                      boxShadow: isCurrent ? '0 0 10px #00e5ff' : 'none'
                     }} />
 
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
@@ -565,30 +564,29 @@ function AppContent() {
                             {(() => {
                               const sev = room.severity || room.urgency || 'NORMAL';
                               let color = '#00e5ff', bg = 'rgba(0,229,255,0.1)', border = 'rgba(0,229,255,0.3)';
-                              if (sev === 'CRITICAL' || sev === '긴급') { color = '#ff2a2a'; bg = 'rgba(255,42,42,0.15)'; border = '#ff2a2a'; }
-                              else if (sev === 'HIGH' || sev === '높음') { color = '#ffb700'; bg = 'rgba(255,183,0,0.15)'; border = '#ffb700'; }
-                              else if (sev === 'NORMAL' || sev === '일반') { color = '#00ff88'; bg = 'rgba(0,255,136,0.15)'; border = '#00ff88'; }
+                              if (sev === 'CRITICAL' || sev === '긴급') { color = '#ff2a2a'; bg = isLight ? '#fee2e2' : 'rgba(255,42,42,0.15)'; border = '#ff2a2a'; }
+                              else if (sev === 'HIGH' || sev === '높음') { color = '#f59e0b'; bg = isLight ? '#fef3c7' : 'rgba(255,183,0,0.15)'; border = '#f59e0b'; }
+                              else if (sev === 'NORMAL' || sev === '일반') { color = '#10b981'; bg = isLight ? '#d1fae5' : 'rgba(0,255,136,0.15)'; border = '#10b981'; }
                               return (
                                 <span className="skeuo-pill" style={{
                                   fontSize: 9, fontWeight: 900, color,
                                   background: bg, border: `1px solid ${border}`,
                                   borderRadius: 6, padding: '2px 8px', letterSpacing: '0.08em',
-                                  boxShadow: `0 0 10px ${bg}`
                                 }}>{sev === '긴급' ? 'CRITICAL' : sev === '높음' ? 'HIGH' : sev === '일반' ? 'NORMAL' : sev}</span>
                               );
                             })()}
                             {isCurrent && (
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 900, color: '#00e5ff', textShadow: '0 0 8px rgba(0,229,255,0.8)' }}>
-                                <span style={{ width: 5, height: 5, borderRadius: 99, background: '#00e5ff', boxShadow: '0 0 8px #00e5ff', display: 'inline-block' }} />
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 900, color: isLight ? '#0284c7' : '#00e5ff' }}>
+                                <span style={{ width: 5, height: 5, borderRadius: 99, background: '#00e5ff', display: 'inline-block' }} />
                                 NOW
                               </span>
                             )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 10, color: '#00e5ff', fontFamily: 'monospace', fontWeight: 900 }}>
+                            <span style={{ fontSize: 10, color: isLight ? '#0284c7' : '#00e5ff', fontFamily: 'monospace', fontWeight: 900 }}>
                               {rawId}
                             </span>
-                            <span style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace', fontWeight: 700 }}>
+                            <span style={{ fontSize: 10, color: isLight ? '#64748b' : '#64748b', fontFamily: 'monospace', fontWeight: 700 }}>
                               {dateTimeStr}
                             </span>
                           </div>
@@ -597,13 +595,13 @@ function AppContent() {
                         {/* 2행: SMS 2줄 미리보기 */}
                         {smsText && (
                           <p style={{
-                            fontSize: 14, color: '#f1f5f9', fontWeight: 500,
+                            fontSize: 14, color: isLight ? '#1e293b' : '#f1f5f9', fontWeight: 500,
                             lineHeight: 1.6, margin: 0,
                             overflow: 'hidden',
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
-                          }} className="group-hover:text-white transition-colors">
+                          }}>
                             {smsText}
                           </p>
                         )}
@@ -612,11 +610,10 @@ function AppContent() {
                       {/* 화살표 */}
                       <div className="skeuo-pill" style={{
                         width: 28, height: 28, borderRadius: 10,
-                        background: `rgba(0,229,255,0.1)`,
-                        border: `1px solid rgba(0,229,255,0.2)`,
+                        background: isLight ? '#f1f5f9' : 'rgba(0,229,255,0.1)',
+                        border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(0,229,255,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0, alignSelf: 'center',
-                        boxShadow: '0 0 10px rgba(0,229,255,0.1)'
                       }}>
                         <ChevronRight size={15} color={accentColor} />
                       </div>
@@ -627,11 +624,11 @@ function AppContent() {
             </div>
 
             {/* 닫기 */}
-            <div style={{ padding: '12px 16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#16191f', flexShrink: 0 }}>
+            <div style={{ padding: '12px 16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)', background: isLight ? '#f8fafc' : '#16191f', flexShrink: 0 }}>
               <button
                 onClick={() => setShowWarRoomPopup(false)}
                 className="skeuo-btn w-full py-3.5 rounded-xl transition-all active:scale-95 active:translate-y-0.5"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#94a3b8', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}
+                style={{ background: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.15)', color: isLight ? '#334155' : '#94a3b8', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}
               >
                 닫기
               </button>
@@ -644,38 +641,37 @@ function AppContent() {
       {showReportPopup && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center">
           {/* 배경 딤 */}
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowReportPopup(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReportPopup(false)} />
 
           {/* 시트 본체 */}
-          <div className="skeuo-card relative z-10 w-full max-w-xl flex flex-col rounded-t-[2rem] border-t border-white/20 overflow-hidden max-h-[78vh] shadow-[0_-15px_50px_rgba(0,0,0,0.95)] animate-slide-in-smooth duration-300"
-            style={{ background: 'linear-gradient(180deg, #1e222b 0%, #12151a 100%)' }}>
+          <div className={`skeuo-card relative z-10 w-full max-w-xl flex flex-col rounded-t-[2rem] border-t overflow-hidden max-h-[78vh] animate-slide-in-smooth duration-300 ${isLight ? 'border-slate-200 shadow-2xl' : 'border-white/20 shadow-[0_-15px_50px_rgba(0,0,0,0.95)]'}`}
+            style={{ background: isLight ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #1e222b 0%, #12151a 100%)' }}>
 
             {/* 상단 헤더 */}
             <div style={{
-              background: '#1c2027',
+              background: isLight ? '#f8fafc' : '#1c2027',
               padding: '14px 20px 16px',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)',
               flexShrink: 0,
             }}>
               {/* 핸들 */}
-              <div className="skeuo-pill w-10 h-1.5 rounded-full mb-3.5 mx-auto bg-white/20" />
+              <div className={`skeuo-pill w-10 h-1.5 rounded-full mb-3.5 mx-auto ${isLight ? 'bg-slate-300' : 'bg-white/20'}`} />
 
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 900, color: isLight ? '#0f172a' : '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                     리포트 선택
                   </h3>
-                  <p style={{ fontSize: 10, color: '#00ff88', fontWeight: 900, letterSpacing: '0.12em', marginTop: 3, textTransform: 'uppercase', textShadow: '0 0 8px rgba(0,255,136,0.4)' }}>
+                  <p style={{ fontSize: 10, color: isLight ? '#059669' : '#00ff88', fontWeight: 900, letterSpacing: '0.12em', marginTop: 3, textTransform: 'uppercase' }}>
                     완료된 War-Room 목록
                   </p>
                 </div>
                 {warRooms.length > 0 && (
                   <div className="skeuo-pill" style={{
-                    background: 'rgba(0,255,136,0.1)',
-                    border: '1px solid rgba(0,255,136,0.3)',
+                    background: isLight ? '#d1fae5' : 'rgba(0,255,136,0.1)',
+                    border: isLight ? '1px solid #6ee7b7' : '1px solid rgba(0,255,136,0.3)',
                     borderRadius: 99, padding: '4px 10px',
-                    fontSize: 11, fontWeight: 900, color: '#00ff88',
-                    boxShadow: '0 0 10px rgba(0,255,136,0.15)'
+                    fontSize: 11, fontWeight: 900, color: isLight ? '#059669' : '#00ff88',
                   }}>
                     {warRooms.length}건
                   </div>
@@ -687,10 +683,10 @@ function AppContent() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {warRooms.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', textAlign: 'center' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                    <FileText size={24} color="#334155" />
+                  <div style={{ width: 56, height: 56, borderRadius: 20, background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <FileText size={24} color={isLight ? '#94a3b8' : '#334155'} />
                   </div>
-                  <p style={{ color: '#475569', fontSize: 14, fontWeight: 600 }}>발행된 리포트가 없습니다.</p>
+                  <p style={{ color: isLight ? '#64748b' : '#475569', fontSize: 14, fontWeight: 600 }}>발행된 리포트가 없습니다.</p>
                 </div>
               ) : warRooms.map((room, index) => {
                 const roomId = room.inc_id || room.id;
@@ -733,40 +729,36 @@ function AppContent() {
                     onTouchStart={handleLongPressStart}
                     onTouchMove={handleLongPressMove}
                     onTouchEnd={handleLongPressEnd}
-                    className="skeuo-card hover:border-[#00ff88]/50 active:scale-[0.98] active:translate-y-0.5 transition-all duration-200 group"
+                    className="skeuo-card active:scale-[0.98] active:translate-y-0.5 transition-all duration-200 group"
                     style={{
-                      background: 'linear-gradient(180deg, rgba(30,35,45,0.8) 0%, rgba(18,21,26,0.95) 100%)',
-                      borderTop: '1px solid rgba(255,255,255,0.15)',
-                      borderRight: '1px solid rgba(255,255,255,0.06)',
-                      borderBottom: '1px solid rgba(0,0,0,0.8)',
-                      borderLeft: `1px solid rgba(255,255,255,0.06)`,
+                      background: isLight ? '#ffffff' : 'linear-gradient(180deg, rgba(30,35,45,0.8) 0%, rgba(18,21,26,0.95) 100%)',
+                      border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)',
                       borderRadius: 20, padding: '18px 16px 18px 20px',
                       cursor: 'pointer', position: 'relative', overflow: 'hidden',
                       minHeight: 110,
                       display: 'flex',
                       flexDirection: 'column',
-                      boxShadow: '0 6px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1)'
+                      boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.04)' : '0 6px 18px rgba(0,0,0,0.6)'
                     }}
                   >
                     {/* 왼쪽 강조 바 */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 4, background: '#00ff88', borderRadius: '20px 0 0 20px', boxShadow: '0 0 10px #00ff88' }} />
+                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 4, background: '#10b981', borderRadius: '20px 0 0 20px' }} />
 
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, width: '100%' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {/* 1행: 배지 + [장애ID & 년월일시] */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                           <span className="skeuo-pill" style={{
-                            fontSize: 9, fontWeight: 900, color: '#00ff88',
-                            background: 'rgba(0,255,136,0.15)', border: '1px solid #00ff88',
+                            fontSize: 9, fontWeight: 900, color: isLight ? '#059669' : '#00ff88',
+                            background: isLight ? '#d1fae5' : 'rgba(0,255,136,0.15)', border: isLight ? '1px solid #6ee7b7' : '1px solid #00ff88',
                             borderRadius: 6, padding: '2px 8px', letterSpacing: '0.08em',
-                            boxShadow: '0 0 10px rgba(0,255,136,0.2)'
                           }}>✓ 완료</span>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 10, color: '#00ff88', fontFamily: 'monospace', fontWeight: 900 }}>
+                            <span style={{ fontSize: 10, color: isLight ? '#059669' : '#00ff88', fontFamily: 'monospace', fontWeight: 900 }}>
                               {rawId}
                             </span>
-                            <span style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace', fontWeight: 700 }}>
+                            <span style={{ fontSize: 10, color: isLight ? '#64748b' : '#64748b', fontFamily: 'monospace', fontWeight: 700 }}>
                               {dateTimeStr}
                             </span>
                           </div>
@@ -775,11 +767,11 @@ function AppContent() {
                         {/* 2행: SMS 원문 2줄 미리보기 */}
                         {smsPreview && (
                           <p style={{
-                            fontSize: 14, color: '#f1f5f9', fontWeight: 500,
+                            fontSize: 14, color: isLight ? '#1e293b' : '#f1f5f9', fontWeight: 500,
                             lineHeight: 1.6, margin: 0,
                             overflow: 'hidden',
                             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                          }} className="group-hover:text-white transition-colors">
+                          }}>
                             {smsPreview}
                           </p>
                         )}
@@ -788,13 +780,12 @@ function AppContent() {
                       {/* 화살표 */}
                       <div className="skeuo-pill" style={{
                         width: 28, height: 28, borderRadius: 10,
-                        background: 'rgba(0,255,136,0.1)',
-                        border: '1px solid rgba(0,255,136,0.2)',
+                        background: isLight ? '#f1f5f9' : 'rgba(0,255,136,0.1)',
+                        border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(0,255,136,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0, alignSelf: 'center',
-                        boxShadow: '0 0 10px rgba(0,255,136,0.1)'
                       }}>
-                        <ChevronRight size={15} color="#00ff88" />
+                        <ChevronRight size={15} color={isLight ? '#059669' : '#00ff88'} />
                       </div>
                     </div>
                   </div>
@@ -803,13 +794,13 @@ function AppContent() {
             </div>
 
             {/* 닫기 버튼 */}
-            <div style={{ padding: '12px 16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#16191f', flexShrink: 0 }}>
+            <div style={{ padding: '12px 16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)', background: isLight ? '#f8fafc' : '#16191f', flexShrink: 0 }}>
               <button
                 onClick={() => setShowReportPopup(false)}
                 className="skeuo-btn w-full py-3.5 rounded-xl transition-all active:scale-95 active:translate-y-0.5"
                 style={{
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)',
-                  color: '#94a3b8', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                  background: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.15)',
+                  color: isLight ? '#334155' : '#94a3b8', fontSize: 15, fontWeight: 800, cursor: 'pointer',
                 }}
               >
                 닫기
@@ -824,36 +815,36 @@ function AppContent() {
         <>
           <div
             onClick={() => setReportLongPressItem(null)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 120, backdropFilter: 'blur(4px)' }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 120, backdropFilter: 'blur(4px)' }}
           />
           <div className="skeuo-card animate-slide-in-smooth duration-300" style={{
             position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 121,
-            background: 'linear-gradient(180deg, #1e222b 0%, #12151a 100%)', borderRadius: '24px 24px 0 0',
-            borderTop: '1px solid rgba(255,255,255,0.2)',
+            background: isLight ? '#ffffff' : 'linear-gradient(180deg, #1e222b 0%, #12151a 100%)', borderRadius: '24px 24px 0 0',
+            borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.2)',
             padding: '12px 0', paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
-            boxShadow: '0 -15px 50px rgba(0,0,0,0.95)'
+            boxShadow: isLight ? '0 -10px 40px rgba(0,0,0,0.15)' : '0 -15px 50px rgba(0,0,0,0.95)'
           }}>
-            <div className="skeuo-pill w-10 h-1.5 rounded-full mb-3.5 mx-auto bg-white/20" />
-            <div style={{ padding: '0 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <p style={{ fontSize: 10, color: '#00ff88', fontWeight: 900, marginBottom: 3, textShadow: '0 0 8px rgba(0,255,136,0.4)' }}>선택된 리포트</p>
-              <p style={{ fontSize: 14, color: '#fff', fontWeight: 900 }}>{reportLongPressItem.title}</p>
-              <p style={{ fontSize: 10, color: '#00ff88', fontFamily: 'monospace', marginTop: 3 }}>{reportLongPressItem.cleanRoomId}</p>
+            <div className={`skeuo-pill w-10 h-1.5 rounded-full mb-3.5 mx-auto ${isLight ? 'bg-slate-300' : 'bg-white/20'}`} />
+            <div style={{ padding: '0 20px 12px', borderBottom: isLight ? '1px solid #f1f5f9' : '1px solid rgba(255,255,255,0.08)' }}>
+              <p style={{ fontSize: 10, color: isLight ? '#059669' : '#00ff88', fontWeight: 900, marginBottom: 3 }}>선택된 리포트</p>
+              <p style={{ fontSize: 14, color: isLight ? '#0f172a' : '#fff', fontWeight: 900 }}>{reportLongPressItem.title}</p>
+              <p style={{ fontSize: 10, color: isLight ? '#059669' : '#00ff88', fontFamily: 'monospace', marginTop: 3 }}>{reportLongPressItem.cleanRoomId}</p>
             </div>
             <div style={{ marginTop: 8 }}>
               <button
                 onClick={() => { setReportLongPressItem(null); setShowReportPopup(false); navigate(`/ai-report/${reportLongPressItem.roomId}`); }}
                 style={{ width: '100%', padding: '15px 20px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-                className="hover:bg-white/5 active:scale-95 transition-all"
+                className={isLight ? 'hover:bg-slate-50 active:scale-95 transition-all' : 'hover:bg-white/5 active:scale-95 transition-all'}
               >
-                <ChevronRight size={20} color="#00ff88" style={{ filter: 'drop-shadow(0 0 8px rgba(0,255,136,0.8))' }} />
-                <span style={{ fontSize: 15, color: '#00ff88', fontWeight: 900, textShadow: '0 0 8px rgba(0,255,136,0.4)' }}>리포트 상세보기</span>
+                <ChevronRight size={20} color={isLight ? '#059669' : '#00ff88'} />
+                <span style={{ fontSize: 15, color: isLight ? '#059669' : '#00ff88', fontWeight: 900 }}>리포트 상세보기</span>
               </button>
               <button
                 onClick={() => setReportLongPressItem(null)}
                 style={{ width: '100%', padding: '15px 20px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-                className="hover:bg-white/5 active:scale-95 transition-all"
+                className={isLight ? 'hover:bg-slate-50 active:scale-95 transition-all' : 'hover:bg-white/5 active:scale-95 transition-all'}
               >
-                <span style={{ fontSize: 15, color: '#94a3b8', fontWeight: 800 }}>취소</span>
+                <span style={{ fontSize: 15, color: isLight ? '#64748b' : '#94a3b8', fontWeight: 800 }}>취소</span>
               </button>
             </div>
           </div>
